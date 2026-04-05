@@ -1,0 +1,71 @@
+[gd_scene load_steps=5 format=3 uid="uid://jf1mhyymb6ea"]
+
+[ext_resource type="Script" uid="uid://gikq6cwyq5bk" path="res://test/MenuTest.cs" id="1_jrwyl"]
+[ext_resource type="Script" uid="uid://uvai8vv7jymi" path="res://menu/MenuButton.cs" id="3_chbfn"]
+[ext_resource type="Texture2D" uid="uid://50yjni8k3beg" path="res://Circle.tres" id="4_3cb37"]
+[ext_resource type="Script" uid="uid://bau1w24xdgh0y" path="res://menu/MenuButton2.cs" id="4_30eod"]
+
+[node name="Control" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -17.0
+offset_bottom = -17.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_jrwyl")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -389.0
+offset_top = -75.0
+offset_right = 389.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="GridContainer" type="GridContainer" parent="HBoxContainer"]
+layout_mode = 2
+theme_override_constants/h_separation = 32
+columns = 2
+
+[node name="Button" type="Button" parent="HBoxContainer/GridContainer"]
+layout_mode = 2
+text = "Text"
+icon = ExtResource("4_3cb37")
+script = ExtResource("3_chbfn")
+RightIcon = ExtResource("4_3cb37")
+
+[node name="Button2" type="Button" parent="HBoxContainer/GridContainer"]
+layout_mode = 2
+text = "Text"
+icon = ExtResource("4_3cb37")
+script = ExtResource("3_chbfn")
+RightIcon = ExtResource("4_3cb37")
+
+[node name="Button3" type="Button" parent="HBoxContainer/GridContainer"]
+layout_mode = 2
+text = "Text"
+icon = ExtResource("4_3cb37")
+script = ExtResource("3_chbfn")
+RightIcon = ExtResource("4_3cb37")
+
+[node name="Button4" type="Button" parent="HBoxContainer/GridContainer"]
+layout_mode = 2
+text = "Text"
+icon = ExtResource("4_3cb37")
+script = ExtResource("3_chbfn")
+RightIcon = ExtResource("4_3cb37")
+
+[node name="MarginContainer" type="MarginContainer" parent="HBoxContainer/GridContainer"]
+layout_mode = 2
+script = ExtResource("4_30eod")
+RightIcon = ExtResource("4_3cb37")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="HBoxContainer/GridContainer"]
+layout_mode = 2

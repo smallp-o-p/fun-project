@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3 uid="uid://brgwn2brawi6c"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gvavx"]
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.728822, 0.72882205, 0.7288217, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(1, 1, 1, 0.6)
+shadow_offset = Vector2(-1, -1)
+
+[node name="RoundedRect" type="Panel"]
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_gvavx")

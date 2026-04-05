@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://dqxdvbxcvwkt6"]
+
+[node name="CharacterPose" type="VBoxContainer"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.78000003
+anchor_right = 1.0
+anchor_bottom = 0.80200005
+offset_left = -0.5600586
+offset_bottom = 0.30395508
+grow_horizontal = 0
+grow_vertical = 2

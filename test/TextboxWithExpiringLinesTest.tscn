@@ -1,0 +1,33 @@
+[gd_scene load_steps=3 format=3 uid="uid://bhmtcjg5xkqyv"]
+
+[ext_resource type="Script" uid="uid://e6rrq6p2nqg5" path="res://test/TextboxWithExpiringLinesTest.cs" id="1_lfeu7"]
+[ext_resource type="PackedScene" uid="uid://ddx602u1vf3cj" path="res://dialogue/action_dialogue_box.tscn" id="2_lfeu7"]
+
+[node name="TextboxWithExpiringLinesTest" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -2.0
+offset_top = -7.0
+offset_right = -2.0
+offset_bottom = -7.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_lfeu7")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -200.0
+offset_right = 300.0
+grow_vertical = 0
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="DialogueBox" parent="MarginContainer" instance=ExtResource("2_lfeu7")]
+custom_minimum_size = Vector2(300, 200)
+layout_mode = 2
