@@ -2,7 +2,6 @@
 .godot/
 /android/
 *.cs.uid
-*.tres
 .claude/
 .vscode/
 addons/**/*

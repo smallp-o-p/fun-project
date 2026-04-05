@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="EquippableStatMod" load_steps=5 format=3 uid="uid://bfusnhkbqteha"]
+
+[ext_resource type="Script" uid="uid://7meo2s47ryx4" path="res://scripts/stats/EquippableStatMod.cs" id="1_mod"]
+[ext_resource type="Script" uid="uid://b1vpexawg6ecu" path="res://scripts/stats/Modifier.cs" id="2_modifier"]
+
+[sub_resource type="StatModifier_Add" id="1"]
+resource_local_to_scene = false
+resource_name = ""
+Value = 5.0
+script = ExtResource("2_modifier")
+Value = 5.0
+
+[sub_resource type="StatModifier_Multiply" id="2"]
+resource_local_to_scene = false
+resource_name = ""
+Multiplier = 1.4
+script = ExtResource("2_modifier")
+Multiplier = 1.4
+
+[resource]
+script = ExtResource("1_mod")
+Name = "Dragons Breath Cartridge"
+Description = "Alchemical shells packed with incendiary powder. Each round burns hotter, trading raw damage for a vicious multiplier on impact."
+TargetStat = 1
+Modifiers = [SubResource("1"), SubResource("2")]

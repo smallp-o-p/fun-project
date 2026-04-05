@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EquippableStatMod" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/stats/EquippableStatMod.cs" id="1_mod"]
+[ext_resource type="Script" path="res://scripts/stats/Modifier.cs" id="2_modifier"]
+
+[sub_resource type="StatModifier_Multiply" id="1"]
+script = ExtResource("2_modifier")
+Multiplier = 0.30
+
+[sub_resource type="StatModifier_CapMin" id="2"]
+script = ExtResource("2_modifier")
+Min = 50.0
+
+[resource]
+script = ExtResource("1_mod")
+Name = "Tungsten Penetrator Rounds"
+Description = "Density over diameter. These slugs punch through what steel hides, sacrificing raw splash for a guaranteed floor on critical rolls."
+TargetStat = 4
+Modifiers = [SubResource("1"), SubResource("2")]
