@@ -7,9 +7,9 @@ namespace FunProject.Stats;
 /// Create concrete subclasses for each kind of modification you need.
 /// </summary>
 [GlobalClass]
-public abstract partial class StatModifier : Resource
+public partial class StatModifier : Resource
 {
-  public abstract float Apply(float value);
+  public virtual float Apply(float value) { return value; }
 }
 
 [GlobalClass]
