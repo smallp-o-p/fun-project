@@ -92,37 +92,37 @@ public partial class WeaponSystemTest : Node
       Assert.False(slot.HasMod);
     });
 
-    T("StatModifier_Add applies flat bonus", () =>
+    T("StatModifier Add applies flat bonus", () =>
     {
-      var mod = new StatModifier_Add { Value = 10 };
-      Assert.Equal(20, mod.Apply(10));
+      var mod = StatModifier.Add(10);
+      Assert.Equal(20f, mod.Apply(10));
     });
 
-    T("StatModifier_Multiply applies multiplier", () =>
+    T("StatModifier Multiply applies multiplier", () =>
     {
-      var mod = new StatModifier_Multiply { Multiplier = 1.5f };
-      Assert.Equal(15, mod.Apply(10));
+      var mod = StatModifier.Multiply(1.5f);
+      Assert.Equal(15f, mod.Apply(10));
     });
 
-    T("StatModifier_CapMin prevents value below floor", () =>
+    T("StatModifier CapMin prevents value below floor", () =>
     {
-      var mod = new StatModifier_CapMin { Min = 0 };
-      Assert.Equal(0, mod.Apply(-10));
-      Assert.Equal(5, mod.Apply(5));
+      var mod = StatModifier.CapMin(0);
+      Assert.Equal(0f, mod.Apply(-10));
+      Assert.Equal(5f, mod.Apply(5));
     });
 
-    T("StatModifier_CapMax prevents value above ceiling", () =>
+    T("StatModifier CapMax prevents value above ceiling", () =>
     {
-      var mod = new StatModifier_CapMax { Max = 100 };
-      Assert.Equal(100, mod.Apply(150));
-      Assert.Equal(50, mod.Apply(50));
+      var mod = StatModifier.CapMax(100);
+      Assert.Equal(100f, mod.Apply(150));
+      Assert.Equal(50f, mod.Apply(50));
     });
 
     T("EquippableStatMod applies modifiers in order", () =>
     {
       var mod = new EquippableStatMod { TargetStat = StatType.Damage };
-      mod.AddModifier(new StatModifier_Add { Value = 10 });
-      mod.AddModifier(new StatModifier_Multiply { Multiplier = 2f });
+      mod.AddModifier(StatModifier.Add(10));
+      mod.AddModifier(StatModifier.Multiply(2f));
       var data = MakeWeaponData();
       data.DamageStat.BaseValue = 5;
       var weapon = new MeleeWeapon(data);
@@ -148,8 +148,8 @@ public partial class WeaponSystemTest : Node
         TargetStat = StatType.Damage,
         Modifiers =
         [
-          new StatModifier_Multiply { Multiplier = 1.2f },
-          new StatModifier_Add { Value = 5 },
+          StatModifier.Multiply(1.2f),
+          StatModifier.Add(5),
         ]
       });
 
@@ -205,14 +205,14 @@ public partial class WeaponSystemTest : Node
     T("EquippableStatMod AddModifier adds to internal list", () =>
     {
       var mod = new EquippableStatMod { TargetStat = StatType.Damage };
-      mod.AddModifier(new StatModifier_Add { Value = 5 });
+      mod.AddModifier(StatModifier.Add(5));
       Assert.Equal(1, mod.Modifiers.Count);
     });
 
     T("EquippableStatMod RemoveModifier removes specific modifier", () =>
     {
       var mod = new EquippableStatMod { TargetStat = StatType.Damage };
-      var add = new StatModifier_Add { Value = 5 };
+      var add = StatModifier.Add(5);
       mod.AddModifier(add);
       Assert.True(mod.RemoveModifier(add));
       Assert.Equal(0, mod.Modifiers.Count);
@@ -221,14 +221,14 @@ public partial class WeaponSystemTest : Node
     T("EquippableStatMod RemoveModifier returns false for non-existent", () =>
     {
       var mod = new EquippableStatMod { TargetStat = StatType.Damage };
-      Assert.False(mod.RemoveModifier(new StatModifier_Add { Value = 5 }));
+      Assert.False(mod.RemoveModifier(StatModifier.Add(5)));
     });
 
     T("EquippableStatMod ClearModifiers clears all", () =>
     {
       var mod = new EquippableStatMod { TargetStat = StatType.Damage };
-      mod.AddModifier(new StatModifier_Add { Value = 5 });
-      mod.AddModifier(new StatModifier_Multiply { Multiplier = 2f });
+      mod.AddModifier(StatModifier.Add(5));
+      mod.AddModifier(StatModifier.Multiply(2f));
       mod.ClearModifiers();
       Assert.Equal(0, mod.Modifiers.Count);
     });
@@ -250,12 +250,12 @@ public partial class WeaponSystemTest : Node
       weapon.GetModSlots()[0].EquippedMod = new EquippableStatMod
       {
         TargetStat = StatType.Range,
-        Modifiers = [new StatModifier_Add { Value = 10 }],
+        Modifiers = [StatModifier.Add(10)],
       };
       weapon.GetModSlots()[1].EquippedMod = new EquippableStatMod
       {
         TargetStat = StatType.Damage,
-        Modifiers = [new StatModifier_Multiply { Multiplier = 1.5f }],
+        Modifiers = [StatModifier.Multiply(1.5f)],
       };
 
       Assert.Equal(data.RangeStat.BaseValue + 10, weapon.GetModSlots()[0].EquippedMod!.Apply(weapon));
@@ -270,7 +270,7 @@ public partial class WeaponSystemTest : Node
       var mod = new EquippableStatMod
       {
         TargetStat = StatType.Damage,
-        Modifiers = [new StatModifier_Multiply { Multiplier = 0f }],
+        Modifiers = [StatModifier.Multiply(0f)],
       };
       Assert.Equal(0f, mod.Apply(weapon));
     });
@@ -283,8 +283,8 @@ public partial class WeaponSystemTest : Node
         TargetStat = StatType.Damage,
         Modifiers =
         [
-          new StatModifier_Add { Value = 100 },
-          new StatModifier_CapMax { Max = 75 },
+          StatModifier.Add(100),
+          StatModifier.CapMax(75),
         ],
       };
       Assert.Equal(75f, mod.Apply(weapon));
@@ -300,8 +300,8 @@ public partial class WeaponSystemTest : Node
         TargetStat = StatType.Damage,
         Modifiers =
         [
-          new StatModifier_Add { Value = -50 },
-          new StatModifier_CapMin { Min = 0 },
+          StatModifier.Add(-50),
+          StatModifier.CapMin(0),
         ],
       };
       Assert.Equal(0f, mod.Apply(weapon));
@@ -356,7 +356,7 @@ public partial class WeaponSystemTest : Node
       var ammoData = new AmmunitionData
       {
         Name = "+Damage Ammo",
-        Modifiers = [new StatModifier_Add { Value = 10 }]
+        Modifiers = [StatModifier.Add(10)]
       };
       var ammo = new Ammunition(ammoData);
       Assert.Equal(1, ammo.statModifiers.Count);
