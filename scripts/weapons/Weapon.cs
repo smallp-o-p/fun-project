@@ -37,9 +37,8 @@ public class Weapon : HasStats, HasModSlots
   public Stat GetCritChanceStat() => _stats[StatType.CriticalChance];
 }
 
-public class MeleeWeapon : Weapon
+public class MeleeWeapon(WeaponData data) : Weapon(data)
 {
-  public MeleeWeapon(WeaponData data) : base(data) { }
 }
 
 public class AmmunitionedWeapon : Weapon
@@ -52,11 +51,8 @@ public class AmmunitionedWeapon : Weapon
   public Stat GetMagAmmoStat() => _stats[StatType.Ammunition];
 }
 
-public class FirearmWeapon : AmmunitionedWeapon
+public class FirearmWeapon(FirearmWeaponData data) : AmmunitionedWeapon(data)
 {
-  public FirearmArchetype Archetype { get; set; }
-  public FirearmWeapon(FirearmWeaponData data) : base(data)
-  {
-    Archetype = data.Archetype;
-  }
+  public FirearmArchetype Archetype { get; set; } = data.Archetype;
+  public Ammunition AmmoType { get; set; } = new Ammunition(data.DefaultAmmoData);
 }

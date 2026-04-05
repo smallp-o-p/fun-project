@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="FirearmWeaponData" load_steps=2 format=3 uid="uid://xilu3cj030eu"]
+
+[ext_resource type="Script" uid="uid://cei4l4eg05jg1" path="res://scripts/weapons/FirearmWeaponData.cs" id="1_fvdq8"]
+
+[resource]
+script = ExtResource("1_fvdq8")
+metadata/_custom_type_script = "uid://cei4l4eg05jg1"
