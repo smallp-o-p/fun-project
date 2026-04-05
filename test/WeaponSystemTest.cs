@@ -42,7 +42,7 @@ public partial class WeaponSystemTest : Node
         ModSlotCount = 0,
       };
       var m = new MeleeWeapon(data);
-      Assert.Equal("Fists", m.Name);
+      Assert.Equal("Fists", m.WeaponName);
       Assert.Equal(DamageElement.Kinetic, m.DamageElement);
       Assert.Equal(10, m.GetDamageStat().BaseValue);
       Assert.Equal(5, m.GetCritChanceStat().BaseValue);
@@ -147,7 +147,7 @@ public partial class WeaponSystemTest : Node
       };
 
       var weapon = new FirearmWeapon(data);
-      weapon.ModSlots[0].Equip(new EquippableStatMod
+      weapon.GetModSlots()[0].Equip(new EquippableStatMod
       {
         Name = "+20% Damage",
         TargetStat = StatType.Damage,
@@ -158,7 +158,7 @@ public partial class WeaponSystemTest : Node
         ]
       });
 
-      var slot = weapon.ModSlots[0];
+      var slot = weapon.GetModSlots()[0];
       Assert.Equal(65f, slot.EquippedMod!.Apply(weapon));
     });
 
@@ -281,19 +281,19 @@ public partial class WeaponSystemTest : Node
       };
 
       var weapon = new FirearmWeapon(data);
-      weapon.ModSlots[0].EquippedMod = new EquippableStatMod
+      weapon.GetModSlots()[0].EquippedMod = new EquippableStatMod
       {
         TargetStat = StatType.Range,
         Modifiers = [new StatModifier_Add { Value = 10 }],
       };
-      weapon.ModSlots[1].EquippedMod = new EquippableStatMod
+      weapon.GetModSlots()[1].EquippedMod = new EquippableStatMod
       {
         TargetStat = StatType.Damage,
         Modifiers = [new StatModifier_Multiply { Multiplier = 1.5f }],
       };
 
-      Assert.Equal(15f, weapon.ModSlots[0].EquippedMod!.Apply(weapon));
-      Assert.Equal(30f, weapon.ModSlots[1].EquippedMod!.Apply(weapon));
+      Assert.Equal(15f, weapon.GetModSlots()[0].EquippedMod!.Apply(weapon));
+      Assert.Equal(30f, weapon.GetModSlots()[1].EquippedMod!.Apply(weapon));
     });
 
     // --- Modifier edge cases ---

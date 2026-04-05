@@ -21,3 +21,8 @@ public partial class ModSlot : Resource
     return m;
   }
 }
+
+public interface HasModSlots
+{
+  Godot.Collections.Array<ModSlot> GetModSlots();
+}

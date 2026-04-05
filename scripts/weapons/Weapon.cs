@@ -1,3 +1,4 @@
+using FunProject.Core;
 using FunProject.Stats;
 using Godot;
 using Godot.Collections;
@@ -21,9 +22,8 @@ public enum FirearmArchetype
 }
 
 [GlobalClass]
-public partial class WeaponData : Resource
+public partial class WeaponData : NamedEntityData
 {
-  [Export] public string Name { get; set; } = "Unnamed Weapon";
   [Export] public DamageElement DamageElement { get; set; }
   [Export] public Stat DamageStat { get; set; }
   [Export] public Stat RangeStat { get; set; }
@@ -43,16 +43,16 @@ public partial class FirearmWeaponData : AmmunitionedWeaponData
   [Export] public FirearmArchetype Archetype { get; set; }
 }
 
-public class Weapon : HasStats
+public class Weapon : HasStats, HasModSlots
 {
-  public string Name { get; }
+  public string WeaponName { get; }
   public DamageElement DamageElement { get; }
-  public Array<ModSlot> ModSlots { get; } = [];
+  protected Array<ModSlot> ModSlots { get; } = [];
   protected readonly Dictionary<StatType, Stat> _stats;
 
   public Weapon(WeaponData data)
   {
-    Name = data.Name;
+    WeaponName = data.Name;
     DamageElement = data.DamageElement;
 
     _stats = new Dictionary<StatType, Stat>
@@ -71,6 +71,7 @@ public class Weapon : HasStats
   public int NumModslots() => ModSlots.Count;
 
   public Dictionary<StatType, Stat> GetStats() => _stats;
+  public Array<ModSlot> GetModSlots() => ModSlots;
   public Stat GetDamageStat() => _stats[StatType.Damage];
   public Stat GetRangeStat() => _stats[StatType.Range];
   public Stat GetCritChanceStat() => _stats[StatType.CriticalChance];
