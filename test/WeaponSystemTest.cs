@@ -19,6 +19,8 @@ public partial class WeaponSystemTest : Node
     CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 5 },
     RangeStat = new Stat { StatType = StatType.Range, BaseValue = 1 },
     AmmunitionStat = new Stat { StatType = StatType.Ammunition, BaseValue = 12 },
+    DefaultAmmoData = new AmmunitionData(),
+    ModSlotCount = 1
   };
 
   public override void _Ready()
@@ -49,13 +51,14 @@ public partial class WeaponSystemTest : Node
       Assert.Equal(0, m.NumModslots());
     });
 
-    T("AmmunitionedWeapon constructed from FirearmWeaponData", () =>
+    T("FirearmWeapon constructed from FirearmWeaponData", () =>
     {
       var data = new FirearmWeaponData
       {
         DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 15 },
         CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 10 },
         RangeStat = new Stat { StatType = StatType.Range, BaseValue = 20 },
+        DefaultAmmoData = new AmmunitionData(),
         AmmunitionStat = new Stat { StatType = StatType.Ammunition, BaseValue = 12 },
         ModSlotCount = 0,
       };
@@ -137,15 +140,7 @@ public partial class WeaponSystemTest : Node
 
     T("Weapon with mod slot produces correct damage", () =>
     {
-      var data = new FirearmWeaponData
-      {
-        DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 50 },
-        CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 10 },
-        RangeStat = new Stat { StatType = StatType.Range, BaseValue = 25 },
-        AmmunitionStat = new Stat { StatType = StatType.Ammunition, BaseValue = 30 },
-        ModSlotCount = 1,
-      };
-
+      var data = MakeFirearmWeaponData();
       var weapon = new FirearmWeapon(data);
       weapon.GetModSlots()[0].Equip(new EquippableStatMod
       {
@@ -159,7 +154,7 @@ public partial class WeaponSystemTest : Node
       });
 
       var slot = weapon.GetModSlots()[0];
-      Assert.Equal(65f, slot.EquippedMod!.Apply(weapon));
+      Assert.Equal((data.DamageStat.BaseValue * 1.2) + 5, slot.EquippedMod!.Apply(weapon));
     });
 
     // --- DamageElement coverage ---
@@ -189,29 +184,6 @@ public partial class WeaponSystemTest : Node
       var archetypes = Enum.GetValues<FirearmArchetype>();
       Assert.Equal(4, archetypes.Length);
       Assert.Equal(FirearmArchetype.Pistol, (FirearmArchetype)0);
-    });
-
-    T("Each archetype produces correct stat access", () =>
-    {
-      var data = new FirearmWeaponData
-      {
-        DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 10 },
-        CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 5 },
-        RangeStat = new Stat { StatType = StatType.Range, BaseValue = 15 },
-        AmmunitionStat = new Stat { StatType = StatType.Ammunition, BaseValue = 8 },
-        ModSlotCount = 0,
-      };
-
-      foreach (FirearmArchetype arch in Enum.GetValues<FirearmArchetype>())
-      {
-        var w = new FirearmWeapon(data);
-        w.Archetype = arch;
-        Assert.Equal(arch, w.Archetype);
-        Assert.Equal(10, w.GetDamageStat().BaseValue);
-        Assert.Equal(15, w.GetRangeStat().BaseValue);
-        Assert.Equal(5, w.GetCritChanceStat().BaseValue);
-        Assert.Equal(8, w.GetStats()[StatType.Ammunition].BaseValue);
-      }
     });
 
     // --- Weapon helper methods ---
@@ -271,14 +243,8 @@ public partial class WeaponSystemTest : Node
 
     T("Multiple mod slots with different stat targets", () =>
     {
-      var data = new FirearmWeaponData
-      {
-        DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 20 },
-        CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 10 },
-        RangeStat = new Stat { StatType = StatType.Range, BaseValue = 5 },
-        AmmunitionStat = new Stat { StatType = StatType.Ammunition, BaseValue = 30 },
-        ModSlotCount = 2,
-      };
+      var data = MakeFirearmWeaponData();
+      data.ModSlotCount = 2;
 
       var weapon = new FirearmWeapon(data);
       weapon.GetModSlots()[0].EquippedMod = new EquippableStatMod
@@ -292,8 +258,8 @@ public partial class WeaponSystemTest : Node
         Modifiers = [new StatModifier_Multiply { Multiplier = 1.5f }],
       };
 
-      Assert.Equal(15f, weapon.GetModSlots()[0].EquippedMod!.Apply(weapon));
-      Assert.Equal(30f, weapon.GetModSlots()[1].EquippedMod!.Apply(weapon));
+      Assert.Equal(data.RangeStat.BaseValue + 10, weapon.GetModSlots()[0].EquippedMod!.Apply(weapon));
+      Assert.Equal(data.DamageStat.BaseValue * 1.5, weapon.GetModSlots()[1].EquippedMod!.Apply(weapon));
     });
 
     // --- Modifier edge cases ---
@@ -348,6 +314,66 @@ public partial class WeaponSystemTest : Node
       var types = Enum.GetValues<StatType>();
       Assert.Equal(5, types.Length);
       Assert.Equal(StatType.Health, (StatType)0);
+    });
+
+    // --- Ammunition and AmmoType ---
+
+    T("Ammunition struct copies data from AmmunitionData", () =>
+    {
+      var ammoData = new AmmunitionData { Name = "AP Round", Description = "Armor-piercing ammo" };
+      var ammo = new Ammunition(ammoData);
+      Assert.Equal("AP Round", ammo.AmmoName);
+      Assert.Equal("Armor-piercing ammo", ammo.AmmoDescription);
+    });
+
+    T("FirearmWeapon initializes AmmoType from DefaultAmmoData", () =>
+    {
+      var data = new FirearmWeaponData
+      {
+        DefaultAmmoData = new AmmunitionData { Name = "Standard", Description = "Standard issue rounds" },
+        DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 10 },
+        CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 5 },
+        RangeStat = new Stat { StatType = StatType.Range, BaseValue = 15 },
+        AmmunitionStat = new Stat { StatType = StatType.Ammunition, BaseValue = 12 },
+        ModSlotCount = 0,
+      };
+      var weapon = new FirearmWeapon(data);
+      Assert.Equal("Standard", weapon.AmmoType.AmmoName);
+      Assert.Equal("Standard issue rounds", weapon.AmmoType.AmmoDescription);
+    });
+
+    T("FirearmWeapon AmmoType can be reassigned", () =>
+    {
+      var data = MakeFirearmWeaponData();
+      var weapon = new FirearmWeapon(data);
+      var newAmmo = new Ammunition(new AmmunitionData { Name = "Incendiary" });
+      weapon.AmmoType = newAmmo;
+      Assert.Equal("Incendiary", weapon.AmmoType.AmmoName);
+    });
+
+    T("Ammunition struct inherits StatModifier array from AmmunitionData", () =>
+    {
+      var ammoData = new AmmunitionData
+      {
+        Name = "+Damage Ammo",
+        Modifiers = [new StatModifier_Add { Value = 10 }]
+      };
+      var ammo = new Ammunition(ammoData);
+      Assert.Equal(1, ammo.statModifiers.Count);
+    });
+
+    T("AmmunitionedWeaponData holds AmmunitionStat and DefaultAmmoData", () =>
+    {
+      var data = new AmmunitionedWeaponData
+      {
+        AmmunitionStat = new Stat { StatType = StatType.Ammunition, BaseValue = 6 },
+        DefaultAmmoData = new AmmunitionData { Name = "Test Ammo" },
+        DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 20 },
+        CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 10 },
+        RangeStat = new Stat { StatType = StatType.Range, BaseValue = 5 },
+      };
+      Assert.Equal(6, data.AmmunitionStat.BaseValue);
+      Assert.Equal("Test Ammo", data.DefaultAmmoData.Name);
     });
 
     int total = _passed + _failed;

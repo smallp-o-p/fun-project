@@ -14,8 +14,8 @@ public static class Assert
         if (condition) throw new Exception($"Expected false but got true. {msg}");
     }
 
-    public static void Equal<T>(T real, T expect, string msg = "")
-    {
+  public static void Equal<T>(T expect, T real, string msg = "")
+  {
         if (!real.Equals(expect)) throw new Exception($"Expected {expect} but got {real}. {msg}");
     }
 
