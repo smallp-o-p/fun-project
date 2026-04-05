@@ -1,47 +1,7 @@
-using FunProject.Core;
 using FunProject.Stats;
-using Godot;
 using Godot.Collections;
 
 namespace FunProject.Weapons;
-
-public enum DamageElement
-{
-  Kinetic,
-  Thermal,
-  Electrical,
-  Chem,
-}
-
-public enum FirearmArchetype
-{
-  Pistol,
-  SniperRifle,
-  AssaultRifle,
-  Shotgun,
-}
-
-[GlobalClass]
-public partial class WeaponData : NamedEntityData
-{
-  [Export] public DamageElement DamageElement { get; set; }
-  [Export] public Stat DamageStat { get; set; }
-  [Export] public Stat RangeStat { get; set; }
-  [Export] public Stat CriticalChanceStat { get; set; }
-  [Export] public int ModSlotCount { get; set; }
-}
-
-[GlobalClass]
-public partial class AmmunitionedWeaponData : WeaponData
-{
-  [Export] public Stat AmmunitionStat { get; set; }
-}
-
-[GlobalClass]
-public partial class FirearmWeaponData : AmmunitionedWeaponData
-{
-  [Export] public FirearmArchetype Archetype { get; set; }
-}
 
 public class Weapon : HasStats, HasModSlots
 {
