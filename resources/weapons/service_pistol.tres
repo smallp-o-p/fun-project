@@ -1,7 +1,40 @@
-[gd_resource type="Resource" script_class="FirearmWeaponData" load_steps=2 format=3 uid="uid://xilu3cj030eu"]
+[gd_resource type="Resource" script_class="FirearmWeaponData" load_steps=8 format=3 uid="uid://xilu3cj030eu"]
 
+[ext_resource type="Script" uid="uid://3lu4rcfn8i8f" path="res://scripts/stats/Stat.cs" id="1_432ql"]
 [ext_resource type="Script" uid="uid://cei4l4eg05jg1" path="res://scripts/weapons/FirearmWeaponData.cs" id="1_fvdq8"]
+[ext_resource type="Resource" uid="uid://djtse040feqhb" path="res://resources/weapons/ammo/standard.tres" id="2_bg1dx"]
+
+[sub_resource type="Resource" id="Resource_vj6ow"]
+script = ExtResource("1_432ql")
+StatType = 3
+BaseValue = 4
+metadata/_custom_type_script = "uid://3lu4rcfn8i8f"
+
+[sub_resource type="Resource" id="Resource_q7nbd"]
+script = ExtResource("1_432ql")
+StatType = 4
+BaseValue = 25
+metadata/_custom_type_script = "uid://3lu4rcfn8i8f"
+
+[sub_resource type="Resource" id="Resource_eu4gj"]
+script = ExtResource("1_432ql")
+StatType = 1
+BaseValue = 4
+metadata/_custom_type_script = "uid://3lu4rcfn8i8f"
+
+[sub_resource type="Resource" id="Resource_4vjy0"]
+script = ExtResource("1_432ql")
+StatType = 8
+BaseValue = 4
+metadata/_custom_type_script = "uid://3lu4rcfn8i8f"
 
 [resource]
 script = ExtResource("1_fvdq8")
+AmmunitionStat = SubResource("Resource_vj6ow")
+DefaultAmmoData = ExtResource("2_bg1dx")
+DamageStat = SubResource("Resource_eu4gj")
+RangeStat = SubResource("Resource_4vjy0")
+CriticalChanceStat = SubResource("Resource_q7nbd")
+Name = "Service Pistol"
+Description = "Standard Issue service pistol offered to every Enforcer. Handy in a pinch, but don't expect to stop anything big. "
 metadata/_custom_type_script = "uid://cei4l4eg05jg1"

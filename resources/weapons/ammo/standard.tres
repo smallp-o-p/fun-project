@@ -4,5 +4,7 @@
 
 [resource]
 script = ExtResource("1_p8dsb")
-Modifiers = null
+Modifiers = Array[Object]([])
+Name = "Standard Issue"
+Description = "Standard Issue rounds that come with every fresh service weapon. Nothing special about them."
 metadata/_custom_type_script = "uid://brvnku5jp645w"
