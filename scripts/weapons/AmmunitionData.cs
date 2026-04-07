@@ -8,5 +8,5 @@ namespace FunProject.Weapons;
 
 public partial class AmmunitionData : NamedEntityData
 {
-  [Export] public Array<StatModifier> Modifiers { get; set; }
+  [Export] public Array<StatMod> Modifiers { get; set; }
 };

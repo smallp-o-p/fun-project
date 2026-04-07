@@ -6,7 +6,7 @@ namespace FunProject.Weapons;
 
 public struct Ammunition(AmmunitionData data)
 {
-  public Array<StatModifier> statModifiers = data.Modifiers;
+  public Array<StatMod> statModifiers = data.Modifiers;
   public string AmmoName = data.Name;
   public string AmmoDescription = data.Description;
 };
