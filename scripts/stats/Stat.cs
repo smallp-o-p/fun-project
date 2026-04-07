@@ -9,6 +9,11 @@ public enum StatType
   Range,
   Ammunition,
   CriticalChance,
+  ActionPoints,
+  Will,
+  Movement,
+  Aim,
+  BaseArmor
 }
 
 [GlobalClass]
