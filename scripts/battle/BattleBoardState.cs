@@ -7,12 +7,25 @@ namespace FunProject.Battle;
 
 public sealed class BattleBoardState
 {
-  private readonly Dictionary<Vector3I, BattleTileState> _tiles = [];
+  private readonly BattleTileState[,,] _tiles;
 
   public int Width { get; }
   public int Length { get; }
   public int Levels { get; }
-  public IReadOnlyCollection<BattleTileState> Tiles => _tiles.Values;
+  public IEnumerable<BattleTileState> Tiles
+  {
+    get
+    {
+      for (int y = 0; y < Levels; y++)
+      {
+        for (int z = 0; z < Length; z++)
+        {
+          for (int x = 0; x < Width; x++)
+            yield return _tiles[x, y, z];
+        }
+      }
+    }
+  }
 
   public BattleBoardState(int width, int length, int levels = 1)
   {
@@ -26,6 +39,7 @@ public sealed class BattleBoardState
     Width = width;
     Length = length;
     Levels = levels;
+    _tiles = new BattleTileState[width, levels, length];
 
     for (int y = 0; y < levels; y++)
     {
@@ -34,7 +48,7 @@ public sealed class BattleBoardState
         for (int x = 0; x < width; x++)
         {
           var coordinates = new Vector3I(x, y, z);
-          _tiles[coordinates] = new BattleTileState(coordinates);
+          _tiles[x, y, z] = new BattleTileState(coordinates);
         }
       }
     }
@@ -50,20 +64,18 @@ public sealed class BattleBoardState
       && coordinates.Z < Length;
   }
 
-  public bool TryGetTile(Vector3I coordinates, out BattleTileState? tile)
+  public BattleTileState? GetTileOrNull(Vector3I coordinates)
   {
     if (!IsInBounds(coordinates))
-    {
-      tile = null;
-      return false;
-    }
+      return null;
 
-    return _tiles.TryGetValue(coordinates, out tile);
+    return _tiles[coordinates.X, coordinates.Y, coordinates.Z];
   }
 
   public BattleTileState GetTile(Vector3I coordinates)
   {
-    if (!TryGetTile(coordinates, out var tile) || tile == null)
+    var tile = GetTileOrNull(coordinates);
+    if (tile == null)
       throw new ArgumentOutOfRangeException(nameof(coordinates));
 
     return tile;
@@ -71,9 +83,7 @@ public sealed class BattleBoardState
 
   public bool CanOccupy(Vector3I coordinates)
   {
-    return TryGetTile(coordinates, out var tile)
-      && tile != null
-      && tile.IsWalkable
-      && !tile.IsOccupied;
+    var tile = GetTileOrNull(coordinates);
+    return tile is { IsWalkable: true, IsOccupied: false };
   }
 }
