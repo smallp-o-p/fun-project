@@ -33,7 +33,7 @@ public sealed class BattleSession
   public int? SelectedUnitId { get; private set; }
   public IReadOnlyCollection<BattleUnitState> Units => _units.Values;
   public IReadOnlyCollection<Faction> TurnQueue => _turnQueue.ToArray();
-  public BattleUnitState? SelectedUnit => SelectedUnitId.HasValue && _units.TryGetValue(SelectedUnitId.Value, out var unit) ? unit : null;
+  public BattleUnitState? SelectedUnit => SelectedUnitId.HasValue ? GetUnitOrNull(SelectedUnitId.Value) : null;
 
   public event Action<BattleEvent>? EventRaised;
 
@@ -60,9 +60,10 @@ public sealed class BattleSession
     return unit;
   }
 
-  public bool TryGetUnit(int unitId, out BattleUnitState? unit)
+  public BattleUnitState? GetUnitOrNull(int unitId)
   {
-    return _units.TryGetValue(unitId, out unit);
+    _units.TryGetValue(unitId, out var unit);
+    return unit;
   }
 
   public IEnumerable<BattleUnitState> GetUnitsForSide(Faction side)
@@ -94,7 +95,7 @@ public sealed class BattleSession
       unit.RefreshForNewTurn();
     }
 
-    SelectFirstUnitForActiveSide();
+    TrySelectFirstUnitForActiveSide();
 
     Publish(new BattleEvent(BattleEventType.SessionStarted, Message: "Battle started."));
     Publish(new BattleEvent(BattleEventType.TurnStarted, Message: $"Turn {TurnNumber} started for {ActiveSide?.Name}."));
@@ -113,11 +114,17 @@ public sealed class BattleSession
 
   public bool TrySelectUnit(int unitId)
   {
-    if (!TryGetUnit(unitId, out var unit) || unit == null || !unit.IsAlive)
+    var unit = GetUnitOrNull(unitId);
+    if (unit == null || !unit.IsAlive)
       return false;
 
-    if (Phase == BattlePhase.InProgress && ActiveSide != null && unit.Side != ActiveSide)
-      return false;
+    if (Phase == BattlePhase.InProgress)
+    {
+      if (ActiveSide != null && unit.Side != ActiveSide)
+        return false;
+      if (unit.Side == ActiveSide && unit.HasEndedActivationThisTurn)
+        return false;
+    }
 
     DeselectCurrentUnit();
     unit.IsSelected = true;
@@ -152,11 +159,14 @@ public sealed class BattleSession
   {
     if (Phase != BattlePhase.InProgress)
       return false;
-    if (!TryGetUnit(unitId, out var unit) || unit == null || !unit.IsAlive)
+    var unit = GetUnitOrNull(unitId);
+    if (unit == null || !unit.IsAlive)
       return false;
     if (ActiveSide == null)
       return false;
     if (unit.Side != ActiveSide)
+      return false;
+    if (unit.HasEndedActivationThisTurn)
       return false;
     if (!IsAdjacent(unit.Position, destination))
       return false;
@@ -187,11 +197,14 @@ public sealed class BattleSession
   {
     if (Phase != BattlePhase.InProgress)
       return false;
-    if (!TryGetUnit(unitId, out var unit) || unit == null || !unit.IsAlive)
+    var unit = GetUnitOrNull(unitId);
+    if (unit == null || !unit.IsAlive)
       return false;
     if (item == null)
       return false;
     if (ActiveSide == null || unit.Side != ActiveSide)
+      return false;
+    if (unit.HasEndedActivationThisTurn)
       return false;
     if (!Board.IsInBounds(targetCell))
       return false;
@@ -212,6 +225,63 @@ public sealed class BattleSession
     }
 
     Publish(new BattleEvent(BattleEventType.ItemThrown, unit.UnitId, targetCell, $"{unit.Combatant.Name} threw {item.ItemName}."));
+    return true;
+  }
+
+  public bool TryPassSelectedUnit()
+  {
+    if (SelectedUnit == null)
+      return false;
+
+    return TryPassUnit(SelectedUnit.UnitId);
+  }
+
+  public bool TryPassUnit(int unitId)
+  {
+    if (Phase != BattlePhase.InProgress)
+      return false;
+    if (ActiveSide == null)
+      return false;
+
+    var unit = GetUnitOrNull(unitId);
+    if (unit == null || !unit.IsAlive)
+      return false;
+    if (unit.Side != ActiveSide)
+      return false;
+    if (unit.HasEndedActivationThisTurn)
+      return false;
+
+    unit.EndActivation();
+    Publish(new BattleEvent(BattleEventType.UnitActivationEnded, unit.UnitId, unit.Position, $"{unit.Combatant.Name} ended their activation."));
+
+    if (SelectedUnitId == unitId)
+      DeselectCurrentUnit();
+
+    if (!TrySelectFirstUnitForActiveSide())
+      AdvanceTurn();
+
+    return true;
+  }
+
+  public bool TryEndFactionTurn()
+  {
+    if (Phase != BattlePhase.InProgress || ActiveSide == null)
+      return false;
+
+    AdvanceTurn();
+    return true;
+  }
+
+  public bool TryEndFactionTurn(Faction expectedActiveSide)
+  {
+    if (expectedActiveSide == null)
+      return false;
+    if (Phase != BattlePhase.InProgress || ActiveSide == null)
+      return false;
+    if (ActiveSide != expectedActiveSide)
+      return false;
+
+    AdvanceTurn();
     return true;
   }
 
@@ -247,7 +317,7 @@ public sealed class BattleSession
       unit.RefreshForNewTurn();
     }
 
-    SelectFirstUnitForActiveSide();
+    TrySelectFirstUnitForActiveSide();
 
     Publish(new BattleEvent(BattleEventType.ActiveSideChanged, Message: $"Active side is now {ActiveSide.Name}."));
     Publish(new BattleEvent(BattleEventType.TurnStarted, Message: $"Turn {TurnNumber} started for {ActiveSide.Name}."));
@@ -255,7 +325,8 @@ public sealed class BattleSession
 
   public void ApplyDamage(int unitId, int amount)
   {
-    if (!TryGetUnit(unitId, out var unit) || unit == null)
+    var unit = GetUnitOrNull(unitId);
+    if (unit == null)
       throw new InvalidOperationException($"Unknown unit id {unitId}.");
 
     unit.ReceiveDamage(amount);
@@ -271,19 +342,24 @@ public sealed class BattleSession
     }
   }
 
-  private void SelectFirstUnitForActiveSide()
+  private bool TrySelectFirstUnitForActiveSide()
   {
     DeselectCurrentUnit();
     if (ActiveSide == null)
-      return;
+      return false;
 
     var firstUnit = GetUnitsForSide(ActiveSide)
-      .Where(unit => unit.IsAlive)
+      .Where(unit => unit.CanAct)
       .OrderBy(unit => unit.UnitId)
       .FirstOrDefault();
 
     if (firstUnit != null)
+    {
       TrySelectUnit(firstUnit.UnitId);
+      return true;
+    }
+
+    return false;
   }
 
   private void DeselectCurrentUnit()
@@ -291,7 +367,8 @@ public sealed class BattleSession
     if (!SelectedUnitId.HasValue)
       return;
 
-    if (_units.TryGetValue(SelectedUnitId.Value, out var selectedUnit))
+    var selectedUnit = GetUnitOrNull(SelectedUnitId.Value);
+    if (selectedUnit != null)
       selectedUnit.IsSelected = false;
 
     SelectedUnitId = null;

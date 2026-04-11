@@ -1,105 +1,160 @@
 #nullable enable
+using FunProject.Items;
 using Godot;
 using System;
-using FunProject.Items;
 
 namespace FunProject.Battle;
 
-public delegate bool BattleActionResolver(BattleSession session, BattleActionIntent intent);
+public delegate bool BattleActionResolver(BattleSession session, CustomBattleActionIntent intent);
 
-public sealed class BattleActionIntent
+public abstract class BattleActionIntent
 {
+  public const string MoveStepActionId = "move_step";
+  public const string PassUnitActionId = "pass_unit";
+  public const string EndFactionTurnActionId = "end_faction_turn";
+  public const string ThrowItemActionId = "throw_item";
+
   public string ActionId { get; }
-  public int UnitId { get; }
-  public Vector3I? TargetCell { get; }
-  public int? TargetUnitId { get; }
-  public Variant? Payload { get; }
 
-  private readonly BattleActionResolver _resolver;
-
-  public BattleActionIntent(
-    string actionId,
-    int unitId,
-    BattleActionResolver resolver,
-    Vector3I? targetCell = null,
-    int? targetUnitId = null,
-    Variant? payload = null)
+  protected BattleActionIntent(string actionId)
   {
+    if (string.IsNullOrWhiteSpace(actionId))
+      throw new ArgumentException("Action id cannot be null or whitespace.", nameof(actionId));
+
     ActionId = actionId;
-    UnitId = unitId;
-    TargetCell = targetCell;
-    TargetUnitId = targetUnitId;
-    Payload = payload;
-    _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
   }
 
-  public bool Apply(BattleSession session)
+  public static MoveStepBattleActionIntent MoveStep(int unitId, Vector3I targetCell, int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
   {
-    ArgumentNullException.ThrowIfNull(session);
-    return _resolver(session, this);
+    return new MoveStepBattleActionIntent(unitId, targetCell, actionPointCost);
   }
 
-  public BattleActionIntent WithResolver(BattleActionResolver resolver)
-  {
-    return new BattleActionIntent(ActionId, UnitId, resolver, TargetCell, TargetUnitId, Payload);
-  }
-
-  public static BattleActionIntent MoveStep(int unitId, Vector3I targetCell, int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
-  {
-    return new BattleActionIntent(
-      actionId: "move_step",
-      unitId: unitId,
-      resolver: (session, intent) =>
-      {
-        if (!intent.TargetCell.HasValue)
-          return false;
-
-        return session.TryMoveUnitStep(intent.UnitId, intent.TargetCell.Value, actionPointCost);
-      },
-      targetCell: targetCell,
-      payload: Variant.From(actionPointCost));
-  }
-
-  public static BattleActionIntent Move(int unitId, Vector3I targetCell, int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
+  public static MoveStepBattleActionIntent Move(int unitId, Vector3I targetCell, int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
   {
     return MoveStep(unitId, targetCell, actionPointCost);
   }
 
-  public static BattleActionIntent EndTurn(int unitId)
+  public static PassUnitBattleActionIntent PassUnit(int unitId)
   {
-    return new BattleActionIntent(
-      actionId: "end_turn",
-      unitId: unitId,
-      resolver: (session, _) =>
-      {
-        session.AdvanceTurn();
-        return true;
-      });
+    return new PassUnitBattleActionIntent(unitId);
   }
 
-  public static BattleActionIntent ThrowItem(int unitId, ThrowableItem item, Vector3I targetCell)
+  public static EndFactionTurnBattleActionIntent EndFactionTurn(Faction issuingSide)
   {
-    return new BattleActionIntent(
-      actionId: "throw_item",
-      unitId: unitId,
-      resolver: (session, intent) =>
-      {
-        if (!intent.TargetCell.HasValue)
-          return false;
-
-        return session.TryThrowItem(intent.UnitId, item, intent.TargetCell.Value);
-      },
-      targetCell: targetCell);
+    return new EndFactionTurnBattleActionIntent(issuingSide);
   }
 
-  public static BattleActionIntent Custom(
+  public static ThrowItemBattleActionIntent ThrowItem(int unitId, ThrowableItem item, Vector3I targetCell)
+  {
+    return new ThrowItemBattleActionIntent(unitId, item, targetCell);
+  }
+
+  public static CustomBattleActionIntent Custom(
     string actionId,
-    int unitId,
     BattleActionResolver resolver,
-    Vector3I? targetCell = null,
-    int? targetUnitId = null,
+    int? unitId = null,
     Variant? payload = null)
   {
-    return new BattleActionIntent(actionId, unitId, resolver, targetCell, targetUnitId, payload);
+    return new CustomBattleActionIntent(actionId, resolver, unitId, payload);
+  }
+
+  public static NamedBattleActionIntent Named(string actionId, int? unitId = null)
+  {
+    return new NamedBattleActionIntent(actionId, unitId);
+  }
+}
+
+public abstract class UnitBattleActionIntent : BattleActionIntent
+{
+  public int UnitId { get; }
+
+  protected UnitBattleActionIntent(string actionId, int unitId) : base(actionId)
+  {
+    UnitId = unitId;
+  }
+}
+
+public sealed class MoveStepBattleActionIntent : UnitBattleActionIntent
+{
+  public Vector3I TargetCell { get; }
+  public int ActionPointCost { get; }
+
+  public MoveStepBattleActionIntent(int unitId, Vector3I targetCell, int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
+    : base(MoveStepActionId, unitId)
+  {
+    if (actionPointCost < 0)
+      throw new ArgumentOutOfRangeException(nameof(actionPointCost), "Action point cost cannot be negative.");
+
+    TargetCell = targetCell;
+    ActionPointCost = actionPointCost;
+  }
+}
+
+public sealed class PassUnitBattleActionIntent : UnitBattleActionIntent
+{
+  public PassUnitBattleActionIntent(int unitId)
+    : base(PassUnitActionId, unitId)
+  {
+  }
+}
+
+public sealed class EndFactionTurnBattleActionIntent : BattleActionIntent
+{
+  public Faction IssuingSide { get; }
+
+  public EndFactionTurnBattleActionIntent(Faction issuingSide)
+    : base(EndFactionTurnActionId)
+  {
+    IssuingSide = issuingSide ?? throw new ArgumentNullException(nameof(issuingSide));
+  }
+}
+
+public sealed class ThrowItemBattleActionIntent : UnitBattleActionIntent
+{
+  public ThrowableItem Item { get; }
+  public Vector3I TargetCell { get; }
+
+  public ThrowItemBattleActionIntent(int unitId, ThrowableItem item, Vector3I targetCell)
+    : base(ThrowItemActionId, unitId)
+  {
+    Item = item ?? throw new ArgumentNullException(nameof(item));
+    TargetCell = targetCell;
+  }
+}
+
+public sealed class CustomBattleActionIntent : BattleActionIntent
+{
+  public int? UnitId { get; }
+  public Variant? Payload { get; }
+
+  private readonly BattleActionResolver _resolver;
+
+  public CustomBattleActionIntent(
+    string actionId,
+    BattleActionResolver resolver,
+    int? unitId = null,
+    Variant? payload = null)
+    : base(actionId)
+  {
+    _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
+    UnitId = unitId;
+    Payload = payload;
+  }
+
+  internal bool Resolve(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(session);
+    return _resolver(session, this);
+  }
+}
+
+public sealed class NamedBattleActionIntent : BattleActionIntent
+{
+  public int? UnitId { get; }
+
+  public NamedBattleActionIntent(string actionId, int? unitId = null)
+    : base(actionId)
+  {
+    UnitId = unitId;
   }
 }

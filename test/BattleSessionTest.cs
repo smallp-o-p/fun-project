@@ -113,6 +113,22 @@ public partial class BattleSessionTest : TestRunner
       Assert.Equal(new Vector3I(1, 1, 1), unit.Position);
     });
 
+    T("Passing a unit ends its activation and selects the next ally", () =>
+    {
+      var session = new BattleSession(4, 4, 1);
+      var faction = MakeFaction("Player");
+      var unitA = session.AddUnit(MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
+      var unitB = session.AddUnit(MakeCombatant("Bravo", faction), new Vector3I(1, 0, 0));
+      session.StartBattle();
+
+      var passed = session.TryPassSelectedUnit();
+
+      Assert.True(passed);
+      Assert.True(unitA.HasEndedActivationThisTurn);
+      Assert.Equal(unitB.UnitId, session.SelectedUnitId!.Value);
+      Assert.Equal(faction, session.ActiveSide);
+    });
+
     T("Killing a selected unit clears occupancy selection and faction queue", () =>
     {
       var session = new BattleSession(4, 4, 1);

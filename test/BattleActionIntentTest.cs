@@ -1,7 +1,4 @@
 using FunProject.Battle;
-using FunProject.Combatants;
-using FunProject.Items;
-using FunProject.Stats;
 using Godot;
 using System;
 
@@ -13,160 +10,79 @@ public partial class BattleActionIntentTest : TestRunner
     {
       var intent = BattleActionIntent.MoveStep(7, new Vector3I(2, 1, 3), 2);
 
-      Assert.Equal("move_step", intent.ActionId);
-      Assert.Equal(7, intent.UnitId);
-      Assert.Equal(new Vector3I(2, 1, 3), intent.TargetCell!.Value);
-      Assert.Equal(2, (int)intent.Payload!.Value);
+      Assert.True(intent is MoveStepBattleActionIntent);
+      Assert.Equal(BattleActionIntent.MoveStepActionId, intent.ActionId);
+      var moveIntent = (MoveStepBattleActionIntent)intent;
+      Assert.Equal(7, moveIntent.UnitId);
+      Assert.Equal(new Vector3I(2, 1, 3), moveIntent.TargetCell);
+      Assert.Equal(2, moveIntent.ActionPointCost);
     });
 
-    T("MoveStep applies step movement through the session", () =>
+    T("PassUnit intent captures expected metadata", () =>
     {
-      var session = new BattleSession(4, 4, 2);
-      var faction = MakeFaction("Player");
-      var unit = session.AddUnit(MakeCombatant("Alpha", faction, actionPoints: 5), new Vector3I(1, 0, 1));
-      session.StartBattle();
+      var intent = BattleActionIntent.PassUnit(5);
 
-      var moved = BattleActionIntent.MoveStep(unit.UnitId, new Vector3I(1, 1, 1), 2).Apply(session);
-
-      Assert.True(moved);
-      Assert.Equal(new Vector3I(1, 1, 1), unit.Position);
-      Assert.Equal(3, unit.CurrentActionPoints);
+      Assert.True(intent is PassUnitBattleActionIntent);
+      Assert.Equal(BattleActionIntent.PassUnitActionId, intent.ActionId);
+      var passIntent = intent;
+      Assert.Equal(5, passIntent.UnitId);
     });
 
-    T("MoveStep fails when the target step is illegal", () =>
+    T("EndFactionTurn intent captures expected metadata", () =>
     {
-      var session = new BattleSession(4, 4, 1);
-      var faction = MakeFaction("Player");
-      var unit = session.AddUnit(MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
-      session.StartBattle();
+      var faction = BattleTestFactory.MakeFaction("Player");
+      var intent = BattleActionIntent.EndFactionTurn(faction);
 
-      var moved = BattleActionIntent.MoveStep(unit.UnitId, new Vector3I(2, 0, 0)).Apply(session);
-
-      Assert.False(moved);
-      Assert.Equal(new Vector3I(0, 0, 0), unit.Position);
+      Assert.True(intent is EndFactionTurnBattleActionIntent);
+      Assert.Equal(BattleActionIntent.EndFactionTurnActionId, intent.ActionId);
+      var endIntent = intent;
+      Assert.Equal(faction, endIntent.IssuingSide);
     });
 
-    T("EndTurn intent advances the active faction", () =>
+    T("ThrowItem intent captures throwable item and target cell", () =>
     {
-      var session = new BattleSession(4, 4, 1);
-      var factionA = MakeFaction("A");
-      var factionB = MakeFaction("B");
+      var grenade = BattleTestFactory.MakeGrenade("Practice");
+      var intent = BattleActionIntent.ThrowItem(3, grenade, new Vector3I(4, 0, 2));
 
-      var unitA = session.AddUnit(MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-      session.AddUnit(MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-      session.StartBattle();
-
-      var applied = BattleActionIntent.EndTurn(unitA.UnitId).Apply(session);
-
-      Assert.True(applied);
-      Assert.Equal(factionB, session.ActiveSide);
+      Assert.True(intent is ThrowItemBattleActionIntent);
+      Assert.Equal(BattleActionIntent.ThrowItemActionId, intent.ActionId);
+      var throwIntent = intent;
+      Assert.Equal(3, throwIntent.UnitId);
+      Assert.Equal(new Vector3I(4, 0, 2), throwIntent.TargetCell);
+      Assert.Equal(grenade, throwIntent.Item);
     });
 
-    T("ThrowItem intent removes throwable from inventory and emits throw flow", () =>
+    T("Named intent preserves unknown action metadata", () =>
     {
-      var session = new BattleSession(5, 5, 1);
-      var faction = MakeFaction("Player");
-      var unit = session.AddUnit(MakeCombatant("Thrower", faction, actionPoints: 4), new Vector3I(1, 0, 1));
-      var grenade = MakeGrenade("Practice");
-      unit.AddInventoryItem(grenade);
-      session.StartBattle();
+      var intent = BattleActionIntent.Named("swap_test", 3);
 
-      var applied = BattleActionIntent.ThrowItem(unit.UnitId, grenade, new Vector3I(2, 0, 1)).Apply(session);
-
-      Assert.True(applied);
-      Assert.False(unit.HasInventoryItem(grenade));
-      Assert.Equal(3, unit.CurrentActionPoints);
+      Assert.True(intent is NamedBattleActionIntent);
+      Assert.Equal("swap_test", intent.ActionId);
+      var namedIntent = intent;
+      Assert.Equal(3, namedIntent.UnitId);
     });
 
-    T("Custom intent executes provided resolver", () =>
+    T("Custom action uses the provided resolver when executed by the executor", () =>
     {
-      var session = new BattleSession(3, 3, 1);
-      var intent = BattleActionIntent.Custom(
-        actionId: "custom_ping",
-        unitId: 11,
-        resolver: (_, self) =>
-        {
-          Assert.Equal("custom_ping", self.ActionId);
-          Assert.Equal(11, self.UnitId);
-          Assert.Equal(new Vector3I(1, 0, 1), self.TargetCell!.Value);
-          Assert.Equal(99, self.TargetUnitId!.Value);
-          Assert.Equal("hello", (string)self.Payload!.Value);
-          return true;
-        },
-        targetCell: new Vector3I(1, 0, 1),
-        targetUnitId: 99,
-        payload: Variant.From("hello"));
-
-      Assert.True(intent.Apply(session));
-    });
-
-    T("WithResolver preserves metadata and swaps behavior", () =>
-    {
-      var original = BattleActionIntent.Custom(
-        actionId: "swap_test",
-        unitId: 3,
-        resolver: (_, _) => false,
-        targetCell: new Vector3I(1, 2, 3),
-        targetUnitId: 4,
-        payload: Variant.From(12));
-
-      var swapped = original.WithResolver((_, self) =>
+      bool invoked = false;
+      var executor = new BattleActionExecutor(new BattleSession(2, 2, 1));
+      var intent = BattleActionIntent.Custom("custom_ping", (_, self) =>
       {
-        Assert.Equal("swap_test", self.ActionId);
-        Assert.Equal(3, self.UnitId);
-        Assert.Equal(new Vector3I(1, 2, 3), self.TargetCell!.Value);
-        Assert.Equal(4, self.TargetUnitId!.Value);
-        Assert.Equal(12, (int)self.Payload!.Value);
+        invoked = true;
+        Assert.Equal("custom_ping", self.ActionId);
+        Assert.Equal(11, self.UnitId);
+        Assert.Equal(7, (int)self.Payload!.Value);
         return true;
-      });
+      }, unitId: 11, payload: Variant.From(7));
 
-      Assert.True(swapped.Apply(new BattleSession(2, 2, 1)));
-    });
+      executor.Enqueue(intent);
+      var result = executor.Tick();
 
-    T("Apply rejects null session", () =>
-    {
-      var intent = BattleActionIntent.Custom("null_session", 1, (_, _) => true);
-      Assert.Throws<ArgumentNullException>(() => intent.Apply(null!));
+      Assert.True(invoked);
+      Assert.True(result.HasValue);
+      Assert.True(result!.Value.Succeeded);
     });
 
     Report();
-  }
-
-  private static Combatant MakeCombatant(string name, Faction faction, int health = 20, int actionPoints = 4, int movement = 12)
-  {
-    return new Combatant(new CombatantData
-    {
-      Name = name,
-      HealthStat = new HealthStat { BaseValue = health },
-      ActionPointsStat = new ActionPointsStat { BaseValue = actionPoints },
-      WillStat = new WillStat { BaseValue = 50 },
-      MovementStat = new MovementStat { BaseValue = movement },
-      AimStat = new AimStat { BaseValue = 65 },
-      BaseArmorStat = new BaseArmorStat { BaseValue = 0 },
-      ModSlotCount = 0,
-    }, faction);
-  }
-
-  private static Faction MakeFaction(string name)
-  {
-    return new Faction(new FactionData
-    {
-      Name = name,
-      Description = $"{name} faction"
-    });
-  }
-
-  private static Grenade MakeGrenade(string name)
-  {
-    return new Grenade(new GrenadeData
-    {
-      Name = name,
-      Description = $"{name} grenade",
-      ThrowRange = 4,
-      ActionPointCost = 1,
-      MaxCharges = 1,
-      ConsumesOnUse = true,
-      BlastRadius = 1,
-    });
   }
 }

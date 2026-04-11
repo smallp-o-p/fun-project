@@ -1,0 +1,16 @@
+# CLAUDE.md
+This project is a turn-based, X-COM style game made with Godot 4 and C# .NET 10.0.
+Players control a fixed-number combatants to participate in skirmishes against enemy combatants.
+
+## Architecture
+- `scripts/` Core logic and classes. Data should be Godot Resources to be easily serializable, and each Resource subclass should be in its own file that has the same name as the class.
+- `scenes/` Godot-related items, so anything that needs to be included in a Godot Scene.
+- `test/` Tests. These are dummy scenes which run unit-tests inside the scene's _Ready() function.
+
+## Coding guidelines
+- Prefer default C# styling.
+- For any function that may throw an error or return null, always add a check for it.
+- Add tests for any added code.
+- Avoid C-style out params, instead just return nullable or an optional type.
+- If considering nullable class members, or making a global "Object" that does multiple things depending on its fields, considering creating derived classes to represent each individual behavior.
+- If a param can be null, it should be a nullable type.

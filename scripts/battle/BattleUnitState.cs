@@ -19,6 +19,7 @@ public sealed class BattleUnitState
   public Vector3I Position { get; private set; }
   public Weapon? EquippedWeapon { get; private set; }
   public bool IsSelected { get; internal set; }
+  public bool HasEndedActivationThisTurn { get; private set; }
   public IReadOnlyList<EquippableItem> Inventory => _inventory;
 
   public int MaxHealth => GetBaseStatValue<HealthStat>();
@@ -27,7 +28,7 @@ public sealed class BattleUnitState
   public int CurrentActionPoints { get; private set; }
   public int Movement => GetBaseStatValue<MovementStat>();
   public bool IsAlive => CurrentHealth > 0;
-  public bool CanAct => IsAlive && CurrentActionPoints > 0;
+  public bool CanAct => IsAlive && CurrentActionPoints > 0 && !HasEndedActivationThisTurn;
 
   public BattleUnitState(int unitId, Combatant combatant, Vector3I position, Weapon? equippedWeapon = null)
   {
@@ -42,6 +43,12 @@ public sealed class BattleUnitState
   public void RefreshForNewTurn()
   {
     CurrentActionPoints = MaxActionPoints;
+    HasEndedActivationThisTurn = false;
+  }
+
+  public void EndActivation()
+  {
+    HasEndedActivationThisTurn = true;
   }
 
   public bool TrySpendActionPoints(int cost)
