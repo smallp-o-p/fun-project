@@ -1,14 +1,12 @@
 using System;
-using System.Collections.Generic;
 using Godot;
 using Godot.Collections;
 
 namespace FunProject.Stats;
 
-[GlobalClass]
-public partial class StatMod : Resource
+public abstract partial class StatMod : Resource
 {
-  [Export] public StatType TargetStat { get; set; }
+  protected abstract Type TargetStatType { get; }
 
   [Export] public Array<StatModifier> Modifiers { get; set; } = [];
 
@@ -20,19 +18,13 @@ public partial class StatMod : Resource
 
   public float Apply(HasStats statStick)
   {
-    try
-    {
-      Stat s = statStick.GetStats()[TargetStat];
-      float value = s.BaseValue;
-      foreach (var m in Modifiers)
-        value = m.Apply(value);
-
-      return value;
-    }
-    catch (KeyNotFoundException)
-    {
-      // Probably should build barriers to ensure that this doesn't leak in release.
+    if (!statStick.TryGetStat(TargetStatType, out var stat))
       throw new InvalidOperationException();
-    }
+
+    float value = stat.BaseValue;
+    foreach (var m in Modifiers)
+      value = m.Apply(value);
+
+    return value;
   }
 }

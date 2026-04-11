@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="EquippableStatMod" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="DamageEquippableStatMod" load_steps=4 format=3]
 
-[ext_resource type="Script" path="res://scripts/stats/EquippableStatMod.cs" id="1_mod"]
+[ext_resource type="Script" path="res://scripts/stats/concrete_mods/DamageEquippableStatMod.cs" id="1_mod"]
 [ext_resource type="Script" path="res://scripts/stats/Modifier.cs" id="2_modifier"]
 
 [sub_resource type="StatModifier_Multiply" id="1"]
@@ -11,5 +11,4 @@ Multiplier = 0.85
 script = ExtResource("1_mod")
 Name = "Suppressor Coil"
 Description = "A coiled baffle stack that swallows the report. Quieter pull at the cost of muzzle velocity and long-range bite."
-TargetStat = 1
 Modifiers = [SubResource("1")]

@@ -21,11 +21,11 @@ public sealed class BattleUnitState
   public bool IsSelected { get; internal set; }
   public IReadOnlyList<EquippableItem> Inventory => _inventory;
 
-  public int MaxHealth => GetBaseStatValue(StatType.Health);
+  public int MaxHealth => GetBaseStatValue<HealthStat>();
   public int CurrentHealth { get; private set; }
-  public int MaxActionPoints => GetBaseStatValue(StatType.ActionPoints);
+  public int MaxActionPoints => GetBaseStatValue<ActionPointsStat>();
   public int CurrentActionPoints { get; private set; }
-  public int Movement => GetBaseStatValue(StatType.Movement);
+  public int Movement => GetBaseStatValue<MovementStat>();
   public bool IsAlive => CurrentHealth > 0;
   public bool CanAct => IsAlive && CurrentActionPoints > 0;
 
@@ -86,9 +86,9 @@ public sealed class BattleUnitState
     return _inventory.Remove(item);
   }
 
-  private int GetBaseStatValue(StatType statType)
+  private int GetBaseStatValue<TStat>() where TStat : Stat
   {
-    if (!Combatant.GetStats().TryGetValue(statType, out var stat))
+    if (!Combatant.TryGetStat<TStat>(out var stat))
       return 0;
 
     return stat.BaseValue;

@@ -5,5 +5,4 @@ namespace FunProject.Stats;
 [GlobalClass]
 public partial class AimStat : Stat
 {
-  public override StatType StatType => StatType.Aim;
 }

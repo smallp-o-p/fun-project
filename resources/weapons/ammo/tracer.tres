@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://bj231n0dm0h73" path="res://scripts/stats/StatModifier.cs" id="1_53wl4"]
 [ext_resource type="Script" uid="uid://brvnku5jp645w" path="res://scripts/weapons/AmmunitionData.cs" id="1_bi1rt"]
-[ext_resource type="Script" uid="uid://cl5bjj507pl44" path="res://scripts/stats/StatMod.cs" id="2_ps25u"]
+[ext_resource type="Script" uid="uid://bwpkhah2nsdu" path="res://scripts/stats/concrete_mods/AimStatMod.cs" id="2_ps25u"]
 
 [sub_resource type="Resource" id="Resource_7v4kf"]
 script = ExtResource("1_53wl4")
@@ -11,9 +11,7 @@ metadata/_custom_type_script = "uid://bj231n0dm0h73"
 
 [sub_resource type="Resource" id="Resource_50b84"]
 script = ExtResource("2_ps25u")
-TargetStat = 8
 Modifiers = Array[Object]([SubResource("Resource_7v4kf")])
-metadata/_custom_type_script = "uid://cl5bjj507pl44"
 
 [resource]
 script = ExtResource("1_bi1rt")

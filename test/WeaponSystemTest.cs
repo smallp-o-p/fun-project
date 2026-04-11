@@ -1,6 +1,7 @@
 using Godot;
 using Godot.Collections;
 using System;
+using FunProject.Combatants;
 using FunProject.Stats;
 using FunProject.Weapons;
 
@@ -29,7 +30,6 @@ public partial class WeaponSystemTest : Node
     {
       var dmg = new DamageStat { BaseValue = 25 };
       Assert.Equal(25, dmg.BaseValue);
-      Assert.Equal(StatType.Damage, dmg.StatType);
     });
 
     T("MeleeWeapon constructed from RangedWeaponData", () =>
@@ -64,7 +64,7 @@ public partial class WeaponSystemTest : Node
       };
       var f = new FirearmWeapon(data);
 
-      Assert.Equal(12, f.GetStats()[StatType.Ammunition].BaseValue);
+      Assert.Equal(12, f.GetMagAmmoStat().BaseValue);
       Assert.Equal(FirearmArchetype.Pistol, f.Archetype);
     });
 
@@ -72,7 +72,47 @@ public partial class WeaponSystemTest : Node
     {
       var data = MakeWeaponData();
       var w = new MeleeWeapon(data);
-      Assert.False(w.GetStats().ContainsKey(StatType.Ammunition));
+      Assert.False(w.TryGetStat<AmmunitionStat>(out _));
+    });
+
+    T("Weapon generic stat lookup returns concrete stats", () =>
+    {
+      var weapon = new MeleeWeapon(MakeWeaponData());
+
+      Assert.Equal(10, weapon.GetStat<DamageStat>().BaseValue);
+      Assert.True(weapon.TryGetStat<RangeStat>(out var range));
+      Assert.Equal(1, range.BaseValue);
+      Assert.False(weapon.TryGetStat<HealthStat>(out _));
+    });
+
+    T("Weapon Type-based stat lookup returns stat instances", () =>
+    {
+      var weapon = new FirearmWeapon(MakeFirearmWeaponData());
+
+      Assert.True(weapon.TryGetStat(typeof(AmmunitionStat), out var ammoStat));
+      Assert.Equal(12, ammoStat.BaseValue);
+      Assert.True(ammoStat is AmmunitionStat);
+      Assert.False(weapon.TryGetStat(typeof(HealthStat), out _));
+    });
+
+    T("Combatant exposes all concrete stat types through lookup", () =>
+    {
+      var combatant = new Combatant(new CombatantData
+      {
+        Name = "Captain",
+        HealthStat = new HealthStat { BaseValue = 20 },
+        ActionPointsStat = new ActionPointsStat { BaseValue = 4 },
+        WillStat = new WillStat { BaseValue = 50 },
+        MovementStat = new MovementStat { BaseValue = 12 },
+        AimStat = new AimStat { BaseValue = 65 },
+        BaseArmorStat = new BaseArmorStat { BaseValue = 3 },
+        ModSlotCount = 0,
+      }, new Faction(new FactionData { Name = "City Guard" }));
+
+      Assert.Equal(20, combatant.GetStat<HealthStat>().BaseValue);
+      Assert.Equal(65, combatant.GetStat<AimStat>().BaseValue);
+      Assert.True(combatant.TryGetStat(typeof(BaseArmorStat), out var armorStat));
+      Assert.Equal(3, armorStat.BaseValue);
     });
 
     T("ModSlot starts empty", () =>
@@ -84,7 +124,7 @@ public partial class WeaponSystemTest : Node
     T("ModSlot can equip and unequip", () =>
     {
       var slot = new ModSlot();
-      var mod = new EquippableStatMod { TargetStat = StatType.Damage };
+      var mod = new DamageEquippableStatMod();
       slot.Equip(mod);
       Assert.True(slot.HasMod);
       var returned = slot.Unequip();
@@ -120,7 +160,7 @@ public partial class WeaponSystemTest : Node
 
     T("EquippableStatMod applies modifiers in order", () =>
     {
-      var mod = new EquippableStatMod { TargetStat = StatType.Damage };
+      var mod = new DamageEquippableStatMod();
       mod.AddModifier(StatModifier.Add(10));
       mod.AddModifier(StatModifier.Multiply(2f));
       var data = MakeWeaponData();
@@ -131,21 +171,31 @@ public partial class WeaponSystemTest : Node
 
     T("EquippableStatMod rejects wrong stat type", () =>
     {
-      var mod = new EquippableStatMod { TargetStat = StatType.Health };
+      var mod = new HealthEquippableStatMod();
       var data = MakeWeaponData();
       var weapon = new MeleeWeapon(data);
       Assert.Throws<InvalidOperationException>(() =>
         mod.Apply(weapon));
     });
 
+    T("Concrete stat mods target stats by class without enum metadata", () =>
+    {
+      var mod = new RangeStatMod
+      {
+        Modifiers = [StatModifier.Add(4)]
+      };
+      var weapon = new MeleeWeapon(MakeWeaponData());
+
+      Assert.Equal(5f, mod.Apply(weapon));
+    });
+
     T("Weapon with mod slot produces correct damage", () =>
     {
       var data = MakeFirearmWeaponData();
       var weapon = new FirearmWeapon(data);
-      weapon.GetModSlots()[0].Equip(new EquippableStatMod
+      weapon.GetModSlots()[0].Equip(new DamageEquippableStatMod
       {
         Name = "+20% Damage",
-        TargetStat = StatType.Damage,
         Modifiers =
         [
           StatModifier.Multiply(1.2f),
@@ -204,14 +254,14 @@ public partial class WeaponSystemTest : Node
 
     T("EquippableStatMod AddModifier adds to internal list", () =>
     {
-      var mod = new EquippableStatMod { TargetStat = StatType.Damage };
+      var mod = new DamageEquippableStatMod();
       mod.AddModifier(StatModifier.Add(5));
       Assert.Equal(1, mod.Modifiers.Count);
     });
 
     T("EquippableStatMod RemoveModifier removes specific modifier", () =>
     {
-      var mod = new EquippableStatMod { TargetStat = StatType.Damage };
+      var mod = new DamageEquippableStatMod();
       var add = StatModifier.Add(5);
       mod.AddModifier(add);
       Assert.True(mod.RemoveModifier(add));
@@ -220,13 +270,13 @@ public partial class WeaponSystemTest : Node
 
     T("EquippableStatMod RemoveModifier returns false for non-existent", () =>
     {
-      var mod = new EquippableStatMod { TargetStat = StatType.Damage };
+      var mod = new DamageEquippableStatMod();
       Assert.False(mod.RemoveModifier(StatModifier.Add(5)));
     });
 
     T("EquippableStatMod ClearModifiers clears all", () =>
     {
-      var mod = new EquippableStatMod { TargetStat = StatType.Damage };
+      var mod = new DamageEquippableStatMod();
       mod.AddModifier(StatModifier.Add(5));
       mod.AddModifier(StatModifier.Multiply(2f));
       mod.ClearModifiers();
@@ -235,7 +285,7 @@ public partial class WeaponSystemTest : Node
 
     T("EquippableStatMod with no modifiers returns base value", () =>
     {
-      var mod = new EquippableStatMod { TargetStat = StatType.Damage };
+      var mod = new DamageEquippableStatMod();
       var data = MakeWeaponData();
       data.DamageStat.BaseValue = 42;
       Assert.Equal(42f, mod.Apply(new MeleeWeapon(data)));
@@ -247,14 +297,12 @@ public partial class WeaponSystemTest : Node
       data.ModSlotCount = 2;
 
       var weapon = new FirearmWeapon(data);
-      weapon.GetModSlots()[0].EquippedMod = new EquippableStatMod
+      weapon.GetModSlots()[0].EquippedMod = new RangeEquippableStatMod
       {
-        TargetStat = StatType.Range,
         Modifiers = [StatModifier.Add(10)],
       };
-      weapon.GetModSlots()[1].EquippedMod = new EquippableStatMod
+      weapon.GetModSlots()[1].EquippedMod = new DamageEquippableStatMod
       {
-        TargetStat = StatType.Damage,
         Modifiers = [StatModifier.Multiply(1.5f)],
       };
 
@@ -267,9 +315,8 @@ public partial class WeaponSystemTest : Node
     T("Multiply by zero zeroes the value", () =>
     {
       var weapon = new MeleeWeapon(MakeWeaponData());
-      var mod = new EquippableStatMod
+      var mod = new DamageEquippableStatMod
       {
-        TargetStat = StatType.Damage,
         Modifiers = [StatModifier.Multiply(0f)],
       };
       Assert.Equal(0f, mod.Apply(weapon));
@@ -278,9 +325,8 @@ public partial class WeaponSystemTest : Node
     T("Add then CapMax chain", () =>
     {
       var weapon = new MeleeWeapon(MakeWeaponData());
-      var mod = new EquippableStatMod
+      var mod = new DamageEquippableStatMod
       {
-        TargetStat = StatType.Damage,
         Modifiers =
         [
           StatModifier.Add(100),
@@ -295,9 +341,8 @@ public partial class WeaponSystemTest : Node
       var data = MakeWeaponData();
       data.DamageStat.BaseValue = 5;
       var weapon = new MeleeWeapon(data);
-      var mod = new EquippableStatMod
+      var mod = new DamageEquippableStatMod
       {
-        TargetStat = StatType.Damage,
         Modifiers =
         [
           StatModifier.Add(-50),
@@ -305,15 +350,6 @@ public partial class WeaponSystemTest : Node
         ],
       };
       Assert.Equal(0f, mod.Apply(weapon));
-    });
-
-    // --- StatType enum coverage ---
-
-    T("All StatType enum values are defined", () =>
-    {
-      var types = Enum.GetValues<StatType>();
-      Assert.Equal(10, types.Length);
-      Assert.Equal(StatType.Health, (StatType)0);
     });
 
     // --- Ammunition and AmmoType ---
@@ -356,8 +392,7 @@ public partial class WeaponSystemTest : Node
       var ammoData = new AmmunitionData
       {
         Name = "+Damage Ammo",
-        Modifiers = [new StatMod {
-          TargetStat = StatType.Damage,
+        Modifiers = [new DamageStatMod {
           Modifiers = [StatModifier.Add(10)]
         }]
       };
