@@ -8,13 +8,13 @@ public partial class ModSlot : Resource
 {
   [Export] public string SlotName { get; set; } = "Mod Slot";
 
-  public EquippableStatMod? EquippedMod { get; set; }
+  public EquippableMod? EquippedMod { get; set; }
 
   public bool HasMod => EquippedMod != null;
 
-  public void Equip(EquippableStatMod mod) => EquippedMod = mod;
+  public void Equip(EquippableMod mod) => EquippedMod = mod;
 
-  public EquippableStatMod? Unequip()
+  public EquippableMod? Unequip()
   {
     var m = EquippedMod;
     EquippedMod = null;

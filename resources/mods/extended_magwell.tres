@@ -1,14 +1,9 @@
-[gd_resource type="Resource" script_class="AmmunitionEquippableStatMod" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="AmmunitionEquippableStatMod" load_steps=2 format=3 uid="uid://iefajrai3ts6"]
 
-[ext_resource type="Script" path="res://scripts/stats/concrete_mods/AmmunitionEquippableStatMod.cs" id="1_mod"]
-[ext_resource type="Script" path="res://scripts/stats/Modifier.cs" id="2_modifier"]
-
-[sub_resource type="StatModifier_Add" id="1"]
-script = ExtResource("2_modifier")
-Value = 25.0
+[ext_resource type="Script" uid="uid://cjggjnemp3puo" path="res://scripts/stats/concrete_mods/AmmunitionEquippableStatMod.cs" id="1_mod"]
 
 [resource]
 script = ExtResource("1_mod")
+Modifiers = []
 Name = "Extended Magwell"
 Description = "Machined feed ramp extension. Accepts one more mag's worth of rounds and still drops clean."
-Modifiers = [SubResource("1")]

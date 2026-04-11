@@ -7,6 +7,7 @@ namespace FunProject.Stats;
 public abstract partial class StatMod : Resource
 {
   protected abstract Type TargetStatType { get; }
+  public Type TargetType => TargetStatType;
 
   [Export] public Array<StatModifier> Modifiers { get; set; } = [];
 

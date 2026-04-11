@@ -166,7 +166,7 @@ public partial class WeaponSystemTest : Node
       var data = MakeWeaponData();
       data.DamageStat.BaseValue = 5;
       var weapon = new MeleeWeapon(data);
-      Assert.Equal(30f, mod.Apply(weapon));
+      Assert.Equal(30f, mod.ApplyToTarget(weapon));
     });
 
     T("EquippableStatMod rejects wrong stat type", () =>
@@ -175,7 +175,7 @@ public partial class WeaponSystemTest : Node
       var data = MakeWeaponData();
       var weapon = new MeleeWeapon(data);
       Assert.Throws<InvalidOperationException>(() =>
-        mod.Apply(weapon));
+        mod.ApplyToTarget(weapon));
     });
 
     T("Concrete stat mods target stats by class without enum metadata", () =>
@@ -187,6 +187,54 @@ public partial class WeaponSystemTest : Node
       var weapon = new MeleeWeapon(MakeWeaponData());
 
       Assert.Equal(5f, mod.Apply(weapon));
+    });
+
+    T("MultiStatMod applies multiple stat effects", () =>
+    {
+      var mod = new MultiStatMod
+      {
+        StatMods =
+        [
+          new DamageStatMod { Modifiers = [StatModifier.Add(5)] },
+          new RangeStatMod { Modifiers = [StatModifier.Multiply(3f)] },
+        ]
+      };
+      var weapon = new MeleeWeapon(MakeWeaponData());
+
+      var results = mod.Apply(weapon);
+
+      Assert.Equal(15f, results[typeof(DamageStat)]);
+      Assert.Equal(3f, results[typeof(RangeStat)]);
+    });
+
+    T("MultiStatMod add remove and clear manage internal list", () =>
+    {
+      var mod = new MultiStatMod();
+      var damage = new DamageStatMod();
+      var range = new RangeStatMod();
+
+      mod.AddStatMod(damage);
+      mod.AddStatMod(range);
+      Assert.Equal(2, mod.StatMods.Count);
+      Assert.True(mod.RemoveStatMod(damage));
+      Assert.Equal(1, mod.StatMods.Count);
+      mod.ClearStatMods();
+      Assert.Equal(0, mod.StatMods.Count);
+    });
+
+    T("MultiStatMod rejects duplicate target stat types", () =>
+    {
+      var mod = new MultiStatMod
+      {
+        StatMods =
+        [
+          new DamageStatMod { Modifiers = [StatModifier.Add(5)] },
+          new DamageStatMod { Modifiers = [StatModifier.Multiply(2f)] },
+        ]
+      };
+      var weapon = new MeleeWeapon(MakeWeaponData());
+
+      Assert.Throws<InvalidOperationException>(() => mod.Apply(weapon));
     });
 
     T("Weapon with mod slot produces correct damage", () =>
@@ -204,7 +252,26 @@ public partial class WeaponSystemTest : Node
       });
 
       var slot = weapon.GetModSlots()[0];
-      Assert.Equal((data.DamageStat.BaseValue * 1.2) + 5, slot.EquippedMod!.Apply(weapon));
+      Assert.Equal((data.DamageStat.BaseValue * 1.2) + 5, slot.EquippedMod!.GetAppliedStat<DamageStat>(weapon));
+    });
+
+    T("Weapon mod slot can equip multi-stat mod", () =>
+    {
+      var data = MakeFirearmWeaponData();
+      var weapon = new FirearmWeapon(data);
+      weapon.GetModSlots()[0].Equip(new MultiStatMod
+      {
+        Name = "Tactical Overhaul",
+        StatMods =
+        [
+          new DamageStatMod { Modifiers = [StatModifier.Add(2)] },
+          new RangeStatMod { Modifiers = [StatModifier.Add(6)] },
+        ]
+      });
+
+      var slot = weapon.GetModSlots()[0];
+      Assert.Equal(data.DamageStat.BaseValue + 2, slot.EquippedMod!.GetAppliedStat<DamageStat>(weapon));
+      Assert.Equal(data.RangeStat.BaseValue + 6, slot.EquippedMod!.GetAppliedStat<RangeStat>(weapon));
     });
 
     // --- DamageElement coverage ---
@@ -288,7 +355,7 @@ public partial class WeaponSystemTest : Node
       var mod = new DamageEquippableStatMod();
       var data = MakeWeaponData();
       data.DamageStat.BaseValue = 42;
-      Assert.Equal(42f, mod.Apply(new MeleeWeapon(data)));
+      Assert.Equal(42f, mod.ApplyToTarget(new MeleeWeapon(data)));
     });
 
     T("Multiple mod slots with different stat targets", () =>
@@ -306,8 +373,8 @@ public partial class WeaponSystemTest : Node
         Modifiers = [StatModifier.Multiply(1.5f)],
       };
 
-      Assert.Equal(data.RangeStat.BaseValue + 10, weapon.GetModSlots()[0].EquippedMod!.Apply(weapon));
-      Assert.Equal(data.DamageStat.BaseValue * 1.5, weapon.GetModSlots()[1].EquippedMod!.Apply(weapon));
+      Assert.Equal(data.RangeStat.BaseValue + 10, weapon.GetModSlots()[0].EquippedMod!.GetAppliedStat<RangeStat>(weapon));
+      Assert.Equal(data.DamageStat.BaseValue * 1.5, weapon.GetModSlots()[1].EquippedMod!.GetAppliedStat<DamageStat>(weapon));
     });
 
     // --- Modifier edge cases ---
@@ -319,7 +386,7 @@ public partial class WeaponSystemTest : Node
       {
         Modifiers = [StatModifier.Multiply(0f)],
       };
-      Assert.Equal(0f, mod.Apply(weapon));
+      Assert.Equal(0f, mod.ApplyToTarget(weapon));
     });
 
     T("Add then CapMax chain", () =>
@@ -333,7 +400,7 @@ public partial class WeaponSystemTest : Node
           StatModifier.CapMax(75),
         ],
       };
-      Assert.Equal(75f, mod.Apply(weapon));
+      Assert.Equal(75f, mod.ApplyToTarget(weapon));
     });
 
     T("CapMin prevents negative result", () =>
@@ -349,7 +416,7 @@ public partial class WeaponSystemTest : Node
           StatModifier.CapMin(0),
         ],
       };
-      Assert.Equal(0f, mod.Apply(weapon));
+      Assert.Equal(0f, mod.ApplyToTarget(weapon));
     });
 
     // --- Ammunition and AmmoType ---
