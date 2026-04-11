@@ -6,3 +6,4 @@
 .vscode/
 addons/**/*
 ./Godot-MCP/
+handoffs/*
