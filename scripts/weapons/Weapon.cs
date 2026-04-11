@@ -1,18 +1,17 @@
+using FunProject.Items;
 using FunProject.Stats;
 using Godot.Collections;
 
 namespace FunProject.Weapons;
 
-public class Weapon : HasStats, HasModSlots
+public class Weapon : EquippableItem, HasStats
 {
-  public string WeaponName { get; }
+  public string WeaponName => ItemName;
   public DamageElement DamageElement { get; }
-  protected Array<ModSlot> ModSlots { get; } = [];
   protected readonly Dictionary<StatType, Stat> _stats;
 
-  public Weapon(WeaponData data)
+  public Weapon(WeaponData data) : base(data)
   {
-    WeaponName = data.Name;
     DamageElement = data.DamageElement;
 
     _stats = new Dictionary<StatType, Stat>
@@ -21,20 +20,14 @@ public class Weapon : HasStats, HasModSlots
       [StatType.Range] = data.RangeStat,
       [StatType.CriticalChance] = data.CriticalChanceStat,
     };
-
-    for(int i = 0; i < data.ModSlotCount; i++)
-    {
-      ModSlots.Add(new ModSlot());
-    }
   }
 
   public int NumModslots() => ModSlots.Count;
 
   public Dictionary<StatType, Stat> GetStats() => _stats;
-  public Array<ModSlot> GetModSlots() => ModSlots;
-  public Stat GetDamageStat() => _stats[StatType.Damage];
-  public Stat GetRangeStat() => _stats[StatType.Range];
-  public Stat GetCritChanceStat() => _stats[StatType.CriticalChance];
+  public DamageStat GetDamageStat() => (DamageStat)_stats[StatType.Damage];
+  public RangeStat GetRangeStat() => (RangeStat)_stats[StatType.Range];
+  public CriticalChanceStat GetCritChanceStat() => (CriticalChanceStat)_stats[StatType.CriticalChance];
 }
 
 public class MeleeWeapon(WeaponData data) : Weapon(data)
@@ -48,7 +41,7 @@ public class AmmunitionedWeapon : Weapon
     _stats[StatType.Ammunition] = data.AmmunitionStat;
   }
 
-  public Stat GetMagAmmoStat() => _stats[StatType.Ammunition];
+  public AmmunitionStat GetMagAmmoStat() => (AmmunitionStat)_stats[StatType.Ammunition];
 }
 
 public class FirearmWeapon(FirearmWeaponData data) : AmmunitionedWeapon(data)

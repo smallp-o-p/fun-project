@@ -1,20 +1,25 @@
 #nullable enable
 using System;
 using FunProject.Combatants;
+using FunProject.Items;
 using FunProject.Stats;
 using FunProject.Weapons;
 using Godot;
+using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
 public sealed class BattleUnitState
 {
+  private readonly List<EquippableItem> _inventory = [];
+
   public int UnitId { get; }
   public Combatant Combatant { get; }
   public Faction Side => Combatant.OwningFaction;
   public Vector3I Position { get; private set; }
   public Weapon? EquippedWeapon { get; private set; }
   public bool IsSelected { get; internal set; }
+  public IReadOnlyList<EquippableItem> Inventory => _inventory;
 
   public int MaxHealth => GetBaseStatValue(StatType.Health);
   public int CurrentHealth { get; private set; }
@@ -64,6 +69,21 @@ public sealed class BattleUnitState
   public void EquipWeapon(Weapon weapon)
   {
     EquippedWeapon = weapon;
+  }
+
+  public void AddInventoryItem(EquippableItem item)
+  {
+    _inventory.Add(item);
+  }
+
+  public bool HasInventoryItem(EquippableItem item)
+  {
+    return _inventory.Contains(item);
+  }
+
+  public bool RemoveInventoryItem(EquippableItem item)
+  {
+    return _inventory.Remove(item);
   }
 
   private int GetBaseStatValue(StatType statType)

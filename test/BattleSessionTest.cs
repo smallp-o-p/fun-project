@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Items;
 using FunProject.Stats;
 using Godot;
 using System;
@@ -127,9 +128,36 @@ public partial class BattleSessionTest : TestRunner
       session.ApplyDamage(unitA.UnitId, 10);
 
       Assert.False(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
-      Assert.Equal(null, session.SelectedUnitId);
+      Assert.False(session.SelectedUnitId.HasValue);
       Assert.False(session.TurnQueue.Contains(factionA));
       Assert.True(session.TurnQueue.Contains(factionB));
+    });
+
+    T("Selected unit can throw a grenade in battle session", () =>
+    {
+      var session = new BattleSession(5, 5, 1);
+      var faction = MakeFaction("Player");
+      var unit = session.AddUnit(MakeCombatant("Thrower", faction, actionPoints: 4), new Vector3I(1, 0, 1));
+      var grenade = MakeGrenade("Practice Grenade", throwRange: 4);
+      unit.AddInventoryItem(grenade);
+
+      BattleEvent? thrownEvent = null;
+      session.EventRaised += battleEvent =>
+      {
+        if (battleEvent.Type == BattleEventType.ItemThrown)
+          thrownEvent = battleEvent;
+      };
+
+      session.StartBattle();
+      var threw = session.TryThrowSelectedUnitItem(grenade, new Vector3I(3, 0, 1));
+
+      Assert.True(threw);
+      Assert.False(unit.HasInventoryItem(grenade));
+      Assert.Equal(3, unit.CurrentActionPoints);
+      Assert.True(thrownEvent.HasValue);
+      Assert.Equal(BattleEventType.ItemThrown, thrownEvent!.Value.Type);
+      Assert.Equal(unit.UnitId, thrownEvent.Value.UnitId!.Value);
+      Assert.Equal(new Vector3I(3, 0, 1), thrownEvent.Value.Position!.Value);
     });
 
     Report();
@@ -140,12 +168,12 @@ public partial class BattleSessionTest : TestRunner
     return new Combatant(new CombatantData
     {
       Name = name,
-      HealthStat = new Stat { StatType = StatType.Health, BaseValue = health },
-      ActionPointsStat = new Stat { StatType = StatType.ActionPoints, BaseValue = actionPoints },
-      WillStat = new Stat { StatType = StatType.Will, BaseValue = 50 },
-      MovementStat = new Stat { StatType = StatType.Movement, BaseValue = movement },
-      AimStat = new Stat { StatType = StatType.Aim, BaseValue = 65 },
-      BaseArmorStat = new Stat { StatType = StatType.BaseArmor, BaseValue = 0 },
+      HealthStat = new HealthStat { BaseValue = health },
+      ActionPointsStat = new ActionPointsStat { BaseValue = actionPoints },
+      WillStat = new WillStat { BaseValue = 50 },
+      MovementStat = new MovementStat { BaseValue = movement },
+      AimStat = new AimStat { BaseValue = 65 },
+      BaseArmorStat = new BaseArmorStat { BaseValue = 0 },
       ModSlotCount = 0,
     }, faction);
   }
@@ -156,6 +184,20 @@ public partial class BattleSessionTest : TestRunner
     {
       Name = name,
       Description = $"{name} faction"
+    });
+  }
+
+  private static Grenade MakeGrenade(string name, int throwRange = 3, int actionPointCost = 1)
+  {
+    return new Grenade(new GrenadeData
+    {
+      Name = name,
+      Description = $"{name} description",
+      ThrowRange = throwRange,
+      ActionPointCost = actionPointCost,
+      MaxCharges = 1,
+      ConsumesOnUse = true,
+      BlastRadius = 1,
     });
   }
 }

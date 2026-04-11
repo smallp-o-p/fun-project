@@ -8,17 +8,17 @@ public partial class WeaponSystemTest : Node
 {
   private WeaponData MakeWeaponData() => new()
   {
-    DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 10 },
-    CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 5 },
-    RangeStat = new Stat { StatType = StatType.Range, BaseValue = 1 },
+    DamageStat = new DamageStat { BaseValue = 10 },
+    CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
+    RangeStat = new RangeStat { BaseValue = 1 },
   };
 
   private FirearmWeaponData MakeFirearmWeaponData() => new()
   {
-    DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 10 },
-    CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 5 },
-    RangeStat = new Stat { StatType = StatType.Range, BaseValue = 1 },
-    AmmunitionStat = new Stat { StatType = StatType.Ammunition, BaseValue = 12 },
+    DamageStat = new DamageStat { BaseValue = 10 },
+    CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
+    RangeStat = new RangeStat { BaseValue = 1 },
+    AmmunitionStat = new AmmunitionStat { BaseValue = 12 },
     DefaultAmmoData = new AmmunitionData(),
     ModSlotCount = 1
   };
@@ -27,7 +27,7 @@ public partial class WeaponSystemTest : Node
   {
     T("Stat instances work", () =>
     {
-      var dmg = new Stat { StatType = StatType.Damage, BaseValue = 25 };
+      var dmg = new DamageStat { BaseValue = 25 };
       Assert.Equal(25, dmg.BaseValue);
       Assert.Equal(StatType.Damage, dmg.StatType);
     });
@@ -38,9 +38,9 @@ public partial class WeaponSystemTest : Node
       {
         Name = "Fists",
         DamageElement = DamageElement.Kinetic,
-        DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 10 },
-        CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 5 },
-        RangeStat = new Stat { StatType = StatType.Range, BaseValue = 1 },
+        DamageStat = new DamageStat { BaseValue = 10 },
+        CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
+        RangeStat = new RangeStat { BaseValue = 1 },
         ModSlotCount = 0,
       };
       var m = new MeleeWeapon(data);
@@ -55,11 +55,11 @@ public partial class WeaponSystemTest : Node
     {
       var data = new FirearmWeaponData
       {
-        DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 15 },
-        CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 10 },
-        RangeStat = new Stat { StatType = StatType.Range, BaseValue = 20 },
+        DamageStat = new DamageStat { BaseValue = 15 },
+        CriticalChanceStat = new CriticalChanceStat { BaseValue = 10 },
+        RangeStat = new RangeStat { BaseValue = 20 },
         DefaultAmmoData = new AmmunitionData(),
-        AmmunitionStat = new Stat { StatType = StatType.Ammunition, BaseValue = 12 },
+        AmmunitionStat = new AmmunitionStat { BaseValue = 12 },
         ModSlotCount = 0,
       };
       var f = new FirearmWeapon(data);
@@ -312,7 +312,7 @@ public partial class WeaponSystemTest : Node
     T("All StatType enum values are defined", () =>
     {
       var types = Enum.GetValues<StatType>();
-      Assert.Equal(5, types.Length);
+      Assert.Equal(10, types.Length);
       Assert.Equal(StatType.Health, (StatType)0);
     });
 
@@ -331,10 +331,10 @@ public partial class WeaponSystemTest : Node
       var data = new FirearmWeaponData
       {
         DefaultAmmoData = new AmmunitionData { Name = "Standard", Description = "Standard issue rounds" },
-        DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 10 },
-        CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 5 },
-        RangeStat = new Stat { StatType = StatType.Range, BaseValue = 15 },
-        AmmunitionStat = new Stat { StatType = StatType.Ammunition, BaseValue = 12 },
+        DamageStat = new DamageStat { BaseValue = 10 },
+        CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
+        RangeStat = new RangeStat { BaseValue = 15 },
+        AmmunitionStat = new AmmunitionStat { BaseValue = 12 },
         ModSlotCount = 0,
       };
       var weapon = new FirearmWeapon(data);
@@ -369,11 +369,11 @@ public partial class WeaponSystemTest : Node
     {
       var data = new AmmunitionedWeaponData
       {
-        AmmunitionStat = new Stat { StatType = StatType.Ammunition, BaseValue = 6 },
+        AmmunitionStat = new AmmunitionStat { BaseValue = 6 },
         DefaultAmmoData = new AmmunitionData { Name = "Test Ammo" },
-        DamageStat = new Stat { StatType = StatType.Damage, BaseValue = 20 },
-        CriticalChanceStat = new Stat { StatType = StatType.CriticalChance, BaseValue = 10 },
-        RangeStat = new Stat { StatType = StatType.Range, BaseValue = 5 },
+        DamageStat = new DamageStat { BaseValue = 20 },
+        CriticalChanceStat = new CriticalChanceStat { BaseValue = 10 },
+        RangeStat = new RangeStat { BaseValue = 5 },
       };
       Assert.Equal(6, data.AmmunitionStat.BaseValue);
       Assert.Equal("Test Ammo", data.DefaultAmmoData.Name);

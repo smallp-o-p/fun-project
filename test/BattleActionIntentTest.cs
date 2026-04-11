@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Items;
 using FunProject.Stats;
 using Godot;
 using System;
@@ -61,6 +62,22 @@ public partial class BattleActionIntentTest : TestRunner
       Assert.Equal(factionB, session.ActiveSide);
     });
 
+    T("ThrowItem intent removes throwable from inventory and emits throw flow", () =>
+    {
+      var session = new BattleSession(5, 5, 1);
+      var faction = MakeFaction("Player");
+      var unit = session.AddUnit(MakeCombatant("Thrower", faction, actionPoints: 4), new Vector3I(1, 0, 1));
+      var grenade = MakeGrenade("Practice");
+      unit.AddInventoryItem(grenade);
+      session.StartBattle();
+
+      var applied = BattleActionIntent.ThrowItem(unit.UnitId, grenade, new Vector3I(2, 0, 1)).Apply(session);
+
+      Assert.True(applied);
+      Assert.False(unit.HasInventoryItem(grenade));
+      Assert.Equal(3, unit.CurrentActionPoints);
+    });
+
     T("Custom intent executes provided resolver", () =>
     {
       var session = new BattleSession(3, 3, 1);
@@ -120,12 +137,12 @@ public partial class BattleActionIntentTest : TestRunner
     return new Combatant(new CombatantData
     {
       Name = name,
-      HealthStat = new Stat { StatType = StatType.Health, BaseValue = health },
-      ActionPointsStat = new Stat { StatType = StatType.ActionPoints, BaseValue = actionPoints },
-      WillStat = new Stat { StatType = StatType.Will, BaseValue = 50 },
-      MovementStat = new Stat { StatType = StatType.Movement, BaseValue = movement },
-      AimStat = new Stat { StatType = StatType.Aim, BaseValue = 65 },
-      BaseArmorStat = new Stat { StatType = StatType.BaseArmor, BaseValue = 0 },
+      HealthStat = new HealthStat { BaseValue = health },
+      ActionPointsStat = new ActionPointsStat { BaseValue = actionPoints },
+      WillStat = new WillStat { BaseValue = 50 },
+      MovementStat = new MovementStat { BaseValue = movement },
+      AimStat = new AimStat { BaseValue = 65 },
+      BaseArmorStat = new BaseArmorStat { BaseValue = 0 },
       ModSlotCount = 0,
     }, faction);
   }
@@ -136,6 +153,20 @@ public partial class BattleActionIntentTest : TestRunner
     {
       Name = name,
       Description = $"{name} faction"
+    });
+  }
+
+  private static Grenade MakeGrenade(string name)
+  {
+    return new Grenade(new GrenadeData
+    {
+      Name = name,
+      Description = $"{name} grenade",
+      ThrowRange = 4,
+      ActionPointCost = 1,
+      MaxCharges = 1,
+      ConsumesOnUse = true,
+      BlastRadius = 1,
     });
   }
 }

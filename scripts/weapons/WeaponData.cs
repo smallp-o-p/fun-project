@@ -1,5 +1,6 @@
 using Godot;
 using FunProject.Core;
+using FunProject.Items;
 using FunProject.Stats;
 
 namespace FunProject.Weapons;
@@ -13,11 +14,10 @@ public enum DamageElement
 }
 
 [GlobalClass]
-public partial class WeaponData : NamedEntityData
+public partial class WeaponData : EquippableItemData
 {
   [Export] public DamageElement DamageElement { get; set; }
-  [Export] public Stat DamageStat { get; set; }
-  [Export] public Stat RangeStat { get; set; }
-  [Export] public Stat CriticalChanceStat { get; set; }
-  [Export] public int ModSlotCount { get; set; }
+  [Export] public DamageStat DamageStat { get; set; }
+  [Export] public RangeStat RangeStat { get; set; }
+  [Export] public CriticalChanceStat CriticalChanceStat { get; set; }
 }

@@ -1,5 +1,6 @@
 #nullable enable
 using FunProject.Combatants;
+using FunProject.Items;
 using FunProject.Weapons;
 using Godot;
 using System;
@@ -174,6 +175,46 @@ public sealed class BattleSession
     return true;
   }
 
+  public bool TryThrowSelectedUnitItem(ThrowableItem item, Vector3I targetCell)
+  {
+    if (SelectedUnit == null)
+      return false;
+
+    return TryThrowItem(SelectedUnit.UnitId, item, targetCell);
+  }
+
+  public bool TryThrowItem(int unitId, ThrowableItem item, Vector3I targetCell)
+  {
+    if (Phase != BattlePhase.InProgress)
+      return false;
+    if (!TryGetUnit(unitId, out var unit) || unit == null || !unit.IsAlive)
+      return false;
+    if (item == null)
+      return false;
+    if (ActiveSide == null || unit.Side != ActiveSide)
+      return false;
+    if (!Board.IsInBounds(targetCell))
+      return false;
+    if (!unit.HasInventoryItem(item))
+      return false;
+    if (GetGridDistance(unit.Position, targetCell) > item.ThrowRange)
+      return false;
+    if (!unit.TrySpendActionPoints(item.ActionPointCost))
+      return false;
+
+    if (item.ConsumesOnUse)
+    {
+      if (!item.TrySpendCharge())
+        return false;
+
+      if (item.IsDepleted)
+        unit.RemoveInventoryItem(item);
+    }
+
+    Publish(new BattleEvent(BattleEventType.ItemThrown, unit.UnitId, targetCell, $"{unit.Combatant.Name} threw {item.ItemName}."));
+    return true;
+  }
+
   public void AdvanceTurn()
   {
     if (Phase != BattlePhase.InProgress)
@@ -260,6 +301,12 @@ public sealed class BattleSession
   {
     Vector3I delta = source - destination;
     return Mathf.Abs(delta.X) + Mathf.Abs(delta.Y) + Mathf.Abs(delta.Z) == 1;
+  }
+
+  private static int GetGridDistance(Vector3I source, Vector3I destination)
+  {
+    Vector3I delta = source - destination;
+    return Mathf.Abs(delta.X) + Mathf.Abs(delta.Y) + Mathf.Abs(delta.Z);
   }
 
   private void Publish(BattleEvent battleEvent)

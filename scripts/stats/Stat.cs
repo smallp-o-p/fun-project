@@ -16,10 +16,9 @@ public enum StatType
   BaseArmor
 }
 
-[GlobalClass]
-public partial class Stat : Resource
+public abstract partial class Stat : Resource
 {
-  [Export] public StatType StatType { get; set; }
+  public abstract StatType StatType { get; }
   [Export] public int BaseValue { get; set; } = 0;
 }
 

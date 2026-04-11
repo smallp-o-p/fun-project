@@ -1,6 +1,7 @@
 #nullable enable
 using Godot;
 using System;
+using FunProject.Items;
 
 namespace FunProject.Battle;
 
@@ -74,6 +75,21 @@ public sealed class BattleActionIntent
         session.AdvanceTurn();
         return true;
       });
+  }
+
+  public static BattleActionIntent ThrowItem(int unitId, ThrowableItem item, Vector3I targetCell)
+  {
+    return new BattleActionIntent(
+      actionId: "throw_item",
+      unitId: unitId,
+      resolver: (session, intent) =>
+      {
+        if (!intent.TargetCell.HasValue)
+          return false;
+
+        return session.TryThrowItem(intent.UnitId, item, intent.TargetCell.Value);
+      },
+      targetCell: targetCell);
   }
 
   public static BattleActionIntent Custom(

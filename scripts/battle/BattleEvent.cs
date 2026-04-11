@@ -14,6 +14,7 @@ public enum BattleEventType
   UnitSelected,
   UnitMoved,
   UnitDamaged,
+  ItemThrown,
 }
 
 public readonly record struct BattleEvent(

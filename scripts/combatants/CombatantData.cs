@@ -7,11 +7,11 @@ namespace FunProject.Combatants;
 [GlobalClass]
 public partial class CombatantData : NamedEntityData
 {
-  [Export] public Stat HealthStat { get; set; }
-  [Export] public Stat ActionPointsStat { get; set; }
-  [Export] public Stat WillStat { get; set; }
-  [Export] public Stat MovementStat { get; set; }
-  [Export] public Stat AimStat { get; set; }
-  [Export] public Stat BaseArmorStat {get; set; }
+  [Export] public HealthStat HealthStat { get; set; }
+  [Export] public ActionPointsStat ActionPointsStat { get; set; }
+  [Export] public WillStat WillStat { get; set; }
+  [Export] public MovementStat MovementStat { get; set; }
+  [Export] public AimStat AimStat { get; set; }
+  [Export] public BaseArmorStat BaseArmorStat {get; set; }
   [Export] public int ModSlotCount { get; set; }
 }
