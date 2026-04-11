@@ -4,24 +4,17 @@ using Godot.Collections;
 
 namespace FunProject.Combatants;
 
-public enum Faction
-{
-  Player,
-  Enemy,
-  Neutral,
-}
-
 public class Combatant : HasStats, HasModSlots
 {
   public string Name { get; }
-  public Faction Faction { get; }
+  public Faction OwningFaction { get; }
   private readonly Dictionary<StatType, Stat> _stats;
   private readonly Array<ModSlot> _modSlots = [];
 
   public Combatant(CombatantData data, Faction faction)
   {
     Name = data.Name;
-    Faction = faction;
+    OwningFaction = faction;
     _stats = new Dictionary<StatType, Stat>
     {
       [StatType.Health] = data.HealthStat,

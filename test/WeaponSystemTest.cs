@@ -356,7 +356,10 @@ public partial class WeaponSystemTest : Node
       var ammoData = new AmmunitionData
       {
         Name = "+Damage Ammo",
-        Modifiers = [StatModifier.Add(10)]
+        Modifiers = [new StatMod {
+          TargetStat = StatType.Damage,
+          Modifiers = [StatModifier.Add(10)]
+        }]
       };
       var ammo = new Ammunition(ammoData);
       Assert.Equal(1, ammo.statModifiers.Count);
