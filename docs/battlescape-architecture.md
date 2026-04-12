@@ -5,6 +5,7 @@ This document is the target architecture reference for the tactical combat layer
 ## Design Goals
 
 - `BattleSession` is the single source of truth for live tactical state.
+- `BattleSession` is constructed from immutable battle configuration data and exposes authoritative runtime state for inbound `BattleSessionMutation` commands executed directly against it.
 - Resource templates such as `CombatantData`, `WeaponData`, and faction resources feed runtime state but never hold mutable battle progress.
 - Tactical systems operate on session state through explicit responsibilities instead of blending rules, rendering, and input together.
 - Godot scene nodes present the battle and collect player input, but they do not own combat truth.
@@ -24,7 +25,7 @@ flowchart LR
     end
 
     subgraph Runtime["Authoritative Tactical Runtime"]
-        BattleSession["BattleSession\nsingle source of truth"]
+        BattleSession["BattleSession\nsingle source of truth\nincluding turn flow"]
 
         subgraph RuntimeState["Mutable Session State"]
             BoardState["BattleBoardState\nBattleTileState[x,y,z]\ncover, occupancy, hazards, objectives"]
@@ -34,7 +35,6 @@ flowchart LR
         end
 
         subgraph Systems["Battle Systems"]
-            TurnSystem["BattleTurnSystem\nturn order, side changes,\nselection, refresh, end turn"]
             ActionExecutor["BattleActionExecutor\nintent queue, step resolution,\ninterrupt handling, animation hooks"]
             Visibility["BattleVisibilitySystem\nLOS, FOV, detection,\nreaction-fire candidates"]
             Pathfinder["BattlePathfinder\nroute generation, reachable tiles,\npath preview, movement cost"]
@@ -69,9 +69,7 @@ flowchart LR
     Pathfinder --> BattleSession
     Pathfinder --> Rules
 
-    TurnSystem --> BattleSession
-    ActionExecutor --> BattleSession
-    ActionExecutor --> TurnSystem
+    ActionExecutor -->|"BattleSessionMutation"| BattleSession
     ActionExecutor --> Rules
     ActionExecutor --> Effects
     ActionExecutor --> Visibility
@@ -101,8 +99,10 @@ flowchart LR
 ## Ownership Rules
 
 - `BattleSession` owns all live tactical truth.
-- `BattleTurnSystem`, `BattleActionExecutor`, `BattleVisibilitySystem`, `BattleEffectSystem`, and `BattleGenerator` are allowed to mutate `BattleSession`.
-- `BattlePathfinder`, `BattleRules`, and `BattleAIController` may read widely, but only the executor, turn system, or explicit effect application path should commit battle-changing results back into session state.
+- `BattleSession` directly owns turn order, active side, turn advancement, faction-queue reconciliation, and the authoritative handling of inbound `BattleSessionMutation` commands.
+- `BattleSession` constructor input defines board dimensions, the stable global faction order, and the combatant rosters each faction brings to the battle.
+- `BattleActionExecutor`, `BattleVisibilitySystem`, `BattleEffectSystem`, and `BattleGenerator` are allowed to mutate `BattleSession` state through explicit battle-runtime APIs.
+- `BattlePathfinder`, `BattleRules`, and `BattleAIController` may read widely, but only the session, executor, or explicit effect application path should commit battle-changing results back into session state.
 - `BattleSceneController`, `BattleScene`, and HUD nodes translate input, display state, and react to events. They do not spend AP, move units, or mark visibility directly.
 - Existing resource types map into the generator phase and runtime instantiation phase only.
 - Weapon mods are split between passive stat modifiers and structured battle effects. Effects are resolved through the battle runtime, not by scene nodes or ad hoc script side effects.
@@ -135,12 +135,12 @@ sequenceDiagram
     Player->>HUD: Confirm movement
     HUD->>Controller: Commit move intent
     Controller->>Exec: Enqueue MoveUnit intent
-    Exec->>Session: Validate active unit and reserve action context
+    Exec->>Session: Apply MoveUnit mutation
 
     loop For each step in path
         Exec->>Rules: Validate AP cost for next step
         Rules-->>Exec: Step legal / illegal
-        Exec->>Session: Spend AP and move unit one tile
+        Exec->>Session: Apply step mutation
         Exec->>Event: Emit UnitMoved step event
         Exec->>Vis: Recalculate visibility from changed position
         Vis->>Session: Update spotted units / seen tiles / reaction candidates
@@ -148,11 +148,11 @@ sequenceDiagram
         Vis->>Rules: Score reaction-fire opportunities
         alt Enemy reactor has valid interrupt
             Vis-->>Exec: Trigger interrupt candidate
-            Exec->>Session: Pause move sequence
+            Exec->>Session: Mutate authoritative interrupt state
             Exec->>Event: Emit ReactionFireStarted
             Exec->>Rules: Resolve shot and damage
             Rules-->>Exec: Hit / miss / damage result
-            Exec->>Session: Apply damage, status, death, morale fallout
+            Exec->>Session: Apply damage/status mutation
             Exec->>Event: Emit shot and damage events
             opt Moving unit can no longer continue
                 Exec->>Session: End move intent early
@@ -162,7 +162,7 @@ sequenceDiagram
         end
     end
 
-    Exec->>Session: Finalize action state
+    Exec->>Session: Finalize action state through mutations
     Exec->>Event: Emit ActionResolved
     Event-->>View: Play movement, spotting, and shot visuals
     Event-->>HUD: Refresh AP, selection, visible enemies, and prompts
@@ -174,11 +174,12 @@ sequenceDiagram
 Use these names consistently in future implementation work, even before all files exist:
 
 - `BattleSession`
+- `BattleSessionMutation`
 - `BattleUnitState`
 - `BattleItemState`
 - `BattleActionIntent`
+- Concrete built-in intents such as `MoveStepBattleActionIntent`, `PassUnitBattleActionIntent`, `EndFactionTurnBattleActionIntent`, and `ThrowItemBattleActionIntent`
 - `BattleActionExecutor`
-- `BattleTurnSystem`
 - `BattleVisibilitySystem`
 - `BattlePathfinder`
 - `BattleRules`
@@ -186,6 +187,11 @@ Use these names consistently in future implementation work, even before all file
 - `BattleAIController`
 - `BattleEvent`
 - `BattleSceneController`
+
+Detailed design notes:
+
+- [BattleActionExecutor Design](./battle-action-executor.md)
+- [BattleSession Command Pattern](./battle-session-command-pattern.md)
 
 ## Battle-Aware Weapon Mods
 

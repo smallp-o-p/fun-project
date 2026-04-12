@@ -1,7 +1,6 @@
 #nullable enable
 using Godot;
 using System;
-using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
@@ -9,46 +8,23 @@ public sealed class BattleBoardState
 {
   private readonly BattleTileState[,,] _tiles;
 
-  public int Width { get; }
-  public int Length { get; }
-  public int Levels { get; }
-  public IEnumerable<BattleTileState> Tiles
+  Vector3I Dimensions { get; }
+
+  public BattleBoardState(Vector3I dim)
   {
-    get
+    if (dim.X <= 0 || dim.Y <= 0 || dim.Z <= 0)
+      throw new ArgumentOutOfRangeException(nameof(dim));
+
+    Dimensions = dim;
+    _tiles = new BattleTileState[Dimensions.X, Dimensions.Y, Dimensions.Z];
+
+    for (int y = 0; y < Dimensions.Y; y++)
     {
-      for (int y = 0; y < Levels; y++)
+      for (int z = 0; z < Dimensions.Z; z++)
       {
-        for (int z = 0; z < Length; z++)
+        for (int x = 0; x < Dimensions.X; x++)
         {
-          for (int x = 0; x < Width; x++)
-            yield return _tiles[x, y, z];
-        }
-      }
-    }
-  }
-
-  public BattleBoardState(int width, int length, int levels = 1)
-  {
-    if (width <= 0)
-      throw new ArgumentOutOfRangeException(nameof(width));
-    if (length <= 0)
-      throw new ArgumentOutOfRangeException(nameof(length));
-    if (levels <= 0)
-      throw new ArgumentOutOfRangeException(nameof(levels));
-
-    Width = width;
-    Length = length;
-    Levels = levels;
-    _tiles = new BattleTileState[width, levels, length];
-
-    for (int y = 0; y < levels; y++)
-    {
-      for (int z = 0; z < length; z++)
-      {
-        for (int x = 0; x < width; x++)
-        {
-          var coordinates = new Vector3I(x, y, z);
-          _tiles[x, y, z] = new BattleTileState(coordinates);
+          _tiles[x, y, z] = new BattleTileState(new Vector3I(x, y, z));
         }
       }
     }
@@ -59,9 +35,9 @@ public sealed class BattleBoardState
     return coordinates.X >= 0
       && coordinates.Y >= 0
       && coordinates.Z >= 0
-      && coordinates.X < Width
-      && coordinates.Y < Levels
-      && coordinates.Z < Length;
+      && coordinates.X < Dimensions.X
+      && coordinates.Y < Dimensions.Y
+      && coordinates.Z < Dimensions.Z;
   }
 
   public BattleTileState? GetTileOrNull(Vector3I coordinates)
@@ -81,9 +57,15 @@ public sealed class BattleBoardState
     return tile;
   }
 
+  public bool TrySetOccupant(Vector3I coords, int unitId)
+  {
+    BattleTileState tile = GetTile(coords);
+    return tile.TrySetOccupant(unitId);
+  }
+
   public bool CanOccupy(Vector3I coordinates)
   {
     var tile = GetTileOrNull(coordinates);
-    return tile is { IsWalkable: true, IsOccupied: false };
+    return tile != null && tile.IsWalkable && !tile.IsOccupied;
   }
 }

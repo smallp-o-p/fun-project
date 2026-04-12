@@ -4,6 +4,10 @@ This document defines the first implementation slice of `BattleActionExecutor` f
 
 It is a narrower design than the long-term architecture in [battlescape-architecture.md](./battlescape-architecture.md). The goal is to introduce the correct authority boundaries now, while keeping the implementation simple enough to use immediately.
 
+The current implementation has moved past this exact intent-based slice. `BattleActionExecutor` now queues executable `BattleSessionMutation` commands directly, and `BattleActionIntent` should be translated upstream before enqueue.
+
+Treat the rest of this document as historical context for the earlier intent-driven executor shape. For the current command-based design, see [BattleSession Command Pattern](./battle-session-command-pattern.md).
+
 ## Purpose
 
 `BattleActionExecutor` is the orchestration layer between action requests and authoritative battle-state mutation.
@@ -16,7 +20,7 @@ It is responsible for:
 
 - owning the pending action queue
 - executing at most one action step at a time
-- translating action intents into calls against `BattleSession`
+- translating action intents into `BattleSessionMutation` values and submitting them through `BattleSession.Apply(...)`
 - returning structured execution results
 - providing one place to add future interrupt checks, animation pacing, and action-level sequencing
 
@@ -32,6 +36,7 @@ It is not responsible for:
 - `BattleSceneController` and `BattleAIController` create `BattleActionIntent` objects.
 - `BattleActionExecutor` consumes those intents.
 - `BattleSession` remains the only owner of authoritative tactical state.
+- `BattleActionExecutor` does not call ad hoc `Try...` methods on the session; it submits typed session mutations instead.
 - `BattleSession` emits `BattleEvent` values after state changes occur.
 - visuals and HUD listen to `BattleEvent` and re-query `BattleSession` as needed.
 
@@ -147,20 +152,20 @@ These are executor-level orchestration events, not presentation state events. Pr
 
 - represented by `MoveStepBattleActionIntent`
 - carries `UnitId`, `TargetCell`, and explicit step AP cost
-- calls `BattleSession.TryMoveUnitStep(...)`
+- submits `BattleSessionMutation.MoveUnitStep(...)`
 
 ### Pass Unit
 
 - represented by `PassUnitBattleActionIntent`
-- calls `BattleSession.TryPassUnit(...)`
+- submits `BattleSessionMutation.PassUnit(...)`
 - marks the unit as done for the current faction turn
-- selects the next available allied unit when one exists
+- leaves any presentation-layer unit focus decisions to higher layers
 
 ### End Faction Turn
 
 - represented by `EndFactionTurnBattleActionIntent`
 - carries the issuing `Faction`
-- calls `BattleSession.TryEndFactionTurn(...)`
+- submits `BattleSessionMutation.EndFactionTurn(...)`
 - executor should reject the intent if battle state already advanced to a different active side before dequeue
 - advances to the next faction when legal
 
@@ -168,7 +173,7 @@ These are executor-level orchestration events, not presentation state events. Pr
 
 - represented by `ThrowItemBattleActionIntent`
 - carries `UnitId`, `TargetCell`, and a `ThrowableItem` reference
-- calls `BattleSession.TryThrowItem(...)`
+- submits `BattleSessionMutation.ThrowItem(...)`
 
 ### Custom
 
@@ -209,7 +214,7 @@ The first executor tests should cover:
 - queued actions execute in FIFO order
 - `move_step` succeeds when legal
 - `move_step` fails when illegal
-- `pass_unit` marks the unit done and moves selection forward
+- `pass_unit` marks the unit done without mutating presentation-layer selection state
 - `end_faction_turn` advances the active side
 - stale `end_faction_turn` intents are rejected once the active side has changed
 - `throw_item` consumes the throwable when legal

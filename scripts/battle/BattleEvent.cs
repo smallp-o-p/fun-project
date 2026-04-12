@@ -11,10 +11,10 @@ public enum BattleEventType
   TurnEnded,
   ActiveSideChanged,
   UnitAdded,
-  UnitSelected,
   UnitActivationEnded,
   UnitMoved,
   UnitDamaged,
+  UnitKilled,
   ItemThrown,
 }
 

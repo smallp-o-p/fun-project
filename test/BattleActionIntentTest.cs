@@ -62,25 +62,23 @@ public partial class BattleActionIntentTest : TestRunner
       Assert.Equal(3, namedIntent.UnitId);
     });
 
-    T("Custom action uses the provided resolver when executed by the executor", () =>
+    T("Custom action uses the provided resolver when executed directly", () =>
     {
       bool invoked = false;
-      var executor = new BattleActionExecutor(new BattleSession(2, 2, 1));
-      var intent = BattleActionIntent.Custom("custom_ping", (_, self) =>
+      var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2));
+      var intent = BattleActionIntent.Custom("custom_ping", (runtimeSession, self) =>
       {
         invoked = true;
         Assert.Equal("custom_ping", self.ActionId);
         Assert.Equal(11, self.UnitId);
         Assert.Equal(7, (int)self.Payload!.Value);
-        return true;
+        return BattleSessionMutation.StartBattle().Execute(runtimeSession).FailureReason == BattleMutationFailureReason.Rejected;
       }, unitId: 11, payload: Variant.From(7));
 
-      executor.Enqueue(intent);
-      var result = executor.Tick();
+      var result = intent.Resolve(session);
 
       Assert.True(invoked);
-      Assert.True(result.HasValue);
-      Assert.True(result!.Value.Succeeded);
+      Assert.True(result);
     });
 
     Report();

@@ -1,6 +1,10 @@
+#nullable enable
+using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Stats;
+using Godot;
+using System.Collections.Generic;
 
 internal static class BattleTestFactory
 {
@@ -45,5 +49,16 @@ internal static class BattleTestFactory
       ConsumesOnUse = true,
       BlastRadius = 1,
     });
+  }
+
+  public static BattleSession MakeSession(
+    Vector3I dimensions,
+    IEnumerable<Faction>? globalFactionOrder = null,
+    IDictionary<Faction, IEnumerable<Combatant>>? factionRosters = null)
+  {
+    return new BattleSession(
+      dimensions,
+      globalFactionOrder ?? [],
+      factionRosters ?? new Dictionary<Faction, IEnumerable<Combatant>>());
   }
 }

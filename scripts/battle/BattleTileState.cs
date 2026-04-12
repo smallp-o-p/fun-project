@@ -18,7 +18,7 @@ public sealed class BattleTileState
 
   public bool TrySetOccupant(int unitId)
   {
-    if (OccupantUnitId.HasValue)
+    if (OccupantUnitId.HasValue || !IsWalkable)
       return false;
 
     OccupantUnitId = unitId;
