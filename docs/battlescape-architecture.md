@@ -1,113 +1,171 @@
 # Battlescape Tactical Runtime Architecture
 
-This document is the target architecture reference for the tactical combat layer. It describes the runtime system boundaries we want to build toward for an X-COM-style battle in Godot, based on the useful separations in OpenXcom without copying its SDL-era implementation shape.
+This document describes the current tactical runtime shape in the repo and the nearby extensions it is designed to support. It reflects the battle code as it exists now, not the older pre-command session design.
 
 ## Design Goals
 
 - `BattleSession` is the single source of truth for live tactical state.
-- `BattleSession` is constructed from immutable battle configuration data and exposes authoritative runtime state for inbound `BattleSessionMutation` commands executed directly against it.
-- Resource templates such as `CombatantData`, `WeaponData`, and faction resources feed runtime state but never hold mutable battle progress.
-- Tactical systems operate on session state through explicit responsibilities instead of blending rules, rendering, and input together.
-- Godot scene nodes present the battle and collect player input, but they do not own combat truth.
-- Action resolution is step-based so movement, visibility refresh, and interrupts such as reaction fire can occur mid-action.
+- `BattleSession` is constructed from battle setup data: board dimensions, stable faction order, and faction rosters.
+- `BattleSessionMutation` is the authoritative command layer. Mutations execute directly against the session.
+- `BattleActionExecutor` is a mutation queue and invoker, not an intent-to-action switchboard.
+- Godot scene nodes own presentation, input, and focused-unit UX. They do not own tactical truth.
+- Board coordinates use normal `Godot.Vector3I` semantics:
+  - `X` = width
+  - `Y` = levels / height
+  - `Z` = length / depth
+- Future tactical systems such as pathfinding, visibility, effects, and AI should integrate through explicit session reads and mutation execution instead of mutating scene state directly.
 
-## Component Diagram
+## Current Runtime Diagram
 
 ```mermaid
 flowchart LR
     subgraph Templates["Static Definitions (Godot Resources)"]
         CombatantData["CombatantData"]
-        WeaponData["WeaponData / FirearmWeaponData / AmmunitionData"]
-        WeaponModData["WeaponModDefinition\nstat modifiers + battle effects"]
-        BattleEffectData["BattleEffectDefinition\nburn, pierce, chain,\nreaction modifiers, reload rules"]
+        WeaponData["WeaponData / FirearmWeaponData"]
+        ItemData["EquippableItemData / ThrowableItemData"]
         FactionData["FactionData"]
-        BattleConfig["Mission / map setup data"]
+        BattleConfig["Battle setup data"]
     end
 
     subgraph Runtime["Authoritative Tactical Runtime"]
-        BattleSession["BattleSession\nsingle source of truth\nincluding turn flow"]
-
-        subgraph RuntimeState["Mutable Session State"]
-            BoardState["BattleBoardState\nBattleTileState[x,y,z]\ncover, occupancy, hazards, objectives"]
-            UnitState["BattleUnitState[]\nposition, AP, facing, stance,\nvisibility, status effects, inventory refs"]
-            ItemState["BattleItemState[]\nammo, ownership, tile drops,\nweapon runtime state"]
-            EventStream["BattleEvent stream"]
-        end
-
-        subgraph Systems["Battle Systems"]
-            ActionExecutor["BattleActionExecutor\nintent queue, step resolution,\ninterrupt handling, animation hooks"]
-            Visibility["BattleVisibilitySystem\nLOS, FOV, detection,\nreaction-fire candidates"]
-            Pathfinder["BattlePathfinder\nroute generation, reachable tiles,\npath preview, movement cost"]
-            Rules["BattleRules\nhit, damage, AP cost,\ncover, deterministic combat math"]
-            Effects["BattleEffectSystem\nweapon mod hooks,\nstatus application,\nsecondary effect generation"]
-            AI["BattleAIController\ndecision making for non-player units"]
-            Generator["BattleGenerator\nspawn units, seed board,\ninstantiate runtime state"]
-        end
+        BattleSession["BattleSession\nsingle source of truth\nturn flow + bookkeeping"]
+        BoardState["BattleBoardState\nBattleTileState[x,y,z]\noccupancy + walkability"]
+        UnitState["BattleUnitState[]\nposition, AP, health,\ninventory refs, equipped weapon"]
+        EventStream["BattleEvent stream"]
+        Mutations["BattleSessionMutation\nexecutable commands"]
+        ActionExecutor["BattleActionExecutor\nmutation queue + invocation"]
     end
 
     subgraph Presentation["Godot Presentation / Input"]
-        SceneController["BattleSceneController\ninput translation, selection UX,\ncamera orchestration"]
-        BattleScene["BattleScene / scene nodes\nmap visuals, units, VFX, HUD"]
-        HUD["Battle HUD\nunit panel, action bar,\nturn controls, previews"]
+        SceneController["BattleSceneController\ninput translation,\nselection UX, camera"]
+        BattleScene["BattleScene / scene nodes\nmap visuals, units, VFX"]
+        HUD["Battle HUD\naction buttons, turn controls,\npreviews"]
     end
 
-    Templates --> Generator
-    Generator --> BattleSession
-    WeaponModData --> Generator
-    BattleEffectData --> Effects
+    Templates --> BattleSession
 
     BattleSession --- BoardState
     BattleSession --- UnitState
-    BattleSession --- ItemState
     BattleSession --- EventStream
 
-    SceneController -->|"BattleActionIntent"| ActionExecutor
-    HUD -->|"BattleActionIntent"| SceneController
+    HUD -->|"player request"| SceneController
     BattleScene -->|"selection / hover / click"| SceneController
+    SceneController -->|"translate to mutation"| ActionExecutor
 
-    SceneController --> Pathfinder
-    Pathfinder --> BattleSession
-    Pathfinder --> Rules
-
-    ActionExecutor -->|"BattleSessionMutation"| BattleSession
-    ActionExecutor --> Rules
-    ActionExecutor --> Effects
-    ActionExecutor --> Visibility
-    ActionExecutor --> Pathfinder
-    ActionExecutor -->|"emit"| EventStream
-
-    Visibility --> BattleSession
-    Visibility --> Rules
-    Visibility -->|"emit spotted / hidden / reaction-ready"| EventStream
-
-    Effects --> BattleSession
-    Effects --> Rules
-    Effects -->|"structured follow-up effects"| ActionExecutor
-    Effects -->|"emit status / hazard / proc"| EventStream
-
-    AI --> BattleSession
-    AI --> Rules
-    AI --> Pathfinder
-    AI -->|"BattleActionIntent"| ActionExecutor
+    ActionExecutor -->|"invoke"| Mutations
+    Mutations -->|"execute against"| BattleSession
 
     BattleSession -->|"query only"| SceneController
     EventStream --> BattleScene
     EventStream --> HUD
-    BattleScene -->|"redraw / animate only"| EventStream
 ```
 
 ## Ownership Rules
 
-- `BattleSession` owns all live tactical truth.
-- `BattleSession` directly owns turn order, active side, turn advancement, faction-queue reconciliation, and the authoritative handling of inbound `BattleSessionMutation` commands.
-- `BattleSession` constructor input defines board dimensions, the stable global faction order, and the combatant rosters each faction brings to the battle.
-- `BattleActionExecutor`, `BattleVisibilitySystem`, `BattleEffectSystem`, and `BattleGenerator` are allowed to mutate `BattleSession` state through explicit battle-runtime APIs.
-- `BattlePathfinder`, `BattleRules`, and `BattleAIController` may read widely, but only the session, executor, or explicit effect application path should commit battle-changing results back into session state.
-- `BattleSceneController`, `BattleScene`, and HUD nodes translate input, display state, and react to events. They do not spend AP, move units, or mark visibility directly.
-- Existing resource types map into the generator phase and runtime instantiation phase only.
-- Weapon mods are split between passive stat modifiers and structured battle effects. Effects are resolved through the battle runtime, not by scene nodes or ad hoc script side effects.
+- `BattleSession` owns:
+  - battle phase
+  - turn number
+  - active side
+  - global faction order
+  - round queue
+  - alive and dead unit bookkeeping
+  - current-turn unit availability
+  - board occupancy
+  - authoritative battle event emission
+- `BattleSessionMutation` owns mutation-specific validation and orchestration. Each concrete mutation decides whether it can execute and which session helpers it needs to call.
+- `BattleActionExecutor` owns:
+  - the pending mutation queue
+  - invocation order
+  - last-result tracking
+  - exception isolation around command execution
+- `BattleSceneController`, `BattleScene`, and HUD own:
+  - focused / selected unit UX
+  - previews
+  - camera behavior
+  - presentation timing
+- `BattleSession` does not track a selected unit. Selection is presentation state.
+- Inventory currently lives on `BattleUnitState`. There is no separate `BattleItemState` runtime layer yet.
+- `BattleActionIntent` is still a useful upstream request model, but it is no longer the executor's core input type.
 
-## Representative Flow: Move With Visibility Refresh And Reaction Fire
+## Current Implemented Runtime
+
+### BattleSession
+
+`BattleSession` currently exposes authoritative state and bookkeeping around:
+
+- `Board`
+- `Phase`
+- `TurnNumber`
+- `ActiveSide`
+- `AliveUnits`
+- `DeadUnits`
+- `GlobalFactionTurnOrder`
+- `TurnQueue`
+- `FactionRosters`
+
+It is initialized with:
+
+- `Vector3I dimensions`
+- `IEnumerable<Faction> globalFactionOrder`
+- `IDictionary<Faction, IEnumerable<Combatant>> factionRosters`
+
+The session currently owns:
+
+- creating runtime unit ids
+- placing spawned units onto the board
+- moving units between alive and dead storage
+- handling faction elimination
+- rebuilding and advancing the round queue
+- refreshing action-point availability for the active side
+- ending the battle when no living factions remain
+
+### BattleSessionMutation
+
+The current built-in authoritative mutations are:
+
+- `StartBattleBattleSessionMutation`
+- `SpawnUnitBattleSessionMutation`
+- `MoveUnitStepBattleSessionMutation`
+- `ThrowItemBattleSessionMutation`
+- `ApplyDamageBattleSessionMutation`
+- `PassUnitBattleSessionMutation`
+- `EndFactionTurnBattleSessionMutation`
+
+Each mutation executes directly through:
+
+```csharp
+var result = mutation.Execute(session);
+```
+
+Mutation results are returned as `BattleMutationResult`, including:
+
+- success or failure
+- failure reason
+- optional affected unit
+- optional message
+
+### BattleActionExecutor
+
+`BattleActionExecutor` currently queues `BattleSessionMutation`, not `BattleActionIntent`.
+
+Current responsibilities:
+
+- `Enqueue(...)`
+- `EnqueueRange(...)`
+- `Tick()`
+- `DrainQueue(...)`
+- `MutationStarted` event
+- `MutationResolved` event
+- `LastResult`
+- `ActiveMutation`
+
+The executor does not currently:
+
+- resolve intents through a switch
+- own selection logic
+- mutate session state directly outside mutation execution
+
+## Representative Flow: Current Move Command
 
 ```mermaid
 sequenceDiagram
@@ -115,76 +173,82 @@ sequenceDiagram
     actor Player
     participant HUD as Battle HUD
     participant Controller as BattleSceneController
-    participant Path as BattlePathfinder
     participant Exec as BattleActionExecutor
+    participant Mutation as MoveUnitStepBattleSessionMutation
     participant Session as BattleSession
-    participant Vis as BattleVisibilitySystem
-    participant Rules as BattleRules
     participant Event as BattleEvent stream
     participant View as BattleScene
 
-    Player->>HUD: Select soldier and hover destination
-    HUD->>Controller: Movement intent preview
-    Controller->>Path: Request path + AP cost preview
-    Path->>Session: Read board, unit, and occupancy state
-    Path->>Rules: Query step costs and movement constraints
-    Path-->>Controller: Path preview + legality + reachable result
-    Controller-->>HUD: Show AP cost and path preview
-    Controller-->>View: Highlight path tiles
-
-    Player->>HUD: Confirm movement
-    HUD->>Controller: Commit move intent
-    Controller->>Exec: Enqueue MoveUnit intent
-    Exec->>Session: Apply MoveUnit mutation
-
-    loop For each step in path
-        Exec->>Rules: Validate AP cost for next step
-        Rules-->>Exec: Step legal / illegal
-        Exec->>Session: Apply step mutation
-        Exec->>Event: Emit UnitMoved step event
-        Exec->>Vis: Recalculate visibility from changed position
-        Vis->>Session: Update spotted units / seen tiles / reaction candidates
-        Vis->>Event: Emit visibility delta events
-        Vis->>Rules: Score reaction-fire opportunities
-        alt Enemy reactor has valid interrupt
-            Vis-->>Exec: Trigger interrupt candidate
-            Exec->>Session: Mutate authoritative interrupt state
-            Exec->>Event: Emit ReactionFireStarted
-            Exec->>Rules: Resolve shot and damage
-            Rules-->>Exec: Hit / miss / damage result
-            Exec->>Session: Apply damage/status mutation
-            Exec->>Event: Emit shot and damage events
-            opt Moving unit can no longer continue
-                Exec->>Session: End move intent early
-                Exec->>Event: Emit MoveInterrupted
-                Note over Exec,Session: Abort remaining path steps
-            end
-        end
-    end
-
-    Exec->>Session: Finalize action state through mutations
-    Exec->>Event: Emit ActionResolved
-    Event-->>View: Play movement, spotting, and shot visuals
-    Event-->>HUD: Refresh AP, selection, visible enemies, and prompts
-
+    Player->>HUD: Confirm move
+    HUD->>Controller: Move request
+    Controller->>Exec: Enqueue move mutation
+    Exec->>Mutation: Execute(session)
+    Mutation->>Session: Validate active side, AP, adjacency, occupancy
+    Mutation->>Session: Commit movement
+    Session->>Event: Raise UnitMoved
+    Exec-->>Controller: Return BattleMutationResult
+    Event-->>View: Animate movement
+    Event-->>HUD: Refresh AP and prompts
 ```
 
-## Canonical Runtime Vocabulary
+## Turn Flow Notes
 
-Use these names consistently in future implementation work, even before all files exist:
+- The battle starts from `BattlePhase.Setup` and transitions to `InProgress` through `StartBattle`.
+- The initial turn queue is built from living factions in the stable global faction order.
+- `ActiveSide` and `TurnNumber` are owned by the session.
+- `EndFactionTurn` is the explicit faction-turn mutation.
+- `PassUnit` ends a unit activation and currently advances the turn automatically if that side has no remaining actable units.
+- Unit death updates alive/dead storage, board occupancy, current-turn availability, and faction queue membership through session bookkeeping.
 
-- `BattleSession`
-- `BattleSessionMutation`
-- `BattleUnitState`
-- `BattleItemState`
-- `BattleActionIntent`
-- Concrete built-in intents such as `MoveStepBattleActionIntent`, `PassUnitBattleActionIntent`, `EndFactionTurnBattleActionIntent`, and `ThrowItemBattleActionIntent`
-- `BattleActionExecutor`
-- `BattleVisibilitySystem`
+## Current Battle Events
+
+The current event stream is intentionally small and authoritative:
+
+- `SessionStarted`
+- `SessionEnded`
+- `TurnStarted`
+- `TurnEnded`
+- `ActiveSideChanged`
+- `UnitAdded`
+- `UnitActivationEnded`
+- `UnitMoved`
+- `UnitDamaged`
+- `UnitKilled`
+- `ItemThrown`
+
+Presentation code should react to these events instead of inferring state changes from executor internals.
+
+## Future Extensions
+
+These systems are still part of the intended architecture, but they are not implemented as first-class runtime systems yet:
+
 - `BattlePathfinder`
+- `BattleVisibilitySystem`
 - `BattleRules`
 - `BattleEffectSystem`
 - `BattleAIController`
+
+When they are added, they should follow these rules:
+
+- read session state directly instead of duplicating tactical truth
+- commit tactical changes through explicit session helpers and mutation execution
+- emit structured battle events instead of mutating scene nodes directly
+- keep presentation-only concerns out of the authoritative runtime
+
+Step-based movement, interrupts, reaction fire, and richer combat-effect hooks are still future extensions on top of the current command-based runtime.
+
+## Canonical Vocabulary
+
+Use these names consistently in future tactical work:
+
+- `BattleSession`
+- `BattleSessionMutation`
+- `BattleMutationResult`
+- `BattleActionExecutor`
+- `BattleActionIntent` as an upstream request model, not the executor's authoritative queue input
+- `BattleBoardState`
+- `BattleTileState`
+- `BattleUnitState`
 - `BattleEvent`
 - `BattleSceneController`
 
@@ -192,23 +256,3 @@ Detailed design notes:
 
 - [BattleActionExecutor Design](./battle-action-executor.md)
 - [BattleSession Command Pattern](./battle-session-command-pattern.md)
-
-## Battle-Aware Weapon Mods
-
-- Weapon mods should be able to contribute both numeric stat changes and structured battle behavior.
-- Keep passive numeric bonuses in the existing stat-mod lane.
-- Add a battle-effect lane for behaviors such as burning targets, piercing cover, modifying reaction-fire exposure, changing reload rules, or spawning secondary hazards.
-- `BattleEffectSystem` should evaluate these effects at curated hook points such as:
-  - before action validation
-  - before hit resolution
-  - before damage application
-  - after damage application
-  - on reload
-  - on turn start / turn end
-- Effects should return structured outcomes for the executor to apply, rather than mutating scene nodes directly.
-
-## Mapping From Current Project Terms
-
-- Your current `CombatantData`, weapon data resources, and `FactionData` remain template definitions.
-- The current conceptual `Battle` layer should evolve into `BattleSession`, not exist beside it as a second authoritative runtime owner.
-- Current runtime classes such as `Combatant` and `Weapon` are still close to template wrappers; future tactical work should split immutable definitions from mutable battle state explicitly.
