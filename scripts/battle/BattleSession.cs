@@ -18,6 +18,7 @@ public enum BattlePhase
 public sealed class BattleSession
 {
   public const int DefaultMovementStepActionPointCost = 1;
+  private static readonly BattleVisibilitySystem VisibilitySystem = new();
 
   private readonly Dictionary<Faction, HashSet<BattleUnitState>> _aliveUnitsByFaction = [];
   private readonly Dictionary<Faction, IReadOnlyList<Combatant>> _factionRosters = [];
@@ -26,6 +27,7 @@ public sealed class BattleSession
   private readonly Queue<Faction> _turnQueue = [];
   private readonly HashSet<Faction> _sidesActedThisRound = [];
   private readonly HashSet<int> _activeFactionUnitsAvailable = [];
+  private BattleVisibilitySnapshot _visibilitySnapshot = BattleVisibilitySnapshot.Empty;
   private int _nextUnitId = 1;
 
   public BattleBoardState Board { get; }
@@ -100,6 +102,83 @@ public sealed class BattleSession
   {
     var unit = GetLivingUnitOrNull(unitId);
     return unit != null && CanUnitActNow(unit);
+  }
+
+  public bool IsUnitVisibleToUnit(int observerUnitId, int targetUnitId)
+  {
+    var observer = GetLivingUnitOrNull(observerUnitId);
+    var target = GetLivingUnitOrNull(targetUnitId);
+    if (observer == null || target == null)
+      return false;
+    if (observer.UnitId == target.UnitId)
+      return true;
+
+    return _visibilitySnapshot
+      .GetVisibleUnitsForObserverOrEmpty(observerUnitId)
+      .Contains(targetUnitId);
+  }
+
+  public bool IsUnitVisibleToFaction(Faction faction, int targetUnitId)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+
+    var target = GetLivingUnitOrNull(targetUnitId);
+    if (target == null)
+      return false;
+    if (target.Side == faction)
+      return true;
+
+    return _visibilitySnapshot
+      .GetFactionStateOrEmpty(faction)
+      .VisibleForeignUnitIds
+      .Contains(targetUnitId);
+  }
+
+  public bool IsTileVisibleToFaction(Faction faction, Vector3I tile)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    if (!Board.IsInBounds(tile))
+      return false;
+
+    return _visibilitySnapshot
+      .GetFactionStateOrEmpty(faction)
+      .VisibleTiles
+      .Contains(tile);
+  }
+
+  public bool HasFactionExploredTile(Faction faction, Vector3I tile)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    if (!Board.IsInBounds(tile))
+      return false;
+
+    return _visibilitySnapshot
+      .GetFactionStateOrEmpty(faction)
+      .ExploredTiles
+      .Contains(tile);
+  }
+
+  public IEnumerable<BattleUnitState> GetVisibleUnitsForFaction(Faction faction)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+
+    var visibleForeignUnitIds = _visibilitySnapshot
+      .GetFactionStateOrEmpty(faction)
+      .VisibleForeignUnitIds;
+
+    return AliveUnits.Where(unit => unit.Side == faction || visibleForeignUnitIds.Contains(unit.UnitId));
+  }
+
+  public IEnumerable<Vector3I> GetVisibleTilesForFaction(Faction faction)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    return _visibilitySnapshot.GetFactionStateOrEmpty(faction).VisibleTiles;
+  }
+
+  public IEnumerable<Vector3I> GetExploredTilesForFaction(Faction faction)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    return _visibilitySnapshot.GetFactionStateOrEmpty(faction).ExploredTiles;
   }
 
   internal bool TryStartBattle()
@@ -343,6 +422,13 @@ public sealed class BattleSession
   internal void RaiseEvent(BattleEvent battleEvent)
   {
     EventRaised?.Invoke(battleEvent);
+  }
+
+  internal void RefreshVisibility()
+  {
+    _visibilitySnapshot = VisibilitySystem
+      .Build(this)
+      .WithMergedExplored(_visibilitySnapshot);
   }
 
   private void RebuildRoundQueueFromLivingSides()

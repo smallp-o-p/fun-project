@@ -14,6 +14,16 @@ public class Combatant : HasStats, HasModSlots
 
   public Combatant(CombatantData data, Faction faction)
   {
+    ArgumentNullException.ThrowIfNull(data);
+    ArgumentNullException.ThrowIfNull(faction);
+    ArgumentNullException.ThrowIfNull(data.HealthStat);
+    ArgumentNullException.ThrowIfNull(data.ActionPointsStat);
+    ArgumentNullException.ThrowIfNull(data.WillStat);
+    ArgumentNullException.ThrowIfNull(data.MovementStat);
+    ArgumentNullException.ThrowIfNull(data.VisionStat);
+    ArgumentNullException.ThrowIfNull(data.AimStat);
+    ArgumentNullException.ThrowIfNull(data.BaseArmorStat);
+
     Name = data.Name;
     OwningFaction = faction;
     _stats = new Dictionary<Type, Stat>
@@ -22,6 +32,7 @@ public class Combatant : HasStats, HasModSlots
       [typeof(ActionPointsStat)] = data.ActionPointsStat,
       [typeof(WillStat)] = data.WillStat,
       [typeof(MovementStat)] = data.MovementStat,
+      [typeof(VisionStat)] = data.VisionStat,
       [typeof(AimStat)] = data.AimStat,
       [typeof(BaseArmorStat)] = data.BaseArmorStat,
     };

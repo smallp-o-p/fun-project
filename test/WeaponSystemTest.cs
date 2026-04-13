@@ -104,12 +104,14 @@ public partial class WeaponSystemTest : Node
         ActionPointsStat = new ActionPointsStat { BaseValue = 4 },
         WillStat = new WillStat { BaseValue = 50 },
         MovementStat = new MovementStat { BaseValue = 12 },
+        VisionStat = new VisionStat { BaseValue = 20 },
         AimStat = new AimStat { BaseValue = 65 },
         BaseArmorStat = new BaseArmorStat { BaseValue = 3 },
         ModSlotCount = 0,
       }, new Faction(new FactionData { Name = "City Guard" }));
 
       Assert.Equal(20, combatant.GetStat<HealthStat>().BaseValue);
+      Assert.Equal(20, combatant.GetStat<VisionStat>().BaseValue);
       Assert.Equal(65, combatant.GetStat<AimStat>().BaseValue);
       Assert.True(combatant.TryGetStat(typeof(BaseArmorStat), out var armorStat));
       Assert.Equal(3, armorStat.BaseValue);

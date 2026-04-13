@@ -62,7 +62,12 @@ public abstract class BattleSessionMutation
   public BattleMutationResult Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
-    return ExecuteCore(session);
+
+    var result = ExecuteCore(session);
+    if (result.Succeeded)
+      session.RefreshVisibility();
+
+    return result;
   }
 
   protected abstract BattleMutationResult ExecuteCore(BattleSession session);

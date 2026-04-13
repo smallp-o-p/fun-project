@@ -13,7 +13,8 @@ internal static class BattleTestFactory
     Faction faction,
     int health = 20,
     int actionPoints = 4,
-    int movement = 12)
+    int movement = 12,
+    int vision = 20)
   {
     return new Combatant(new CombatantData
     {
@@ -22,6 +23,7 @@ internal static class BattleTestFactory
       ActionPointsStat = new ActionPointsStat { BaseValue = actionPoints },
       WillStat = new WillStat { BaseValue = 50 },
       MovementStat = new MovementStat { BaseValue = movement },
+      VisionStat = new VisionStat { BaseValue = vision },
       AimStat = new AimStat { BaseValue = 65 },
       BaseArmorStat = new BaseArmorStat { BaseValue = 0 },
       ModSlotCount = 0,

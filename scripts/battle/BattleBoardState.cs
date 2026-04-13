@@ -1,6 +1,7 @@
 #nullable enable
 using Godot;
 using System;
+using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
@@ -8,7 +9,7 @@ public sealed class BattleBoardState
 {
   private readonly BattleTileState[,,] _tiles;
 
-  Vector3I Dimensions { get; }
+  public Vector3I Dimensions { get; }
 
   public BattleBoardState(Vector3I dim)
   {
@@ -67,5 +68,17 @@ public sealed class BattleBoardState
   {
     var tile = GetTileOrNull(coordinates);
     return tile != null && tile.IsWalkable && !tile.IsOccupied;
+  }
+
+  public IEnumerable<Vector3I> EnumerateBoardCoordinates()
+  {
+    for (int y = 0; y < Dimensions.Y; y++)
+    {
+      for (int z = 0; z < Dimensions.Z; z++)
+      {
+        for (int x = 0; x < Dimensions.X; x++)
+          yield return new Vector3I(x, y, z);
+      }
+    }
   }
 }

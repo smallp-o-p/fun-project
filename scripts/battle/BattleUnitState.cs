@@ -25,6 +25,7 @@ public sealed class BattleUnitState
   public int MaxActionPoints => GetBaseStatValue<ActionPointsStat>();
   public int CurrentActionPoints { get; private set; }
   public int Movement => GetBaseStatValue<MovementStat>();
+  public int Vision => GetBaseStatValue<VisionStat>();
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
 
