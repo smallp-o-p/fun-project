@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://o3mwl1vcesuh"]
-
-[ext_resource type="Script" uid="uid://d4btdv88p1r3w" path="res://test/WeaponSystemTest.cs" id="1_jc77v"]
-
-[node name="WeaponSystemTest" type="Node2D"]
-script = ExtResource("1_jc77v")

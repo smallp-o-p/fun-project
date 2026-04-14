@@ -9,3 +9,4 @@ addons/**/*
 handoffs/*
 test/TestResults/
 test/.runsettings
+gdunit4_testadapter_v5/**/*

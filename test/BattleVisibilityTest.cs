@@ -1,190 +1,201 @@
 #nullable enable
 using FunProject.Battle;
 using FunProject.Combatants;
+using GdUnit4;
 using Godot;
 using System.Linq;
 
-public partial class BattleVisibilityTest : TestRunner
+[TestSuite]
+[RequireGodotRuntime]
+public class BattleVisibilityTest
 {
-  public override void _Ready()
+  [TestCase(TestName = "Open space visibility succeeds between units")]
+  public void OpenSpaceVisibilitySucceedsBetweenUnits()
   {
-    T("Open space visibility succeeds between units", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-      var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
-      var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
-      var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
+    var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
 
-      StartBattle(session);
+    StartBattle(session);
 
-      Assert.True(session.IsUnitVisibleToUnit(observer.UnitId, target.UnitId));
-      Assert.True(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
-    });
+    Assert.True(session.IsUnitVisibleToUnit(observer.UnitId, target.UnitId));
+    Assert.True(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
+  }
 
-    T("Blocking tiles break line of sight", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-      var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
-      var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
-      var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
+  [TestCase(TestName = "Blocking tiles break line of sight")]
+  public void BlockingTilesBreakLineOfSight()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
+    var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
 
-      session.Board.GetTile(new Vector3I(1, 0, 0)).BlocksLineOfSight = true;
-      StartBattle(session);
+    session.Board.GetTile(new Vector3I(1, 0, 0)).BlocksLineOfSight = true;
+    StartBattle(session);
 
-      Assert.False(session.IsUnitVisibleToUnit(observer.UnitId, target.UnitId));
-      Assert.False(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
-    });
+    Assert.False(session.IsUnitVisibleToUnit(observer.UnitId, target.UnitId));
+    Assert.False(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
+  }
 
-    T("Vertical line of sight works across levels", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-      var session = BattleTestFactory.MakeSession(new Vector3I(1, 3, 1), [playerFaction, enemyFaction]);
-      var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 5), new Vector3I(0, 0, 0));
-      var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(0, 2, 0));
+  [TestCase(TestName = "Vertical line of sight works across levels")]
+  public void VerticalLineOfSightWorksAcrossLevels()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(1, 3, 1), [playerFaction, enemyFaction]);
+    var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 5), new Vector3I(0, 0, 0));
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(0, 2, 0));
 
-      StartBattle(session);
+    StartBattle(session);
 
-      Assert.True(session.IsUnitVisibleToUnit(observer.UnitId, target.UnitId));
-    });
+    Assert.True(session.IsUnitVisibleToUnit(observer.UnitId, target.UnitId));
+  }
 
-    T("Vision stat changes which targets are visible", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-      var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 2), [playerFaction, enemyFaction]);
-      var shortSighted = SpawnUnit(session, BattleTestFactory.MakeCombatant("Short", playerFaction, vision: 2), new Vector3I(0, 0, 0));
-      var longSighted = SpawnUnit(session, BattleTestFactory.MakeCombatant("Long", playerFaction, vision: 3), new Vector3I(0, 0, 1));
-      var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
+  [TestCase(TestName = "Vision stat changes which targets are visible")]
+  public void VisionStatChangesWhichTargetsAreVisible()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 3), [playerFaction, enemyFaction]);
+    var shortSighted = SpawnUnit(session, BattleTestFactory.MakeCombatant("Short", playerFaction, vision: 2), new Vector3I(0, 0, 0));
+    var longSighted = SpawnUnit(session, BattleTestFactory.MakeCombatant("Long", playerFaction, vision: 3), new Vector3I(0, 0, 1));
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 2));
 
-      StartBattle(session);
+    StartBattle(session);
 
-      Assert.False(session.IsUnitVisibleToUnit(shortSighted.UnitId, target.UnitId));
-      Assert.True(session.IsUnitVisibleToUnit(longSighted.UnitId, target.UnitId));
-    });
+    Assert.False(session.IsUnitVisibleToUnit(shortSighted.UnitId, target.UnitId));
+    Assert.True(session.IsUnitVisibleToUnit(longSighted.UnitId, target.UnitId));
+  }
 
-    T("Faction visible tiles are the union of all living allies", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [playerFaction]);
-      SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, vision: 1), new Vector3I(0, 0, 0));
-      SpawnUnit(session, BattleTestFactory.MakeCombatant("Bravo", playerFaction, vision: 1), new Vector3I(4, 0, 4));
+  [TestCase(TestName = "Faction visible tiles are the union of all living allies")]
+  public void FactionVisibleTilesAreTheUnionOfAllLivingAllies()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [playerFaction]);
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, vision: 1), new Vector3I(0, 0, 0));
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Bravo", playerFaction, vision: 1), new Vector3I(4, 0, 4));
 
-      StartBattle(session);
+    StartBattle(session);
 
-      Assert.True(session.IsTileVisibleToFaction(playerFaction, new Vector3I(1, 0, 0)));
-      Assert.True(session.IsTileVisibleToFaction(playerFaction, new Vector3I(4, 0, 3)));
-      Assert.False(session.IsTileVisibleToFaction(playerFaction, new Vector3I(2, 0, 2)));
-    });
+    Assert.True(session.IsTileVisibleToFaction(playerFaction, new Vector3I(1, 0, 0)));
+    Assert.True(session.IsTileVisibleToFaction(playerFaction, new Vector3I(4, 0, 3)));
+    Assert.False(session.IsTileVisibleToFaction(playerFaction, new Vector3I(2, 0, 2)));
+  }
 
-    T("Tile visibility includes tiles at the edge of vision range", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var session = BattleTestFactory.MakeSession(new Vector3I(6, 1, 1), [playerFaction]);
-      SpawnUnit(session, BattleTestFactory.MakeCombatant("Scout", playerFaction, vision: 3), new Vector3I(0, 0, 0));
+  [TestCase(TestName = "Tile visibility includes tiles at the edge of vision range")]
+  public void TileVisibilityIncludesTilesAtTheEdgeOfVisionRange()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(6, 1, 1), [playerFaction]);
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Scout", playerFaction, vision: 3), new Vector3I(0, 0, 0));
 
-      StartBattle(session);
+    StartBattle(session);
 
-      Assert.True(session.IsTileVisibleToFaction(playerFaction, new Vector3I(3, 0, 0)));
-      Assert.False(session.IsTileVisibleToFaction(playerFaction, new Vector3I(4, 0, 0)));
-    });
+    Assert.True(session.IsTileVisibleToFaction(playerFaction, new Vector3I(3, 0, 0)));
+    Assert.False(session.IsTileVisibleToFaction(playerFaction, new Vector3I(4, 0, 0)));
+  }
 
-    T("Explored tiles persist after they leave current visibility", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 3), [playerFaction]);
-      var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Scout", playerFaction, vision: 2), new Vector3I(1, 0, 1));
+  [TestCase(TestName = "Explored tiles persist after they leave current visibility")]
+  public void ExploredTilesPersistAfterTheyLeaveCurrentVisibility()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 3), [playerFaction]);
+    var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Scout", playerFaction, vision: 2), new Vector3I(1, 0, 1));
+    var tile = new Vector3I(3, 0, 1);
 
-      StartBattle(session);
-      Assert.True(session.IsTileVisibleToFaction(playerFaction, new Vector3I(2, 0, 1)));
+    StartBattle(session);
+    Assert.True(session.IsTileVisibleToFaction(playerFaction, tile));
 
-      var moveResult = BattleSessionMutation.MoveUnitStep(observer.UnitId, new Vector3I(0, 0, 1)).Execute(session);
-      Assert.True(moveResult.Succeeded);
+    var moveResult = BattleSessionMutation.MoveUnitStep(observer.UnitId, new Vector3I(0, 0, 1)).Execute(session);
+    Assert.True(moveResult.Succeeded);
 
-      Assert.False(session.IsTileVisibleToFaction(playerFaction, new Vector3I(2, 0, 1)));
-      Assert.True(session.HasFactionExploredTile(playerFaction, new Vector3I(2, 0, 1)));
-    });
+    Assert.False(session.IsTileVisibleToFaction(playerFaction, tile));
+    Assert.True(session.HasFactionExploredTile(playerFaction, tile));
+  }
 
-    T("Enemy units drop from faction visibility when sight is broken", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-      var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
-      var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Scout", playerFaction, vision: 3), new Vector3I(1, 0, 0));
-      var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(3, 0, 0));
+  [TestCase(TestName = "Enemy units drop from faction visibility when sight is broken")]
+  public void EnemyUnitsDropFromFactionVisibilityWhenSightIsBroken()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 1), [playerFaction, enemyFaction]);
+    var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Scout", playerFaction, vision: 3), new Vector3I(1, 0, 0));
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(4, 0, 0));
 
-      StartBattle(session);
-      Assert.True(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
+    StartBattle(session);
+    Assert.True(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
 
-      var moveResult = BattleSessionMutation.MoveUnitStep(observer.UnitId, new Vector3I(0, 0, 0)).Execute(session);
-      Assert.True(moveResult.Succeeded);
+    var moveResult = BattleSessionMutation.MoveUnitStep(observer.UnitId, new Vector3I(0, 0, 0)).Execute(session);
+    Assert.True(moveResult.Succeeded);
 
-      Assert.False(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
-    });
+    Assert.False(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
+  }
 
-    T("Own units remain known to their faction without direct line of sight", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 1), [playerFaction]);
-      var alpha = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, vision: 1), new Vector3I(0, 0, 0));
-      var bravo = SpawnUnit(session, BattleTestFactory.MakeCombatant("Bravo", playerFaction, vision: 1), new Vector3I(4, 0, 0));
+  [TestCase(TestName = "Own units remain known to their faction without direct line of sight")]
+  public void OwnUnitsRemainKnownToTheirFactionWithoutDirectLineOfSight()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 1), [playerFaction]);
+    var alpha = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, vision: 1), new Vector3I(0, 0, 0));
+    var bravo = SpawnUnit(session, BattleTestFactory.MakeCombatant("Bravo", playerFaction, vision: 1), new Vector3I(4, 0, 0));
 
-      StartBattle(session);
+    StartBattle(session);
 
-      Assert.False(session.IsUnitVisibleToUnit(alpha.UnitId, bravo.UnitId));
-      Assert.True(session.IsUnitVisibleToFaction(playerFaction, bravo.UnitId));
-      Assert.Equal(2, session.GetVisibleUnitsForFaction(playerFaction).Count());
-    });
+    Assert.False(session.IsUnitVisibleToUnit(alpha.UnitId, bravo.UnitId));
+    Assert.True(session.IsUnitVisibleToFaction(playerFaction, bravo.UnitId));
+    Assert.Equal(2, session.GetVisibleUnitsForFaction(playerFaction).Count());
+  }
 
-    T("SpawnUnit refreshes visibility caches", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-      var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
-      SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
+  [TestCase(TestName = "SpawnUnit refreshes visibility caches")]
+  public void SpawnUnitRefreshesVisibilityCaches()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
 
-      var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
 
-      Assert.True(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
-    });
+    Assert.True(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
+  }
 
-    T("StartBattle refreshes visibility caches", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-      var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
-      var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
-      var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
+  [TestCase(TestName = "StartBattle refreshes visibility caches")]
+  public void StartBattleRefreshesVisibilityCaches()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
+    var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
 
-      Assert.True(session.IsUnitVisibleToUnit(observer.UnitId, target.UnitId));
-      session.Board.GetTile(new Vector3I(1, 0, 0)).BlocksLineOfSight = true;
+    Assert.True(session.IsUnitVisibleToUnit(observer.UnitId, target.UnitId));
+    session.Board.GetTile(new Vector3I(1, 0, 0)).BlocksLineOfSight = true;
 
-      StartBattle(session);
+    StartBattle(session);
 
-      Assert.False(session.IsUnitVisibleToUnit(observer.UnitId, target.UnitId));
-    });
+    Assert.False(session.IsUnitVisibleToUnit(observer.UnitId, target.UnitId));
+  }
 
-    T("Lethal damage refreshes visibility caches", () =>
-    {
-      var playerFaction = BattleTestFactory.MakeFaction("Player");
-      var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-      var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
-      var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, health: 10, vision: 4), new Vector3I(0, 0, 0));
-      var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, health: 10, vision: 1), new Vector3I(2, 0, 0));
+  [TestCase(TestName = "Lethal damage refreshes visibility caches")]
+  public void LethalDamageRefreshesVisibilityCaches()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
+    var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, health: 10, vision: 4), new Vector3I(0, 0, 0));
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, health: 10, vision: 1), new Vector3I(2, 0, 0));
 
-      StartBattle(session);
-      Assert.True(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
+    StartBattle(session);
+    Assert.True(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
 
-      var damageResult = BattleSessionMutation.ApplyDamage(observer.UnitId, 10).Execute(session);
-      Assert.True(damageResult.Succeeded);
+    var damageResult = BattleSessionMutation.ApplyDamage(observer.UnitId, 10).Execute(session);
+    Assert.True(damageResult.Succeeded);
 
-      Assert.False(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
-      Assert.Equal(0, session.GetVisibleUnitsForFaction(playerFaction).Count());
-    });
-
-    Report();
+    Assert.False(session.IsUnitVisibleToFaction(playerFaction, target.UnitId));
+    Assert.Equal(0, session.GetVisibleUnitsForFaction(playerFaction).Count());
   }
 
   private static BattleUnitState SpawnUnit(BattleSession session, Combatant combatant, Vector3I position)
