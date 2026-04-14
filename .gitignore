@@ -7,3 +7,5 @@
 addons/**/*
 ./Godot-MCP/
 handoffs/*
+test/TestResults/
+test/.runsettings
