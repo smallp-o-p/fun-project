@@ -12,12 +12,21 @@ public partial class GameCamera : AnimatableBody3D
   [Export] public float CenterLookAngleDegrees { get; set; } = -30.0f;
   [Export] public float CameraMoveSpeed { get; set; } = 30.0f;
   [Export] public float CameraStep { get; set; } = 0.5f;
+  [Export] public float ZoomStep { get; set; } = 4.0f;
+  [Export] public float MinFov { get; set; } = 15.0f;
+  [Export] public float MaxFov { get; set; } = 100.0f;
   [Export] public float ScrollCameraStep { get; set; } = 0.4f;
 
   private Path3D? cameraPath;
   private PathFollow3D? pathFollow;
   private Camera3D? camera;
   private Tween? rotationTween;
+
+  enum CameraRotation
+  {
+    Left,
+    Right
+  }
 
   enum MoveDirection
   {
@@ -92,16 +101,13 @@ public partial class GameCamera : AnimatableBody3D
     if (cameraPath != null)
     {
       Curve3D? curve = cameraPath.Curve;
-      if (curve != null)
+      if (Input.IsActionJustPressed("rotate_camera_l"))
       {
-        if (Input.IsActionJustReleased("rotate_camera_l"))
-        {
-          RotateQuarterTurn(curve, 1.0f);
-        }
-        else if (Input.IsActionJustReleased("rotate_camera_r"))
-        {
-          RotateQuarterTurn(curve, -1.0f);
-        }
+        RotateQuarterTurn(curve, CameraRotation.Left);
+      }
+      else if (Input.IsActionJustPressed("rotate_camera_r"))
+      {
+        RotateQuarterTurn(curve, CameraRotation.Right);
       }
     }
     UpdateCameraOrientation();
@@ -111,7 +117,8 @@ public partial class GameCamera : AnimatableBody3D
   {
     Vector2 moveDirection = GetRequestedMoveDirection();
     float verticalStep = GetRequestedVerticalStep();
-    MoveCamera(moveDirection, verticalStep, delta);
+    float cameraZoom = GetZoom();
+    MoveCamera(moveDirection, verticalStep, cameraZoom, delta);
   }
 
   private static Curve3D BuildCircleCurve(float radius)
@@ -157,12 +164,19 @@ public partial class GameCamera : AnimatableBody3D
     return ((right.Normalized() * normalizedInput.X) + (forward.Normalized() * normalizedInput.Y)) * step;
   }
 
-  private void RotateQuarterTurn(Curve3D curve, float direction)
+
+  private void RotateQuarterTurn(Curve3D curve, CameraRotation rotate)
   {
     if (pathFollow == null)
     {
       return;
     }
+
+    float direction = rotate switch
+    {
+      CameraRotation.Left => 1.0f,
+      CameraRotation.Right => -1.0f,
+    };
 
     float targetProgress = pathFollow.Progress + (direction * GetQuarterTurnDistance(curve));
 
@@ -203,11 +217,11 @@ public partial class GameCamera : AnimatableBody3D
   private float GetRequestedVerticalStep()
   {
     float verticalStep = 0.0f;
-    if (Input.IsActionJustPressed("camera_up"))
+    if (Input.IsActionPressed("camera_up"))
     {
       verticalStep += ScrollCameraStep;
     }
-    if (Input.IsActionJustPressed("camera_down"))
+    if (Input.IsActionPressed("camera_down"))
     {
       verticalStep -= ScrollCameraStep;
     }
@@ -215,7 +229,22 @@ public partial class GameCamera : AnimatableBody3D
     return verticalStep;
   }
 
-  private void MoveCamera(Vector2 direction, float verticalStep, double delta)
+  private float GetZoom()
+  {
+    float zoom = 0.0f;
+    if (Input.IsActionJustReleased("camera_zoom_in"))
+    {
+      zoom += ZoomStep;
+    }
+    if (Input.IsActionJustReleased("camera_zoom_out"))
+    {
+      zoom -= ZoomStep;
+    }
+
+    return zoom;
+  }
+
+  private void MoveCamera(Vector2 direction, float verticalStep, float zoom, double delta)
   {
     if (camera == null)
     {
@@ -224,12 +253,9 @@ public partial class GameCamera : AnimatableBody3D
 
     float movementDistance = CameraMoveSpeed * (float)delta;
     Vector3 movementOffset = GetRelativeMovementOffset(camera.GlobalTransform.Basis, direction, movementDistance) + (Vector3.Up * verticalStep);
-    if (movementOffset.IsZeroApprox())
-    {
-      return;
-    }
 
     GlobalPosition += movementOffset;
+    camera.Fov = Math.Min(Math.Max(camera.Fov - zoom, MinFov), MaxFov);
   }
 
   private void UpdateCameraOrientation()
