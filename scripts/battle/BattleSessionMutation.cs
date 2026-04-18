@@ -74,57 +74,57 @@ public abstract class BattleSessionMutation
 
   protected abstract BattleMutationResult ExecuteCore(BattleSession session);
 
-  public static StartBattleBattleSessionMutation StartBattle()
+  public static StartBattle StartBattle()
   {
-    return new StartBattleBattleSessionMutation();
+    return new StartBattle();
   }
 
-  public static SpawnUnitBattleSessionMutation SpawnUnit(Combatant combatant, Vector3I position, Weapon? equippedWeapon = null)
+  public static SpawnUnit SpawnUnit(Combatant combatant, Vector3I position, Weapon? equippedWeapon = null)
   {
-    return new SpawnUnitBattleSessionMutation(combatant, position, equippedWeapon);
+    return new SpawnUnit(combatant, position, equippedWeapon);
   }
 
-  public static MoveUnitStepBattleSessionMutation MoveUnitStep(
+  public static MoveUnitStep MoveUnitStep(
     int unitId,
     Vector3I destination,
     int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
   {
-    return new MoveUnitStepBattleSessionMutation(unitId, destination, actionPointCost);
+    return new MoveUnitStep(unitId, destination, actionPointCost);
   }
 
-  public static MoveUnitBattleSessionMutation MoveUnit(
+  public static MoveUnit MoveUnit(
     int unitId,
     IEnumerable<Vector3I> path,
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost
   )
   {
-    return new MoveUnitBattleSessionMutation(unitId, path, actionPointCostPerStep);
+    return new MoveUnit(unitId, path, actionPointCostPerStep);
   }
 
-  public static ThrowItemBattleSessionMutation ThrowItem(int unitId, ThrowableItem item, Vector3I targetCell)
+  public static ThrowItem ThrowItem(int unitId, ThrowableItem item, Vector3I targetCell)
   {
-    return new ThrowItemBattleSessionMutation(unitId, item, targetCell);
+    return new ThrowItem(unitId, item, targetCell);
   }
 
-  public static ApplyDamageBattleSessionMutation ApplyDamage(int unitId, int amount)
+  public static ApplyDamage ApplyDamage(int unitId, int amount)
   {
-    return new ApplyDamageBattleSessionMutation(unitId, amount);
+    return new ApplyDamage(unitId, amount);
   }
 
-  public static PassUnitBattleSessionMutation PassUnit(int unitId)
+  public static PassUnit PassUnit(int unitId)
   {
-    return new PassUnitBattleSessionMutation(unitId);
+    return new PassUnit(unitId);
   }
 
-  public static EndFactionTurnBattleSessionMutation EndFactionTurn(Faction expectedActiveSide)
+  public static EndFactionTurn EndFactionTurn(Faction expectedActiveSide)
   {
-    return new EndFactionTurnBattleSessionMutation(expectedActiveSide);
+    return new EndFactionTurn(expectedActiveSide);
   }
 }
 
-public sealed class StartBattleBattleSessionMutation : BattleSessionMutation
+public sealed class StartBattle : BattleSessionMutation
 {
-  public StartBattleBattleSessionMutation()
+  public StartBattle()
     : base(StartBattleMutationId)
   {
   }
@@ -140,13 +140,13 @@ public sealed class StartBattleBattleSessionMutation : BattleSessionMutation
   }
 }
 
-public sealed class SpawnUnitBattleSessionMutation : BattleSessionMutation
+public sealed class SpawnUnit : BattleSessionMutation
 {
   public Combatant Combatant { get; }
   public Vector3I Position { get; }
   public Weapon? EquippedWeapon { get; }
 
-  public SpawnUnitBattleSessionMutation(Combatant combatant, Vector3I position, Weapon? equippedWeapon = null)
+  public SpawnUnit(Combatant combatant, Vector3I position, Weapon? equippedWeapon = null)
     : base(SpawnUnitMutationId)
   {
     Combatant = combatant ?? throw new ArgumentNullException(nameof(combatant));
@@ -170,13 +170,13 @@ public sealed class SpawnUnitBattleSessionMutation : BattleSessionMutation
   }
 }
 
-public sealed class MoveUnitStepBattleSessionMutation : BattleSessionMutation
+public sealed class MoveUnitStep : BattleSessionMutation
 {
   public int UnitId { get; }
   public Vector3I Destination { get; }
   public int ActionPointCost { get; }
 
-  public MoveUnitStepBattleSessionMutation(
+  public MoveUnitStep(
     int unitId,
     Vector3I destination,
     int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
@@ -217,13 +217,13 @@ public sealed class MoveUnitStepBattleSessionMutation : BattleSessionMutation
   }
 }
 
-public sealed class MoveUnitBattleSessionMutation : BattleSessionMutation
+public sealed class MoveUnit : BattleSessionMutation
 {
   public int UnitId { get; }
   public IReadOnlyList<Vector3I> Path { get; }
   public int ActionPointCostPerStep { get; }
 
-  public MoveUnitBattleSessionMutation(
+  public MoveUnit(
     int unitId,
     IEnumerable<Vector3I> path,
     int perStepAPCost = BattleSession.DefaultMovementStepActionPointCost)
@@ -270,7 +270,7 @@ public sealed class MoveUnitBattleSessionMutation : BattleSessionMutation
     BattleUnitState currentUnit = unit;
     for (int stepIndex = 1; stepIndex < Path.Count; stepIndex++)
     {
-      MoveUnitStepBattleSessionMutation stepMutation = new(UnitId, Path[stepIndex], ActionPointCostPerStep);
+      MoveUnitStep stepMutation = new(UnitId, Path[stepIndex], ActionPointCostPerStep);
       BattleMutationResult stepResult = stepMutation.Execute(session);
       if (!stepResult.Succeeded)
         return BattleMutationResult.Failure(this, stepResult.FailureReason, stepResult.Message ?? "Move unit mutation was rejected by the battle session.");
@@ -282,13 +282,13 @@ public sealed class MoveUnitBattleSessionMutation : BattleSessionMutation
   }
 }
 
-public sealed class ThrowItemBattleSessionMutation : BattleSessionMutation
+public sealed class ThrowItem : BattleSessionMutation
 {
   public int UnitId { get; }
   public ThrowableItem Item { get; }
   public Vector3I TargetCell { get; }
 
-  public ThrowItemBattleSessionMutation(int unitId, ThrowableItem item, Vector3I targetCell)
+  public ThrowItem(int unitId, ThrowableItem item, Vector3I targetCell)
     : base(ThrowItemMutationId)
   {
     Item = item ?? throw new ArgumentNullException(nameof(item));
@@ -333,12 +333,12 @@ public sealed class ThrowItemBattleSessionMutation : BattleSessionMutation
   }
 }
 
-public sealed class ApplyDamageBattleSessionMutation : BattleSessionMutation
+public sealed class ApplyDamage : BattleSessionMutation
 {
   public int UnitId { get; }
   public int Amount { get; }
 
-  public ApplyDamageBattleSessionMutation(int unitId, int amount)
+  public ApplyDamage(int unitId, int amount)
     : base(ApplyDamageMutationId)
   {
     Amount = amount;
@@ -362,11 +362,11 @@ public sealed class ApplyDamageBattleSessionMutation : BattleSessionMutation
   }
 }
 
-public sealed class PassUnitBattleSessionMutation : BattleSessionMutation
+public sealed class PassUnit : BattleSessionMutation
 {
   public int UnitId { get; }
 
-  public PassUnitBattleSessionMutation(int unitId)
+  public PassUnit(int unitId)
     : base(PassUnitMutationId)
   {
     UnitId = unitId;
@@ -395,11 +395,11 @@ public sealed class PassUnitBattleSessionMutation : BattleSessionMutation
   }
 }
 
-public sealed class EndFactionTurnBattleSessionMutation : BattleSessionMutation
+public sealed class EndFactionTurn : BattleSessionMutation
 {
   public Faction ExpectedActiveSide { get; }
 
-  public EndFactionTurnBattleSessionMutation(Faction expectedActiveSide)
+  public EndFactionTurn(Faction expectedActiveSide)
     : base(EndFactionTurnMutationId)
   {
     ExpectedActiveSide = expectedActiveSide ?? throw new ArgumentNullException(nameof(expectedActiveSide));

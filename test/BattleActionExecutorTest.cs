@@ -46,10 +46,10 @@ public class BattleActionExecutorTest
 
     Assert.True(first.HasValue);
     Assert.True(first!.Value.Succeeded);
-    Assert.True(first.Value.Mutation is MoveUnitStepBattleSessionMutation);
+    Assert.True(first.Value.Mutation is MoveUnitStep);
     Assert.True(second.HasValue);
     Assert.True(second!.Value.Succeeded);
-    Assert.True(second.Value.Mutation is EndFactionTurnBattleSessionMutation);
+    Assert.True(second.Value.Mutation is EndFactionTurn);
     Assert.Equal(factionB, session.ActiveSide);
   }
 
@@ -110,7 +110,7 @@ public class BattleActionExecutorTest
 
     Assert.True(resolvedResult.HasValue);
     Assert.True(resolvedResult!.Value.Succeeded);
-    Assert.True(resolvedResult.Value.Mutation is MoveUnitStepBattleSessionMutation);
+    Assert.True(resolvedResult.Value.Mutation is MoveUnitStep);
   }
 
   [TestCase(TestName = "Executor drain queue returns all mutation results")]
