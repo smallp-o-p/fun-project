@@ -52,6 +52,8 @@ These classes own:
 - whether a cell is walkable
 - whether a cell blocks line of sight
 - which unit occupies a cell
+- how occupants are placed, moved, and removed
+- board-local pathfinding queries across traversable cells
 - hazard state and future tactical modifiers
 
 ### Static Map Data
@@ -98,6 +100,7 @@ The tile system should evolve toward these responsibilities:
   - static per-cell authoring data
 - `BattleBoardState`
   - authoritative runtime tile state derived from setup and mutations
+  - board-local occupancy mutation and pathfinding
 - `BattleBoardPresenter`
   - scene-side builder that instantiates visuals from map or board data
 - `BattleSceneController`
@@ -148,6 +151,25 @@ For flat ground, tile picking should work like this:
 7. Use that cell for hover highlight, selection, or action targeting.
 
 This allows a proof of concept without creating a separate interactable node for every tile.
+
+## Pathfinding Ownership
+
+For the current runtime, pathfinding should live in `BattleBoardState`.
+
+That keeps all board-local spatial rules together:
+
+- which cells can be traversed
+- which neighbors connect
+- which occupied cells block movement
+- how a path between two cells is resolved
+
+`BattleSession` and `BattleSessionMutation` should still own battle legality such as:
+
+- whether the unit may act right now
+- action point spending
+- faction and turn checks
+
+The current implementation path is to integrate Godot `AStar3D` into `BattleBoardState` and expose a board query such as `FindPath(...)`. Presentation and controller code can use that query to preview a route to the player, and `MoveUnitBattleSessionMutation` should then execute the chosen path as a composition of explicit steps instead of silently pathfinding on the player's behalf. If pathfinding later becomes heavily unit-specific or expensive to rebuild, it can be extracted behind a separate service without changing that contract.
 
 ### Future Picking
 

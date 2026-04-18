@@ -230,7 +230,7 @@ public sealed class BattleSession
     unitsForSide.Add(unit);
     EnqueueFactionInGlobalOrder(unit.Side);
 
-    var occupantSet = Board.TrySetOccupant(unit.Position, unit.UnitId);
+    bool occupantSet = Board.TryPlaceOccupant(unit.Position, unit.UnitId);
     if (!occupantSet)
     {
       unitsForSide.Remove(unit);
@@ -244,39 +244,17 @@ public sealed class BattleSession
     return true;
   }
 
-  internal bool TryMoveUnit(BattleUnitState unit, Vector3I destination)
-  {
-    ArgumentNullException.ThrowIfNull(unit);
-
-    var sourceTile = Board.GetTileOrNull(unit.Position);
-    var destinationTile = Board.GetTileOrNull(destination);
-    if (sourceTile == null || destinationTile == null)
-      return false;
-    if (!destinationTile.TrySetOccupant(unit.UnitId))
-      return false;
-
-    sourceTile.ClearOccupant();
-    unit.MoveTo(destination);
-    return true;
-  }
-
   internal void HandleUnitDeath(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
 
     var unitSide = unit.Side;
     MoveUnitToDeadStorage(unit);
-    ClearTileOccupant(unit.Position);
+    Board.TryClearOccupant(unit.Position, unit.UnitId);
 
     _activeFactionUnitsAvailable.Remove(unit.UnitId);
     RaiseEvent(new BattleEvent(BattleEventType.UnitKilled, unit.UnitId, unit.Position, $"Unit ID {unit.UnitId} was killed!"));
     HandleFactionLoss(unitSide);
-  }
-
-  internal void ClearTileOccupant(Vector3I coordinates)
-  {
-    var tile = Board.GetTileOrNull(coordinates);
-    tile?.ClearOccupant();
   }
 
   internal bool TryRemoveAvailableUnit(int unitId)
@@ -396,11 +374,6 @@ public sealed class BattleSession
       return false;
 
     return unit.CurrentActionPoints > 0;
-  }
-
-  internal static bool IsAdjacent(Vector3I source, Vector3I destination)
-  {
-    return Mathf.Abs((source - destination).Length()) == 1;
   }
 
   internal static int GetGridDistance(Vector3I source, Vector3I destination)

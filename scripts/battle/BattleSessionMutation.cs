@@ -5,6 +5,7 @@ using FunProject.Weapons;
 using Godot;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
@@ -44,6 +45,7 @@ public abstract class BattleSessionMutation
   public const string StartBattleMutationId = "start_battle";
   public const string SpawnUnitMutationId = "spawn_unit";
   public const string MoveUnitStepMutationId = "move_unit_step";
+  public const string MoveUnitMutationId = "move_unit";
   public const string ThrowItemMutationId = "throw_item";
   public const string ApplyDamageMutationId = "apply_damage";
   public const string PassUnitMutationId = "pass_unit";
@@ -88,6 +90,15 @@ public abstract class BattleSessionMutation
     int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
   {
     return new MoveUnitStepBattleSessionMutation(unitId, destination, actionPointCost);
+  }
+
+  public static MoveUnitBattleSessionMutation MoveUnit(
+    int unitId,
+    IEnumerable<Vector3I> path,
+    int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost
+  )
+  {
+    return new MoveUnitBattleSessionMutation(unitId, path, actionPointCostPerStep);
   }
 
   public static ThrowItemBattleSessionMutation ThrowItem(int unitId, ThrowableItem item, Vector3I targetCell)
@@ -191,17 +202,83 @@ public sealed class MoveUnitStepBattleSessionMutation : BattleSessionMutation
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
     if (!session.IsUnitStillAvailableThisTurn(UnitId))
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
-    if (!BattleSession.IsAdjacent(unit.Position, Destination))
+    if (!session.Board.IsAdjacent(unit.Position, Destination))
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
     if (!session.Board.CanOccupy(Destination))
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
     if (!unit.TrySpendActionPoints(ActionPointCost))
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
-    if (!session.TryMoveUnit(unit, Destination))
+    if (!session.Board.TryMoveOccupant(unit.Position, Destination, unit.UnitId))
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
 
+    unit.MoveTo(Destination);
     session.RaiseEvent(new BattleEvent(BattleEventType.UnitMoved, unit.UnitId, Destination));
     return BattleMutationResult.Success(this, unit);
+  }
+}
+
+public sealed class MoveUnitBattleSessionMutation : BattleSessionMutation
+{
+  public int UnitId { get; }
+  public IReadOnlyList<Vector3I> Path { get; }
+  public int ActionPointCostPerStep { get; }
+
+  public MoveUnitBattleSessionMutation(
+    int unitId,
+    IEnumerable<Vector3I> path,
+    int perStepAPCost = BattleSession.DefaultMovementStepActionPointCost)
+    : base(MoveUnitMutationId)
+  {
+    ArgumentNullException.ThrowIfNull(path);
+    if (perStepAPCost < 0)
+      throw new ArgumentOutOfRangeException(nameof(perStepAPCost), "Action point cost cannot be negative.");
+
+    UnitId = unitId;
+    Path = [.. path];
+    ActionPointCostPerStep = perStepAPCost;
+  }
+
+  protected override BattleMutationResult ExecuteCore(BattleSession session)
+  {
+    if (session.Phase != BattlePhase.InProgress)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation was rejected by the battle session.");
+
+    BattleUnitState? unit = session.GetLivingUnitOrNull(UnitId);
+    if (unit == null || session.ActiveSide == null)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation was rejected by the battle session.");
+    if (unit.Side != session.ActiveSide)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation was rejected by the battle session.");
+    if (!session.IsUnitStillAvailableThisTurn(UnitId))
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation was rejected by the battle session.");
+    if (Path.Count == 0)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation requires a non-empty path.");
+    if (Path[0] != unit.Position)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation path must start at the unit's current position.");
+
+    Vector3I destination = Path[^1];
+
+    int stepCount = Path.Count - 1;
+    if (stepCount == 0)
+      return BattleMutationResult.Success(this, unit, $"Unit already occupies {destination}.");
+
+    long totalActionPointCost = (long)stepCount * ActionPointCostPerStep;
+    if (totalActionPointCost > int.MaxValue)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, "Move unit mutation exceeded the supported action point cost.");
+    if (unit.CurrentActionPoints < totalActionPointCost)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation was rejected by the battle session.");
+
+    BattleUnitState currentUnit = unit;
+    for (int stepIndex = 1; stepIndex < Path.Count; stepIndex++)
+    {
+      MoveUnitStepBattleSessionMutation stepMutation = new(UnitId, Path[stepIndex], ActionPointCostPerStep);
+      BattleMutationResult stepResult = stepMutation.Execute(session);
+      if (!stepResult.Succeeded)
+        return BattleMutationResult.Failure(this, stepResult.FailureReason, stepResult.Message ?? "Move unit mutation was rejected by the battle session.");
+
+      currentUnit = stepResult.AffectedUnit ?? currentUnit;
+    }
+
+    return BattleMutationResult.Success(this, currentUnit, $"Moved to {destination}.");
   }
 }
 

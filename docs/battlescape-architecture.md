@@ -29,7 +29,7 @@ flowchart LR
 
     subgraph Runtime["Authoritative Tactical Runtime"]
         BattleSession["BattleSession\nsingle source of truth\nturn flow + bookkeeping"]
-        BoardState["BattleBoardState\nBattleTileState[x,y,z]\noccupancy + walkability"]
+        BoardState["BattleBoardState\nBattleTileState[x,y,z]\noccupancy + spatial path queries"]
         UnitState["BattleUnitState[]\nposition, AP, health,\ninventory refs, equipped weapon"]
         VisibilityState["BattleVisibilitySnapshot\nper-faction fog of war\nexplored tiles + visible enemies"]
         VisibilitySystem["BattleVisibilitySystem\ntile-based LOS + faction FOV rebuilds"]
@@ -75,9 +75,14 @@ flowchart LR
   - round queue
   - alive and dead unit bookkeeping
   - current-turn unit availability
-  - board occupancy
   - faction visibility and explored-tile state
   - authoritative battle event emission
+- `BattleBoardState` owns:
+  - tile storage
+  - walkability and occupancy state
+  - adjacency queries
+  - occupant placement, movement, and removal
+  - board-local pathfinding queries
 - `BattleSessionMutation` owns mutation-specific validation and orchestration. Each concrete mutation decides whether it can execute and which session helpers it needs to call.
 - `BattleVisibilitySystem` owns:
   - tile-based line-of-sight checks
@@ -123,7 +128,6 @@ It is initialized with:
 The session currently owns:
 
 - creating runtime unit ids
-- placing spawned units onto the board
 - moving units between alive and dead storage
 - handling faction elimination
 - rebuilding and advancing the round queue
@@ -136,6 +140,18 @@ The session currently owns:
   - `IsTileVisibleToFaction(...)`
   - `HasFactionExploredTile(...)`
   - `GetVisibleUnitsForFaction(...)`
+
+### BattleBoardState
+
+`BattleBoardState` now owns board-local spatial operations:
+
+- `TryPlaceOccupant(...)`
+- `TryMoveOccupant(...)`
+- `TryClearOccupant(...)`
+- `FindPath(...)`
+- `IsAdjacent(...)`
+
+Pathfinding is currently integrated directly into the board through Godot `AStar3D`. Scene controllers, HUD preview code, and AI can query the board for a path, then pass the chosen path into `MoveUnitBattleSessionMutation`. If path rules become substantially more unit-specific later, this can still be extracted behind a dedicated pathfinder service without changing the player-facing flow.
 
 ### BattleVisibilitySystem
 
@@ -163,6 +179,7 @@ The current built-in authoritative mutations are:
 - `StartBattleBattleSessionMutation`
 - `SpawnUnitBattleSessionMutation`
 - `MoveUnitStepBattleSessionMutation`
+- `MoveUnitBattleSessionMutation`
 - `ThrowItemBattleSessionMutation`
 - `ApplyDamageBattleSessionMutation`
 - `PassUnitBattleSessionMutation`
@@ -211,18 +228,20 @@ sequenceDiagram
     participant HUD as Battle HUD
     participant Controller as BattleSceneController
     participant Exec as BattleActionExecutor
-    participant Mutation as MoveUnitStepBattleSessionMutation
+    participant Mutation as MoveUnitBattleSessionMutation
     participant Session as BattleSession
+    participant Board as BattleBoardState
     participant Event as BattleEvent stream
     participant View as BattleScene
 
     Player->>HUD: Confirm move
     HUD->>Controller: Move request
+    Controller->>Board: Query preview path
     Controller->>Exec: Enqueue move mutation
     Exec->>Mutation: Execute(session)
-    Mutation->>Session: Validate active side, AP, adjacency, occupancy
-    Mutation->>Session: Commit movement
-    Session->>Event: Raise UnitMoved
+    Mutation->>Session: Validate active side, AP, unit availability
+    Mutation->>Board: Commit each provided board step
+    Mutation->>Event: Raise UnitMoved per step
     Exec-->>Controller: Return BattleMutationResult
     Event-->>View: Animate movement
     Event-->>HUD: Refresh AP and prompts
@@ -259,7 +278,6 @@ Presentation code should react to these events instead of inferring state change
 
 These systems are still part of the intended architecture, but they are not implemented as first-class runtime systems yet:
 
-- `BattlePathfinder`
 - `BattleRules`
 - `BattleEffectSystem`
 - `BattleAIController`

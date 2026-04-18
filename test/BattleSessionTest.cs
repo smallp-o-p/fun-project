@@ -311,6 +311,77 @@ public class BattleSessionTest
     Assert.Equal(new Vector3I(1, 1, 1), unit.Position);
   }
 
+  [TestCase(TestName = "MoveUnit follows a multi-step board path and spends AP per step")]
+  public void MoveUnitFollowsAMultiStepBoardPathAndSpendsAPPerStep()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 5), new Vector3I(0, 0, 0));
+    StartBattle(session);
+
+    Vector3I[] path = session.Board.FindPath(unit.Position, new Vector3I(2, 0, 0), unit.UnitId);
+    Assert.Equal(3, path.Length);
+
+    var moved = BattleSessionMutation.MoveUnit(unit.UnitId, path).Execute(session);
+
+    Assert.True(moved.Succeeded);
+    Assert.Equal(new Vector3I(2, 0, 0), unit.Position);
+    Assert.False(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
+    Assert.True(session.Board.GetTile(new Vector3I(2, 0, 0)).IsOccupied);
+    Assert.Equal(3, unit.CurrentActionPoints);
+  }
+
+  [TestCase(TestName = "MoveUnit rejects paths that do not start at the current position")]
+  public void MoveUnitRejectsPathsThatDoNotStartAtTheCurrentPosition()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 5), new Vector3I(0, 0, 0));
+    StartBattle(session);
+
+    var moved = BattleSessionMutation.MoveUnit(unit.UnitId, [new Vector3I(1, 0, 0), new Vector3I(2, 0, 0)]).Execute(session);
+
+    Assert.False(moved.Succeeded);
+    Assert.Equal(new Vector3I(0, 0, 0), unit.Position);
+    Assert.True(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
+    Assert.False(session.Board.GetTile(new Vector3I(2, 0, 0)).IsOccupied);
+  }
+
+  [TestCase(TestName = "MoveUnit rejects invalid composed steps")]
+  public void MoveUnitRejectsInvalidComposedSteps()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 5), new Vector3I(0, 0, 0));
+    StartBattle(session);
+
+    var moved = BattleSessionMutation.MoveUnit(unit.UnitId, [unit.Position, new Vector3I(2, 0, 0)]).Execute(session);
+
+    Assert.False(moved.Succeeded);
+    Assert.Equal(new Vector3I(0, 0, 0), unit.Position);
+    Assert.Equal(5, unit.CurrentActionPoints);
+    Assert.True(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
+  }
+
+  [TestCase(TestName = "MoveUnit rejects paths that cost more AP than the unit has")]
+  public void MoveUnitRejectsPathsThatCostMoreApThanTheUnitHas()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 1), new Vector3I(0, 0, 0));
+    StartBattle(session);
+
+    Vector3I[] path = session.Board.FindPath(unit.Position, new Vector3I(2, 0, 0), unit.UnitId);
+    Assert.Equal(3, path.Length);
+
+    var moved = BattleSessionMutation.MoveUnit(unit.UnitId, path).Execute(session);
+
+    Assert.False(moved.Succeeded);
+    Assert.Equal(new Vector3I(0, 0, 0), unit.Position);
+    Assert.Equal(1, unit.CurrentActionPoints);
+    Assert.True(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
+  }
+
   [TestCase(TestName = "Passing a unit ends its activation while keeping the next ally available")]
   public void PassingAUnitEndsItsActivationWhileKeepingTheNextAllyAvailable()
   {
