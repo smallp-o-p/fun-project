@@ -104,6 +104,24 @@ public class BattleSessionTest
     Assert.False(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
   }
 
+  [TestCase(TestName = "Constructor can use a prebuilt board state")]
+  public void ConstructorCanUseAPrebuiltBoardState()
+  {
+    var faction = BattleTestFactory.MakeFaction("A");
+    var board = new BattleBoardState(new Vector3I(3, 1, 3));
+    board.GetTile(new Vector3I(1, 0, 0)).IsWalkable = false;
+
+    var session = new BattleSession(
+      board,
+      [faction],
+      new Dictionary<Faction, IEnumerable<Combatant>>());
+
+    var result = BattleSessionMutation.SpawnUnit(BattleTestFactory.MakeCombatant("A1", faction), new Vector3I(1, 0, 0)).Execute(session);
+
+    Assert.True(object.ReferenceEquals(board, session.Board));
+    Assert.False(result.Succeeded);
+  }
+
   [TestCase(TestName = "AdvanceTurn rotates only participating factions without incrementing early")]
   public void AdvanceTurnRotatesOnlyParticipatingFactionsWithoutIncrementingEarly()
   {

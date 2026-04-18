@@ -13,7 +13,7 @@ This document describes the current tactical runtime shape in the repo and the n
   - `X` = width
   - `Y` = levels / height
   - `Z` = length / depth
-- Future tactical systems such as pathfinding, visibility, effects, and AI should integrate through explicit session reads and mutation execution instead of mutating scene state directly.
+- Future tactical systems such as pathfinding, effects, and AI should integrate through explicit session reads and mutation execution instead of mutating scene state directly.
 
 ## Current Runtime Diagram
 
@@ -31,6 +31,8 @@ flowchart LR
         BattleSession["BattleSession\nsingle source of truth\nturn flow + bookkeeping"]
         BoardState["BattleBoardState\nBattleTileState[x,y,z]\noccupancy + walkability"]
         UnitState["BattleUnitState[]\nposition, AP, health,\ninventory refs, equipped weapon"]
+        VisibilityState["BattleVisibilitySnapshot\nper-faction fog of war\nexplored tiles + visible enemies"]
+        VisibilitySystem["BattleVisibilitySystem\ntile-based LOS + faction FOV rebuilds"]
         EventStream["BattleEvent stream"]
         Mutations["BattleSessionMutation\nexecutable commands"]
         ActionExecutor["BattleActionExecutor\nmutation queue + invocation"]
@@ -46,7 +48,10 @@ flowchart LR
 
     BattleSession --- BoardState
     BattleSession --- UnitState
+    BattleSession --- VisibilityState
     BattleSession --- EventStream
+    VisibilitySystem -->|"rebuild"| VisibilityState
+    Mutations -->|"refresh on success"| VisibilitySystem
 
     HUD -->|"player request"| SceneController
     BattleScene -->|"selection / hover / click"| SceneController
@@ -71,8 +76,14 @@ flowchart LR
   - alive and dead unit bookkeeping
   - current-turn unit availability
   - board occupancy
+  - faction visibility and explored-tile state
   - authoritative battle event emission
 - `BattleSessionMutation` owns mutation-specific validation and orchestration. Each concrete mutation decides whether it can execute and which session helpers it needs to call.
+- `BattleVisibilitySystem` owns:
+  - tile-based line-of-sight checks
+  - tile visibility checks
+  - deriving visible units from visible tiles
+  - rebuilding faction fog-of-war snapshots from session state
 - `BattleActionExecutor` owns:
   - the pending mutation queue
   - invocation order
@@ -117,7 +128,33 @@ The session currently owns:
 - handling faction elimination
 - rebuilding and advancing the round queue
 - refreshing action-point availability for the active side
+- rebuilding faction visibility after successful mutations
 - ending the battle when no living factions remain
+- exposing visibility queries such as:
+  - `IsUnitVisibleToUnit(...)`
+  - `IsUnitVisibleToFaction(...)`
+  - `IsTileVisibleToFaction(...)`
+  - `HasFactionExploredTile(...)`
+  - `GetVisibleUnitsForFaction(...)`
+
+### BattleVisibilitySystem
+
+`BattleVisibilitySystem` is now a first-class runtime subsystem.
+
+Current behavior:
+
+- uses `VisionStat` as the maximum sight range per unit
+- traces LOS from tile center to tile center
+- treats units as visible when they stand on a currently visible tile
+- builds per-faction current visibility and explored-tile memory
+- keeps own living units known to their faction even without direct LOS
+- rebuilds the full visibility snapshot after every successful battle mutation
+
+Current limitations:
+
+- vision is omnidirectional
+- `BlocksLineOfSight` is whole-tile occlusion
+- there is no smoke attenuation, lighting model, or last-known enemy memory yet
 
 ### BattleSessionMutation
 
@@ -223,7 +260,6 @@ Presentation code should react to these events instead of inferring state change
 These systems are still part of the intended architecture, but they are not implemented as first-class runtime systems yet:
 
 - `BattlePathfinder`
-- `BattleVisibilitySystem`
 - `BattleRules`
 - `BattleEffectSystem`
 - `BattleAIController`
@@ -256,3 +292,4 @@ Detailed design notes:
 
 - [BattleActionExecutor Design](./battle-action-executor.md)
 - [BattleSession Command Pattern](./battle-session-command-pattern.md)
+- [Battlescape Tile System Design](./battlescape-tile-system.md)

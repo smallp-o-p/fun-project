@@ -46,14 +46,20 @@ public sealed class BattleSession
     Vector3I dimensions,
     IEnumerable<Faction> globalFactionOrder,
     IDictionary<Faction, IEnumerable<Combatant>> factionRosters)
+    : this(new BattleBoardState(dimensions), globalFactionOrder, factionRosters)
   {
-    if (dimensions.X <= 0 || dimensions.Y <= 0 || dimensions.Z <= 0)
-      throw new ArgumentOutOfRangeException(nameof(dimensions));
+  }
 
+  public BattleSession(
+    BattleBoardState board,
+    IEnumerable<Faction> globalFactionOrder,
+    IDictionary<Faction, IEnumerable<Combatant>> factionRosters)
+  {
+    ArgumentNullException.ThrowIfNull(board);
     ArgumentNullException.ThrowIfNull(globalFactionOrder);
     ArgumentNullException.ThrowIfNull(factionRosters);
 
-    Board = new BattleBoardState(dimensions);
+    Board = board;
 
     foreach (var faction in globalFactionOrder)
     {
@@ -394,8 +400,7 @@ public sealed class BattleSession
 
   internal static bool IsAdjacent(Vector3I source, Vector3I destination)
   {
-    var delta = source - destination;
-    return Mathf.Abs(delta.X) + Mathf.Abs(delta.Y) + Mathf.Abs(delta.Z) == 1;
+    return Mathf.Abs((source - destination).Length()) == 1;
   }
 
   internal static int GetGridDistance(Vector3I source, Vector3I destination)
