@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://dunqc522deawo"]
+
+[ext_resource type="Script" uid="uid://b02lmm86txijg" path="res://scenes/TestInteractObject.cs" id="1_w8k1h"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_usmlq"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_yj3fb"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4q05m"]
+albedo_color = Color(0.998638, 0, 0.09340162, 1)
+
+[node name="TestInteractObject" type="Area3D" unique_id=203400911]
+script = ExtResource("1_w8k1h")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2131296768]
+shape = SubResource("SphereShape3D_usmlq")
+debug_color = Color(0.9481264, 0.092578225, 0.52432853, 0.41960785)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="CollisionShape3D" unique_id=1224509614]
+mesh = SubResource("SphereMesh_yj3fb")
+surface_material_override/0 = SubResource("StandardMaterial3D_4q05m")
