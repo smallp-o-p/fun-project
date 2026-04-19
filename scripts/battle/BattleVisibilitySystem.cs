@@ -17,7 +17,7 @@ internal sealed class BattleVisibilitySystem
     ArgumentNullException.ThrowIfNull(session);
 
     var board = session.Board;
-    var livingUnits = session.AliveUnits.Where(unit => unit.IsAlive).ToArray();
+    var livingUnits = session.AliveUnits.ToArray();
     Dictionary<Vector3I, BattleUnitState> livingUnitsByPosition = livingUnits.ToDictionary(unit => unit.Position);
     Dictionary<Faction, HashSet<Vector3I>> visibleTilesByFaction = [];
     Dictionary<Faction, HashSet<int>> visibleForeignUnitsByFaction = [];

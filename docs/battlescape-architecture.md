@@ -6,8 +6,8 @@ This document describes the current tactical runtime shape in the repo and the n
 
 - `BattleSession` is the single source of truth for live tactical state.
 - `BattleSession` is constructed from battle setup data: board dimensions, stable faction order, and faction rosters.
-- `BattleSessionMutation` is the authoritative command layer. Mutations execute directly against the session.
-- `BattleActionExecutor` is a mutation queue and invoker, not an intent-to-action switchboard.
+- `BattleSessionMutation` is the authoritative command layer.
+- `BattleActionExecutor` validates and invokes queued `BattleSessionMutation` values.
 - Godot scene nodes own presentation, input, and focused-unit UX. They do not own tactical truth.
 - Board coordinates use normal `Godot.Vector3I` semantics:
   - `X` = width
@@ -83,13 +83,14 @@ flowchart LR
   - adjacency queries
   - occupant placement, movement, and removal
   - board-local pathfinding queries
-- `BattleSessionMutation` owns mutation-specific validation and orchestration. Each concrete mutation decides whether it can execute and which session helpers it needs to call.
+- `BattleSessionMutation` owns mutation-specific application and orchestration after executor-side validation succeeds.
 - `BattleVisibilitySystem` owns:
   - tile-based line-of-sight checks
   - tile visibility checks
   - deriving visible units from visible tiles
   - rebuilding faction fog-of-war snapshots from session state
 - `BattleActionExecutor` owns:
+  - preview validation for supported mutations
   - the pending mutation queue
   - invocation order
   - last-result tracking
@@ -101,7 +102,6 @@ flowchart LR
   - presentation timing
 - `BattleSession` does not track a selected unit. Selection is presentation state.
 - Inventory currently lives on `BattleUnitState`. There is no separate `BattleItemState` runtime layer yet.
-- `BattleActionIntent` is still a useful upstream request model, but it is no longer the executor's core input type.
 
 ## Current Implemented Runtime
 
@@ -151,7 +151,7 @@ The session currently owns:
 - `FindPath(...)`
 - `IsAdjacent(...)`
 
-Pathfinding is currently integrated directly into the board through Godot `AStar3D`. Scene controllers, HUD preview code, and AI can query the board for a path, then pass the chosen path into `MoveUnitBattleSessionMutation`. If path rules become substantially more unit-specific later, this can still be extracted behind a dedicated pathfinder service without changing the player-facing flow.
+Pathfinding is currently integrated directly into the board through Godot `AStar3D`. Scene controllers, HUD preview code, and AI can query the board for a path, then pass the chosen path into `MoveUnit`. If path rules become substantially more unit-specific later, this can still be extracted behind a dedicated pathfinder service without changing the player-facing flow.
 
 ### BattleVisibilitySystem
 
@@ -176,14 +176,14 @@ Current limitations:
 
 The current built-in authoritative mutations are:
 
-- `StartBattleBattleSessionMutation`
-- `SpawnUnitBattleSessionMutation`
-- `MoveUnitStepBattleSessionMutation`
-- `MoveUnitBattleSessionMutation`
-- `ThrowItemBattleSessionMutation`
-- `ApplyDamageBattleSessionMutation`
-- `PassUnitBattleSessionMutation`
-- `EndFactionTurnBattleSessionMutation`
+- `StartBattle`
+- `SpawnUnit`
+- `MoveUnitStep`
+- `MoveUnit`
+- `ThrowItem`
+- `ApplyDamage`
+- `PassUnit`
+- `EndFactionTurn`
 
 Each mutation executes directly through:
 
@@ -200,10 +200,12 @@ Mutation results are returned as `BattleMutationResult`, including:
 
 ### BattleActionExecutor
 
-`BattleActionExecutor` currently queues `BattleSessionMutation`, not `BattleActionIntent`.
+`BattleActionExecutor` currently queues `BattleSessionMutation`.
 
 Current responsibilities:
 
+- `Evaluate(...)`
+- `ExecuteNow(...)`
 - `Enqueue(...)`
 - `EnqueueRange(...)`
 - `Tick()`
@@ -215,7 +217,6 @@ Current responsibilities:
 
 The executor does not currently:
 
-- resolve intents through a switch
 - own selection logic
 - mutate session state directly outside mutation execution
 
@@ -228,7 +229,7 @@ sequenceDiagram
     participant HUD as Battle HUD
     participant Controller as BattleSceneController
     participant Exec as BattleActionExecutor
-    participant Mutation as MoveUnitBattleSessionMutation
+    participant Mutation as MoveUnit
     participant Session as BattleSession
     participant Board as BattleBoardState
     participant Event as BattleEvent stream
@@ -237,9 +238,11 @@ sequenceDiagram
     Player->>HUD: Confirm move
     HUD->>Controller: Move request
     Controller->>Board: Query preview path
+    Controller->>Exec: Evaluate move mutation
+    Exec->>Session: Validate active side, AP, unit availability
+    Exec->>Board: Validate adjacency, occupancy, and path legality
     Controller->>Exec: Enqueue move mutation
-    Exec->>Mutation: Execute(session)
-    Mutation->>Session: Validate active side, AP, unit availability
+    Exec->>Mutation: ExecuteUnchecked(session)
     Mutation->>Board: Commit each provided board step
     Mutation->>Event: Raise UnitMoved per step
     Exec-->>Controller: Return BattleMutationResult
@@ -299,7 +302,7 @@ Use these names consistently in future tactical work:
 - `BattleSessionMutation`
 - `BattleMutationResult`
 - `BattleActionExecutor`
-- `BattleActionIntent` as an upstream request model, not the executor's authoritative queue input
+- `BattleActionEvaluation`
 - `BattleBoardState`
 - `BattleTileState`
 - `BattleUnitState`

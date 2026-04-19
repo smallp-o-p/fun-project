@@ -104,7 +104,7 @@ The tile system should evolve toward these responsibilities:
 - `BattleBoardPresenter`
   - scene-side builder that instantiates visuals from map or board data
 - `BattleSceneController`
-  - translates selected or hovered cells into actions
+  - translates selected or hovered cells into mutations
 
 ## Coordinate Conventions
 
@@ -163,13 +163,13 @@ That keeps all board-local spatial rules together:
 - which occupied cells block movement
 - how a path between two cells is resolved
 
-`BattleSession` and `BattleSessionMutation` should still own battle legality such as:
+`BattleActionExecutor` and `BattleSession` should still own battle legality such as:
 
 - whether the unit may act right now
 - action point spending
 - faction and turn checks
 
-The current implementation path is to integrate Godot `AStar3D` into `BattleBoardState` and expose a board query such as `FindPath(...)`. Presentation and controller code can use that query to preview a route to the player, and `MoveUnitBattleSessionMutation` should then execute the chosen path as a composition of explicit steps instead of silently pathfinding on the player's behalf. If pathfinding later becomes heavily unit-specific or expensive to rebuild, it can be extracted behind a separate service without changing that contract.
+The current implementation path is to integrate Godot `AStar3D` into `BattleBoardState` and expose a board query such as `FindPath(...)`. Presentation and controller code can use that query to preview a route to the player, then submit `MoveUnit` through `BattleActionExecutor` for legality checks before the mutation applies the chosen path as a composition of explicit steps. If pathfinding later becomes heavily unit-specific or expensive to rebuild, it can be extracted behind a separate service without changing that contract.
 
 ### Future Picking
 

@@ -64,7 +64,12 @@ public abstract class BattleSessionMutation
   public BattleMutationResult Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
+    return new BattleActionExecutor(session).ExecuteNow(this);
+  }
 
+  internal BattleMutationResult ExecuteUnchecked(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(session);
     var result = ExecuteCore(session);
     if (result.Succeeded)
       session.RefreshVisibility();
@@ -192,24 +197,13 @@ public sealed class MoveUnitStep : BattleSessionMutation
 
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
-    if (session.Phase != BattlePhase.InProgress)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
-
     var unit = session.GetLivingUnitOrNull(UnitId);
-    if (unit == null || session.ActiveSide == null)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
-    if (unit.Side != session.ActiveSide)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
-    if (!session.IsUnitStillAvailableThisTurn(UnitId))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
-    if (!session.Board.IsAdjacent(unit.Position, Destination))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
-    if (!session.Board.CanOccupy(Destination))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
+    if (unit == null)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit step mutation could not resolve unit {UnitId}.");
     if (!unit.TrySpendActionPoints(ActionPointCost))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit step mutation could not spend {ActionPointCost} action points for unit {UnitId}.");
     if (!session.Board.TryMoveOccupant(unit.Position, Destination, unit.UnitId))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit step mutation was rejected by the battle session.");
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit step mutation could not move unit {UnitId} to {Destination}.");
 
     unit.MoveTo(Destination);
     session.RaiseEvent(new BattleEvent(BattleEventType.UnitMoved, unit.UnitId, Destination));
@@ -240,20 +234,13 @@ public sealed class MoveUnit : BattleSessionMutation
 
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
-    if (session.Phase != BattlePhase.InProgress)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation was rejected by the battle session.");
-
     BattleUnitState? unit = session.GetLivingUnitOrNull(UnitId);
-    if (unit == null || session.ActiveSide == null)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation was rejected by the battle session.");
-    if (unit.Side != session.ActiveSide)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation was rejected by the battle session.");
-    if (!session.IsUnitStillAvailableThisTurn(UnitId))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation was rejected by the battle session.");
+    if (unit == null)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit mutation could not resolve unit {UnitId}.");
     if (Path.Count == 0)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation requires a non-empty path.");
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, "Move unit mutation requires a non-empty path.");
     if (Path[0] != unit.Position)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation path must start at the unit's current position.");
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, "Move unit mutation path must start at the unit's current position.");
 
     Vector3I destination = Path[^1];
 
@@ -261,19 +248,13 @@ public sealed class MoveUnit : BattleSessionMutation
     if (stepCount == 0)
       return BattleMutationResult.Success(this, unit, $"Unit already occupies {destination}.");
 
-    long totalActionPointCost = (long)stepCount * ActionPointCostPerStep;
-    if (totalActionPointCost > int.MaxValue)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, "Move unit mutation exceeded the supported action point cost.");
-    if (unit.CurrentActionPoints < totalActionPointCost)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Move unit mutation was rejected by the battle session.");
-
     BattleUnitState currentUnit = unit;
     for (int stepIndex = 1; stepIndex < Path.Count; stepIndex++)
     {
       MoveUnitStep stepMutation = new(UnitId, Path[stepIndex], ActionPointCostPerStep);
-      BattleMutationResult stepResult = stepMutation.Execute(session);
+      BattleMutationResult stepResult = stepMutation.ExecuteUnchecked(session);
       if (!stepResult.Succeeded)
-        return BattleMutationResult.Failure(this, stepResult.FailureReason, stepResult.Message ?? "Move unit mutation was rejected by the battle session.");
+        return BattleMutationResult.Failure(this, stepResult.FailureReason, stepResult.Message ?? "Move unit mutation could not be applied.");
 
       currentUnit = stepResult.AffectedUnit ?? currentUnit;
     }
@@ -298,31 +279,20 @@ public sealed class ThrowItem : BattleSessionMutation
 
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
-    if (session.Phase != BattlePhase.InProgress)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Throw item mutation was rejected by the battle session.");
-
     var unit = session.GetLivingUnitOrNull(UnitId);
-    if (unit == null || session.ActiveSide == null)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Throw item mutation was rejected by the battle session.");
-    if (unit.Side != session.ActiveSide)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Throw item mutation was rejected by the battle session.");
-    if (!session.IsUnitStillAvailableThisTurn(UnitId))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Throw item mutation was rejected by the battle session.");
-    if (!session.Board.IsInBounds(TargetCell))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Throw item mutation was rejected by the battle session.");
+    if (unit == null)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Throw item mutation could not resolve unit {UnitId}.");
     if (!unit.HasInventoryItem(Item))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Throw item mutation was rejected by the battle session.");
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"{unit.Combatant.Name} no longer has {Item.ItemName}.");
     if (Item.ConsumesOnUse && Item.IsDepleted)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Throw item mutation was rejected by the battle session.");
-    if (BattleSession.GetGridDistance(unit.Position, TargetCell) > Item.ThrowRange)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Throw item mutation was rejected by the battle session.");
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"{Item.ItemName} has no charges remaining.");
     if (!unit.TrySpendActionPoints(Item.ActionPointCost))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Throw item mutation was rejected by the battle session.");
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"{unit.Combatant.Name} could not spend {Item.ActionPointCost} action points.");
 
     if (Item.ConsumesOnUse)
     {
       if (!Item.TrySpendCharge())
-        return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Throw item mutation was rejected by the battle session.");
+        return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"{Item.ItemName} could not spend a charge.");
 
       if (Item.IsDepleted)
         unit.RemoveInventoryItem(Item);
@@ -375,16 +345,13 @@ public sealed class PassUnit : BattleSessionMutation
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
     var activeSide = session.ActiveSide;
-    if (session.Phase != BattlePhase.InProgress || activeSide == null)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Pass unit mutation was rejected by the battle session.");
-
     var unit = session.GetLivingUnitOrNull(UnitId);
+    if (activeSide == null)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, "Pass unit mutation could not resolve the active side.");
     if (unit == null)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Pass unit mutation was rejected by the battle session.");
-    if (unit.Side != activeSide)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Pass unit mutation was rejected by the battle session.");
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Pass unit mutation could not resolve unit {UnitId}.");
     if (!session.TryRemoveAvailableUnit(UnitId))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Pass unit mutation was rejected by the battle session.");
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Pass unit mutation could not remove unit {UnitId} from the active roster.");
 
     session.RaiseEvent(new BattleEvent(BattleEventType.UnitActivationEnded, unit.UnitId, unit.Position, $"{unit.Combatant.Name} ended their activation."));
 
@@ -408,7 +375,7 @@ public sealed class EndFactionTurn : BattleSessionMutation
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
     if (!session.TryEndFactionTurn(ExpectedActiveSide))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "End faction turn mutation was rejected by the battle session.");
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"End faction turn mutation could not end {ExpectedActiveSide.Name}'s turn.");
 
     return BattleMutationResult.Success(this);
   }

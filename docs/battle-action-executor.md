@@ -1,232 +1,152 @@
 # BattleActionExecutor Design
 
-This document defines the first implementation slice of `BattleActionExecutor` for the tactical combat runtime.
+This document describes the current role of `BattleActionExecutor` in the tactical combat runtime.
 
-It is a narrower design than the long-term architecture in [battlescape-architecture.md](./battlescape-architecture.md). The goal is to introduce the correct authority boundaries now, while keeping the implementation simple enough to use immediately.
-
-The current implementation has moved past this exact intent-based slice. `BattleActionExecutor` now queues executable `BattleSessionMutation` commands directly, and `BattleActionIntent` should be translated upstream before enqueue.
-
-Treat the rest of this document as historical context for the earlier intent-driven executor shape. For the current command-based design, see [BattleSession Command Pattern](./battle-session-command-pattern.md).
+`BattleActionExecutor` is the validation and invocation layer for `BattleSessionMutation`.
 
 ## Purpose
 
-`BattleActionExecutor` is the orchestration layer between action requests and authoritative battle-state mutation.
+The executor exists to answer two questions cleanly:
 
-It exists to answer one question cleanly:
-
-- given a `BattleActionIntent`, what happens next in the battle runtime?
+- can this mutation execute against the current battle state?
+- if it can, when and in what order should it execute?
 
 It is responsible for:
 
-- owning the pending action queue
-- executing at most one action step at a time
-- translating action intents into `BattleSessionMutation` values and submitting them through `BattleSession.Apply(...)`
-- returning structured execution results
-- providing one place to add future interrupt checks, animation pacing, and action-level sequencing
+- validating supported player-facing mutations against current session state
+- owning the pending mutation queue
+- executing at most one queued mutation per `Tick()`
+- returning structured `BattleMutationResult` and `BattleActionEvaluation` values
+- isolating exceptions raised during mutation execution
 
 It is not responsible for:
 
 - owning tactical truth
 - rendering or animating battle actions
-- pathfinding, visibility, or damage math
+- pathfinding graph maintenance
 - AI decision-making
 
 ## Authority Boundaries
 
-- `BattleSceneController` and `BattleAIController` create `BattleActionIntent` objects.
-- `BattleActionExecutor` consumes those intents.
 - `BattleSession` remains the only owner of authoritative tactical state.
-- `BattleActionExecutor` does not call ad hoc `Try...` methods on the session; it submits typed session mutations instead.
-- `BattleSession` emits `BattleEvent` values after state changes occur.
-- visuals and HUD listen to `BattleEvent` and re-query `BattleSession` as needed.
+- `BattleSessionMutation` remains the command object that applies a state change.
+- `BattleActionExecutor` validates and invokes mutations.
+- scene controllers, HUD code, and AI build mutations and submit them to the executor.
+- visuals and HUD react to `BattleEvent` after session state changes.
 
 The important split is:
 
-- `BattleActionIntent` = command/request
-- `BattleActionExecutor` = sequencer/orchestrator
+- `BattleSessionMutation` = executable command
+- `BattleActionExecutor` = validator, queue, and invoker
 - `BattleSession` = source of truth
-- `BattleEvent` = notification that state already changed
+- `BattleEvent` = notification that authoritative state already changed
 
-## First Implementation Slice
+## Current Public Surface
 
-The first usable executor should support the action types the runtime already knows how to resolve:
+The current executor API is:
 
-- `move_step`
-- `pass_unit`
-- `end_faction_turn`
-- `throw_item`
-
-This first slice is intentionally synchronous and single-threaded:
-
-- `Tick()` resolves at most one queued action
-- one action returns one `BattleActionExecutionResult`
-- the executor does not yet wait for presentation acknowledgements
-- the executor does not yet suspend and resume interrupted actions
-
-That is enough to establish the correct battle-runtime boundary now.
-
-## Why Single-Threaded
-
-Authoritative battle mutation should remain single-threaded.
-
-Reasons:
-
-- combat outcomes stay deterministic
-- interrupts are easier to reason about
-- state mutation order is explicit
-- replay, debugging, and future save/load remain tractable
-
-If expensive work appears later, only pure read-only calculations such as pathfinding previews, LOS candidate queries, or AI scoring should be moved off-thread. The executor and `BattleSession` mutation path should remain single-threaded.
-
-## Incremental Execution Model
-
-Even though the first slice resolves one whole intent per `Tick()`, the executor API should already be shaped for incremental execution.
-
-The intended evolution path is:
-
-1. queue action intent
-2. `Tick()` begins resolving it
-3. executor commits one micro-step
-4. session emits `BattleEvent`
-5. executor either:
-   - continues next tick
-   - waits for presentation
-   - pauses for interrupt handling
-   - completes the action
-
-That means a long move, overwatch interrupt, or reaction shot can later be spread across frames without changing the core ownership model.
-
-## Intent Shape
-
-`BattleActionIntent` should be an abstract base type with concrete subclasses for real action shapes.
-
-Built-in intents should be concrete types, for example:
-
-- `MoveStepBattleActionIntent`
-- `PassUnitBattleActionIntent`
-- `EndFactionTurnBattleActionIntent`
-- `ThrowItemBattleActionIntent`
-
-That gives each action only the fields it actually needs and lets the executor dispatch by intent type instead of a nullable property bag.
-
-The first executor implementation may keep a `CustomBattleActionIntent` escape hatch for prototype-only actions and a `NamedBattleActionIntent` fallback for unsupported ids. Those are transitional lanes and should not become the main built-in action model.
-
-## Execution Result Shape
-
-Each resolved action returns a `BattleActionExecutionResult`.
-
-The result should answer:
-
-- which intent was executed
-- whether it succeeded
-- if it failed, why
-- optional explanatory message
-
-The first failure reasons should stay small and practical:
-
-- `UnsupportedAction`
-- `ActionRejected`
-- `UnexpectedError`
-
-## Public Surface
-
-The first public executor surface should be:
-
-- `Enqueue(BattleActionIntent intent)`
+- `Evaluate(BattleSessionMutation mutation)`
+- `ExecuteNow(BattleSessionMutation mutation)`
+- `Enqueue(BattleSessionMutation mutation)`
+- `EnqueueRange(IEnumerable<BattleSessionMutation> mutations)`
 - `Tick()`
-- `DrainQueue()`
+- `DrainQueue(int maxActions = int.MaxValue)`
 - `PendingCount`
-- `ActiveIntent`
+- `ActiveMutation`
 - `LastResult`
 
 And events:
 
-- `ActionStarted`
-- `ActionResolved`
+- `MutationStarted`
+- `MutationResolved`
 
-These are executor-level orchestration events, not presentation state events. Presentation should still listen to `BattleSession.EventRaised`.
+`Evaluate(...)` is the preview-friendly entry point. Controllers can build a mutation, ask the executor whether it is legal, inspect the rejection message or action-point cost, and only then enqueue or execute it.
 
-## Action Resolution Rules
+## Evaluation Shape
 
-### Move Step
+`BattleActionEvaluation` currently reports:
 
-- represented by `MoveStepBattleActionIntent`
-- carries `UnitId`, `TargetCell`, and explicit step AP cost
-- submits `BattleSessionMutation.MoveUnitStep(...)`
+- the mutation being evaluated
+- whether the mutation is allowed
+- the failure reason when rejected
+- an optional message
+- the total action-point cost when that concept applies
 
-### Pass Unit
+This keeps UI and AI code on the same validation path as actual execution.
 
-- represented by `PassUnitBattleActionIntent`
-- submits `BattleSessionMutation.PassUnit(...)`
-- marks the unit as done for the current faction turn
-- leaves any presentation-layer unit focus decisions to higher layers
+## Execution Flow
 
-### End Faction Turn
+The current happy-path flow is:
 
-- represented by `EndFactionTurnBattleActionIntent`
-- carries the issuing `Faction`
-- submits `BattleSessionMutation.EndFactionTurn(...)`
-- executor should reject the intent if battle state already advanced to a different active side before dequeue
-- advances to the next faction when legal
+1. controller or AI constructs a `BattleSessionMutation`
+2. optional preview code calls `Evaluate(mutation)`
+3. the mutation is queued with `Enqueue(...)` or executed immediately with `ExecuteNow(...)`
+4. the executor validates the mutation against the current `BattleSession`
+5. the executor calls `mutation.ExecuteUnchecked(session)` if the mutation is legal
+6. the mutation applies its change through session and board helpers
+7. `BattleSession` raises authoritative `BattleEvent` values
+8. the executor returns a `BattleMutationResult`
 
-### Throw Item
+`BattleSessionMutation.Execute(session)` also routes through the executor so direct mutation execution uses the same validation path.
 
-- represented by `ThrowItemBattleActionIntent`
-- carries `UnitId`, `TargetCell`, and a `ThrowableItem` reference
-- submits `BattleSessionMutation.ThrowItem(...)`
+## Supported Validation Rules
 
-### Custom
+The executor currently performs battle-legality validation for these mutations:
 
-- if a `CustomBattleActionIntent` is present, the executor may delegate to its resolver
-- this is a temporary extensibility lane for prototyping
-- built-in action types should not use this path
+- `MoveUnitStep`
+- `MoveUnit`
+- `ThrowItem`
+- `PassUnit`
+- `EndFactionTurn`
 
-## Relationship To Future Interrupts
+These checks include battle phase, active side, unit availability, action-point cost, adjacency, board occupancy, throw range, and path legality.
 
-This first implementation does not yet suspend or resume actions. The next executor growth path is:
+Other mutations currently pass through without extra executor-side legality rules:
 
-1. convert long movement from one intent into a multi-step execution context
-2. after each committed step, query interrupt candidates
-3. suspend the current action if a valid interrupt exists
-4. resolve the interrupt action
-5. either resume or abort the original action
+- `StartBattle`
+- `SpawnUnit`
+- `ApplyDamage`
 
-That future design fits naturally on top of the queued `Tick()` API.
+Those mutations still protect their own invariants during application.
+
+## Single-Threaded Execution
+
+Authoritative battle mutation remains single-threaded.
+
+Reasons:
+
+- combat outcomes stay deterministic
+- ordering stays explicit
+- replay and debugging remain tractable
+- interrupts and future sequencing are easier to reason about
+
+Pure read-only work such as path previews or AI scoring can still move elsewhere later. The executor and `BattleSession` mutation path should remain single-threaded.
 
 ## Relationship To Visuals
 
-Visual systems should not listen to executor internals to understand battle state.
+Visual systems should not infer tactical truth from executor internals.
 
 Recommended rule:
 
-- listen to `BattleEvent` for visual updates
-- optionally listen to executor `ActionResolved` for orchestration or controller logic
+- use `BattleActionEvaluation` and `BattleMutationResult` for controller logic
+- use `BattleEvent` for visual updates
 
 Example:
 
-- `UnitMoved` battle event tells the visuals a unit has moved
-- controller may use executor result to decide whether to queue the next action
+- controller uses `Evaluate(...)` to decide whether to enable a move confirmation
+- scene visuals listen for `UnitMoved`
+- HUD refreshes AP and prompts after `MutationResolved` or after relevant battle events
 
-## Initial Test Coverage
+## Initial Query Surface
 
-The first executor tests should cover:
+The executor now provides one general preview query:
 
-- queued actions execute in FIFO order
-- `move_step` succeeds when legal
-- `move_step` fails when illegal
-- `pass_unit` marks the unit done without mutating presentation-layer selection state
-- `end_faction_turn` advances the active side
-- stale `end_faction_turn` intents are rejected once the active side has changed
-- `throw_item` consumes the throwable when legal
-- unsupported action ids fail cleanly
-- custom resolver fallback still works
+- `Evaluate(BattleSessionMutation mutation)`
 
-## Deliberate Limitations In This Slice
+As the tactics layer grows, additional explicit read APIs can be added alongside it, for example:
 
-- no pathfinding integration yet
-- no presentation wait state yet
-- no overwatch or interrupt stack yet
-- no multithreaded query work
-- no durable item/unit ids beyond current runtime references
+- reachable cells for a unit
+- valid throw targets for an item
+- action-point cost for a path
 
-These are acceptable limitations for the first executor as long as it establishes the right architectural boundary now.
+Those should stay read-only and should not bypass the authoritative mutation path.

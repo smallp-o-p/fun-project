@@ -1,57 +1,49 @@
 # BattleSession Command Pattern
 
-This document sketches the target class layout for a full Command-pattern refactor around `BattleSession`, `BattleSessionMutation`, and `BattleActionExecutor`.
-
-It is a forward-looking design note, not a description of the current implementation.
-
-## Design Goals
-
-- Make `BattleSessionMutation` a real command object instead of a data-only mutation message.
-- Let `BattleActionExecutor` invoke commands directly instead of translating action requests through a large switch.
-- Keep `BattleSession` as the single source of truth for live battle state.
-- Shrink `BattleSession` so it focuses on authoritative bookkeeping, turn flow, queue reconciliation, and event emission.
-- Keep battle invariants protected by `BattleSession` instead of letting commands mutate arbitrary collections directly.
+This document describes the command-pattern shape currently used around `BattleSession`, `BattleSessionMutation`, and `BattleActionExecutor`.
 
 ## Pattern Mapping
 
 - `BattleSessionMutation` = command
-- `BattleActionExecutor` = invoker
+- `BattleActionExecutor` = validator and invoker
 - `BattleSession` = receiver and aggregate root
-- `BattleActionIntent` = higher-level request model outside the command layer
 
-`BattleActionIntent` still has value as a UI or AI-facing request shape, but it should sit upstream from the command queue.
-
-## Target Flow
+## Current Flow
 
 ```text
-BattleSceneController / BattleAIController
-  -> BattleActionIntent
-  -> translate to BattleSessionMutation
-  -> BattleActionExecutor.Enqueue(mutation)
-  -> BattleActionExecutor.Tick()
-  -> mutation.Execute(session)
+BattleSceneController / HUD / AI
+  -> build BattleSessionMutation
+  -> optional BattleActionExecutor.Evaluate(mutation)
+  -> BattleActionExecutor.Enqueue(mutation) or ExecuteNow(mutation)
+  -> mutation.ExecuteUnchecked(session)
   -> BattleSession bookkeeping APIs
   -> BattleEvent emission
 ```
 
-The important change is that the executor queues and invokes commands directly. Intent translation happens before the command enters the queue.
+The queue and replay surface stay focused on authoritative battle commands.
 
 ## Class Layout
 
 ```mermaid
 classDiagram
-    class BattleActionIntent {
-        <<request>>
-    }
-
     class BattleActionExecutor {
         -Queue~BattleSessionMutation~ _pending
+        +Evaluate(BattleSessionMutation mutation) BattleActionEvaluation
+        +ExecuteNow(BattleSessionMutation mutation) BattleMutationResult
         +Enqueue(BattleSessionMutation mutation)
         +EnqueueRange(IEnumerable~BattleSessionMutation~ mutations)
         +Tick() BattleMutationResult?
         +DrainQueue(int maxActions) IReadOnlyList~BattleMutationResult~
         +ActiveMutation BattleSessionMutation?
         +LastResult BattleMutationResult?
+    }
+
+    class BattleActionEvaluation {
+        +Mutation BattleSessionMutation
+        +IsAllowed bool
+        +FailureReason BattleMutationFailureReason
+        +Message string?
+        +ActionPointCost int
     }
 
     class BattleSession {
@@ -67,34 +59,37 @@ classDiagram
         <<abstract command>>
         +MutationId string
         +Execute(BattleSession session) BattleMutationResult
+        +ExecuteUnchecked(BattleSession session) BattleMutationResult
         #ExecuteCore(BattleSession session) BattleMutationResult
     }
 
-    class StartBattleBattleSessionMutation
-    class SpawnUnitBattleSessionMutation
-    class MoveUnitStepBattleSessionMutation
-    class ThrowItemBattleSessionMutation
-    class ApplyDamageBattleSessionMutation
-    class PassUnitBattleSessionMutation
-    class EndFactionTurnBattleSessionMutation
+    class StartBattle
+    class SpawnUnit
+    class MoveUnitStep
+    class MoveUnit
+    class ThrowItem
+    class ApplyDamage
+    class PassUnit
+    class EndFactionTurn
 
-    BattleActionIntent ..> BattleSessionMutation : translated into
-    BattleActionExecutor --> BattleSessionMutation : invokes
+    BattleActionExecutor --> BattleActionEvaluation : returns
+    BattleActionExecutor --> BattleSessionMutation : validates and invokes
     BattleSessionMutation --> BattleSession : executes against
-    BattleSessionMutation <|-- StartBattleBattleSessionMutation
-    BattleSessionMutation <|-- SpawnUnitBattleSessionMutation
-    BattleSessionMutation <|-- MoveUnitStepBattleSessionMutation
-    BattleSessionMutation <|-- ThrowItemBattleSessionMutation
-    BattleSessionMutation <|-- ApplyDamageBattleSessionMutation
-    BattleSessionMutation <|-- PassUnitBattleSessionMutation
-    BattleSessionMutation <|-- EndFactionTurnBattleSessionMutation
+    BattleSessionMutation <|-- StartBattle
+    BattleSessionMutation <|-- SpawnUnit
+    BattleSessionMutation <|-- MoveUnitStep
+    BattleSessionMutation <|-- MoveUnit
+    BattleSessionMutation <|-- ThrowItem
+    BattleSessionMutation <|-- ApplyDamage
+    BattleSessionMutation <|-- PassUnit
+    BattleSessionMutation <|-- EndFactionTurn
 ```
 
-## Proposed Public Surface
+## BattleSessionMutation
 
-### BattleSessionMutation
+`BattleSessionMutation` is the command type used by the runtime.
 
-Keep the current concrete mutation subclasses, but give the base type execution behavior.
+The base class exposes:
 
 ```csharp
 public abstract class BattleSessionMutation
@@ -104,204 +99,88 @@ public abstract class BattleSessionMutation
   public BattleMutationResult Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
-    return ExecuteCore(session);
+    return new BattleActionExecutor(session).ExecuteNow(this);
+  }
+
+  internal BattleMutationResult ExecuteUnchecked(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(session);
+    var result = ExecuteCore(session);
+    if (result.Succeeded)
+      session.RefreshVisibility();
+
+    return result;
   }
 
   protected abstract BattleMutationResult ExecuteCore(BattleSession session);
 }
 ```
 
-Each concrete mutation owns:
+The important split is:
 
-- its own validation
-- its own battle-state orchestration
-- its own success or failure result
-- its own choice of affected unit and message
+- the executor decides whether a supported mutation is legal right now
+- the mutation applies the state change once execution begins
+- the session keeps authoritative bookkeeping consistent
 
-### BattleSession
+## BattleActionExecutor
 
-`BattleSession` should not expose a public `Apply(...)` wrapper in the strict Command-pattern version.
+`BattleActionExecutor` is now a real validator and command invoker.
 
-Commands execute directly:
+It currently owns:
 
-```csharp
-var result = mutation.Execute(session);
-```
+- mutation preview via `Evaluate(...)`
+- pending mutation queue state
+- execution ordering
+- exception isolation around mutation execution
+- last-result tracking
 
-`BattleSession` should stop owning command-specific branching logic. Its job is to expose narrow authoritative APIs that commands use to keep session state consistent.
+It does not own:
 
-### BattleActionExecutor
-
-The executor should become a real command invoker:
-
-```csharp
-public sealed class BattleActionExecutor
-{
-  public void Enqueue(BattleSessionMutation mutation);
-  public void EnqueueRange(IEnumerable<BattleSessionMutation> mutations);
-  public BattleMutationResult? Tick();
-  public IReadOnlyList<BattleMutationResult> DrainQueue(int maxActions = int.MaxValue);
-  public BattleSessionMutation? ActiveMutation { get; }
-  public BattleMutationResult? LastResult { get; }
-}
-```
-
-If the project still wants to keep `BattleActionIntent`, the translation from intent to command should happen before enqueue or in a thin adapter method, not inside the executor's main execution loop.
+- selection logic
+- tactical truth
+- presentation state
 
 ## BattleSession Responsibilities
 
-In this refactor, `BattleSession` should keep only aggregate-root responsibilities.
+`BattleSession` remains the aggregate root and source of truth.
 
-It should continue to own:
+It owns:
 
 - authoritative battle state
 - alive and dead unit registration
 - active faction and turn number
 - faction order and round queue state
 - availability for the current faction turn
-- event emission
-- book-keeping around faction elimination, turn advancement, and battle end conditions
-
-It should stop owning:
-
-- the big mutation-type switch
-- per-command handler methods such as `Handle(MoveUnitStepBattleSessionMutation ...)`
-- logic that exists only to dispatch a command to its implementation
-
-## Recommended Internal API Shape
-
-Commands should not manipulate `_aliveUnitsByFaction`, `_turnQueue`, `_deadUnits`, or `_factionUnitsStillAvailableThisTurn` directly.
-
-Instead, `BattleSession` should expose a narrow internal API grouped around bookkeeping primitives.
-
-### Query Helpers
-
-- `internal BattleUnitState? GetLivingUnitOrNull(int unitId)`
-- `internal BattleUnitState? GetUnitOrNull(int unitId)`
-- `internal IEnumerable<BattleUnitState> GetFactionAlive(Faction side)`
-- `internal bool HasLivingUnits(Faction side)`
-- `internal bool CanUnitActNow(BattleUnitState unit)`
-- `internal bool IsUnitStillAvailableThisTurn(int unitId)`
-
-### Board And Unit Commit Helpers
-
-- `internal bool TryAddLivingUnit(BattleUnitState unit)`
-- `internal bool TryMoveUnit(BattleUnitState unit, Vector3I destination)`
-- `internal void MoveUnitToDeadStorage(BattleUnitState unit)`
-- `internal void ClearTileOccupant(Vector3I coordinates)`
-
-### Turn And Queue Helpers
-
-- `internal void RefreshCurrentFactionAvailability()`
-- `internal void RegisterSpawnedUnitForCurrentRound(BattleUnitState unit)`
-- `internal void AdvanceTurn()`
-- `internal void StartNextRound()`
-- `internal void BeginNextQueuedSideTurn()`
-- `internal void HandleFactionLoss(Faction side)`
-- `internal void EndBattle()`
-
-### Event Helpers
-
-- `internal void RaiseEvent(BattleEvent battleEvent)`
-
-The rule is:
-
-- commands decide what should happen
-- `BattleSession` commits authoritative bookkeeping
-
-## Command Responsibilities By Example
-
-### MoveUnitStepBattleSessionMutation
-
-This command should own:
-
-- validating that the battle is in progress
-- resolving the acting unit
-- checking active side rules
-- checking adjacency and AP cost
-- calling session helpers to commit movement
-- raising the `UnitMoved` event through the session
-
-It should not directly edit queue state because movement does not own turn progression rules.
-
-### ApplyDamageBattleSessionMutation
-
-This command should own:
-
-- resolving the target unit
-- applying damage to the unit
-- raising `UnitDamaged`
-- deciding whether death follow-up is needed
-
-It should delegate bookkeeping to session helpers for:
-
-- moving the unit to dead storage
-- clearing tile occupancy
-- removing the unit from current-turn availability
-- handling faction loss
-- preserving authoritative death bookkeeping without taking on presentation-layer selection concerns
-
-### PassUnitBattleSessionMutation
-
-This command should own:
-
-- validating the current active side
-- resolving the unit
-- marking the unit's activation complete
-- deciding whether to select another ally or end the faction turn
-
-It should call session helpers for:
-
-- removing current-turn availability
-- turn advancement
+- visibility refresh and bookkeeping
 - event emission
 
-## Boundary With BattleActionIntent
+It should not own a command-type dispatch switch. Commands and the executor sit around the session; they do not replace it as the authority.
 
-`BattleActionIntent` remains useful, but it is not the command once this refactor is complete.
+## Query And Commit Split
 
-Recommended split:
+The current runtime works best when responsibilities stay narrow:
 
-- `BattleActionIntent` = external request from controller, HUD, or AI
-- `BattleSessionMutation` = executable command in the authoritative battle runtime
+- scene controllers and AI query board, visibility, and unit state
+- preview code calls `BattleActionExecutor.Evaluate(...)`
+- executor validates whether the mutation may run
+- mutation code commits the change through session and board helpers
+- `BattleSession` emits authoritative events
 
-That keeps the queue and replay layer focused on battle commands instead of UI-facing intent objects.
-
-## Suggested File Ownership
-
-Keep the current file split, but change the responsibility of each file.
-
-- `scripts/battle/BattleSession.cs`
-  - aggregate state
-  - authoritative bookkeeping helpers
-- `scripts/battle/BattleSessionMutation.cs`
-  - command base class
-  - concrete command subclasses
-  - command execution logic
-- `scripts/battle/BattleActionExecutor.cs`
-  - mutation queue
-  - mutation invocation
-  - execution results and executor events
-
-If `BattleSessionMutation.cs` grows too large, the next clean step is one file per concrete command class. The command pattern still holds either way.
+That split keeps controller code from duplicating legality rules while also keeping mutation application logic out of presentation code.
 
 ## Design Rules
 
 - `BattleSession` stays the only owner of tactical truth.
-- Presentation-layer selection state belongs outside `BattleSession`.
-- Commands may orchestrate state changes, but they should commit session-wide bookkeeping through narrow session APIs.
-- Command classes should not read or write session backing collections directly.
-- The executor should queue executable commands, not unprocessed requests.
-- Event emission should remain authoritative and happen through `BattleSession`.
-- Null-returning and failure-prone session helpers should always be checked by commands before continuing.
+- `BattleActionExecutor` owns legality checks for supported player-facing mutations.
+- `BattleSessionMutation` owns command-specific application logic.
+- command classes should not read or write session backing collections directly.
+- event emission should remain authoritative and happen through `BattleSession`.
+- null-returning and failure-prone helpers should always be checked before continuing.
 
-## Migration Plan
+## Near-Term Extension Points
 
-1. Add `Execute(BattleSession session)` to `BattleSessionMutation`.
-2. Move one command, such as `MoveUnitStepBattleSessionMutation`, out of `BattleSession` and into its mutation class.
-3. Remove `BattleSession.Apply(...)`.
-4. Convert `BattleActionExecutor` to queue `BattleSessionMutation` instead of `BattleActionIntent`.
-5. Leave `BattleActionIntent` as an upstream request model and translate it before enqueue.
-6. Move the remaining mutation handlers one at a time.
+The next clean expansions on top of this pattern are:
 
-This migration keeps the refactor incremental while still converging on the full Command-pattern shape.
+- more explicit read-only preview queries beside `Evaluate(...)`
+- richer multi-step execution contexts for interrupts or reaction fire
+- splitting large mutation files into one file per concrete command when the command set grows

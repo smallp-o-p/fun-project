@@ -27,6 +27,64 @@ public class BattleActionExecutorTest
     Assert.Equal(3, unit.CurrentActionPoints);
   }
 
+  [TestCase(TestName = "Executor evaluates a legal move step mutation without mutating state")]
+  public void ExecutorEvaluatesALegalMoveStepMutationWithoutMutatingState()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), new Vector3I(1, 0, 1));
+    StartBattle(session);
+
+    var executor = new BattleActionExecutor(session);
+
+    var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnitStep(unit.UnitId, new Vector3I(1, 0, 2), 2));
+
+    Assert.True(evaluation.IsAllowed);
+    Assert.True(evaluation.Mutation is MoveUnitStep);
+    Assert.Equal(2, evaluation.ActionPointCost);
+    Assert.Equal(new Vector3I(1, 0, 1), unit.Position);
+    Assert.Equal(5, unit.CurrentActionPoints);
+  }
+
+  [TestCase(TestName = "Executor evaluates an invalid move step mutation without mutating state")]
+  public void ExecutorEvaluatesAnInvalidMoveStepMutationWithoutMutatingState()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
+    StartBattle(session);
+
+    var executor = new BattleActionExecutor(session);
+
+    var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnitStep(unit.UnitId, new Vector3I(2, 0, 0)));
+
+    Assert.False(evaluation.IsAllowed);
+    Assert.Equal(BattleMutationFailureReason.Rejected, evaluation.FailureReason);
+    Assert.True(evaluation.Mutation is MoveUnitStep);
+    Assert.Equal(new Vector3I(0, 0, 0), unit.Position);
+    Assert.Equal(4, unit.CurrentActionPoints);
+  }
+
+  [TestCase(TestName = "Executor evaluates move mutation action point cost")]
+  public void ExecutorEvaluatesMoveMutationActionPointCost()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 5), new Vector3I(0, 0, 0));
+    StartBattle(session);
+
+    var executor = new BattleActionExecutor(session);
+    Vector3I[] path = session.Board.FindPath(unit.Position, new Vector3I(2, 0, 0), unit.UnitId);
+    Assert.Equal(3, path.Length);
+
+    var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnit(unit.UnitId, path));
+
+    Assert.True(evaluation.IsAllowed);
+    Assert.Equal(2, evaluation.ActionPointCost);
+    Assert.Equal(new Vector3I(0, 0, 0), unit.Position);
+    Assert.Equal(5, unit.CurrentActionPoints);
+  }
+
   [TestCase(TestName = "Executor resolves queued mutations in FIFO order")]
   public void ExecutorResolvesQueuedMutationsInFifoOrder()
   {
