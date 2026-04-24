@@ -8,5 +8,4 @@ addons/**/*
 Godot-MCP/**/*
 handoffs/*
 test/TestResults/
-test/.runsettings
 gdunit4_testadapter_v5/**/*
