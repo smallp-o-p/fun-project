@@ -50,7 +50,7 @@ classDiagram
         +Board BattleBoardState
         +Phase BattlePhase
         +TurnNumber int
-        +ActiveSide Faction?
+        +ActiveSide Faction
         +EventRaised Action~BattleEvent~
         <<receiver>>
     }
@@ -153,6 +153,8 @@ It owns:
 - availability for the current faction turn
 - visibility refresh and bookkeeping
 - event emission
+
+`ActiveSide` is initialized from the configured faction order when the session is constructed; `Phase` determines whether that side is in setup, active battle, or ended state.
 
 It should not own a command-type dispatch switch. Commands and the executor sit around the session; they do not replace it as the authority.
 

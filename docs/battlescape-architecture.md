@@ -5,7 +5,7 @@ This document describes the current tactical runtime shape in the repo and the n
 ## Design Goals
 
 - `BattleSession` is the single source of truth for live tactical state.
-- `BattleSession` is constructed from battle setup data: board dimensions, stable faction order, and faction rosters.
+- `BattleSession` is constructed from battle setup data: a prepared board state, stable faction order, and faction rosters.
 - `BattleSessionMutation` is the authoritative command layer.
 - `BattleActionExecutor` validates and invokes queued `BattleSessionMutation` values.
 - Godot scene nodes own presentation, input, and focused-unit UX. They do not own tactical truth.
@@ -121,9 +121,11 @@ flowchart LR
 
 It is initialized with:
 
-- `Vector3I dimensions`
+- `BattleBoardState board`
 - `IEnumerable<Faction> globalFactionOrder`
 - `IDictionary<Faction, IEnumerable<Combatant>> factionRosters`
+
+The configured faction order must contain at least one faction after rosters are included. The setup turn queue and `ActiveSide` are initialized from the first faction in that order.
 
 The session currently owns:
 
@@ -253,7 +255,8 @@ sequenceDiagram
 ## Turn Flow Notes
 
 - The battle starts from `BattlePhase.Setup` and transitions to `InProgress` through `StartBattle`.
-- The initial turn queue is built from living factions in the stable global faction order.
+- Setup initializes the turn queue from the stable global faction order.
+- `StartBattle` rebuilds the active round queue from living factions in that order.
 - `ActiveSide` and `TurnNumber` are owned by the session.
 - `EndFactionTurn` is the explicit faction-turn mutation.
 - `PassUnit` ends a unit activation and currently advances the turn automatically if that side has no remaining actable units.

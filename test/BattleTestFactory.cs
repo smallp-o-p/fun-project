@@ -59,7 +59,7 @@ internal static class BattleTestFactory
     IDictionary<Faction, IEnumerable<Combatant>>? factionRosters = null)
   {
     return new BattleSession(
-      dimensions,
+      new BattleBoardState(dimensions),
       globalFactionOrder ?? [],
       factionRosters ?? new Dictionary<Faction, IEnumerable<Combatant>>());
   }

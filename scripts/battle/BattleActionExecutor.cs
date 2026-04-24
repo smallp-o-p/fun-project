@@ -192,7 +192,7 @@ public sealed class BattleActionExecutor
     if (moveUnit.Path[^1] == unit.Position)
       return BattleActionEvaluation.Allowed(moveUnit, 0, $"Unit already occupies {moveUnit.Path[^1]}.");
 
-    long totalActionPointCost = (long)moveUnit.Path.Count * moveUnit.ActionPointCostPerStep;
+    long totalActionPointCost = (long)(moveUnit.Path.Count - 1) * moveUnit.ActionPointCostPerStep;
     if (unit.CurrentActionPoints < totalActionPointCost)
       return BattleActionEvaluation.Rejected(
         moveUnit,
@@ -207,8 +207,15 @@ public sealed class BattleActionExecutor
           $"Unit id {unit} is not on a valid tile",
           actionPointCost: (int)totalActionPointCost);
 
+    Vector3I previousStep = moveUnit.Path[0];
     foreach (var step in moveUnit.Path.Skip(1))
     {
+      if (!_session.Board.IsAdjacent(previousStep, step))
+        return BattleActionEvaluation.Rejected(
+          moveUnit,
+          $"Move unit path step {step} is not adjacent to {previousStep}.",
+          actionPointCost: (int)totalActionPointCost);
+
       BattleTileState? destinationTile = _session.Board.GetTileOrNull(step);
       if (destinationTile == null)
         return BattleActionEvaluation.Rejected(
@@ -221,6 +228,14 @@ public sealed class BattleActionExecutor
           moveUnit,
           $"Move unit path step {step} enters an unwalkable tile.",
           actionPointCost: (int)totalActionPointCost);
+
+      if (destinationTile.IsOccupied)
+        return BattleActionEvaluation.Rejected(
+          moveUnit,
+          $"Move unit path step {step} enters an occupied tile.",
+          actionPointCost: (int)totalActionPointCost);
+
+      previousStep = step;
     }
 
     return BattleActionEvaluation.Allowed(moveUnit, (int)totalActionPointCost);
@@ -271,9 +286,7 @@ public sealed class BattleActionExecutor
     if (_session.Phase != BattlePhase.InProgress)
       return BattleActionEvaluation.Rejected(endFactionTurn, "Battle is not in progress.");
 
-    Faction? activeSide = _session.ActiveSide;
-    if (activeSide == null)
-      return BattleActionEvaluation.Rejected(endFactionTurn, "There is no active side.");
+    Faction activeSide = _session.ActiveSide;
     if (activeSide != endFactionTurn.ExpectedActiveSide)
       return BattleActionEvaluation.Rejected(endFactionTurn, $"{endFactionTurn.ExpectedActiveSide.Name} cannot end a turn while {activeSide.Name} is active.");
 
@@ -287,9 +300,7 @@ public sealed class BattleActionExecutor
     if (_session.Phase != BattlePhase.InProgress)
       return new UnitActionContext(null, BattleActionEvaluation.Rejected(mutation, "Battle is not in progress.", actionPointCost: actionPointCost));
 
-    Faction? activeSide = _session.ActiveSide;
-    if (activeSide == null)
-      return new UnitActionContext(null, BattleActionEvaluation.Rejected(mutation, "There is no active side.", actionPointCost: actionPointCost));
+    Faction activeSide = _session.ActiveSide;
 
     BattleUnitState? unit = _session.GetLivingUnitOrNull(unitId);
     if (unit == null)

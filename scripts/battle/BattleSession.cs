@@ -24,7 +24,7 @@ public sealed class BattleSession
   private readonly Dictionary<Faction, IReadOnlyList<Combatant>> _factionRosters = [];
   private readonly List<BattleUnitState> _deadUnits = [];
   private readonly Queue<Faction> _globalFactionOrder = [];
-  private readonly Queue<Faction> _turnQueue = [];
+  private Queue<Faction> _turnQueue = [];
   private readonly HashSet<Faction> _sidesActedThisRound = [];
   private readonly HashSet<int> _activeFactionUnitsAvailable = [];
   private BattleVisibilitySnapshot _visibilitySnapshot = BattleVisibilitySnapshot.Empty;
@@ -33,7 +33,7 @@ public sealed class BattleSession
   public BattleBoardState Board { get; }
   public BattlePhase Phase { get; private set; } = BattlePhase.Setup;
   public int TurnNumber { get; private set; } = 1;
-  public Faction? ActiveSide { get; private set; }
+  public Faction ActiveSide { get; private set; }
   public IReadOnlyCollection<BattleUnitState> AliveUnits => _aliveUnitsByFaction.Values.SelectMany(units => units).ToArray();
   public IReadOnlyCollection<BattleUnitState> DeadUnits => _deadUnits;
   public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _globalFactionOrder;
@@ -43,59 +43,43 @@ public sealed class BattleSession
   public event Action<BattleEvent>? EventRaised;
 
   public BattleSession(
-    Vector3I dimensions,
-    IEnumerable<Faction> globalFactionOrder,
-    IDictionary<Faction, IEnumerable<Combatant>> factionRosters)
-    : this(new BattleBoardState(dimensions), globalFactionOrder, factionRosters)
-  {
-  }
-
-  public BattleSession(
     BattleBoardState board,
     IEnumerable<Faction> globalFactionOrder,
     IDictionary<Faction, IEnumerable<Combatant>> factionRosters)
   {
-    ArgumentNullException.ThrowIfNull(board);
-    ArgumentNullException.ThrowIfNull(globalFactionOrder);
-    ArgumentNullException.ThrowIfNull(factionRosters);
-
     Board = board;
 
     foreach (var faction in globalFactionOrder)
     {
-      ArgumentNullException.ThrowIfNull(faction);
       EnqueueFactionInGlobalOrder(faction);
     }
 
     foreach (var (faction, roster) in factionRosters)
     {
-      ArgumentNullException.ThrowIfNull(faction);
-      ArgumentNullException.ThrowIfNull(roster);
-
       List<Combatant> copiedRoster = [];
       foreach (var combatant in roster)
       {
-        ArgumentNullException.ThrowIfNull(combatant);
         copiedRoster.Add(combatant);
       }
 
       _factionRosters[faction] = copiedRoster;
       EnqueueFactionInGlobalOrder(faction);
     }
+
+    if (_globalFactionOrder.Count == 0)
+      throw new ArgumentException("Battle session requires at least one faction in the global order or faction rosters.");
+
+    _turnQueue = new Queue<Faction>(_globalFactionOrder);
+    ActiveSide = _turnQueue.Peek();
   }
 
-  public IEnumerable<BattleUnitState> GetFactionAlive(Faction side)
+  public IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
   {
-    ArgumentNullException.ThrowIfNull(side);
-    if (_aliveUnitsByFaction.TryGetValue(side, out var units))
-      return units;
-
-    return Array.Empty<BattleUnitState>();
+    return _aliveUnitsByFaction.TryGetValue(side, out var units) ? units : [];
   }
 
-  public IEnumerable<BattleUnitState> GetFactionDead(Faction side)
+  public IEnumerable<BattleUnitState> GetFactionDeadUnits(Faction side)
   {
-    ArgumentNullException.ThrowIfNull(side);
     return _deadUnits.Where(unit => unit.Side == side);
   }
 
@@ -114,20 +98,18 @@ public sealed class BattleSession
   {
     var observer = GetLivingUnitOrNull(observerUnitId);
     var target = GetLivingUnitOrNull(targetUnitId);
-    if (observer == null || target == null)
-      return false;
-    if (observer.UnitId == target.UnitId)
-      return true;
+    if (observer == null)
+      throw new InvalidOperationException($"Observer unit ID {observerUnitId} is invalid");
+    if (target == null)
+      throw new InvalidOperationException($"Checking visibility to invalid unit ID ${targetUnitId}");
 
-    return _visibilitySnapshot
+    return observerUnitId == targetUnitId || _visibilitySnapshot
       .GetVisibleUnitsForObserverOrEmpty(observerUnitId)
       .Contains(targetUnitId);
   }
 
   public bool IsUnitVisibleToFaction(Faction faction, int targetUnitId)
   {
-    ArgumentNullException.ThrowIfNull(faction);
-
     var target = GetLivingUnitOrNull(targetUnitId);
     if (target == null)
       return false;
@@ -142,9 +124,8 @@ public sealed class BattleSession
 
   public bool IsTileVisibleToFaction(Faction faction, Vector3I tile)
   {
-    ArgumentNullException.ThrowIfNull(faction);
     if (!Board.IsInBounds(tile))
-      return false;
+      throw new InvalidOperationException($"Attempted to check visiblity on invalid tile ${tile}");
 
     return _visibilitySnapshot
       .GetFactionStateOrEmpty(faction)
@@ -154,9 +135,8 @@ public sealed class BattleSession
 
   public bool HasFactionExploredTile(Faction faction, Vector3I tile)
   {
-    ArgumentNullException.ThrowIfNull(faction);
     if (!Board.IsInBounds(tile))
-      return false;
+      throw new InvalidOperationException($"Attempted to check visiblity on invalid tile ${tile}");
 
     return _visibilitySnapshot
       .GetFactionStateOrEmpty(faction)
@@ -166,8 +146,6 @@ public sealed class BattleSession
 
   public IEnumerable<BattleUnitState> GetVisibleUnitsForFaction(Faction faction)
   {
-    ArgumentNullException.ThrowIfNull(faction);
-
     var visibleForeignUnitIds = _visibilitySnapshot
       .GetFactionStateOrEmpty(faction)
       .VisibleForeignUnitIds;
@@ -177,13 +155,11 @@ public sealed class BattleSession
 
   public IEnumerable<Vector3I> GetVisibleTilesForFaction(Faction faction)
   {
-    ArgumentNullException.ThrowIfNull(faction);
     return _visibilitySnapshot.GetFactionStateOrEmpty(faction).VisibleTiles;
   }
 
   public IEnumerable<Vector3I> GetExploredTilesForFaction(Faction faction)
   {
-    ArgumentNullException.ThrowIfNull(faction);
     return _visibilitySnapshot.GetFactionStateOrEmpty(faction).ExploredTiles;
   }
 
@@ -207,19 +183,18 @@ public sealed class BattleSession
     RefreshCurrentFactionAvailability();
 
     RaiseEvent(new BattleEvent(BattleEventType.SessionStarted, Message: "Battle started."));
-    RaiseEvent(new BattleEvent(BattleEventType.TurnStarted, Message: $"Turn {TurnNumber} started for {ActiveSide?.Name}."));
+    RaiseEvent(new BattleEvent(BattleEventType.TurnStarted, Message: $"Turn {TurnNumber} started for {ActiveSide.Name}."));
     return true;
   }
 
-  internal BattleUnitState CreateUnitState(Combatant combatant, Vector3I position, Weapon? equippedWeapon = null)
+  internal BattleUnitState AddUnit(Combatant combatant, Vector3I position, Weapon? equippedWeapon = null)
   {
     ArgumentNullException.ThrowIfNull(combatant);
-    return new BattleUnitState(_nextUnitId++, combatant, position, equippedWeapon);
-  }
 
-  internal bool TryAddUnit(BattleUnitState unit)
-  {
-    ArgumentNullException.ThrowIfNull(unit);
+    var unit = new BattleUnitState(_nextUnitId++, combatant, position, equippedWeapon);
+    bool occupantSet = Board.TryPlaceOccupant(unit.Position, unit.UnitId);
+    if (!occupantSet)
+      throw new InvalidOperationException($"Could not place unit {unit.UnitId} at {unit.Position}.");
 
     if (!_aliveUnitsByFaction.TryGetValue(unit.Side, out var unitsForSide))
     {
@@ -230,36 +205,47 @@ public sealed class BattleSession
     unitsForSide.Add(unit);
     EnqueueFactionInGlobalOrder(unit.Side);
 
-    bool occupantSet = Board.TryPlaceOccupant(unit.Position, unit.UnitId);
-    if (!occupantSet)
-    {
-      unitsForSide.Remove(unit);
-      if (unitsForSide.Count == 0)
-        _aliveUnitsByFaction.Remove(unit.Side);
+    if (Phase == BattlePhase.Setup && !_turnQueue.Contains(unit.Side))
+      _turnQueue.Enqueue(unit.Side);
+    if (Phase == BattlePhase.InProgress)
+      RegisterSpawnedUnitForCurrentRound(unit);
 
-      return false;
-    }
-
-    RegisterSpawnedUnitForCurrentRound(unit);
-    return true;
+    return unit;
   }
 
   internal void HandleUnitDeath(BattleUnitState unit)
   {
-    ArgumentNullException.ThrowIfNull(unit);
-
     var unitSide = unit.Side;
     MoveUnitToDeadStorage(unit);
-    Board.TryClearOccupant(unit.Position, unit.UnitId);
+    bool occupantCleared = Board.TryClearOccupant(unit.Position, unit.UnitId);
+    if (!occupantCleared)
+      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} from {unit.Position}.");
 
     _activeFactionUnitsAvailable.Remove(unit.UnitId);
     RaiseEvent(new BattleEvent(BattleEventType.UnitKilled, unit.UnitId, unit.Position, $"Unit ID {unit.UnitId} was killed!"));
     HandleFactionLoss(unitSide);
   }
 
-  internal bool TryRemoveAvailableUnit(int unitId)
+  internal void RemoveAvailableUnit(int unitId)
   {
-    return _activeFactionUnitsAvailable.Remove(unitId);
+    if (!_activeFactionUnitsAvailable.Remove(unitId))
+      throw new InvalidOperationException($"Unit {unitId} is not available this turn.");
+  }
+
+  internal void EndUnitActivation(BattleUnitState unit)
+  {
+    if (Phase != BattlePhase.InProgress)
+      throw new InvalidOperationException("Cannot end a unit activation while the battle is not in progress.");
+
+    var activeSide = ActiveSide;
+    if (unit.Side != activeSide)
+      throw new InvalidOperationException($"Unit {unit.UnitId} is not on the active side.");
+
+    RemoveAvailableUnit(unit.UnitId);
+    RaiseEvent(new BattleEvent(BattleEventType.UnitActivationEnded, unit.UnitId, unit.Position, $"{unit.Combatant.Name} ended their activation."));
+
+    if (!GetFactionAliveUnits(activeSide).Any(CanUnitActNow))
+      EndFactionTurn(activeSide);
   }
 
   internal void AdvanceTurn()
@@ -268,9 +254,6 @@ public sealed class BattleSession
       return;
 
     var activeSide = ActiveSide;
-    if (activeSide == null)
-      return;
-
     RaiseEvent(new BattleEvent(BattleEventType.TurnEnded, Message: $"Turn {TurnNumber} ended for {activeSide.Name}."));
     _sidesActedThisRound.Add(activeSide);
 
@@ -287,15 +270,16 @@ public sealed class BattleSession
     BeginNextQueuedSideTurn();
   }
 
-  internal bool TryEndFactionTurn(Faction expectedActiveSide)
+  internal void EndFactionTurn(Faction expectedActiveSide)
   {
-    ArgumentNullException.ThrowIfNull(expectedActiveSide);
+    if (Phase != BattlePhase.InProgress)
+      throw new InvalidOperationException("Cannot end a faction turn while the battle is not in progress.");
 
-    if (Phase != BattlePhase.InProgress || ActiveSide == null || ActiveSide != expectedActiveSide)
-      return false;
+    var activeSide = ActiveSide;
+    if (activeSide != expectedActiveSide)
+      throw new InvalidOperationException($"{expectedActiveSide.Name} cannot end a turn while {activeSide.Name} is active.");
 
     AdvanceTurn();
-    return true;
   }
 
   internal void EndBattle()
@@ -303,7 +287,6 @@ public sealed class BattleSession
     if (Phase == BattlePhase.Ended)
       return;
 
-    ActiveSide = null;
     _activeFactionUnitsAvailable.Clear();
     _turnQueue.Clear();
     Phase = BattlePhase.Ended;
@@ -313,13 +296,8 @@ public sealed class BattleSession
 
   internal void RegisterSpawnedUnitForCurrentRound(BattleUnitState unit)
   {
-    ArgumentNullException.ThrowIfNull(unit);
-
     if (Phase != BattlePhase.InProgress)
-      return;
-    if (ActiveSide == null)
-      return;
-
+      throw new InvalidOperationException("Trying to spawn unit while battle hasn't started or is done.");
     if (unit.Side == ActiveSide)
     {
       _activeFactionUnitsAvailable.Add(unit.UnitId);
@@ -336,11 +314,7 @@ public sealed class BattleSession
 
   internal BattleUnitState? GetUnitOrNull(int unitId)
   {
-    var livingUnit = GetLivingUnitOrNull(unitId);
-    if (livingUnit != null)
-      return livingUnit;
-
-    return _deadUnits.FirstOrDefault(unit => unit.UnitId == unitId);
+    return GetLivingUnitOrNull(unitId) ?? _deadUnits.FirstOrDefault(unit => unit.UnitId == unitId);
   }
 
   internal BattleUnitState? GetLivingUnitOrNull(int unitId)
@@ -350,24 +324,19 @@ public sealed class BattleSession
 
   internal void MoveUnitToDeadStorage(BattleUnitState unit)
   {
-    ArgumentNullException.ThrowIfNull(unit);
-
     if (!_aliveUnitsByFaction.TryGetValue(unit.Side, out var units))
-      return;
+      throw new InvalidOperationException($"Faction {unit.Side.Name} does not have living units to remove.");
     if (!units.Remove(unit))
-      return;
-    if (units.Count == 0)
-      _aliveUnitsByFaction.Remove(unit.Side);
+      throw new InvalidOperationException($"Unit {unit.UnitId} is not tracked as alive.");
 
     _deadUnits.Add(unit);
   }
 
   internal bool CanUnitActNow(BattleUnitState unit)
   {
-    ArgumentNullException.ThrowIfNull(unit);
+    if (Phase != BattlePhase.InProgress)
+      throw new InvalidOperationException("Trying to check unit while the battle is not in progress.");
 
-    if (ActiveSide == null)
-      return false;
     if (unit.Side != ActiveSide)
       return false;
     if (!_activeFactionUnitsAvailable.Contains(unit.UnitId))
@@ -384,16 +353,16 @@ public sealed class BattleSession
 
   internal bool HasLivingUnits(Faction side)
   {
-    ArgumentNullException.ThrowIfNull(side);
     return _aliveUnitsByFaction.TryGetValue(side, out var units) && units.Count > 0;
   }
 
   internal void RefreshCurrentFactionAvailability()
   {
-    if (ActiveSide == null)
+    if (Phase != BattlePhase.InProgress)
       return;
+
     _activeFactionUnitsAvailable.Clear();
-    foreach (var unit in GetFactionAlive(ActiveSide))
+    foreach (var unit in GetFactionAliveUnits(ActiveSide))
       _activeFactionUnitsAvailable.Add(unit.UnitId);
   }
 
@@ -437,7 +406,6 @@ public sealed class BattleSession
 
   private void EnqueueFactionInGlobalOrder(Faction side)
   {
-    ArgumentNullException.ThrowIfNull(side);
     if (_globalFactionOrder.Contains(side))
       return;
 
@@ -446,13 +414,10 @@ public sealed class BattleSession
 
   private void HandleFactionLoss(Faction side)
   {
-    ArgumentNullException.ThrowIfNull(side);
-
     if (HasLivingUnits(side))
       return;
 
     _sidesActedThisRound.Remove(side);
-
     if (Phase != BattlePhase.InProgress)
     {
       RemoveSideFromQueue(side);
@@ -470,19 +435,7 @@ public sealed class BattleSession
 
   private void RemoveSideFromQueue(Faction side)
   {
-    ArgumentNullException.ThrowIfNull(side);
-
-    if (!_turnQueue.Contains(side))
-      return;
-
-    var existingOrder = _turnQueue.ToArray();
-    _turnQueue.Clear();
-
-    foreach (var queuedSide in existingOrder)
-    {
-      if (queuedSide != side && !_turnQueue.Contains(queuedSide))
-        _turnQueue.Enqueue(queuedSide);
-    }
+    _turnQueue = new Queue<Faction>(_turnQueue.Where(faction => faction != side));
   }
 
   private void StartNextRound()
@@ -513,7 +466,7 @@ public sealed class BattleSession
 
     var nextSide = _turnQueue.Peek();
     ActiveSide = nextSide;
-    foreach (var unit in GetFactionAlive(nextSide))
+    foreach (var unit in GetFactionAliveUnits(nextSide))
       unit.RefreshForNewTurn();
 
     RefreshCurrentFactionAvailability();

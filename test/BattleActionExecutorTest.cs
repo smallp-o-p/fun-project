@@ -263,7 +263,8 @@ public class BattleActionExecutorTest
   [TestCase(TestName = "Executor returns null when the queue is empty")]
   public void ExecutorReturnsNullWhenTheQueueIsEmpty()
   {
-    var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2));
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2), [faction]);
     var executor = new BattleActionExecutor(session);
 
     var result = executor.Tick();

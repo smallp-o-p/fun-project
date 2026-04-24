@@ -4,7 +4,6 @@ using FunProject.Items;
 using FunProject.Weapons;
 using Godot;
 using System;
-using System.Linq;
 using System.Collections.Generic;
 
 namespace FunProject.Battle;
@@ -166,10 +165,7 @@ public sealed class SpawnUnit : BattleSessionMutation
     if (!session.Board.CanOccupy(Position))
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, $"Cannot place a unit at {Position}.");
 
-    var unit = session.CreateUnitState(Combatant, Position, EquippedWeapon);
-    if (!session.TryAddUnit(unit))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, $"Cannot place a unit at {Position}.");
-
+    var unit = session.AddUnit(Combatant, Position, EquippedWeapon);
     session.RaiseEvent(new BattleEvent(BattleEventType.UnitAdded, unit.UnitId, unit.Position));
     return BattleMutationResult.Success(this, unit);
   }
@@ -247,6 +243,19 @@ public sealed class MoveUnit : BattleSessionMutation
     int stepCount = Path.Count - 1;
     if (stepCount == 0)
       return BattleMutationResult.Success(this, unit, $"Unit already occupies {destination}.");
+    long totalActionPointCost = (long)stepCount * ActionPointCostPerStep;
+    if (unit.CurrentActionPoints < totalActionPointCost)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"{unit.Combatant.Name} needs {totalActionPointCost} action points but only has {unit.CurrentActionPoints}.");
+
+    for (int stepIndex = 1; stepIndex < Path.Count; stepIndex++)
+    {
+      Vector3I previousStep = Path[stepIndex - 1];
+      Vector3I step = Path[stepIndex];
+      if (!session.Board.IsAdjacent(previousStep, step))
+        return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit path step {step} is not adjacent to {previousStep}.");
+      if (!session.Board.CanOccupy(step))
+        return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit path step {step} cannot be occupied.");
+    }
 
     BattleUnitState currentUnit = unit;
     for (int stepIndex = 1; stepIndex < Path.Count; stepIndex++)
@@ -344,21 +353,12 @@ public sealed class PassUnit : BattleSessionMutation
 
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
-    var activeSide = session.ActiveSide;
     var unit = session.GetLivingUnitOrNull(UnitId);
-    if (activeSide == null)
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, "Pass unit mutation could not resolve the active side.");
     if (unit == null)
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Pass unit mutation could not resolve unit {UnitId}.");
-    if (!session.TryRemoveAvailableUnit(UnitId))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Pass unit mutation could not remove unit {UnitId} from the active roster.");
 
-    session.RaiseEvent(new BattleEvent(BattleEventType.UnitActivationEnded, unit.UnitId, unit.Position, $"{unit.Combatant.Name} ended their activation."));
-
-    if (!session.GetFactionAlive(activeSide).Any(session.CanUnitActNow))
-      session.AdvanceTurn();
-
-    return BattleMutationResult.Success(this, session.GetUnitOrNull(UnitId));
+    session.EndUnitActivation(unit);
+    return BattleMutationResult.Success(this, unit);
   }
 }
 
@@ -374,9 +374,7 @@ public sealed class EndFactionTurn : BattleSessionMutation
 
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
-    if (!session.TryEndFactionTurn(ExpectedActiveSide))
-      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"End faction turn mutation could not end {ExpectedActiveSide.Name}'s turn.");
-
+    session.EndFactionTurn(ExpectedActiveSide);
     return BattleMutationResult.Success(this);
   }
 }

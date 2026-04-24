@@ -3,6 +3,7 @@ using FunProject.Battle;
 using FunProject.Combatants;
 using GdUnit4;
 using Godot;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -27,8 +28,8 @@ public class BattleSessionTest
   [TestCase(TestName = "SpawnUnit occupies its tile")]
   public void SpawnUnitOccupiesItsTile()
   {
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 2, 4));
     var faction = BattleTestFactory.MakeFaction("City Guard");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 2, 4), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
 
     var tile = session.Board.GetTile(new Vector3I(1, 0, 1));
@@ -39,8 +40,8 @@ public class BattleSessionTest
   [TestCase(TestName = "SpawnUnit rejects occupied tile")]
   public void SpawnUnitRejectsOccupiedTile()
   {
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4));
     var faction = BattleTestFactory.MakeFaction("City Guard");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
 
     SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
     var result = BattleSessionMutation.SpawnUnit(BattleTestFactory.MakeCombatant("Bravo", faction), new Vector3I(1, 0, 1)).Execute(session);
@@ -66,9 +67,9 @@ public class BattleSessionTest
   [TestCase(TestName = "Global faction order keeps each faction only once")]
   public void GlobalFactionOrderKeepsEachFactionOnlyOnce()
   {
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4));
     var factionA = BattleTestFactory.MakeFaction("A");
     var factionB = BattleTestFactory.MakeFaction("B");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [factionA]);
 
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A2", factionA), new Vector3I(1, 0, 0));
@@ -77,6 +78,9 @@ public class BattleSessionTest
     Assert.Equal(2, session.GlobalFactionTurnOrder.Count);
     Assert.Equal(factionA, session.GlobalFactionTurnOrder.First());
     Assert.Equal(factionB, session.GlobalFactionTurnOrder.Last());
+    Assert.Equal(2, session.TurnQueue.Count);
+    Assert.Equal(factionA, session.TurnQueue.First());
+    Assert.Equal(factionB, session.TurnQueue.Last());
   }
 
   [TestCase(TestName = "Constructor seeds global faction order and faction rosters")]
@@ -87,7 +91,7 @@ public class BattleSessionTest
     var combatantA = BattleTestFactory.MakeCombatant("A1", factionA);
     var combatantB = BattleTestFactory.MakeCombatant("B1", factionB);
     var session = new BattleSession(
-      new Vector3I(4, 1, 4),
+      new BattleBoardState(new Vector3I(4, 1, 4)),
       [factionB, factionA, factionB],
       new Dictionary<Faction, IEnumerable<Combatant>>
       {
@@ -100,6 +104,8 @@ public class BattleSessionTest
     Assert.Equal(factionA, session.GlobalFactionTurnOrder.Last());
     Assert.True(session.FactionRosters[factionA].Contains(combatantA));
     Assert.True(session.FactionRosters[factionB].Contains(combatantB));
+    Assert.Equal(factionB, session.ActiveSide);
+    Assert.Equal(factionB, session.TurnQueue.First());
     Assert.Equal(0, session.AliveUnits.Count);
     Assert.False(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
   }
@@ -120,6 +126,28 @@ public class BattleSessionTest
 
     Assert.True(object.ReferenceEquals(board, session.Board));
     Assert.False(result.Succeeded);
+  }
+
+  [TestCase(TestName = "Constructor initializes active side from turn queue")]
+  public void ConstructorInitializesActiveSideFromTurnQueue()
+  {
+    var factionA = BattleTestFactory.MakeFaction("A");
+    var factionB = BattleTestFactory.MakeFaction("B");
+    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [factionA, factionB]);
+
+    Assert.Equal(factionA, session.ActiveSide);
+    Assert.Equal(factionA, session.TurnQueue.First());
+  }
+
+  [TestCase(TestName = "Constructor rejects sessions without factions")]
+  public void ConstructorRejectsSessionsWithoutFactions()
+  {
+    var board = new BattleBoardState(new Vector3I(3, 1, 3));
+
+    Assert.Throws<ArgumentException>(() => new BattleSession(
+      board,
+      [],
+      new Dictionary<Faction, IEnumerable<Combatant>>()));
   }
 
   [TestCase(TestName = "AdvanceTurn rotates only participating factions without incrementing early")]
@@ -417,8 +445,8 @@ public class BattleSessionTest
     Assert.Equal(factionA, session.ActiveSide);
     Assert.False(session.AliveUnits.Contains(unitA));
     Assert.True(session.DeadUnits.Contains(unitA));
-    Assert.False(session.GetFactionAlive(factionA).Contains(unitA));
-    Assert.True(session.GetFactionDead(factionA).Contains(unitA));
+    Assert.False(session.GetFactionAliveUnits(factionA).Contains(unitA));
+    Assert.True(session.GetFactionDeadUnits(factionA).Contains(unitA));
     Assert.True(session.TurnQueue.Contains(factionA));
     Assert.True(session.TurnQueue.Contains(factionB));
 
@@ -496,6 +524,76 @@ public class BattleSessionTest
     Assert.Equal(new Vector3I(3, 0, 1), thrownEvent.Value.Position!.Value);
   }
 
+  [TestCase(TestName = "AddUnit throws when a validated placement can no longer be applied")]
+  public void AddUnitThrowsWhenValidatedPlacementCanNoLongerBeApplied()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var occupiedUnit = session.AddUnit(BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+
+    Assert.Throws<InvalidOperationException>(() => session.AddUnit(BattleTestFactory.MakeCombatant("Bravo", faction), new Vector3I(1, 0, 1)));
+    Assert.Equal(1, session.AliveUnits.Count);
+    Assert.True(session.AliveUnits.Contains(occupiedUnit));
+    Assert.False(session.AliveUnits.Any(unit => unit.Combatant.Name == "Bravo"));
+  }
+
+  [TestCase(TestName = "HandleUnitDeath throws when the unit is not tracked as alive")]
+  public void HandleUnitDeathThrowsWhenUnitIsNotTrackedAsAlive()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var unit = new BattleUnitState(1, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+
+    Assert.Throws<InvalidOperationException>(() => session.HandleUnitDeath(unit));
+    Assert.False(session.DeadUnits.Contains(unit));
+  }
+
+  [TestCase(TestName = "RemoveAvailableUnit throws when the unit is already unavailable")]
+  public void RemoveAvailableUnitThrowsWhenTheUnitIsAlreadyUnavailable()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
+    StartBattle(session);
+
+    session.RemoveAvailableUnit(unit.UnitId);
+
+    Assert.False(session.IsUnitStillAvailableThisTurn(unit.UnitId));
+    Assert.Throws<InvalidOperationException>(() => session.RemoveAvailableUnit(unit.UnitId));
+  }
+
+  [TestCase(TestName = "EndUnitActivation advances the turn when no active units remain")]
+  public void EndUnitActivationAdvancesTheTurnWhenNoActiveUnitsRemain()
+  {
+    var factionA = BattleTestFactory.MakeFaction("A");
+    var factionB = BattleTestFactory.MakeFaction("B");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [factionA, factionB]);
+    var unitA = SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
+    StartBattle(session);
+
+    session.EndUnitActivation(unitA);
+
+    Assert.False(session.IsUnitStillAvailableThisTurn(unitA.UnitId));
+    Assert.Equal(factionB, session.ActiveSide);
+    Assert.Equal(1, session.TurnNumber);
+  }
+
+  [TestCase(TestName = "EndFactionTurn throws when the expected side is not active")]
+  public void EndFactionTurnThrowsWhenTheExpectedSideIsNotActive()
+  {
+    var factionA = BattleTestFactory.MakeFaction("A");
+    var factionB = BattleTestFactory.MakeFaction("B");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [factionA, factionB]);
+
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
+    StartBattle(session);
+
+    Assert.Throws<InvalidOperationException>(() => session.EndFactionTurn(factionB));
+    Assert.Equal(factionA, session.ActiveSide);
+  }
+
   private static BattleUnitState SpawnUnit(BattleSession session, Combatant combatant, Vector3I position)
   {
     var result = BattleSessionMutation.SpawnUnit(combatant, position).Execute(session);
@@ -513,8 +611,7 @@ public class BattleSessionTest
   private static void AdvanceTurn(BattleSession session)
   {
     var activeSide = session.ActiveSide;
-    Assert.True(activeSide != null);
-    var result = BattleSessionMutation.EndFactionTurn(activeSide!).Execute(session);
+    var result = BattleSessionMutation.EndFactionTurn(activeSide).Execute(session);
     Assert.True(result.Succeeded);
   }
 
