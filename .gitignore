@@ -5,7 +5,7 @@
 .claude/
 .vscode/
 addons/**/*
-./Godot-MCP/
+Godot-MCP/**/*
 handoffs/*
 test/TestResults/
 test/.runsettings
