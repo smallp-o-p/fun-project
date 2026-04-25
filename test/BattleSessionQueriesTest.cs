@@ -10,13 +10,15 @@ using static BattleQueryTestHelper;
 [RequireGodotRuntime]
 public class BattleSessionQueriesTest
 {
-  [TestCase(TestName = "Query runner returns failure object for unknown living unit")]
-  public void QueryRunnerReturnsFailureObjectForUnknownLivingUnit()
+  [TestCase(TestName = "Query runner returns failure object for foreign living unit handle")]
+  public void QueryRunnerReturnsFailureObjectForForeignLivingUnitHandle()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
+    var foreignSession = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
+    var foreignUnit = SpawnUnit(foreignSession, BattleTestFactory.MakeCombatant("Foreign", faction), new Vector3I(0, 0, 0));
 
-    BattleQueryResult<BattleUnitState> result = session.Queries.Execute(new GetLivingUnit(404));
+    BattleQueryResult<BattleUnitState> result = session.Queries.Execute(new GetLivingUnit(foreignUnit.Handle));
 
     Assert.False(result.Succeeded);
     BattleQueryFailure failure = GetFailure(result);
@@ -30,7 +32,7 @@ public class BattleSessionQueriesTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction), new Vector3I(0, 0, 0));
 
-    Vector3I[] path = GetValue(session.Queries.Execute(new FindPathForUnit(unit.UnitId, new Vector3I(2, 0, 0))));
+    Vector3I[] path = GetValue(session.Queries.Execute(new FindPathForUnit(unit.Handle, new Vector3I(2, 0, 0))));
 
     Assert.Equal(3, path.Length);
     Assert.Equal(new Vector3I(0, 0, 0), path[0]);
@@ -45,7 +47,7 @@ public class BattleSessionQueriesTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 2), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    IReadOnlyCollection<Vector3I> tiles = GetValue(session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit.UnitId)));
+    IReadOnlyCollection<Vector3I> tiles = GetValue(session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit.Handle)));
 
     Assert.True(tiles.Contains(new Vector3I(1, 0, 0)));
     Assert.True(tiles.Contains(new Vector3I(2, 0, 0)));
@@ -62,7 +64,7 @@ public class BattleSessionQueriesTest
     session.Board.GetTile(new Vector3I(1, 0, 0)).IsWalkable = false;
     StartBattle(session);
 
-    IReadOnlyCollection<Vector3I> tiles = GetValue(session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit.UnitId)));
+    IReadOnlyCollection<Vector3I> tiles = GetValue(session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit.Handle)));
 
     Assert.False(tiles.Contains(new Vector3I(1, 0, 0)));
     Assert.False(tiles.Contains(new Vector3I(2, 0, 0)));
@@ -81,7 +83,7 @@ public class BattleSessionQueriesTest
     session.Board.GetTile(new Vector3I(3, 0, 0)).BlocksLineOfSight = true;
     StartBattle(session);
 
-    IReadOnlyCollection<BattleUnitState> enemies = GetValue(session.Queries.Execute(new GetVisibleEnemiesForUnit(observer.UnitId)));
+    IReadOnlyCollection<BattleUnitState> enemies = GetValue(session.Queries.Execute(new GetVisibleEnemiesForUnit(observer.Handle)));
 
     Assert.True(enemies.Contains(visibleEnemy));
     Assert.False(enemies.Contains(hiddenEnemy));
@@ -100,14 +102,14 @@ public class BattleSessionQueriesTest
     Assert.Equal(BattleQueryFailureReason.InvalidTile, failure.Reason);
   }
 
-  private static BattleUnitState SpawnUnit(BattleSession session, Combatant combatant, Vector3I position)
+  private static BattleTestUnit SpawnUnit(BattleSession session, Combatant combatant, Vector3I position)
   {
     var result = BattleSessionMutation.SpawnUnit(combatant, position).Execute(session);
     Assert.True(result.Succeeded);
-    if (result.AffectedUnit == null)
-      throw new System.InvalidOperationException("Spawn unit mutation succeeded without an affected unit.");
+    if (result.AffectedUnit == null || result.AffectedUnitHandle == null)
+      throw new System.InvalidOperationException("Spawn unit mutation succeeded without an affected unit and handle.");
 
-    return result.AffectedUnit;
+    return new BattleTestUnit(result.AffectedUnit, result.AffectedUnitHandle);
   }
 
   private static void StartBattle(BattleSession session)

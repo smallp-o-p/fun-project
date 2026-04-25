@@ -9,21 +9,21 @@ public sealed class GetUnit : BattleSessionQuery<BattleUnitState>
 {
   public const string Id = "get_unit";
 
-  public int UnitId { get; }
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
 
-  public GetUnit(int unitId)
+  public GetUnit(BattleSession.BattleUnitHandle unitHandle)
     : base(Id)
   {
-    UnitId = unitId;
+    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
   }
 
   internal override BattleQueryResult<BattleUnitState> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    var unit = session.GetUnitOrNull(UnitId);
+    var unit = session.GetUnitOrNull(UnitHandle);
     if (unit == null)
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitId}.");
+      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitHandle.UnitId}.");
 
     return Succeed(unit);
   }
@@ -33,27 +33,27 @@ public sealed class GetLivingUnit : BattleSessionQuery<BattleUnitState>
 {
   public const string Id = "get_living_unit";
 
-  public int UnitId { get; }
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
 
-  public GetLivingUnit(int unitId)
+  public GetLivingUnit(BattleSession.BattleUnitHandle unitHandle)
     : base(Id)
   {
-    UnitId = unitId;
+    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
   }
 
   internal override BattleQueryResult<BattleUnitState> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    var unit = session.GetLivingUnitOrNull(UnitId);
+    var unit = session.GetLivingUnitOrNull(UnitHandle);
     if (unit != null)
       return Succeed(unit);
 
-    var trackedUnit = session.GetUnitOrNull(UnitId);
+    var trackedUnit = session.GetUnitOrNull(UnitHandle);
     if (trackedUnit == null)
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitId}.");
+      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitHandle.UnitId}.");
 
-    return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {UnitId} is not alive.");
+    return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {UnitHandle.UnitId} is not alive.");
   }
 }
 
@@ -99,12 +99,11 @@ public sealed class CanUnitActNow : BattleSessionQuery<bool>
 {
   public const string Id = "can_unit_act_now";
 
-  public int UnitId { get; }
-
-  public CanUnitActNow(int unitId)
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  public CanUnitActNow(BattleSession.BattleUnitHandle unitHandle)
     : base(Id)
   {
-    UnitId = unitId;
+    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
   }
 
   internal override BattleQueryResult<bool> Execute(BattleSession session)
@@ -114,7 +113,7 @@ public sealed class CanUnitActNow : BattleSessionQuery<bool>
     if (session.Phase != BattlePhase.InProgress)
       return Fail(BattleQueryFailureReason.InvalidBattleState, "Cannot query active unit state while the battle is not in progress.");
 
-    BattleQueryResult<BattleUnitState> unitResult = new GetLivingUnit(UnitId).Execute(session);
+    BattleQueryResult<BattleUnitState> unitResult = new GetLivingUnit(UnitHandle).Execute(session);
     if (unitResult is BattleQueryFailureResult<BattleUnitState> failureResult)
       return Fail(failureResult.Failure.Reason, failureResult.Failure.Message);
 
@@ -127,12 +126,12 @@ public sealed class IsUnitStillAvailableThisTurn : BattleSessionQuery<bool>
 {
   public const string Id = "is_unit_still_available_this_turn";
 
-  public int UnitId { get; }
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
 
-  public IsUnitStillAvailableThisTurn(int unitId)
+  public IsUnitStillAvailableThisTurn(BattleSession.BattleUnitHandle unitHandle)
     : base(Id)
   {
-    UnitId = unitId;
+    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
   }
 
   internal override BattleQueryResult<bool> Execute(BattleSession session)
@@ -142,11 +141,11 @@ public sealed class IsUnitStillAvailableThisTurn : BattleSessionQuery<bool>
     if (session.Phase != BattlePhase.InProgress)
       return Fail(BattleQueryFailureReason.InvalidBattleState, "Cannot query unit turn availability while the battle is not in progress.");
 
-    BattleQueryResult<BattleUnitState> unitResult = new GetLivingUnit(UnitId).Execute(session);
+    BattleQueryResult<BattleUnitState> unitResult = new GetLivingUnit(UnitHandle).Execute(session);
     if (unitResult is BattleQueryFailureResult<BattleUnitState> failureResult)
       return Fail(failureResult.Failure.Reason, failureResult.Failure.Message);
 
-    return Succeed(session.IsUnitStillAvailableThisTurn(UnitId));
+    return Succeed(session.IsUnitStillAvailableThisTurn(UnitHandle));
   }
 }
 

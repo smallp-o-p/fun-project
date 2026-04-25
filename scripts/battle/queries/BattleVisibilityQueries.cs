@@ -9,25 +9,27 @@ public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>
 {
   public const string Id = "is_unit_visible_to_unit";
 
-  public int ObserverUnitId { get; }
-  public int TargetUnitId { get; }
+  public BattleSession.BattleUnitHandle ObserverUnitHandle { get; }
+  public BattleSession.BattleUnitHandle TargetUnitHandle { get; }
+  internal int ObserverUnitId => ObserverUnitHandle.UnitId;
+  internal int TargetUnitId => TargetUnitHandle.UnitId;
 
-  public IsUnitVisibleToUnit(int observerUnitId, int targetUnitId)
+  public IsUnitVisibleToUnit(BattleSession.BattleUnitHandle observerUnitHandle, BattleSession.BattleUnitHandle targetUnitHandle)
     : base(Id)
   {
-    ObserverUnitId = observerUnitId;
-    TargetUnitId = targetUnitId;
+    ObserverUnitHandle = observerUnitHandle ?? throw new ArgumentNullException(nameof(observerUnitHandle));
+    TargetUnitHandle = targetUnitHandle ?? throw new ArgumentNullException(nameof(targetUnitHandle));
   }
 
   internal override BattleQueryResult<bool> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    BattleQueryResult<BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitId).Execute(session);
+    BattleQueryResult<BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
     if (observerResult is BattleQueryFailureResult<BattleUnitState> observerFailure)
       return Fail(observerFailure.Failure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Failure.Message}");
 
-    BattleQueryResult<BattleUnitState> targetResult = new GetLivingUnit(TargetUnitId).Execute(session);
+    BattleQueryResult<BattleUnitState> targetResult = new GetLivingUnit(TargetUnitHandle).Execute(session);
     if (targetResult is BattleQueryFailureResult<BattleUnitState> targetFailure)
       return Fail(targetFailure.Failure.Reason, $"Target unit {TargetUnitId} could not be resolved. {targetFailure.Failure.Message}");
 
@@ -45,20 +47,21 @@ public sealed class IsUnitVisibleToFaction : BattleSessionQuery<bool>
   public const string Id = "is_unit_visible_to_faction";
 
   public Faction Faction { get; }
-  public int TargetUnitId { get; }
+  public BattleSession.BattleUnitHandle TargetUnitHandle { get; }
+  internal int TargetUnitId => TargetUnitHandle.UnitId;
 
-  public IsUnitVisibleToFaction(Faction faction, int targetUnitId)
+  public IsUnitVisibleToFaction(Faction faction, BattleSession.BattleUnitHandle targetUnitHandle)
     : base(Id)
   {
     Faction = faction ?? throw new ArgumentNullException(nameof(faction));
-    TargetUnitId = targetUnitId;
+    TargetUnitHandle = targetUnitHandle ?? throw new ArgumentNullException(nameof(targetUnitHandle));
   }
 
   internal override BattleQueryResult<bool> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    BattleQueryResult<BattleUnitState> targetResult = new GetLivingUnit(TargetUnitId).Execute(session);
+    BattleQueryResult<BattleUnitState> targetResult = new GetLivingUnit(TargetUnitHandle).Execute(session);
     if (targetResult is BattleQueryFailureResult<BattleUnitState> targetFailure)
       return Fail(targetFailure.Failure.Reason, $"Target unit {TargetUnitId} could not be resolved. {targetFailure.Failure.Message}");
 
@@ -133,19 +136,20 @@ public sealed class GetVisibleUnitsForUnit : BattleSessionQuery<IReadOnlyCollect
 {
   public const string Id = "get_visible_units_for_unit";
 
-  public int ObserverUnitId { get; }
+  public BattleSession.BattleUnitHandle ObserverUnitHandle { get; }
+  internal int ObserverUnitId => ObserverUnitHandle.UnitId;
 
-  public GetVisibleUnitsForUnit(int observerUnitId)
+  public GetVisibleUnitsForUnit(BattleSession.BattleUnitHandle observerUnitHandle)
     : base(Id)
   {
-    ObserverUnitId = observerUnitId;
+    ObserverUnitHandle = observerUnitHandle ?? throw new ArgumentNullException(nameof(observerUnitHandle));
   }
 
   internal override BattleQueryResult<IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    BattleQueryResult<BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitId).Execute(session);
+    BattleQueryResult<BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
     if (observerResult is BattleQueryFailureResult<BattleUnitState> observerFailure)
       return Fail(observerFailure.Failure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Failure.Message}");
 
@@ -160,19 +164,20 @@ public sealed class GetVisibleEnemiesForUnit : BattleSessionQuery<IReadOnlyColle
 {
   public const string Id = "get_visible_enemies_for_unit";
 
-  public int ObserverUnitId { get; }
+  public BattleSession.BattleUnitHandle ObserverUnitHandle { get; }
+  internal int ObserverUnitId => ObserverUnitHandle.UnitId;
 
-  public GetVisibleEnemiesForUnit(int observerUnitId)
+  public GetVisibleEnemiesForUnit(BattleSession.BattleUnitHandle observerUnitHandle)
     : base(Id)
   {
-    ObserverUnitId = observerUnitId;
+    ObserverUnitHandle = observerUnitHandle ?? throw new ArgumentNullException(nameof(observerUnitHandle));
   }
 
   internal override BattleQueryResult<IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    BattleQueryResult<BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitId).Execute(session);
+    BattleQueryResult<BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
     if (observerResult is BattleQueryFailureResult<BattleUnitState> observerFailure)
       return Fail(observerFailure.Failure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Failure.Message}");
 

@@ -13,7 +13,7 @@ public sealed class BattleUnitState
 {
   private readonly List<EquippableItem> _inventory = [];
 
-  public int UnitId { get; }
+  internal int UnitId { get; }
   public Combatant Combatant { get; }
   public Faction Side => Combatant.OwningFaction;
   public Vector3I Position { get; private set; }
@@ -29,10 +29,13 @@ public sealed class BattleUnitState
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
 
-  public BattleUnitState(int unitId, Combatant combatant, Vector3I position, Weapon? equippedWeapon = null)
+  internal BattleUnitState(int unitId, Combatant combatant, Vector3I position, Weapon? equippedWeapon = null)
   {
+    if (unitId <= 0)
+      throw new ArgumentOutOfRangeException(nameof(unitId), "Unit id must be positive.");
+
     UnitId = unitId;
-    Combatant = combatant;
+    Combatant = combatant ?? throw new ArgumentNullException(nameof(combatant));
     Position = position;
     EquippedWeapon = equippedWeapon;
     CurrentHealth = MaxHealth;

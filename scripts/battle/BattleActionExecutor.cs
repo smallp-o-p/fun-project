@@ -157,7 +157,7 @@ public sealed class BattleActionExecutor
   {
     ArgumentNullException.ThrowIfNull(moveStep);
 
-    UnitActionContext context = ValidateActingUnit(moveStep, moveStep.UnitId, moveStep.ActionPointCost);
+    UnitActionContext context = ValidateActingUnit(moveStep, moveStep.UnitHandle, moveStep.ActionPointCost);
     if (context is InvalidUnitActionContext invalidContext)
       return invalidContext.Failure;
 
@@ -174,7 +174,7 @@ public sealed class BattleActionExecutor
   {
     ArgumentNullException.ThrowIfNull(moveUnit);
 
-    UnitActionContext context = ValidateActingUnit(moveUnit, moveUnit.UnitId);
+    UnitActionContext context = ValidateActingUnit(moveUnit, moveUnit.UnitHandle);
     if (context is InvalidUnitActionContext invalidContext)
       return invalidContext.Failure;
 
@@ -241,7 +241,7 @@ public sealed class BattleActionExecutor
     ArgumentNullException.ThrowIfNull(throwItem);
 
     int actionPointCost = throwItem.Item.ActionPointCost;
-    UnitActionContext context = ValidateActingUnit(throwItem, throwItem.UnitId, actionPointCost);
+    UnitActionContext context = ValidateActingUnit(throwItem, throwItem.UnitHandle, actionPointCost);
     if (context is InvalidUnitActionContext invalidContext)
       return invalidContext.Failure;
 
@@ -265,7 +265,7 @@ public sealed class BattleActionExecutor
   {
     ArgumentNullException.ThrowIfNull(passUnit);
 
-    UnitActionContext context = ValidateActingUnit(passUnit, passUnit.UnitId);
+    UnitActionContext context = ValidateActingUnit(passUnit, passUnit.UnitHandle);
     if (context is InvalidUnitActionContext invalidContext)
       return invalidContext.Failure;
 
@@ -286,16 +286,17 @@ public sealed class BattleActionExecutor
     return BattleActionEvaluation.Allowed(endFactionTurn);
   }
 
-  private UnitActionContext ValidateActingUnit(BattleSessionMutation mutation, int unitId, int actionPointCost = 0)
+  private UnitActionContext ValidateActingUnit(BattleSessionMutation mutation, BattleSession.BattleUnitHandle unitHandle, int actionPointCost = 0)
   {
     ArgumentNullException.ThrowIfNull(mutation);
+    ArgumentNullException.ThrowIfNull(unitHandle);
 
     if (_session.Phase != BattlePhase.InProgress)
       return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(mutation, "Battle is not in progress.", actionPointCost: actionPointCost));
 
     Faction activeSide = _session.ActiveSide;
 
-    BattleQueryResult<BattleUnitState> unitResult = _session.Queries.Execute(new GetLivingUnit(unitId));
+    BattleQueryResult<BattleUnitState> unitResult = _session.Queries.Execute(new GetLivingUnit(unitHandle));
     if (unitResult is BattleQueryFailureResult<BattleUnitState> unitFailure)
     {
       return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(
@@ -309,7 +310,7 @@ public sealed class BattleActionExecutor
     if (unit.Side != activeSide)
       return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(mutation, $"{unit.Combatant.Name} is not on the active side.", actionPointCost: actionPointCost));
 
-    BattleQueryResult<bool> availableResult = _session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitId));
+    BattleQueryResult<bool> availableResult = _session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitHandle));
     if (availableResult is BattleQueryFailureResult<bool> availableFailure)
     {
       return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(

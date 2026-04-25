@@ -18,7 +18,7 @@ public class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unit.UnitId, new Vector3I(1, 1, 1), 2));
+    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unit.Handle, new Vector3I(1, 1, 1), 2));
 
     var result = executor.Tick();
 
@@ -38,7 +38,7 @@ public class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
 
-    var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnitStep(unit.UnitId, new Vector3I(1, 0, 2), 2));
+    var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnitStep(unit.Handle, new Vector3I(1, 0, 2), 2));
 
     Assert.True(evaluation.IsAllowed);
     Assert.True(evaluation.Mutation is MoveUnitStep);
@@ -57,7 +57,7 @@ public class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
 
-    var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnitStep(unit.UnitId, new Vector3I(2, 0, 0)));
+    var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnitStep(unit.Handle, new Vector3I(2, 0, 0)));
 
     Assert.False(evaluation.IsAllowed);
     Assert.Equal(BattleMutationFailureReason.Rejected, evaluation.FailureReason);
@@ -75,10 +75,10 @@ public class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    Vector3I[] path = GetValue(session.Queries.Execute(new FindPathForUnit(unit.UnitId, new Vector3I(2, 0, 0))));
+    Vector3I[] path = GetValue(session.Queries.Execute(new FindPathForUnit(unit.Handle, new Vector3I(2, 0, 0))));
     Assert.Equal(3, path.Length);
 
-    var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnit(unit.UnitId, path));
+    var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnit(unit.Handle, path));
 
     Assert.True(evaluation.IsAllowed);
     Assert.Equal(2, evaluation.ActionPointCost);
@@ -97,7 +97,7 @@ public class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unitA.UnitId, new Vector3I(0, 0, 1)));
+    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unitA.Handle, new Vector3I(0, 0, 1)));
     executor.Enqueue(BattleSessionMutation.EndFactionTurn(factionA));
 
     var first = executor.Tick();
@@ -122,15 +122,15 @@ public class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    executor.Enqueue(BattleSessionMutation.PassUnit(unitA.UnitId));
+    executor.Enqueue(BattleSessionMutation.PassUnit(unitA.Handle));
 
     var result = executor.Tick();
 
     Assert.True(result.HasValue);
     Assert.True(result!.Value.Succeeded);
-    Assert.False(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitA.UnitId))));
-    Assert.False(GetValue(session.Queries.Execute(new CanUnitActNow(unitA.UnitId))));
-    Assert.True(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitB.UnitId))));
+    Assert.False(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitA.Handle))));
+    Assert.False(GetValue(session.Queries.Execute(new CanUnitActNow(unitA.Handle))));
+    Assert.True(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitB.Handle))));
     Assert.Equal(faction, session.ActiveSide);
   }
 
@@ -143,7 +143,7 @@ public class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unit.UnitId, new Vector3I(2, 0, 0)));
+    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unit.Handle, new Vector3I(2, 0, 0)));
 
     var result = executor.Tick();
 
@@ -164,7 +164,7 @@ public class BattleActionExecutorTest
     BattleMutationResult? resolvedResult = null;
     executor.MutationResolved += result => resolvedResult = result;
 
-    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unit.UnitId, new Vector3I(1, 0, 2)));
+    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unit.Handle, new Vector3I(1, 0, 2)));
     executor.Tick();
 
     Assert.True(resolvedResult.HasValue);
@@ -185,8 +185,8 @@ public class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unitA.UnitId, new Vector3I(0, 0, 1)));
-    executor.Enqueue(BattleSessionMutation.ThrowItem(unitA.UnitId, grenade, new Vector3I(2, 0, 1)));
+    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unitA.Handle, new Vector3I(0, 0, 1)));
+    executor.Enqueue(BattleSessionMutation.ThrowItem(unitA.Handle, grenade, new Vector3I(2, 0, 1)));
     executor.Enqueue(BattleSessionMutation.EndFactionTurn(factionA));
 
     var results = executor.DrainQueue();
@@ -210,7 +210,7 @@ public class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    executor.Enqueue(BattleSessionMutation.PassUnit(unitA.UnitId));
+    executor.Enqueue(BattleSessionMutation.PassUnit(unitA.Handle));
     executor.Enqueue(BattleSessionMutation.EndFactionTurn(factionA));
 
     var first = executor.Tick();
@@ -244,8 +244,8 @@ public class BattleActionExecutorTest
       throw new InvalidOperationException("boom");
     };
 
-    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unit.UnitId, new Vector3I(1, 0, 2), 2));
-    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unit.UnitId, new Vector3I(1, 1, 1), 2));
+    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unit.Handle, new Vector3I(1, 0, 2), 2));
+    executor.Enqueue(BattleSessionMutation.MoveUnitStep(unit.Handle, new Vector3I(1, 1, 1), 2));
 
     var first = executor.Tick();
     var second = executor.Tick();
@@ -274,12 +274,13 @@ public class BattleActionExecutorTest
     Assert.True(executor.LastResult == null);
   }
 
-  private static BattleUnitState SpawnUnit(BattleSession session, Combatant combatant, Vector3I position)
+  private static BattleTestUnit SpawnUnit(BattleSession session, Combatant combatant, Vector3I position)
   {
     var result = BattleSessionMutation.SpawnUnit(combatant, position).Execute(session);
     Assert.True(result.Succeeded);
     Assert.True(result.AffectedUnit != null);
-    return result.AffectedUnit!;
+    Assert.True(result.AffectedUnitHandle != null);
+    return new BattleTestUnit(result.AffectedUnit!, result.AffectedUnitHandle!);
   }
 
   private static void StartBattle(BattleSession session)

@@ -21,12 +21,17 @@ public readonly record struct BattleMutationResult(
   bool Succeeded,
   BattleMutationFailureReason FailureReason = BattleMutationFailureReason.None,
   BattleUnitState? AffectedUnit = null,
-  string? Message = null)
+  string? Message = null,
+  BattleSession.BattleUnitHandle? AffectedUnitHandle = null)
 {
-  public static BattleMutationResult Success(BattleSessionMutation mutation, BattleUnitState? affectedUnit = null, string? message = null)
+  public static BattleMutationResult Success(
+    BattleSessionMutation mutation,
+    BattleUnitState? affectedUnit = null,
+    string? message = null,
+    BattleSession.BattleUnitHandle? affectedUnitHandle = null)
   {
     ArgumentNullException.ThrowIfNull(mutation);
-    return new BattleMutationResult(mutation, true, BattleMutationFailureReason.None, affectedUnit, message);
+    return new BattleMutationResult(mutation, true, BattleMutationFailureReason.None, affectedUnit, message, affectedUnitHandle);
   }
 
   public static BattleMutationResult Failure(BattleSessionMutation mutation, BattleMutationFailureReason failureReason, string? message = null)
@@ -89,35 +94,35 @@ public abstract class BattleSessionMutation
   }
 
   public static MoveUnitStep MoveUnitStep(
-    int unitId,
+    BattleSession.BattleUnitHandle unitHandle,
     Vector3I destination,
     int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
   {
-    return new MoveUnitStep(unitId, destination, actionPointCost);
+    return new MoveUnitStep(unitHandle, destination, actionPointCost);
   }
 
   public static MoveUnit MoveUnit(
-    int unitId,
+    BattleSession.BattleUnitHandle unitHandle,
     IEnumerable<Vector3I> path,
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost
   )
   {
-    return new MoveUnit(unitId, path, actionPointCostPerStep);
+    return new MoveUnit(unitHandle, path, actionPointCostPerStep);
   }
 
-  public static ThrowItem ThrowItem(int unitId, ThrowableItem item, Vector3I targetCell)
+  public static ThrowItem ThrowItem(BattleSession.BattleUnitHandle unitHandle, ThrowableItem item, Vector3I targetCell)
   {
-    return new ThrowItem(unitId, item, targetCell);
+    return new ThrowItem(unitHandle, item, targetCell);
   }
 
-  public static ApplyDamage ApplyDamage(int unitId, int amount)
+  public static ApplyDamage ApplyDamage(BattleSession.BattleUnitHandle unitHandle, int amount)
   {
-    return new ApplyDamage(unitId, amount);
+    return new ApplyDamage(unitHandle, amount);
   }
 
-  public static PassUnit PassUnit(int unitId)
+  public static PassUnit PassUnit(BattleSession.BattleUnitHandle unitHandle)
   {
-    return new PassUnit(unitId);
+    return new PassUnit(unitHandle);
   }
 
   public static EndFactionTurn EndFactionTurn(Faction expectedActiveSide)
@@ -165,35 +170,36 @@ public sealed class SpawnUnit : BattleSessionMutation
     if (!session.Board.CanOccupy(Position))
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, $"Cannot place a unit at {Position}.");
 
-    var unit = session.AddUnit(Combatant, Position, EquippedWeapon);
-    session.RaiseEvent(new BattleEvent(BattleEventType.UnitAdded, unit.UnitId, unit.Position));
-    return BattleMutationResult.Success(this, unit);
+    var spawnedUnit = session.AddUnit(Combatant, Position, EquippedWeapon);
+    session.RaiseEvent(new BattleEvent(BattleEventType.UnitAdded, spawnedUnit.Unit.UnitId, spawnedUnit.Unit.Position));
+    return BattleMutationResult.Success(this, spawnedUnit.Unit, affectedUnitHandle: spawnedUnit.Handle);
   }
 }
 
 public sealed class MoveUnitStep : BattleSessionMutation
 {
-  public int UnitId { get; }
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  internal int UnitId => UnitHandle.UnitId;
   public Vector3I Destination { get; }
   public int ActionPointCost { get; }
 
   public MoveUnitStep(
-    int unitId,
+    BattleSession.BattleUnitHandle unitHandle,
     Vector3I destination,
     int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
     : base(MoveUnitStepMutationId)
   {
+    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
     if (actionPointCost < 0)
       throw new ArgumentOutOfRangeException(nameof(actionPointCost), "Action point cost cannot be negative.");
 
-    UnitId = unitId;
     Destination = destination;
     ActionPointCost = actionPointCost;
   }
 
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
-    var unit = session.GetLivingUnitOrNull(UnitId);
+    var unit = session.GetLivingUnitOrNull(UnitHandle);
     if (unit == null)
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit step mutation could not resolve unit {UnitId}.");
     if (!unit.TrySpendActionPoints(ActionPointCost))
@@ -203,34 +209,35 @@ public sealed class MoveUnitStep : BattleSessionMutation
 
     unit.MoveTo(Destination);
     session.RaiseEvent(new BattleEvent(BattleEventType.UnitMoved, unit.UnitId, Destination));
-    return BattleMutationResult.Success(this, unit);
+    return BattleMutationResult.Success(this, unit, affectedUnitHandle: UnitHandle);
   }
 }
 
 public sealed class MoveUnit : BattleSessionMutation
 {
-  public int UnitId { get; }
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  internal int UnitId => UnitHandle.UnitId;
   public IReadOnlyList<Vector3I> Path { get; }
   public int ActionPointCostPerStep { get; }
 
   public MoveUnit(
-    int unitId,
+    BattleSession.BattleUnitHandle unitHandle,
     IEnumerable<Vector3I> path,
     int perStepAPCost = BattleSession.DefaultMovementStepActionPointCost)
     : base(MoveUnitMutationId)
   {
+    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
     ArgumentNullException.ThrowIfNull(path);
     if (perStepAPCost < 0)
       throw new ArgumentOutOfRangeException(nameof(perStepAPCost), "Action point cost cannot be negative.");
 
-    UnitId = unitId;
     Path = [.. path];
     ActionPointCostPerStep = perStepAPCost;
   }
 
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
-    BattleUnitState? unit = session.GetLivingUnitOrNull(UnitId);
+    BattleUnitState? unit = session.GetLivingUnitOrNull(UnitHandle);
     if (unit == null)
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit mutation could not resolve unit {UnitId}.");
     if (Path.Count == 0)
@@ -242,7 +249,7 @@ public sealed class MoveUnit : BattleSessionMutation
 
     int stepCount = Path.Count - 1;
     if (stepCount == 0)
-      return BattleMutationResult.Success(this, unit, $"Unit already occupies {destination}.");
+      return BattleMutationResult.Success(this, unit, $"Unit already occupies {destination}.", UnitHandle);
     long totalActionPointCost = (long)stepCount * ActionPointCostPerStep;
     if (unit.CurrentActionPoints < totalActionPointCost)
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"{unit.Combatant.Name} needs {totalActionPointCost} action points but only has {unit.CurrentActionPoints}.");
@@ -260,7 +267,7 @@ public sealed class MoveUnit : BattleSessionMutation
     BattleUnitState currentUnit = unit;
     for (int stepIndex = 1; stepIndex < Path.Count; stepIndex++)
     {
-      MoveUnitStep stepMutation = new(UnitId, Path[stepIndex], ActionPointCostPerStep);
+      MoveUnitStep stepMutation = new(UnitHandle, Path[stepIndex], ActionPointCostPerStep);
       BattleMutationResult stepResult = stepMutation.ExecuteUnchecked(session);
       if (!stepResult.Succeeded)
         return BattleMutationResult.Failure(this, stepResult.FailureReason, stepResult.Message ?? "Move unit mutation could not be applied.");
@@ -268,27 +275,28 @@ public sealed class MoveUnit : BattleSessionMutation
       currentUnit = stepResult.AffectedUnit ?? currentUnit;
     }
 
-    return BattleMutationResult.Success(this, currentUnit, $"Moved to {destination}.");
+    return BattleMutationResult.Success(this, currentUnit, $"Moved to {destination}.", UnitHandle);
   }
 }
 
 public sealed class ThrowItem : BattleSessionMutation
 {
-  public int UnitId { get; }
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  internal int UnitId => UnitHandle.UnitId;
   public ThrowableItem Item { get; }
   public Vector3I TargetCell { get; }
 
-  public ThrowItem(int unitId, ThrowableItem item, Vector3I targetCell)
+  public ThrowItem(BattleSession.BattleUnitHandle unitHandle, ThrowableItem item, Vector3I targetCell)
     : base(ThrowItemMutationId)
   {
+    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
     Item = item ?? throw new ArgumentNullException(nameof(item));
-    UnitId = unitId;
     TargetCell = targetCell;
   }
 
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
-    var unit = session.GetLivingUnitOrNull(UnitId);
+    var unit = session.GetLivingUnitOrNull(UnitHandle);
     if (unit == null)
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Throw item mutation could not resolve unit {UnitId}.");
     if (!unit.HasInventoryItem(Item))
@@ -308,25 +316,26 @@ public sealed class ThrowItem : BattleSessionMutation
     }
 
     session.RaiseEvent(new BattleEvent(BattleEventType.ItemThrown, unit.UnitId, TargetCell, $"{unit.Combatant.Name} threw {Item.ItemName}."));
-    return BattleMutationResult.Success(this, unit);
+    return BattleMutationResult.Success(this, unit, affectedUnitHandle: UnitHandle);
   }
 }
 
 public sealed class ApplyDamage : BattleSessionMutation
 {
-  public int UnitId { get; }
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  internal int UnitId => UnitHandle.UnitId;
   public int Amount { get; }
 
-  public ApplyDamage(int unitId, int amount)
+  public ApplyDamage(BattleSession.BattleUnitHandle unitHandle, int amount)
     : base(ApplyDamageMutationId)
   {
+    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
     Amount = amount;
-    UnitId = unitId;
   }
 
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
-    var unit = session.GetLivingUnitOrNull(UnitId);
+    var unit = session.GetLivingUnitOrNull(UnitHandle);
     if (unit == null)
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, $"Unknown unit id {UnitId}.");
 
@@ -334,31 +343,32 @@ public sealed class ApplyDamage : BattleSessionMutation
     session.RaiseEvent(new BattleEvent(BattleEventType.UnitDamaged, UnitId, unit.Position, $"Damage: {Amount}"));
 
     if (!unit.IsDead)
-      return BattleMutationResult.Success(this, unit);
+      return BattleMutationResult.Success(this, unit, affectedUnitHandle: UnitHandle);
 
     session.HandleUnitDeath(unit);
-    return BattleMutationResult.Success(this, session.GetUnitOrNull(UnitId));
+    return BattleMutationResult.Success(this, session.GetUnitOrNull(UnitHandle), affectedUnitHandle: UnitHandle);
   }
 }
 
 public sealed class PassUnit : BattleSessionMutation
 {
-  public int UnitId { get; }
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  internal int UnitId => UnitHandle.UnitId;
 
-  public PassUnit(int unitId)
+  public PassUnit(BattleSession.BattleUnitHandle unitHandle)
     : base(PassUnitMutationId)
   {
-    UnitId = unitId;
+    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
   }
 
   protected override BattleMutationResult ExecuteCore(BattleSession session)
   {
-    var unit = session.GetLivingUnitOrNull(UnitId);
+    var unit = session.GetLivingUnitOrNull(UnitHandle);
     if (unit == null)
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Pass unit mutation could not resolve unit {UnitId}.");
 
     session.EndUnitActivation(unit);
-    return BattleMutationResult.Success(this, unit);
+    return BattleMutationResult.Success(this, unit, affectedUnitHandle: UnitHandle);
   }
 }
 

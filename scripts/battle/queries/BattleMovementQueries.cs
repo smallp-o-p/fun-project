@@ -8,13 +8,13 @@ public sealed class FindPathForUnit : BattleSessionQuery<Vector3I[]>
 {
   public const string Id = "find_path_for_unit";
 
-  public int UnitId { get; }
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
   public Vector3I Destination { get; }
 
-  public FindPathForUnit(int unitId, Vector3I destination)
+  public FindPathForUnit(BattleSession.BattleUnitHandle unitHandle, Vector3I destination)
     : base(Id)
   {
-    UnitId = unitId;
+    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
     Destination = destination;
   }
 
@@ -22,13 +22,13 @@ public sealed class FindPathForUnit : BattleSessionQuery<Vector3I[]>
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    BattleQueryResult<BattleUnitState> unitResult = new GetLivingUnit(UnitId).Execute(session);
+    BattleQueryResult<BattleUnitState> unitResult = new GetLivingUnit(UnitHandle).Execute(session);
     if (unitResult is BattleQueryFailureResult<BattleUnitState> failureResult)
       return Fail(failureResult.Failure.Reason, failureResult.Failure.Message);
 
     BattleUnitState unit = ((BattleQuerySuccess<BattleUnitState>)unitResult).Value;
     if (!session.Board.IsInBounds(unit.Position))
-      return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {UnitId} is on invalid tile {unit.Position}.");
+      return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {UnitHandle.UnitId} is on invalid tile {unit.Position}.");
     if (!session.Board.IsInBounds(Destination))
       return Fail(BattleQueryFailureReason.InvalidTile, $"Destination {Destination} is outside the battle board.");
 
@@ -40,18 +40,18 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
 {
   public const string Id = "get_possible_move_tiles_for_unit";
 
-  public int UnitId { get; }
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
   public int ActionPointCostPerStep { get; }
 
   public GetPossibleMoveTilesForUnit(
-    int unitId,
+    BattleSession.BattleUnitHandle unitHandle,
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost)
     : base(Id)
   {
+    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
     if (actionPointCostPerStep < 0)
       throw new ArgumentOutOfRangeException(nameof(actionPointCostPerStep), "Action point cost cannot be negative.");
 
-    UnitId = unitId;
     ActionPointCostPerStep = actionPointCostPerStep;
   }
 
@@ -59,7 +59,7 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    BattleQueryResult<BattleUnitState> unitResult = new GetLivingUnit(UnitId).Execute(session);
+    BattleQueryResult<BattleUnitState> unitResult = new GetLivingUnit(UnitHandle).Execute(session);
     if (unitResult is BattleQueryFailureResult<BattleUnitState> failureResult)
       return Fail(failureResult.Failure.Reason, failureResult.Failure.Message);
 
@@ -77,6 +77,8 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
         continue;
 
       Vector3I[] path = session.Board.FindPath(unit.Position, coordinates, unit.UnitId);
+      if (path.Length == 0)
+        continue;
 
       int stepCount = path.Length - 1;
       if (CanPayMovementCost(unit, stepCount))

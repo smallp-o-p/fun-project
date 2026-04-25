@@ -16,11 +16,24 @@ public enum BattlePhase
 
 public sealed class BattleSession
 {
+  internal readonly record struct SpawnedBattleUnit(BattleUnitHandle Handle, BattleUnitState Unit);
+
+  public sealed class BattleUnitHandle
+  {
+    internal int UnitId { get; }
+
+    internal BattleUnitHandle(int unitId)
+    {
+      UnitId = unitId;
+    }
+  }
+
   public const int DefaultMovementStepActionPointCost = 1;
   private static readonly BattleVisibilitySystem VisibilitySystem = new();
 
   private readonly Dictionary<Faction, HashSet<BattleUnitState>> _aliveUnitsByFaction = [];
   private readonly Dictionary<Faction, IReadOnlyList<Combatant>> _factionRosters = [];
+  private readonly Dictionary<BattleUnitHandle, BattleUnitState> _unitsByHandle = [];
   private readonly List<BattleUnitState> _deadUnits = [];
   private readonly Queue<Faction> _globalFactionOrder = [];
   private Queue<Faction> _turnQueue = [];
@@ -80,9 +93,13 @@ public sealed class BattleSession
     return _aliveUnitsByFaction.TryGetValue(side, out var units) ? units : [];
   }
 
-  internal bool IsUnitStillAvailableThisTurn(int unitId)
+  internal bool IsUnitStillAvailableThisTurn(BattleUnitHandle handle)
   {
-    return _activeFactionUnitsAvailable.Contains(unitId);
+    ArgumentNullException.ThrowIfNull(handle);
+    if (!IsHandleFromThisSession(handle))
+      return false;
+
+    return _activeFactionUnitsAvailable.Contains(handle.UnitId);
   }
 
   internal bool TryStartBattle()
@@ -109,12 +126,17 @@ public sealed class BattleSession
     return true;
   }
 
-  internal BattleUnitState AddUnit(Combatant combatant, Vector3I position, Weapon equippedWeapon = null)
+  internal SpawnedBattleUnit AddUnit(Combatant combatant, Vector3I position, Weapon equippedWeapon = null)
   {
-    var unit = new BattleUnitState(_nextUnitId++, combatant, position, equippedWeapon);
+    ArgumentNullException.ThrowIfNull(combatant);
+
+    var handle = new BattleUnitHandle(_nextUnitId++);
+    var unit = new BattleUnitState(handle.UnitId, combatant, position, equippedWeapon);
     bool occupantSet = Board.TryPlaceOccupant(unit.Position, unit.UnitId);
     if (!occupantSet)
       throw new InvalidOperationException($"Could not place unit {unit.UnitId} at {unit.Position}.");
+
+    _unitsByHandle.Add(handle, unit);
 
     if (!_aliveUnitsByFaction.TryGetValue(unit.Side, out var unitsForSide))
     {
@@ -130,7 +152,7 @@ public sealed class BattleSession
     if (Phase == BattlePhase.InProgress)
       RegisterSpawnedUnitForCurrentRound(unit);
 
-    return unit;
+    return new SpawnedBattleUnit(handle, unit);
   }
 
   internal void HandleUnitDeath(BattleUnitState unit)
@@ -146,7 +168,16 @@ public sealed class BattleSession
     HandleFactionLoss(unitSide);
   }
 
-  internal void RemoveAvailableUnit(int unitId)
+  internal void RemoveAvailableUnit(BattleUnitHandle handle)
+  {
+    ArgumentNullException.ThrowIfNull(handle);
+    if (!IsHandleFromThisSession(handle))
+      throw new InvalidOperationException("Unit handle does not belong to this battle session.");
+
+    RemoveAvailableUnit(handle.UnitId);
+  }
+
+  private void RemoveAvailableUnit(int unitId)
   {
     if (!_activeFactionUnitsAvailable.Remove(unitId))
       throw new InvalidOperationException($"Unit {unitId} is not available this turn.");
@@ -232,14 +263,19 @@ public sealed class BattleSession
     _turnQueue.Enqueue(unit.Side);
   }
 
-  internal BattleUnitState GetUnitOrNull(int unitId)
+  internal BattleUnitState GetUnitOrNull(BattleUnitHandle handle)
   {
-    return GetLivingUnitOrNull(unitId) ?? _deadUnits.FirstOrDefault(unit => unit.UnitId == unitId);
+    ArgumentNullException.ThrowIfNull(handle);
+    return _unitsByHandle.TryGetValue(handle, out var unit) ? unit : null;
   }
 
-  internal BattleUnitState GetLivingUnitOrNull(int unitId)
+  internal BattleUnitState GetLivingUnitOrNull(BattleUnitHandle handle)
   {
-    return AliveUnits.FirstOrDefault(unit => unit.UnitId == unitId);
+    ArgumentNullException.ThrowIfNull(handle);
+    if (!_unitsByHandle.TryGetValue(handle, out var unit))
+      return null;
+
+    return unit.IsAlive ? unit : null;
   }
 
   internal void MoveUnitToDeadStorage(BattleUnitState unit)
@@ -298,6 +334,12 @@ public sealed class BattleSession
     _visibilitySnapshot = VisibilitySystem
       .Build(this)
       .WithMergedExplored(_visibilitySnapshot);
+  }
+
+  internal bool IsHandleFromThisSession(BattleUnitHandle handle)
+  {
+    ArgumentNullException.ThrowIfNull(handle);
+    return _unitsByHandle.ContainsKey(handle);
   }
 
   private void RebuildRoundQueueFromLivingSides()
