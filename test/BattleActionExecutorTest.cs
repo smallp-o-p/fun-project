@@ -3,6 +3,7 @@ using FunProject.Combatants;
 using GdUnit4;
 using Godot;
 using System;
+using static BattleQueryTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -74,7 +75,7 @@ public class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    Vector3I[] path = session.Board.FindPath(unit.Position, new Vector3I(2, 0, 0), unit.UnitId);
+    Vector3I[] path = GetValue(session.Queries.Execute(new FindPathForUnit(unit.UnitId, new Vector3I(2, 0, 0))));
     Assert.Equal(3, path.Length);
 
     var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnit(unit.UnitId, path));
@@ -127,9 +128,9 @@ public class BattleActionExecutorTest
 
     Assert.True(result.HasValue);
     Assert.True(result!.Value.Succeeded);
-    Assert.False(session.IsUnitStillAvailableThisTurn(unitA.UnitId));
-    Assert.False(session.CanUnitActNow(unitA.UnitId));
-    Assert.True(session.IsUnitStillAvailableThisTurn(unitB.UnitId));
+    Assert.False(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitA.UnitId))));
+    Assert.False(GetValue(session.Queries.Execute(new CanUnitActNow(unitA.UnitId))));
+    Assert.True(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitB.UnitId))));
     Assert.Equal(faction, session.ActiveSide);
   }
 

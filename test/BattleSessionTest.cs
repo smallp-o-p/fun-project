@@ -6,6 +6,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static BattleQueryTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -347,7 +348,7 @@ public class BattleSessionTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 5), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    Vector3I[] path = session.Board.FindPath(unit.Position, new Vector3I(2, 0, 0), unit.UnitId);
+    Vector3I[] path = GetValue(session.Queries.Execute(new FindPathForUnit(unit.UnitId, new Vector3I(2, 0, 0))));
     Assert.Equal(3, path.Length);
 
     var moved = BattleSessionMutation.MoveUnit(unit.UnitId, path).Execute(session);
@@ -399,7 +400,7 @@ public class BattleSessionTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 1), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    Vector3I[] path = session.Board.FindPath(unit.Position, new Vector3I(2, 0, 0), unit.UnitId);
+    Vector3I[] path = GetValue(session.Queries.Execute(new FindPathForUnit(unit.UnitId, new Vector3I(2, 0, 0))));
     Assert.Equal(3, path.Length);
 
     var moved = BattleSessionMutation.MoveUnit(unit.UnitId, path).Execute(session);
@@ -421,9 +422,9 @@ public class BattleSessionTest
 
     PassUnit(session, unitA.UnitId);
 
-    Assert.False(session.IsUnitStillAvailableThisTurn(unitA.UnitId));
-    Assert.False(session.CanUnitActNow(unitA.UnitId));
-    Assert.True(session.IsUnitStillAvailableThisTurn(unitB.UnitId));
+    Assert.False(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitA.UnitId))));
+    Assert.False(GetValue(session.Queries.Execute(new CanUnitActNow(unitA.UnitId))));
+    Assert.True(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitB.UnitId))));
     Assert.Equal(faction, session.ActiveSide);
   }
 
@@ -445,8 +446,8 @@ public class BattleSessionTest
     Assert.Equal(factionA, session.ActiveSide);
     Assert.False(session.AliveUnits.Contains(unitA));
     Assert.True(session.DeadUnits.Contains(unitA));
-    Assert.False(session.GetFactionAliveUnits(factionA).Contains(unitA));
-    Assert.True(session.GetFactionDeadUnits(factionA).Contains(unitA));
+    Assert.False(GetValue(session.Queries.Execute(new GetFactionAliveUnits(factionA))).Contains(unitA));
+    Assert.True(GetValue(session.Queries.Execute(new GetFactionDeadUnits(factionA))).Contains(unitA));
     Assert.True(session.TurnQueue.Contains(factionA));
     Assert.True(session.TurnQueue.Contains(factionB));
 
@@ -468,7 +469,7 @@ public class BattleSessionTest
     ApplyDamage(session, unitA1.UnitId, 10);
 
     Assert.Equal(factionA, session.ActiveSide);
-    Assert.True(session.CanUnitActNow(unitA2.UnitId));
+    Assert.True(GetValue(session.Queries.Execute(new CanUnitActNow(unitA2.UnitId))));
     Assert.False(session.Board.GetTile(unitA1.Position).IsOccupied);
     Assert.True(session.DeadUnits.Contains(unitA1));
   }
@@ -484,13 +485,13 @@ public class BattleSessionTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", factionB, health: 10), new Vector3I(2, 0, 0));
     StartBattle(session);
 
-    Assert.False(session.CanUnitActNow(unitA2.UnitId));
+    Assert.False(GetValue(session.Queries.Execute(new CanUnitActNow(unitA2.UnitId))));
 
     ApplyDamage(session, unitA1.UnitId, 10);
 
     Assert.Equal(factionA, session.ActiveSide);
     Assert.Equal(1, session.TurnNumber);
-    Assert.False(session.CanUnitActNow(unitA2.UnitId));
+    Assert.False(GetValue(session.Queries.Execute(new CanUnitActNow(unitA2.UnitId))));
 
     AdvanceTurn(session);
     Assert.Equal(factionB, session.ActiveSide);
@@ -558,7 +559,7 @@ public class BattleSessionTest
 
     session.RemoveAvailableUnit(unit.UnitId);
 
-    Assert.False(session.IsUnitStillAvailableThisTurn(unit.UnitId));
+    Assert.False(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unit.UnitId))));
     Assert.Throws<InvalidOperationException>(() => session.RemoveAvailableUnit(unit.UnitId));
   }
 
@@ -574,7 +575,7 @@ public class BattleSessionTest
 
     session.EndUnitActivation(unitA);
 
-    Assert.False(session.IsUnitStillAvailableThisTurn(unitA.UnitId));
+    Assert.False(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitA.UnitId))));
     Assert.Equal(factionB, session.ActiveSide);
     Assert.Equal(1, session.TurnNumber);
   }

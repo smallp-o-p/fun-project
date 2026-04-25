@@ -43,10 +43,9 @@ public readonly record struct BattleActionEvaluation(
 
 public sealed class BattleActionExecutor
 {
-  private readonly record struct UnitActionContext(BattleUnitState? Unit, BattleActionEvaluation? Failure)
-  {
-    public bool IsValid => Failure == null && Unit != null;
-  }
+  private abstract record UnitActionContext;
+  private sealed record ValidUnitActionContext(BattleUnitState Unit) : UnitActionContext;
+  private sealed record InvalidUnitActionContext(BattleActionEvaluation Failure) : UnitActionContext;
 
   private readonly BattleSession _session;
   private readonly Queue<BattleSessionMutation> _pending = [];
@@ -159,12 +158,10 @@ public sealed class BattleActionExecutor
     ArgumentNullException.ThrowIfNull(moveStep);
 
     UnitActionContext context = ValidateActingUnit(moveStep, moveStep.UnitId, moveStep.ActionPointCost);
-    if (!context.IsValid)
-      return context.Failure!.Value;
+    if (context is InvalidUnitActionContext invalidContext)
+      return invalidContext.Failure;
 
-    BattleUnitState? unit = context.Unit;
-    if (unit == null)
-      return BattleActionEvaluation.Rejected(moveStep, $"Unit {moveStep.UnitId} could not be resolved.", BattleMutationFailureReason.UnexpectedError, moveStep.ActionPointCost);
+    BattleUnitState unit = ((ValidUnitActionContext)context).Unit;
     if (!_session.Board.IsAdjacent(unit.Position, moveStep.Destination))
       return BattleActionEvaluation.Rejected(moveStep, $"{moveStep.Destination} is not adjacent to {unit.Position}.", actionPointCost: moveStep.ActionPointCost);
     if (!_session.Board.CanOccupy(moveStep.Destination))
@@ -178,13 +175,11 @@ public sealed class BattleActionExecutor
     ArgumentNullException.ThrowIfNull(moveUnit);
 
     UnitActionContext context = ValidateActingUnit(moveUnit, moveUnit.UnitId);
-    if (!context.IsValid)
-      return context.Failure!.Value;
+    if (context is InvalidUnitActionContext invalidContext)
+      return invalidContext.Failure;
 
-    BattleUnitState? unit = context.Unit;
+    BattleUnitState unit = ((ValidUnitActionContext)context).Unit;
 
-    if (unit == null)
-      return BattleActionEvaluation.Rejected(moveUnit, $"Unit {moveUnit.UnitId} could not be resolved.", BattleMutationFailureReason.UnexpectedError);
     if (moveUnit.Path.Count == 0)
       return BattleActionEvaluation.Rejected(moveUnit, "Move unit mutation requires a non-empty path.");
     if (moveUnit.Path[0] != unit.Position)
@@ -247,12 +242,10 @@ public sealed class BattleActionExecutor
 
     int actionPointCost = throwItem.Item.ActionPointCost;
     UnitActionContext context = ValidateActingUnit(throwItem, throwItem.UnitId, actionPointCost);
-    if (!context.IsValid)
-      return context.Failure!.Value;
+    if (context is InvalidUnitActionContext invalidContext)
+      return invalidContext.Failure;
 
-    BattleUnitState? unit = context.Unit;
-    if (unit == null)
-      return BattleActionEvaluation.Rejected(throwItem, $"Unit {throwItem.UnitId} could not be resolved.", BattleMutationFailureReason.UnexpectedError, actionPointCost);
+    BattleUnitState unit = ((ValidUnitActionContext)context).Unit;
     if (!_session.Board.IsInBounds(throwItem.TargetCell))
       return BattleActionEvaluation.Rejected(throwItem, $"{throwItem.TargetCell} is outside the battle board.", actionPointCost: actionPointCost);
     if (!unit.HasInventoryItem(throwItem.Item))
@@ -273,8 +266,8 @@ public sealed class BattleActionExecutor
     ArgumentNullException.ThrowIfNull(passUnit);
 
     UnitActionContext context = ValidateActingUnit(passUnit, passUnit.UnitId);
-    if (!context.IsValid)
-      return context.Failure!.Value;
+    if (context is InvalidUnitActionContext invalidContext)
+      return invalidContext.Failure;
 
     return BattleActionEvaluation.Allowed(passUnit);
   }
@@ -298,26 +291,53 @@ public sealed class BattleActionExecutor
     ArgumentNullException.ThrowIfNull(mutation);
 
     if (_session.Phase != BattlePhase.InProgress)
-      return new UnitActionContext(null, BattleActionEvaluation.Rejected(mutation, "Battle is not in progress.", actionPointCost: actionPointCost));
+      return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(mutation, "Battle is not in progress.", actionPointCost: actionPointCost));
 
     Faction activeSide = _session.ActiveSide;
 
-    BattleUnitState? unit = _session.GetLivingUnitOrNull(unitId);
-    if (unit == null)
-      return new UnitActionContext(null, BattleActionEvaluation.Rejected(mutation, $"Unit {unitId} is not alive.", actionPointCost: actionPointCost));
+    BattleQueryResult<BattleUnitState> unitResult = _session.Queries.Execute(new GetLivingUnit(unitId));
+    if (unitResult is BattleQueryFailureResult<BattleUnitState> unitFailure)
+    {
+      return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(
+        mutation,
+        unitFailure.Failure.Message,
+        ToMutationFailureReason(unitFailure.Failure),
+        actionPointCost));
+    }
+
+    BattleUnitState unit = ((BattleQuerySuccess<BattleUnitState>)unitResult).Value;
     if (unit.Side != activeSide)
-      return new UnitActionContext(null, BattleActionEvaluation.Rejected(mutation, $"{unit.Combatant.Name} is not on the active side.", actionPointCost: actionPointCost));
-    if (!_session.IsUnitStillAvailableThisTurn(unitId))
-      return new UnitActionContext(null, BattleActionEvaluation.Rejected(mutation, $"{unit.Combatant.Name} is no longer available this turn.", actionPointCost: actionPointCost));
+      return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(mutation, $"{unit.Combatant.Name} is not on the active side.", actionPointCost: actionPointCost));
+
+    BattleQueryResult<bool> availableResult = _session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitId));
+    if (availableResult is BattleQueryFailureResult<bool> availableFailure)
+    {
+      return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(
+        mutation,
+        availableFailure.Failure.Message,
+        ToMutationFailureReason(availableFailure.Failure),
+        actionPointCost));
+    }
+
+    if (!((BattleQuerySuccess<bool>)availableResult).Value)
+      return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(mutation, $"{unit.Combatant.Name} is no longer available this turn.", actionPointCost: actionPointCost));
     if (unit.CurrentActionPoints < actionPointCost)
-      return new UnitActionContext(
-        null,
+      return new InvalidUnitActionContext(
         BattleActionEvaluation.Rejected(
           mutation,
           $"{unit.Combatant.Name} needs {actionPointCost} action points but only has {unit.CurrentActionPoints}.",
           actionPointCost: actionPointCost));
 
-    return new UnitActionContext(unit, null);
+    return new ValidUnitActionContext(unit);
+  }
+
+  private static BattleMutationFailureReason ToMutationFailureReason(BattleQueryFailure failure)
+  {
+    ArgumentNullException.ThrowIfNull(failure);
+
+    return failure.Reason == BattleQueryFailureReason.UnexpectedError
+      ? BattleMutationFailureReason.UnexpectedError
+      : BattleMutationFailureReason.Rejected;
   }
 
   private static int GetActionPointCost(BattleSessionMutation mutation)

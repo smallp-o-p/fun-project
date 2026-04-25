@@ -1,4 +1,3 @@
-#nullable enable
 using FunProject.Combatants;
 using FunProject.Weapons;
 using Godot;
@@ -31,6 +30,7 @@ public sealed class BattleSession
   private int _nextUnitId = 1;
 
   public BattleBoardState Board { get; }
+  public BattleQueryRunner Queries { get; }
   public BattlePhase Phase { get; private set; } = BattlePhase.Setup;
   public int TurnNumber { get; private set; } = 1;
   public Faction ActiveSide { get; private set; }
@@ -40,7 +40,7 @@ public sealed class BattleSession
   public IReadOnlyCollection<Faction> TurnQueue => _turnQueue;
   public IReadOnlyDictionary<Faction, IReadOnlyList<Combatant>> FactionRosters => _factionRosters;
 
-  public event Action<BattleEvent>? EventRaised;
+  public event Action<BattleEvent> EventRaised;
 
   public BattleSession(
     BattleBoardState board,
@@ -48,6 +48,8 @@ public sealed class BattleSession
     IDictionary<Faction, IEnumerable<Combatant>> factionRosters)
   {
     Board = board;
+
+    Queries = new BattleQueryRunner(this);
 
     foreach (var faction in globalFactionOrder)
     {
@@ -73,94 +75,14 @@ public sealed class BattleSession
     ActiveSide = _turnQueue.Peek();
   }
 
-  public IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
+  internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
   {
     return _aliveUnitsByFaction.TryGetValue(side, out var units) ? units : [];
   }
 
-  public IEnumerable<BattleUnitState> GetFactionDeadUnits(Faction side)
-  {
-    return _deadUnits.Where(unit => unit.Side == side);
-  }
-
-  public bool IsUnitStillAvailableThisTurn(int unitId)
+  internal bool IsUnitStillAvailableThisTurn(int unitId)
   {
     return _activeFactionUnitsAvailable.Contains(unitId);
-  }
-
-  public bool CanUnitActNow(int unitId)
-  {
-    var unit = GetLivingUnitOrNull(unitId);
-    return unit != null && CanUnitActNow(unit);
-  }
-
-  public bool IsUnitVisibleToUnit(int observerUnitId, int targetUnitId)
-  {
-    var observer = GetLivingUnitOrNull(observerUnitId);
-    var target = GetLivingUnitOrNull(targetUnitId);
-    if (observer == null)
-      throw new InvalidOperationException($"Observer unit ID {observerUnitId} is invalid");
-    if (target == null)
-      throw new InvalidOperationException($"Checking visibility to invalid unit ID ${targetUnitId}");
-
-    return observerUnitId == targetUnitId || _visibilitySnapshot
-      .GetVisibleUnitsForObserverOrEmpty(observerUnitId)
-      .Contains(targetUnitId);
-  }
-
-  public bool IsUnitVisibleToFaction(Faction faction, int targetUnitId)
-  {
-    var target = GetLivingUnitOrNull(targetUnitId);
-    if (target == null)
-      return false;
-    if (target.Side == faction)
-      return true;
-
-    return _visibilitySnapshot
-      .GetFactionStateOrEmpty(faction)
-      .VisibleForeignUnitIds
-      .Contains(targetUnitId);
-  }
-
-  public bool IsTileVisibleToFaction(Faction faction, Vector3I tile)
-  {
-    if (!Board.IsInBounds(tile))
-      throw new InvalidOperationException($"Attempted to check visiblity on invalid tile ${tile}");
-
-    return _visibilitySnapshot
-      .GetFactionStateOrEmpty(faction)
-      .VisibleTiles
-      .Contains(tile);
-  }
-
-  public bool HasFactionExploredTile(Faction faction, Vector3I tile)
-  {
-    if (!Board.IsInBounds(tile))
-      throw new InvalidOperationException($"Attempted to check visiblity on invalid tile ${tile}");
-
-    return _visibilitySnapshot
-      .GetFactionStateOrEmpty(faction)
-      .ExploredTiles
-      .Contains(tile);
-  }
-
-  public IEnumerable<BattleUnitState> GetVisibleUnitsForFaction(Faction faction)
-  {
-    var visibleForeignUnitIds = _visibilitySnapshot
-      .GetFactionStateOrEmpty(faction)
-      .VisibleForeignUnitIds;
-
-    return AliveUnits.Where(unit => unit.Side == faction || visibleForeignUnitIds.Contains(unit.UnitId));
-  }
-
-  public IEnumerable<Vector3I> GetVisibleTilesForFaction(Faction faction)
-  {
-    return _visibilitySnapshot.GetFactionStateOrEmpty(faction).VisibleTiles;
-  }
-
-  public IEnumerable<Vector3I> GetExploredTilesForFaction(Faction faction)
-  {
-    return _visibilitySnapshot.GetFactionStateOrEmpty(faction).ExploredTiles;
   }
 
   internal bool TryStartBattle()
@@ -187,10 +109,8 @@ public sealed class BattleSession
     return true;
   }
 
-  internal BattleUnitState AddUnit(Combatant combatant, Vector3I position, Weapon? equippedWeapon = null)
+  internal BattleUnitState AddUnit(Combatant combatant, Vector3I position, Weapon equippedWeapon = null)
   {
-    ArgumentNullException.ThrowIfNull(combatant);
-
     var unit = new BattleUnitState(_nextUnitId++, combatant, position, equippedWeapon);
     bool occupantSet = Board.TryPlaceOccupant(unit.Position, unit.UnitId);
     if (!occupantSet)
@@ -312,12 +232,12 @@ public sealed class BattleSession
     _turnQueue.Enqueue(unit.Side);
   }
 
-  internal BattleUnitState? GetUnitOrNull(int unitId)
+  internal BattleUnitState GetUnitOrNull(int unitId)
   {
     return GetLivingUnitOrNull(unitId) ?? _deadUnits.FirstOrDefault(unit => unit.UnitId == unitId);
   }
 
-  internal BattleUnitState? GetLivingUnitOrNull(int unitId)
+  internal BattleUnitState GetLivingUnitOrNull(int unitId)
   {
     return AliveUnits.FirstOrDefault(unit => unit.UnitId == unitId);
   }
@@ -355,6 +275,8 @@ public sealed class BattleSession
   {
     return _aliveUnitsByFaction.TryGetValue(side, out var units) && units.Count > 0;
   }
+
+  internal BattleVisibilitySnapshot VisibilitySnapshot => _visibilitySnapshot;
 
   internal void RefreshCurrentFactionAvailability()
   {

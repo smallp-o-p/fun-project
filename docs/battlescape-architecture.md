@@ -1,6 +1,6 @@
 # Battlescape Tactical Runtime Architecture
 
-This document describes the current tactical runtime shape in the repo and the nearby extensions it is designed to support. It reflects the battle code as it exists now, not the older pre-command session design.
+This document describes the tactical runtime shape in the repo and the nearby extensions it is designed to support. It reflects the current command-based session design and typed read-side query interface.
 
 ## Design Goals
 
@@ -8,6 +8,8 @@ This document describes the current tactical runtime shape in the repo and the n
 - `BattleSession` is constructed from battle setup data: a prepared board state, stable faction order, and faction rosters.
 - `BattleSessionMutation` is the authoritative command layer.
 - `BattleActionExecutor` validates and invokes queued `BattleSessionMutation` values.
+- Read-side battle questions are represented as typed query objects, executed through a single query runner.
+- Controllers, HUD code, and AI should ask battle-state questions through explicit query types instead of accumulating public query methods on `BattleSession`.
 - Godot scene nodes own presentation, input, and focused-unit UX. They do not own tactical truth.
 - Board coordinates use normal `Godot.Vector3I` semantics:
   - `X` = width
@@ -36,6 +38,8 @@ flowchart LR
         EventStream["BattleEvent stream"]
         Mutations["BattleSessionMutation\nexecutable commands"]
         ActionExecutor["BattleActionExecutor\nmutation queue + invocation"]
+        Queries["BattleSessionQuery<TResult>\ntyped read questions"]
+        QueryRunner["BattleQueryRunner\nread-query invocation"]
     end
 
     subgraph Presentation["Godot Presentation / Input"]
@@ -52,15 +56,19 @@ flowchart LR
     BattleSession --- EventStream
     VisibilitySystem -->|"rebuild"| VisibilityState
     Mutations -->|"refresh on success"| VisibilitySystem
+    Queries -->|"read only"| BattleSession
+    Queries -->|"read only"| BoardState
+    Queries -->|"read only"| VisibilityState
 
     HUD -->|"player request"| SceneController
     BattleScene -->|"selection / hover / click"| SceneController
     SceneController -->|"translate to mutation"| ActionExecutor
+    SceneController -->|"ask typed query"| QueryRunner
 
     ActionExecutor -->|"invoke"| Mutations
     Mutations -->|"execute against"| BattleSession
+    QueryRunner -->|"invoke"| Queries
 
-    BattleSession -->|"query only"| SceneController
     EventStream --> BattleScene
     EventStream --> HUD
 ```
@@ -95,15 +103,24 @@ flowchart LR
   - invocation order
   - last-result tracking
   - exception isolation around command execution
+- `BattleQueryRunner` owns:
+  - the single public entry point for read-side tactical questions
+  - null checks on submitted query objects
+  - invoking typed query objects against the current session
+- concrete `BattleSessionQuery<TResult>` classes own:
+  - one specific read-side question
+  - the result type and failure semantics for that question
+  - any query-specific composition across session, board, visibility, or unit state
 - `BattleSceneController`, `BattleScene`, and HUD own:
   - focused / selected unit UX
   - previews
   - camera behavior
   - presentation timing
 - `BattleSession` does not track a selected unit. Selection is presentation state.
+- `BattleSession` should not grow a public method for every controller, HUD, or AI question.
 - Inventory currently lives on `BattleUnitState`. There is no separate `BattleItemState` runtime layer yet.
 
-## Current Implemented Runtime
+## Runtime Components
 
 ### BattleSession
 
@@ -127,7 +144,7 @@ It is initialized with:
 
 The configured faction order must contain at least one faction after rosters are included. The setup turn queue and `ActiveSide` are initialized from the first faction in that order.
 
-The session currently owns:
+The session owns:
 
 - creating runtime unit ids
 - moving units between alive and dead storage
@@ -136,12 +153,71 @@ The session currently owns:
 - refreshing action-point availability for the active side
 - rebuilding faction visibility after successful mutations
 - ending the battle when no living factions remain
-- exposing visibility queries such as:
-  - `IsUnitVisibleToUnit(...)`
-  - `IsUnitVisibleToFaction(...)`
-  - `IsTileVisibleToFaction(...)`
-  - `HasFactionExploredTile(...)`
-  - `GetVisibleUnitsForFaction(...)`
+
+The target public read-side surface is a query runner, not a growing method list:
+
+```csharp
+var result = session.Queries.Execute(new SomeBattleQuery(...));
+```
+
+The session may keep internal helpers for commands and query objects, but controllers and AI should not depend on those helpers directly.
+
+### BattleSessionQuery
+
+Read-side tactical questions should be modeled as typed query objects.
+
+Current base shape:
+
+```csharp
+public abstract class BattleSessionQuery<TResult>
+{
+  public string QueryId { get; }
+
+  protected BattleSessionQuery(string queryId)
+  {
+    if (string.IsNullOrWhiteSpace(queryId))
+      throw new ArgumentException("Query id cannot be null or whitespace.", nameof(queryId));
+
+    QueryId = queryId;
+  }
+
+  internal abstract BattleQueryResult<TResult> Execute(BattleSession session);
+}
+```
+
+Current runner shape:
+
+```csharp
+public sealed class BattleQueryRunner
+{
+  private readonly BattleSession _session;
+
+  internal BattleQueryRunner(BattleSession session)
+  {
+    _session = session ?? throw new ArgumentNullException(nameof(session));
+  }
+
+  public BattleQueryResult<TResult> Execute<TResult>(BattleSessionQuery<TResult> query)
+  {
+    ArgumentNullException.ThrowIfNull(query);
+    return query.Execute(_session);
+  }
+}
+```
+
+`BattleQueryResult<TResult>` has explicit success and failure shapes. Query callers should handle `BattleQueryFailureResult<TResult>` before using a `BattleQuerySuccess<TResult>.Value`; missing units, invalid tiles, and invalid battle-state questions are failures, not nullable query values.
+
+Example query types:
+
+- `FindPathForUnit`
+- `GetPossibleMoveTilesForUnit`
+- `GetVisibleEnemiesForUnit`
+- `GetVisibleUnitsForFaction`
+- `CanUnitActNow`
+- `IsTileVisibleToFaction`
+- `GetFactionAliveUnits`
+
+Each query should encode one question. Avoid catch-all query classes with enum modes, nullable selector fields, or behavior controlled by unrelated properties. If a query algorithm becomes complex or variable, use a strategy behind that specific query rather than turning the query runner into a dispatch switch.
 
 ### BattleBoardState
 
@@ -153,7 +229,7 @@ The session currently owns:
 - `FindPath(...)`
 - `IsAdjacent(...)`
 
-Pathfinding is currently integrated directly into the board through Godot `AStar3D`. Scene controllers, HUD preview code, and AI can query the board for a path, then pass the chosen path into `MoveUnit`. If path rules become substantially more unit-specific later, this can still be extracted behind a dedicated pathfinder service without changing the player-facing flow.
+Pathfinding is currently integrated directly into the board through Godot `AStar3D`. Query objects should be the controller-facing surface for unit-specific path questions, for example `FindPathForUnit` and `GetPossibleMoveTilesForUnit`. If path rules become substantially more unit-specific later, this can be extracted behind a movement-query strategy without changing the controller-facing query contract.
 
 ### BattleVisibilitySystem
 
@@ -230,6 +306,7 @@ sequenceDiagram
     actor Player
     participant HUD as Battle HUD
     participant Controller as BattleSceneController
+    participant Queries as BattleQueryRunner
     participant Exec as BattleActionExecutor
     participant Mutation as MoveUnit
     participant Session as BattleSession
@@ -239,7 +316,10 @@ sequenceDiagram
 
     Player->>HUD: Confirm move
     HUD->>Controller: Move request
-    Controller->>Board: Query preview path
+    Controller->>Queries: Execute FindPathForUnit query
+    Queries->>Session: Read unit state
+    Queries->>Board: FindPath
+    Queries-->>Controller: Return path
     Controller->>Exec: Evaluate move mutation
     Exec->>Session: Validate active side, AP, unit availability
     Exec->>Board: Validate adjacency, occupancy, and path legality
@@ -287,10 +367,12 @@ These systems are still part of the intended architecture, but they are not impl
 - `BattleRules`
 - `BattleEffectSystem`
 - `BattleAIController`
+- movement-query strategies
+- targeting-query strategies
 
 When they are added, they should follow these rules:
 
-- read session state directly instead of duplicating tactical truth
+- read battle state through typed query objects instead of duplicating tactical truth
 - commit tactical changes through explicit session helpers and mutation execution
 - emit structured battle events instead of mutating scene nodes directly
 - keep presentation-only concerns out of the authoritative runtime
@@ -306,6 +388,10 @@ Use these names consistently in future tactical work:
 - `BattleMutationResult`
 - `BattleActionExecutor`
 - `BattleActionEvaluation`
+- `BattleSessionQuery<TResult>`
+- `BattleQueryRunner`
+- `BattleQueryResult<TResult>`
+- `BattleQueryFailure`
 - `BattleBoardState`
 - `BattleTileState`
 - `BattleUnitState`
@@ -316,4 +402,5 @@ Detailed design notes:
 
 - [BattleActionExecutor Design](./battle-action-executor.md)
 - [BattleSession Command Pattern](./battle-session-command-pattern.md)
+- [Battle Query Interface Implementation Plan](./battle-query-interface-implementation-plan.md)
 - [Battlescape Tile System Design](./battlescape-tile-system.md)
