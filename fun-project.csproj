@@ -8,7 +8,8 @@
     <RunSettingsFilePath>$(MSBuildThisFileDirectory).runsettings</RunSettingsFilePath>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="gdUnit4.api" Version="5.0.0"/>
-    <PackageReference Include="gdUnit4.test.adapter" Version="3.0.0"/>
+    <PackageReference Include="gdUnit4.api" Version="5.0.0" />
+    <PackageReference Include="gdUnit4.test.adapter" Version="3.0.0" />
+    <PackageReference Include="LanguageExt.Core" Version="5.0.0-beta-77" />
   </ItemGroup>
 </Project>

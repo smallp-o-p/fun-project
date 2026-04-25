@@ -31,14 +31,14 @@ public sealed class BattleSession
   public const int DefaultMovementStepActionPointCost = 1;
   private static readonly BattleVisibilitySystem VisibilitySystem = new();
 
-  private readonly Dictionary<Faction, HashSet<BattleUnitState>> _aliveUnitsByFaction = [];
+  private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleUnitState>> _aliveUnitsByFaction = [];
   private readonly Dictionary<Faction, IReadOnlyList<Combatant>> _factionRosters = [];
   private readonly Dictionary<BattleUnitHandle, BattleUnitState> _unitsByHandle = [];
   private readonly List<BattleUnitState> _deadUnits = [];
   private readonly Queue<Faction> _globalFactionOrder = [];
   private Queue<Faction> _turnQueue = [];
-  private readonly HashSet<Faction> _sidesActedThisRound = [];
-  private readonly HashSet<int> _activeFactionUnitsAvailable = [];
+  private readonly SysColGeneric.HashSet<Faction> _sidesActedThisRound = [];
+  private readonly SysColGeneric.HashSet<int> _activeFactionUnitsAvailable = [];
   private BattleVisibilitySnapshot _visibilitySnapshot = BattleVisibilitySnapshot.Empty;
   private int _nextUnitId = 1;
 

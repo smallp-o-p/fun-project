@@ -128,7 +128,7 @@ public sealed class BattleBoardState
       restoreSourceDisabled = true;
     }
 
-    Vector3I[] path = Array.ConvertAll(_pathGraph.GetIdPath(sourceId, destinationId), PointIdToCoordinates);
+    Vector3I[] path = System.Array.ConvertAll(_pathGraph.GetIdPath(sourceId, destinationId), PointIdToCoordinates);
     if (restoreSourceDisabled)
       _pathGraph.SetPointDisabled(sourceId, ShouldDisablePathPoint(sourceTile));
 
