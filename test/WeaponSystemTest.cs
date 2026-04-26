@@ -77,7 +77,7 @@ public class WeaponSystemTest
   public void MeleeWeaponStatsDictionaryHasNoAmmoEntry()
   {
     var weapon = new MeleeWeapon(MakeWeaponData());
-    Assert.False(weapon.TryGetStat<AmmunitionStat>(out _));
+    Assert.True(weapon.TryGetStat<AmmunitionStat>().IsNone);
   }
 
   [TestCase(TestName = "Weapon generic stat lookup returns concrete stats")]
@@ -86,9 +86,10 @@ public class WeaponSystemTest
     var weapon = new MeleeWeapon(MakeWeaponData());
 
     Assert.Equal(10, weapon.GetStat<DamageStat>().BaseValue);
-    Assert.True(weapon.TryGetStat<RangeStat>(out var range));
-    Assert.Equal(1, range.BaseValue);
-    Assert.False(weapon.TryGetStat<HealthStat>(out _));
+    Option<RangeStat> range = weapon.TryGetStat<RangeStat>();
+    Assert.True(range.IsSome);
+    Assert.Equal(1, range.RequireSome().BaseValue);
+    Assert.True(weapon.TryGetStat<HealthStat>().IsNone);
   }
 
   [TestCase(TestName = "Weapon Type-based stat lookup returns stat instances")]
@@ -96,10 +97,11 @@ public class WeaponSystemTest
   {
     var weapon = new FirearmWeapon(MakeFirearmWeaponData());
 
-    Assert.True(weapon.TryGetStat(typeof(AmmunitionStat), out var ammoStat));
-    Assert.Equal(12, ammoStat.BaseValue);
-    Assert.True(ammoStat is AmmunitionStat);
-    Assert.False(weapon.TryGetStat(typeof(HealthStat), out _));
+    Option<Stat> ammoStat = weapon.TryGetStat(typeof(AmmunitionStat));
+    Assert.True(ammoStat.IsSome);
+    Assert.Equal(12, ammoStat.RequireSome().BaseValue);
+    Assert.True(ammoStat.RequireSome() is AmmunitionStat);
+    Assert.True(weapon.TryGetStat(typeof(HealthStat)).IsNone);
   }
 
   [TestCase(TestName = "Combatant exposes all concrete stat types through lookup")]
@@ -121,8 +123,9 @@ public class WeaponSystemTest
     Assert.Equal(20, combatant.GetStat<HealthStat>().BaseValue);
     Assert.Equal(20, combatant.GetStat<VisionStat>().BaseValue);
     Assert.Equal(65, combatant.GetStat<AimStat>().BaseValue);
-    Assert.True(combatant.TryGetStat(typeof(BaseArmorStat), out var armorStat));
-    Assert.Equal(3, armorStat.BaseValue);
+    Option<Stat> armorStat = combatant.TryGetStat(typeof(BaseArmorStat));
+    Assert.True(armorStat.IsSome);
+    Assert.Equal(3, armorStat.RequireSome().BaseValue);
   }
 
   [TestCase(TestName = "ModSlot starts empty")]
@@ -140,7 +143,7 @@ public class WeaponSystemTest
     slot.Equip(mod);
     Assert.True(slot.HasMod);
     var returned = slot.Unequip();
-    Assert.Equal(mod, returned);
+    Assert.Equal(mod, returned.RequireSome());
     Assert.False(slot.HasMod);
   }
 
@@ -275,7 +278,7 @@ public class WeaponSystemTest
     });
 
     var slot = weapon.GetModSlots()[0];
-    Assert.Equal((data.DamageStat.BaseValue * 1.2) + 5, slot.EquippedMod!.GetAppliedStat<DamageStat>(weapon));
+    Assert.Equal((data.DamageStat.BaseValue * 1.2) + 5, slot.EquippedMod.RequireSome().GetAppliedStat<DamageStat>(weapon));
   }
 
   [TestCase(TestName = "Weapon mod slot can equip multi-stat mod")]
@@ -294,8 +297,8 @@ public class WeaponSystemTest
     });
 
     var slot = weapon.GetModSlots()[0];
-    Assert.Equal(data.DamageStat.BaseValue + 2, slot.EquippedMod!.GetAppliedStat<DamageStat>(weapon));
-    Assert.Equal(data.RangeStat.BaseValue + 6, slot.EquippedMod!.GetAppliedStat<RangeStat>(weapon));
+    Assert.Equal(data.DamageStat.BaseValue + 2, slot.EquippedMod.RequireSome().GetAppliedStat<DamageStat>(weapon));
+    Assert.Equal(data.RangeStat.BaseValue + 6, slot.EquippedMod.RequireSome().GetAppliedStat<RangeStat>(weapon));
   }
 
   [TestCase(TestName = "All damage elements are valid enum values")]
@@ -391,17 +394,17 @@ public class WeaponSystemTest
     data.ModSlotCount = 2;
 
     var weapon = new FirearmWeapon(data);
-    weapon.GetModSlots()[0].EquippedMod = new RangeEquippableStatMod
+    weapon.GetModSlots()[0].EquippedMod = Some<EquippableMod>(new RangeEquippableStatMod
     {
       Modifiers = [StatModifier.Add(10)],
-    };
-    weapon.GetModSlots()[1].EquippedMod = new DamageEquippableStatMod
+    });
+    weapon.GetModSlots()[1].EquippedMod = Some<EquippableMod>(new DamageEquippableStatMod
     {
       Modifiers = [StatModifier.Multiply(1.5f)],
-    };
+    });
 
-    Assert.Equal(data.RangeStat.BaseValue + 10, weapon.GetModSlots()[0].EquippedMod!.GetAppliedStat<RangeStat>(weapon));
-    Assert.Equal(data.DamageStat.BaseValue * 1.5, weapon.GetModSlots()[1].EquippedMod!.GetAppliedStat<DamageStat>(weapon));
+    Assert.Equal(data.RangeStat.BaseValue + 10, weapon.GetModSlots()[0].EquippedMod.RequireSome().GetAppliedStat<RangeStat>(weapon));
+    Assert.Equal(data.DamageStat.BaseValue * 1.5, weapon.GetModSlots()[1].EquippedMod.RequireSome().GetAppliedStat<DamageStat>(weapon));
   }
 
   [TestCase(TestName = "Multiply by zero zeroes the value")]

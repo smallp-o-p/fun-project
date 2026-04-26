@@ -25,26 +25,28 @@ public class Weapon : EquippableItem, HasStats
 
   public int NumModslots() => ModSlots.Count;
 
-  public bool TryGetStat(Type statType, out Stat stat) => _stats.TryGetValue(statType, out stat);
+  public Option<Stat> TryGetStat(Type statType)
+  {
+    return _stats.TryGetValue(statType, out var stat)
+      ? Some(stat)
+      : None;
+  }
 
-  public bool TryGetStat<TStat>(out TStat stat) where TStat : Stat
+  public Option<TStat> TryGetStat<TStat>() where TStat : Stat
   {
     if (_stats.TryGetValue(typeof(TStat), out var foundStat))
     {
-      stat = (TStat)foundStat;
-      return true;
+      return Some((TStat)foundStat);
     }
 
-    stat = null!;
-    return false;
+    return None;
   }
 
   public TStat GetStat<TStat>() where TStat : Stat
   {
-    if (TryGetStat<TStat>(out var stat))
-      return stat;
-
-    throw new InvalidOperationException();
+    return TryGetStat<TStat>().Match(
+      stat => stat,
+      () => throw new InvalidOperationException());
   }
 
   public DamageStat GetDamageStat() => GetStat<DamageStat>();

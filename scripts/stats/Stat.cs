@@ -10,7 +10,7 @@ public abstract partial class Stat : Resource
 
 public interface HasStats
 {
-  bool TryGetStat(Type statType, out Stat stat);
-  bool TryGetStat<TStat>(out TStat stat) where TStat : Stat;
+  Option<Stat> TryGetStat(Type statType);
+  Option<TStat> TryGetStat<TStat>() where TStat : Stat;
   TStat GetStat<TStat>() where TStat : Stat;
 }

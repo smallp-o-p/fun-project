@@ -11,22 +11,20 @@ public abstract partial class EquippableMod : Resource
 
   public abstract Dictionary<Type, float> Apply(HasStats statStick);
 
-  public bool TryGetAppliedStat<TStat>(HasStats statStick, out float value)
+  public Option<float> TryGetAppliedStat<TStat>(HasStats statStick)
     where TStat : Stat
   {
-    if (Apply(statStick).TryGetValue(typeof(TStat), out value))
-      return true;
+    if (Apply(statStick).TryGetValue(typeof(TStat), out var value))
+      return Some(value);
 
-    value = 0f;
-    return false;
+    return None;
   }
 
   public float GetAppliedStat<TStat>(HasStats statStick)
     where TStat : Stat
   {
-    if (TryGetAppliedStat<TStat>(statStick, out var value))
-      return value;
-
-    throw new InvalidOperationException();
+    return TryGetAppliedStat<TStat>(statStick).Match(
+      value => value,
+      () => throw new InvalidOperationException());
   }
 }

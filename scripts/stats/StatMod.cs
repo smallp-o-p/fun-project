@@ -19,8 +19,9 @@ public abstract partial class StatMod : Resource
 
   public float Apply(HasStats statStick)
   {
-    if (!statStick.TryGetStat(TargetStatType, out var stat))
-      throw new InvalidOperationException();
+    Stat stat = statStick.TryGetStat(TargetStatType).Match(
+      foundStat => foundStat,
+      () => throw new InvalidOperationException());
 
     float value = stat.BaseValue;
     foreach (var m in Modifiers)
