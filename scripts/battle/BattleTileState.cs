@@ -1,4 +1,3 @@
-#nullable enable
 using Godot;
 using System;
 
@@ -18,15 +17,15 @@ public sealed class BattleTileState
         return;
 
       _isWalkable = value;
-      TraversalStateChanged?.Invoke(this);
+      TraversalStateChanged.Invoke(this);
     }
   }
   public bool BlocksLineOfSight { get; set; }
   public bool HasHazard { get; set; }
-  public int? OccupantUnitId { get; private set; }
-  public bool IsOccupied => OccupantUnitId.HasValue;
+  public Option<int> OccupantUnitId { get; private set; }
+  public bool IsOccupied => OccupantUnitId.IsSome;
 
-  public event Action<BattleTileState>? TraversalStateChanged;
+  public event Action<BattleTileState> TraversalStateChanged = delegate { };
 
   public BattleTileState(Vector3I coordinates)
   {
@@ -35,20 +34,27 @@ public sealed class BattleTileState
 
   public bool TrySetOccupant(int unitId)
   {
-    if (OccupantUnitId.HasValue || !IsWalkable)
+    if (OccupantUnitId.IsSome || !IsWalkable)
       return false;
 
-    OccupantUnitId = unitId;
-    TraversalStateChanged?.Invoke(this);
+    OccupantUnitId = Some(unitId);
+    TraversalStateChanged.Invoke(this);
     return true;
+  }
+
+  public bool HasOccupant(int unitId)
+  {
+    return OccupantUnitId.Match(
+      occupantUnitId => occupantUnitId == unitId,
+      () => false);
   }
 
   public void ClearOccupant()
   {
-    if (!OccupantUnitId.HasValue)
+    if (OccupantUnitId.IsNone)
       return;
 
-    OccupantUnitId = null;
-    TraversalStateChanged?.Invoke(this);
+    OccupantUnitId = None;
+    TraversalStateChanged.Invoke(this);
   }
 }

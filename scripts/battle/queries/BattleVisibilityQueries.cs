@@ -17,8 +17,10 @@ public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>
   public IsUnitVisibleToUnit(BattleSession.BattleUnitHandle observerUnitHandle, BattleSession.BattleUnitHandle targetUnitHandle)
     : base(Id)
   {
-    ObserverUnitHandle = observerUnitHandle ?? throw new ArgumentNullException(nameof(observerUnitHandle));
-    TargetUnitHandle = targetUnitHandle ?? throw new ArgumentNullException(nameof(targetUnitHandle));
+    ArgumentNullException.ThrowIfNull(observerUnitHandle);
+    ArgumentNullException.ThrowIfNull(targetUnitHandle);
+    ObserverUnitHandle = observerUnitHandle;
+    TargetUnitHandle = targetUnitHandle;
   }
 
   internal override BattleQueryResult<bool> Execute(BattleSession session)
@@ -53,8 +55,10 @@ public sealed class IsUnitVisibleToFaction : BattleSessionQuery<bool>
   public IsUnitVisibleToFaction(Faction faction, BattleSession.BattleUnitHandle targetUnitHandle)
     : base(Id)
   {
-    Faction = faction ?? throw new ArgumentNullException(nameof(faction));
-    TargetUnitHandle = targetUnitHandle ?? throw new ArgumentNullException(nameof(targetUnitHandle));
+    ArgumentNullException.ThrowIfNull(faction);
+    ArgumentNullException.ThrowIfNull(targetUnitHandle);
+    Faction = faction;
+    TargetUnitHandle = targetUnitHandle;
   }
 
   internal override BattleQueryResult<bool> Execute(BattleSession session)
@@ -86,7 +90,8 @@ public sealed class IsTileVisibleToFaction : BattleSessionQuery<bool>
   public IsTileVisibleToFaction(Faction faction, Vector3I tile)
     : base(Id)
   {
-    Faction = faction ?? throw new ArgumentNullException(nameof(faction));
+    ArgumentNullException.ThrowIfNull(faction);
+    Faction = faction;
     Tile = tile;
   }
 
@@ -114,7 +119,8 @@ public sealed class HasFactionExploredTile : BattleSessionQuery<bool>
   public HasFactionExploredTile(Faction faction, Vector3I tile)
     : base(Id)
   {
-    Faction = faction ?? throw new ArgumentNullException(nameof(faction));
+    ArgumentNullException.ThrowIfNull(faction);
+    Faction = faction;
     Tile = tile;
   }
 
@@ -142,7 +148,8 @@ public sealed class GetVisibleUnitsForUnit : BattleSessionQuery<IReadOnlyCollect
   public GetVisibleUnitsForUnit(BattleSession.BattleUnitHandle observerUnitHandle)
     : base(Id)
   {
-    ObserverUnitHandle = observerUnitHandle ?? throw new ArgumentNullException(nameof(observerUnitHandle));
+    ArgumentNullException.ThrowIfNull(observerUnitHandle);
+    ObserverUnitHandle = observerUnitHandle;
   }
 
   internal override BattleQueryResult<IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
@@ -170,7 +177,8 @@ public sealed class GetVisibleEnemiesForUnit : BattleSessionQuery<IReadOnlyColle
   public GetVisibleEnemiesForUnit(BattleSession.BattleUnitHandle observerUnitHandle)
     : base(Id)
   {
-    ObserverUnitHandle = observerUnitHandle ?? throw new ArgumentNullException(nameof(observerUnitHandle));
+    ArgumentNullException.ThrowIfNull(observerUnitHandle);
+    ObserverUnitHandle = observerUnitHandle;
   }
 
   internal override BattleQueryResult<IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
@@ -198,7 +206,8 @@ public sealed class GetVisibleUnitsForFaction : BattleSessionQuery<IReadOnlyColl
   public GetVisibleUnitsForFaction(Faction faction)
     : base(Id)
   {
-    Faction = faction ?? throw new ArgumentNullException(nameof(faction));
+    ArgumentNullException.ThrowIfNull(faction);
+    Faction = faction;
   }
 
   internal override BattleQueryResult<IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
@@ -224,7 +233,8 @@ public sealed class GetVisibleTilesForFaction : BattleSessionQuery<IReadOnlyColl
   public GetVisibleTilesForFaction(Faction faction)
     : base(Id)
   {
-    Faction = faction ?? throw new ArgumentNullException(nameof(faction));
+    ArgumentNullException.ThrowIfNull(faction);
+    Faction = faction;
   }
 
   internal override BattleQueryResult<IReadOnlyCollection<Vector3I>> Execute(BattleSession session)
@@ -243,7 +253,8 @@ public sealed class GetExploredTilesForFaction : BattleSessionQuery<IReadOnlyCol
   public GetExploredTilesForFaction(Faction faction)
     : base(Id)
   {
-    Faction = faction ?? throw new ArgumentNullException(nameof(faction));
+    ArgumentNullException.ThrowIfNull(faction);
+    Faction = faction;
   }
 
   internal override BattleQueryResult<IReadOnlyCollection<Vector3I>> Execute(BattleSession session)

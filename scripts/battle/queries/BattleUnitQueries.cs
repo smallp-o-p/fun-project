@@ -14,18 +14,17 @@ public sealed class GetUnit : BattleSessionQuery<BattleUnitState>
   public GetUnit(BattleSession.BattleUnitHandle unitHandle)
     : base(Id)
   {
-    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
+    ArgumentNullException.ThrowIfNull(unitHandle);
+    UnitHandle = unitHandle;
   }
 
   internal override BattleQueryResult<BattleUnitState> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    var unit = session.GetUnitOrNull(UnitHandle);
-    if (unit == null)
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitHandle.UnitId}.");
-
-    return Succeed(unit);
+    return session.GetUnit(UnitHandle).Match(
+      Succeed,
+      () => Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitHandle.UnitId}."));
   }
 }
 
@@ -38,22 +37,19 @@ public sealed class GetLivingUnit : BattleSessionQuery<BattleUnitState>
   public GetLivingUnit(BattleSession.BattleUnitHandle unitHandle)
     : base(Id)
   {
-    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
+    ArgumentNullException.ThrowIfNull(unitHandle);
+    UnitHandle = unitHandle;
   }
 
   internal override BattleQueryResult<BattleUnitState> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    var unit = session.GetLivingUnitOrNull(UnitHandle);
-    if (unit != null)
-      return Succeed(unit);
-
-    var trackedUnit = session.GetUnitOrNull(UnitHandle);
-    if (trackedUnit == null)
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitHandle.UnitId}.");
-
-    return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {UnitHandle.UnitId} is not alive.");
+    return session.GetLivingUnit(UnitHandle).Match(
+      Succeed,
+      () => session.GetUnit(UnitHandle).Match(
+        _ => Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {UnitHandle.UnitId} is not alive."),
+        () => Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitHandle.UnitId}.")));
   }
 }
 
@@ -66,7 +62,8 @@ public sealed class GetFactionAliveUnits : BattleSessionQuery<IReadOnlyCollectio
   public GetFactionAliveUnits(Faction side)
     : base(Id)
   {
-    Side = side ?? throw new ArgumentNullException(nameof(side));
+    ArgumentNullException.ThrowIfNull(side);
+    Side = side;
   }
 
   internal override BattleQueryResult<IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
@@ -85,7 +82,8 @@ public sealed class GetFactionDeadUnits : BattleSessionQuery<IReadOnlyCollection
   public GetFactionDeadUnits(Faction side)
     : base(Id)
   {
-    Side = side ?? throw new ArgumentNullException(nameof(side));
+    ArgumentNullException.ThrowIfNull(side);
+    Side = side;
   }
 
   internal override BattleQueryResult<IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
@@ -103,7 +101,8 @@ public sealed class CanUnitActNow : BattleSessionQuery<bool>
   public CanUnitActNow(BattleSession.BattleUnitHandle unitHandle)
     : base(Id)
   {
-    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
+    ArgumentNullException.ThrowIfNull(unitHandle);
+    UnitHandle = unitHandle;
   }
 
   internal override BattleQueryResult<bool> Execute(BattleSession session)
@@ -131,7 +130,8 @@ public sealed class IsUnitStillAvailableThisTurn : BattleSessionQuery<bool>
   public IsUnitStillAvailableThisTurn(BattleSession.BattleUnitHandle unitHandle)
     : base(Id)
   {
-    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
+    ArgumentNullException.ThrowIfNull(unitHandle);
+    UnitHandle = unitHandle;
   }
 
   internal override BattleQueryResult<bool> Execute(BattleSession session)

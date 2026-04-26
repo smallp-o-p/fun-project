@@ -14,7 +14,8 @@ public sealed class FindPathForUnit : BattleSessionQuery<Vector3I[]>
   public FindPathForUnit(BattleSession.BattleUnitHandle unitHandle, Vector3I destination)
     : base(Id)
   {
-    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
+    ArgumentNullException.ThrowIfNull(unitHandle);
+    UnitHandle = unitHandle;
     Destination = destination;
   }
 
@@ -48,7 +49,8 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost)
     : base(Id)
   {
-    UnitHandle = unitHandle ?? throw new ArgumentNullException(nameof(unitHandle));
+    ArgumentNullException.ThrowIfNull(unitHandle);
+    UnitHandle = unitHandle;
     if (actionPointCostPerStep < 0)
       throw new ArgumentOutOfRangeException(nameof(actionPointCostPerStep), "Action point cost cannot be negative.");
 

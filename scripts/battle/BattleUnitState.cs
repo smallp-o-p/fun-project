@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using FunProject.Combatants;
 using FunProject.Items;
@@ -17,7 +16,7 @@ public sealed class BattleUnitState
   public Combatant Combatant { get; }
   public Faction Side => Combatant.OwningFaction;
   public Vector3I Position { get; private set; }
-  public Weapon? EquippedWeapon { get; private set; }
+  public Option<Weapon> EquippedWeapon { get; private set; }
   public IReadOnlyList<EquippableItem> Inventory => _inventory;
 
   public int MaxHealth => GetBaseStatValue<HealthStat>();
@@ -29,13 +28,24 @@ public sealed class BattleUnitState
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
 
-  internal BattleUnitState(int unitId, Combatant combatant, Vector3I position, Weapon? equippedWeapon = null)
+  internal BattleUnitState(int unitId, Combatant combatant, Vector3I position)
+    : this(unitId, combatant, position, None)
+  {
+  }
+
+  internal BattleUnitState(int unitId, Combatant combatant, Vector3I position, Weapon equippedWeapon)
+    : this(unitId, combatant, position, Some(equippedWeapon))
+  {
+  }
+
+  internal BattleUnitState(int unitId, Combatant combatant, Vector3I position, Option<Weapon> equippedWeapon)
   {
     if (unitId <= 0)
       throw new ArgumentOutOfRangeException(nameof(unitId), "Unit id must be positive.");
 
     UnitId = unitId;
-    Combatant = combatant ?? throw new ArgumentNullException(nameof(combatant));
+    ArgumentNullException.ThrowIfNull(combatant);
+    Combatant = combatant;
     Position = position;
     EquippedWeapon = equippedWeapon;
     CurrentHealth = MaxHealth;
@@ -71,7 +81,7 @@ public sealed class BattleUnitState
 
   public void EquipWeapon(Weapon weapon)
   {
-    EquippedWeapon = weapon;
+    EquippedWeapon = Some(weapon);
   }
 
   public void AddInventoryItem(EquippableItem item)
@@ -91,9 +101,8 @@ public sealed class BattleUnitState
 
   private int GetBaseStatValue<TStat>() where TStat : Stat
   {
-    if (!Combatant.TryGetStat<TStat>(out var stat))
-      return 0;
-
-    return stat.BaseValue;
+    return Combatant.TryGetStat<TStat>().Match(
+      stat => stat.BaseValue,
+      () => 0);
   }
 }

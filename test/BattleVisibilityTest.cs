@@ -1,4 +1,3 @@
-#nullable enable
 using FunProject.Battle;
 using FunProject.Combatants;
 using GdUnit4;
@@ -203,9 +202,9 @@ public class BattleVisibilityTest
   {
     var result = BattleSessionMutation.SpawnUnit(combatant, position).Execute(session);
     Assert.True(result.Succeeded);
-    Assert.True(result.AffectedUnit != null);
-    Assert.True(result.AffectedUnitHandle != null);
-    return new BattleTestUnit(result.AffectedUnit!, result.AffectedUnitHandle!);
+    Assert.True(result.AffectedUnit.IsSome);
+    Assert.True(result.AffectedUnitHandle.IsSome);
+    return new BattleTestUnit(result.AffectedUnit.RequireSome(), result.AffectedUnitHandle.RequireSome());
   }
 
   private static void StartBattle(BattleSession session)

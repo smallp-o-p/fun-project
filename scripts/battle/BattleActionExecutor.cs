@@ -1,4 +1,3 @@
-#nullable enable
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -10,13 +9,20 @@ public readonly record struct BattleActionEvaluation(
   BattleSessionMutation Mutation,
   bool IsAllowed,
   BattleMutationFailureReason FailureReason = BattleMutationFailureReason.None,
-  string? Message = null,
+  Option<string> Message = default,
   int ActionPointCost = 0)
 {
-  public static BattleActionEvaluation Allowed(
-    BattleSessionMutation mutation,
-    int actionPointCost = 0,
-    string? message = null)
+  public static BattleActionEvaluation Allowed(BattleSessionMutation mutation, int actionPointCost = 0)
+  {
+    return Allowed(mutation, actionPointCost, None);
+  }
+
+  public static BattleActionEvaluation Allowed(BattleSessionMutation mutation, int actionPointCost, string message)
+  {
+    return Allowed(mutation, actionPointCost, Some(message));
+  }
+
+  public static BattleActionEvaluation Allowed(BattleSessionMutation mutation, int actionPointCost, Option<string> message)
   {
     ArgumentNullException.ThrowIfNull(mutation);
     if (actionPointCost < 0)
@@ -27,7 +33,24 @@ public readonly record struct BattleActionEvaluation(
 
   public static BattleActionEvaluation Rejected(
     BattleSessionMutation mutation,
-    string? message = null,
+    BattleMutationFailureReason failureReason = BattleMutationFailureReason.Rejected,
+    int actionPointCost = 0)
+  {
+    return Rejected(mutation, None, failureReason, actionPointCost);
+  }
+
+  public static BattleActionEvaluation Rejected(
+    BattleSessionMutation mutation,
+    string message,
+    BattleMutationFailureReason failureReason = BattleMutationFailureReason.Rejected,
+    int actionPointCost = 0)
+  {
+    return Rejected(mutation, Some(message), failureReason, actionPointCost);
+  }
+
+  public static BattleActionEvaluation Rejected(
+    BattleSessionMutation mutation,
+    Option<string> message,
     BattleMutationFailureReason failureReason = BattleMutationFailureReason.Rejected,
     int actionPointCost = 0)
   {
@@ -52,15 +75,16 @@ public sealed class BattleActionExecutor
 
   public int PendingCount => _pending.Count;
   public bool IsBusy { get; private set; }
-  public BattleSessionMutation? ActiveMutation { get; private set; }
-  public BattleMutationResult? LastResult { get; private set; }
+  public Option<BattleSessionMutation> ActiveMutation { get; private set; }
+  public Option<BattleMutationResult> LastResult { get; private set; }
 
-  public event Action<BattleSessionMutation>? MutationStarted;
-  public event Action<BattleMutationResult>? MutationResolved;
+  public event Action<BattleSessionMutation> MutationStarted = delegate { };
+  public event Action<BattleMutationResult> MutationResolved = delegate { };
 
   public BattleActionExecutor(BattleSession session)
   {
-    _session = session ?? throw new ArgumentNullException(nameof(session));
+    ArgumentNullException.ThrowIfNull(session);
+    _session = session;
   }
 
   public void Enqueue(BattleSessionMutation mutation)
@@ -80,19 +104,19 @@ public sealed class BattleActionExecutor
     }
   }
 
-  public BattleMutationResult? Tick()
+  public Option<BattleMutationResult> Tick()
   {
     if (IsBusy || _pending.Count == 0)
-      return null;
+      return None;
 
     BattleSessionMutation activeMutation = _pending.Dequeue();
-    ActiveMutation = activeMutation;
+    ActiveMutation = Some(activeMutation);
     IsBusy = true;
 
     BattleMutationResult result;
     try
     {
-      MutationStarted?.Invoke(activeMutation);
+      MutationStarted.Invoke(activeMutation);
       result = ExecuteNow(activeMutation);
     }
     catch (Exception exception)
@@ -103,11 +127,11 @@ public sealed class BattleActionExecutor
         exception.Message);
     }
 
-    LastResult = result;
-    ActiveMutation = null;
+    LastResult = Some(result);
+    ActiveMutation = None;
     IsBusy = false;
-    MutationResolved?.Invoke(result);
-    return result;
+    MutationResolved.Invoke(result);
+    return Some(result);
   }
 
   public BattleActionEvaluation Evaluate(BattleSessionMutation mutation)
@@ -143,11 +167,11 @@ public sealed class BattleActionExecutor
     List<BattleMutationResult> results = [];
     while (_pending.Count > 0 && results.Count < maxActions)
     {
-      BattleMutationResult? result = Tick();
-      if (!result.HasValue)
+      Option<BattleMutationResult> result = Tick();
+      if (result.IsNone)
         break;
 
-      results.Add(result.Value);
+      results.Add(result.RequireSome());
     }
 
     return results;
@@ -194,9 +218,9 @@ public sealed class BattleActionExecutor
         $"{unit.Combatant.Name} needs {totalActionPointCost} action points but only has {unit.CurrentActionPoints}.",
         actionPointCost: (int)totalActionPointCost);
 
-    BattleTileState? currentTile = _session.Board.GetTileOrNull(unit.Position);
+    Option<BattleTileState> currentTile = _session.Board.GetTileOrNone(unit.Position);
 
-    if (currentTile == null)
+    if (currentTile.IsNone)
       return BattleActionEvaluation.Rejected(
           moveUnit,
           $"Unit id {unit} is not on a valid tile",
@@ -211,20 +235,21 @@ public sealed class BattleActionExecutor
           $"Move unit path step {step} is not adjacent to {previousStep}.",
           actionPointCost: (int)totalActionPointCost);
 
-      BattleTileState? destinationTile = _session.Board.GetTileOrNull(step);
-      if (destinationTile == null)
+      Option<BattleTileState> destinationTile = _session.Board.GetTileOrNone(step);
+      if (destinationTile.IsNone)
         return BattleActionEvaluation.Rejected(
           moveUnit,
           $"Move unit path step {step} leaves the board.",
           actionPointCost: (int)totalActionPointCost);
 
-      if (!destinationTile.IsWalkable)
+      BattleTileState destinationTileValue = destinationTile.RequireSome();
+      if (!destinationTileValue.IsWalkable)
         return BattleActionEvaluation.Rejected(
           moveUnit,
           $"Move unit path step {step} enters an unwalkable tile.",
           actionPointCost: (int)totalActionPointCost);
 
-      if (destinationTile.IsOccupied)
+      if (destinationTileValue.IsOccupied)
         return BattleActionEvaluation.Rejected(
           moveUnit,
           $"Move unit path step {step} enters an occupied tile.",

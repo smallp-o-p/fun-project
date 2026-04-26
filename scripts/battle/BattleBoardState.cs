@@ -1,4 +1,3 @@
-#nullable enable
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -56,12 +55,12 @@ public sealed class BattleBoardState
       && coordinates.Z < Dimensions.Z;
   }
 
-  public BattleTileState? GetTileOrNull(Vector3I coordinates)
+  public Option<BattleTileState> GetTileOrNone(Vector3I coordinates)
   {
     if (!IsInBounds(coordinates))
-      return null;
+      return None;
 
-    return _tiles[coordinates.X, coordinates.Y, coordinates.Z];
+    return Some(_tiles[coordinates.X, coordinates.Y, coordinates.Z]);
   }
 
   public BattleTileState GetTile(Vector3I coordinates)
@@ -88,7 +87,7 @@ public sealed class BattleBoardState
 
     BattleTileState sourceTile = GetTileInBounds(source);
     BattleTileState destinationTile = GetTileInBounds(destination);
-    if (sourceTile.OccupantUnitId != unitId)
+    if (!sourceTile.HasOccupant(unitId))
       return false;
     if (source == destination)
       return true;
@@ -105,7 +104,7 @@ public sealed class BattleBoardState
       return false;
 
     BattleTileState tile = GetTileInBounds(coordinates);
-    if (tile.OccupantUnitId != unitId)
+    if (!tile.HasOccupant(unitId))
       return false;
 
     tile.ClearOccupant();
@@ -122,7 +121,7 @@ public sealed class BattleBoardState
     BattleTileState sourceTile = GetTileInBounds(source);
     bool restoreSourceDisabled = false;
 
-    if (sourceTile.OccupantUnitId == movingUnitId && _pathGraph.IsPointDisabled(sourceId))
+    if (sourceTile.HasOccupant(movingUnitId) && _pathGraph.IsPointDisabled(sourceId))
     {
       _pathGraph.SetPointDisabled(sourceId, false);
       restoreSourceDisabled = true;
@@ -191,7 +190,7 @@ public sealed class BattleBoardState
     if (!tile.IsOccupied)
       return true;
 
-    return tile.OccupantUnitId == movingUnitId;
+    return tile.HasOccupant(movingUnitId);
   }
 
   private long CoordinatesToPointId(Vector3I coordinates)

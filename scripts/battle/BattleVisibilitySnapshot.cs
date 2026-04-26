@@ -1,4 +1,3 @@
-#nullable enable
 using FunProject.Combatants;
 using System;
 using System.Collections.Generic;
@@ -8,7 +7,7 @@ namespace FunProject.Battle;
 
 public sealed class BattleVisibilitySnapshot
 {
-  private static readonly IReadOnlySet<int> EmptyVisibleUnitIds = new HashSet<int>();
+  private static readonly IReadOnlySet<int> EmptyVisibleUnitIds = new SysColGeneric.HashSet<int>();
 
   public static BattleVisibilitySnapshot Empty { get; } =
     new BattleVisibilitySnapshot(
@@ -31,7 +30,7 @@ public sealed class BattleVisibilitySnapshot
 
     VisibleUnitsByObserverUnitId = visibleUnitsByObserverUnitId.ToDictionary(
       entry => entry.Key,
-      entry => (IReadOnlySet<int>)new HashSet<int>(entry.Value));
+      entry => (IReadOnlySet<int>)new SysColGeneric.HashSet<int>(entry.Value));
   }
 
   public BattleFactionVisibilityState GetFactionStateOrEmpty(Faction faction)
@@ -56,13 +55,13 @@ public sealed class BattleVisibilitySnapshot
     ArgumentNullException.ThrowIfNull(previousSnapshot);
 
     Dictionary<Faction, BattleFactionVisibilityState> mergedFactionStates = [];
-    HashSet<Faction> allFactions = [.. FactionStates.Keys, .. previousSnapshot.FactionStates.Keys];
+    SysColGeneric.HashSet<Faction> allFactions = [.. FactionStates.Keys, .. previousSnapshot.FactionStates.Keys];
 
     foreach (var faction in allFactions)
     {
       var currentState = GetFactionStateOrEmpty(faction);
       var previousState = previousSnapshot.GetFactionStateOrEmpty(faction);
-      HashSet<Godot.Vector3I> exploredTiles = [.. previousState.ExploredTiles];
+      SysColGeneric.HashSet<Godot.Vector3I> exploredTiles = [.. previousState.ExploredTiles];
       exploredTiles.UnionWith(currentState.ExploredTiles);
       mergedFactionStates[faction] = currentState.WithExploredTiles(exploredTiles);
     }

@@ -8,7 +8,8 @@ public sealed class BattleQueryRunner
 
   internal BattleQueryRunner(BattleSession session)
   {
-    _session = session ?? throw new ArgumentNullException(nameof(session));
+    ArgumentNullException.ThrowIfNull(session);
+    _session = session;
   }
 
   public BattleQueryResult<TResult> Execute<TResult>(BattleSessionQuery<TResult> query)

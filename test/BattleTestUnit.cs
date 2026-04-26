@@ -1,4 +1,3 @@
-#nullable enable
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Items;
@@ -16,8 +15,10 @@ internal sealed class BattleTestUnit
 
   public BattleTestUnit(BattleUnitState state, BattleSession.BattleUnitHandle handle)
   {
-    State = state ?? throw new System.ArgumentNullException(nameof(state));
-    Handle = handle ?? throw new System.ArgumentNullException(nameof(handle));
+    System.ArgumentNullException.ThrowIfNull(state);
+    System.ArgumentNullException.ThrowIfNull(handle);
+    State = state;
+    Handle = handle;
   }
 
   public void AddInventoryItem(EquippableItem item)

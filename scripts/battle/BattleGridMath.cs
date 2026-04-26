@@ -1,4 +1,3 @@
-#nullable enable
 using Godot;
 using System;
 
@@ -30,19 +29,19 @@ public static class BattleGridMath
       (coordinates.Z + 0.5f) * tileSize);
   }
 
-  public static Vector3? TryIntersectRayWithHorizontalPlane(Vector3 rayOrigin, Vector3 rayDirection, float planeY = 0.0f)
+  public static Option<Vector3> TryIntersectRayWithHorizontalPlane(Vector3 rayOrigin, Vector3 rayDirection, float planeY = 0.0f)
   {
     if (Mathf.Abs(rayDirection.Y) <= RayParallelEpsilon)
-      return null;
+      return None;
 
     float distanceAlongRay = (planeY - rayOrigin.Y) / rayDirection.Y;
     if (distanceAlongRay < 0.0f)
-      return null;
+      return None;
 
-    return rayOrigin + (rayDirection * distanceAlongRay);
+    return Some(rayOrigin + (rayDirection * distanceAlongRay));
   }
 
-  public static Vector3I? TryLocalPointToFlatGroundCell(Vector3 localPoint, Vector3I dimensions, float tileSize = 1.0f)
+  public static Option<Vector3I> TryLocalPointToFlatGroundCell(Vector3 localPoint, Vector3I dimensions, float tileSize = 1.0f)
   {
     if (!BattleMapData.HasValidDimensions(dimensions))
       throw new ArgumentOutOfRangeException(nameof(dimensions), "Dimensions must be positive.");
@@ -53,8 +52,8 @@ public static class BattleGridMath
     int z = Mathf.FloorToInt(localPoint.Z / tileSize);
 
     if (x < 0 || z < 0 || x >= dimensions.X || z >= dimensions.Z)
-      return null;
+      return None;
 
-    return new Vector3I(x, 0, z);
+    return Some(new Vector3I(x, 0, z));
   }
 }

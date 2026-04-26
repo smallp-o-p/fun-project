@@ -1,4 +1,3 @@
-#nullable enable
 using FunProject.Combatants;
 using Godot;
 using System;
@@ -19,8 +18,8 @@ internal sealed class BattleVisibilitySystem
     var board = session.Board;
     var livingUnits = session.AliveUnits.ToArray();
     Dictionary<Vector3I, BattleUnitState> livingUnitsByPosition = livingUnits.ToDictionary(unit => unit.Position);
-    Dictionary<Faction, HashSet<Vector3I>> visibleTilesByFaction = [];
-    Dictionary<Faction, HashSet<int>> visibleForeignUnitsByFaction = [];
+    Dictionary<Faction, SysColGeneric.HashSet<Vector3I>> visibleTilesByFaction = [];
+    Dictionary<Faction, SysColGeneric.HashSet<int>> visibleForeignUnitsByFaction = [];
     Dictionary<int, IReadOnlySet<int>> visibleUnitsByObserver = [];
 
     foreach (var faction in GetParticipatingFactions(session))
@@ -31,8 +30,8 @@ internal sealed class BattleVisibilitySystem
 
     foreach (var observer in livingUnits)
     {
-      HashSet<Vector3I> observerVisibleTiles = [];
-      HashSet<int> visibleUnits = [];
+      SysColGeneric.HashSet<Vector3I> observerVisibleTiles = [];
+      SysColGeneric.HashSet<int> visibleUnits = [];
       visibleUnitsByObserver[observer.UnitId] = visibleUnits;
 
       foreach (var targetTile in EnumerateTileCandidates(board, observer))
@@ -111,7 +110,7 @@ internal sealed class BattleVisibilitySystem
       return false;
     if (!board.IsInBounds(targetTile))
       return false;
-    if (board.GetTileOrNull(targetTile)?.BlocksLineOfSight == true && targetTile != observer.Position)
+    if (targetTile != observer.Position && board.GetTileOrNone(targetTile).Match(tile => tile.BlocksLineOfSight, () => false))
       return false;
 
     var observerPoint = ToWorldPoint(observer.Position);
@@ -193,10 +192,10 @@ internal sealed class BattleVisibilitySystem
       if (currentCell == targetCell)
         return true;
 
-      var tile = board.GetTileOrNull(currentCell);
-      if (tile == null)
+      Option<BattleTileState> tile = board.GetTileOrNone(currentCell);
+      if (tile.IsNone)
         return false;
-      if (tile.BlocksLineOfSight)
+      if (tile.Match(tileValue => tileValue.BlocksLineOfSight, () => false))
         return false;
     }
 

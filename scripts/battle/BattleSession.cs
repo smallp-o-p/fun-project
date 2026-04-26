@@ -53,13 +53,17 @@ public sealed class BattleSession
   public IReadOnlyCollection<Faction> TurnQueue => _turnQueue;
   public IReadOnlyDictionary<Faction, IReadOnlyList<Combatant>> FactionRosters => _factionRosters;
 
-  public event Action<BattleEvent> EventRaised;
+  public event Action<BattleEvent> EventRaised = delegate { };
 
   public BattleSession(
     BattleBoardState board,
     IEnumerable<Faction> globalFactionOrder,
     IDictionary<Faction, IEnumerable<Combatant>> factionRosters)
   {
+    ArgumentNullException.ThrowIfNull(board);
+    ArgumentNullException.ThrowIfNull(globalFactionOrder);
+    ArgumentNullException.ThrowIfNull(factionRosters);
+
     Board = board;
 
     Queries = new BattleQueryRunner(this);
@@ -121,12 +125,17 @@ public sealed class BattleSession
 
     RefreshCurrentFactionAvailability();
 
-    RaiseEvent(new BattleEvent(BattleEventType.SessionStarted, Message: "Battle started."));
-    RaiseEvent(new BattleEvent(BattleEventType.TurnStarted, Message: $"Turn {TurnNumber} started for {ActiveSide.Name}."));
+    RaiseEvent(new BattleEvent(BattleEventType.SessionStarted, Message: Some("Battle started.")));
+    RaiseEvent(new BattleEvent(BattleEventType.TurnStarted, Message: Some($"Turn {TurnNumber} started for {ActiveSide.Name}.")));
     return true;
   }
 
-  internal SpawnedBattleUnit AddUnit(Combatant combatant, Vector3I position, Weapon equippedWeapon = null)
+  internal SpawnedBattleUnit AddUnit(Combatant combatant, Vector3I position)
+  {
+    return AddUnit(combatant, position, None);
+  }
+
+  internal SpawnedBattleUnit AddUnit(Combatant combatant, Vector3I position, Option<Weapon> equippedWeapon)
   {
     ArgumentNullException.ThrowIfNull(combatant);
 
@@ -164,7 +173,7 @@ public sealed class BattleSession
       throw new InvalidOperationException($"Could not clear unit {unit.UnitId} from {unit.Position}.");
 
     _activeFactionUnitsAvailable.Remove(unit.UnitId);
-    RaiseEvent(new BattleEvent(BattleEventType.UnitKilled, unit.UnitId, unit.Position, $"Unit ID {unit.UnitId} was killed!"));
+    RaiseEvent(new BattleEvent(BattleEventType.UnitKilled, Some(unit.UnitId), Some(unit.Position), Some($"Unit ID {unit.UnitId} was killed!")));
     HandleFactionLoss(unitSide);
   }
 
@@ -193,7 +202,7 @@ public sealed class BattleSession
       throw new InvalidOperationException($"Unit {unit.UnitId} is not on the active side.");
 
     RemoveAvailableUnit(unit.UnitId);
-    RaiseEvent(new BattleEvent(BattleEventType.UnitActivationEnded, unit.UnitId, unit.Position, $"{unit.Combatant.Name} ended their activation."));
+    RaiseEvent(new BattleEvent(BattleEventType.UnitActivationEnded, Some(unit.UnitId), Some(unit.Position), Some($"{unit.Combatant.Name} ended their activation.")));
 
     if (!GetFactionAliveUnits(activeSide).Any(CanUnitActNow))
       EndFactionTurn(activeSide);
@@ -205,7 +214,7 @@ public sealed class BattleSession
       return;
 
     var activeSide = ActiveSide;
-    RaiseEvent(new BattleEvent(BattleEventType.TurnEnded, Message: $"Turn {TurnNumber} ended for {activeSide.Name}."));
+    RaiseEvent(new BattleEvent(BattleEventType.TurnEnded, Message: Some($"Turn {TurnNumber} ended for {activeSide.Name}.")));
     _sidesActedThisRound.Add(activeSide);
 
     if (_turnQueue.Count > 0)
@@ -242,7 +251,7 @@ public sealed class BattleSession
     _turnQueue.Clear();
     Phase = BattlePhase.Ended;
 
-    RaiseEvent(new BattleEvent(BattleEventType.SessionEnded, Message: "Battle ended."));
+    RaiseEvent(new BattleEvent(BattleEventType.SessionEnded, Message: Some("Battle ended.")));
   }
 
   internal void RegisterSpawnedUnitForCurrentRound(BattleUnitState unit)
@@ -263,19 +272,24 @@ public sealed class BattleSession
     _turnQueue.Enqueue(unit.Side);
   }
 
-  internal BattleUnitState GetUnitOrNull(BattleUnitHandle handle)
-  {
-    ArgumentNullException.ThrowIfNull(handle);
-    return _unitsByHandle.TryGetValue(handle, out var unit) ? unit : null;
-  }
-
-  internal BattleUnitState GetLivingUnitOrNull(BattleUnitHandle handle)
+  internal Option<BattleUnitState> GetUnit(BattleUnitHandle handle)
   {
     ArgumentNullException.ThrowIfNull(handle);
     if (!_unitsByHandle.TryGetValue(handle, out var unit))
-      return null;
+      return None;
 
-    return unit.IsAlive ? unit : null;
+    return Some(unit);
+  }
+
+  internal Option<BattleUnitState> GetLivingUnit(BattleUnitHandle handle)
+  {
+    ArgumentNullException.ThrowIfNull(handle);
+    if (!_unitsByHandle.TryGetValue(handle, out var unit))
+      return None;
+    if (!unit.IsAlive)
+      return None;
+
+    return Some(unit);
   }
 
   internal void MoveUnitToDeadStorage(BattleUnitState unit)
@@ -326,7 +340,7 @@ public sealed class BattleSession
 
   internal void RaiseEvent(BattleEvent battleEvent)
   {
-    EventRaised?.Invoke(battleEvent);
+    EventRaised.Invoke(battleEvent);
   }
 
   internal void RefreshVisibility()
@@ -435,7 +449,7 @@ public sealed class BattleSession
 
     RefreshCurrentFactionAvailability();
 
-    RaiseEvent(new BattleEvent(BattleEventType.ActiveSideChanged, Message: $"Active side is now {nextSide.Name}."));
-    RaiseEvent(new BattleEvent(BattleEventType.TurnStarted, Message: $"Turn {TurnNumber} started for {nextSide.Name}."));
+    RaiseEvent(new BattleEvent(BattleEventType.ActiveSideChanged, Message: Some($"Active side is now {nextSide.Name}.")));
+    RaiseEvent(new BattleEvent(BattleEventType.TurnStarted, Message: Some($"Turn {TurnNumber} started for {nextSide.Name}.")));
   }
 }

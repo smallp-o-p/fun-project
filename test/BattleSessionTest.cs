@@ -1,6 +1,7 @@
-#nullable enable
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Stats;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System;
@@ -21,9 +22,9 @@ public class BattleSessionTest
     Assert.False(board.IsInBounds(new Vector3I(3, 2, 4)));
     Assert.False(board.IsInBounds(new Vector3I(3, 1, 5)));
 
-    var tile = board.GetTileOrNull(new Vector3I(3, 1, 4));
-    Assert.True(tile != null);
-    Assert.Equal(new Vector3I(3, 1, 4), tile!.Coordinates);
+    Option<BattleTileState> tile = board.GetTileOrNone(new Vector3I(3, 1, 4));
+    Assert.True(tile.IsSome);
+    Assert.Equal(new Vector3I(3, 1, 4), tile.RequireSome().Coordinates);
   }
 
   [TestCase(TestName = "SpawnUnit occupies its tile")]
@@ -35,7 +36,7 @@ public class BattleSessionTest
 
     var tile = session.Board.GetTile(new Vector3I(1, 0, 1));
     Assert.True(tile.IsOccupied);
-    Assert.Equal(unit.UnitId, tile.OccupantUnitId!.Value);
+    Assert.Equal(unit.UnitId, tile.OccupantUnitId.RequireSome());
   }
 
   [TestCase(TestName = "SpawnUnit rejects occupied tile")]
@@ -149,6 +150,53 @@ public class BattleSessionTest
       board,
       [],
       new Dictionary<Faction, IEnumerable<Combatant>>()));
+  }
+
+  [TestCase(TestName = "GetUnit returns None for foreign handle")]
+  public void GetUnitReturnsNoneForForeignHandle()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var foreignSession = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var foreignUnit = SpawnUnit(foreignSession, BattleTestFactory.MakeCombatant("Foreign", faction), new Vector3I(0, 0, 0));
+
+    Assert.True(IsNone(session.GetUnit(foreignUnit.Handle)));
+  }
+
+  [TestCase(TestName = "GetLivingUnit returns None for dead unit")]
+  public void GetLivingUnitReturnsNoneForDeadUnit()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, health: 10), new Vector3I(0, 0, 0));
+    StartBattle(session);
+
+    Assert.True(IsSome(session.GetLivingUnit(unit.Handle)));
+
+    ApplyDamage(session, unit.Handle, 10);
+
+    Assert.True(IsSome(session.GetUnit(unit.Handle)));
+    Assert.True(IsNone(session.GetLivingUnit(unit.Handle)));
+  }
+
+  [TestCase(TestName = "AddUnit accepts equipped weapon option")]
+  public void AddUnitAcceptsEquippedWeaponOption()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var weapon = new MeleeWeapon(new WeaponData
+    {
+      DamageStat = new DamageStat { BaseValue = 10 },
+      CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
+      RangeStat = new RangeStat { BaseValue = 1 },
+    });
+
+    var spawnedUnit = session.AddUnit(
+      BattleTestFactory.MakeCombatant("Alpha", faction),
+      new Vector3I(0, 0, 0),
+      Some<Weapon>(weapon));
+
+    Assert.Equal(weapon, spawnedUnit.Unit.EquippedWeapon.RequireSome());
   }
 
   [TestCase(TestName = "AdvanceTurn rotates only participating factions without incrementing early")]
@@ -506,11 +554,11 @@ public class BattleSessionTest
     var grenade = BattleTestFactory.MakeGrenade("Practice Grenade", throwRange: 4);
     unit.AddInventoryItem(grenade);
 
-    BattleEvent? thrownEvent = null;
+    Option<BattleEvent> thrownEvent = None;
     session.EventRaised += battleEvent =>
     {
       if (battleEvent.Type == BattleEventType.ItemThrown)
-        thrownEvent = battleEvent;
+        thrownEvent = Some(battleEvent);
     };
 
     StartBattle(session);
@@ -519,10 +567,11 @@ public class BattleSessionTest
     Assert.True(threw.Succeeded);
     Assert.False(unit.HasInventoryItem(grenade));
     Assert.Equal(3, unit.CurrentActionPoints);
-    Assert.True(thrownEvent.HasValue);
-    Assert.Equal(BattleEventType.ItemThrown, thrownEvent!.Value.Type);
-    Assert.Equal(unit.UnitId, thrownEvent.Value.UnitId!.Value);
-    Assert.Equal(new Vector3I(3, 0, 1), thrownEvent.Value.Position!.Value);
+    Assert.True(thrownEvent.IsSome);
+    BattleEvent itemThrownEvent = thrownEvent.RequireSome();
+    Assert.Equal(BattleEventType.ItemThrown, itemThrownEvent.Type);
+    Assert.Equal(unit.UnitId, itemThrownEvent.UnitId.RequireSome());
+    Assert.Equal(new Vector3I(3, 0, 1), itemThrownEvent.Position.RequireSome());
   }
 
   [TestCase(TestName = "AddUnit throws when a validated placement can no longer be applied")]
@@ -600,9 +649,9 @@ public class BattleSessionTest
   {
     var result = BattleSessionMutation.SpawnUnit(combatant, position).Execute(session);
     Assert.True(result.Succeeded);
-    Assert.True(result.AffectedUnit != null);
-    Assert.True(result.AffectedUnitHandle != null);
-    return new BattleTestUnit(result.AffectedUnit!, result.AffectedUnitHandle!);
+    Assert.True(result.AffectedUnit.IsSome);
+    Assert.True(result.AffectedUnitHandle.IsSome);
+    return new BattleTestUnit(result.AffectedUnit.RequireSome(), result.AffectedUnitHandle.RequireSome());
   }
 
   private static void StartBattle(BattleSession session)
@@ -628,5 +677,19 @@ public class BattleSessionTest
   {
     var result = BattleSessionMutation.ApplyDamage(unitHandle, amount).Execute(session);
     Assert.True(result.Succeeded);
+  }
+
+  private static bool IsSome<T>(Option<T> option)
+  {
+    return option.Match(
+      _ => true,
+      () => false);
+  }
+
+  private static bool IsNone<T>(Option<T> option)
+  {
+    return option.Match(
+      _ => false,
+      () => true);
   }
 }

@@ -1,4 +1,3 @@
-#nullable enable
 using FunProject.Battle;
 using GdUnit4;
 using Godot;

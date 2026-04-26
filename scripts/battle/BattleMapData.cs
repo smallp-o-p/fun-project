@@ -1,4 +1,3 @@
-#nullable enable
 using Godot;
 using Godot.Collections;
 using System;
@@ -22,7 +21,7 @@ public partial class BattleMapData : Resource
 
     var board = new BattleBoardState(Dimensions);
 
-    foreach (BattleMapTileData? tileOverride in TileOverrides)
+    foreach (BattleMapTileData tileOverride in TileOverrides)
     {
       if (tileOverride == null)
       {
@@ -36,15 +35,18 @@ public partial class BattleMapData : Resource
         continue;
       }
 
-      BattleTileState? tile = board.GetTileOrNull(tileOverride.Coordinates);
-      if (tile == null)
-      {
-        GD.PushError($"{nameof(BattleMapData)} could not resolve board tile at '{tileOverride.Coordinates}'.");
-        continue;
-      }
-
-      tile.IsWalkable = tileOverride.IsPresent && tileOverride.IsWalkable;
-      tile.BlocksLineOfSight = tileOverride.IsPresent && tileOverride.BlocksLineOfSight;
+      board.GetTileOrNone(tileOverride.Coordinates).Match(
+        tile =>
+        {
+          tile.IsWalkable = tileOverride.IsPresent && tileOverride.IsWalkable;
+          tile.BlocksLineOfSight = tileOverride.IsPresent && tileOverride.BlocksLineOfSight;
+          return true;
+        },
+        () =>
+        {
+          GD.PushError($"{nameof(BattleMapData)} could not resolve board tile at '{tileOverride.Coordinates}'.");
+          return false;
+        });
     }
 
     return board;
@@ -62,8 +64,8 @@ public partial class BattleMapData : Resource
         for (int x = 0; x < Dimensions.X; x++)
         {
           Vector3I coordinates = new(x, y, z);
-          BattleMapTileData? tileOverride = GetTileOverrideOrNull(coordinates);
-          if (tileOverride?.IsPresent == false)
+          Option<BattleMapTileData> tileOverride = GetTileOverrideOrNone(coordinates);
+          if (tileOverride.Match(value => !value.IsPresent, () => false))
             continue;
 
           yield return coordinates;
@@ -72,18 +74,18 @@ public partial class BattleMapData : Resource
     }
   }
 
-  public BattleMapTileData? GetTileOverrideOrNull(Vector3I coordinates)
+  public Option<BattleMapTileData> GetTileOverrideOrNone(Vector3I coordinates)
   {
-    BattleMapTileData? matchedTile = null;
+    Option<BattleMapTileData> matchedTile = None;
 
-    foreach (BattleMapTileData? tileOverride in TileOverrides)
+    foreach (BattleMapTileData tileOverride in TileOverrides)
     {
       if (tileOverride == null)
         continue;
       if (tileOverride.Coordinates != coordinates)
         continue;
 
-      matchedTile = tileOverride;
+      matchedTile = Some(tileOverride);
     }
 
     return matchedTile;

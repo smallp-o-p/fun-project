@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using Godot;
@@ -7,8 +6,8 @@ namespace FunProject.Battle;
 
 public sealed class BattleFactionVisibilityState
 {
-  private static readonly IReadOnlySet<Vector3I> EmptyTileSet = new HashSet<Vector3I>();
-  private static readonly IReadOnlySet<int> EmptyUnitIdSet = new HashSet<int>();
+  private static readonly IReadOnlySet<Vector3I> EmptyTileSet = new SysColGeneric.HashSet<Vector3I>();
+  private static readonly IReadOnlySet<int> EmptyUnitIdSet = new SysColGeneric.HashSet<int>();
 
   public static BattleFactionVisibilityState Empty { get; } = new();
 
@@ -16,14 +15,21 @@ public sealed class BattleFactionVisibilityState
   public IReadOnlySet<Vector3I> ExploredTiles { get; }
   public IReadOnlySet<int> VisibleForeignUnitIds { get; }
 
-  public BattleFactionVisibilityState(
-    IEnumerable<Vector3I>? visibleTiles = null,
-    IEnumerable<Vector3I>? exploredTiles = null,
-    IEnumerable<int>? visibleForeignUnitIds = null)
+  public BattleFactionVisibilityState()
   {
-    VisibleTiles = visibleTiles == null ? EmptyTileSet : new HashSet<Vector3I>(visibleTiles);
-    ExploredTiles = exploredTiles == null ? EmptyTileSet : new HashSet<Vector3I>(exploredTiles);
-    VisibleForeignUnitIds = visibleForeignUnitIds == null ? EmptyUnitIdSet : new HashSet<int>(visibleForeignUnitIds);
+    VisibleTiles = EmptyTileSet;
+    ExploredTiles = EmptyTileSet;
+    VisibleForeignUnitIds = EmptyUnitIdSet;
+  }
+
+  public BattleFactionVisibilityState(
+    IEnumerable<Vector3I> visibleTiles,
+    IEnumerable<Vector3I> exploredTiles,
+    IEnumerable<int> visibleForeignUnitIds)
+  {
+    VisibleTiles = new SysColGeneric.HashSet<Vector3I>(visibleTiles);
+    ExploredTiles = new SysColGeneric.HashSet<Vector3I>(exploredTiles);
+    VisibleForeignUnitIds = new SysColGeneric.HashSet<int>(visibleForeignUnitIds);
   }
 
   public BattleFactionVisibilityState WithExploredTiles(IEnumerable<Vector3I> exploredTiles)

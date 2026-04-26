@@ -1,4 +1,3 @@
-#nullable enable
 using FunProject.Battle;
 using GdUnit4;
 using Godot;
@@ -66,7 +65,7 @@ public partial class BattleBoardStateTest
     Assert.False(board.TryMoveOccupant(new Vector3I(0, 0, 0), new Vector3I(1, 0, 0), 8));
     Assert.True(board.TryMoveOccupant(new Vector3I(0, 0, 0), new Vector3I(1, 0, 0), 7));
     Assert.False(board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
-    Assert.True(board.GetTile(new Vector3I(1, 0, 0)).OccupantUnitId != null);
-    Assert.Equal(7, board.GetTile(new Vector3I(1, 0, 0)).OccupantUnitId!.Value);
+    Assert.True(board.GetTile(new Vector3I(1, 0, 0)).OccupantUnitId.IsSome);
+    Assert.Equal(7, board.GetTile(new Vector3I(1, 0, 0)).OccupantUnitId.RequireSome());
   }
 }

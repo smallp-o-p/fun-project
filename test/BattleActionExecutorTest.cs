@@ -22,8 +22,8 @@ public class BattleActionExecutorTest
 
     var result = executor.Tick();
 
-    Assert.True(result.HasValue);
-    Assert.True(result!.Value.Succeeded);
+    Assert.True(result.IsSome);
+    Assert.True(result.RequireSome().Succeeded);
     Assert.Equal(new Vector3I(1, 1, 1), unit.Position);
     Assert.Equal(3, unit.CurrentActionPoints);
   }
@@ -103,12 +103,12 @@ public class BattleActionExecutorTest
     var first = executor.Tick();
     var second = executor.Tick();
 
-    Assert.True(first.HasValue);
-    Assert.True(first!.Value.Succeeded);
-    Assert.True(first.Value.Mutation is MoveUnitStep);
-    Assert.True(second.HasValue);
-    Assert.True(second!.Value.Succeeded);
-    Assert.True(second.Value.Mutation is EndFactionTurn);
+    Assert.True(first.IsSome);
+    Assert.True(first.RequireSome().Succeeded);
+    Assert.True(first.RequireSome().Mutation is MoveUnitStep);
+    Assert.True(second.IsSome);
+    Assert.True(second.RequireSome().Succeeded);
+    Assert.True(second.RequireSome().Mutation is EndFactionTurn);
     Assert.Equal(factionB, session.ActiveSide);
   }
 
@@ -126,8 +126,8 @@ public class BattleActionExecutorTest
 
     var result = executor.Tick();
 
-    Assert.True(result.HasValue);
-    Assert.True(result!.Value.Succeeded);
+    Assert.True(result.IsSome);
+    Assert.True(result.RequireSome().Succeeded);
     Assert.False(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitA.Handle))));
     Assert.False(GetValue(session.Queries.Execute(new CanUnitActNow(unitA.Handle))));
     Assert.True(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitB.Handle))));
@@ -147,9 +147,9 @@ public class BattleActionExecutorTest
 
     var result = executor.Tick();
 
-    Assert.True(result.HasValue);
-    Assert.False(result!.Value.Succeeded);
-    Assert.Equal(BattleMutationFailureReason.Rejected, result.Value.FailureReason);
+    Assert.True(result.IsSome);
+    Assert.False(result.RequireSome().Succeeded);
+    Assert.Equal(BattleMutationFailureReason.Rejected, result.RequireSome().FailureReason);
   }
 
   [TestCase(TestName = "Executor emits mutation resolved events")]
@@ -161,15 +161,15 @@ public class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    BattleMutationResult? resolvedResult = null;
-    executor.MutationResolved += result => resolvedResult = result;
+    Option<BattleMutationResult> resolvedResult = None;
+    executor.MutationResolved += result => resolvedResult = Some(result);
 
     executor.Enqueue(BattleSessionMutation.MoveUnitStep(unit.Handle, new Vector3I(1, 0, 2)));
     executor.Tick();
 
-    Assert.True(resolvedResult.HasValue);
-    Assert.True(resolvedResult!.Value.Succeeded);
-    Assert.True(resolvedResult.Value.Mutation is MoveUnitStep);
+    Assert.True(resolvedResult.IsSome);
+    Assert.True(resolvedResult.RequireSome().Succeeded);
+    Assert.True(resolvedResult.RequireSome().Mutation is MoveUnitStep);
   }
 
   [TestCase(TestName = "Executor drain queue returns all mutation results")]
@@ -216,12 +216,12 @@ public class BattleActionExecutorTest
     var first = executor.Tick();
     var second = executor.Tick();
 
-    Assert.True(first.HasValue);
-    Assert.True(first!.Value.Succeeded);
+    Assert.True(first.IsSome);
+    Assert.True(first.RequireSome().Succeeded);
     Assert.Equal(factionB, session.ActiveSide);
-    Assert.True(second.HasValue);
-    Assert.False(second!.Value.Succeeded);
-    Assert.Equal(BattleMutationFailureReason.Rejected, second.Value.FailureReason);
+    Assert.True(second.IsSome);
+    Assert.False(second.RequireSome().Succeeded);
+    Assert.Equal(BattleMutationFailureReason.Rejected, second.RequireSome().FailureReason);
     Assert.Equal(factionB, session.ActiveSide);
   }
 
@@ -250,14 +250,14 @@ public class BattleActionExecutorTest
     var first = executor.Tick();
     var second = executor.Tick();
 
-    Assert.True(first.HasValue);
-    Assert.False(first!.Value.Succeeded);
-    Assert.Equal(BattleMutationFailureReason.UnexpectedError, first.Value.FailureReason);
+    Assert.True(first.IsSome);
+    Assert.False(first.RequireSome().Succeeded);
+    Assert.Equal(BattleMutationFailureReason.UnexpectedError, first.RequireSome().FailureReason);
     Assert.False(executor.IsBusy);
-    Assert.True(executor.ActiveMutation == null);
+    Assert.True(executor.ActiveMutation.IsNone);
 
-    Assert.True(second.HasValue);
-    Assert.True(second!.Value.Succeeded);
+    Assert.True(second.IsSome);
+    Assert.True(second.RequireSome().Succeeded);
     Assert.Equal(new Vector3I(1, 1, 1), unit.Position);
   }
 
@@ -270,17 +270,17 @@ public class BattleActionExecutorTest
 
     var result = executor.Tick();
 
-    Assert.False(result.HasValue);
-    Assert.True(executor.LastResult == null);
+    Assert.False(result.IsSome);
+    Assert.True(executor.LastResult.IsNone);
   }
 
   private static BattleTestUnit SpawnUnit(BattleSession session, Combatant combatant, Vector3I position)
   {
     var result = BattleSessionMutation.SpawnUnit(combatant, position).Execute(session);
     Assert.True(result.Succeeded);
-    Assert.True(result.AffectedUnit != null);
-    Assert.True(result.AffectedUnitHandle != null);
-    return new BattleTestUnit(result.AffectedUnit!, result.AffectedUnitHandle!);
+    Assert.True(result.AffectedUnit.IsSome);
+    Assert.True(result.AffectedUnitHandle.IsSome);
+    return new BattleTestUnit(result.AffectedUnit.RequireSome(), result.AffectedUnitHandle.RequireSome());
   }
 
   private static void StartBattle(BattleSession session)

@@ -1,4 +1,3 @@
-#nullable enable
 using Godot;
 
 namespace FunProject.Battle;
@@ -20,7 +19,7 @@ public enum BattleEventType
 
 public readonly record struct BattleEvent(
   BattleEventType Type,
-  int? UnitId = null,
-  Vector3I? Position = null,
-  string? Message = null
+  Option<int> UnitId = default,
+  Option<Vector3I> Position = default,
+  Option<string> Message = default
 );

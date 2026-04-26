@@ -106,10 +106,10 @@ public class BattleSessionQueriesTest
   {
     var result = BattleSessionMutation.SpawnUnit(combatant, position).Execute(session);
     Assert.True(result.Succeeded);
-    if (result.AffectedUnit == null || result.AffectedUnitHandle == null)
+    if (result.AffectedUnit.IsNone || result.AffectedUnitHandle.IsNone)
       throw new System.InvalidOperationException("Spawn unit mutation succeeded without an affected unit and handle.");
 
-    return new BattleTestUnit(result.AffectedUnit, result.AffectedUnitHandle);
+    return new BattleTestUnit(result.AffectedUnit.RequireSome(), result.AffectedUnitHandle.RequireSome());
   }
 
   private static void StartBattle(BattleSession session)

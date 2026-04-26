@@ -1,4 +1,3 @@
-#nullable enable
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Items;
@@ -55,12 +54,22 @@ internal static class BattleTestFactory
 
   public static BattleSession MakeSession(
     Vector3I dimensions,
-    IEnumerable<Faction>? globalFactionOrder = null,
-    IDictionary<Faction, IEnumerable<Combatant>>? factionRosters = null)
+    IEnumerable<Faction> globalFactionOrder)
+  {
+    return MakeSession(
+      dimensions,
+      globalFactionOrder,
+      new Dictionary<Faction, IEnumerable<Combatant>>());
+  }
+
+  public static BattleSession MakeSession(
+    Vector3I dimensions,
+    IEnumerable<Faction> globalFactionOrder,
+    IDictionary<Faction, IEnumerable<Combatant>> factionRosters)
   {
     return new BattleSession(
       new BattleBoardState(dimensions),
-      globalFactionOrder ?? [],
-      factionRosters ?? new Dictionary<Faction, IEnumerable<Combatant>>());
+      globalFactionOrder,
+      factionRosters);
   }
 }
