@@ -164,6 +164,8 @@ public sealed class CanOccupyTile : BattleSessionQuery<bool>
   internal override BattleQueryResult<bool> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
-    return Succeed(session.Board.CanOccupy(Coordinates));
+    return session.Board.ValidatePoint(Coordinates).Match(
+      point => Succeed(session.Board.CanOccupy(point)),
+      () => Succeed(false));
   }
 }

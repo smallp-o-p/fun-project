@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Tests;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
@@ -61,7 +62,7 @@ public class BattleSessionQueriesTest
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 4), new Vector3I(0, 0, 0));
-    session.Board.GetTile(new Vector3I(1, 0, 0)).IsWalkable = false;
+    session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).IsWalkable = false;
     StartBattle(session);
 
     IReadOnlyCollection<Vector3I> tiles = GetValue(session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit.Handle)));
@@ -80,7 +81,7 @@ public class BattleSessionQueriesTest
     var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
     var visibleEnemy = SpawnUnit(session, BattleTestFactory.MakeCombatant("Visible", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
     var hiddenEnemy = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hidden", enemyFaction, vision: 1), new Vector3I(4, 0, 0));
-    session.Board.GetTile(new Vector3I(3, 0, 0)).BlocksLineOfSight = true;
+    session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(3, 0, 0)).RequireSome()).BlocksLineOfSight = true;
     StartBattle(session);
 
     IReadOnlyCollection<BattleUnitState> enemies = GetValue(session.Queries.Execute(new GetVisibleEnemiesForUnit(observer.Handle)));
@@ -117,4 +118,5 @@ public class BattleSessionQueriesTest
     var result = BattleSessionMutation.StartBattle().Execute(session);
     Assert.True(result.Succeeded);
   }
+
 }

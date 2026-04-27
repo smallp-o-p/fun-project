@@ -1,9 +1,8 @@
 using FunProject.Combatants;
 using FunProject.Stats;
+using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
-using Godot;
-using Godot.Collections;
 using System;
 
 [TestSuite]

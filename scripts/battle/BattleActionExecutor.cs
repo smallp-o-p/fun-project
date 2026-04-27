@@ -192,9 +192,19 @@ public sealed class BattleActionExecutor
       return invalidContext.Failure;
 
     BattleUnitState unit = ((ValidUnitActionContext)context).Unit;
-    if (!_session.Board.IsAdjacent(unit.Position, moveStep.Destination))
+    Option<BattleBoardState.ValidatedPoint> unitPointOption = _session.Board.ValidatePoint(unit.Position);
+    if (unitPointOption.IsNone)
+      return BattleActionEvaluation.Rejected(moveStep, $"Unit id {unit.UnitId} is not on a valid tile.", actionPointCost: moveStep.ActionPointCost);
+    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+
+    Option<BattleBoardState.ValidatedPoint> destinationPointOption = _session.Board.ValidatePoint(moveStep.Destination);
+    if (destinationPointOption.IsNone)
+      return BattleActionEvaluation.Rejected(moveStep, $"{moveStep.Destination} cannot be occupied.", actionPointCost: moveStep.ActionPointCost);
+    BattleBoardState.ValidatedPoint destinationPoint = destinationPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+
+    if (!BattleBoardState.AreAdjacent(unitPoint, destinationPoint))
       return BattleActionEvaluation.Rejected(moveStep, $"{moveStep.Destination} is not adjacent to {unit.Position}.", actionPointCost: moveStep.ActionPointCost);
-    if (!_session.Board.CanOccupy(moveStep.Destination))
+    if (!_session.Board.CanOccupy(destinationPoint))
       return BattleActionEvaluation.Rejected(moveStep, $"{moveStep.Destination} cannot be occupied.", actionPointCost: moveStep.ActionPointCost);
 
     return BattleActionEvaluation.Allowed(moveStep, moveStep.ActionPointCost);
@@ -224,36 +234,41 @@ public sealed class BattleActionExecutor
         $"{unit.Combatant.Name} needs {totalActionPointCost} action points but only has {unit.CurrentActionPoints}.",
         actionPointCost: (int)totalActionPointCost);
 
-    BattleActionEvaluation currentTileEvaluation = _session.Board.GetTileOrNone(unit.Position).Match(
-      _ => BattleActionEvaluation.Allowed(moveUnit, (int)totalActionPointCost),
-      () => BattleActionEvaluation.Rejected(
+    Option<BattleBoardState.ValidatedPoint> previousPointOption = _session.Board.ValidatePoint(unit.Position);
+    if (previousPointOption.IsNone)
+      return BattleActionEvaluation.Rejected(
         moveUnit,
         $"Unit id {unit.UnitId} is not on a valid tile",
-        actionPointCost: (int)totalActionPointCost));
+        actionPointCost: (int)totalActionPointCost);
+    BattleBoardState.ValidatedPoint previousPoint = previousPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
 
-    if (!currentTileEvaluation.IsAllowed)
-      return currentTileEvaluation;
-
-    Vector3I previousStep = moveUnit.Path[0];
+    Vector3I previousStep = unit.Position;
     foreach (var step in moveUnit.Path.Skip(1))
     {
-      if (!_session.Board.IsAdjacent(previousStep, step))
+      Option<BattleBoardState.ValidatedPoint> stepPointOption = _session.Board.ValidatePoint(step);
+      if (stepPointOption.IsNone)
+        return BattleActionEvaluation.Rejected(
+          moveUnit,
+          $"Move unit path step {step} leaves the board.",
+          actionPointCost: (int)totalActionPointCost);
+      BattleBoardState.ValidatedPoint stepPoint = stepPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+
+      if (!BattleBoardState.AreAdjacent(previousPoint, stepPoint))
         return BattleActionEvaluation.Rejected(
           moveUnit,
           $"Move unit path step {step} is not adjacent to {previousStep}.",
           actionPointCost: (int)totalActionPointCost);
 
-      BattleActionEvaluation destinationEvaluation = _session.Board.GetTileOrNone(step).Match(
-        tile => EvaluateMoveUnitPathDestination(moveUnit, step, tile, (int)totalActionPointCost),
-        () => BattleActionEvaluation.Rejected(
-          moveUnit,
-          $"Move unit path step {step} leaves the board.",
-          actionPointCost: (int)totalActionPointCost));
-
+      BattleActionEvaluation destinationEvaluation = EvaluateMoveUnitPathDestination(
+        moveUnit,
+        step,
+        _session.Board.GetTile(stepPoint),
+        (int)totalActionPointCost);
       if (!destinationEvaluation.IsAllowed)
         return destinationEvaluation;
 
       previousStep = step;
+      previousPoint = stepPoint;
     }
 
     return BattleActionEvaluation.Allowed(moveUnit, (int)totalActionPointCost);
@@ -269,7 +284,7 @@ public sealed class BattleActionExecutor
       return invalidContext.Failure;
 
     BattleUnitState unit = ((ValidUnitActionContext)context).Unit;
-    if (!_session.Board.IsInBounds(throwItem.TargetCell))
+    if (_session.Board.ValidatePoint(throwItem.TargetCell).IsNone)
       return BattleActionEvaluation.Rejected(throwItem, $"{throwItem.TargetCell} is outside the battle board.", actionPointCost: actionPointCost);
     if (!unit.HasInventoryItem(throwItem.Item))
       return BattleActionEvaluation.Rejected(throwItem, $"{unit.Combatant.Name} does not have {throwItem.Item.ItemName}.", actionPointCost: actionPointCost);

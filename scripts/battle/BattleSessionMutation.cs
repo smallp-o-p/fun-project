@@ -214,10 +214,15 @@ public sealed class SpawnUnit : BattleSessionMutation
   {
     if (session.Phase == BattlePhase.Ended)
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, "Cannot add units after the battle has ended.");
-    if (!session.Board.CanOccupy(Position))
+
+    Option<BattleBoardState.ValidatedPoint> positionPointOption = session.Board.ValidatePoint(Position);
+    if (positionPointOption.IsNone)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, $"Cannot place a unit at {Position}.");
+    BattleBoardState.ValidatedPoint positionPoint = positionPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+    if (!session.Board.CanOccupy(positionPoint))
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.Rejected, $"Cannot place a unit at {Position}.");
 
-    var spawnedUnit = session.AddUnit(Combatant, Position, EquippedWeapon);
+    var spawnedUnit = session.AddUnit(Combatant, positionPoint, EquippedWeapon);
     session.RaiseEvent(new BattleEvent(BattleEventType.UnitAdded, Some(spawnedUnit.Unit.UnitId), Some(spawnedUnit.Unit.Position)));
     return BattleMutationResult.Success(this, spawnedUnit.Unit, spawnedUnit.Handle);
   }
@@ -250,9 +255,19 @@ public sealed class MoveUnitStep : BattleSessionMutation
     return session.GetLivingUnit(UnitHandle).Match(
       unit =>
       {
+        Option<BattleBoardState.ValidatedPoint> sourcePointOption = session.Board.ValidatePoint(unit.Position);
+        if (sourcePointOption.IsNone)
+          return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit step mutation could not resolve source position {unit.Position} for unit {UnitId}.");
+        BattleBoardState.ValidatedPoint sourcePoint = sourcePointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+
+        Option<BattleBoardState.ValidatedPoint> destinationPointOption = session.Board.ValidatePoint(Destination);
+        if (destinationPointOption.IsNone)
+          return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit step mutation could not resolve destination {Destination}.");
+        BattleBoardState.ValidatedPoint destinationPoint = destinationPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+
         if (!unit.TrySpendActionPoints(ActionPointCost))
           return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit step mutation could not spend {ActionPointCost} action points for unit {UnitId}.");
-        if (!session.Board.TryMoveOccupant(unit.Position, Destination, unit.UnitId))
+        if (!session.Board.TryMoveOccupant(sourcePoint, destinationPoint, unit.UnitId))
           return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit step mutation could not move unit {UnitId} to {Destination}.");
 
         unit.MoveTo(Destination);
@@ -309,14 +324,26 @@ public sealed class MoveUnit : BattleSessionMutation
     if (unit.CurrentActionPoints < totalActionPointCost)
       return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"{unit.Combatant.Name} needs {totalActionPointCost} action points but only has {unit.CurrentActionPoints}.");
 
+    Option<BattleBoardState.ValidatedPoint> previousPointOption = session.Board.ValidatePoint(Path[0]);
+    if (previousPointOption.IsNone)
+      return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit path step {Path[0]} cannot be occupied.");
+    BattleBoardState.ValidatedPoint previousPoint = previousPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+
     for (int stepIndex = 1; stepIndex < Path.Count; stepIndex++)
     {
       Vector3I previousStep = Path[stepIndex - 1];
       Vector3I step = Path[stepIndex];
-      if (!session.Board.IsAdjacent(previousStep, step))
-        return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit path step {step} is not adjacent to {previousStep}.");
-      if (!session.Board.CanOccupy(step))
+
+      Option<BattleBoardState.ValidatedPoint> stepPointOption = session.Board.ValidatePoint(step);
+      if (stepPointOption.IsNone)
         return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit path step {step} cannot be occupied.");
+      BattleBoardState.ValidatedPoint stepPoint = stepPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+      if (!BattleBoardState.AreAdjacent(previousPoint, stepPoint))
+        return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit path step {step} is not adjacent to {previousStep}.");
+      if (!session.Board.CanOccupy(stepPoint))
+        return BattleMutationResult.Failure(this, BattleMutationFailureReason.UnexpectedError, $"Move unit path step {step} cannot be occupied.");
+
+      previousPoint = stepPoint;
     }
 
     BattleUnitState currentUnit = unit;

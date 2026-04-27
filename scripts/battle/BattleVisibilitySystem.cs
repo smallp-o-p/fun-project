@@ -106,11 +106,13 @@ internal sealed class BattleVisibilitySystem
 
     if (observer.IsDead)
       return false;
-    if (!board.IsInBounds(observer.Position))
+
+    Option<BattleBoardState.ValidatedPoint> observerCell = board.ValidatePoint(observer.Position);
+    Option<BattleBoardState.ValidatedPoint> targetCell = board.ValidatePoint(targetTile);
+
+    if (observerCell.IsNone || targetCell.IsNone)
       return false;
-    if (!board.IsInBounds(targetTile))
-      return false;
-    if (targetTile != observer.Position && board.GetTileOrNone(targetTile).Match(tile => tile.BlocksLineOfSight, () => false))
+    if (targetTile != observer.Position && targetCell.Match(point => board.GetTile(point).BlocksLineOfSight, () => false))
       return false;
 
     var observerPoint = ToWorldPoint(observer.Position);
@@ -141,7 +143,9 @@ internal sealed class BattleVisibilitySystem
 
     var originCell = ToTileCoordinates(origin);
     var targetCell = ToTileCoordinates(target);
-    if (!board.IsInBounds(originCell) || !board.IsInBounds(targetCell))
+    Option<BattleBoardState.ValidatedPoint> originPoint = board.ValidatePoint(originCell);
+    Option<BattleBoardState.ValidatedPoint> targetPoint = board.ValidatePoint(targetCell);
+    if (originPoint.IsNone || targetPoint.IsNone)
       return false;
     if (originCell == targetCell)
       return true;
@@ -187,15 +191,14 @@ internal sealed class BattleVisibilitySystem
       }
 
       var currentCell = new Vector3I(currentX, currentY, currentZ);
-      if (!board.IsInBounds(currentCell))
+      Option<BattleBoardState.ValidatedPoint> currentPointOption = board.ValidatePoint(currentCell);
+      if (currentPointOption.IsNone)
         return false;
+      BattleBoardState.ValidatedPoint currentPoint = currentPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
       if (currentCell == targetCell)
         return true;
 
-      Option<BattleTileState> tile = board.GetTileOrNone(currentCell);
-      if (tile.IsNone)
-        return false;
-      if (tile.Match(tileValue => tileValue.BlocksLineOfSight, () => false))
+      if (board.GetTile(currentPoint).BlocksLineOfSight)
         return false;
     }
 

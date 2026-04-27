@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -28,12 +29,19 @@ public sealed class FindPathForUnit : BattleSessionQuery<Vector3I[]>
       return Fail(failureResult.Failure.Reason, failureResult.Failure.Message);
 
     BattleUnitState unit = ((BattleQuerySuccess<BattleUnitState>)unitResult).Value;
-    if (!session.Board.IsInBounds(unit.Position))
+
+    Option<BattleBoardState.ValidatedPoint> unitPointOption = session.Board.ValidatePoint(unit.Position);
+    Option<BattleBoardState.ValidatedPoint> destinationPointOption = session.Board.ValidatePoint(Destination);
+
+    if (unitPointOption.IsNone)
       return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {UnitHandle.UnitId} is on invalid tile {unit.Position}.");
-    if (!session.Board.IsInBounds(Destination))
+    if (destinationPointOption.IsNone)
       return Fail(BattleQueryFailureReason.InvalidTile, $"Destination {Destination} is outside the battle board.");
 
-    return Succeed(session.Board.FindPath(unit.Position, Destination, unit.UnitId));
+    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+    BattleBoardState.ValidatedPoint destinationPoint = destinationPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+
+    return Succeed(session.Board.FindPath(unitPoint, destinationPoint, unit.UnitId).Select(point => point.Raw).ToArray());
   }
 }
 
@@ -70,15 +78,21 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
     if (unit.CurrentActionPoints < ActionPointCostPerStep)
       return Succeed([]);
 
+    Option<BattleBoardState.ValidatedPoint> unitPointOption = session.Board.ValidatePoint(unit.Position);
+    if (unitPointOption.IsNone)
+      return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {UnitHandle.UnitId} is on invalid tile {unit.Position}.");
+    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+
     List<Vector3I> possibleTiles = [];
-    foreach (Vector3I coordinates in EnumerateCandidateCoordinates(session.Board, unit))
+    foreach (BattleBoardState.ValidatedPoint candidatePoint in EnumerateCandidatePoints(session.Board, unit))
     {
+      Vector3I coordinates = candidatePoint.Raw;
       if (coordinates == unit.Position)
         continue;
-      if (!session.Board.CanOccupy(coordinates))
+      if (!session.Board.CanOccupy(candidatePoint))
         continue;
 
-      Vector3I[] path = session.Board.FindPath(unit.Position, coordinates, unit.UnitId);
+      BattleBoardState.ValidatedPoint[] path = session.Board.FindPath(unitPoint, candidatePoint, unit.UnitId);
       if (path.Length == 0)
         continue;
 
@@ -90,16 +104,16 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
     return Succeed(possibleTiles.ToArray());
   }
 
-  private IEnumerable<Vector3I> EnumerateCandidateCoordinates(BattleBoardState board, BattleUnitState unit)
+  private IEnumerable<BattleBoardState.ValidatedPoint> EnumerateCandidatePoints(BattleBoardState board, BattleUnitState unit)
   {
     if (ActionPointCostPerStep == 0)
-      return board.EnumerateBoardCoordinates();
+      return board.EnumerateBoardPoints();
 
     int maxSteps = unit.CurrentActionPoints / ActionPointCostPerStep;
-    return EnumerateCoordinatesWithinStepBound(board, unit.Position, maxSteps);
+    return EnumeratePointsWithinStepBound(board, unit.Position, maxSteps);
   }
 
-  private static IEnumerable<Vector3I> EnumerateCoordinatesWithinStepBound(
+  private static IEnumerable<BattleBoardState.ValidatedPoint> EnumeratePointsWithinStepBound(
     BattleBoardState board,
     Vector3I origin,
     int maxSteps)
@@ -118,8 +132,12 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
         for (int x = minX; x <= maxX; x++)
         {
           Vector3I coordinates = new(x, y, z);
-          if (BattleSession.GetGridDistance(origin, coordinates) <= maxSteps)
-            yield return coordinates;
+          if (BattleSession.GetGridDistance(origin, coordinates) > maxSteps)
+            continue;
+
+          Option<BattleBoardState.ValidatedPoint> point = board.ValidatePoint(coordinates);
+          if (point.IsSome)
+            yield return point.IfNone(default(BattleBoardState.ValidatedPoint));
         }
       }
     }

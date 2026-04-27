@@ -19,33 +19,20 @@ public partial class BattleMapData : Resource
     if (TileSize <= 0.0f)
       throw new InvalidOperationException($"{nameof(BattleMapData)} requires a positive tile size.");
 
-    var board = new BattleBoardState(Dimensions);
+    BattleBoardState board = new(Dimensions);
 
     foreach (BattleMapTileData tileOverride in TileOverrides)
     {
-      if (tileOverride == null)
-      {
-        GD.PushError($"{nameof(BattleMapData)} contains a null tile override.");
-        continue;
-      }
-
-      if (!board.IsInBounds(tileOverride.Coordinates))
-      {
-        GD.PushError($"{nameof(BattleMapData)} tile override at '{tileOverride.Coordinates}' is out of bounds for dimensions '{Dimensions}'.");
-        continue;
-      }
-
-      board.GetTileOrNone(tileOverride.Coordinates).Match(
-        tile =>
+      board.ValidatePoint(tileOverride.Coordinates).Match(
+        point =>
         {
+          BattleTileState tile = board.GetTile(point);
           tile.IsWalkable = tileOverride.IsPresent && tileOverride.IsWalkable;
           tile.BlocksLineOfSight = tileOverride.IsPresent && tileOverride.BlocksLineOfSight;
-          return true;
         },
         () =>
         {
-          GD.PushError($"{nameof(BattleMapData)} could not resolve board tile at '{tileOverride.Coordinates}'.");
-          return false;
+          GD.PushError($"{nameof(BattleMapData)} tile override at '{tileOverride.Coordinates}' is out of bounds for dimensions '{Dimensions}'.");
         });
     }
 

@@ -1,6 +1,7 @@
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Stats;
+using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
@@ -18,13 +19,12 @@ public class BattleSessionTest
   {
     var board = new BattleBoardState(new Vector3I(4, 2, 5));
 
-    Assert.True(board.IsInBounds(new Vector3I(3, 1, 4)));
-    Assert.False(board.IsInBounds(new Vector3I(3, 2, 4)));
-    Assert.False(board.IsInBounds(new Vector3I(3, 1, 5)));
+    Assert.True(board.ValidatePoint(new Vector3I(3, 1, 4)).IsSome);
+    Assert.True(board.ValidatePoint(new Vector3I(3, 2, 4)).IsNone);
+    Assert.True(board.ValidatePoint(new Vector3I(3, 1, 5)).IsNone);
 
-    Option<BattleTileState> tile = board.GetTileOrNone(new Vector3I(3, 1, 4));
-    Assert.True(tile.IsSome);
-    Assert.Equal(new Vector3I(3, 1, 4), tile.RequireSome().Coordinates);
+    BattleBoardState.ValidatedPoint point = board.ValidatePoint(new Vector3I(3, 1, 4)).RequireSome();
+    Assert.Equal(new Vector3I(3, 1, 4), point.Raw);
   }
 
   [TestCase(TestName = "SpawnUnit occupies its tile")]
@@ -34,7 +34,7 @@ public class BattleSessionTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 2, 4), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
 
-    var tile = session.Board.GetTile(new Vector3I(1, 0, 1));
+    var tile = session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
     Assert.True(tile.IsOccupied);
     Assert.Equal(unit.UnitId, tile.OccupantUnitId.RequireSome());
   }
@@ -109,7 +109,7 @@ public class BattleSessionTest
     Assert.Equal(factionB, session.ActiveSide);
     Assert.Equal(factionB, session.TurnQueue.First());
     Assert.Equal(0, session.AliveUnits.Count);
-    Assert.False(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
+    Assert.False(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()).IsOccupied);
   }
 
   [TestCase(TestName = "Constructor can use a prebuilt board state")]
@@ -117,7 +117,7 @@ public class BattleSessionTest
   {
     var faction = BattleTestFactory.MakeFaction("A");
     var board = new BattleBoardState(new Vector3I(3, 1, 3));
-    board.GetTile(new Vector3I(1, 0, 0)).IsWalkable = false;
+    board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).IsWalkable = false;
 
     var session = new BattleSession(
       board,
@@ -358,8 +358,8 @@ public class BattleSessionTest
 
     Assert.True(moved.Succeeded);
     Assert.Equal(new Vector3I(1, 1, 1), unit.Position);
-    Assert.False(session.Board.GetTile(new Vector3I(1, 0, 1)).IsOccupied);
-    Assert.True(session.Board.GetTile(new Vector3I(1, 1, 1)).IsOccupied);
+    Assert.False(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome()).IsOccupied);
+    Assert.True(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 1, 1)).RequireSome()).IsOccupied);
     Assert.Equal(3, unit.CurrentActionPoints);
   }
 
@@ -403,8 +403,8 @@ public class BattleSessionTest
 
     Assert.True(moved.Succeeded);
     Assert.Equal(new Vector3I(2, 0, 0), unit.Position);
-    Assert.False(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
-    Assert.True(session.Board.GetTile(new Vector3I(2, 0, 0)).IsOccupied);
+    Assert.False(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()).IsOccupied);
+    Assert.True(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(2, 0, 0)).RequireSome()).IsOccupied);
     Assert.Equal(3, unit.CurrentActionPoints);
   }
 
@@ -420,8 +420,8 @@ public class BattleSessionTest
 
     Assert.False(moved.Succeeded);
     Assert.Equal(new Vector3I(0, 0, 0), unit.Position);
-    Assert.True(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
-    Assert.False(session.Board.GetTile(new Vector3I(2, 0, 0)).IsOccupied);
+    Assert.True(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()).IsOccupied);
+    Assert.False(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(2, 0, 0)).RequireSome()).IsOccupied);
   }
 
   [TestCase(TestName = "MoveUnit rejects invalid composed steps")]
@@ -437,7 +437,7 @@ public class BattleSessionTest
     Assert.False(moved.Succeeded);
     Assert.Equal(new Vector3I(0, 0, 0), unit.Position);
     Assert.Equal(5, unit.CurrentActionPoints);
-    Assert.True(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
+    Assert.True(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()).IsOccupied);
   }
 
   [TestCase(TestName = "MoveUnit rejects paths that cost more AP than the unit has")]
@@ -456,7 +456,7 @@ public class BattleSessionTest
     Assert.False(moved.Succeeded);
     Assert.Equal(new Vector3I(0, 0, 0), unit.Position);
     Assert.Equal(1, unit.CurrentActionPoints);
-    Assert.True(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
+    Assert.True(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()).IsOccupied);
   }
 
   [TestCase(TestName = "Passing a unit ends its activation while keeping the next ally available")]
@@ -490,7 +490,7 @@ public class BattleSessionTest
 
     ApplyDamage(session, unitA.Handle, 10);
 
-    Assert.False(session.Board.GetTile(new Vector3I(0, 0, 0)).IsOccupied);
+    Assert.False(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()).IsOccupied);
     Assert.Equal(factionA, session.ActiveSide);
     Assert.False(session.AliveUnits.Contains(unitA));
     Assert.True(session.DeadUnits.Contains(unitA));
@@ -518,7 +518,7 @@ public class BattleSessionTest
 
     Assert.Equal(factionA, session.ActiveSide);
     Assert.True(GetValue(session.Queries.Execute(new CanUnitActNow(unitA2.Handle))));
-    Assert.False(session.Board.GetTile(unitA1.Position).IsOccupied);
+    Assert.False(session.Board.GetTile(session.Board.ValidatePoint(unitA1.Position).RequireSome()).IsOccupied);
     Assert.True(session.DeadUnits.Contains(unitA1));
   }
 

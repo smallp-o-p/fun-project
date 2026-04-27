@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Tests;
 using GdUnit4;
 using Godot;
 using System.Linq;
@@ -25,7 +26,7 @@ public partial class BattleMapDataTest
     };
 
     BattleBoardState board = mapData.CreateBoardState();
-    BattleTileState tile = board.GetTile(new Vector3I(1, 0, 1));
+    BattleTileState tile = board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
 
     Assert.False(tile.IsWalkable);
     Assert.True(tile.BlocksLineOfSight);

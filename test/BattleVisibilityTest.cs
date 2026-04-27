@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Tests;
 using GdUnit4;
 using Godot;
 using System.Linq;
@@ -33,7 +34,7 @@ public class BattleVisibilityTest
     var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
     var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
 
-    session.Board.GetTile(new Vector3I(1, 0, 0)).BlocksLineOfSight = true;
+    session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).BlocksLineOfSight = true;
     StartBattle(session);
 
     Assert.False(GetValue(session.Queries.Execute(new IsUnitVisibleToUnit(observer.Handle, target.Handle))));
@@ -172,7 +173,7 @@ public class BattleVisibilityTest
     var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
 
     Assert.True(GetValue(session.Queries.Execute(new IsUnitVisibleToUnit(observer.Handle, target.Handle))));
-    session.Board.GetTile(new Vector3I(1, 0, 0)).BlocksLineOfSight = true;
+    session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).BlocksLineOfSight = true;
 
     StartBattle(session);
 

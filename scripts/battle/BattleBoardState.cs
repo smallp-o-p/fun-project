@@ -6,15 +6,48 @@ namespace FunProject.Battle;
 
 public sealed class BattleBoardState
 {
-  private static readonly Vector3I[] AdjacentDirections =
-  [
-    new Vector3I(1, 0, 0),
-    new Vector3I(-1, 0, 0),
-    new Vector3I(0, 1, 0),
-    new Vector3I(0, -1, 0),
-    new Vector3I(0, 0, 1),
-    new Vector3I(0, 0, -1),
-  ];
+  public readonly struct ValidatedPoint : IEquatable<ValidatedPoint>
+  {
+    public readonly Vector3I Raw;
+    public int X => Raw.X;
+    public int Y => Raw.Y;
+    public int Z => Raw.Z;
+
+    internal ValidatedPoint(Vector3I coordinates)
+    {
+      Raw = coordinates;
+    }
+
+    public bool Equals(ValidatedPoint other)
+    {
+      return Raw == other.Raw;
+    }
+
+    public override bool Equals(object obj)
+    {
+      return obj is ValidatedPoint other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+      return Raw.GetHashCode();
+    }
+
+    public override string ToString()
+    {
+      return Raw.ToString();
+    }
+
+    public static bool operator ==(ValidatedPoint left, ValidatedPoint right)
+    {
+      return left.Equals(right);
+    }
+
+    public static bool operator !=(ValidatedPoint left, ValidatedPoint right)
+    {
+      return !(left == right);
+    }
+  }
 
   private readonly BattleTileState[,,] _tiles;
   private readonly AStar3D _pathGraph = new();
@@ -35,8 +68,9 @@ public sealed class BattleBoardState
       {
         for (int x = 0; x < Dimensions.X; x++)
         {
-          BattleTileState tile = new(new Vector3I(x, y, z));
-          tile.TraversalStateChanged += OnTileTraversalStateChanged;
+          ValidatedPoint point = new(new Vector3I(x, y, z));
+          BattleTileState tile = new();
+          tile.TraversalStateChanged += changedTile => OnTileTraversalStateChanged(point, changedTile);
           _tiles[x, y, z] = tile;
         }
       }
@@ -45,7 +79,7 @@ public sealed class BattleBoardState
     InitializePathGraph();
   }
 
-  public bool IsInBounds(Vector3I coordinates)
+  private bool IsInBounds(Vector3I coordinates)
   {
     return coordinates.X >= 0
       && coordinates.Y >= 0
@@ -55,41 +89,26 @@ public sealed class BattleBoardState
       && coordinates.Z < Dimensions.Z;
   }
 
-  public Option<BattleTileState> GetTileOrNone(Vector3I coordinates)
+  public Option<ValidatedPoint> ValidatePoint(Vector3I coordinates)
   {
     if (!IsInBounds(coordinates))
       return None;
 
-    return Some(_tiles[coordinates.X, coordinates.Y, coordinates.Z]);
+    return Some(new ValidatedPoint(coordinates));
   }
 
-  public BattleTileState GetTile(Vector3I coordinates)
+  public bool TryPlaceOccupant(ValidatedPoint point, int unitId)
   {
-    if (!IsInBounds(coordinates))
-      throw new ArgumentOutOfRangeException(nameof(coordinates));
-
-    return GetTileInBounds(coordinates);
+    return GetTile(point).TrySetOccupant(unitId);
   }
 
-  public bool TryPlaceOccupant(Vector3I coordinates, int unitId)
+  public bool TryMoveOccupant(ValidatedPoint source, ValidatedPoint destination, int unitId)
   {
-    if (!IsInBounds(coordinates))
-      return false;
+    BattleTileState sourceTile = GetTile(source), destinationTile = GetTile(destination);
 
-    BattleTileState tile = GetTileInBounds(coordinates);
-    return tile.TrySetOccupant(unitId);
-  }
-
-  public bool TryMoveOccupant(Vector3I source, Vector3I destination, int unitId)
-  {
-    if (!IsInBounds(source) || !IsInBounds(destination))
-      return false;
-
-    BattleTileState sourceTile = GetTileInBounds(source);
-    BattleTileState destinationTile = GetTileInBounds(destination);
     if (!sourceTile.HasOccupant(unitId))
       return false;
-    if (source == destination)
+    if (source.Equals(destination))
       return true;
     if (!destinationTile.TrySetOccupant(unitId))
       return false;
@@ -98,12 +117,9 @@ public sealed class BattleBoardState
     return true;
   }
 
-  public bool TryClearOccupant(Vector3I coordinates, int unitId)
+  public bool TryClearOccupant(ValidatedPoint point, int unitId)
   {
-    if (!IsInBounds(coordinates))
-      return false;
-
-    BattleTileState tile = GetTileInBounds(coordinates);
+    BattleTileState tile = GetTile(point);
     if (!tile.HasOccupant(unitId))
       return false;
 
@@ -111,14 +127,14 @@ public sealed class BattleBoardState
     return true;
   }
 
-  public Vector3I[] FindPath(Vector3I source, Vector3I destination, int movingUnitId = 0)
+  public ValidatedPoint[] FindPath(ValidatedPoint source, ValidatedPoint destination, int movingUnitId = 0)
   {
     if (!CanUsePathEndpoint(source, movingUnitId) || !CanUsePathEndpoint(destination, movingUnitId))
       return [];
 
     long sourceId = CoordinatesToPointId(source);
     long destinationId = CoordinatesToPointId(destination);
-    BattleTileState sourceTile = GetTileInBounds(source);
+    BattleTileState sourceTile = GetTile(source);
     bool restoreSourceDisabled = false;
 
     if (sourceTile.HasOccupant(movingUnitId) && _pathGraph.IsPointDisabled(sourceId))
@@ -127,46 +143,33 @@ public sealed class BattleBoardState
       restoreSourceDisabled = true;
     }
 
-    Vector3I[] path = System.Array.ConvertAll(_pathGraph.GetIdPath(sourceId, destinationId), PointIdToCoordinates);
+    ValidatedPoint[] path = System.Array.ConvertAll(_pathGraph.GetIdPath(sourceId, destinationId), PointIdToCoordinates);
     if (restoreSourceDisabled)
       _pathGraph.SetPointDisabled(sourceId, ShouldDisablePathPoint(sourceTile));
 
     return path;
   }
 
-  public bool CanOccupy(Vector3I coordinates)
+  public bool CanOccupy(ValidatedPoint point)
   {
-    if (!IsInBounds(coordinates))
-      return false;
-
-    BattleTileState tile = GetTileInBounds(coordinates);
+    BattleTileState tile = GetTile(point);
     return tile.IsWalkable && !tile.IsOccupied;
   }
 
-  public bool IsAdjacent(Vector3I source, Vector3I destination)
+  public static bool AreAdjacent(ValidatedPoint source, ValidatedPoint destination)
   {
-    Vector3I delta = source - destination;
+    Vector3I delta = source.Raw - destination.Raw;
     return Mathf.Abs(delta.X) + Mathf.Abs(delta.Y) + Mathf.Abs(delta.Z) == 1;
   }
 
-  public IEnumerable<Vector3I> EnumerateAdjacentCoordinates(Vector3I coordinates)
-  {
-    foreach (Vector3I direction in AdjacentDirections)
-    {
-      Vector3I adjacent = coordinates + direction;
-      if (IsInBounds(adjacent))
-        yield return adjacent;
-    }
-  }
-
-  public IEnumerable<Vector3I> EnumerateBoardCoordinates()
+  public IEnumerable<ValidatedPoint> EnumerateBoardPoints()
   {
     for (int y = 0; y < Dimensions.Y; y++)
     {
       for (int z = 0; z < Dimensions.Z; z++)
       {
         for (int x = 0; x < Dimensions.X; x++)
-          yield return new Vector3I(x, y, z);
+          yield return new ValidatedPoint(new Vector3I(x, y, z));
       }
     }
   }
@@ -175,22 +178,26 @@ public sealed class BattleBoardState
   {
     _pathGraph.ReserveSpace(Dimensions.X * Dimensions.Y * Dimensions.Z);
 
-    foreach (Vector3I coordinates in EnumerateBoardCoordinates())
-      InitializePathGraphPoint(coordinates);
+    foreach (ValidatedPoint point in EnumerateBoardPoints())
+      InitializePathGraphPoint(point);
   }
 
-  private bool CanUsePathEndpoint(Vector3I coordinates, int movingUnitId)
+  private bool CanUsePathEndpoint(ValidatedPoint point, int movingUnitId)
   {
-    if (!IsInBounds(coordinates))
-      return false;
-
-    BattleTileState tile = GetTileInBounds(coordinates);
+    BattleTileState tile = GetTile(point);
     if (!tile.IsWalkable)
       return false;
     if (!tile.IsOccupied)
       return true;
 
     return tile.HasOccupant(movingUnitId);
+  }
+
+  private long CoordinatesToPointId(ValidatedPoint point)
+  {
+    return point.X
+      + ((long)Dimensions.X * point.Z)
+      + ((long)Dimensions.X * Dimensions.Z * point.Y);
   }
 
   private long CoordinatesToPointId(Vector3I coordinates)
@@ -200,32 +207,34 @@ public sealed class BattleBoardState
       + ((long)Dimensions.X * Dimensions.Z * coordinates.Y);
   }
 
-  private BattleTileState GetTileInBounds(Vector3I coordinates)
+  public BattleTileState GetTile(ValidatedPoint point)
   {
-    return _tiles[coordinates.X, coordinates.Y, coordinates.Z];
+    return _tiles[point.X, point.Y, point.Z];
   }
 
-  private void OnTileTraversalStateChanged(BattleTileState tile)
+  private void OnTileTraversalStateChanged(ValidatedPoint point, BattleTileState tile)
   {
     ArgumentNullException.ThrowIfNull(tile);
-    UpdatePathPointState(tile);
+    UpdatePathPointState(point, tile);
   }
 
-  private void UpdatePathPointState(BattleTileState tile)
+  private void UpdatePathPointState(ValidatedPoint point, BattleTileState tile)
   {
-    _pathGraph.SetPointDisabled(CoordinatesToPointId(tile.Coordinates), ShouldDisablePathPoint(tile));
+    ArgumentNullException.ThrowIfNull(tile);
+    _pathGraph.SetPointDisabled(CoordinatesToPointId(point), ShouldDisablePathPoint(tile));
   }
 
-  private void InitializePathGraphPoint(Vector3I coordinates)
+  private void InitializePathGraphPoint(ValidatedPoint point)
   {
-    long pointId = CoordinatesToPointId(coordinates);
+    Vector3I coordinates = point.Raw;
+    long pointId = CoordinatesToPointId(point);
     _pathGraph.AddPoint(pointId, BattleGridMath.CellToLocalCenter(coordinates));
 
     ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(-1, 0, 0));
     ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, 0, -1));
     ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, -1, 0));
 
-    UpdatePathPointState(GetTileInBounds(coordinates));
+    UpdatePathPointState(point, GetTile(point));
   }
 
   private void ConnectPathGraphPointToExistingNeighbor(long pointId, Vector3I neighborCoordinates)
@@ -241,7 +250,7 @@ public sealed class BattleBoardState
     return !tile.IsWalkable || tile.IsOccupied;
   }
 
-  private Vector3I PointIdToCoordinates(long pointId)
+  private ValidatedPoint PointIdToCoordinates(long pointId)
   {
     long layerSize = (long)Dimensions.X * Dimensions.Z;
     if (pointId < 0)
@@ -254,6 +263,6 @@ public sealed class BattleBoardState
     if (x >= Dimensions.X || y >= Dimensions.Y || z >= Dimensions.Z)
       throw new ArgumentOutOfRangeException(nameof(pointId), "Point id must map to a valid board coordinate.");
 
-    return new Vector3I((int)x, (int)y, (int)z);
+    return new ValidatedPoint(new Vector3I((int)x, (int)y, (int)z));
   }
 }

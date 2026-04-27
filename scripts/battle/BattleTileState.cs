@@ -1,4 +1,3 @@
-using Godot;
 using System;
 
 namespace FunProject.Battle;
@@ -6,8 +5,6 @@ namespace FunProject.Battle;
 public sealed class BattleTileState
 {
   private bool _isWalkable = true;
-
-  public Vector3I Coordinates { get; }
   public bool IsWalkable
   {
     get => _isWalkable;
@@ -20,17 +17,13 @@ public sealed class BattleTileState
       TraversalStateChanged.Invoke(this);
     }
   }
+
   public bool BlocksLineOfSight { get; set; }
   public bool HasHazard { get; set; }
   public Option<int> OccupantUnitId { get; private set; }
   public bool IsOccupied => OccupantUnitId.IsSome;
 
   public event Action<BattleTileState> TraversalStateChanged = delegate { };
-
-  public BattleTileState(Vector3I coordinates)
-  {
-    Coordinates = coordinates;
-  }
 
   public bool TrySetOccupant(int unitId)
   {

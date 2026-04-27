@@ -99,7 +99,7 @@ public sealed class IsTileVisibleToFaction : BattleSessionQuery<bool>
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    if (!session.Board.IsInBounds(Tile))
+    if (session.Board.ValidatePoint(Tile).IsNone)
       return Fail(BattleQueryFailureReason.InvalidTile, $"Tile {Tile} is outside the battle board.");
 
     return Succeed(session.VisibilitySnapshot
@@ -128,7 +128,7 @@ public sealed class HasFactionExploredTile : BattleSessionQuery<bool>
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    if (!session.Board.IsInBounds(Tile))
+    if (session.Board.ValidatePoint(Tile).IsNone)
       return Fail(BattleQueryFailureReason.InvalidTile, $"Tile {Tile} is outside the battle board.");
 
     return Succeed(session.VisibilitySnapshot

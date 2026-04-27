@@ -135,13 +135,28 @@ public sealed class BattleSession
     return AddUnit(combatant, position, None);
   }
 
+  internal SpawnedBattleUnit AddUnit(Combatant combatant, BattleBoardState.ValidatedPoint position)
+  {
+    return AddUnit(combatant, position, None);
+  }
+
   internal SpawnedBattleUnit AddUnit(Combatant combatant, Vector3I position, Option<Weapon> equippedWeapon)
+  {
+    Option<BattleBoardState.ValidatedPoint> positionPointOption = Board.ValidatePoint(position);
+    if (positionPointOption.IsNone)
+      throw new InvalidOperationException($"Could not place unit at invalid board position {position}.");
+    BattleBoardState.ValidatedPoint positionPoint = positionPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+
+    return AddUnit(combatant, positionPoint, equippedWeapon);
+  }
+
+  internal SpawnedBattleUnit AddUnit(Combatant combatant, BattleBoardState.ValidatedPoint position, Option<Weapon> equippedWeapon)
   {
     ArgumentNullException.ThrowIfNull(combatant);
 
     var handle = new BattleUnitHandle(_nextUnitId++);
-    var unit = new BattleUnitState(handle.UnitId, combatant, position, equippedWeapon);
-    bool occupantSet = Board.TryPlaceOccupant(unit.Position, unit.UnitId);
+    var unit = new BattleUnitState(handle.UnitId, combatant, position.Raw, equippedWeapon);
+    bool occupantSet = Board.TryPlaceOccupant(position, unit.UnitId);
     if (!occupantSet)
       throw new InvalidOperationException($"Could not place unit {unit.UnitId} at {unit.Position}.");
 
@@ -168,7 +183,12 @@ public sealed class BattleSession
   {
     var unitSide = unit.Side;
     MoveUnitToDeadStorage(unit);
-    bool occupantCleared = Board.TryClearOccupant(unit.Position, unit.UnitId);
+    Option<BattleBoardState.ValidatedPoint> unitPointOption = Board.ValidatePoint(unit.Position);
+    if (unitPointOption.IsNone)
+      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} from invalid board position {unit.Position}.");
+    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+
+    bool occupantCleared = Board.TryClearOccupant(unitPoint, unit.UnitId);
     if (!occupantCleared)
       throw new InvalidOperationException($"Could not clear unit {unit.UnitId} from {unit.Position}.");
 
