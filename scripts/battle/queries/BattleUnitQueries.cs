@@ -51,6 +51,31 @@ public sealed class GetLivingUnit : BattleSessionQuery<BattleUnitState>
   }
 }
 
+public sealed class GetUnitPosition : BattleSessionQuery<BattleBoardState.ValidatedPoint>
+{
+  public const string Id = "get_unit_position";
+
+  public BattleSession.BattleUnitHandle UnitHandle { get; }
+
+  public GetUnitPosition(BattleSession.BattleUnitHandle unitHandle)
+    : base(Id)
+  {
+    ArgumentNullException.ThrowIfNull(unitHandle);
+    UnitHandle = unitHandle;
+  }
+
+  internal override Either<BattleQueryFailure, BattleBoardState.ValidatedPoint> Execute(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(session);
+
+    return session.GetUnit(UnitHandle).Match(
+      _ => session.GetUnitPosition(UnitHandle).Match(
+        Succeed,
+        () => Fail(BattleQueryFailureReason.InvalidTile, $"Unit {UnitHandle.UnitId} is not on the board.")),
+      () => Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitHandle.UnitId}."));
+  }
+}
+
 public sealed class GetFactionAliveUnits : BattleSessionQuery<IReadOnlyCollection<BattleUnitState>>
 {
   public const string Id = "get_faction_alive_units";

@@ -3,6 +3,7 @@ using FunProject.Combatants;
 using FunProject.Tests;
 using GdUnit4;
 using Godot;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using static BattleQueryTestHelper;
@@ -33,11 +34,23 @@ public class BattleSessionQueriesTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction), new Vector3I(0, 0, 0));
 
-    Vector3I[] path = GetValue(session.Queries.Execute(new FindPathForUnit(unit.Handle, new Vector3I(2, 0, 0))));
+    BattleBoardState.ValidatedPoint[] path = GetValue(session.Queries.Execute(new FindPathForUnit(unit.Handle, new Vector3I(2, 0, 0))));
 
     Assert.Equal(3, path.Length);
-    Assert.Equal(new Vector3I(0, 0, 0), path[0]);
-    Assert.Equal(new Vector3I(2, 0, 0), path[^1]);
+    Assert.Equal(new Vector3I(0, 0, 0), path[0].Raw);
+    Assert.Equal(new Vector3I(2, 0, 0), path[^1].Raw);
+  }
+
+  [TestCase(TestName = "GetUnitPosition returns the board position for a spawned unit")]
+  public void GetUnitPositionReturnsTheBoardPositionForASpawnedUnit()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction), new Vector3I(0, 0, 0));
+
+    BattleBoardState.ValidatedPoint position = GetValue(session.Queries.Execute(new GetUnitPosition(unit.Handle)));
+
+    Assert.Equal(new Vector3I(0, 0, 0), position.Raw);
   }
 
   [TestCase(TestName = "GetPossibleMoveTilesForUnit respects action points")]
@@ -48,12 +61,10 @@ public class BattleSessionQueriesTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 2), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    IReadOnlyCollection<Vector3I> tiles = GetValue(session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit.Handle)));
-
-    Assert.True(tiles.Contains(new Vector3I(1, 0, 0)));
-    Assert.True(tiles.Contains(new Vector3I(2, 0, 0)));
-    Assert.False(tiles.Contains(new Vector3I(3, 0, 0)));
-    Assert.False(tiles.Contains(unit.Position));
+    IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = GetValue(session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit.Handle)));
+    Assert.True(tiles.Count == 2);
+    Assert.True(tiles.Select(tile => tile.Raw) == new List<Vector3I>([new Vector3I(1, 0, 0), new Vector3I(2, 0, 0)]));
+    Assert.False(tiles.Any(tile => tile.Raw == session.GetUnitPosition(unit.Handle).RequireSome().Raw));
   }
 
   [TestCase(TestName = "GetPossibleMoveTilesForUnit does not include unreachable tiles inside movement range")]
@@ -65,11 +76,8 @@ public class BattleSessionQueriesTest
     session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).IsWalkable = false;
     StartBattle(session);
 
-    IReadOnlyCollection<Vector3I> tiles = GetValue(session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit.Handle)));
-
-    Assert.False(tiles.Contains(new Vector3I(1, 0, 0)));
-    Assert.False(tiles.Contains(new Vector3I(2, 0, 0)));
-    Assert.False(tiles.Contains(new Vector3I(3, 0, 0)));
+    IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = GetValue(session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit.Handle)));
+    Assert.True(tiles.Count == 0);
   }
 
   [TestCase(TestName = "GetVisibleEnemiesForUnit returns visible enemies only")]
@@ -120,4 +128,3 @@ public class BattleSessionQueriesTest
   }
 
 }
-

@@ -3,7 +3,6 @@ using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Stats;
 using FunProject.Weapons;
-using Godot;
 using System.Collections.Generic;
 
 namespace FunProject.Battle;
@@ -15,7 +14,6 @@ public sealed class BattleUnitState
   internal int UnitId { get; }
   public Combatant Combatant { get; }
   public Faction Side => Combatant.OwningFaction;
-  public Vector3I Position { get; private set; }
   public Option<Weapon> EquippedWeapon { get; private set; }
   public IReadOnlyList<EquippableItem> Inventory => _inventory;
 
@@ -28,17 +26,17 @@ public sealed class BattleUnitState
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
 
-  internal BattleUnitState(int unitId, Combatant combatant, Vector3I position)
-    : this(unitId, combatant, position, None)
+  internal BattleUnitState(int unitId, Combatant combatant)
+    : this(unitId, combatant, None)
   {
   }
 
-  internal BattleUnitState(int unitId, Combatant combatant, Vector3I position, Weapon equippedWeapon)
-    : this(unitId, combatant, position, Some(equippedWeapon))
+  internal BattleUnitState(int unitId, Combatant combatant, Weapon equippedWeapon)
+    : this(unitId, combatant, Some(equippedWeapon))
   {
   }
 
-  internal BattleUnitState(int unitId, Combatant combatant, Vector3I position, Option<Weapon> equippedWeapon)
+  internal BattleUnitState(int unitId, Combatant combatant, Option<Weapon> equippedWeapon)
   {
     if (unitId <= 0)
       throw new ArgumentOutOfRangeException(nameof(unitId), "Unit id must be positive.");
@@ -46,7 +44,6 @@ public sealed class BattleUnitState
     UnitId = unitId;
     ArgumentNullException.ThrowIfNull(combatant);
     Combatant = combatant;
-    Position = position;
     EquippedWeapon = equippedWeapon;
     CurrentHealth = MaxHealth;
     CurrentActionPoints = MaxActionPoints;
@@ -72,11 +69,6 @@ public sealed class BattleUnitState
       return;
 
     CurrentHealth = Math.Max(CurrentHealth - amount, 0);
-  }
-
-  public void MoveTo(Vector3I position)
-  {
-    Position = position;
   }
 
   public void EquipWeapon(Weapon weapon)

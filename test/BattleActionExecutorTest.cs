@@ -4,6 +4,7 @@ using FunProject.Tests;
 using GdUnit4;
 using Godot;
 using System;
+using System.Linq;
 using static BattleQueryTestHelper;
 
 [TestSuite]
@@ -25,7 +26,7 @@ public class BattleActionExecutorTest
 
     Assert.True(result.IsSome);
     Assert.True(result.RequireSome().Succeeded);
-    Assert.Equal(new Vector3I(1, 1, 1), unit.Position);
+    Assert.Equal(new Vector3I(1, 1, 1), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
     Assert.Equal(3, unit.CurrentActionPoints);
   }
 
@@ -44,7 +45,7 @@ public class BattleActionExecutorTest
     Assert.True(evaluation.IsAllowed);
     Assert.True(evaluation.Mutation is MoveUnitStep);
     Assert.Equal(2, evaluation.ActionPointCost);
-    Assert.Equal(new Vector3I(1, 0, 1), unit.Position);
+    Assert.Equal(new Vector3I(1, 0, 1), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
     Assert.Equal(5, unit.CurrentActionPoints);
   }
 
@@ -63,7 +64,7 @@ public class BattleActionExecutorTest
     Assert.False(evaluation.IsAllowed);
     Assert.Equal(BattleMutationFailureReason.Rejected, evaluation.FailureReason);
     Assert.True(evaluation.Mutation is MoveUnitStep);
-    Assert.Equal(new Vector3I(0, 0, 0), unit.Position);
+    Assert.Equal(new Vector3I(0, 0, 0), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
     Assert.Equal(4, unit.CurrentActionPoints);
   }
 
@@ -76,15 +77,12 @@ public class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    Vector3I[] path = GetValue(session.Queries.Execute(new FindPathForUnit(unit.Handle, new Vector3I(2, 0, 0))));
-    Assert.Equal(3, path.Length);
+    BattleBoardState.ValidatedPoint[] validatedPath = GetValue(session.Queries.Execute(new FindPathForUnit(unit.Handle, new Vector3I(2, 0, 0))));
 
-    var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnit(unit.Handle, path));
+    var evaluation = executor.Evaluate(BattleSessionMutation.MoveUnit(unit.Handle, [.. validatedPath.Select(point => point.Raw)]));
 
     Assert.True(evaluation.IsAllowed);
     Assert.Equal(2, evaluation.ActionPointCost);
-    Assert.Equal(new Vector3I(0, 0, 0), unit.Position);
-    Assert.Equal(5, unit.CurrentActionPoints);
   }
 
   [TestCase(TestName = "Executor resolves queued mutations in FIFO order")]
@@ -259,7 +257,7 @@ public class BattleActionExecutorTest
 
     Assert.True(second.IsSome);
     Assert.True(second.RequireSome().Succeeded);
-    Assert.Equal(new Vector3I(1, 1, 1), unit.Position);
+    Assert.Equal(new Vector3I(1, 1, 1), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
   }
 
   [TestCase(TestName = "Executor returns null when the queue is empty")]

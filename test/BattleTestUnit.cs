@@ -1,7 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Items;
-using Godot;
 
 internal sealed class BattleTestUnit
 {
@@ -10,7 +9,6 @@ internal sealed class BattleTestUnit
 
   public int UnitId => State.UnitId;
   public Combatant Combatant => State.Combatant;
-  public Vector3I Position => State.Position;
   public int CurrentActionPoints => State.CurrentActionPoints;
 
   public BattleTestUnit(BattleUnitState state, BattleSession.BattleUnitHandle handle)

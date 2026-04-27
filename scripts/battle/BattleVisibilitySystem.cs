@@ -17,7 +17,7 @@ internal sealed class BattleVisibilitySystem
 
     var board = session.Board;
     var livingUnits = session.AliveUnits.ToArray();
-    Dictionary<Vector3I, BattleUnitState> livingUnitsByPosition = livingUnits.ToDictionary(unit => unit.Position);
+    Dictionary<Vector3I, BattleUnitState> livingUnitsByPosition = GetLivingUnitsByPosition(session, livingUnits);
     Dictionary<Faction, SysColGeneric.HashSet<Vector3I>> visibleTilesByFaction = [];
     Dictionary<Faction, SysColGeneric.HashSet<int>> visibleForeignUnitsByFaction = [];
     Dictionary<int, IReadOnlySet<int>> visibleUnitsByObserver = [];
@@ -33,10 +33,14 @@ internal sealed class BattleVisibilitySystem
       SysColGeneric.HashSet<Vector3I> observerVisibleTiles = [];
       SysColGeneric.HashSet<int> visibleUnits = [];
       visibleUnitsByObserver[observer.UnitId] = visibleUnits;
+      Option<BattleBoardState.ValidatedPoint> observerPointOption = session.GetUnitPosition(observer);
+      if (observerPointOption.IsNone)
+        continue;
+      Vector3I observerPosition = observerPointOption.IfNone(default(BattleBoardState.ValidatedPoint)).Raw;
 
-      foreach (var targetTile in EnumerateTileCandidates(board, observer))
+      foreach (var targetTile in EnumerateTileCandidates(board, observer, observerPosition))
       {
-        if (CanSeeTile(board, observer, targetTile))
+        if (CanSeeTile(board, observer, observerPosition, targetTile))
           observerVisibleTiles.Add(targetTile);
       }
 
@@ -68,13 +72,33 @@ internal sealed class BattleVisibilitySystem
     return new BattleVisibilitySnapshot(factionStates, visibleUnitsByObserver);
   }
 
+  private static Dictionary<Vector3I, BattleUnitState> GetLivingUnitsByPosition(
+    BattleSession session,
+    IReadOnlyCollection<BattleUnitState> livingUnits)
+  {
+    ArgumentNullException.ThrowIfNull(session);
+    ArgumentNullException.ThrowIfNull(livingUnits);
+
+    Dictionary<Vector3I, BattleUnitState> livingUnitsByPosition = [];
+    foreach (var unit in livingUnits)
+    {
+      Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(unit);
+      if (unitPointOption.IsNone)
+        continue;
+
+      livingUnitsByPosition[unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint)).Raw] = unit;
+    }
+
+    return livingUnitsByPosition;
+  }
+
   private static IEnumerable<Faction> GetParticipatingFactions(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     return [.. session.GlobalFactionTurnOrder];
   }
 
-  private static IEnumerable<Vector3I> EnumerateTileCandidates(BattleBoardState board, BattleUnitState observer)
+  private static IEnumerable<Vector3I> EnumerateTileCandidates(BattleBoardState board, BattleUnitState observer, Vector3I observerPosition)
   {
     ArgumentNullException.ThrowIfNull(board);
     ArgumentNullException.ThrowIfNull(observer);
@@ -82,12 +106,12 @@ internal sealed class BattleVisibilitySystem
     if (observer.Vision <= 0)
       yield break;
 
-    int minX = Math.Max(0, observer.Position.X - observer.Vision);
-    int maxX = Math.Min(board.Dimensions.X - 1, observer.Position.X + observer.Vision);
-    int minY = Math.Max(0, observer.Position.Y - observer.Vision);
-    int maxY = Math.Min(board.Dimensions.Y - 1, observer.Position.Y + observer.Vision);
-    int minZ = Math.Max(0, observer.Position.Z - observer.Vision);
-    int maxZ = Math.Min(board.Dimensions.Z - 1, observer.Position.Z + observer.Vision);
+    int minX = Math.Max(0, observerPosition.X - observer.Vision);
+    int maxX = Math.Min(board.Dimensions.X - 1, observerPosition.X + observer.Vision);
+    int minY = Math.Max(0, observerPosition.Y - observer.Vision);
+    int maxY = Math.Min(board.Dimensions.Y - 1, observerPosition.Y + observer.Vision);
+    int minZ = Math.Max(0, observerPosition.Z - observer.Vision);
+    int maxZ = Math.Min(board.Dimensions.Z - 1, observerPosition.Z + observer.Vision);
 
     for (int y = minY; y <= maxY; y++)
     {
@@ -99,7 +123,7 @@ internal sealed class BattleVisibilitySystem
     }
   }
 
-  private static bool CanSeeTile(BattleBoardState board, BattleUnitState observer, Vector3I targetTile)
+  private static bool CanSeeTile(BattleBoardState board, BattleUnitState observer, Vector3I observerPosition, Vector3I targetTile)
   {
     ArgumentNullException.ThrowIfNull(board);
     ArgumentNullException.ThrowIfNull(observer);
@@ -107,15 +131,15 @@ internal sealed class BattleVisibilitySystem
     if (observer.IsDead)
       return false;
 
-    Option<BattleBoardState.ValidatedPoint> observerCell = board.ValidatePoint(observer.Position);
+    Option<BattleBoardState.ValidatedPoint> observerCell = board.ValidatePoint(observerPosition);
     Option<BattleBoardState.ValidatedPoint> targetCell = board.ValidatePoint(targetTile);
 
     if (observerCell.IsNone || targetCell.IsNone)
       return false;
-    if (targetTile != observer.Position && targetCell.Match(point => board.GetTile(point).BlocksLineOfSight, () => false))
+    if (targetTile != observerPosition && targetCell.Match(point => board.GetTile(point).BlocksLineOfSight, () => false))
       return false;
 
-    var observerPoint = ToWorldPoint(observer.Position);
+    var observerPoint = ToWorldPoint(observerPosition);
     var targetPoint = ToWorldPoint(targetTile);
     if (!IsWithinVisionRange(observer, observerPoint, targetPoint))
       return false;

@@ -34,6 +34,7 @@ public sealed class BattleSession
   private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleUnitState>> _aliveUnitsByFaction = [];
   private readonly Dictionary<Faction, IReadOnlyList<Combatant>> _factionRosters = [];
   private readonly Dictionary<BattleUnitHandle, BattleUnitState> _unitsByHandle = [];
+  private readonly Dictionary<BattleUnitHandle, BattleBoardState.ValidatedPoint> _unitPositionsByHandle = [];
   private readonly List<BattleUnitState> _deadUnits = [];
   private readonly Queue<Faction> _globalFactionOrder = [];
   private Queue<Faction> _turnQueue = [];
@@ -155,12 +156,13 @@ public sealed class BattleSession
     ArgumentNullException.ThrowIfNull(combatant);
 
     var handle = new BattleUnitHandle(_nextUnitId++);
-    var unit = new BattleUnitState(handle.UnitId, combatant, position.Raw, equippedWeapon);
+    var unit = new BattleUnitState(handle.UnitId, combatant, equippedWeapon);
     bool occupantSet = Board.TryPlaceOccupant(position, unit.UnitId);
     if (!occupantSet)
-      throw new InvalidOperationException($"Could not place unit {unit.UnitId} at {unit.Position}.");
+      throw new InvalidOperationException($"Could not place unit {unit.UnitId} at {position.Raw}.");
 
     _unitsByHandle.Add(handle, unit);
+    _unitPositionsByHandle.Add(handle, position);
 
     if (!_aliveUnitsByFaction.TryGetValue(unit.Side, out var unitsForSide))
     {
@@ -182,18 +184,26 @@ public sealed class BattleSession
   internal void HandleUnitDeath(BattleUnitState unit)
   {
     var unitSide = unit.Side;
-    MoveUnitToDeadStorage(unit);
-    Option<BattleBoardState.ValidatedPoint> unitPointOption = Board.ValidatePoint(unit.Position);
+    Option<BattleUnitHandle> handleOption = GetHandleForUnit(unit);
+    if (handleOption.IsNone)
+      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} because it does not belong to this battle session.");
+    BattleUnitHandle handle = handleOption.IfNone(default(BattleUnitHandle));
+
+    Option<BattleBoardState.ValidatedPoint> unitPointOption = GetUnitPosition(handle);
     if (unitPointOption.IsNone)
-      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} from invalid board position {unit.Position}.");
+      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} because it is not on the board.");
     BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+    Vector3I unitPosition = unitPoint.Raw;
+
+    MoveUnitToDeadStorage(unit);
 
     bool occupantCleared = Board.TryClearOccupant(unitPoint, unit.UnitId);
     if (!occupantCleared)
-      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} from {unit.Position}.");
+      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} from {unitPosition}.");
+    _unitPositionsByHandle.Remove(handle);
 
     _activeFactionUnitsAvailable.Remove(unit.UnitId);
-    RaiseEvent(new BattleEvent(BattleEventType.UnitKilled, Some(unit.UnitId), Some(unit.Position), Some($"Unit ID {unit.UnitId} was killed!")));
+    RaiseEvent(new BattleEvent(BattleEventType.UnitKilled, Some(unit.UnitId), Some(unitPosition), Some($"Unit ID {unit.UnitId} was killed!")));
     HandleFactionLoss(unitSide);
   }
 
@@ -221,8 +231,13 @@ public sealed class BattleSession
     if (unit.Side != activeSide)
       throw new InvalidOperationException($"Unit {unit.UnitId} is not on the active side.");
 
+    Option<BattleBoardState.ValidatedPoint> unitPointOption = GetUnitPosition(unit);
+    if (unitPointOption.IsNone)
+      throw new InvalidOperationException($"Cannot end activation for unit {unit.UnitId} because it is not on the board.");
+    Vector3I unitPosition = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint)).Raw;
+
     RemoveAvailableUnit(unit.UnitId);
-    RaiseEvent(new BattleEvent(BattleEventType.UnitActivationEnded, Some(unit.UnitId), Some(unit.Position), Some($"{unit.Combatant.Name} ended their activation.")));
+    RaiseEvent(new BattleEvent(BattleEventType.UnitActivationEnded, Some(unit.UnitId), Some(unitPosition), Some($"{unit.Combatant.Name} ended their activation.")));
 
     if (!GetFactionAliveUnits(activeSide).Any(CanUnitActNow))
       EndFactionTurn(activeSide);
@@ -310,6 +325,51 @@ public sealed class BattleSession
       return None;
 
     return Some(unit);
+  }
+
+  internal Option<BattleBoardState.ValidatedPoint> GetUnitPosition(BattleUnitHandle handle)
+  {
+    ArgumentNullException.ThrowIfNull(handle);
+    if (!_unitPositionsByHandle.TryGetValue(handle, out var position))
+      return None;
+
+    return Some(position);
+  }
+
+  internal Option<BattleBoardState.ValidatedPoint> GetUnitPosition(BattleUnitState unit)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    return GetHandleForUnit(unit).Match(
+      GetUnitPosition,
+      () => None);
+  }
+
+  internal bool TryMoveUnit(BattleUnitHandle handle, BattleBoardState.ValidatedPoint source, BattleBoardState.ValidatedPoint destination)
+  {
+    ArgumentNullException.ThrowIfNull(handle);
+    if (!_unitsByHandle.TryGetValue(handle, out var unit))
+      return false;
+    if (!_unitPositionsByHandle.TryGetValue(handle, out var trackedPosition))
+      return false;
+    if (trackedPosition != source)
+      return false;
+    if (!Board.TryMoveOccupant(source, destination, unit.UnitId))
+      return false;
+
+    _unitPositionsByHandle[handle] = destination;
+    return true;
+  }
+
+  private Option<BattleUnitHandle> GetHandleForUnit(BattleUnitState unit)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    foreach (var (handle, trackedUnit) in _unitsByHandle)
+    {
+      if (trackedUnit == unit)
+        return Some(handle);
+    }
+
+    return None;
   }
 
   internal void MoveUnitToDeadStorage(BattleUnitState unit)
