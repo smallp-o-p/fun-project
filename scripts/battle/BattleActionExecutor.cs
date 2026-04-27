@@ -168,10 +168,16 @@ public sealed class BattleActionExecutor
     while (_pending.Count > 0 && results.Count < maxActions)
     {
       Option<BattleMutationResult> result = Tick();
-      if (result.IsNone)
-        break;
+      bool hasResult = result.Match(
+        resultValue =>
+        {
+          results.Add(resultValue);
+          return true;
+        },
+        () => false);
 
-      results.Add(result.RequireSome());
+      if (!hasResult)
+        break;
     }
 
     return results;
@@ -218,13 +224,15 @@ public sealed class BattleActionExecutor
         $"{unit.Combatant.Name} needs {totalActionPointCost} action points but only has {unit.CurrentActionPoints}.",
         actionPointCost: (int)totalActionPointCost);
 
-    Option<BattleTileState> currentTile = _session.Board.GetTileOrNone(unit.Position);
+    BattleActionEvaluation currentTileEvaluation = _session.Board.GetTileOrNone(unit.Position).Match(
+      _ => BattleActionEvaluation.Allowed(moveUnit, (int)totalActionPointCost),
+      () => BattleActionEvaluation.Rejected(
+        moveUnit,
+        $"Unit id {unit.UnitId} is not on a valid tile",
+        actionPointCost: (int)totalActionPointCost));
 
-    if (currentTile.IsNone)
-      return BattleActionEvaluation.Rejected(
-          moveUnit,
-          $"Unit id {unit} is not on a valid tile",
-          actionPointCost: (int)totalActionPointCost);
+    if (!currentTileEvaluation.IsAllowed)
+      return currentTileEvaluation;
 
     Vector3I previousStep = moveUnit.Path[0];
     foreach (var step in moveUnit.Path.Skip(1))
@@ -235,25 +243,15 @@ public sealed class BattleActionExecutor
           $"Move unit path step {step} is not adjacent to {previousStep}.",
           actionPointCost: (int)totalActionPointCost);
 
-      Option<BattleTileState> destinationTile = _session.Board.GetTileOrNone(step);
-      if (destinationTile.IsNone)
-        return BattleActionEvaluation.Rejected(
+      BattleActionEvaluation destinationEvaluation = _session.Board.GetTileOrNone(step).Match(
+        tile => EvaluateMoveUnitPathDestination(moveUnit, step, tile, (int)totalActionPointCost),
+        () => BattleActionEvaluation.Rejected(
           moveUnit,
           $"Move unit path step {step} leaves the board.",
-          actionPointCost: (int)totalActionPointCost);
+          actionPointCost: (int)totalActionPointCost));
 
-      BattleTileState destinationTileValue = destinationTile.RequireSome();
-      if (!destinationTileValue.IsWalkable)
-        return BattleActionEvaluation.Rejected(
-          moveUnit,
-          $"Move unit path step {step} enters an unwalkable tile.",
-          actionPointCost: (int)totalActionPointCost);
-
-      if (destinationTileValue.IsOccupied)
-        return BattleActionEvaluation.Rejected(
-          moveUnit,
-          $"Move unit path step {step} enters an occupied tile.",
-          actionPointCost: (int)totalActionPointCost);
+      if (!destinationEvaluation.IsAllowed)
+        return destinationEvaluation;
 
       previousStep = step;
     }
@@ -284,6 +282,30 @@ public sealed class BattleActionExecutor
         actionPointCost: actionPointCost);
 
     return BattleActionEvaluation.Allowed(throwItem, actionPointCost);
+  }
+
+  private static BattleActionEvaluation EvaluateMoveUnitPathDestination(
+    MoveUnit moveUnit,
+    Vector3I step,
+    BattleTileState destinationTile,
+    int totalActionPointCost)
+  {
+    ArgumentNullException.ThrowIfNull(moveUnit);
+    ArgumentNullException.ThrowIfNull(destinationTile);
+
+    if (!destinationTile.IsWalkable)
+      return BattleActionEvaluation.Rejected(
+        moveUnit,
+        $"Move unit path step {step} enters an unwalkable tile.",
+        actionPointCost: totalActionPointCost);
+
+    if (destinationTile.IsOccupied)
+      return BattleActionEvaluation.Rejected(
+        moveUnit,
+        $"Move unit path step {step} enters an occupied tile.",
+        actionPointCost: totalActionPointCost);
+
+    return BattleActionEvaluation.Allowed(moveUnit, totalActionPointCost);
   }
 
   private BattleActionEvaluation EvaluatePassUnit(PassUnit passUnit)
