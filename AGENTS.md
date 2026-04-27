@@ -14,3 +14,4 @@ Players control a fixed-number combatants to participate in skirmishes against e
 - Avoid C-style out params, instead just return nullable or an optional type.
 - If considering nullable class members, or making a global "Object" that does multiple things depending on its fields, considering creating derived classes to represent each individual behavior.
 - Avoid params nullable params if possible. If a default behavior is expected, then just make that the default param value. A nullable type should only be used if null is a valid input.
+- If in a non-nullable context, do not insert exceptions to check a null input for parameters that are not nullable.
