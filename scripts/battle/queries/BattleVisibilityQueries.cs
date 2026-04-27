@@ -23,24 +23,28 @@ public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>
     TargetUnitHandle = targetUnitHandle;
   }
 
-  internal override BattleQueryResult<bool> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    BattleQueryResult<BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
-    if (observerResult is BattleQueryFailureResult<BattleUnitState> observerFailure)
-      return Fail(observerFailure.Failure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Failure.Message}");
+    Either<BattleQueryFailure, BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
+    return observerResult.Match(
+      observerFailure => Fail(observerFailure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Message}"),
+      _ =>
+      {
+        Either<BattleQueryFailure, BattleUnitState> targetResult = new GetLivingUnit(TargetUnitHandle).Execute(session);
+        return targetResult.Match(
+          targetFailure => Fail(targetFailure.Reason, $"Target unit {TargetUnitId} could not be resolved. {targetFailure.Message}"),
+          _ =>
+          {
+            if (ObserverUnitId == TargetUnitId)
+              return Succeed(true);
 
-    BattleQueryResult<BattleUnitState> targetResult = new GetLivingUnit(TargetUnitHandle).Execute(session);
-    if (targetResult is BattleQueryFailureResult<BattleUnitState> targetFailure)
-      return Fail(targetFailure.Failure.Reason, $"Target unit {TargetUnitId} could not be resolved. {targetFailure.Failure.Message}");
-
-    if (ObserverUnitId == TargetUnitId)
-      return Succeed(true);
-
-    return Succeed(session.VisibilitySnapshot
-      .GetVisibleUnitsForObserverOrEmpty(ObserverUnitId)
-      .Contains(TargetUnitId));
+            return Succeed(session.VisibilitySnapshot
+              .GetVisibleUnitsForObserverOrEmpty(ObserverUnitId)
+              .Contains(TargetUnitId));
+          });
+      });
   }
 }
 
@@ -61,22 +65,23 @@ public sealed class IsUnitVisibleToFaction : BattleSessionQuery<bool>
     TargetUnitHandle = targetUnitHandle;
   }
 
-  internal override BattleQueryResult<bool> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    BattleQueryResult<BattleUnitState> targetResult = new GetLivingUnit(TargetUnitHandle).Execute(session);
-    if (targetResult is BattleQueryFailureResult<BattleUnitState> targetFailure)
-      return Fail(targetFailure.Failure.Reason, $"Target unit {TargetUnitId} could not be resolved. {targetFailure.Failure.Message}");
+    Either<BattleQueryFailure, BattleUnitState> targetResult = new GetLivingUnit(TargetUnitHandle).Execute(session);
+    return targetResult.Match(
+      targetFailure => Fail(targetFailure.Reason, $"Target unit {TargetUnitId} could not be resolved. {targetFailure.Message}"),
+      target =>
+      {
+        if (target.Side == Faction)
+          return Succeed(true);
 
-    BattleUnitState target = ((BattleQuerySuccess<BattleUnitState>)targetResult).Value;
-    if (target.Side == Faction)
-      return Succeed(true);
-
-    return Succeed(session.VisibilitySnapshot
-      .GetFactionStateOrEmpty(Faction)
-      .VisibleForeignUnitIds
-      .Contains(TargetUnitId));
+        return Succeed(session.VisibilitySnapshot
+          .GetFactionStateOrEmpty(Faction)
+          .VisibleForeignUnitIds
+          .Contains(TargetUnitId));
+      });
   }
 }
 
@@ -95,7 +100,7 @@ public sealed class IsTileVisibleToFaction : BattleSessionQuery<bool>
     Tile = tile;
   }
 
-  internal override BattleQueryResult<bool> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
@@ -124,7 +129,7 @@ public sealed class HasFactionExploredTile : BattleSessionQuery<bool>
     Tile = tile;
   }
 
-  internal override BattleQueryResult<bool> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
@@ -152,18 +157,20 @@ public sealed class GetVisibleUnitsForUnit : BattleSessionQuery<IReadOnlyCollect
     ObserverUnitHandle = observerUnitHandle;
   }
 
-  internal override BattleQueryResult<IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    BattleQueryResult<BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
-    if (observerResult is BattleQueryFailureResult<BattleUnitState> observerFailure)
-      return Fail(observerFailure.Failure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Failure.Message}");
-
-    IReadOnlySet<int> visibleUnitIds = session.VisibilitySnapshot.GetVisibleUnitsForObserverOrEmpty(ObserverUnitId);
-    return Succeed(session.AliveUnits
-      .Where(unit => visibleUnitIds.Contains(unit.UnitId))
-      .ToArray());
+    Either<BattleQueryFailure, BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
+    return observerResult.Match(
+      observerFailure => Fail(observerFailure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Message}"),
+      _ =>
+      {
+        IReadOnlySet<int> visibleUnitIds = session.VisibilitySnapshot.GetVisibleUnitsForObserverOrEmpty(ObserverUnitId);
+        return Succeed(session.AliveUnits
+          .Where(unit => visibleUnitIds.Contains(unit.UnitId))
+          .ToArray());
+      });
   }
 }
 
@@ -181,19 +188,20 @@ public sealed class GetVisibleEnemiesForUnit : BattleSessionQuery<IReadOnlyColle
     ObserverUnitHandle = observerUnitHandle;
   }
 
-  internal override BattleQueryResult<IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    BattleQueryResult<BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
-    if (observerResult is BattleQueryFailureResult<BattleUnitState> observerFailure)
-      return Fail(observerFailure.Failure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Failure.Message}");
-
-    BattleUnitState observer = ((BattleQuerySuccess<BattleUnitState>)observerResult).Value;
-    IReadOnlySet<int> visibleUnitIds = session.VisibilitySnapshot.GetVisibleUnitsForObserverOrEmpty(ObserverUnitId);
-    return Succeed(session.AliveUnits
-      .Where(unit => unit.Side != observer.Side && visibleUnitIds.Contains(unit.UnitId))
-      .ToArray());
+    Either<BattleQueryFailure, BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
+    return observerResult.Match(
+      observerFailure => Fail(observerFailure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Message}"),
+      observer =>
+      {
+        IReadOnlySet<int> visibleUnitIds = session.VisibilitySnapshot.GetVisibleUnitsForObserverOrEmpty(ObserverUnitId);
+        return Succeed(session.AliveUnits
+          .Where(unit => unit.Side != observer.Side && visibleUnitIds.Contains(unit.UnitId))
+          .ToArray());
+      });
   }
 }
 
@@ -210,7 +218,7 @@ public sealed class GetVisibleUnitsForFaction : BattleSessionQuery<IReadOnlyColl
     Faction = faction;
   }
 
-  internal override BattleQueryResult<IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
@@ -237,7 +245,7 @@ public sealed class GetVisibleTilesForFaction : BattleSessionQuery<IReadOnlyColl
     Faction = faction;
   }
 
-  internal override BattleQueryResult<IReadOnlyCollection<Vector3I>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IReadOnlyCollection<Vector3I>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     return Succeed(session.VisibilitySnapshot.GetFactionStateOrEmpty(Faction).VisibleTiles.ToArray());
@@ -257,9 +265,10 @@ public sealed class GetExploredTilesForFaction : BattleSessionQuery<IReadOnlyCol
     Faction = faction;
   }
 
-  internal override BattleQueryResult<IReadOnlyCollection<Vector3I>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IReadOnlyCollection<Vector3I>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     return Succeed(session.VisibilitySnapshot.GetFactionStateOrEmpty(Faction).ExploredTiles.ToArray());
   }
 }
+

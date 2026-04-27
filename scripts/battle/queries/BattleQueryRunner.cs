@@ -12,29 +12,19 @@ public sealed class BattleQueryRunner
     _session = session;
   }
 
-  public BattleQueryResult<TResult> Execute<TResult>(BattleSessionQuery<TResult> query)
+  public Either<BattleQueryFailure, TResult> Execute<TResult>(BattleSessionQuery<TResult> query)
   {
     ArgumentNullException.ThrowIfNull(query);
 
     try
     {
-      var result = query.Execute(_session);
-      if (result == null)
-      {
-        return BattleQueryResult<TResult>.Failed(
-          query.QueryId,
-          BattleQueryFailureReason.InvalidQuery,
-          $"Query {query.QueryId} returned no result.");
-      }
-
-      return result;
+      return query.Execute(_session);
     }
     catch (Exception exception)
     {
-      return BattleQueryResult<TResult>.Failed(
-        query.QueryId,
+      return Left<BattleQueryFailure, TResult>(new BattleQueryFailure(
         BattleQueryFailureReason.UnexpectedError,
-        exception.Message);
+        exception.Message));
     }
   }
 }

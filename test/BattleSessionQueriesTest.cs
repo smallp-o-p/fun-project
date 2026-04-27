@@ -19,9 +19,9 @@ public class BattleSessionQueriesTest
     var foreignSession = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
     var foreignUnit = SpawnUnit(foreignSession, BattleTestFactory.MakeCombatant("Foreign", faction), new Vector3I(0, 0, 0));
 
-    BattleQueryResult<BattleUnitState> result = session.Queries.Execute(new GetLivingUnit(foreignUnit.Handle));
+    Either<BattleQueryFailure, BattleUnitState> result = session.Queries.Execute(new GetLivingUnit(foreignUnit.Handle));
 
-    Assert.False(result.Succeeded);
+    Assert.True(result.IsLeft);
     BattleQueryFailure failure = GetFailure(result);
     Assert.Equal(BattleQueryFailureReason.UnknownUnit, failure.Reason);
   }
@@ -96,9 +96,9 @@ public class BattleSessionQueriesTest
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2), [faction]);
 
-    BattleQueryResult<bool> result = session.Queries.Execute(new IsTileVisibleToFaction(faction, new Vector3I(4, 0, 0)));
+    Either<BattleQueryFailure, bool> result = session.Queries.Execute(new IsTileVisibleToFaction(faction, new Vector3I(4, 0, 0)));
 
-    Assert.False(result.Succeeded);
+    Assert.True(result.IsLeft);
     BattleQueryFailure failure = GetFailure(result);
     Assert.Equal(BattleQueryFailureReason.InvalidTile, failure.Reason);
   }
@@ -120,3 +120,4 @@ public class BattleSessionQueriesTest
   }
 
 }
+

@@ -358,40 +358,39 @@ public sealed class BattleActionExecutor
 
     Faction activeSide = _session.ActiveSide;
 
-    BattleQueryResult<BattleUnitState> unitResult = _session.Queries.Execute(new GetLivingUnit(unitHandle));
-    if (unitResult is BattleQueryFailureResult<BattleUnitState> unitFailure)
-    {
-      return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(
+    Either<BattleQueryFailure, BattleUnitState> unitResult = _session.Queries.Execute(new GetLivingUnit(unitHandle));
+    return unitResult.Match<UnitActionContext>(
+      unitFailure => new InvalidUnitActionContext(BattleActionEvaluation.Rejected(
         mutation,
-        unitFailure.Failure.Message,
-        ToMutationFailureReason(unitFailure.Failure),
-        actionPointCost));
-    }
+        unitFailure.Message,
+        ToMutationFailureReason(unitFailure),
+        actionPointCost)),
+      unit =>
+      {
+        if (unit.Side != activeSide)
+          return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(mutation, $"{unit.Combatant.Name} is not on the active side.", actionPointCost: actionPointCost));
 
-    BattleUnitState unit = ((BattleQuerySuccess<BattleUnitState>)unitResult).Value;
-    if (unit.Side != activeSide)
-      return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(mutation, $"{unit.Combatant.Name} is not on the active side.", actionPointCost: actionPointCost));
+        Either<BattleQueryFailure, bool> availableResult = _session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitHandle));
+        return availableResult.Match<UnitActionContext>(
+          availableFailure => new InvalidUnitActionContext(BattleActionEvaluation.Rejected(
+            mutation,
+            availableFailure.Message,
+            ToMutationFailureReason(availableFailure),
+            actionPointCost)),
+          isAvailable =>
+          {
+            if (!isAvailable)
+              return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(mutation, $"{unit.Combatant.Name} is no longer available this turn.", actionPointCost: actionPointCost));
+            if (unit.CurrentActionPoints < actionPointCost)
+              return new InvalidUnitActionContext(
+                BattleActionEvaluation.Rejected(
+                  mutation,
+                  $"{unit.Combatant.Name} needs {actionPointCost} action points but only has {unit.CurrentActionPoints}.",
+                  actionPointCost: actionPointCost));
 
-    BattleQueryResult<bool> availableResult = _session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitHandle));
-    if (availableResult is BattleQueryFailureResult<bool> availableFailure)
-    {
-      return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(
-        mutation,
-        availableFailure.Failure.Message,
-        ToMutationFailureReason(availableFailure.Failure),
-        actionPointCost));
-    }
-
-    if (!((BattleQuerySuccess<bool>)availableResult).Value)
-      return new InvalidUnitActionContext(BattleActionEvaluation.Rejected(mutation, $"{unit.Combatant.Name} is no longer available this turn.", actionPointCost: actionPointCost));
-    if (unit.CurrentActionPoints < actionPointCost)
-      return new InvalidUnitActionContext(
-        BattleActionEvaluation.Rejected(
-          mutation,
-          $"{unit.Combatant.Name} needs {actionPointCost} action points but only has {unit.CurrentActionPoints}.",
-          actionPointCost: actionPointCost));
-
-    return new ValidUnitActionContext(unit);
+            return new ValidUnitActionContext(unit);
+          });
+      });
   }
 
   private static BattleMutationFailureReason ToMutationFailureReason(BattleQueryFailure failure)
@@ -424,3 +423,4 @@ public sealed class BattleActionExecutor
     return totalActionPointCost > int.MaxValue ? int.MaxValue : (int)totalActionPointCost;
   }
 }
+

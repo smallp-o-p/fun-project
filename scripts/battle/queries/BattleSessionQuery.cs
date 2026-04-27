@@ -14,15 +14,21 @@ public abstract class BattleSessionQuery<TResult>
     QueryId = queryId;
   }
 
-  internal abstract BattleQueryResult<TResult> Execute(BattleSession session);
+  internal abstract Either<BattleQueryFailure, TResult> Execute(BattleSession session);
 
-  protected BattleQueryResult<TResult> Succeed(TResult value)
+  protected Either<BattleQueryFailure, TResult> Succeed(TResult value)
   {
-    return BattleQueryResult<TResult>.Success(QueryId, value);
+    return Right<BattleQueryFailure, TResult>(value);
   }
 
-  protected BattleQueryResult<TResult> Fail(BattleQueryFailureReason reason, string message)
+  protected Either<BattleQueryFailure, TResult> Fail(BattleQueryFailureReason reason, string message)
   {
-    return BattleQueryResult<TResult>.Failed(QueryId, reason, message);
+    return Left<BattleQueryFailure, TResult>(new BattleQueryFailure(reason, message));
+  }
+
+  protected Either<BattleQueryFailure, TResult> Fail(BattleQueryFailure failure)
+  {
+    ArgumentNullException.ThrowIfNull(failure);
+    return Left<BattleQueryFailure, TResult>(failure);
   }
 }
