@@ -76,6 +76,28 @@ public sealed class GetUnitPosition : BattleSessionQuery<BattleBoardState.Valida
   }
 }
 
+public sealed class GetUnitAtTile : BattleSessionQuery<Option<BattleUnitState>>
+{
+  public const string Id = "get_unit_at_tile";
+
+  public Vector3I Coordinates { get; }
+
+  public GetUnitAtTile(Vector3I coordinates)
+    : base(Id)
+  {
+    Coordinates = coordinates;
+  }
+
+  internal override Either<BattleQueryFailure, Option<BattleUnitState>> Execute(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(session);
+
+    return session.Board.ValidatePoint(Coordinates).Match(
+      point => Succeed(session.GetUnitAt(point)),
+      () => Fail(BattleQueryFailureReason.InvalidTile, $"Tile {Coordinates} is outside the battle board."));
+  }
+}
+
 public sealed class GetFactionAliveUnits : BattleSessionQuery<IReadOnlyCollection<BattleUnitState>>
 {
   public const string Id = "get_faction_alive_units";

@@ -53,6 +53,44 @@ public class BattleSessionQueriesTest
     Assert.Equal(new Vector3I(0, 0, 0), position.Raw);
   }
 
+  [TestCase(TestName = "GetUnitAtTile returns the unit occupying a tile")]
+  public void GetUnitAtTileReturnsTheUnitOccupyingATile()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction), new Vector3I(1, 0, 0));
+
+    Option<BattleUnitState> occupant = GetValue(session.Queries.Execute(new GetUnitAtTile(new Vector3I(1, 0, 0))));
+
+    Assert.True(occupant.IsSome);
+    Assert.Equal(unit.State, occupant.RequireSome());
+  }
+
+  [TestCase(TestName = "GetUnitAtTile returns None for an empty tile")]
+  public void GetUnitAtTileReturnsNoneForAnEmptyTile()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction), new Vector3I(1, 0, 0));
+
+    Option<BattleUnitState> occupant = GetValue(session.Queries.Execute(new GetUnitAtTile(new Vector3I(2, 0, 0))));
+
+    Assert.True(occupant.IsNone);
+  }
+
+  [TestCase(TestName = "GetUnitAtTile returns failure for an invalid tile")]
+  public void GetUnitAtTileReturnsFailureForAnInvalidTile()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
+
+    Either<BattleQueryFailure, Option<BattleUnitState>> result = session.Queries.Execute(new GetUnitAtTile(new Vector3I(4, 0, 0)));
+
+    Assert.True(result.IsLeft);
+    BattleQueryFailure failure = GetFailure(result);
+    Assert.Equal(BattleQueryFailureReason.InvalidTile, failure.Reason);
+  }
+
   [TestCase(TestName = "GetPossibleMoveTilesForUnit respects action points")]
   public void GetPossibleMoveTilesForUnitRespectsActionPoints()
   {
@@ -63,7 +101,7 @@ public class BattleSessionQueriesTest
 
     IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = GetValue(session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit.Handle)));
     Assert.True(tiles.Count == 2);
-    Assert.True(tiles.Select(tile => tile.Raw) == new List<Vector3I>([new Vector3I(1, 0, 0), new Vector3I(2, 0, 0)]));
+    Assert.True(tiles.Select(tile => tile.Raw).SequenceEqual(new List<Vector3I>([new Vector3I(1, 0, 0), new Vector3I(2, 0, 0)])));
     Assert.False(tiles.Any(tile => tile.Raw == session.GetUnitPosition(unit.Handle).RequireSome().Raw));
   }
 

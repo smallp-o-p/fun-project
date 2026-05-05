@@ -344,6 +344,30 @@ public sealed class BattleSession
       () => None);
   }
 
+  internal Option<BattleUnitState> GetUnitAt(BattleBoardState.ValidatedPoint point)
+  {
+    BattleTileState tile = Board.GetTile(point);
+    return tile.OccupantUnitId.Match(
+      unitId =>
+      {
+        foreach (BattleUnitState unit in _unitsByHandle.Values)
+        {
+          if (unit.UnitId == unitId)
+            return Some(unit);
+        }
+
+        return None;
+      },
+      () => None);
+  }
+
+  internal Option<BattleUnitState> GetUnitAt(Vector3I position)
+  {
+    return Board.ValidatePoint(position).Match(
+      GetUnitAt,
+      () => None);
+  }
+
   internal bool TryMoveUnit(BattleUnitHandle handle, BattleBoardState.ValidatedPoint source, BattleBoardState.ValidatedPoint destination)
   {
     ArgumentNullException.ThrowIfNull(handle);
