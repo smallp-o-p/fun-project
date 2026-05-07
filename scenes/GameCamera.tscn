@@ -12,6 +12,9 @@ closed = true
 [sub_resource type="SphereMesh" id="SphereMesh_qy4fe"]
 
 [node name="CameraSwivel" type="AnimatableBody3D" unique_id=1404942062]
+collision_layer = 0
+collision_mask = 0
+input_ray_pickable = false
 script = ExtResource("1_qy4fe")
 metadata/cameraRadius = 0.0
 

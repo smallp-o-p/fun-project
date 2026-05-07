@@ -1,7 +1,6 @@
 using System;
 using Godot;
 
-#nullable enable
 public partial class GameCamera : AnimatableBody3D
 {
   public const float CircleBezierFactor = 0.55228475f;
@@ -17,10 +16,10 @@ public partial class GameCamera : AnimatableBody3D
   [Export] public float MaxFov { get; set; } = 100.0f;
   [Export] public float ScrollCameraStep { get; set; } = 0.4f;
 
-  private Path3D? cameraPath;
-  private PathFollow3D? pathFollow;
-  private Camera3D? camera;
-  private Tween? rotationTween;
+  private Path3D cameraPath;
+  private PathFollow3D pathFollow;
+  private Camera3D camera;
+  private Option<Tween> rotationTween;
 
   enum CameraRotation
   {
@@ -43,72 +42,39 @@ public partial class GameCamera : AnimatableBody3D
     CameraStep = Mathf.Max(1.0f, CameraStep);
     ScrollCameraStep = Mathf.Max(0.4f, ScrollCameraStep);
 
-    CollisionShape3D? shape = GetNodeOrNull<CollisionShape3D>("RadiusObject");
-    if (shape == null)
-    {
-      GD.PushError("Missing RadiusObject child.");
-      return;
-    }
+    CollisionShape3D shape = GetNodeOrNull<CollisionShape3D>("RadiusObject") ?? throw new InvalidOperationException("Missing radius object");
 
     if (shape.Shape is not CylinderShape3D circle)
     {
-      GD.PushError("RadiusObject must use a CylinderShape3D.");
-      return;
+      throw new InvalidOperationException("RadiusObject isn't a CylinderShape3D");
     }
-
     circle.Radius = PathRadius;
 
-    cameraPath = GetNodeOrNull<Path3D>("CameraPath");
-    if (cameraPath == null)
-    {
-      GD.PushError("Missing CameraPath child.");
-      return;
-    }
-
+    cameraPath = GetNodeOrNull<Path3D>("CameraPath") ?? throw new InvalidOperationException("Missing CameraPath");
     cameraPath.Curve = BuildCircleCurve(PathRadius);
 
-    Curve3D? curve = cameraPath.Curve;
-    if (curve == null)
-    {
-      GD.PushError("CameraPath is missing a Curve3D.");
-      return;
-    }
-
-    pathFollow = GetNodeOrNull<PathFollow3D>("CameraPath/PathFollow3D");
-    if (pathFollow == null)
-    {
-      GD.PushError("Missing PathFollow3D child.");
-      return;
-    }
-
+    pathFollow = GetNodeOrNull<PathFollow3D>("CameraPath/PathFollow3D") ?? throw new InvalidOperationException("Missing CameraPath/PathFollow3D");
     pathFollow.Loop = true;
     pathFollow.RotationMode = PathFollow3D.RotationModeEnum.None;
-    pathFollow.Progress = GetQuarterTurnDistance(curve);
+    pathFollow.Progress = GetQuarterTurnDistance(cameraPath.Curve);
 
-    camera = GetNodeOrNull<Camera3D>("CameraPath/PathFollow3D/Camera");
-    if (camera == null)
-    {
-      GD.PushError("Missing Camera child.");
-      return;
-    }
 
+    camera = GetNodeOrNull<Camera3D>("CameraPath/PathFollow3D/Camera") ?? throw new InvalidOperationException("Missing CameraPath/PathFollow3D/Camera");
     camera.Position = Vector3.Zero;
+
     UpdateCameraOrientation();
   }
 
   public override void _Process(double delta)
   {
-    if (cameraPath != null)
+
+    if (Input.IsActionJustPressed("rotate_camera_l"))
     {
-      Curve3D? curve = cameraPath.Curve;
-      if (Input.IsActionJustPressed("rotate_camera_l"))
-      {
-        RotateQuarterTurn(curve, CameraRotation.Left);
-      }
-      else if (Input.IsActionJustPressed("rotate_camera_r"))
-      {
-        RotateQuarterTurn(curve, CameraRotation.Right);
-      }
+      RotateQuarterTurn(cameraPath.Curve, CameraRotation.Left);
+    }
+    else if (Input.IsActionJustPressed("rotate_camera_r"))
+    {
+      RotateQuarterTurn(cameraPath.Curve, CameraRotation.Right);
     }
     UpdateCameraOrientation();
   }
@@ -167,28 +133,24 @@ public partial class GameCamera : AnimatableBody3D
 
   private void RotateQuarterTurn(Curve3D curve, CameraRotation rotate)
   {
-    if (pathFollow == null)
-    {
-      return;
-    }
-
     float direction = rotate switch
     {
       CameraRotation.Left => 1.0f,
       CameraRotation.Right => -1.0f,
+      _ => throw new NotImplementedException(),
     };
 
     float targetProgress = pathFollow.Progress + (direction * GetQuarterTurnDistance(curve));
 
-    if (rotationTween != null && IsInstanceValid(rotationTween))
-    {
-      rotationTween.Kill();
-    }
+    if (rotationTween.Match(IsInstanceValid, () => false))
+      rotationTween.IfSome(tween => tween.Kill());
 
-    rotationTween = CreateTween();
-    rotationTween.SetTrans(Tween.TransitionType.Sine);
-    rotationTween.SetEase(Tween.EaseType.InOut);
-    rotationTween.TweenProperty(pathFollow, "progress", targetProgress, RotationDurationSeconds);
+    Tween createdTween = CreateTween()
+      .SetTrans(Tween.TransitionType.Sine)
+      .SetEase(Tween.EaseType.InOut);
+    createdTween.TweenProperty(pathFollow, "progress", targetProgress, RotationDurationSeconds);
+
+    rotationTween = Some(createdTween);
   }
 
   private static Vector2 GetRequestedMoveDirection()
@@ -246,11 +208,6 @@ public partial class GameCamera : AnimatableBody3D
 
   private void MoveCamera(Vector2 direction, float verticalStep, float zoom, double delta)
   {
-    if (camera == null)
-    {
-      return;
-    }
-
     float movementDistance = CameraMoveSpeed * (float)delta;
     Vector3 movementOffset = GetRelativeMovementOffset(camera.GlobalTransform.Basis, direction, movementDistance) + (Vector3.Up * verticalStep);
 
@@ -260,19 +217,12 @@ public partial class GameCamera : AnimatableBody3D
 
   private void UpdateCameraOrientation()
   {
-    if (camera == null || cameraPath == null)
-    {
-      return;
-    }
-
     Transform3D cameraTransform = camera.GetGlobalTransformInterpolated();
     Vector3 orbitCenterPosition = cameraPath.GetGlobalTransformInterpolated().Origin;
     Vector3 horizontalLookTarget = GetHorizontalLookTarget(cameraTransform.Origin, orbitCenterPosition);
 
     if (cameraTransform.Origin.IsEqualApprox(horizontalLookTarget))
-    {
       return;
-    }
 
     camera.LookAt(horizontalLookTarget, Vector3.Up);
     camera.RotateObjectLocal(Vector3.Right, Mathf.DegToRad(CenterLookAngleDegrees));
