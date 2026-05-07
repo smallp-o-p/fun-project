@@ -1,7 +1,7 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
-*.cs.uid
+*.uid
 .claude/
 .vscode/
 addons/**/*
@@ -9,3 +9,6 @@ Godot-MCP/**/*
 handoffs/*
 test/TestResults/
 gdunit4_testadapter_v5/**/*
+fun-project-test/bin
+fun-project-test/obj
+**/textures
