@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Godot;
 
-#nullable enable
 public abstract partial class Interactable : Area3D, IInteractable
 {
   [Signal]

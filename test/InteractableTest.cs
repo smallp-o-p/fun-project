@@ -2,7 +2,6 @@ using System;
 using GdUnit4;
 using Godot;
 
-#nullable enable
 [TestSuite]
 [RequireGodotRuntime]
 public partial class InteractableTest
