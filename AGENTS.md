@@ -5,7 +5,7 @@ Players control a fixed-number combatants to participate in skirmishes against e
 ## Architecture
 - `scripts/` Core logic and classes. Data should be Godot Resources to be easily serializable, and each Resource subclass should be in its own file that has the same name as the class.
 - `scenes/` Godot-related items, so anything that needs to be included in a Godot Scene.
-- `test/` Tests. These are dummy scenes which run unit-tests inside the scene's _Ready() function.
+- `fun-project-test/test/` Tests. Keep test-only code in the `fun-project-test` subproject so IDE test discovery can run it separately from the Godot game project.
 
 ## Coding guidelines
 - Prefer default C# styling.

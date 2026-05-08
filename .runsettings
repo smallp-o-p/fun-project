@@ -2,8 +2,8 @@
 <RunSettings>
     <RunConfiguration>
         <MaxCpuCount>2</MaxCpuCount>
-        <TestAdaptersPaths>./test</TestAdaptersPaths>
-        <ResultsDirectory>./test/TestResults</ResultsDirectory>
+        <TestAdaptersPaths>./fun-project-test/test</TestAdaptersPaths>
+        <ResultsDirectory>./fun-project-test/TestResults</ResultsDirectory>
         <TestSessionTimeout>1800000</TestSessionTimeout>
         <TreatNoTestsAsError>true</TreatNoTestsAsError>
         <!-- Environment variables available to tests -->

@@ -8,7 +8,11 @@ addons/**/*
 Godot-MCP/**/*
 handoffs/*
 test/TestResults/
+fun-project-test/TestResults/
 gdunit4_testadapter_v5/**/*
+fun-project-test/gdunit4_testadapter_v5/
 fun-project-test/bin
 fun-project-test/obj
 **/textures
+docs/superpowers/**
+DemoBattle*

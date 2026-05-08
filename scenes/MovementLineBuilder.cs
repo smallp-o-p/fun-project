@@ -41,6 +41,7 @@ public static class MovementLineBuilder
     {
       Name = "MovementLine",
       Mesh = mesh,
+      MaterialOverride = material,
       CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
       Visible = mesh.GetSurfaceCount() > 0
     };
