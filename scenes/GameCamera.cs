@@ -5,6 +5,7 @@ public partial class GameCamera : AnimatableBody3D
 {
   public const float CircleBezierFactor = 0.55228475f;
   public const float QuarterTurnRatio = 0.25f;
+  public const float DefaultRaycastLength = 1000.0f;
 
   [Export] public float PathRadius { get; set; } = 6.0f;
   [Export] public float RotationDurationSeconds { get; set; } = 0.2f;
@@ -16,9 +17,9 @@ public partial class GameCamera : AnimatableBody3D
   [Export] public float MaxFov { get; set; } = 100.0f;
   [Export] public float ScrollCameraStep { get; set; } = 0.4f;
 
-  private Path3D cameraPath;
-  private PathFollow3D pathFollow;
-  private Camera3D camera;
+  private Path3D? cameraPath;
+  private PathFollow3D? pathFollow;
+  private Camera3D? camera;
   private Option<Tween> rotationTween;
 
   enum CameraRotation
@@ -70,11 +71,11 @@ public partial class GameCamera : AnimatableBody3D
 
     if (Input.IsActionJustPressed("rotate_camera_l"))
     {
-      RotateQuarterTurn(cameraPath.Curve, CameraRotation.Left);
+      RotateQuarterTurn(cameraPath!.Curve, CameraRotation.Left);
     }
     else if (Input.IsActionJustPressed("rotate_camera_r"))
     {
-      RotateQuarterTurn(cameraPath.Curve, CameraRotation.Right);
+      RotateQuarterTurn(cameraPath!.Curve, CameraRotation.Right);
     }
     UpdateCameraOrientation();
   }
@@ -85,6 +86,60 @@ public partial class GameCamera : AnimatableBody3D
     float verticalStep = GetRequestedVerticalStep();
     float cameraZoom = GetZoom();
     MoveCamera(moveDirection, verticalStep, cameraZoom, delta);
+  }
+
+  public Option<Vector3> TryRaycastViewportPosition(Vector2 viewportPosition, float rayLength = DefaultRaycastLength)
+  {
+    if (camera == null)
+      throw new InvalidOperationException($"{nameof(GameCamera)} has not been initialized.");
+
+    World3D world = GetWorld3D() ?? throw new InvalidOperationException($"{nameof(GameCamera)} must be inside a 3D world before raycasting.");
+    return TryRaycastViewportPosition(camera, world, viewportPosition, rayLength);
+  }
+
+  public static Option<Vector3> TryRaycastViewportPosition(
+    Camera3D activeCamera,
+    World3D world,
+    Vector2 viewportPosition,
+    float rayLength = DefaultRaycastLength)
+  {
+    ArgumentNullException.ThrowIfNull(world);
+
+    PhysicsRayQueryParameters3D query = CreateViewportRayQuery(activeCamera, viewportPosition, rayLength);
+    PhysicsDirectSpaceState3D spaceState =
+      world.DirectSpaceState ?? throw new InvalidOperationException($"{nameof(World3D)} has no direct space state.");
+
+    return TryReadRaycastHitPosition(spaceState.IntersectRay(query));
+  }
+
+  public static PhysicsRayQueryParameters3D CreateViewportRayQuery(
+    Camera3D activeCamera,
+    Vector2 viewportPosition,
+    float rayLength = DefaultRaycastLength)
+  {
+    ArgumentNullException.ThrowIfNull(activeCamera);
+    if (rayLength <= 0.0f)
+      throw new ArgumentOutOfRangeException(nameof(rayLength), "Ray length must be positive.");
+
+    Vector3 rayOrigin = activeCamera.ProjectRayOrigin(viewportPosition);
+    Vector3 rayDirection = activeCamera.ProjectRayNormal(viewportPosition);
+    Vector3 rayEnd = rayOrigin + (rayDirection * rayLength);
+    PhysicsRayQueryParameters3D query = PhysicsRayQueryParameters3D.Create(rayOrigin, rayEnd);
+    query.CollideWithAreas = false;
+    query.CollideWithBodies = true;
+
+    return query;
+  }
+
+  private static Option<Vector3> TryReadRaycastHitPosition(Godot.Collections.Dictionary result)
+  {
+    ArgumentNullException.ThrowIfNull(result);
+    if (result.Count == 0)
+      return None;
+    if (!result.ContainsKey("position"))
+      return None;
+
+    return Some(result["position"].AsVector3());
   }
 
   private static Curve3D BuildCircleCurve(float radius)
@@ -140,7 +195,7 @@ public partial class GameCamera : AnimatableBody3D
       _ => throw new NotImplementedException(),
     };
 
-    float targetProgress = pathFollow.Progress + (direction * GetQuarterTurnDistance(curve));
+    float targetProgress = pathFollow!.Progress + (direction * GetQuarterTurnDistance(curve));
 
     if (rotationTween.Match(IsInstanceValid, () => false))
       rotationTween.IfSome(tween => tween.Kill());
@@ -209,7 +264,7 @@ public partial class GameCamera : AnimatableBody3D
   private void MoveCamera(Vector2 direction, float verticalStep, float zoom, double delta)
   {
     float movementDistance = CameraMoveSpeed * (float)delta;
-    Vector3 movementOffset = GetRelativeMovementOffset(camera.GlobalTransform.Basis, direction, movementDistance) + (Vector3.Up * verticalStep);
+    Vector3 movementOffset = GetRelativeMovementOffset(camera!.GlobalTransform.Basis, direction, movementDistance) + (Vector3.Up * verticalStep);
 
     GlobalPosition += movementOffset;
     camera.Fov = Math.Min(Math.Max(camera.Fov - zoom, MinFov), MaxFov);
@@ -217,8 +272,8 @@ public partial class GameCamera : AnimatableBody3D
 
   private void UpdateCameraOrientation()
   {
-    Transform3D cameraTransform = camera.GetGlobalTransformInterpolated();
-    Vector3 orbitCenterPosition = cameraPath.GetGlobalTransformInterpolated().Origin;
+    Transform3D cameraTransform = camera!.GetGlobalTransformInterpolated();
+    Vector3 orbitCenterPosition = cameraPath!.GetGlobalTransformInterpolated().Origin;
     Vector3 horizontalLookTarget = GetHorizontalLookTarget(cameraTransform.Origin, orbitCenterPosition);
 
     if (cameraTransform.Origin.IsEqualApprox(horizontalLookTarget))
