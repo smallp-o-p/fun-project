@@ -6,8 +6,8 @@ This document describes the tactical runtime shape in the repo and the nearby ex
 
 - `BattleSession` is the single source of truth for live tactical state.
 - `BattleSession` is constructed from battle setup data: a prepared board state, stable faction order, and faction rosters.
-- `BattleSessionMutation` is the authoritative command layer.
-- `BattleActionExecutor` validates and invokes queued `BattleSessionMutation` values.
+- `BattleAction` is the authoritative command layer.
+- `BattleActionExecutor` validates primitive actions produced by queued `BattleAction` values.
 - Read-side battle questions are represented as typed query objects, executed through a single query runner.
 - Controllers, HUD code, and AI should ask battle-state questions through explicit query types instead of accumulating public query methods on `BattleSession`.
 - Godot scene nodes own presentation, input, and focused-unit UX. They do not own tactical truth.
@@ -15,7 +15,7 @@ This document describes the tactical runtime shape in the repo and the nearby ex
   - `X` = width
   - `Y` = levels / height
   - `Z` = length / depth
-- Future tactical systems such as pathfinding, effects, and AI should integrate through explicit session reads and mutation execution instead of mutating scene state directly.
+- Future tactical systems such as pathfinding, effects, and AI should integrate through explicit session reads and action execution instead of mutating scene state directly.
 
 ## Current Runtime Diagram
 
@@ -36,8 +36,8 @@ flowchart LR
         VisibilityState["BattleVisibilitySnapshot\nper-faction fog of war\nexplored tiles + visible enemies"]
         VisibilitySystem["BattleVisibilitySystem\ntile-based LOS + faction FOV rebuilds"]
         EventStream["BattleEvent stream"]
-        Mutations["BattleSessionMutation\nexecutable commands"]
-        ActionExecutor["BattleActionExecutor\nmutation queue + invocation"]
+        Actions["BattleAction\nqueued intent + primitive commands"]
+        ActionExecutor["BattleActionExecutor\naction queue + invocation"]
         Queries["BattleSessionQuery<TResult>\ntyped read questions"]
         QueryRunner["BattleQueryRunner\nread-query invocation"]
     end
@@ -55,22 +55,22 @@ flowchart LR
     BattleSession --- VisibilityState
     BattleSession --- EventStream
     VisibilitySystem -->|"rebuild"| VisibilityState
-    Mutations -->|"refresh on success"| VisibilitySystem
+    Actions -->|"refresh on success"| VisibilitySystem
     Queries -->|"read only"| BattleSession
     Queries -->|"read only"| BoardState
     Queries -->|"read only"| VisibilityState
 
     HUD -->|"player request"| SceneController
     BattleScene -->|"selection / hover / click"| SceneController
-    SceneController -->|"translate to mutation"| ActionExecutor
+    SceneController -->|"translate to action"| ActionExecutor
     SceneController -->|"ask typed query"| QueryRunner
 
-    ActionExecutor -->|"invoke"| Mutations
-    Mutations -->|"execute against"| BattleSession
+    ActionExecutor -->|"invoke primitive action"| Actions
+    Actions -->|"execute against"| BattleSession
     QueryRunner -->|"invoke"| Queries
 
-    EventStream --> BattleScene
-    EventStream --> HUD
+    EventStream -->|"BattleEventCommitted"| BattleScene
+    EventStream -->|"BattleEventCommitted"| HUD
 ```
 
 ## Ownership Rules
@@ -91,16 +91,17 @@ flowchart LR
   - adjacency queries
   - occupant placement, movement, and removal
   - board-local pathfinding queries
-- `BattleSessionMutation` owns mutation-specific application and orchestration after executor-side validation succeeds.
+- `BattleAction` owns action-specific application and any composite action sequencing after executor-side validation succeeds.
 - `BattleVisibilitySystem` owns:
   - tile-based line-of-sight checks
   - tile visibility checks
   - deriving visible units from visible tiles
   - rebuilding faction fog-of-war snapshots from session state
 - `BattleActionExecutor` owns:
-  - preview validation for supported mutations
-  - the pending mutation queue
+  - preview validation for supported primitive actions
+  - the pending action queue
   - invocation order
+  - trigger response scheduling after committed events
   - last-result tracking
   - exception isolation around command execution
 - `BattleQueryRunner` owns:
@@ -151,7 +152,7 @@ The session owns:
 - handling faction elimination
 - rebuilding and advancing the round queue
 - refreshing action-point availability for the active side
-- rebuilding faction visibility after successful mutations
+- rebuilding faction visibility after successful actions
 - ending the battle when no living factions remain
 
 The target public read-side surface is a query runner, not a growing method list:
@@ -160,7 +161,7 @@ The target public read-side surface is a query runner, not a growing method list
 var result = session.Queries.Execute(new SomeBattleQuery(...));
 ```
 
-The session may keep internal helpers for commands and query objects, but controllers and AI should not depend on those helpers directly.
+The session may keep internal helpers for actions and query objects, but controllers and AI should not depend on those helpers directly.
 
 ### BattleSessionQuery
 
@@ -242,7 +243,7 @@ Current behavior:
 - treats units as visible when they stand on a currently visible tile
 - builds per-faction current visibility and explored-tile memory
 - keeps own living units known to their faction even without direct LOS
-- rebuilds the full visibility snapshot after every successful battle mutation
+- rebuilds the full visibility snapshot after every successful battle action
 
 Current limitations:
 
@@ -250,9 +251,9 @@ Current limitations:
 - `BlocksLineOfSight` is whole-tile occlusion
 - there is no smoke attenuation, lighting model, or last-known enemy memory yet
 
-### BattleSessionMutation
+### BattleAction
 
-The current built-in authoritative mutations are:
+The current built-in authoritative actions are:
 
 - `StartBattle`
 - `SpawnUnit`
@@ -263,13 +264,14 @@ The current built-in authoritative mutations are:
 - `PassUnit`
 - `EndFactionTurn`
 
-Each mutation executes directly through:
+Actions should execute through an explicit executor:
 
 ```csharp
-var result = mutation.Execute(session);
+var executor = new BattleActionExecutor(session);
+var result = executor.Submit(BattleAction.MoveUnitStep(unit.Handle, destination));
 ```
 
-Mutation results are returned as `BattleMutationResult`, including:
+Submitted action results are returned as `IReadOnlyList<BattleActionResult>`. Each produced result includes:
 
 - success or failure
 - failure reason
@@ -278,25 +280,19 @@ Mutation results are returned as `BattleMutationResult`, including:
 
 ### BattleActionExecutor
 
-`BattleActionExecutor` currently queues `BattleSessionMutation`.
+`BattleActionExecutor` accepts submitted `BattleAction` values. Composite actions yield one primitive `BattleAction` at a time, and the executor invokes primitive actions until the submitted action and its reaction actions settle. Each primitive action validates itself against the current `BattleSession` before committing changes.
 
 Current responsibilities:
 
-- `Evaluate(...)`
-- `ExecuteNow(...)`
-- `Enqueue(...)`
-- `EnqueueRange(...)`
-- `Tick()`
-- `DrainQueue(...)`
-- `MutationStarted` event
-- `MutationResolved` event
+- `Submit(...)`
+- `OnActionStart` event
+- `OnActionComplete` event
 - `LastResult`
-- `ActiveMutation`
 
 The executor does not currently:
 
 - own selection logic
-- mutate session state directly outside mutation execution
+- mutate session state directly outside action execution
 
 ## Representative Flow: Current Move Command
 
@@ -308,7 +304,7 @@ sequenceDiagram
     participant Controller as BattleSceneController
     participant Queries as BattleQueryRunner
     participant Exec as BattleActionExecutor
-    participant Mutation as MoveUnit
+    participant Action as MoveUnit
     participant Session as BattleSession
     participant Board as BattleBoardState
     participant Event as BattleEvent stream
@@ -320,16 +316,18 @@ sequenceDiagram
     Queries->>Session: Read unit state
     Queries->>Board: FindPath
     Queries-->>Controller: Return path
-    Controller->>Exec: Evaluate move mutation
-    Exec->>Session: Validate active side, AP, unit availability
-    Exec->>Board: Validate adjacency, occupancy, and path legality
-    Controller->>Exec: Enqueue move mutation
-    Exec->>Mutation: ExecuteUnchecked(session)
-    Mutation->>Board: Commit each provided board step
-    Mutation->>Event: Raise UnitMoved per step
-    Exec-->>Controller: Return BattleMutationResult
-    Event-->>View: Animate movement
-    Event-->>HUD: Refresh AP and prompts
+    Controller->>Exec: Submit move action
+    loop Until action and reactions settle
+        Exec->>Action: Request next primitive action
+        Action->>Session: Validate active side, AP, and unit availability
+        Action->>Board: Validate adjacency, occupancy, and path legality
+        Action->>Board: Commit the next board step
+        Action->>Event: Raise UnitMoved and TileOccupied
+        Exec->>Exec: Resolve trigger responses from committed events
+    end
+    Exec-->>Controller: Return IReadOnlyList<BattleActionResult>
+    Event-->>View: Animate movement from committed battle event
+    Event-->>HUD: Refresh AP and prompts from committed battle event
 ```
 
 ## Turn Flow Notes
@@ -338,13 +336,13 @@ sequenceDiagram
 - Setup initializes the turn queue from the stable global faction order.
 - `StartBattle` rebuilds the active round queue from living factions in that order.
 - `ActiveSide` and `TurnNumber` are owned by the session.
-- `EndFactionTurn` is the explicit faction-turn mutation.
+- `EndFactionTurn` is the explicit faction-turn action.
 - `PassUnit` ends a unit activation and currently advances the turn automatically if that side has no remaining actable units.
 - Unit death updates alive/dead storage, board occupancy, current-turn availability, and faction queue membership through session bookkeeping.
 
 ## Current Battle Events
 
-The current event stream is intentionally small and authoritative:
+The current event stream is intentionally small and authoritative. Presentation code observes it through `BattleSession.BattleEventCommitted`, which is raised only after the corresponding state change has happened.
 
 - `SessionStarted`
 - `SessionEnded`
@@ -354,11 +352,14 @@ The current event stream is intentionally small and authoritative:
 - `UnitAdded`
 - `UnitActivationEnded`
 - `UnitMoved`
+- `TileOccupied`
 - `UnitDamaged`
 - `UnitKilled`
 - `ItemThrown`
 
 Presentation code should react to these events instead of inferring state changes from executor internals.
+
+`BattleEventType` is the stable event bucket used by trigger registration. Concrete event subclasses, such as `UnitMovedBattleEvent` and `TurnStartedBattleEvent`, carry event-specific payloads.
 
 ## Future Extensions
 
@@ -373,21 +374,21 @@ These systems are still part of the intended architecture, but they are not impl
 When they are added, they should follow these rules:
 
 - read battle state through typed query objects instead of duplicating tactical truth
-- commit tactical changes through explicit session helpers and mutation execution
+- commit tactical changes through explicit actions and `BattleActionExecutor`
 - emit structured battle events instead of mutating scene nodes directly
 - keep presentation-only concerns out of the authoritative runtime
 
-Step-based movement, interrupts, reaction fire, and richer combat-effect hooks are still future extensions on top of the current command-based runtime.
+Reaction fire and richer combat-effect hooks are still future extensions on top of the current action-based runtime.
 
 ## Canonical Vocabulary
 
 Use these names consistently in future tactical work:
 
 - `BattleSession`
-- `BattleSessionMutation`
-- `BattleMutationResult`
+- `BattleAction`
+- `BattleActionResult`
 - `BattleActionExecutor`
-- `BattleActionEvaluation`
+- `BattleTrigger`
 - `BattleSessionQuery<TResult>`
 - `BattleQueryRunner`
 - `BattleQueryResult<TResult>`

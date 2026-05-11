@@ -1,5 +1,4 @@
 using FunProject.Battle;
-using System;
 
 internal static class BattleQueryTestHelper
 {
@@ -17,4 +16,3 @@ internal static class BattleQueryTestHelper
       _ => throw new InvalidOperationException("Expected query failure, but query succeeded."));
   }
 }
-

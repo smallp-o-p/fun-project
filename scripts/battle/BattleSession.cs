@@ -54,7 +54,7 @@ public sealed class BattleSession
   public IReadOnlyCollection<Faction> TurnQueue => _turnQueue;
   public IReadOnlyDictionary<Faction, IReadOnlyList<Combatant>> FactionRosters => _factionRosters;
 
-  public event Action<BattleEvent> EventRaised = delegate { };
+  public event Action<BattleEvent> BattleEventCommitted = delegate { };
 
   public BattleSession(
     BattleBoardState board,
@@ -126,8 +126,10 @@ public sealed class BattleSession
 
     RefreshCurrentFactionAvailability();
 
-    RaiseEvent(new BattleEvent(BattleEventType.SessionStarted, Message: Some("Battle started.")));
-    RaiseEvent(new BattleEvent(BattleEventType.TurnStarted, Message: Some($"Turn {TurnNumber} started for {ActiveSide.Name}.")));
+    RaiseCommittedEvent(new SessionStartedBattleEvent());
+    RaiseCommittedEvent(new TurnStartedBattleEvent(
+      ActiveSide,
+      TurnNumber));
     return true;
   }
 
@@ -193,17 +195,16 @@ public sealed class BattleSession
     if (unitPointOption.IsNone)
       throw new InvalidOperationException($"Could not clear unit {unit.UnitId} because it is not on the board.");
     BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
-    Vector3I unitPosition = unitPoint.Raw;
 
     MoveUnitToDeadStorage(unit);
 
     bool occupantCleared = Board.TryClearOccupant(unitPoint, unit.UnitId);
     if (!occupantCleared)
-      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} from {unitPosition}.");
+      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} from {unitPoint.Raw}.");
     _unitPositionsByHandle.Remove(handle);
 
     _activeFactionUnitsAvailable.Remove(unit.UnitId);
-    RaiseEvent(new BattleEvent(BattleEventType.UnitKilled, Some(unit.UnitId), Some(unitPosition), Some($"Unit ID {unit.UnitId} was killed!")));
+    RaiseCommittedEvent(new UnitKilledBattleEvent(unit, unitPoint));
     HandleFactionLoss(unitSide);
   }
 
@@ -234,10 +235,10 @@ public sealed class BattleSession
     Option<BattleBoardState.ValidatedPoint> unitPointOption = GetUnitPosition(unit);
     if (unitPointOption.IsNone)
       throw new InvalidOperationException($"Cannot end activation for unit {unit.UnitId} because it is not on the board.");
-    Vector3I unitPosition = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint)).Raw;
+    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
 
     RemoveAvailableUnit(unit.UnitId);
-    RaiseEvent(new BattleEvent(BattleEventType.UnitActivationEnded, Some(unit.UnitId), Some(unitPosition), Some($"{unit.Combatant.Name} ended their activation.")));
+    RaiseCommittedEvent(new UnitActivationEndedBattleEvent(unit, unitPoint));
 
     if (!GetFactionAliveUnits(activeSide).Any(CanUnitActNow))
       EndFactionTurn(activeSide);
@@ -249,7 +250,9 @@ public sealed class BattleSession
       return;
 
     var activeSide = ActiveSide;
-    RaiseEvent(new BattleEvent(BattleEventType.TurnEnded, Message: Some($"Turn {TurnNumber} ended for {activeSide.Name}.")));
+    RaiseCommittedEvent(new TurnEndedBattleEvent(
+      activeSide,
+      TurnNumber));
     _sidesActedThisRound.Add(activeSide);
 
     if (_turnQueue.Count > 0)
@@ -286,7 +289,7 @@ public sealed class BattleSession
     _turnQueue.Clear();
     Phase = BattlePhase.Ended;
 
-    RaiseEvent(new BattleEvent(BattleEventType.SessionEnded, Message: Some("Battle ended.")));
+    RaiseCommittedEvent(new SessionEndedBattleEvent());
   }
 
   internal void RegisterSpawnedUnitForCurrentRound(BattleUnitState unit)
@@ -442,9 +445,10 @@ public sealed class BattleSession
       _activeFactionUnitsAvailable.Add(unit.UnitId);
   }
 
-  internal void RaiseEvent(BattleEvent battleEvent)
+  internal void RaiseCommittedEvent(BattleEvent battleEvent)
   {
-    EventRaised.Invoke(battleEvent);
+    RefreshVisibility();
+    BattleEventCommitted.Invoke(battleEvent);
   }
 
   internal void RefreshVisibility()
@@ -553,7 +557,9 @@ public sealed class BattleSession
 
     RefreshCurrentFactionAvailability();
 
-    RaiseEvent(new BattleEvent(BattleEventType.ActiveSideChanged, Message: Some($"Active side is now {nextSide.Name}.")));
-    RaiseEvent(new BattleEvent(BattleEventType.TurnStarted, Message: Some($"Turn {TurnNumber} started for {nextSide.Name}.")));
+    RaiseCommittedEvent(new ActiveSideChangedBattleEvent(nextSide));
+    RaiseCommittedEvent(new TurnStartedBattleEvent(
+      nextSide,
+      TurnNumber));
   }
 }

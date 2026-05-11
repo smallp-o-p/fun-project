@@ -1,9 +1,9 @@
 using FunProject.Battle;
-using FunProject.Combatants;
 using FunProject.Tests;
 using GdUnit4;
 using Godot;
 using System.Linq;
+using static BattleActionTestHelper;
 using static BattleQueryTestHelper;
 
 [TestSuite]
@@ -110,7 +110,8 @@ public class BattleVisibilityTest
     StartBattle(session);
     Assert.True(GetValue(session.Queries.Execute(new IsTileVisibleToFaction(playerFaction, tile))));
 
-    var moveResult = BattleSessionMutation.MoveUnitStep(observer.Handle, new Vector3I(0, 0, 1)).Execute(session);
+    var moveExecutor = new BattleActionExecutor(session);
+    var moveResult = moveExecutor.Submit(BattleAction.MoveUnitStep(observer.Handle, new Vector3I(0, 0, 1))).RequireSingleResult();
     Assert.True(moveResult.Succeeded);
 
     Assert.False(GetValue(session.Queries.Execute(new IsTileVisibleToFaction(playerFaction, tile))));
@@ -129,7 +130,8 @@ public class BattleVisibilityTest
     StartBattle(session);
     Assert.True(GetValue(session.Queries.Execute(new IsUnitVisibleToFaction(playerFaction, target.Handle))));
 
-    var moveResult = BattleSessionMutation.MoveUnitStep(observer.Handle, new Vector3I(0, 0, 0)).Execute(session);
+    var moveExecutor = new BattleActionExecutor(session);
+    var moveResult = moveExecutor.Submit(BattleAction.MoveUnitStep(observer.Handle, new Vector3I(0, 0, 0))).RequireSingleResult();
     Assert.True(moveResult.Succeeded);
 
     Assert.False(GetValue(session.Queries.Execute(new IsUnitVisibleToFaction(playerFaction, target.Handle))));
@@ -192,25 +194,12 @@ public class BattleVisibilityTest
     StartBattle(session);
     Assert.True(GetValue(session.Queries.Execute(new IsUnitVisibleToFaction(playerFaction, target.Handle))));
 
-    var damageResult = BattleSessionMutation.ApplyDamage(observer.Handle, 10).Execute(session);
+    var damageExecutor = new BattleActionExecutor(session);
+    var damageResult = damageExecutor.Submit(BattleAction.ApplyDamage(observer.Handle, 10)).RequireSingleResult();
     Assert.True(damageResult.Succeeded);
 
     Assert.False(GetValue(session.Queries.Execute(new IsUnitVisibleToFaction(playerFaction, target.Handle))));
     Assert.Equal(0, GetValue(session.Queries.Execute(new GetVisibleUnitsForFaction(playerFaction))).Count);
   }
 
-  private static BattleTestUnit SpawnUnit(BattleSession session, Combatant combatant, Vector3I position)
-  {
-    var result = BattleSessionMutation.SpawnUnit(combatant, position).Execute(session);
-    Assert.True(result.Succeeded);
-    Assert.True(result.AffectedUnit.IsSome);
-    Assert.True(result.AffectedUnitHandle.IsSome);
-    return new BattleTestUnit(result.AffectedUnit.RequireSome(), result.AffectedUnitHandle.RequireSome());
-  }
-
-  private static void StartBattle(BattleSession session)
-  {
-    var result = BattleSessionMutation.StartBattle().Execute(session);
-    Assert.True(result.Succeeded);
-  }
 }

@@ -1,0 +1,81 @@
+using FunProject.Battle;
+using FunProject.Tests;
+using GdUnit4;
+using Godot;
+using System.Collections.Generic;
+using System.Linq;
+
+[TestSuite]
+[RequireGodotRuntime]
+public class BattleEventTest
+{
+  [TestCase(TestName = "Battle events build display strings from event data")]
+  public void BattleEventsBuildDisplayStringsFromEventData()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var sourcePosition = session.Board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome();
+    var position = session.Board.ValidatePoint(new Vector3I(1, 0, 2)).RequireSome();
+    var unit = BattleActionTestHelper.SpawnUnit(
+      session,
+      BattleTestFactory.MakeCombatant("Alpha", faction),
+      sourcePosition.Raw);
+    var grenade = BattleTestFactory.MakeGrenade("Frag Grenade");
+
+    Assert.Equal("Battle started.", new SessionStartedBattleEvent().ToDisplayString());
+    Assert.Equal("Battle ended.", new SessionEndedBattleEvent().ToDisplayString());
+    Assert.Equal("Turn 2 started for Player.", new TurnStartedBattleEvent(faction, 2).ToDisplayString());
+    Assert.Equal("Turn 2 ended for Player.", new TurnEndedBattleEvent(faction, 2).ToDisplayString());
+    Assert.Equal("Active side is now Player.", new ActiveSideChangedBattleEvent(faction).ToDisplayString());
+    Assert.Equal($"Alpha entered the battle at {position}.", new UnitAddedBattleEvent(unit.State, position).ToDisplayString());
+    Assert.Equal("Alpha ended their activation.", new UnitActivationEndedBattleEvent(unit.State, position).ToDisplayString());
+    Assert.Equal($"Unit ID {unit.UnitId} moved from {sourcePosition} to {position}.", new UnitMovedBattleEvent(unit.State, position, sourcePosition).ToDisplayString());
+    Assert.Equal($"Unit ID {unit.UnitId} occupied {position}.", new TileOccupiedBattleEvent(unit.State, position, sourcePosition).ToDisplayString());
+    Assert.Equal("Damage: 3", new UnitDamagedBattleEvent(unit.State, position, 3).ToDisplayString());
+    Assert.Equal($"Unit ID {unit.UnitId} was killed!", new UnitKilledBattleEvent(unit.State, position).ToDisplayString());
+    Assert.Equal("Alpha threw Frag Grenade.", new ItemThrownBattleEvent(unit.State, position, grenade).ToDisplayString());
+  }
+
+  [TestCase(TestName = "Committed battle events expose session domain objects")]
+  public void CommittedBattleEventsExposeSessionDomainObjects()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
+    var raisedEvents = new List<BattleEvent>();
+    session.BattleEventCommitted += raisedEvents.Add;
+
+    var start = session.Board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome();
+    var destination = session.Board.ValidatePoint(new Vector3I(1, 0, 2)).RequireSome();
+    var target = session.Board.ValidatePoint(new Vector3I(3, 0, 2)).RequireSome();
+    var unit = BattleActionTestHelper.SpawnUnit(
+      session,
+      BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 6),
+      start.Raw);
+    var grenade = BattleTestFactory.MakeGrenade("Frag Grenade", throwRange: 4, actionPointCost: 1);
+    unit.State.AddInventoryItem(grenade);
+    BattleActionTestHelper.StartBattle(session);
+
+    var executor = new BattleActionExecutor(session);
+    executor.Submit(BattleAction.MoveUnitStep(unit.Handle, destination.Raw)).RequireSingleResult();
+    executor.Submit(BattleAction.ThrowItem(unit.Handle, grenade, target.Raw)).RequireSingleResult();
+    executor.Submit(BattleAction.ApplyDamage(unit.Handle, 3)).RequireSingleResult();
+
+    var addedEvent = raisedEvents.OfType<UnitAddedBattleEvent>().Single();
+    Assert.True(object.ReferenceEquals(unit.State, addedEvent.Unit));
+    Assert.Equal(start, addedEvent.Position);
+
+    var movedEvent = raisedEvents.OfType<UnitMovedBattleEvent>().Single();
+    Assert.True(object.ReferenceEquals(unit.State, movedEvent.Unit));
+    Assert.Equal(destination, movedEvent.Position);
+    Assert.Equal(start, movedEvent.SourcePosition);
+
+    var thrownEvent = raisedEvents.OfType<ItemThrownBattleEvent>().Single();
+    Assert.True(object.ReferenceEquals(unit.State, thrownEvent.Unit));
+    Assert.True(object.ReferenceEquals(grenade, thrownEvent.Item));
+    Assert.Equal(target, thrownEvent.Position);
+
+    var damagedEvent = raisedEvents.OfType<UnitDamagedBattleEvent>().Single();
+    Assert.True(object.ReferenceEquals(unit.State, damagedEvent.Unit));
+    Assert.Equal(destination, damagedEvent.Position);
+  }
+}

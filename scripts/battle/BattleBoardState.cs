@@ -1,12 +1,13 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace FunProject.Battle;
 
 public sealed class BattleBoardState
 {
-  public readonly struct ValidatedPoint : IEquatable<ValidatedPoint>
+  public readonly struct ValidatedPoint : IEquatable<ValidatedPoint>, IEquatable<Vector3I>
   {
     public readonly Vector3I Raw;
     public int X => Raw.X;
@@ -23,9 +24,14 @@ public sealed class BattleBoardState
       return Raw == other.Raw;
     }
 
-    public override bool Equals(object obj)
+    public bool Equals(Vector3I other)
     {
-      return obj is ValidatedPoint other && Equals(other);
+      return Raw == other;
+    }
+
+    public override bool Equals(object? obj)
+    {
+      return (obj is ValidatedPoint other && Equals(other)) || (obj is Vector3I other2 && Equals(other2));
     }
 
     public override int GetHashCode()
@@ -91,10 +97,32 @@ public sealed class BattleBoardState
 
   public Option<ValidatedPoint> ValidatePoint(Vector3I coordinates)
   {
-    if (!IsInBounds(coordinates))
-      return None;
+    return IsInBounds(coordinates) ? Some(new ValidatedPoint(coordinates)) : None;
+  }
 
-    return Some(new ValidatedPoint(coordinates));
+  public Option<List<ValidatedPoint>> ValidatePath(IEnumerable<Vector3I> path)
+  {
+    List<ValidatedPoint> validatedPts = new()
+    {
+      Capacity = path.Count()
+    };
+
+    foreach (var pt in path)
+    {
+      bool validated = ValidatePoint(pt).Match(
+        (validated) =>
+        {
+          validatedPts.Add(validated);
+          return true;
+        },
+        () => false
+      );
+
+      if (!validated)
+        return None;
+    }
+
+    return Some(validatedPts);
   }
 
   public bool TryPlaceOccupant(ValidatedPoint point, int unitId)

@@ -169,7 +169,7 @@ That keeps all board-local spatial rules together:
 - action point spending
 - faction and turn checks
 
-The current implementation path is to integrate Godot `AStar3D` into `BattleBoardState` and expose a board query such as `FindPath(...)`. Presentation and controller code can use that query to preview a route to the player, then submit `MoveUnit` through `BattleActionExecutor` for legality checks before the mutation applies the chosen path as a composition of explicit steps. If pathfinding later becomes heavily unit-specific or expensive to rebuild, it can be extracted behind a separate service without changing that contract.
+The current implementation path is to integrate Godot `AStar3D` into `BattleBoardState` and expose a board query such as `FindPath(...)`. Presentation and controller code can use that query to preview a route to the player, then submit `MoveUnit` through `BattleActionExecutor` for legality checks before the action applies the chosen path as a composition of explicit steps. If pathfinding later becomes heavily unit-specific or expensive to rebuild, it can be extracted behind a separate service without changing that contract.
 
 ### Future Picking
 

@@ -1,11 +1,10 @@
 using FunProject.Battle;
-using FunProject.Combatants;
 using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using static BattleActionTestHelper;
 using static BattleQueryTestHelper;
 
 [TestSuite]
@@ -147,22 +146,6 @@ public class BattleSessionQueriesTest
     Assert.True(result.IsLeft);
     BattleQueryFailure failure = GetFailure(result);
     Assert.Equal(BattleQueryFailureReason.InvalidTile, failure.Reason);
-  }
-
-  private static BattleTestUnit SpawnUnit(BattleSession session, Combatant combatant, Vector3I position)
-  {
-    var result = BattleSessionMutation.SpawnUnit(combatant, position).Execute(session);
-    Assert.True(result.Succeeded);
-    if (result.AffectedUnit.IsNone || result.AffectedUnitHandle.IsNone)
-      throw new System.InvalidOperationException("Spawn unit mutation succeeded without an affected unit and handle.");
-
-    return new BattleTestUnit(result.AffectedUnit.RequireSome(), result.AffectedUnitHandle.RequireSome());
-  }
-
-  private static void StartBattle(BattleSession session)
-  {
-    var result = BattleSessionMutation.StartBattle().Execute(session);
-    Assert.True(result.Succeeded);
   }
 
 }

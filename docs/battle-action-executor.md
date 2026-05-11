@@ -2,22 +2,23 @@
 
 This document describes the current role of `BattleActionExecutor` in the tactical combat runtime.
 
-`BattleActionExecutor` is the validation and invocation layer for `BattleSessionMutation`.
+`BattleActionExecutor` is the trigger-resolution and sequencing layer for queued `BattleAction` work.
 
 ## Purpose
 
 The executor exists to answer two questions cleanly:
 
-- can this mutation execute against the current battle state?
-- if it can, when and in what order should it execute?
+- what is the next primitive action that should execute?
+- after it commits, which trigger response actions should interrupt queued work?
 
 It is responsible for:
 
-- validating supported player-facing mutations against current session state
-- owning the pending mutation queue
-- executing at most one queued mutation per `Tick()`
-- returning structured `BattleMutationResult` and `BattleActionEvaluation` values
-- isolating exceptions raised during mutation execution
+- owning the pending action queue
+- accepting a submitted `BattleAction` intent and resolving the resulting action chain
+- executing one primitive action at a time from the queued action head
+- resolving trigger responses from committed events after an action succeeds
+- returning the ordered `IReadOnlyList<BattleActionResult>` produced by that submission
+- isolating exceptions raised during action execution
 
 It is not responsible for:
 
@@ -29,15 +30,15 @@ It is not responsible for:
 ## Authority Boundaries
 
 - `BattleSession` remains the only owner of authoritative tactical state.
-- `BattleSessionMutation` remains the command object that applies a state change.
-- `BattleActionExecutor` validates and invokes mutations.
-- scene controllers, HUD code, and AI build mutations and submit them to the executor.
-- visuals and HUD react to `BattleEvent` after session state changes.
+- `BattleAction` is the command object. It owns action-specific legality checks and execution against the session. It may be primitive, or it may unfold into primitive child actions.
+- `BattleActionExecutor` invokes primitive actions produced by queued actions.
+- scene controllers, HUD code, and AI build actions and submit them to the executor.
+- visuals and HUD react to `BattleSession.BattleEventCommitted` after session state changes.
 
 The important split is:
 
-- `BattleSessionMutation` = executable command
-- `BattleActionExecutor` = validator, queue, and invoker
+- `BattleAction` = queued tactical intent and primitive executable command
+- `BattleActionExecutor` = trigger mediator, queue, and invoker
 - `BattleSession` = source of truth
 - `BattleEvent` = notification that authoritative state already changed
 
@@ -45,73 +46,48 @@ The important split is:
 
 The current executor API is:
 
-- `Evaluate(BattleSessionMutation mutation)`
-- `ExecuteNow(BattleSessionMutation mutation)`
-- `Enqueue(BattleSessionMutation mutation)`
-- `EnqueueRange(IEnumerable<BattleSessionMutation> mutations)`
-- `Tick()`
-- `DrainQueue(int maxActions = int.MaxValue)`
+- `Submit(BattleAction action)`
+- `RegisterTrigger(BattleTrigger trigger, BattleEventType eventType)`
+- `RegisterTrigger(BattleTrigger trigger, IEnumerable<BattleEventType> eventTypes)`
 - `PendingCount`
-- `ActiveMutation`
 - `LastResult`
 
 And events:
 
-- `MutationStarted`
-- `MutationResolved`
-
-`Evaluate(...)` is the preview-friendly entry point. Controllers can build a mutation, ask the executor whether it is legal, inspect the rejection message or action-point cost, and only then enqueue or execute it.
-
-## Evaluation Shape
-
-`BattleActionEvaluation` currently reports:
-
-- the mutation being evaluated
-- whether the mutation is allowed
-- the failure reason when rejected
-- an optional message
-- the total action-point cost when that concept applies
-
-This keeps UI and AI code on the same validation path as actual execution.
+- `OnActionStart`
+- `OnActionComplete`
 
 ## Execution Flow
 
 The current happy-path flow is:
 
-1. controller or AI constructs a `BattleSessionMutation`
-2. optional preview code calls `Evaluate(mutation)`
-3. the mutation is queued with `Enqueue(...)` or executed immediately with `ExecuteNow(...)`
-4. the executor validates the mutation against the current `BattleSession`
-5. the executor calls `mutation.ExecuteUnchecked(session)` if the mutation is legal
-6. the mutation applies its change through session and board helpers
-7. `BattleSession` raises authoritative `BattleEvent` values
-8. the executor returns a `BattleMutationResult`
+1. controller or AI constructs a `BattleAction`
+2. the action is submitted with `Submit(action)`
+3. the executor queues the submitted action internally
+4. while the queue has work, the executor asks the queue head for its next primitive action
+5. the executor captures `BattleEvent` values raised while the primitive action commits
+6. the executor calls the primitive action's internal execution path
+7. the action validates itself against the current `BattleSession`
+8. the action applies its change through session and board helpers
+9. `BattleSession` raises authoritative `BattleEvent` values through `BattleEventCommitted` after state changes
+10. the executor evaluates triggers from those committed events
+11. the executor inserts trigger response actions ahead of paused work
+12. the executor continues until the submitted action and its reactions settle
+13. `Submit` returns every `BattleActionResult` produced by that submission
 
-`BattleSessionMutation.Execute(session)` also routes through the executor so direct mutation execution uses the same validation path.
+Actions should be executed through an explicit `BattleActionExecutor` by calling `Submit`. A normal submission leaves the queue empty when it returns; the queue is non-empty only while the executor is actively resolving submitted work.
+
+Trigger response actions still raise `OnActionStart`, `OnActionComplete`, and committed `BattleEvent` notifications as they are resolved inside the same submission. `Submit` does not expose `Tick`; it queues the provided action, resolves the action and reactions immediately, and returns the result sequence.
 
 ## Supported Validation Rules
 
-The executor currently performs battle-legality validation for these mutations:
+Actions perform their own battle-legality validation before mutating session state. Current checks include battle phase, active side, unit availability, action-point cost, adjacency, board occupancy, throw range, path legality, and stale faction-turn requests.
 
-- `MoveUnitStep`
-- `MoveUnit`
-- `ThrowItem`
-- `PassUnit`
-- `EndFactionTurn`
-
-These checks include battle phase, active side, unit availability, action-point cost, adjacency, board occupancy, throw range, and path legality.
-
-Other mutations currently pass through without extra executor-side legality rules:
-
-- `StartBattle`
-- `SpawnUnit`
-- `ApplyDamage`
-
-Those mutations still protect their own invariants during application.
+The executor does not need to know which concrete action type it is running.
 
 ## Single-Threaded Execution
 
-Authoritative battle mutation remains single-threaded.
+Authoritative battle action execution remains single-threaded.
 
 Reasons:
 
@@ -120,7 +96,7 @@ Reasons:
 - replay and debugging remain tractable
 - interrupts and future sequencing are easier to reason about
 
-Pure read-only work such as path previews or AI scoring can still move elsewhere later. The executor and `BattleSession` mutation path should remain single-threaded.
+Pure read-only work such as path previews or AI scoring can still move elsewhere later. The executor and `BattleSession` action path should remain single-threaded.
 
 ## Relationship To Visuals
 
@@ -128,25 +104,24 @@ Visual systems should not infer tactical truth from executor internals.
 
 Recommended rule:
 
-- use `BattleActionEvaluation` and `BattleMutationResult` for controller logic
-- use `BattleEvent` for visual updates
+- use `BattleActionResult` for command outcomes
+- use read-side `BattleSessionQuery<TResult>` values for previews
+- use `BattleEventCommitted` for visual updates after state has committed
 
 Example:
 
-- controller uses `Evaluate(...)` to decide whether to enable a move confirmation
-- scene visuals listen for `UnitMoved`
-- HUD refreshes AP and prompts after `MutationResolved` or after relevant battle events
+- controller uses `FindPathForUnit` and related queries to decide whether to enable a move confirmation
+- scene visuals listen for committed `UnitMovedBattleEvent`
+- HUD refreshes AP and prompts after `OnActionComplete` or after relevant committed battle events
+
+Godot scene nodes that need actual Godot signals should adapt this C# event at the presentation boundary. `BattleSession` stays a pure runtime object; a scene/controller can subscribe to `BattleEventCommitted` and re-emit a Godot signal with Variant-compatible payloads for animation code.
 
 ## Initial Query Surface
 
-The executor now provides one general preview query:
-
-- `Evaluate(BattleSessionMutation mutation)`
-
-As the tactics layer grows, additional explicit read APIs can be added alongside it, for example:
+The executor does not expose preview evaluation. Controllers and AI should use explicit read-side queries, for example:
 
 - reachable cells for a unit
 - valid throw targets for an item
 - action-point cost for a path
 
-Those should stay read-only and should not bypass the authoritative mutation path.
+Those should stay read-only and should not bypass the authoritative action path.
