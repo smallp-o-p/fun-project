@@ -552,9 +552,9 @@ public partial class BattleActionExecutorTest
     BattleActionResult result = executor.Submit(BattleAction.PassUnit(unitA.Handle)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
-    Assert.False(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitA.Handle))));
-    Assert.False(GetValue(session.Queries.Execute(new CanUnitActNow(unitA.Handle))));
-    Assert.True(GetValue(session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitB.Handle))));
+    Assert.False(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitA.Handle))));
+    Assert.False(GetValue(Query(session, new CanUnitActNow(unitA.Handle))));
+    Assert.True(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitB.Handle))));
     Assert.Equal(faction, session.ActiveSide);
   }
 

@@ -44,7 +44,6 @@ public sealed class BattleSession
   private int _nextUnitId = 1;
 
   public BattleBoardState Board { get; }
-  public BattleQueryRunner Queries { get; }
   public BattlePhase Phase { get; private set; } = BattlePhase.Setup;
   public int TurnNumber { get; private set; } = 1;
   public Faction ActiveSide { get; private set; }
@@ -66,8 +65,6 @@ public sealed class BattleSession
     ArgumentNullException.ThrowIfNull(factionRosters);
 
     Board = board;
-
-    Queries = new BattleQueryRunner(this);
 
     foreach (var faction in globalFactionOrder)
     {

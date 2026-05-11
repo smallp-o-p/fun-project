@@ -14,10 +14,11 @@ public class BattleEventTest
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var runtime = new BattleRuntime(session);
     var sourcePosition = session.Board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome();
     var position = session.Board.ValidatePoint(new Vector3I(1, 0, 2)).RequireSome();
     var unit = BattleActionTestHelper.SpawnUnit(
-      session,
+      runtime,
       BattleTestFactory.MakeCombatant("Alpha", faction),
       sourcePosition.Raw);
     var grenade = BattleTestFactory.MakeGrenade("Frag Grenade");
@@ -41,24 +42,24 @@ public class BattleEventTest
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
+    var runtime = new BattleRuntime(session);
     var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
+    runtime.BattleEventCommitted += raisedEvents.Add;
 
     var start = session.Board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome();
     var destination = session.Board.ValidatePoint(new Vector3I(1, 0, 2)).RequireSome();
     var target = session.Board.ValidatePoint(new Vector3I(3, 0, 2)).RequireSome();
     var unit = BattleActionTestHelper.SpawnUnit(
-      session,
+      runtime,
       BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 6),
       start.Raw);
     var grenade = BattleTestFactory.MakeGrenade("Frag Grenade", throwRange: 4, actionPointCost: 1);
     unit.State.AddInventoryItem(grenade);
-    BattleActionTestHelper.StartBattle(session);
+    BattleActionTestHelper.StartBattle(runtime);
 
-    var executor = new BattleActionExecutor(session);
-    executor.Submit(BattleAction.MoveUnitStep(unit.Handle, destination.Raw)).RequireSingleResult();
-    executor.Submit(BattleAction.ThrowItem(unit.Handle, grenade, target.Raw)).RequireSingleResult();
-    executor.Submit(BattleAction.ApplyDamage(unit.Handle, 3)).RequireSingleResult();
+    runtime.ExecuteAction(BattleAction.MoveUnitStep(unit.Handle, destination.Raw)).RequireSingleResult();
+    runtime.ExecuteAction(BattleAction.ThrowItem(unit.Handle, grenade, target.Raw)).RequireSingleResult();
+    runtime.ExecuteAction(BattleAction.ApplyDamage(unit.Handle, 3)).RequireSingleResult();
 
     var addedEvent = raisedEvents.OfType<UnitAddedBattleEvent>().Single();
     Assert.True(object.ReferenceEquals(unit.State, addedEvent.Unit));

@@ -68,44 +68,32 @@ public abstract class BattleAction
 
     Faction activeSide = session.ActiveSide;
 
-    Either<BattleQueryFailure, BattleUnitState> unitResult = session.Queries.Execute(new GetLivingUnit(unitHandle));
-    return unitResult.Match<Either<BattleActionResult, BattleUnitState>>(
-      unitFailure => Left<BattleActionResult, BattleUnitState>(
-        BattleActionResult.Failure(this, ToActionFailureReason(unitFailure), unitFailure.Message)),
+    return session.GetUnit(unitHandle).Match<Either<BattleActionResult, BattleUnitState>>(
       unit =>
       {
+        if (!unit.IsAlive)
+          return Left<BattleActionResult, BattleUnitState>(
+            BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit {unitHandle.UnitId} is not alive."));
+
         if (unit.Side != activeSide)
           return Left<BattleActionResult, BattleUnitState>(
             BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} is not on the active side."));
 
-        Either<BattleQueryFailure, bool> availableResult = session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitHandle));
-        return availableResult.Match<Either<BattleActionResult, BattleUnitState>>(
-          availableFailure => Left<BattleActionResult, BattleUnitState>(
-            BattleActionResult.Failure(this, ToActionFailureReason(availableFailure), availableFailure.Message)),
-          isAvailable =>
-          {
-            if (!isAvailable)
-              return Left<BattleActionResult, BattleUnitState>(
-                BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} is no longer available this turn."));
-            if (unit.CurrentActionPoints < actionPointCost)
-              return Left<BattleActionResult, BattleUnitState>(
-                BattleActionResult.Failure(
-                  this,
-                  BattleActionFailureReason.Rejected,
-                  $"{unit.Combatant.Name} needs {actionPointCost} action points but only has {unit.CurrentActionPoints}."));
+        if (!session.IsUnitStillAvailableThisTurn(unitHandle))
+          return Left<BattleActionResult, BattleUnitState>(
+            BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} is no longer available this turn."));
 
-            return Right<BattleActionResult, BattleUnitState>(unit);
-          });
-      });
-  }
+        if (unit.CurrentActionPoints < actionPointCost)
+          return Left<BattleActionResult, BattleUnitState>(
+            BattleActionResult.Failure(
+              this,
+              BattleActionFailureReason.Rejected,
+              $"{unit.Combatant.Name} needs {actionPointCost} action points but only has {unit.CurrentActionPoints}."));
 
-  private static BattleActionFailureReason ToActionFailureReason(BattleQueryFailure failure)
-  {
-    ArgumentNullException.ThrowIfNull(failure);
-
-    return failure.Reason == BattleQueryFailureReason.UnexpectedError
-      ? BattleActionFailureReason.UnexpectedError
-      : BattleActionFailureReason.Rejected;
+        return Right<BattleActionResult, BattleUnitState>(unit);
+      },
+      () => Left<BattleActionResult, BattleUnitState>(
+        BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unknown unit id {unitHandle.UnitId}.")));
   }
 
   public virtual void ConsumeResult(BattleActionResult result)
