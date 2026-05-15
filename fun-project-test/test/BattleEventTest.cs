@@ -57,7 +57,7 @@ public class BattleEventTest
     unit.State.AddInventoryItem(grenade);
     BattleActionTestHelper.StartBattle(runtime);
 
-    runtime.ExecuteAction(BattleAction.MoveUnitStep(unit.Handle, destination.Raw)).RequireSingleResult();
+    runtime.ExecuteAction(BattleAction.MoveUnit(unit.Handle, [destination.Raw])).RequireSingleResult();
     runtime.ExecuteAction(BattleAction.ThrowItem(unit.Handle, grenade, target.Raw)).RequireSingleResult();
     runtime.ExecuteAction(BattleAction.ApplyDamage(unit.Handle, 3)).RequireSingleResult();
 

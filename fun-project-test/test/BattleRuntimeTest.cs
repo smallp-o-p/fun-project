@@ -100,7 +100,7 @@ public sealed partial class BattleRuntimeTest
     runtime.RegisterTrigger(new RuntimeRecordingTrigger("runtime_trigger", targetPosition, log), BattleEventType.UnitMoved);
 
     BattleActionResult result = runtime
-      .ExecuteAction(BattleAction.MoveUnitStep(unit.Handle, targetPosition))
+      .ExecuteAction(BattleAction.MoveUnit(unit.Handle, [targetPosition]))
       .RequireSingleResult();
 
     Assert.True(result.Succeeded);
@@ -123,7 +123,7 @@ public sealed partial class BattleRuntimeTest
       new[] { BattleEventType.UnitMoved });
 
     BattleActionResult result = runtime
-      .ExecuteAction(BattleAction.MoveUnitStep(unit.Handle, targetPosition))
+      .ExecuteAction(BattleAction.MoveUnit(unit.Handle, [targetPosition]))
       .RequireSingleResult();
 
     Assert.True(result.Succeeded);

@@ -5,6 +5,7 @@ using Godot;
 using FunProject.Items;
 using FunProject.Weapons;
 using System.Linq;
+using LanguageExt.UnsafeValueAccess;
 
 namespace FunProject.Battle;
 
@@ -55,7 +56,7 @@ public abstract class BattleAction
   private protected Either<BattleActionResult, BattleUnitState> ValidateActingUnit(
     BattleSession session,
     BattleSession.BattleUnitHandle unitHandle,
-    int actionPointCost = 0)
+    long actionPointCost = 0)
   {
     ArgumentNullException.ThrowIfNull(session);
     ArgumentNullException.ThrowIfNull(unitHandle);
@@ -144,21 +145,13 @@ public abstract class BattleAction
     return new SpawnUnit(combatant, position, equippedWeapon);
   }
 
-  public static MoveUnitStep MoveUnitStep(
-    BattleSession.BattleUnitHandle unitHandle,
-    Vector3I destination,
-    int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
-  {
-    return new MoveUnitStep(unitHandle, destination, actionPointCost);
-  }
-
   public static MoveUnit MoveUnit(
     BattleSession.BattleUnitHandle unitHandle,
-    IEnumerable<Vector3I> path,
+    IEnumerable<Vector3I> destinations,
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost
   )
   {
-    return new MoveUnit(unitHandle, path, actionPointCostPerStep);
+    return new MoveUnit(unitHandle, destinations, actionPointCostPerStep);
   }
 
   public static ThrowItem ThrowItem(BattleSession.BattleUnitHandle unitHandle, ThrowableItem item, Vector3I targetCell)
@@ -184,27 +177,24 @@ public abstract class BattleAction
 
 public sealed class MoveUnit : BattleAction
 {
-  private int _nextStepIndex = 1;
-  private bool _hasValidatedInitialPath;
+  private Either<IReadOnlyList<Vector3I>, Queue<BattleBoardState.ValidatedPoint>> _routeState;
 
   public BattleSession.BattleUnitHandle UnitHandle { get; }
-  public IReadOnlyList<Vector3I> Path { get; }
-  public int ActionPointCostPerStep { get; }
+  public int StepAPCost { get; }
 
   public MoveUnit(
     BattleSession.BattleUnitHandle unitHandle,
-    IEnumerable<Vector3I> path,
+    IEnumerable<Vector3I> destinations,
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost)
     : base("move_unit")
   {
     ArgumentNullException.ThrowIfNull(unitHandle);
-    ArgumentNullException.ThrowIfNull(path);
-    if (actionPointCostPerStep < 0)
-      throw new ArgumentOutOfRangeException(nameof(actionPointCostPerStep), "Action point cost cannot be negative.");
+    ArgumentNullException.ThrowIfNull(destinations);
+    ArgumentOutOfRangeException.ThrowIfLessThan(actionPointCostPerStep, 0);
 
     UnitHandle = unitHandle;
-    Path = [.. path];
-    ActionPointCostPerStep = actionPointCostPerStep;
+    _routeState = Left<IReadOnlyList<Vector3I>, Queue<BattleBoardState.ValidatedPoint>>([.. destinations]);
+    StepAPCost = actionPointCostPerStep;
   }
 
   public override Option<BattleAction> NextAction(BattleSession session)
@@ -213,102 +203,96 @@ public sealed class MoveUnit : BattleAction
     if (IsDone())
       return None;
 
-    if (!_hasValidatedInitialPath && !ValidateInitialPath(session))
-      return None;
-
-    if (_nextStepIndex >= Path.Count)
+    Option<BattleAction> NextValidatedStep(Queue<BattleBoardState.ValidatedPoint> remainingSteps)
     {
-      MarkCompleted();
-      return None;
+      if (remainingSteps.Count == 0)
+      {
+        MarkCompleted();
+        return None;
+      }
+
+      Option<BattleUnitState> unitOption = session.GetLivingUnit(UnitHandle);
+      if (unitOption.IsNone)
+      {
+        MarkCancelled();
+        return None;
+      }
+
+      return session.GetUnitPosition(UnitHandle).Match((currUnitPos) =>
+      {
+        MarkRunning();
+        return Some<BattleAction>(
+          new MoveUnitStep(
+            UnitHandle,
+            currUnitPos,
+            remainingSteps.Peek(),
+            StepAPCost)
+        );
+      }, () =>
+      {
+        MarkCancelled();
+        return Option<BattleAction>.None;
+      });
     }
 
-    Option<BattleUnitState> unitOption = session.GetLivingUnit(UnitHandle);
-    if (unitOption.IsNone)
-    {
-      MarkCancelled();
-      return None;
-    }
-
-    Option<BattleBoardState.ValidatedPoint> currentPointOption = session.GetUnitPosition(UnitHandle);
-    if (currentPointOption.IsNone)
-    {
-      MarkCancelled();
-      return None;
-    }
-
-    Vector3I expectedPosition = Path[_nextStepIndex - 1];
-    Vector3I currentPosition = currentPointOption.IfNone(default(BattleBoardState.ValidatedPoint)).Raw;
-    if (currentPosition != expectedPosition)
-    {
-      MarkCancelled();
-      return None;
-    }
-
-    MarkRunning();
-    BattleAction action = new MoveUnitStep(UnitHandle, Path[_nextStepIndex], ActionPointCostPerStep);
-    return Some(action);
+    return _routeState.Match(
+      rawDestinations => ValidateRoute(session, rawDestinations).Match(NextValidatedStep, None),
+      NextValidatedStep);
   }
 
-  private bool ValidateInitialPath(BattleSession session)
+  private Option<Queue<BattleBoardState.ValidatedPoint>> ValidateRoute(BattleSession session, IReadOnlyList<Vector3I> tilesToOccupy)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    if (Path.Count == 0)
+    if (tilesToOccupy.Count == 0)
     {
       MarkFailed();
-      return false;
+      return None;
     }
 
-    Option<BattleUnitState> unitOption = session.GetLivingUnit(UnitHandle);
-    if (unitOption.IsNone)
-    {
-      MarkCancelled();
-      return false;
-    }
+    long apCost = tilesToOccupy.Count * StepAPCost;
 
-    BattleUnitState unit = unitOption.IfNone(default(BattleUnitState));
-    long totalActionPointCost = (long)Math.Max(Path.Count - 1, 0) * ActionPointCostPerStep;
-    if (unit.CurrentActionPoints < totalActionPointCost)
-    {
-      MarkFailed();
-      return false;
-    }
-
-    Option<BattleBoardState.ValidatedPoint> currentPointOption = session.GetUnitPosition(UnitHandle);
-    if (currentPointOption.IsNone)
-    {
-      MarkCancelled();
-      return false;
-    }
-
-    BattleBoardState.ValidatedPoint previousPoint = currentPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
-    if (previousPoint.Raw != Path[0])
-    {
-      MarkFailed();
-      return false;
-    }
-
-    for (int stepIndex = 1; stepIndex < Path.Count; stepIndex++)
-    {
-      Option<BattleBoardState.ValidatedPoint> stepPointOption = session.Board.ValidatePoint(Path[stepIndex]);
-      if (stepPointOption.IsNone)
+    return ValidateActingUnit(session, UnitHandle, apCost).Match(
+      failure =>
       {
         MarkFailed();
-        return false;
-      }
-
-      BattleBoardState.ValidatedPoint stepPoint = stepPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
-      if (!BattleBoardState.AreAdjacent(previousPoint, stepPoint) || !session.Board.CanOccupy(stepPoint))
+        return None;
+      },
+      _ =>
       {
-        MarkFailed();
-        return false;
-      }
+        Option<BattleBoardState.ValidatedPoint> currentPointOption = session.GetUnitPosition(UnitHandle);
+        if (currentPointOption.IsNone)
+        {
+          MarkCancelled();
+          return None;
+        }
 
-      previousPoint = stepPoint;
-    }
+        BattleBoardState.ValidatedPoint previousPoint = currentPointOption.Value();
+        Queue<BattleBoardState.ValidatedPoint> validatedSteps = [];
 
-    _hasValidatedInitialPath = true;
-    return true;
+        foreach (Vector3I tile in tilesToOccupy)
+        {
+          Option<BattleBoardState.ValidatedPoint> stepPointOption = session.Board.ValidatePoint(tile);
+          if (stepPointOption.IsNone)
+          {
+            MarkFailed();
+            return None;
+          }
+
+          BattleBoardState.ValidatedPoint stepPoint = stepPointOption.Value();
+          if (!BattleBoardState.AreAdjacent(previousPoint, stepPoint) || !session.Board.CanOccupy(stepPoint))
+          {
+            MarkFailed();
+            return None;
+          }
+
+          validatedSteps.Enqueue(stepPoint);
+          previousPoint = stepPoint;
+        }
+
+        _routeState = Right<IReadOnlyList<Vector3I>, Queue<BattleBoardState.ValidatedPoint>>(validatedSteps);
+        return Some(validatedSteps);
+      });
   }
 
   public override void ConsumeResult(BattleActionResult result)
@@ -319,8 +303,15 @@ public sealed class MoveUnit : BattleAction
       return;
     }
 
-    _nextStepIndex++;
-    if (_nextStepIndex >= Path.Count)
+    bool routeComplete = _routeState.Match(
+      _ => throw new InvalidOperationException("Move route must be validated before consuming step results."),
+      remainingSteps =>
+      {
+        remainingSteps.Dequeue();
+        return remainingSteps.Count == 0;
+      });
+
+    if (routeComplete)
       MarkCompleted();
     else
       MarkPending();

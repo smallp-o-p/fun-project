@@ -111,7 +111,7 @@ public class BattleVisibilityTest
     Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, tile))));
 
     var moveExecutor = new BattleActionExecutor(session);
-    var moveResult = moveExecutor.Submit(BattleAction.MoveUnitStep(observer.Handle, new Vector3I(0, 0, 1))).RequireSingleResult();
+    var moveResult = moveExecutor.Submit(BattleAction.MoveUnit(observer.Handle, [new Vector3I(0, 0, 1)])).RequireSingleResult();
     Assert.True(moveResult.Succeeded);
 
     Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, tile))));
@@ -131,7 +131,7 @@ public class BattleVisibilityTest
     Assert.True(GetValue(Query(session, new IsUnitVisibleToFaction(playerFaction, target.Handle))));
 
     var moveExecutor = new BattleActionExecutor(session);
-    var moveResult = moveExecutor.Submit(BattleAction.MoveUnitStep(observer.Handle, new Vector3I(0, 0, 0))).RequireSingleResult();
+    var moveResult = moveExecutor.Submit(BattleAction.MoveUnit(observer.Handle, [new Vector3I(0, 0, 0)])).RequireSingleResult();
     Assert.True(moveResult.Succeeded);
 
     Assert.False(GetValue(Query(session, new IsUnitVisibleToFaction(playerFaction, target.Handle))));

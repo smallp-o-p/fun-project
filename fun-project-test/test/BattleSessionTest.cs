@@ -358,7 +358,7 @@ public class BattleSessionTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    var moved = executor.Submit(BattleAction.MoveUnitStep(unit.Handle, new Vector3I(1, 1, 1), 2)).RequireSingleResult();
+    var moved = executor.Submit(BattleAction.MoveUnit(unit.Handle, [new Vector3I(1, 1, 1)], 2)).RequireSingleResult();
 
     Assert.True(moved.Succeeded);
     Assert.Equal(new Vector3I(1, 1, 1), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
@@ -376,8 +376,8 @@ public class BattleSessionTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.MoveUnitStep(unit.Handle, new Vector3I(2, 0, 0))).RequireSingleResult();
-    Assert.False(result.Succeeded);
+    var result = executor.Submit(BattleAction.MoveUnit(unit.Handle, [new Vector3I(2, 0, 0)]));
+    Assert.Equal(0, result.Count);
   }
 
   [TestCase(TestName = "Vertical move is allowed as a one-cell step")]
@@ -389,13 +389,13 @@ public class BattleSessionTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.MoveUnitStep(unit.Handle, new Vector3I(1, 1, 1))).RequireSingleResult();
+    var result = executor.Submit(BattleAction.MoveUnit(unit.Handle, [new Vector3I(1, 1, 1)])).RequireSingleResult();
     Assert.True(result.Succeeded);
     Assert.Equal(new Vector3I(1, 1, 1), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
   }
 
-  [TestCase(TestName = "MoveUnit follows a multi-step board path and spends AP per step")]
-  public void MoveUnitFollowsAMultiStepBoardPathAndSpendsAPPerStep()
+  [TestCase(TestName = "MoveUnit follows a multi-step route and spends AP per step")]
+  public void MoveUnitFollowsAMultiStepRouteAndSpendsAPPerStep()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
@@ -403,15 +403,16 @@ public class BattleSessionTest
     StartBattle(session);
 
     BattleBoardState.ValidatedPoint[] validatedPath = GetValue(Query(session, new FindPathForUnit(unit.Handle, new Vector3I(2, 0, 0))));
-    Vector3I[] path = validatedPath.Select(point => point.Raw).ToArray();
-    Assert.Equal(3, path.Length);
+    Vector3I[] path = validatedPath.Skip(1).Select(point => point.Raw).ToArray();
+    Assert.Equal(3, validatedPath.Length);
+    Assert.Equal(2, path.Length);
 
     var executor = new BattleActionExecutor(session);
     IReadOnlyList<BattleActionResult> moveResults = executor.Submit(BattleAction.MoveUnit(unit.Handle, path));
 
-    Assert.Equal(2, moveResults.Count);
-    Assert.True(moveResults.All(result => result.Succeeded));
-    Assert.True(moveResults.All(result => result.Action is MoveUnitStep));
+    BattleActionResult moveResult = moveResults.RequireSingleResult();
+    Assert.True(moveResult.Succeeded);
+    Assert.True(moveResult.Action is MoveUnit);
     Assert.Equal(new Vector3I(2, 0, 0), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
     Assert.False(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()).IsOccupied);
     Assert.True(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(2, 0, 0)).RequireSome()).IsOccupied);
@@ -429,7 +430,7 @@ public class BattleSessionTest
     Assert.Equal(new Vector3I(0, 0, 0), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
 
     var executor = new BattleActionExecutor(session);
-    var moved = executor.Submit(BattleAction.MoveUnitStep(unit.Handle, new Vector3I(1, 0, 0))).RequireSingleResult();
+    var moved = executor.Submit(BattleAction.MoveUnit(unit.Handle, [new Vector3I(1, 0, 0)])).RequireSingleResult();
 
     Assert.True(moved.Succeeded);
     Assert.Equal(new Vector3I(1, 0, 0), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
@@ -439,8 +440,8 @@ public class BattleSessionTest
     Assert.True(session.GetUnitPosition(unit.Handle).IsNone);
   }
 
-  [TestCase(TestName = "MoveUnit rejects paths that do not start at the current position")]
-  public void MoveUnitRejectsPathsThatDoNotStartAtTheCurrentPosition()
+  [TestCase(TestName = "MoveUnit treats route entries as destinations from the current position")]
+  public void MoveUnitTreatsRouteEntriesAsDestinationsFromTheCurrentPosition()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
@@ -449,13 +450,13 @@ public class BattleSessionTest
 
     var action = BattleAction.MoveUnit(unit.Handle, [new Vector3I(1, 0, 0), new Vector3I(2, 0, 0)]);
     var executor = new BattleActionExecutor(session);
-    var moved = executor.Submit(action);
+    var moved = executor.Submit(action).RequireSingleResult();
 
-    Assert.Equal(0, moved.Count);
+    Assert.True(moved.Succeeded);
     Assert.True(action.IsDone());
-    Assert.Equal(new Vector3I(0, 0, 0), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
-    Assert.True(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()).IsOccupied);
-    Assert.False(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(2, 0, 0)).RequireSome()).IsOccupied);
+    Assert.Equal(new Vector3I(2, 0, 0), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.False(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()).IsOccupied);
+    Assert.True(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(2, 0, 0)).RequireSome()).IsOccupied);
   }
 
   [TestCase(TestName = "MoveUnit rejects invalid composed steps")]
@@ -468,7 +469,7 @@ public class BattleSessionTest
 
     var action = BattleAction.MoveUnit(
       unit.Handle,
-      [session.GetUnitPosition(unit.Handle).RequireSome().Raw, new Vector3I(2, 0, 0)]);
+      [new Vector3I(1, 0, 0), new Vector3I(3, 0, 0)]);
     var executor = new BattleActionExecutor(session);
     var moved = executor.Submit(action);
 
@@ -479,8 +480,8 @@ public class BattleSessionTest
     Assert.True(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()).IsOccupied);
   }
 
-  [TestCase(TestName = "MoveUnit rejects paths that cost more AP than the unit has")]
-  public void MoveUnitRejectsPathsThatCostMoreApThanTheUnitHas()
+  [TestCase(TestName = "MoveUnit rejects routes that cost more AP than the unit has")]
+  public void MoveUnitRejectsRoutesThatCostMoreApThanTheUnitHas()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
@@ -488,8 +489,9 @@ public class BattleSessionTest
     StartBattle(session);
 
     BattleBoardState.ValidatedPoint[] validatedPath = GetValue(Query(session, new FindPathForUnit(unit.Handle, new Vector3I(2, 0, 0))));
-    Vector3I[] path = validatedPath.Select(point => point.Raw).ToArray();
-    Assert.Equal(3, path.Length);
+    Vector3I[] path = validatedPath.Skip(1).Select(point => point.Raw).ToArray();
+    Assert.Equal(3, validatedPath.Length);
+    Assert.Equal(2, path.Length);
 
     var action = BattleAction.MoveUnit(unit.Handle, path);
     var executor = new BattleActionExecutor(session);

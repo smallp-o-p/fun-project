@@ -17,7 +17,7 @@ It is responsible for:
 - accepting a submitted `BattleAction` intent and resolving the resulting action chain
 - executing one primitive action at a time from the queued action head
 - resolving trigger responses from committed events after an action succeeds
-- returning the ordered `IReadOnlyList<BattleActionResult>` produced by that submission
+- returning the ordered public `IReadOnlyList<BattleActionResult>` produced by that submission
 - isolating exceptions raised during action execution
 
 It is not responsible for:
@@ -37,7 +37,7 @@ It is not responsible for:
 
 The important split is:
 
-- `BattleAction` = queued tactical intent and primitive executable command
+- `BattleAction` = queued tactical intent, which may be composite or primitive
 - `BattleActionExecutor` = trigger mediator, queue, and invoker
 - `BattleSession` = source of truth
 - `BattleEvent` = notification that authoritative state already changed
@@ -73,11 +73,13 @@ The current happy-path flow is:
 10. the executor evaluates triggers from those committed events
 11. the executor inserts trigger response actions ahead of paused work
 12. the executor continues until the submitted action and its reactions settle
-13. `Submit` returns every `BattleActionResult` produced by that submission
+13. `Submit` returns every public `BattleActionResult` produced by that submission
 
 Actions should be executed through an explicit `BattleActionExecutor` by calling `Submit`. A normal submission leaves the queue empty when it returns; the queue is non-empty only while the executor is actively resolving submitted work.
 
-Trigger response actions still raise `OnActionStart`, `OnActionComplete`, and committed `BattleEvent` notifications as they are resolved inside the same submission. `Submit` does not expose `Tick`; it queues the provided action, resolves the action and reactions immediately, and returns the result sequence.
+Composite actions can produce primitive child actions internally. Those child actions are commit checkpoints for validation, event emission, and trigger evaluation; they are not reported as public action results. For example, `MoveUnit` may execute several `MoveUnitStep` commits, but `Submit` does not include those steps in its public result list.
+
+Trigger response actions still raise `OnActionStart`, `OnActionComplete`, and committed `BattleEvent` notifications as they are resolved inside the same submission. `Submit` does not expose `Tick`; it queues the provided action, resolves the action and reactions immediately, and returns the public result sequence.
 
 ## Supported Validation Rules
 
@@ -110,7 +112,7 @@ Recommended rule:
 
 Example:
 
-- controller uses `FindPathForUnit` and related queries to decide whether to enable a move confirmation
+- controller uses `FindPathForUnit` and related queries to decide whether to enable a move confirmation, then submits destination steps only to `MoveUnit`
 - scene visuals listen for committed `UnitMovedBattleEvent`
 - HUD refreshes AP and prompts after `OnActionComplete` or after relevant committed battle events
 

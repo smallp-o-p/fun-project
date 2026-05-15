@@ -95,7 +95,7 @@ Either<BattleQueryFailure, IReadOnlyCollection<BattleBoardState.ValidatedPoint>>
   runtime.Query(new GetPossibleMoveTilesForUnit(unitHandle));
 
 IReadOnlyList<BattleActionResult> results =
-  runtime.ExecuteAction(BattleAction.MoveUnit(unitHandle, path));
+  runtime.ExecuteAction(BattleAction.MoveUnit(unitHandle, destinations));
 ```
 
 This keeps callers aware of battle concepts, not battle storage or executor plumbing.

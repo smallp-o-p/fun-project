@@ -24,7 +24,7 @@ BattleSceneController / HUD / AI
   -> executor resolves trigger response actions from committed events before continuing
 ```
 
-The queue and replay surface stay focused on explicit battle actions. Composite actions such as `MoveUnit` yield one primitive child action at a time. Primitive actions such as `MoveUnitStep`, `ThrowItem`, and `ApplyDamage` apply one authoritative state change. `Submit` queues the provided action, resolves that action and every reaction caused by it, then returns the ordered result list.
+The queue and replay surface stay focused on explicit battle actions. Composite actions such as `MoveUnit` may yield internal primitive child actions one at a time. Primitive actions such as `ThrowItem` and `ApplyDamage` apply one authoritative state change. `Submit` queues the provided action, resolves that action and every reaction caused by it, then returns the ordered public result list.
 
 ## Runtime Split
 
@@ -48,7 +48,7 @@ And events:
 - `OnActionStart`
 - `OnActionComplete`
 
-`Submit` returns `IReadOnlyList<BattleActionResult>` from that submission. Trigger response actions still raise events and mutate battle state, but they are resolved before `Submit` returns.
+`Submit` returns `IReadOnlyList<BattleActionResult>` from that submission. Composite child actions are not public results: `MoveUnitStep` results produced inside `MoveUnit` are hidden from callers. Trigger response actions still raise events and mutate battle state, but they are resolved before `Submit` returns.
 
 Presentation code that needs committed state changes should subscribe to `BattleSession.BattleEventCommitted`. That callback runs after the corresponding state change has happened, so graphical work can query the session and see the committed state.
 
@@ -58,14 +58,13 @@ The current built-in actions are:
 
 - `StartBattle`
 - `SpawnUnit`
-- `MoveUnitStep`
 - `MoveUnit`
 - `ThrowItem`
 - `ApplyDamage`
 - `PassUnit`
 - `EndFactionTurn`
 
-`MoveUnit` is composite. It validates that the unit is still alive and still on the expected path tile, then yields a `MoveUnitStep` for the next tile. This gives the executor a checkpoint where committed movement events can trigger reactions before the path continues inside the same submission.
+`MoveUnit` is composite. Callers provide ordered destination steps, and the action validates that route from the unit's current session position before yielding an internal `MoveUnitStep` for each tile. This gives the executor a checkpoint where committed movement events can trigger reactions before the route continues inside the same submission. If one of those internal steps fails, the public result is a failed `MoveUnit`, not a failed `MoveUnitStep`.
 
 ## Read Side
 

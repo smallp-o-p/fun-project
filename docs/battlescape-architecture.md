@@ -257,7 +257,6 @@ The current built-in authoritative actions are:
 
 - `StartBattle`
 - `SpawnUnit`
-- `MoveUnitStep`
 - `MoveUnit`
 - `ThrowItem`
 - `ApplyDamage`
@@ -268,10 +267,10 @@ Actions should execute through an explicit executor:
 
 ```csharp
 var executor = new BattleActionExecutor(session);
-var result = executor.Submit(BattleAction.MoveUnitStep(unit.Handle, destination));
+var result = executor.Submit(BattleAction.MoveUnit(unit.Handle, [destination]));
 ```
 
-Submitted action results are returned as `IReadOnlyList<BattleActionResult>`. Each produced result includes:
+Submitted action results are returned as `IReadOnlyList<BattleActionResult>`. The list reports public action outcomes, not every primitive child commit from a composite action. Each produced result includes:
 
 - success or failure
 - failure reason
@@ -315,8 +314,8 @@ sequenceDiagram
     Controller->>Queries: Execute FindPathForUnit query
     Queries->>Session: Read unit state
     Queries->>Board: FindPath
-    Queries-->>Controller: Return path
-    Controller->>Exec: Submit move action
+    Queries-->>Controller: Return preview path
+    Controller->>Exec: Submit move action with destination steps
     loop Until action and reactions settle
         Exec->>Action: Request next primitive action
         Action->>Session: Validate active side, AP, and unit availability
@@ -325,7 +324,7 @@ sequenceDiagram
         Action->>Event: Raise UnitMoved and TileOccupied
         Exec->>Exec: Resolve trigger responses from committed events
     end
-    Exec-->>Controller: Return IReadOnlyList<BattleActionResult>
+    Exec-->>Controller: Return public IReadOnlyList<BattleActionResult>
     Event-->>View: Animate movement from committed battle event
     Event-->>HUD: Refresh AP and prompts from committed battle event
 ```

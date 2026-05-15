@@ -71,18 +71,20 @@ public sealed class SpawnUnit : BattleAction
   }
 }
 
-public sealed class MoveUnitStep : BattleAction
+internal sealed class MoveUnitStep : BattleAction
 {
   public const string MoveUnitStepActionId = "move_unit_step";
 
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  internal BattleSession.BattleUnitHandle UnitHandle { get; }
   internal int UnitId => UnitHandle.UnitId;
-  public Vector3I Destination { get; }
-  public int ActionPointCost { get; }
+  internal BattleBoardState.ValidatedPoint Source { get; }
+  internal BattleBoardState.ValidatedPoint Destination { get; }
+  internal int ActionPointCost { get; }
 
-  public MoveUnitStep(
+  internal MoveUnitStep(
     BattleSession.BattleUnitHandle unitHandle,
-    Vector3I destination,
+    BattleBoardState.ValidatedPoint source,
+    BattleBoardState.ValidatedPoint destination,
     int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
     : base(MoveUnitStepActionId)
   {
@@ -91,12 +93,15 @@ public sealed class MoveUnitStep : BattleAction
     if (actionPointCost < 0)
       throw new ArgumentOutOfRangeException(nameof(actionPointCost), "Action point cost cannot be negative.");
 
+    Source = source;
     Destination = destination;
     ActionPointCost = actionPointCost;
   }
 
   public override BattleActionResult Execute(BattleSession session)
   {
+    ArgumentNullException.ThrowIfNull(session);
+
     return ValidateActingUnit(session, UnitHandle, ActionPointCost).Match(
       failure => failure,
       unit =>
@@ -106,22 +111,17 @@ public sealed class MoveUnitStep : BattleAction
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {UnitId} is not on a valid tile.");
         BattleBoardState.ValidatedPoint sourcePoint = sourcePointOption.IfNone(default(BattleBoardState.ValidatedPoint));
 
-        Option<BattleBoardState.ValidatedPoint> destinationPointOption = session.Board.ValidatePoint(Destination);
-        if (destinationPointOption.IsNone)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Destination} cannot be occupied.");
-        BattleBoardState.ValidatedPoint destinationPoint = destinationPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
-
-        if (!BattleBoardState.AreAdjacent(sourcePoint, destinationPoint))
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Destination} is not adjacent to {sourcePoint.Raw}.");
-        if (!session.Board.CanOccupy(destinationPoint))
+        if (sourcePoint != Source)
+          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {UnitId} is no longer at {Source.Raw}.");
+        if (!session.Board.CanOccupy(Destination))
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Destination} cannot be occupied.");
         if (!unit.TrySpendActionPoints(ActionPointCost))
           return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Move unit step action could not spend {ActionPointCost} action points for unit {UnitId}.");
-        if (!session.TryMoveUnit(UnitHandle, sourcePoint, destinationPoint))
-          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Move unit step action could not move unit {UnitId} to {Destination}.");
+        if (!session.TryMoveUnit(UnitHandle, Source, Destination))
+          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Move unit step action could not move unit {UnitId} to {Destination.Raw}.");
 
-        session.RaiseCommittedEvent(new UnitMovedBattleEvent(unit, destinationPoint, sourcePoint));
-        session.RaiseCommittedEvent(new TileOccupiedBattleEvent(unit, destinationPoint, sourcePoint));
+        session.RaiseCommittedEvent(new UnitMovedBattleEvent(unit, Destination, Source));
+        session.RaiseCommittedEvent(new TileOccupiedBattleEvent(unit, Destination, Source));
         return BattleActionResult.Success(this, unit, UnitHandle);
       });
   }

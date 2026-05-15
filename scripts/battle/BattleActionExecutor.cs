@@ -73,9 +73,13 @@ public sealed class BattleActionExecutor
             }
           })();
 
-          LastResult = Some(result);
-          OnActionComplete.Invoke(result);
-          results.Add(result);
+          ReportResult(result, sub, currentAction)
+            .IfSome(reportedResult =>
+            {
+              LastResult = Some(reportedResult);
+              OnActionComplete.Invoke(reportedResult);
+              results.Add(reportedResult);
+            });
         });
     }
 
@@ -113,6 +117,29 @@ public sealed class BattleActionExecutor
       _pending.AddFirst(reaction);
 
     return result;
+  }
+
+  private static Option<BattleActionResult> ReportResult(
+    BattleActionResult result,
+    BattleAction action,
+    BattleAction activeAction)
+  {
+    if (ReferenceEquals(action, activeAction))
+      return Some(result);
+
+    if (!activeAction.IsDone())
+      return None;
+
+    return result.Succeeded
+      ? Some(BattleActionResult.Success(
+        activeAction,
+        result.AffectedUnit,
+        result.Message,
+        result.AffectedUnitHandle))
+      : Some(BattleActionResult.Failure(
+        activeAction,
+        result.FailureReason,
+        result.Message));
   }
 
   private static void ConsumeResult(BattleAction primitiveAction, BattleAction activeAction, BattleActionResult result)

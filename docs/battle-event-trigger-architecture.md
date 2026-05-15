@@ -64,7 +64,7 @@ Controller / AI
 
 The important distinction is between composite actions and primitive actions.
 
-- A high-level action is intent, such as "move this unit along this path."
+- A high-level action is intent, such as "move this unit through these destination tiles."
 - A primitive action is an atomic authoritative state change, such as "move this unit from tile A to adjacent tile B."
 
 Longer actions should be modeled as sequences of primitive actions. This gives the runtime a stable checkpoint after each step where visibility, triggers, reactions, and presentation updates can happen.
@@ -126,7 +126,7 @@ Responsibilities:
 - resolve registered triggers for committed events
 - queue deterministic trigger response actions
 - decide whether the active action continues, pauses, cancels, or completes
-- return the ordered result list from the submission
+- return the ordered public result list from the submission
 
 The executor should still be single-threaded. It is a scheduler and resolver, not a parallel event bus.
 
@@ -146,6 +146,8 @@ ReactionFire may commit UnitDamaged
 ```
 
 The queue can therefore grow while a submission is being resolved. The executor controls where new actions are inserted so nested reactions remain deterministic, and a normal submission leaves the queue empty when it returns.
+
+The public result list does not include primitive child actions produced by a composite action. A `MoveUnit` that commits multiple `MoveUnitStep` actions hides those step results from callers. The committed `BattleEvent` stream remains the source for per-step movement and trigger details.
 
 The executor may publish presentation notifications after rule resolution, but it should not be the source of truth for domain events. Primitive actions and the session emit committed `BattleEvent` values as they change authoritative state.
 
@@ -289,7 +291,7 @@ The mediated model keeps event-driven behavior while preserving deterministic or
 Example: a unit moves from tile `X` toward tile `X + N`, and an enemy has overwatch over an intermediate tile.
 
 ```text
-1. Player or AI enqueues MoveUnit(unit, path: X -> X + 1 -> ... -> X + N)
+1. Player or AI enqueues MoveUnit(unit, destinations: X + 1 -> ... -> X + N), using the unit's current session position as the route source.
 2. Executor starts the move action.
 3. Executor validates and commits MoveUnitStep(unit, X, X + 1).
 4. Session updates board occupancy and unit position.
@@ -362,11 +364,11 @@ Each interrupt should resolve to a clear continuation decision:
 For movement:
 
 - if the mover survives reaction fire, continue from the mover's current tile
-- if the mover dies, cancel the remaining path
-- if the destination becomes blocked, cancel or revalidate the remaining path
+- if the mover dies, cancel the remaining route
+- if the destination becomes blocked, cancel or revalidate the remaining route
 - if the mover loses action points, revalidate before each next step
 
-The path should not be considered guaranteed after the action starts. It is a plan that is revalidated step by step.
+The route should not be considered guaranteed after the action starts. It is a plan that is revalidated step by step.
 
 ## Ordering
 
@@ -406,7 +408,7 @@ Useful patterns for this model:
 ## Current Migration Result
 
 1. `BattleAction` is the executor-facing action abstraction.
-2. `MoveUnitStep` is the primitive movement commit.
+2. `MoveUnitStep` is the internal primitive movement commit.
 3. Multi-step movement orchestration lives in `MoveUnit`.
 4. The executor stores triggers by committed event type.
 5. Tile triggers can register against `TileOccupied`.
