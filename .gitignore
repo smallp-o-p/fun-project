@@ -16,3 +16,4 @@ fun-project-test/obj
 **/textures
 docs/superpowers/**
 DemoBattle*
+*.lscache
