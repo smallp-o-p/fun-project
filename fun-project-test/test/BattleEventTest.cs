@@ -31,8 +31,8 @@ public class BattleEventTest
     Assert.Equal($"Alpha entered the battle at {position}.", new UnitAddedBattleEvent(unit.State, position).ToDisplayString());
     Assert.Equal("Alpha ended their activation.", new UnitActivationEndedBattleEvent(unit.State, position).ToDisplayString());
     Assert.Equal($"Unit ID {unit.UnitId} moved from {sourcePosition} to {position}.", new UnitMovedBattleEvent(unit.State, position, sourcePosition).ToDisplayString());
-    Assert.Equal($"Unit ID {unit.UnitId} occupied {position}.", new TileOccupiedBattleEvent(unit.State, position, sourcePosition).ToDisplayString());
-    Assert.Equal("Damage: 3", new UnitDamagedBattleEvent(unit.State, position, 3).ToDisplayString());
+    Assert.Equal($"Unit ID {unit.UnitId} occupied {position}.", new TileOccupiedBattleEvent(unit.State, position).ToDisplayString());
+    Assert.Equal("Damage: 3", new UnitDamagedBattleEvent(unit.State, 3).ToDisplayString());
     Assert.Equal($"Unit ID {unit.UnitId} was killed!", new UnitKilledBattleEvent(unit.State, position).ToDisplayString());
     Assert.Equal("Alpha threw Frag Grenade.", new ItemThrownBattleEvent(unit.State, position, grenade).ToDisplayString());
   }
@@ -57,26 +57,25 @@ public class BattleEventTest
     unit.State.AddInventoryItem(grenade);
     BattleActionTestHelper.StartBattle(runtime);
 
-    runtime.ExecuteAction(BattleAction.MoveUnit(unit.Handle, [destination.Raw])).RequireSingleResult();
-    runtime.ExecuteAction(BattleAction.ThrowItem(unit.Handle, grenade, target.Raw)).RequireSingleResult();
-    runtime.ExecuteAction(BattleAction.ApplyDamage(unit.Handle, 3)).RequireSingleResult();
+    runtime.ExecuteAction(BattleAction.MoveUnit(unit.State, [destination.Raw])).RequireSingleResult();
+    runtime.ExecuteAction(BattleAction.ThrowItem(unit.State, grenade, target.Raw)).RequireSingleResult();
+    runtime.ExecuteAction(BattleAction.ApplyDamage(unit.State, 3)).RequireSingleResult();
 
     var addedEvent = raisedEvents.OfType<UnitAddedBattleEvent>().Single();
-    Assert.True(object.ReferenceEquals(unit.State, addedEvent.Unit));
+    Assert.True(ReferenceEquals(unit.State, addedEvent.Unit));
     Assert.Equal(start, addedEvent.Position);
 
     var movedEvent = raisedEvents.OfType<UnitMovedBattleEvent>().Single();
-    Assert.True(object.ReferenceEquals(unit.State, movedEvent.Unit));
+    Assert.True(ReferenceEquals(unit.State, movedEvent.Unit));
     Assert.Equal(destination, movedEvent.Position);
     Assert.Equal(start, movedEvent.SourcePosition);
 
     var thrownEvent = raisedEvents.OfType<ItemThrownBattleEvent>().Single();
-    Assert.True(object.ReferenceEquals(unit.State, thrownEvent.Unit));
-    Assert.True(object.ReferenceEquals(grenade, thrownEvent.Item));
+    Assert.True(ReferenceEquals(unit.State, thrownEvent.Unit));
+    Assert.True(ReferenceEquals(grenade, thrownEvent.Item));
     Assert.Equal(target, thrownEvent.Position);
 
     var damagedEvent = raisedEvents.OfType<UnitDamagedBattleEvent>().Single();
-    Assert.True(object.ReferenceEquals(unit.State, damagedEvent.Unit));
-    Assert.Equal(destination, damagedEvent.Position);
+    Assert.True(ReferenceEquals(unit.State, damagedEvent.Unit));
   }
 }

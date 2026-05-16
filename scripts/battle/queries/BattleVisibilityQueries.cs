@@ -9,33 +9,33 @@ public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>
 {
   public const string Id = "is_unit_visible_to_unit";
 
-  public BattleSession.BattleUnitHandle ObserverUnitHandle { get; }
-  public BattleSession.BattleUnitHandle TargetUnitHandle { get; }
-  internal int ObserverUnitId => ObserverUnitHandle.UnitId;
-  internal int TargetUnitId => TargetUnitHandle.UnitId;
+  public BattleUnitState ObserverUnit { get; }
+  public BattleUnitState TargetUnit { get; }
+  internal int ObserverUnitId => ObserverUnit.Id;
+  internal int TargetUnitId => TargetUnit.Id;
 
-  public IsUnitVisibleToUnit(BattleSession.BattleUnitHandle observerUnitHandle, BattleSession.BattleUnitHandle targetUnitHandle)
+  public IsUnitVisibleToUnit(BattleUnitState observerUnit, BattleUnitState targetUnit)
     : base(Id)
   {
-    ArgumentNullException.ThrowIfNull(observerUnitHandle);
-    ArgumentNullException.ThrowIfNull(targetUnitHandle);
-    ObserverUnitHandle = observerUnitHandle;
-    TargetUnitHandle = targetUnitHandle;
+    ArgumentNullException.ThrowIfNull(observerUnit);
+    ArgumentNullException.ThrowIfNull(targetUnit);
+    ObserverUnit = observerUnit;
+    TargetUnit = targetUnit;
   }
 
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    Either<BattleQueryFailure, BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
-    return observerResult.Match(
-      observerFailure => Fail(observerFailure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Message}"),
-      _ =>
+    Option<BattleQueryFailure> observerFailure = ValidateLivingUnit(session, ObserverUnit, "Observer");
+    return observerFailure.Match(
+      Fail,
+      () =>
       {
-        Either<BattleQueryFailure, BattleUnitState> targetResult = new GetLivingUnit(TargetUnitHandle).Execute(session);
-        return targetResult.Match(
-          targetFailure => Fail(targetFailure.Reason, $"Target unit {TargetUnitId} could not be resolved. {targetFailure.Message}"),
-          _ =>
+        Option<BattleQueryFailure> targetFailure = ValidateLivingUnit(session, TargetUnit, "Target");
+        return targetFailure.Match(
+          Fail,
+          () =>
           {
             if (ObserverUnitId == TargetUnitId)
               return Succeed(true);
@@ -46,6 +46,16 @@ public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>
           });
       });
   }
+
+  private static Option<BattleQueryFailure> ValidateLivingUnit(BattleSession session, BattleUnitState unit, string role)
+  {
+    if (!unit.BelongsTo(session))
+      return Some(new BattleQueryFailure(BattleQueryFailureReason.UnknownUnit, $"{role} unit {unit.Id} could not be resolved. Unknown unit id {unit.Id}."));
+    if (!unit.IsAlive)
+      return Some(new BattleQueryFailure(BattleQueryFailureReason.UnitNotAlive, $"{role} unit {unit.Id} could not be resolved. Unit {unit.Id} is not alive."));
+
+    return None;
+  }
 }
 
 public sealed class IsUnitVisibleToFaction : BattleSessionQuery<bool>
@@ -53,35 +63,33 @@ public sealed class IsUnitVisibleToFaction : BattleSessionQuery<bool>
   public const string Id = "is_unit_visible_to_faction";
 
   public Faction Faction { get; }
-  public BattleSession.BattleUnitHandle TargetUnitHandle { get; }
-  internal int TargetUnitId => TargetUnitHandle.UnitId;
+  public BattleUnitState TargetUnit { get; }
+  internal int TargetUnitId => TargetUnit.Id;
 
-  public IsUnitVisibleToFaction(Faction faction, BattleSession.BattleUnitHandle targetUnitHandle)
+  public IsUnitVisibleToFaction(Faction faction, BattleUnitState targetUnit)
     : base(Id)
   {
     ArgumentNullException.ThrowIfNull(faction);
-    ArgumentNullException.ThrowIfNull(targetUnitHandle);
+    ArgumentNullException.ThrowIfNull(targetUnit);
     Faction = faction;
-    TargetUnitHandle = targetUnitHandle;
+    TargetUnit = targetUnit;
   }
 
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    Either<BattleQueryFailure, BattleUnitState> targetResult = new GetLivingUnit(TargetUnitHandle).Execute(session);
-    return targetResult.Match(
-      targetFailure => Fail(targetFailure.Reason, $"Target unit {TargetUnitId} could not be resolved. {targetFailure.Message}"),
-      target =>
-      {
-        if (target.Side == Faction)
-          return Succeed(true);
+    if (!TargetUnit.BelongsTo(session))
+      return Fail(BattleQueryFailureReason.UnknownUnit, $"Target unit {TargetUnitId} could not be resolved. Unknown unit id {TargetUnitId}.");
+    if (!TargetUnit.IsAlive)
+      return Fail(BattleQueryFailureReason.UnitNotAlive, $"Target unit {TargetUnitId} could not be resolved. Unit {TargetUnitId} is not alive.");
+    if (TargetUnit.Side == Faction)
+      return Succeed(true);
 
-        return Succeed(session.VisibilitySnapshot
-          .GetFactionStateOrEmpty(Faction)
-          .VisibleForeignUnitIds
-          .Contains(TargetUnitId));
-      });
+    return Succeed(session.VisibilitySnapshot
+      .GetFactionStateOrEmpty(Faction)
+      .VisibleForeignUnitIds
+      .Contains(TargetUnitId));
   }
 }
 
@@ -147,30 +155,29 @@ public sealed class GetVisibleUnitsForUnit : BattleSessionQuery<IReadOnlyCollect
 {
   public const string Id = "get_visible_units_for_unit";
 
-  public BattleSession.BattleUnitHandle ObserverUnitHandle { get; }
-  internal int ObserverUnitId => ObserverUnitHandle.UnitId;
+  public BattleUnitState ObserverUnit { get; }
+  internal int ObserverUnitId => ObserverUnit.Id;
 
-  public GetVisibleUnitsForUnit(BattleSession.BattleUnitHandle observerUnitHandle)
+  public GetVisibleUnitsForUnit(BattleUnitState observerUnit)
     : base(Id)
   {
-    ArgumentNullException.ThrowIfNull(observerUnitHandle);
-    ObserverUnitHandle = observerUnitHandle;
+    ArgumentNullException.ThrowIfNull(observerUnit);
+    ObserverUnit = observerUnit;
   }
 
   internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    Either<BattleQueryFailure, BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
-    return observerResult.Match(
-      observerFailure => Fail(observerFailure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Message}"),
-      _ =>
-      {
-        IReadOnlySet<int> visibleUnitIds = session.VisibilitySnapshot.GetVisibleUnitsForObserverOrEmpty(ObserverUnitId);
-        return Succeed(session.AliveUnits
-          .Where(unit => visibleUnitIds.Contains(unit.UnitId))
-          .ToArray());
-      });
+    if (!ObserverUnit.BelongsTo(session))
+      return Fail(BattleQueryFailureReason.UnknownUnit, $"Observer unit {ObserverUnitId} could not be resolved. Unknown unit id {ObserverUnitId}.");
+    if (!ObserverUnit.IsAlive)
+      return Fail(BattleQueryFailureReason.UnitNotAlive, $"Observer unit {ObserverUnitId} could not be resolved. Unit {ObserverUnitId} is not alive.");
+
+    IReadOnlySet<int> visibleUnitIds = session.VisibilitySnapshot.GetVisibleUnitsForObserverOrEmpty(ObserverUnitId);
+    return Succeed(session.AliveUnits
+      .Where(unit => visibleUnitIds.Contains(unit.Id))
+      .ToArray());
   }
 }
 
@@ -178,30 +185,29 @@ public sealed class GetVisibleEnemiesForUnit : BattleSessionQuery<IReadOnlyColle
 {
   public const string Id = "get_visible_enemies_for_unit";
 
-  public BattleSession.BattleUnitHandle ObserverUnitHandle { get; }
-  internal int ObserverUnitId => ObserverUnitHandle.UnitId;
+  public BattleUnitState ObserverUnit { get; }
+  internal int ObserverUnitId => ObserverUnit.Id;
 
-  public GetVisibleEnemiesForUnit(BattleSession.BattleUnitHandle observerUnitHandle)
+  public GetVisibleEnemiesForUnit(BattleUnitState observerUnit)
     : base(Id)
   {
-    ArgumentNullException.ThrowIfNull(observerUnitHandle);
-    ObserverUnitHandle = observerUnitHandle;
+    ArgumentNullException.ThrowIfNull(observerUnit);
+    ObserverUnit = observerUnit;
   }
 
   internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    Either<BattleQueryFailure, BattleUnitState> observerResult = new GetLivingUnit(ObserverUnitHandle).Execute(session);
-    return observerResult.Match(
-      observerFailure => Fail(observerFailure.Reason, $"Observer unit {ObserverUnitId} could not be resolved. {observerFailure.Message}"),
-      observer =>
-      {
-        IReadOnlySet<int> visibleUnitIds = session.VisibilitySnapshot.GetVisibleUnitsForObserverOrEmpty(ObserverUnitId);
-        return Succeed(session.AliveUnits
-          .Where(unit => unit.Side != observer.Side && visibleUnitIds.Contains(unit.UnitId))
-          .ToArray());
-      });
+    if (!ObserverUnit.BelongsTo(session))
+      return Fail(BattleQueryFailureReason.UnknownUnit, $"Observer unit {ObserverUnitId} could not be resolved. Unknown unit id {ObserverUnitId}.");
+    if (!ObserverUnit.IsAlive)
+      return Fail(BattleQueryFailureReason.UnitNotAlive, $"Observer unit {ObserverUnitId} could not be resolved. Unit {ObserverUnitId} is not alive.");
+
+    IReadOnlySet<int> visibleUnitIds = session.VisibilitySnapshot.GetVisibleUnitsForObserverOrEmpty(ObserverUnitId);
+    return Succeed(session.AliveUnits
+      .Where(unit => unit.Side != ObserverUnit.Side && visibleUnitIds.Contains(unit.Id))
+      .ToArray());
   }
 }
 
@@ -227,7 +233,7 @@ public sealed class GetVisibleUnitsForFaction : BattleSessionQuery<IReadOnlyColl
       .VisibleForeignUnitIds;
 
     return Succeed(session.AliveUnits
-      .Where(unit => unit.Side == Faction || visibleForeignUnitIds.Contains(unit.UnitId))
+      .Where(unit => unit.Side == Faction || visibleForeignUnitIds.Contains(unit.Id))
       .ToArray());
   }
 }
@@ -271,4 +277,3 @@ public sealed class GetExploredTilesForFaction : BattleSessionQuery<IReadOnlyCol
     return Succeed(session.VisibilitySnapshot.GetFactionStateOrEmpty(Faction).ExploredTiles.ToArray());
   }
 }
-

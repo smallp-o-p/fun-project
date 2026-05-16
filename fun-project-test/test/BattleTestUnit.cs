@@ -5,18 +5,15 @@ using FunProject.Items;
 internal sealed class BattleTestUnit
 {
   public BattleUnitState State { get; }
-  public BattleSession.BattleUnitHandle Handle { get; }
 
-  public int UnitId => State.UnitId;
+  public int UnitId => State.Id;
   public Combatant Combatant => State.Combatant;
   public int CurrentActionPoints => State.CurrentActionPoints;
 
-  public BattleTestUnit(BattleUnitState state, BattleSession.BattleUnitHandle handle)
+  public BattleTestUnit(BattleUnitState state)
   {
     System.ArgumentNullException.ThrowIfNull(state);
-    System.ArgumentNullException.ThrowIfNull(handle);
     State = state;
-    Handle = handle;
   }
 
   public void AddInventoryItem(EquippableItem item)

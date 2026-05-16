@@ -32,7 +32,7 @@ internal sealed class BattleVisibilitySystem
     {
       SysColGeneric.HashSet<Vector3I> observerVisibleTiles = [];
       SysColGeneric.HashSet<int> visibleUnits = [];
-      visibleUnitsByObserver[observer.UnitId] = visibleUnits;
+      visibleUnitsByObserver[observer.Id] = visibleUnits;
       Option<BattleBoardState.ValidatedPoint> observerPointOption = session.GetUnitPosition(observer);
       if (observerPointOption.IsNone)
         continue;
@@ -50,12 +50,12 @@ internal sealed class BattleVisibilitySystem
       {
         if (!livingUnitsByPosition.TryGetValue(visibleTile, out var target))
           continue;
-        if (target.UnitId == observer.UnitId)
+        if (target.Id == observer.Id)
           continue;
 
-        visibleUnits.Add(target.UnitId);
+        visibleUnits.Add(target.Id);
         if (target.Side != observer.Side)
-          visibleForeignUnitsByFaction[observer.Side].Add(target.UnitId);
+          visibleForeignUnitsByFaction[observer.Side].Add(target.Id);
       }
     }
 

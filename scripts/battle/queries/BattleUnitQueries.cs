@@ -5,74 +5,28 @@ using System.Linq;
 
 namespace FunProject.Battle;
 
-public sealed class GetUnit : BattleSessionQuery<BattleUnitState>
-{
-  public const string Id = "get_unit";
-
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
-
-  public GetUnit(BattleSession.BattleUnitHandle unitHandle)
-    : base(Id)
-  {
-    ArgumentNullException.ThrowIfNull(unitHandle);
-    UnitHandle = unitHandle;
-  }
-
-  internal override Either<BattleQueryFailure, BattleUnitState> Execute(BattleSession session)
-  {
-    ArgumentNullException.ThrowIfNull(session);
-
-    return session.GetUnit(UnitHandle).Match(
-      Succeed,
-      () => Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitHandle.UnitId}."));
-  }
-}
-
-public sealed class GetLivingUnit : BattleSessionQuery<BattleUnitState>
-{
-  public const string Id = "get_living_unit";
-
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
-
-  public GetLivingUnit(BattleSession.BattleUnitHandle unitHandle)
-    : base(Id)
-  {
-    ArgumentNullException.ThrowIfNull(unitHandle);
-    UnitHandle = unitHandle;
-  }
-
-  internal override Either<BattleQueryFailure, BattleUnitState> Execute(BattleSession session)
-  {
-    ArgumentNullException.ThrowIfNull(session);
-
-    return session.GetUnit(UnitHandle).Match(
-      (unit) => unit.IsAlive ? Succeed(unit) : Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {UnitHandle.UnitId} is not alive."),
-      () => Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitHandle.UnitId}."));
-  }
-}
-
 public sealed class GetUnitPosition : BattleSessionQuery<BattleBoardState.ValidatedPoint>
 {
   public const string Id = "get_unit_position";
 
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  public BattleUnitState Unit { get; }
 
-  public GetUnitPosition(BattleSession.BattleUnitHandle unitHandle)
+  public GetUnitPosition(BattleUnitState unit)
     : base(Id)
   {
-    ArgumentNullException.ThrowIfNull(unitHandle);
-    UnitHandle = unitHandle;
+    ArgumentNullException.ThrowIfNull(unit);
+    Unit = unit;
   }
 
   internal override Either<BattleQueryFailure, BattleBoardState.ValidatedPoint> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
+    if (!Unit.BelongsTo(session))
+      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {Unit.Id}.");
 
-    return session.GetUnit(UnitHandle).Match(
-      _ => session.GetUnitPosition(UnitHandle).Match(
-        Succeed,
-        () => Fail(BattleQueryFailureReason.InvalidTile, $"Unit {UnitHandle.UnitId} is not on the board.")),
-      () => Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {UnitHandle.UnitId}."));
+    return session.GetUnitPosition(Unit).Match(
+      Succeed,
+      () => Fail(BattleQueryFailureReason.InvalidTile, $"Unit {Unit.Id} is not on the board."));
   }
 }
 
@@ -94,7 +48,7 @@ public sealed class GetUnitAtTile : BattleSessionQuery<Option<BattleUnitState>>
 
     return session.Board.ValidatePoint(Coordinates).Match(
       point => Succeed(session.GetUnitAt(point)),
-      () => Fail(BattleQueryFailureReason.InvalidTile, $"Tile {Coordinates} is outside the battle board."));
+      () => Fail(BattleQueryFailureReason.InvalidTile, $"{Coordinates} is invalid"));
   }
 }
 
@@ -118,7 +72,7 @@ public sealed class GetFactionAliveUnits : BattleSessionQuery<IReadOnlyCollectio
   }
 }
 
-public sealed class GetFactionDeadUnits : BattleSessionQuery<IReadOnlyCollection<BattleUnitState>>
+public sealed class GetFactionDeadUnits : BattleSessionQuery<IEnumerable<BattleUnitState>>
 {
   public const string Id = "get_faction_dead_units";
 
@@ -131,7 +85,7 @@ public sealed class GetFactionDeadUnits : BattleSessionQuery<IReadOnlyCollection
     Side = side;
   }
 
-  internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IEnumerable<BattleUnitState>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     return Succeed(session.DeadUnits);
@@ -142,12 +96,12 @@ public sealed class CanUnitActNow : BattleSessionQuery<bool>
 {
   public const string Id = "can_unit_act_now";
 
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
-  public CanUnitActNow(BattleSession.BattleUnitHandle unitHandle)
+  public BattleUnitState Unit { get; }
+  public CanUnitActNow(BattleUnitState unit)
     : base(Id)
   {
-    ArgumentNullException.ThrowIfNull(unitHandle);
-    UnitHandle = unitHandle;
+    ArgumentNullException.ThrowIfNull(unit);
+    Unit = unit;
   }
 
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
@@ -156,11 +110,12 @@ public sealed class CanUnitActNow : BattleSessionQuery<bool>
 
     if (session.Phase != BattlePhase.InProgress)
       return Fail(BattleQueryFailureReason.InvalidBattleState, "Cannot query active unit state while the battle is not in progress.");
+    if (!Unit.BelongsTo(session))
+      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {Unit.Id}.");
+    if (!Unit.IsAlive)
+      return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {Unit.Id} is not alive.");
 
-    Either<BattleQueryFailure, BattleUnitState> unitResult = new GetLivingUnit(UnitHandle).Execute(session);
-    return unitResult.Match(
-      Fail,
-      unit => Succeed(session.CanUnitActNow(unit)));
+    return Succeed(session.CanUnitActNow(Unit));
   }
 }
 
@@ -168,13 +123,13 @@ public sealed class IsUnitStillAvailableThisTurn : BattleSessionQuery<bool>
 {
   public const string Id = "is_unit_still_available_this_turn";
 
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  public BattleUnitState Unit { get; }
 
-  public IsUnitStillAvailableThisTurn(BattleSession.BattleUnitHandle unitHandle)
+  public IsUnitStillAvailableThisTurn(BattleUnitState unit)
     : base(Id)
   {
-    ArgumentNullException.ThrowIfNull(unitHandle);
-    UnitHandle = unitHandle;
+    ArgumentNullException.ThrowIfNull(unit);
+    Unit = unit;
   }
 
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
@@ -183,11 +138,12 @@ public sealed class IsUnitStillAvailableThisTurn : BattleSessionQuery<bool>
 
     if (session.Phase != BattlePhase.InProgress)
       return Fail(BattleQueryFailureReason.InvalidBattleState, "Cannot query unit turn availability while the battle is not in progress.");
+    if (!Unit.BelongsTo(session))
+      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {Unit.Id}.");
+    if (!Unit.IsAlive)
+      return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {Unit.Id} is not alive.");
 
-    Either<BattleQueryFailure, BattleUnitState> unitResult = new GetLivingUnit(UnitHandle).Execute(session);
-    return unitResult.Match(
-      Fail,
-      _ => Succeed(session.IsUnitStillAvailableThisTurn(UnitHandle)));
+    return Succeed(session.IsUnitStillAvailableThisTurn(Unit));
   }
 }
 

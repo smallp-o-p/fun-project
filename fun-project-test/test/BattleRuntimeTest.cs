@@ -27,7 +27,7 @@ public sealed partial class BattleRuntimeTest
     var foreignUnit = SpawnUnit(foreignSession, BattleTestFactory.MakeCombatant("Foreign", faction), new Vector3I(0, 0, 0));
     var runtime = new BattleRuntime(session);
 
-    Either<BattleQueryFailure, BattleUnitState> result = runtime.Query(new GetLivingUnit(foreignUnit.Handle));
+    Either<BattleQueryFailure, BattleBoardState.ValidatedPoint> result = runtime.Query(new GetUnitPosition(foreignUnit.State));
 
     Assert.True(result.IsLeft);
     BattleQueryFailure failure = GetFailure(result);
@@ -54,8 +54,8 @@ public sealed partial class BattleRuntimeTest
       .RequireSingleResult();
 
     Assert.True(result.Succeeded);
-    BattleSession.BattleUnitHandle handle = result.AffectedUnitHandle.RequireSome();
-    Assert.True(session.GetUnit(handle).IsSome);
+    BattleUnitState unit = result.AffectedUnit.RequireSome();
+    Assert.True(session.GetUnitPosition(unit).IsSome);
     Assert.Equal(0, runtime.PendingActionCount);
     Assert.Equal(result, runtime.LastActionResult.RequireSome());
   }
@@ -100,7 +100,7 @@ public sealed partial class BattleRuntimeTest
     runtime.RegisterTrigger(new RuntimeRecordingTrigger("runtime_trigger", targetPosition, log), BattleEventType.UnitMoved);
 
     BattleActionResult result = runtime
-      .ExecuteAction(BattleAction.MoveUnit(unit.Handle, [targetPosition]))
+      .ExecuteAction(BattleAction.MoveUnit(unit.State, [targetPosition]))
       .RequireSingleResult();
 
     Assert.True(result.Succeeded);
@@ -123,7 +123,7 @@ public sealed partial class BattleRuntimeTest
       new[] { BattleEventType.UnitMoved });
 
     BattleActionResult result = runtime
-      .ExecuteAction(BattleAction.MoveUnit(unit.Handle, [targetPosition]))
+      .ExecuteAction(BattleAction.MoveUnit(unit.State, [targetPosition]))
       .RequireSingleResult();
 
     Assert.True(result.Succeeded);

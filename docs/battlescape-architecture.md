@@ -32,7 +32,7 @@ flowchart LR
     subgraph Runtime["Authoritative Tactical Runtime"]
         BattleSession["BattleSession\nsingle source of truth\nturn flow + bookkeeping"]
         BoardState["BattleBoardState\nBattleTileState[x,y,z]\noccupancy + spatial path queries"]
-        UnitState["BattleUnitState[]\nposition, AP, health,\ninventory refs, equipped weapon"]
+        UnitState["BattleUnitState[]\nAP, health,\ninventory refs, equipped weapon"]
         VisibilityState["BattleVisibilitySnapshot\nper-faction fog of war\nexplored tiles + visible enemies"]
         VisibilitySystem["BattleVisibilitySystem\ntile-based LOS + faction FOV rebuilds"]
         EventStream["BattleEvent stream"]
@@ -80,6 +80,8 @@ flowchart LR
   - turn number
   - active side
   - global faction order
+  - pooled unit identity
+  - unit position lookup
   - round queue
   - alive and dead unit bookkeeping
   - current-turn unit availability
@@ -267,7 +269,7 @@ Actions should execute through an explicit executor:
 
 ```csharp
 var executor = new BattleActionExecutor(session);
-var result = executor.Submit(BattleAction.MoveUnit(unit.Handle, [destination]));
+var result = executor.Submit(BattleAction.MoveUnit(unit, [destination]));
 ```
 
 Submitted action results are returned as `IReadOnlyList<BattleActionResult>`. The list reports public action outcomes, not every primitive child commit from a composite action. Each produced result includes:

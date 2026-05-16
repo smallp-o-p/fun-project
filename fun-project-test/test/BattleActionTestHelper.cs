@@ -12,8 +12,7 @@ internal static class BattleActionTestHelper
     var result = executor.Submit(BattleAction.SpawnUnit(combatant, position)).RequireSingleResult();
     Assert.True(result.Succeeded);
     Assert.True(result.AffectedUnit.IsSome);
-    Assert.True(result.AffectedUnitHandle.IsSome);
-    return new BattleTestUnit(result.AffectedUnit.RequireSome(), result.AffectedUnitHandle.RequireSome());
+    return new BattleTestUnit(result.AffectedUnit.RequireSome());
   }
 
   public static BattleTestUnit SpawnUnit(BattleRuntime runtime, Combatant combatant, Vector3I position)
@@ -21,8 +20,7 @@ internal static class BattleActionTestHelper
     var result = runtime.ExecuteAction(BattleAction.SpawnUnit(combatant, position)).RequireSingleResult();
     Assert.True(result.Succeeded);
     Assert.True(result.AffectedUnit.IsSome);
-    Assert.True(result.AffectedUnitHandle.IsSome);
-    return new BattleTestUnit(result.AffectedUnit.RequireSome(), result.AffectedUnitHandle.RequireSome());
+    return new BattleTestUnit(result.AffectedUnit.RequireSome());
   }
 
   public static void StartBattle(BattleSession session)

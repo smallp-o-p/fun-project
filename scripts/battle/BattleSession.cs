@@ -1,6 +1,7 @@
 using FunProject.Combatants;
 using FunProject.Weapons;
 using Godot;
+using LanguageExt.UnsafeValueAccess;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,39 +17,27 @@ public enum BattlePhase
 
 public sealed class BattleSession
 {
-  internal readonly record struct SpawnedBattleUnit(BattleUnitHandle Handle, BattleUnitState Unit);
-
-  public sealed class BattleUnitHandle
-  {
-    internal int UnitId { get; }
-
-    internal BattleUnitHandle(int unitId)
-    {
-      UnitId = unitId;
-    }
-  }
+  internal readonly record struct SpawnedBattleUnit(BattleUnitState Unit);
 
   public const int DefaultMovementStepActionPointCost = 1;
   private static readonly BattleVisibilitySystem VisibilitySystem = new();
 
   private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleUnitState>> _aliveUnitsByFaction = [];
   private readonly Dictionary<Faction, IReadOnlyList<Combatant>> _factionRosters = [];
-  private readonly Dictionary<BattleUnitHandle, BattleUnitState> _unitsByHandle = [];
-  private readonly Dictionary<BattleUnitHandle, BattleBoardState.ValidatedPoint> _unitPositionsByHandle = [];
-  private readonly List<BattleUnitState> _deadUnits = [];
+  private readonly List<BattleUnitState> _units = [];
+  private readonly Dictionary<BattleUnitState, BattleBoardState.ValidatedPoint> _unitToPosition = [];
   private readonly Queue<Faction> _globalFactionOrder = [];
   private Queue<Faction> _turnQueue = [];
   private readonly SysColGeneric.HashSet<Faction> _sidesActedThisRound = [];
-  private readonly SysColGeneric.HashSet<int> _activeFactionUnitsAvailable = [];
+  private readonly SysColGeneric.HashSet<BattleUnitState> _activeFactionUnitsAvailable = [];
   private BattleVisibilitySnapshot _visibilitySnapshot = BattleVisibilitySnapshot.Empty;
-  private int _nextUnitId = 1;
 
   public BattleBoardState Board { get; }
   public BattlePhase Phase { get; private set; } = BattlePhase.Setup;
   public int TurnNumber { get; private set; } = 1;
   public Faction ActiveSide { get; private set; }
-  public IReadOnlyCollection<BattleUnitState> AliveUnits => _aliveUnitsByFaction.Values.SelectMany(units => units).ToArray();
-  public IReadOnlyCollection<BattleUnitState> DeadUnits => _deadUnits;
+  public IEnumerable<BattleUnitState> AliveUnits => _units.Where((unit) => unit.IsAlive);
+  public IEnumerable<BattleUnitState> DeadUnits => _units.Where((unit) => unit.IsDead);
   public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _globalFactionOrder;
   public IReadOnlyCollection<Faction> TurnQueue => _turnQueue;
   public IReadOnlyDictionary<Faction, IReadOnlyList<Combatant>> FactionRosters => _factionRosters;
@@ -95,13 +84,10 @@ public sealed class BattleSession
     return _aliveUnitsByFaction.TryGetValue(side, out var units) ? units : [];
   }
 
-  internal bool IsUnitStillAvailableThisTurn(BattleUnitHandle handle)
+  internal bool IsUnitStillAvailableThisTurn(BattleUnitState unit)
   {
-    ArgumentNullException.ThrowIfNull(handle);
-    if (!IsHandleFromThisSession(handle))
-      return false;
-
-    return _activeFactionUnitsAvailable.Contains(handle.UnitId);
+    ArgumentNullException.ThrowIfNull(unit);
+    return unit.BelongsTo(this) && _activeFactionUnitsAvailable.Contains(unit);
   }
 
   internal bool TryStartBattle()
@@ -154,14 +140,13 @@ public sealed class BattleSession
   {
     ArgumentNullException.ThrowIfNull(combatant);
 
-    var handle = new BattleUnitHandle(_nextUnitId++);
-    var unit = new BattleUnitState(handle.UnitId, combatant, equippedWeapon);
-    bool occupantSet = Board.TryPlaceOccupant(position, unit.UnitId);
+    var unit = new BattleUnitState(this, _units.Count, combatant, equippedWeapon);
+    bool occupantSet = Board.TryPlaceOccupant(position, unit.Id);
     if (!occupantSet)
-      throw new InvalidOperationException($"Could not place unit {unit.UnitId} at {position.Raw}.");
+      throw new InvalidOperationException($"Could not place unit {unit.Id} at {position.Raw}.");
 
-    _unitsByHandle.Add(handle, unit);
-    _unitPositionsByHandle.Add(handle, position);
+    _units.Add(unit);
+    _unitToPosition.Add(unit, position);
 
     if (!_aliveUnitsByFaction.TryGetValue(unit.Side, out var unitsForSide))
     {
@@ -177,47 +162,53 @@ public sealed class BattleSession
     if (Phase == BattlePhase.InProgress)
       RegisterSpawnedUnitForCurrentRound(unit);
 
-    return new SpawnedBattleUnit(handle, unit);
+    RaiseCommittedEvent(new UnitAddedBattleEvent(unit, position));
+
+    return new SpawnedBattleUnit(unit);
+  }
+
+  public void DealDamageTo(BattleUnitState unit, int dmg)
+  {
+    unit.ReceiveDamage(dmg);
+    RaiseCommittedEvent(new UnitDamagedBattleEvent(unit, dmg));
+    if (unit.IsDead)
+    {
+      HandleUnitDeath(unit);
+    }
   }
 
   internal void HandleUnitDeath(BattleUnitState unit)
   {
+    ArgumentNullException.ThrowIfNull(unit);
+
     var unitSide = unit.Side;
-    Option<BattleUnitHandle> handleOption = GetHandleForUnit(unit);
-    if (handleOption.IsNone)
-      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} because it does not belong to this battle session.");
-    BattleUnitHandle handle = handleOption.IfNone(default(BattleUnitHandle));
-
-    Option<BattleBoardState.ValidatedPoint> unitPointOption = GetUnitPosition(handle);
+    Option<BattleBoardState.ValidatedPoint> unitPointOption = GetUnitPosition(unit);
     if (unitPointOption.IsNone)
-      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} because it is not on the board.");
-    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+      throw new InvalidOperationException($"Could not clear unit {unit.Id} because it is not on the board.");
+    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.Value();
 
-    MoveUnitToDeadStorage(unit);
-
-    bool occupantCleared = Board.TryClearOccupant(unitPoint, unit.UnitId);
+    bool occupantCleared = Board.TryClearOccupant(unitPoint, unit.Id);
     if (!occupantCleared)
-      throw new InvalidOperationException($"Could not clear unit {unit.UnitId} from {unitPoint.Raw}.");
-    _unitPositionsByHandle.Remove(handle);
+      throw new InvalidOperationException($"Could not clear unit {unit.Id} from {unitPoint.Raw}.");
 
-    _activeFactionUnitsAvailable.Remove(unit.UnitId);
+    if (!_aliveUnitsByFaction.TryGetValue(unit.Side, out var units))
+      throw new InvalidOperationException($"Faction {unit.Side.Name} does not have living units to remove.");
+    if (!units.Remove(unit))
+      throw new InvalidOperationException($"Unit {unit.Id} is not tracked as alive.");
+
+    _activeFactionUnitsAvailable.Remove(unit);
     RaiseCommittedEvent(new UnitKilledBattleEvent(unit, unitPoint));
     HandleFactionLoss(unitSide);
   }
 
-  internal void RemoveAvailableUnit(BattleUnitHandle handle)
+  internal void RemoveAvailableUnit(BattleUnitState unit)
   {
-    ArgumentNullException.ThrowIfNull(handle);
-    if (!IsHandleFromThisSession(handle))
-      throw new InvalidOperationException("Unit handle does not belong to this battle session.");
+    ArgumentNullException.ThrowIfNull(unit);
+    if (!unit.BelongsTo(this))
+      throw new InvalidOperationException("Unit does not belong to this battle session.");
 
-    RemoveAvailableUnit(handle.UnitId);
-  }
-
-  private void RemoveAvailableUnit(int unitId)
-  {
-    if (!_activeFactionUnitsAvailable.Remove(unitId))
-      throw new InvalidOperationException($"Unit {unitId} is not available this turn.");
+    if (!_activeFactionUnitsAvailable.Remove(unit))
+      throw new InvalidOperationException($"Unit {unit.Id} is not available this turn.");
   }
 
   internal void EndUnitActivation(BattleUnitState unit)
@@ -227,14 +218,14 @@ public sealed class BattleSession
 
     var activeSide = ActiveSide;
     if (unit.Side != activeSide)
-      throw new InvalidOperationException($"Unit {unit.UnitId} is not on the active side.");
+      throw new InvalidOperationException($"Unit {unit.Id} is not on the active side.");
 
     Option<BattleBoardState.ValidatedPoint> unitPointOption = GetUnitPosition(unit);
     if (unitPointOption.IsNone)
-      throw new InvalidOperationException($"Cannot end activation for unit {unit.UnitId} because it is not on the board.");
+      throw new InvalidOperationException($"Cannot end activation for unit {unit.Id} because it is not on the board.");
     BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
 
-    RemoveAvailableUnit(unit.UnitId);
+    RemoveAvailableUnit(unit);
     RaiseCommittedEvent(new UnitActivationEndedBattleEvent(unit, unitPoint));
 
     if (!GetFactionAliveUnits(activeSide).Any(CanUnitActNow))
@@ -295,7 +286,7 @@ public sealed class BattleSession
       throw new InvalidOperationException("Trying to spawn unit while battle hasn't started or is done.");
     if (unit.Side == ActiveSide)
     {
-      _activeFactionUnitsAvailable.Add(unit.UnitId);
+      _activeFactionUnitsAvailable.Add(unit);
       return;
     }
 
@@ -307,56 +298,29 @@ public sealed class BattleSession
     _turnQueue.Enqueue(unit.Side);
   }
 
-  internal Option<BattleUnitState> GetUnit(BattleUnitHandle handle)
+  internal Option<BattleBoardState.ValidatedPoint> GetUnitPosition(BattleUnitState unit)
   {
-    ArgumentNullException.ThrowIfNull(handle);
-    if (!_unitsByHandle.TryGetValue(handle, out var unit))
-      return None;
+    ArgumentNullException.ThrowIfNull(unit);
+    if (!unit.BelongsTo(this))
+      throw new InvalidOperationException($"Unit {unit.Id} does not belong to this battle session.");
 
-    return Some(unit);
-  }
-
-  internal Option<BattleUnitState> GetLivingUnit(BattleUnitHandle handle)
-  {
-    ArgumentNullException.ThrowIfNull(handle);
-    if (!_unitsByHandle.TryGetValue(handle, out var unit))
-      return None;
-    if (!unit.IsAlive)
-      return None;
-
-    return Some(unit);
-  }
-
-  internal Option<BattleBoardState.ValidatedPoint> GetUnitPosition(BattleUnitHandle handle)
-  {
-    ArgumentNullException.ThrowIfNull(handle);
-    if (!_unitPositionsByHandle.TryGetValue(handle, out var position))
+    if (!_unitToPosition.TryGetValue(unit, out var position))
       return None;
 
     return Some(position);
   }
 
-  internal Option<BattleBoardState.ValidatedPoint> GetUnitPosition(BattleUnitState unit)
-  {
-    ArgumentNullException.ThrowIfNull(unit);
-    return GetHandleForUnit(unit).Match(
-      GetUnitPosition,
-      () => None);
-  }
-
   internal Option<BattleUnitState> GetUnitAt(BattleBoardState.ValidatedPoint point)
   {
     BattleTileState tile = Board.GetTile(point);
+
     return tile.OccupantUnitId.Match(
       unitId =>
       {
-        foreach (BattleUnitState unit in _unitsByHandle.Values)
-        {
-          if (unit.UnitId == unitId)
-            return Some(unit);
-        }
+        if (unitId < 0 || unitId >= _units.Count)
+          return None;
 
-        return None;
+        return Some(_units[unitId]);
       },
       () => None);
   }
@@ -368,42 +332,24 @@ public sealed class BattleSession
       () => None);
   }
 
-  internal bool TryMoveUnit(BattleUnitHandle handle, BattleBoardState.ValidatedPoint source, BattleBoardState.ValidatedPoint destination)
+  internal bool TryMoveUnit(BattleUnitState unit, BattleBoardState.ValidatedPoint source, BattleBoardState.ValidatedPoint destination)
   {
-    ArgumentNullException.ThrowIfNull(handle);
-    if (!_unitsByHandle.TryGetValue(handle, out var unit))
+    ArgumentNullException.ThrowIfNull(unit);
+    if (!unit.BelongsTo(this))
       return false;
-    if (!_unitPositionsByHandle.TryGetValue(handle, out var trackedPosition))
+    if (!_unitToPosition.TryGetValue(unit, out var trackedPosition))
       return false;
     if (trackedPosition != source)
       return false;
-    if (!Board.TryMoveOccupant(source, destination, unit.UnitId))
+    if (!Board.TryMoveOccupant(source, destination, unit.Id))
       return false;
 
-    _unitPositionsByHandle[handle] = destination;
+    _unitToPosition[unit] = destination;
+
+    RaiseCommittedEvent(new UnitMovedBattleEvent(unit, destination, source));
+    RaiseCommittedEvent(new TileOccupiedBattleEvent(unit, destination));
+
     return true;
-  }
-
-  private Option<BattleUnitHandle> GetHandleForUnit(BattleUnitState unit)
-  {
-    ArgumentNullException.ThrowIfNull(unit);
-    foreach (var (handle, trackedUnit) in _unitsByHandle)
-    {
-      if (trackedUnit == unit)
-        return Some(handle);
-    }
-
-    return None;
-  }
-
-  internal void MoveUnitToDeadStorage(BattleUnitState unit)
-  {
-    if (!_aliveUnitsByFaction.TryGetValue(unit.Side, out var units))
-      throw new InvalidOperationException($"Faction {unit.Side.Name} does not have living units to remove.");
-    if (!units.Remove(unit))
-      throw new InvalidOperationException($"Unit {unit.UnitId} is not tracked as alive.");
-
-    _deadUnits.Add(unit);
   }
 
   internal bool CanUnitActNow(BattleUnitState unit)
@@ -413,7 +359,7 @@ public sealed class BattleSession
 
     if (unit.Side != ActiveSide)
       return false;
-    if (!_activeFactionUnitsAvailable.Contains(unit.UnitId))
+    if (!_activeFactionUnitsAvailable.Contains(unit))
       return false;
 
     return unit.CurrentActionPoints > 0;
@@ -439,7 +385,7 @@ public sealed class BattleSession
 
     _activeFactionUnitsAvailable.Clear();
     foreach (var unit in GetFactionAliveUnits(ActiveSide))
-      _activeFactionUnitsAvailable.Add(unit.UnitId);
+      _activeFactionUnitsAvailable.Add(unit);
   }
 
   internal void RaiseCommittedEvent(BattleEvent battleEvent)
@@ -453,12 +399,6 @@ public sealed class BattleSession
     _visibilitySnapshot = VisibilitySystem
       .Build(this)
       .WithMergedExplored(_visibilitySnapshot);
-  }
-
-  internal bool IsHandleFromThisSession(BattleUnitHandle handle)
-  {
-    ArgumentNullException.ThrowIfNull(handle);
-    return _unitsByHandle.ContainsKey(handle);
   }
 
   private void RebuildRoundQueueFromLivingSides()

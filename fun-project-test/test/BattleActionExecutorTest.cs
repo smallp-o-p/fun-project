@@ -19,11 +19,11 @@ public partial class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
     var targetPosition = new Vector3I(1, 0, 0);
-    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", targetPosition, unit.Handle, 3, shouldConsume: true), BattleEventType.TileOccupied);
+    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", targetPosition, unit.State, 3, shouldConsume: true), BattleEventType.TileOccupied);
     var resolvedActions = new List<BattleAction>();
     executor.OnActionComplete += result => resolvedActions.Add(result.Action);
 
-    BattleAction submittedAction = BattleAction.MoveUnit(unit.Handle, [targetPosition]);
+    BattleAction submittedAction = BattleAction.MoveUnit(unit.State, [targetPosition]);
     IReadOnlyList<BattleActionResult> results = executor.Submit(submittedAction);
 
     Assert.Equal(2, results.Count);
@@ -31,7 +31,7 @@ public partial class BattleActionExecutorTest
     Assert.True(results[0].Succeeded);
     Assert.True(results[1].Succeeded);
     Assert.True(results[1].Action is ApplyDamage);
-    Assert.Equal(targetPosition, session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(targetPosition, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(7, unit.State.CurrentHealth);
     Assert.Equal(0, executor.PendingCount);
     Assert.True(resolvedActions.Select(action => action.ActionId).SequenceEqual([
@@ -52,18 +52,18 @@ public partial class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", mid, unit.Handle, 3, shouldConsume: true), BattleEventType.TileOccupied);
+    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", mid, unit.State, 3, shouldConsume: true), BattleEventType.TileOccupied);
     var resolvedActions = new List<BattleAction>();
     executor.OnActionComplete += result => resolvedActions.Add(result.Action);
 
-    BattleAction submittedAction = new MoveUnit(unit.Handle, [mid, end]);
+    BattleAction submittedAction = new MoveUnit(unit.State, [mid, end]);
     IReadOnlyList<BattleActionResult> results = executor.Submit(submittedAction);
 
     Assert.Equal(2, results.Count);
     Assert.True(results.All(result => result.Succeeded));
     Assert.True(results[0].Action is ApplyDamage);
     Assert.Equal(submittedAction, results[1].Action);
-    Assert.Equal(end, session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(end, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(7, unit.State.CurrentHealth);
     Assert.Equal(0, executor.PendingCount);
     Assert.True(submittedAction.IsDone());
@@ -86,15 +86,13 @@ public partial class BattleActionExecutorTest
     session.BattleEventCommitted += raisedEvents.Add;
 
     var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.MoveUnit(unit.Handle, [new Vector3I(1, 0, 2)], 2));
+    var result = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 0, 2)], 2));
 
     Assert.True(result.First().Succeeded);
     Assert.True(raisedEvents.OfType<UnitMovedBattleEvent>().Any(battleEvent =>
-      battleEvent.UnitId == unit.UnitId &&
       battleEvent.Position.Raw == new Vector3I(1, 0, 2) &&
       battleEvent.SourcePosition.Raw == new Vector3I(1, 0, 1)));
     Assert.True(raisedEvents.OfType<TileOccupiedBattleEvent>().Any(battleEvent =>
-      battleEvent.UnitId == unit.UnitId &&
       battleEvent.Position.Raw == new Vector3I(1, 0, 2)));
   }
 
@@ -111,11 +109,11 @@ public partial class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(enemyUnit.Handle, [destination]));
+    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(enemyUnit.State, [destination]));
 
     Assert.Equal(0, results.Count);
     Assert.Equal(playerFaction, session.ActiveSide);
-    Assert.Equal(start, session.GetUnitPosition(enemyUnit.Handle).RequireSome().Raw);
+    Assert.Equal(start, session.GetUnitPosition(enemyUnit.State).RequireSome().Raw);
   }
 
   [TestCase(TestName = "Committed battle event listeners observe committed session state")]
@@ -132,11 +130,11 @@ public partial class BattleActionExecutorTest
     session.BattleEventCommitted += battleEvent =>
     {
       if (battleEvent is UnitMovedBattleEvent)
-        observedPositionDuringEvent = session.GetUnitPosition(unit.Handle).Map(point => point.Raw);
+        observedPositionDuringEvent = session.GetUnitPosition(unit.State).Map(point => point.Raw);
     };
 
     var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.MoveUnit(unit.Handle, [destination], 2)).RequireSingleResult();
+    var result = executor.Submit(BattleAction.MoveUnit(unit.State, [destination], 2)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
     Assert.Equal(destination, observedPositionDuringEvent.RequireSome());
@@ -150,7 +148,7 @@ public partial class BattleActionExecutorTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    var action = BattleAction.ApplyDamage(unit.Handle, 1);
+    var action = BattleAction.ApplyDamage(unit.State, 1);
 
     Option<BattleAction> first = action.NextAction(session);
     Option<BattleAction> second = action.NextAction(session);
@@ -176,7 +174,7 @@ public partial class BattleActionExecutorTest
     executor.RegisterTrigger(new RecordingTrigger("second", 0, targetPosition, log, "second"), BattleEventType.UnitMoved);
     executor.RegisterTrigger(new RecordingTrigger("ignored", -10, targetPosition, log, "ignored"), BattleEventType.UnitDamaged);
 
-    BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.Handle, [targetPosition])).RequireSingleResult();
+    BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition])).RequireSingleResult();
 
     Assert.True(result.Succeeded);
     Assert.True(log.SequenceEqual(["first", "second", "late"]));
@@ -198,7 +196,7 @@ public partial class BattleActionExecutorTest
     executor.RegisterTrigger(ignoredTrigger, BattleEventType.UnitDamaged);
     executor.RegisterTrigger(matchingTrigger, BattleEventType.UnitMoved);
 
-    BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.Handle, [targetPosition])).RequireSingleResult();
+    BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition])).RequireSingleResult();
 
     Assert.True(result.Succeeded);
     Assert.Equal(0, ignoredTrigger.MatchCallCount);
@@ -221,7 +219,7 @@ public partial class BattleActionExecutorTest
       new RecordingTrigger("movement-or-occupation", 0, targetPosition, log, "matched"),
       [BattleEventType.UnitMoved, BattleEventType.TileOccupied]);
 
-    BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.Handle, [targetPosition])).RequireSingleResult();
+    BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition])).RequireSingleResult();
 
     Assert.True(result.Succeeded);
     Assert.True(log.SequenceEqual(["matched", "matched"]));
@@ -243,9 +241,9 @@ public partial class BattleActionExecutorTest
 
     BattleActionResult[] results =
     [
-      executor.Submit(BattleAction.MoveUnit(unit.Handle, [targetPosition])).RequireSingleResult(),
-      executor.Submit(BattleAction.MoveUnit(unit.Handle, [start])).RequireSingleResult(),
-      executor.Submit(BattleAction.MoveUnit(unit.Handle, [targetPosition])).RequireSingleResult(),
+      executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition])).RequireSingleResult(),
+      executor.Submit(BattleAction.MoveUnit(unit.State, [start])).RequireSingleResult(),
+      executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition])).RequireSingleResult(),
     ];
 
     Assert.Equal(3, results.Length);
@@ -265,13 +263,13 @@ public partial class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
     executor.RegisterTrigger(
-      new DamageOnTileOccupiedTrigger("late", targetPosition, unit.Handle, 2, shouldConsume: true) { Priority = 10 },
+      new DamageOnTileOccupiedTrigger("late", targetPosition, unit.State, 2, shouldConsume: true) { Priority = 10 },
       BattleEventType.UnitMoved);
     executor.RegisterTrigger(
-      new DamageOnTileOccupiedTrigger("first", targetPosition, unit.Handle, 1, shouldConsume: true) { Priority = 0 },
+      new DamageOnTileOccupiedTrigger("first", targetPosition, unit.State, 1, shouldConsume: true) { Priority = 0 },
       BattleEventType.UnitMoved);
 
-    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.Handle, [targetPosition]));
+    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition]));
     int[] damageAmounts = results
       .Select(result => result.Action)
       .OfType<ApplyDamage>()
@@ -294,16 +292,16 @@ public partial class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
     var targetPosition = new Vector3I(1, 0, 0);
-    var trigger = new DamageOnTileOccupiedTrigger("mine", targetPosition, unit.Handle, 3, shouldConsume: true);
+    var trigger = new DamageOnTileOccupiedTrigger("mine", targetPosition, unit.State, 3, shouldConsume: true);
     executor.RegisterTrigger(trigger, BattleEventType.TileOccupied);
 
-    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.Handle, [targetPosition]));
+    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition]));
 
     Assert.Equal(2, results.Count);
     Assert.True(results.All(result => result.Succeeded));
     Assert.True(results[0].Action is MoveUnit);
     Assert.True(results[1].Action is ApplyDamage);
-    Assert.Equal(targetPosition, session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(targetPosition, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(targetPosition, trigger.ObservedTargetPositionDuringEvaluation.RequireSome());
     Assert.Equal(7, unit.State.CurrentHealth);
     Assert.Equal(0, executor.PendingCount);
@@ -319,17 +317,17 @@ public partial class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
     var targetPosition = new Vector3I(2, 0, 0);
-    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", targetPosition, unit.Handle, 3, shouldConsume: true), BattleEventType.TileOccupied);
+    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", targetPosition, unit.State, 3, shouldConsume: true), BattleEventType.TileOccupied);
 
-    IReadOnlyList<BattleActionResult> rejectedResults = executor.Submit(BattleAction.MoveUnit(unit.Handle, [targetPosition]));
+    IReadOnlyList<BattleActionResult> rejectedResults = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition]));
 
     Assert.Equal(0, rejectedResults.Count);
-    Assert.Equal(new Vector3I(0, 0, 0), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(new Vector3I(0, 0, 0), session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(10, unit.State.CurrentHealth);
     Assert.Equal(0, executor.PendingCount);
 
-    BattleActionResult approachResult = executor.Submit(BattleAction.MoveUnit(unit.Handle, [new Vector3I(1, 0, 0)])).RequireSingleResult();
-    IReadOnlyList<BattleActionResult> sourceResults = executor.Submit(BattleAction.MoveUnit(unit.Handle, [targetPosition]));
+    BattleActionResult approachResult = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 0, 0)])).RequireSingleResult();
+    IReadOnlyList<BattleActionResult> sourceResults = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition]));
 
     Assert.True(approachResult.Succeeded);
     Assert.Equal(2, sourceResults.Count);
@@ -355,13 +353,13 @@ public partial class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
     executor.RegisterTrigger(
-      new DamageOnTileOccupiedTrigger("mine", firstTrap, unit.Handle, 2, shouldConsume: true),
+      new DamageOnTileOccupiedTrigger("mine", firstTrap, unit.State, 2, shouldConsume: true),
       BattleEventType.TileOccupied);
     executor.RegisterTrigger(
-      new DamageOnTileOccupiedTrigger("mine", secondTrap, unit.Handle, 3, shouldConsume: true),
+      new DamageOnTileOccupiedTrigger("mine", secondTrap, unit.State, 3, shouldConsume: true),
       BattleEventType.TileOccupied);
 
-    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.Handle, [firstTrap, secondTrap]));
+    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [firstTrap, secondTrap]));
 
     Assert.Equal(3, results.Count);
     Assert.True(results.All(result => result.Succeeded));
@@ -382,13 +380,13 @@ public partial class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
     var nonProducingResult = executor.Submit(new NonProducingBattleAction());
-    var result = executor.Submit(BattleAction.MoveUnit(unit.Handle, [new Vector3I(1, 0, 0)]));
+    var result = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 0, 0)]));
 
     Assert.Equal(0, nonProducingResult.Count);
     BattleActionResult moveResult = result.RequireSingleResult();
     Assert.True(moveResult.Succeeded);
     Assert.True(moveResult.Action is MoveUnit);
-    Assert.Equal(new Vector3I(1, 0, 0), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(new Vector3I(1, 0, 0), session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(0, executor.PendingCount);
   }
 
@@ -403,7 +401,7 @@ public partial class BattleActionExecutorTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), start);
     StartBattle(session);
 
-    var action = new MoveUnit(unit.Handle, [mid, end]);
+    var action = new MoveUnit(unit.State, [mid, end]);
     var executor = new BattleActionExecutor(session);
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
@@ -411,7 +409,7 @@ public partial class BattleActionExecutorTest
     Assert.True(result.Succeeded);
     Assert.Equal(action, result.Action);
     Assert.True(result.Action.IsDone());
-    Assert.Equal(end, session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(end, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.True(action.IsDone());
     Assert.Equal(0, executor.PendingCount);
   }
@@ -427,16 +425,16 @@ public partial class BattleActionExecutorTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, health: 10, actionPoints: 5), start);
     StartBattle(session);
 
-    var action = new MoveUnit(unit.Handle, [mid, end]);
+    var action = new MoveUnit(unit.State, [mid, end]);
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", mid, unit.Handle, 3, shouldConsume: true), BattleEventType.TileOccupied);
+    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", mid, unit.State, 3, shouldConsume: true), BattleEventType.TileOccupied);
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
     Assert.Equal(2, results.Count);
     Assert.True(results.All(result => result.Succeeded));
     Assert.True(results[0].Action is ApplyDamage);
     Assert.Equal(action, results[1].Action);
-    Assert.Equal(end, session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(end, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(7, unit.State.CurrentHealth);
     Assert.True(action.IsDone());
     Assert.Equal(0, executor.PendingCount);
@@ -454,7 +452,7 @@ public partial class BattleActionExecutorTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), start);
     StartBattle(session);
 
-    var action = new MoveUnit(unit.Handle, [mid, end]);
+    var action = new MoveUnit(unit.State, [mid, end]);
     var executor = new BattleActionExecutor(session);
     executor.RegisterTrigger(
       new SpawnUnitOnTileOccupiedTrigger("blocker", mid, end, enemyFaction),
@@ -467,7 +465,7 @@ public partial class BattleActionExecutorTest
     Assert.True(results[0].Action is SpawnUnit);
     Assert.False(results[1].Succeeded);
     Assert.Equal(action, results[1].Action);
-    Assert.Equal(mid, session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(mid, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.True(action.IsDone());
     Assert.Equal(0, executor.PendingCount);
   }
@@ -484,10 +482,10 @@ public partial class BattleActionExecutorTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("Bravo", faction, actionPoints: 5), new Vector3I(0, 0, 1));
     StartBattle(session);
 
-    var action = new MoveUnit(unit.Handle, [mid, end]);
+    var action = new MoveUnit(unit.State, [mid, end]);
     var executor = new BattleActionExecutor(session);
     executor.RegisterTrigger(
-      new PassUnitOnTileOccupiedTrigger("stop", mid, unit.Handle),
+      new PassUnitOnTileOccupiedTrigger("stop", mid, unit.State),
       BattleEventType.TileOccupied);
 
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
@@ -497,7 +495,7 @@ public partial class BattleActionExecutorTest
     Assert.True(results[0].Action is PassUnit);
     Assert.False(results[1].Succeeded);
     Assert.Equal(action, results[1].Action);
-    Assert.Equal(mid, session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(mid, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.True(action.IsDone());
     Assert.Equal(0, executor.PendingCount);
   }
@@ -513,9 +511,9 @@ public partial class BattleActionExecutorTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, health: 3, actionPoints: 5), start);
     StartBattle(session);
 
-    var action = new MoveUnit(unit.Handle, [mid, end]);
+    var action = new MoveUnit(unit.State, [mid, end]);
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", mid, unit.Handle, 3, shouldConsume: true), BattleEventType.TileOccupied);
+    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", mid, unit.State, 3, shouldConsume: true), BattleEventType.TileOccupied);
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
     BattleActionResult result = results.RequireSingleResult();
@@ -523,7 +521,6 @@ public partial class BattleActionExecutorTest
     Assert.True(result.Action is ApplyDamage);
     Assert.True(action.IsDone());
     Assert.Equal(0, unit.State.CurrentHealth);
-    Assert.True(session.GetUnitPosition(unit.Handle).IsNone);
     Assert.Equal(0, executor.PendingCount);
   }
 
@@ -538,13 +535,13 @@ public partial class BattleActionExecutorTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), start);
     StartBattle(session);
 
-    var action = new MoveUnit(unit.Handle, [mid, nonAdjacent]);
+    var action = new MoveUnit(unit.State, [mid, nonAdjacent]);
     var executor = new BattleActionExecutor(session);
     var result = executor.Submit(action);
 
     Assert.Equal(0, result.Count);
     Assert.True(action.IsDone());
-    Assert.Equal(start, session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(start, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(5, unit.State.CurrentActionPoints);
     Assert.Equal(0, executor.PendingCount);
   }
@@ -558,13 +555,13 @@ public partial class BattleActionExecutorTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), start);
     StartBattle(session);
 
-    var action = new MoveUnit(unit.Handle, []);
+    var action = new MoveUnit(unit.State, []);
     var executor = new BattleActionExecutor(session);
     var result = executor.Submit(action);
 
     Assert.Equal(0, result.Count);
     Assert.True(action.IsDone());
-    Assert.Equal(start, session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(start, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(0, executor.PendingCount);
   }
 
@@ -604,7 +601,7 @@ public partial class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    BattleActionResult first = executor.Submit(BattleAction.MoveUnit(unitA.Handle, [new Vector3I(0, 0, 1)])).RequireSingleResult();
+    BattleActionResult first = executor.Submit(BattleAction.MoveUnit(unitA.State, [new Vector3I(0, 0, 1)])).RequireSingleResult();
     BattleActionResult second = executor.Submit(BattleAction.EndFactionTurn(factionA)).RequireSingleResult();
 
     Assert.True(first.Succeeded);
@@ -624,12 +621,12 @@ public partial class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    BattleActionResult result = executor.Submit(BattleAction.PassUnit(unitA.Handle)).RequireSingleResult();
+    BattleActionResult result = executor.Submit(BattleAction.PassUnit(unitA.State)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
-    Assert.False(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitA.Handle))));
-    Assert.False(GetValue(Query(session, new CanUnitActNow(unitA.Handle))));
-    Assert.True(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitB.Handle))));
+    Assert.False(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitA.State))));
+    Assert.False(GetValue(Query(session, new CanUnitActNow(unitA.State))));
+    Assert.True(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitB.State))));
     Assert.Equal(faction, session.ActiveSide);
   }
 
@@ -642,7 +639,7 @@ public partial class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.Handle, [new Vector3I(2, 0, 0)]));
+    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(2, 0, 0)]));
 
     Assert.Equal(0, results.Count);
   }
@@ -659,7 +656,7 @@ public partial class BattleActionExecutorTest
     Option<BattleActionResult> resolvedResult = None;
     executor.OnActionComplete += result => resolvedResult = Some(result);
 
-    executor.Submit(BattleAction.MoveUnit(unit.Handle, [new Vector3I(1, 0, 2)]));
+    executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 0, 2)]));
 
     Assert.True(resolvedResult.IsSome);
     Assert.True(resolvedResult.RequireSome().Succeeded);
@@ -681,8 +678,8 @@ public partial class BattleActionExecutorTest
     var executor = new BattleActionExecutor(session);
     BattleActionResult[] results =
     [
-      executor.Submit(BattleAction.MoveUnit(unitA.Handle, [new Vector3I(0, 0, 1)])).RequireSingleResult(),
-      executor.Submit(BattleAction.ThrowItem(unitA.Handle, grenade, new Vector3I(2, 0, 1))).RequireSingleResult(),
+      executor.Submit(BattleAction.MoveUnit(unitA.State, [new Vector3I(0, 0, 1)])).RequireSingleResult(),
+      executor.Submit(BattleAction.ThrowItem(unitA.State, grenade, new Vector3I(2, 0, 1))).RequireSingleResult(),
       executor.Submit(BattleAction.EndFactionTurn(factionA)).RequireSingleResult(),
     ];
 
@@ -705,7 +702,7 @@ public partial class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    BattleActionResult first = executor.Submit(BattleAction.PassUnit(unitA.Handle)).RequireSingleResult();
+    BattleActionResult first = executor.Submit(BattleAction.PassUnit(unitA.State)).RequireSingleResult();
     BattleActionResult second = executor.Submit(BattleAction.EndFactionTurn(factionA)).RequireSingleResult();
 
     Assert.True(first.Succeeded);
@@ -734,14 +731,14 @@ public partial class BattleActionExecutorTest
       throw new InvalidOperationException("boom");
     };
 
-    BattleActionResult first = executor.Submit(BattleAction.MoveUnit(unit.Handle, [new Vector3I(1, 0, 2)], 2)).RequireSingleResult();
-    BattleActionResult second = executor.Submit(BattleAction.MoveUnit(unit.Handle, [new Vector3I(1, 1, 1)], 2)).RequireSingleResult();
+    BattleActionResult first = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 0, 2)], 2)).RequireSingleResult();
+    BattleActionResult second = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 1, 1)], 2)).RequireSingleResult();
 
     Assert.False(first.Succeeded);
     Assert.Equal(BattleActionFailureReason.UnexpectedError, first.FailureReason);
 
     Assert.True(second.Succeeded);
-    Assert.Equal(new Vector3I(1, 1, 1), session.GetUnitPosition(unit.Handle).RequireSome().Raw);
+    Assert.Equal(new Vector3I(1, 1, 1), session.GetUnitPosition(unit.State).RequireSome().Raw);
   }
 
   [TestCase(TestName = "Executor returns no results when submitted action produces none")]
@@ -841,7 +838,7 @@ public partial class BattleActionExecutorTest
   private sealed partial class DamageOnTileOccupiedTrigger : BattleTrigger
   {
     private readonly Vector3I _position;
-    private readonly BattleSession.BattleUnitHandle _targetHandle;
+    private readonly BattleUnitState _targetUnit;
     private readonly int _damage;
     private readonly bool _shouldConsume;
 
@@ -850,13 +847,13 @@ public partial class BattleActionExecutorTest
     public DamageOnTileOccupiedTrigger(
       string triggerId,
       Vector3I position,
-      BattleSession.BattleUnitHandle targetHandle,
+      BattleUnitState targetUnit,
       int damage,
       bool shouldConsume)
       : base(triggerId)
     {
       _position = position;
-      _targetHandle = targetHandle;
+      _targetUnit = targetUnit;
       _damage = damage;
       _shouldConsume = shouldConsume;
     }
@@ -868,11 +865,11 @@ public partial class BattleActionExecutorTest
 
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
-      ObservedTargetPositionDuringEvaluation = session.GetUnitPosition(_targetHandle)
+      ObservedTargetPositionDuringEvaluation = session.GetUnitPosition(_targetUnit)
         .Match(point => Some(point.Raw), () => None);
 
       return BattleTriggerResult.QueueInterruptAfterCommit(
-        BattleAction.ApplyDamage(_targetHandle, _damage),
+        BattleAction.ApplyDamage(_targetUnit, _damage),
         _shouldConsume);
     }
   }
@@ -911,16 +908,16 @@ public partial class BattleActionExecutorTest
   private sealed partial class PassUnitOnTileOccupiedTrigger : BattleTrigger
   {
     private readonly Vector3I _triggerPosition;
-    private readonly BattleSession.BattleUnitHandle _unitHandle;
+    private readonly BattleUnitState _unit;
 
     public PassUnitOnTileOccupiedTrigger(
       string triggerId,
       Vector3I triggerPosition,
-      BattleSession.BattleUnitHandle unitHandle)
+      BattleUnitState unit)
       : base(triggerId)
     {
       _triggerPosition = triggerPosition;
-      _unitHandle = unitHandle;
+      _unit = unit;
     }
 
     public override bool Matches(BattleEvent battleEvent)
@@ -931,7 +928,7 @@ public partial class BattleActionExecutorTest
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
       return BattleTriggerResult.QueueInterruptAfterCommit(
-        BattleAction.PassUnit(_unitHandle),
+        BattleAction.PassUnit(_unit),
         shouldConsumeTrigger: true);
     }
   }
@@ -939,18 +936,18 @@ public partial class BattleActionExecutorTest
   private sealed partial class DamageOnMovementEventTrigger : BattleTrigger
   {
     private readonly Vector3I _position;
-    private readonly BattleSession.BattleUnitHandle _targetHandle;
+    private readonly BattleUnitState _targetUnit;
     private readonly int _damage;
 
     public DamageOnMovementEventTrigger(
       string triggerId,
       Vector3I position,
-      BattleSession.BattleUnitHandle targetHandle,
+      BattleUnitState targetUnit,
       int damage)
       : base(triggerId)
     {
       _position = position;
-      _targetHandle = targetHandle;
+      _targetUnit = targetUnit;
       _damage = damage;
     }
 
@@ -962,7 +959,7 @@ public partial class BattleActionExecutorTest
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
       return BattleTriggerResult.QueueInterruptAfterCommit(
-        BattleAction.ApplyDamage(_targetHandle, _damage),
+        BattleAction.ApplyDamage(_targetUnit, _damage),
         shouldConsumeTrigger: true);
     }
   }

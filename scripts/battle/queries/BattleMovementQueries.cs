@@ -8,14 +8,14 @@ public sealed class FindPathForUnit : BattleSessionQuery<BattleBoardState.Valida
 {
   public const string Id = "find_path_for_unit";
 
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  public BattleUnitState Unit { get; }
   public Vector3I Destination { get; }
 
-  public FindPathForUnit(BattleSession.BattleUnitHandle unitHandle, Vector3I destination)
+  public FindPathForUnit(BattleUnitState unit, Vector3I destination)
     : base(Id)
   {
-    ArgumentNullException.ThrowIfNull(unitHandle);
-    UnitHandle = unitHandle;
+    ArgumentNullException.ThrowIfNull(unit);
+    Unit = unit;
     Destination = destination;
   }
 
@@ -23,24 +23,23 @@ public sealed class FindPathForUnit : BattleSessionQuery<BattleBoardState.Valida
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    Either<BattleQueryFailure, BattleUnitState> unitResult = new GetLivingUnit(UnitHandle).Execute(session);
-    return unitResult.Match(
-      Fail,
-      unit =>
-      {
-        Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(unit);
-        Option<BattleBoardState.ValidatedPoint> destinationPointOption = session.Board.ValidatePoint(Destination);
+    if (!Unit.BelongsTo(session))
+      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {Unit.Id}.");
+    if (!Unit.IsAlive)
+      return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {Unit.Id} is not alive.");
 
-        if (unitPointOption.IsNone)
-          return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {UnitHandle.UnitId} is not on the board.");
-        if (destinationPointOption.IsNone)
-          return Fail(BattleQueryFailureReason.InvalidTile, $"Destination {Destination} is outside the battle board.");
+    Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(Unit);
+    Option<BattleBoardState.ValidatedPoint> destinationPointOption = session.Board.ValidatePoint(Destination);
 
-        BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
-        BattleBoardState.ValidatedPoint destinationPoint = destinationPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+    if (unitPointOption.IsNone)
+      return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {Unit.Id} is not on the board.");
+    if (destinationPointOption.IsNone)
+      return Fail(BattleQueryFailureReason.InvalidTile, $"Destination {Destination} is outside the battle board.");
 
-        return Succeed(session.Board.FindPath(unitPoint, destinationPoint, unit.UnitId));
-      });
+    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+    BattleBoardState.ValidatedPoint destinationPoint = destinationPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+
+    return Succeed(session.Board.FindPath(unitPoint, destinationPoint, Unit.Id));
   }
 }
 
@@ -48,16 +47,16 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
 {
   public const string Id = "get_possible_move_tiles_for_unit";
 
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  public BattleUnitState Unit { get; }
   public int ActionPointCostPerStep { get; }
 
   public GetPossibleMoveTilesForUnit(
-    BattleSession.BattleUnitHandle unitHandle,
+    BattleUnitState unit,
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost)
     : base(Id)
   {
-    ArgumentNullException.ThrowIfNull(unitHandle);
-    UnitHandle = unitHandle;
+    ArgumentNullException.ThrowIfNull(unit);
+    Unit = unit;
     if (actionPointCostPerStep < 0)
       throw new ArgumentOutOfRangeException(nameof(actionPointCostPerStep), "Action point cost cannot be negative.");
 
@@ -68,39 +67,37 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    Either<BattleQueryFailure, BattleUnitState> unitResult = new GetLivingUnit(UnitHandle).Execute(session);
-    return unitResult.Match(
-      Fail,
-      unit =>
-      {
-        if (unit.CurrentActionPoints < ActionPointCostPerStep)
-          return Succeed([]);
+    if (!Unit.BelongsTo(session))
+      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {Unit.Id}.");
+    if (!Unit.IsAlive)
+      return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {Unit.Id} is not alive.");
+    if (Unit.CurrentActionPoints < ActionPointCostPerStep)
+      return Succeed([]);
 
-        Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(unit);
-        if (unitPointOption.IsNone)
-          return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {UnitHandle.UnitId} is not on the board.");
+    Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(Unit);
+    if (unitPointOption.IsNone)
+      return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {Unit.Id} is not on the board.");
 
-        BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
 
-        List<BattleBoardState.ValidatedPoint> possibleTiles = [];
-        foreach (BattleBoardState.ValidatedPoint candidatePoint in EnumerateCandidatePoints(session.Board, unit, unitPoint))
-        {
-          if (candidatePoint == unitPoint)
-            continue;
-          if (!session.Board.CanOccupy(candidatePoint))
-            continue;
+    List<BattleBoardState.ValidatedPoint> possibleTiles = [];
+    foreach (BattleBoardState.ValidatedPoint candidatePoint in EnumerateCandidatePoints(session.Board, Unit, unitPoint))
+    {
+      if (candidatePoint == unitPoint)
+        continue;
+      if (!session.Board.CanOccupy(candidatePoint))
+        continue;
 
-          BattleBoardState.ValidatedPoint[] path = session.Board.FindPath(unitPoint, candidatePoint, unit.UnitId);
-          if (path.Length == 0)
-            continue;
+      BattleBoardState.ValidatedPoint[] path = session.Board.FindPath(unitPoint, candidatePoint, Unit.Id);
+      if (path.Length == 0)
+        continue;
 
-          int stepCount = path.Length - 1;
-          if (CanPayMovementCost(unit, stepCount))
-            possibleTiles.Add(candidatePoint);
-        }
+      int stepCount = path.Length - 1;
+      if (CanPayMovementCost(Unit, stepCount))
+        possibleTiles.Add(candidatePoint);
+    }
 
-        return Succeed(possibleTiles);
-      });
+    return Succeed(possibleTiles);
   }
 
   private IEnumerable<BattleBoardState.ValidatedPoint> EnumerateCandidatePoints(BattleBoardState board, BattleUnitState unit, BattleBoardState.ValidatedPoint unitPosition)

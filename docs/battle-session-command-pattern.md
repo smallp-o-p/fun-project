@@ -73,9 +73,9 @@ Read-side queries should mirror the command side without pretending reads are ac
 Controllers and AI should use queries for read-only decisions, for example:
 
 ```csharp
-session.Queries.Execute(new GetPossibleMoveTilesForUnit(unitHandle));
-session.Queries.Execute(new FindPathForUnit(unitHandle, destination));
-session.Queries.Execute(new IsUnitStillAvailableThisTurn(unitHandle));
+session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit));
+session.Queries.Execute(new FindPathForUnit(unit, destination));
+session.Queries.Execute(new IsUnitStillAvailableThisTurn(unit));
 ```
 
 Commands should remain explicit `BattleAction` values executed through `BattleActionExecutor.Submit`.

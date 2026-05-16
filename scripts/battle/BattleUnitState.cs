@@ -9,9 +9,11 @@ namespace FunProject.Battle;
 
 public sealed class BattleUnitState
 {
+  private readonly BattleSession _session;
   private readonly List<EquippableItem> _inventory = [];
 
-  internal int UnitId { get; }
+  internal int Id { get; }
+  public Option<BattleBoardState.ValidatedPoint> Position => _session.GetUnitPosition(this);
   public Combatant Combatant { get; }
   public Faction Side => Combatant.OwningFaction;
   public Option<Weapon> EquippedWeapon { get; private set; }
@@ -26,27 +28,34 @@ public sealed class BattleUnitState
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
 
-  internal BattleUnitState(int unitId, Combatant combatant)
-    : this(unitId, combatant, None)
+  internal BattleUnitState(BattleSession session, int unitId, Combatant combatant)
+    : this(session, unitId, combatant, None)
   {
   }
 
-  internal BattleUnitState(int unitId, Combatant combatant, Weapon equippedWeapon)
-    : this(unitId, combatant, Some(equippedWeapon))
+  internal BattleUnitState(BattleSession session, int unitId, Combatant combatant, Weapon equippedWeapon)
+    : this(session, unitId, combatant, Some(equippedWeapon))
   {
   }
 
-  internal BattleUnitState(int unitId, Combatant combatant, Option<Weapon> equippedWeapon)
+  internal BattleUnitState(BattleSession session, int unitId, Combatant combatant, Option<Weapon> equippedWeapon)
   {
-    if (unitId <= 0)
-      throw new ArgumentOutOfRangeException(nameof(unitId), "Unit id must be positive.");
+    ArgumentNullException.ThrowIfNull(session);
+    ArgumentOutOfRangeException.ThrowIfLessThan(unitId, 0);
 
-    UnitId = unitId;
+    _session = session;
+    Id = unitId;
     ArgumentNullException.ThrowIfNull(combatant);
     Combatant = combatant;
     EquippedWeapon = equippedWeapon;
     CurrentHealth = MaxHealth;
     CurrentActionPoints = MaxActionPoints;
+  }
+
+  internal bool BelongsTo(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(session);
+    return ReferenceEquals(_session, session);
   }
 
   public void RefreshForNewTurn()

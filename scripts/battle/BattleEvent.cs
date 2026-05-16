@@ -34,7 +34,6 @@ public abstract record BattleEvent
 public interface IUnitBattleEvent
 {
   BattleUnitState Unit { get; }
-  int UnitId { get; }
 }
 
 public interface IPositionedBattleEvent
@@ -123,7 +122,6 @@ public sealed record ActiveSideChangedBattleEvent : BattleEvent, IFactionBattleE
 public sealed record UnitAddedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
-  public int UnitId => Unit.UnitId;
   public BattleBoardState.ValidatedPoint Position { get; }
 
   public UnitAddedBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position)
@@ -140,7 +138,6 @@ public sealed record UnitAddedBattleEvent : BattleEvent, IUnitBattleEvent, IPosi
 public sealed record UnitActivationEndedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
-  public int UnitId => Unit.UnitId;
   public BattleBoardState.ValidatedPoint Position { get; }
 
   public UnitActivationEndedBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position)
@@ -157,7 +154,6 @@ public sealed record UnitActivationEndedBattleEvent : BattleEvent, IUnitBattleEv
 public sealed record UnitMovedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, ISourcePositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
-  public int UnitId => Unit.UnitId;
   public BattleBoardState.ValidatedPoint Position { get; }
   public BattleBoardState.ValidatedPoint SourcePosition { get; }
 
@@ -173,44 +169,37 @@ public sealed record UnitMovedBattleEvent : BattleEvent, IUnitBattleEvent, IPosi
     SourcePosition = sourcePosition;
   }
 
-  public override string ToDisplayString() => $"Unit ID {UnitId} moved from {SourcePosition} to {Position}.";
+  public override string ToDisplayString() => $"Unit ID {Unit.Id} moved from {SourcePosition} to {Position}.";
 }
 
-public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, ISourcePositionedBattleEvent
+public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
-  public int UnitId => Unit.UnitId;
   public BattleBoardState.ValidatedPoint Position { get; }
-  public BattleBoardState.ValidatedPoint SourcePosition { get; }
 
   public TileOccupiedBattleEvent(
     BattleUnitState unit,
-    BattleBoardState.ValidatedPoint position,
-    BattleBoardState.ValidatedPoint sourcePosition)
+    BattleBoardState.ValidatedPoint position)
     : base(BattleEventType.TileOccupied)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
     Position = position;
-    SourcePosition = sourcePosition;
   }
 
-  public override string ToDisplayString() => $"Unit ID {UnitId} occupied {Position}.";
+  public override string ToDisplayString() => $"Unit ID {Unit.Id} occupied {Position}.";
 }
 
-public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
+public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
-  public int UnitId => Unit.UnitId;
-  public BattleBoardState.ValidatedPoint Position { get; }
   public int Amount { get; }
 
-  public UnitDamagedBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position, int amount)
+  public UnitDamagedBattleEvent(BattleUnitState unit, int amount)
     : base(BattleEventType.UnitDamaged)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
-    Position = position;
     Amount = amount;
   }
 
@@ -220,7 +209,6 @@ public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent, IPo
 public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
-  public int UnitId => Unit.UnitId;
   public BattleBoardState.ValidatedPoint Position { get; }
 
   public UnitKilledBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position)
@@ -231,13 +219,12 @@ public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPos
     Position = position;
   }
 
-  public override string ToDisplayString() => $"Unit ID {UnitId} was killed!";
+  public override string ToDisplayString() => $"Unit ID {Unit.Id} was killed!";
 }
 
 public sealed record ItemThrownBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
-  public int UnitId => Unit.UnitId;
   public BattleBoardState.ValidatedPoint Position { get; }
   public ThrowableItem Item { get; }
 

@@ -15,30 +15,27 @@ public readonly record struct BattleActionResult(
   bool Succeeded,
   BattleActionFailureReason FailureReason = BattleActionFailureReason.None,
   Option<BattleUnitState> AffectedUnit = default,
-  string Message = "",
-  Option<BattleSession.BattleUnitHandle> AffectedUnitHandle = default)
+  string Message = "")
 {
   public static BattleActionResult Success(BattleAction action)
   {
-    return Success(action, None, "", None);
+    return Success(action, None, "");
   }
 
   public static BattleActionResult Success(
     BattleAction action,
-    BattleUnitState affectedUnit,
-    BattleSession.BattleUnitHandle affectedUnitHandle)
+    BattleUnitState affectedUnit)
   {
-    return Success(action, Some(affectedUnit), "", Some(affectedUnitHandle));
+    return Success(action, Some(affectedUnit), "");
   }
 
   public static BattleActionResult Success(
     BattleAction action,
     Option<BattleUnitState> affectedUnit,
-    string message,
-    Option<BattleSession.BattleUnitHandle> affectedUnitHandle)
+    string message)
   {
     ArgumentNullException.ThrowIfNull(action);
-    return new BattleActionResult(action, true, BattleActionFailureReason.None, affectedUnit, message, affectedUnitHandle);
+    return new BattleActionResult(action, true, BattleActionFailureReason.None, affectedUnit, message);
   }
 
   public static BattleActionResult Failure(BattleAction action, BattleActionFailureReason failureReason, string message)

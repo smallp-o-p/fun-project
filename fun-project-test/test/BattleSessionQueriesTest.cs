@@ -11,15 +11,15 @@ using static BattleQueryTestHelper;
 [RequireGodotRuntime]
 public class BattleSessionQueriesTest
 {
-  [TestCase(TestName = "Query runner returns failure object for foreign living unit handle")]
-  public void QueryRunnerReturnsFailureObjectForForeignLivingUnitHandle()
+  [TestCase(TestName = "Query runner returns failure object for foreign unit")]
+  public void QueryRunnerReturnsFailureObjectForForeignUnit()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
     var foreignSession = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
     var foreignUnit = SpawnUnit(foreignSession, BattleTestFactory.MakeCombatant("Foreign", faction), new Vector3I(0, 0, 0));
 
-    Either<BattleQueryFailure, BattleUnitState> result = Query(session, new GetLivingUnit(foreignUnit.Handle));
+    Either<BattleQueryFailure, BattleBoardState.ValidatedPoint> result = Query(session, new GetUnitPosition(foreignUnit.State));
 
     Assert.True(result.IsLeft);
     BattleQueryFailure failure = GetFailure(result);
@@ -33,7 +33,7 @@ public class BattleSessionQueriesTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction), new Vector3I(0, 0, 0));
 
-    BattleBoardState.ValidatedPoint[] path = GetValue(Query(session, new FindPathForUnit(unit.Handle, new Vector3I(2, 0, 0))));
+    BattleBoardState.ValidatedPoint[] path = GetValue(Query(session, new FindPathForUnit(unit.State, new Vector3I(2, 0, 0))));
 
     Assert.Equal(3, path.Length);
     Assert.Equal(new Vector3I(0, 0, 0), path[0].Raw);
@@ -47,7 +47,7 @@ public class BattleSessionQueriesTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction), new Vector3I(0, 0, 0));
 
-    BattleBoardState.ValidatedPoint position = GetValue(Query(session, new GetUnitPosition(unit.Handle)));
+    BattleBoardState.ValidatedPoint position = GetValue(Query(session, new GetUnitPosition(unit.State)));
 
     Assert.Equal(new Vector3I(0, 0, 0), position.Raw);
   }
@@ -98,10 +98,10 @@ public class BattleSessionQueriesTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 2), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = GetValue(Query(session, new GetPossibleMoveTilesForUnit(unit.Handle)));
+    IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = GetValue(Query(session, new GetPossibleMoveTilesForUnit(unit.State)));
     Assert.True(tiles.Count == 2);
     Assert.True(tiles.Select(tile => tile.Raw).SequenceEqual(new List<Vector3I>([new Vector3I(1, 0, 0), new Vector3I(2, 0, 0)])));
-    Assert.False(tiles.Any(tile => tile.Raw == session.GetUnitPosition(unit.Handle).RequireSome().Raw));
+    Assert.False(tiles.Any(tile => tile.Raw == session.GetUnitPosition(unit.State).RequireSome().Raw));
   }
 
   [TestCase(TestName = "GetPossibleMoveTilesForUnit does not include unreachable tiles inside movement range")]
@@ -113,7 +113,7 @@ public class BattleSessionQueriesTest
     session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).IsWalkable = false;
     StartBattle(session);
 
-    IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = GetValue(Query(session, new GetPossibleMoveTilesForUnit(unit.Handle)));
+    IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = GetValue(Query(session, new GetPossibleMoveTilesForUnit(unit.State)));
     Assert.True(tiles.Count == 0);
   }
 
@@ -129,7 +129,7 @@ public class BattleSessionQueriesTest
     session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(3, 0, 0)).RequireSome()).BlocksLineOfSight = true;
     StartBattle(session);
 
-    IReadOnlyCollection<BattleUnitState> enemies = GetValue(Query(session, new GetVisibleEnemiesForUnit(observer.Handle)));
+    IReadOnlyCollection<BattleUnitState> enemies = GetValue(Query(session, new GetVisibleEnemiesForUnit(observer.State)));
 
     Assert.True(enemies.Contains(visibleEnemy));
     Assert.False(enemies.Contains(hiddenEnemy));

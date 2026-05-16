@@ -66,8 +66,7 @@ public sealed class SpawnUnit : BattleAction
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Cannot place a unit at {Position}.");
 
     var spawnedUnit = session.AddUnit(Combatant, positionPoint, EquippedWeapon);
-    session.RaiseCommittedEvent(new UnitAddedBattleEvent(spawnedUnit.Unit, positionPoint));
-    return BattleActionResult.Success(this, spawnedUnit.Unit, spawnedUnit.Handle);
+    return BattleActionResult.Success(this, spawnedUnit.Unit);
   }
 }
 
@@ -75,24 +74,23 @@ internal sealed class MoveUnitStep : BattleAction
 {
   public const string MoveUnitStepActionId = "move_unit_step";
 
-  internal BattleSession.BattleUnitHandle UnitHandle { get; }
-  internal int UnitId => UnitHandle.UnitId;
+  internal BattleUnitState Unit { get; }
+  internal int UnitId => Unit.Id;
   internal BattleBoardState.ValidatedPoint Source { get; }
   internal BattleBoardState.ValidatedPoint Destination { get; }
   internal int ActionPointCost { get; }
 
   internal MoveUnitStep(
-    BattleSession.BattleUnitHandle unitHandle,
+    BattleUnitState unit,
     BattleBoardState.ValidatedPoint source,
     BattleBoardState.ValidatedPoint destination,
     int actionPointCost = BattleSession.DefaultMovementStepActionPointCost)
     : base(MoveUnitStepActionId)
   {
-    ArgumentNullException.ThrowIfNull(unitHandle);
-    UnitHandle = unitHandle;
-    if (actionPointCost < 0)
-      throw new ArgumentOutOfRangeException(nameof(actionPointCost), "Action point cost cannot be negative.");
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentOutOfRangeException.ThrowIfLessThan(actionPointCost, 0);
 
+    Unit = unit;
     Source = source;
     Destination = destination;
     ActionPointCost = actionPointCost;
@@ -102,7 +100,7 @@ internal sealed class MoveUnitStep : BattleAction
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    return ValidateActingUnit(session, UnitHandle, ActionPointCost).Match(
+    return ValidateActingUnit(session, Unit, ActionPointCost).Match(
       failure => failure,
       unit =>
       {
@@ -117,12 +115,10 @@ internal sealed class MoveUnitStep : BattleAction
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Destination} cannot be occupied.");
         if (!unit.TrySpendActionPoints(ActionPointCost))
           return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Move unit step action could not spend {ActionPointCost} action points for unit {UnitId}.");
-        if (!session.TryMoveUnit(UnitHandle, Source, Destination))
+        if (!session.TryMoveUnit(Unit, Source, Destination))
           return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Move unit step action could not move unit {UnitId} to {Destination.Raw}.");
 
-        session.RaiseCommittedEvent(new UnitMovedBattleEvent(unit, Destination, Source));
-        session.RaiseCommittedEvent(new TileOccupiedBattleEvent(unit, Destination, Source));
-        return BattleActionResult.Success(this, unit, UnitHandle);
+        return BattleActionResult.Success(this, unit);
       });
   }
 }
@@ -131,30 +127,30 @@ public sealed class ThrowItem : BattleAction
 {
   public const string ThrowItemActionId = "throw_item";
 
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
-  internal int UnitId => UnitHandle.UnitId;
+  public BattleUnitState Unit { get; }
   public ThrowableItem Item { get; }
   public Vector3I TargetCell { get; }
 
-  public ThrowItem(BattleSession.BattleUnitHandle unitHandle, ThrowableItem item, Vector3I targetCell)
+  public ThrowItem(BattleUnitState unit, ThrowableItem item, Vector3I targetCell)
     : base(ThrowItemActionId)
   {
-    ArgumentNullException.ThrowIfNull(unitHandle);
+    ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(item);
-    UnitHandle = unitHandle;
+
+    Unit = unit;
     Item = item;
     TargetCell = targetCell;
   }
 
   public override BattleActionResult Execute(BattleSession session)
   {
-    return ValidateActingUnit(session, UnitHandle, Item.ActionPointCost).Match(
+    return ValidateActingUnit(session, Unit, Item.ActionPointCost).Match(
       failure => failure,
       unit =>
       {
         Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(unit);
         if (unitPointOption.IsNone)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {UnitId} is not on a valid tile.");
+          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {unit.Id} is not on a valid tile.");
         Vector3I unitPosition = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint)).Raw;
 
         Option<BattleBoardState.ValidatedPoint> targetPointOption = session.Board.ValidatePoint(TargetCell);
@@ -180,7 +176,7 @@ public sealed class ThrowItem : BattleAction
         }
 
         session.RaiseCommittedEvent(new ItemThrownBattleEvent(unit, targetPoint, Item));
-        return BattleActionResult.Success(this, unit, UnitHandle);
+        return BattleActionResult.Success(this, unit);
       });
   }
 }
@@ -189,37 +185,32 @@ public sealed class ApplyDamage : BattleAction
 {
   public const string ApplyDamageActionId = "apply_damage";
 
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
-  internal int UnitId => UnitHandle.UnitId;
+  public BattleUnitState Unit { get; }
   public int Amount { get; }
 
-  public ApplyDamage(BattleSession.BattleUnitHandle unitHandle, int amount)
+  public ApplyDamage(BattleUnitState unit, int amount)
     : base(ApplyDamageActionId)
   {
-    ArgumentNullException.ThrowIfNull(unitHandle);
-    UnitHandle = unitHandle;
+    ArgumentNullException.ThrowIfNull(unit);
+    Unit = unit;
     Amount = amount;
   }
 
   public override BattleActionResult Execute(BattleSession session)
   {
-    return session.GetLivingUnit(UnitHandle).Match(
-      unit =>
-      {
-        Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(unit);
-        if (unitPointOption.IsNone)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Damage action could not resolve position for unit {UnitId}.");
-        BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+    ArgumentNullException.ThrowIfNull(session);
+    if (!Unit.BelongsTo(session))
+      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unknown unit id {Unit.Id}.");
+    if (!Unit.IsAlive)
+      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit {Unit.Id} is not alive.");
 
-        unit.ReceiveDamage(Amount);
-        session.RaiseCommittedEvent(new UnitDamagedBattleEvent(unit, unitPoint, Amount));
+    Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(Unit);
+    if (unitPointOption.IsNone)
+      return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Damage action could not resolve position for unit {Unit.Id}.");
 
-        if (unit.IsDead)
-          session.HandleUnitDeath(unit);
+    session.DealDamageTo(Unit, Amount);
 
-        return BattleActionResult.Success(this, unit, UnitHandle);
-      },
-      () => BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unknown unit id {UnitId}."));
+    return BattleActionResult.Success(this, Unit);
   }
 }
 
@@ -227,24 +218,24 @@ public sealed class PassUnit : BattleAction
 {
   public const string PassUnitActionId = "pass_unit";
 
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
-  internal int UnitId => UnitHandle.UnitId;
+  public BattleUnitState Unit { get; }
+  internal int UnitId => Unit.Id;
 
-  public PassUnit(BattleSession.BattleUnitHandle unitHandle)
+  public PassUnit(BattleUnitState unit)
     : base(PassUnitActionId)
   {
-    ArgumentNullException.ThrowIfNull(unitHandle);
-    UnitHandle = unitHandle;
+    ArgumentNullException.ThrowIfNull(unit);
+    Unit = unit;
   }
 
   public override BattleActionResult Execute(BattleSession session)
   {
-    return ValidateActingUnit(session, UnitHandle).Match(
+    return ValidateActingUnit(session, Unit).Match(
       failure => failure,
       unit =>
       {
         session.EndUnitActivation(unit);
-        return BattleActionResult.Success(this, unit, UnitHandle);
+        return BattleActionResult.Success(this, unit);
       });
   }
 }

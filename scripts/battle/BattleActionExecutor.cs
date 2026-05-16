@@ -134,8 +134,7 @@ public sealed class BattleActionExecutor
       ? Some(BattleActionResult.Success(
         activeAction,
         result.AffectedUnit,
-        result.Message,
-        result.AffectedUnitHandle))
+        result.Message))
       : Some(BattleActionResult.Failure(
         activeAction,
         result.FailureReason,

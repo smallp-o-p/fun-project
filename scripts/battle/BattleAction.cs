@@ -55,13 +55,16 @@ public abstract class BattleAction
 
   private protected Either<BattleActionResult, BattleUnitState> ValidateActingUnit(
     BattleSession session,
-    BattleSession.BattleUnitHandle unitHandle,
+    BattleUnitState unit,
     long actionPointCost = 0)
   {
     ArgumentNullException.ThrowIfNull(session);
-    ArgumentNullException.ThrowIfNull(unitHandle);
-    if (actionPointCost < 0)
-      throw new ArgumentOutOfRangeException(nameof(actionPointCost), "Action point cost cannot be negative.");
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentOutOfRangeException.ThrowIfLessThan(actionPointCost, 0);
+
+    if (!unit.BelongsTo(session))
+      return Left<BattleActionResult, BattleUnitState>(
+        BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unknown unit id {unit.Id}."));
 
     if (session.Phase != BattlePhase.InProgress)
       return Left<BattleActionResult, BattleUnitState>(
@@ -69,32 +72,34 @@ public abstract class BattleAction
 
     Faction activeSide = session.ActiveSide;
 
-    return session.GetUnit(unitHandle).Match<Either<BattleActionResult, BattleUnitState>>(
-      unit =>
-      {
-        if (!unit.IsAlive)
-          return Left<BattleActionResult, BattleUnitState>(
-            BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit {unitHandle.UnitId} is not alive."));
+    if (!unit.IsAlive)
+    {
+      return Left<BattleActionResult, BattleUnitState>(
+        BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit {unit.Id} is not alive."));
+    }
 
-        if (unit.Side != activeSide)
-          return Left<BattleActionResult, BattleUnitState>(
-            BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} is not on the active side."));
+    if (unit.Side != activeSide)
+    {
+      return Left<BattleActionResult, BattleUnitState>(
+        BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} is not on the active side."));
+    }
 
-        if (!session.IsUnitStillAvailableThisTurn(unitHandle))
-          return Left<BattleActionResult, BattleUnitState>(
-            BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} is no longer available this turn."));
+    if (!session.IsUnitStillAvailableThisTurn(unit))
+    {
+      return Left<BattleActionResult, BattleUnitState>(
+        BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} is no longer available this turn."));
+    }
 
-        if (unit.CurrentActionPoints < actionPointCost)
-          return Left<BattleActionResult, BattleUnitState>(
-            BattleActionResult.Failure(
-              this,
-              BattleActionFailureReason.Rejected,
-              $"{unit.Combatant.Name} needs {actionPointCost} action points but only has {unit.CurrentActionPoints}."));
+    if (unit.CurrentActionPoints < actionPointCost)
+    {
+      return Left<BattleActionResult, BattleUnitState>(
+        BattleActionResult.Failure(
+          this,
+          BattleActionFailureReason.Rejected,
+          $"{unit.Combatant.Name} needs {actionPointCost} action points but only has {unit.CurrentActionPoints}."));
+    }
 
-        return Right<BattleActionResult, BattleUnitState>(unit);
-      },
-      () => Left<BattleActionResult, BattleUnitState>(
-        BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unknown unit id {unitHandle.UnitId}.")));
+    return Right<BattleActionResult, BattleUnitState>(unit);
   }
 
   public virtual void ConsumeResult(BattleActionResult result)
@@ -146,27 +151,27 @@ public abstract class BattleAction
   }
 
   public static MoveUnit MoveUnit(
-    BattleSession.BattleUnitHandle unitHandle,
+    BattleUnitState unit,
     IEnumerable<Vector3I> destinations,
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost
   )
   {
-    return new MoveUnit(unitHandle, destinations, actionPointCostPerStep);
+    return new MoveUnit(unit, destinations, actionPointCostPerStep);
   }
 
-  public static ThrowItem ThrowItem(BattleSession.BattleUnitHandle unitHandle, ThrowableItem item, Vector3I targetCell)
+  public static ThrowItem ThrowItem(BattleUnitState unit, ThrowableItem item, Vector3I targetCell)
   {
-    return new ThrowItem(unitHandle, item, targetCell);
+    return new ThrowItem(unit, item, targetCell);
   }
 
-  public static ApplyDamage ApplyDamage(BattleSession.BattleUnitHandle unitHandle, int amount)
+  public static ApplyDamage ApplyDamage(BattleUnitState unit, int amount)
   {
-    return new ApplyDamage(unitHandle, amount);
+    return new ApplyDamage(unit, amount);
   }
 
-  public static PassUnit PassUnit(BattleSession.BattleUnitHandle unitHandle)
+  public static PassUnit PassUnit(BattleUnitState unit)
   {
-    return new PassUnit(unitHandle);
+    return new PassUnit(unit);
   }
 
   public static EndFactionTurn EndFactionTurn(Faction expectedActiveSide)
@@ -179,20 +184,20 @@ public sealed class MoveUnit : BattleAction
 {
   private Either<IReadOnlyList<Vector3I>, Queue<BattleBoardState.ValidatedPoint>> _routeState;
 
-  public BattleSession.BattleUnitHandle UnitHandle { get; }
+  public BattleUnitState Unit { get; }
   public int StepAPCost { get; }
 
   public MoveUnit(
-    BattleSession.BattleUnitHandle unitHandle,
+    BattleUnitState unit,
     IEnumerable<Vector3I> destinations,
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost)
     : base("move_unit")
   {
-    ArgumentNullException.ThrowIfNull(unitHandle);
+    ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(destinations);
     ArgumentOutOfRangeException.ThrowIfLessThan(actionPointCostPerStep, 0);
 
-    UnitHandle = unitHandle;
+    Unit = unit;
     _routeState = Left<IReadOnlyList<Vector3I>, Queue<BattleBoardState.ValidatedPoint>>([.. destinations]);
     StepAPCost = actionPointCostPerStep;
   }
@@ -211,19 +216,18 @@ public sealed class MoveUnit : BattleAction
         return None;
       }
 
-      Option<BattleUnitState> unitOption = session.GetLivingUnit(UnitHandle);
-      if (unitOption.IsNone)
+      if (!Unit.BelongsTo(session) || !Unit.IsAlive)
       {
         MarkCancelled();
         return None;
       }
 
-      return session.GetUnitPosition(UnitHandle).Match((currUnitPos) =>
+      return session.GetUnitPosition(Unit).Match((currUnitPos) =>
       {
         MarkRunning();
         return Some<BattleAction>(
           new MoveUnitStep(
-            UnitHandle,
+            Unit,
             currUnitPos,
             remainingSteps.Peek(),
             StepAPCost)
@@ -252,7 +256,7 @@ public sealed class MoveUnit : BattleAction
 
     long apCost = tilesToOccupy.Count * StepAPCost;
 
-    return ValidateActingUnit(session, UnitHandle, apCost).Match(
+    return ValidateActingUnit(session, Unit, apCost).Match(
       failure =>
       {
         MarkFailed();
@@ -260,7 +264,7 @@ public sealed class MoveUnit : BattleAction
       },
       _ =>
       {
-        Option<BattleBoardState.ValidatedPoint> currentPointOption = session.GetUnitPosition(UnitHandle);
+        Option<BattleBoardState.ValidatedPoint> currentPointOption = session.GetUnitPosition(Unit);
         if (currentPointOption.IsNone)
         {
           MarkCancelled();
