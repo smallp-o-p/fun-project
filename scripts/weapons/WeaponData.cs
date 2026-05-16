@@ -17,7 +17,7 @@ public enum DamageElement
 public partial class WeaponData : EquippableItemData
 {
   [Export] public DamageElement DamageElement { get; set; }
-  [Export] public DamageStat DamageStat { get; set; }
-  [Export] public RangeStat RangeStat { get; set; }
-  [Export] public CriticalChanceStat CriticalChanceStat { get; set; }
+  [Export] required public DamageStat DamageStat { get; set; }
+  [Export] required public RangeStat RangeStat { get; set; }
+  [Export] required public CriticalChanceStat CriticalChanceStat { get; set; }
 }

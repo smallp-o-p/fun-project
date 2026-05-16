@@ -16,13 +16,6 @@ public class Combatant : HasStats, HasModSlots
   {
     ArgumentNullException.ThrowIfNull(data);
     ArgumentNullException.ThrowIfNull(faction);
-    ArgumentNullException.ThrowIfNull(data.HealthStat);
-    ArgumentNullException.ThrowIfNull(data.ActionPointsStat);
-    ArgumentNullException.ThrowIfNull(data.WillStat);
-    ArgumentNullException.ThrowIfNull(data.MovementStat);
-    ArgumentNullException.ThrowIfNull(data.VisionStat);
-    ArgumentNullException.ThrowIfNull(data.AimStat);
-    ArgumentNullException.ThrowIfNull(data.BaseArmorStat);
 
     Name = data.Name;
     OwningFaction = faction;
