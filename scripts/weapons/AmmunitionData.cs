@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using FunProject.Core;
 using FunProject.Stats;
 using Godot;
@@ -8,5 +9,11 @@ namespace FunProject.Weapons;
 
 public partial class AmmunitionData : NamedEntityData
 {
-  [Export] required public Array<StatMod> Modifiers { get; set; }
+  [Export] required public Array<StatMod> Modifiers { get; set; } = [];
+
+  [SetsRequiredMembers]
+  public AmmunitionData()
+  {
+    Modifiers = [];
+  }
 };

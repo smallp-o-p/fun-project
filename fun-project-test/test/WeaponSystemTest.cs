@@ -44,6 +44,8 @@ public class WeaponSystemTest
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
       RangeStat = new RangeStat { BaseValue = 1 },
       ModSlotCount = 0,
+      AmmunitionStat = default,
+      DefaultAmmoData = default
     };
     var weapon = new MeleeWeapon(data);
 
