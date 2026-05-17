@@ -109,8 +109,8 @@ public sealed class BattleSession
 
     RefreshCurrentFactionAvailability();
 
-    RaiseCommittedEvent(new SessionStartedBattleEvent());
-    RaiseCommittedEvent(new TurnStartedBattleEvent(
+    RaiseEvent(new SessionStartedBattleEvent());
+    RaiseEvent(new TurnStartedBattleEvent(
       ActiveSide,
       TurnNumber));
     return true;
@@ -162,7 +162,7 @@ public sealed class BattleSession
     if (Phase == BattlePhase.InProgress)
       RegisterSpawnedUnitForCurrentRound(unit);
 
-    RaiseCommittedEvent(new UnitAddedBattleEvent(unit, position));
+    RaiseEvent(new UnitAddedBattleEvent(unit, position));
 
     return new SpawnedBattleUnit(unit);
   }
@@ -170,7 +170,7 @@ public sealed class BattleSession
   public void DealDamageTo(BattleUnitState unit, int dmg)
   {
     unit.ReceiveDamage(dmg);
-    RaiseCommittedEvent(new UnitDamagedBattleEvent(unit, dmg));
+    RaiseEvent(new UnitDamagedBattleEvent(unit, dmg));
     if (unit.IsDead)
     {
       HandleUnitDeath(unit);
@@ -197,7 +197,7 @@ public sealed class BattleSession
       throw new InvalidOperationException($"Unit {unit.Id} is not tracked as alive.");
 
     _activeFactionUnitsAvailable.Remove(unit);
-    RaiseCommittedEvent(new UnitKilledBattleEvent(unit, unitPoint));
+    RaiseEvent(new UnitKilledBattleEvent(unit, unitPoint));
     HandleFactionLoss(unitSide);
   }
 
@@ -226,7 +226,7 @@ public sealed class BattleSession
     BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
 
     RemoveAvailableUnit(unit);
-    RaiseCommittedEvent(new UnitActivationEndedBattleEvent(unit, unitPoint));
+    RaiseEvent(new UnitActivationEndedBattleEvent(unit, unitPoint));
 
     if (!GetFactionAliveUnits(activeSide).Any(CanUnitActNow))
       EndFactionTurn(activeSide);
@@ -238,7 +238,7 @@ public sealed class BattleSession
       return;
 
     var activeSide = ActiveSide;
-    RaiseCommittedEvent(new TurnEndedBattleEvent(
+    RaiseEvent(new TurnEndedBattleEvent(
       activeSide,
       TurnNumber));
     _sidesActedThisRound.Add(activeSide);
@@ -277,7 +277,7 @@ public sealed class BattleSession
     _turnQueue.Clear();
     Phase = BattlePhase.Ended;
 
-    RaiseCommittedEvent(new SessionEndedBattleEvent());
+    RaiseEvent(new SessionEndedBattleEvent());
   }
 
   internal void RegisterSpawnedUnitForCurrentRound(BattleUnitState unit)
@@ -346,8 +346,8 @@ public sealed class BattleSession
 
     _unitToPosition[unit] = destination;
 
-    RaiseCommittedEvent(new UnitMovedBattleEvent(unit, destination, source));
-    RaiseCommittedEvent(new TileOccupiedBattleEvent(unit, destination));
+    RaiseEvent(new UnitMovedBattleEvent(unit, destination, source));
+    RaiseEvent(new TileOccupiedBattleEvent(unit, destination));
 
     return true;
   }
@@ -388,7 +388,7 @@ public sealed class BattleSession
       _activeFactionUnitsAvailable.Add(unit);
   }
 
-  internal void RaiseCommittedEvent(BattleEvent battleEvent)
+  internal void RaiseEvent(BattleEvent battleEvent)
   {
     RefreshVisibility();
     BattleEventCommitted.Invoke(battleEvent);
@@ -494,8 +494,8 @@ public sealed class BattleSession
 
     RefreshCurrentFactionAvailability();
 
-    RaiseCommittedEvent(new ActiveSideChangedBattleEvent(nextSide));
-    RaiseCommittedEvent(new TurnStartedBattleEvent(
+    RaiseEvent(new ActiveSideChangedBattleEvent(nextSide));
+    RaiseEvent(new TurnStartedBattleEvent(
       nextSide,
       TurnNumber));
   }

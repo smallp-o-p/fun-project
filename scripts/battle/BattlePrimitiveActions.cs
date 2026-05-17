@@ -175,7 +175,7 @@ public sealed class ThrowItem : BattleAction
             unit.RemoveInventoryItem(Item);
         }
 
-        session.RaiseCommittedEvent(new ItemThrownBattleEvent(unit, targetPoint, Item));
+        session.RaiseEvent(new ItemThrownBattleEvent(unit, targetPoint, Item));
         return BattleActionResult.Success(this, unit);
       });
   }
