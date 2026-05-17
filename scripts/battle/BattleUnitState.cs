@@ -11,6 +11,8 @@ public sealed class BattleUnitState
 {
   private readonly BattleSession _session;
   private readonly List<EquippableItem> _inventory = [];
+  private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
+  private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
 
   internal int Id { get; }
   public Option<BattleBoardState.ValidatedPoint> Position => _session.GetUnitPosition(this);
@@ -18,6 +20,8 @@ public sealed class BattleUnitState
   public Faction Side => Combatant.OwningFaction;
   public Option<Weapon> EquippedWeapon { get; private set; }
   public IReadOnlyList<EquippableItem> Inventory => _inventory;
+  internal IReadOnlySet<BattleUnitState> VisibleUnits => _visibleUnits;
+  internal IReadOnlySet<BattleBoardState.ValidatedPoint> VisibleTiles => _visibleTiles;
 
   public int MaxHealth => GetBaseStatValue<HealthStat>();
   public int CurrentHealth { get; private set; }
@@ -98,6 +102,23 @@ public sealed class BattleUnitState
   public bool RemoveInventoryItem(EquippableItem item)
   {
     return _inventory.Remove(item);
+  }
+
+  internal void ClearVisibility()
+  {
+    _visibleUnits.Clear();
+    _visibleTiles.Clear();
+  }
+
+  internal void AddVisibleTile(BattleBoardState.ValidatedPoint tile)
+  {
+    _visibleTiles.Add(tile);
+  }
+
+  internal void AddVisibleUnit(BattleUnitState unit)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    _visibleUnits.Add(unit);
   }
 
   private int GetBaseStatValue<TStat>() where TStat : Stat

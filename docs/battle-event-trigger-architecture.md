@@ -349,7 +349,7 @@ The starting event list does not include visibility events yet, but the model ca
 - `UnitLostFromSight`
 - `TileRevealed`
 
-For now, overwatch can use the committed event to discover that a watched tile became occupied, then validate against the current `BattleVisibilitySnapshot` before the reaction shot executes.
+For now, overwatch can use the committed event to discover that a watched tile became occupied, then validate against current per-unit visibility before the reaction shot executes.
 
 ## Action Continuation Rules
 

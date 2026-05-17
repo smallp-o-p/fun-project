@@ -32,9 +32,9 @@ flowchart LR
     subgraph Runtime["Authoritative Tactical Runtime"]
         BattleSession["BattleSession\nsingle source of truth\nturn flow + bookkeeping"]
         BoardState["BattleBoardState\nBattleTileState[x,y,z]\noccupancy + spatial path queries"]
-        UnitState["BattleUnitState[]\nAP, health,\ninventory refs, equipped weapon"]
-        VisibilityState["BattleVisibilitySnapshot\nper-faction fog of war\nexplored tiles + visible enemies"]
-        VisibilitySystem["BattleVisibilitySystem\ntile-based LOS + faction FOV rebuilds"]
+        UnitState["BattleUnitState[]\nAP, health,\ninventory refs,\ncurrent visibility"]
+        VisibilityMemory["Explored tile memory\nper faction"]
+        VisibilitySystem["BattleVisibilitySystem\ntile-based LOS + unit FOV refresh"]
         EventStream["BattleEvent stream"]
         Actions["BattleAction\nqueued intent + primitive commands"]
         ActionExecutor["BattleActionExecutor\naction queue + invocation"]
@@ -52,13 +52,15 @@ flowchart LR
 
     BattleSession --- BoardState
     BattleSession --- UnitState
-    BattleSession --- VisibilityState
+    BattleSession --- VisibilityMemory
     BattleSession --- EventStream
-    VisibilitySystem -->|"rebuild"| VisibilityState
+    VisibilitySystem -->|"refresh"| UnitState
+    VisibilitySystem -->|"merge"| VisibilityMemory
     Actions -->|"refresh on success"| VisibilitySystem
     Queries -->|"read only"| BattleSession
     Queries -->|"read only"| BoardState
-    Queries -->|"read only"| VisibilityState
+    Queries -->|"read only"| UnitState
+    Queries -->|"read only"| VisibilityMemory
 
     HUD -->|"player request"| SceneController
     BattleScene -->|"selection / hover / click"| SceneController
@@ -85,7 +87,7 @@ flowchart LR
   - round queue
   - alive and dead unit bookkeeping
   - current-turn unit availability
-  - faction visibility and explored-tile state
+  - faction explored-tile memory
   - authoritative battle event emission
 - `BattleBoardState` owns:
   - tile storage
@@ -98,7 +100,7 @@ flowchart LR
   - tile-based line-of-sight checks
   - tile visibility checks
   - deriving visible units from visible tiles
-  - rebuilding faction fog-of-war snapshots from session state
+  - refreshing current unit visibility from session state
 - `BattleActionExecutor` owns:
   - preview validation for supported primitive actions
   - the pending action queue
@@ -243,9 +245,10 @@ Current behavior:
 - uses `VisionStat` as the maximum sight range per unit
 - traces LOS from tile center to tile center
 - treats units as visible when they stand on a currently visible tile
-- builds per-faction current visibility and explored-tile memory
+- stores each unit's current visible `BattleBoardState.ValidatedPoint`s and visible `BattleUnitState` handles on `BattleUnitState`
+- stores explored `BattleBoardState.ValidatedPoint` memory per faction on `BattleSession`
 - keeps own living units known to their faction even without direct LOS
-- rebuilds the full visibility snapshot after every successful battle action
+- refreshes current unit visibility after committed battle events
 
 Current limitations:
 

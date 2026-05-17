@@ -135,17 +135,4 @@ public class BattleSessionQueriesTest
     Assert.False(enemies.Contains(hiddenEnemy));
   }
 
-  [TestCase(TestName = "Tile visibility query returns failure for invalid tile")]
-  public void TileVisibilityQueryReturnsFailureForInvalidTile()
-  {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2), [faction]);
-
-    Either<BattleQueryFailure, bool> result = Query(session, new IsTileVisibleToFaction(faction, new Vector3I(4, 0, 0)));
-
-    Assert.True(result.IsLeft);
-    BattleQueryFailure failure = GetFailure(result);
-    Assert.Equal(BattleQueryFailureReason.InvalidTile, failure.Reason);
-  }
-
 }

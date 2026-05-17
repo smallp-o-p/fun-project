@@ -21,21 +21,23 @@ public sealed class BattleSession
 
   public const int DefaultMovementStepActionPointCost = 1;
   private static readonly BattleVisibilitySystem VisibilitySystem = new();
+  private static readonly IReadOnlySet<BattleBoardState.ValidatedPoint> EmptyTileSet = new SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>();
 
   private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleUnitState>> _aliveUnitsByFaction = [];
   private readonly Dictionary<Faction, IReadOnlyList<Combatant>> _factionRosters = [];
   private readonly List<BattleUnitState> _units = [];
   private readonly Dictionary<BattleUnitState, BattleBoardState.ValidatedPoint> _unitToPosition = [];
+  private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>> _exploredTilesByFaction = [];
   private readonly Queue<Faction> _globalFactionOrder = [];
   private Queue<Faction> _turnQueue = [];
   private readonly SysColGeneric.HashSet<Faction> _sidesActedThisRound = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _activeFactionUnitsAvailable = [];
-  private BattleVisibilitySnapshot _visibilitySnapshot = BattleVisibilitySnapshot.Empty;
 
   public BattleBoardState Board { get; }
   public BattlePhase Phase { get; private set; } = BattlePhase.Setup;
   public int TurnNumber { get; private set; } = 1;
   public Faction ActiveSide { get; private set; }
+  internal IEnumerable<BattleUnitState> Units => _units;
   public IEnumerable<BattleUnitState> AliveUnits => _units.Where((unit) => unit.IsAlive);
   public IEnumerable<BattleUnitState> DeadUnits => _units.Where((unit) => unit.IsDead);
   public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _globalFactionOrder;
@@ -82,6 +84,32 @@ public sealed class BattleSession
   internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
   {
     return _aliveUnitsByFaction.TryGetValue(side, out var units) ? units : [];
+  }
+
+  internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetFactionVisibleTiles(Faction side)
+  {
+    ArgumentNullException.ThrowIfNull(side);
+    return GetFactionAliveUnits(side)
+      .SelectMany(unit => unit.VisibleTiles)
+      .ToHashSet();
+  }
+
+  internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetFactionExploredTiles(Faction side)
+  {
+    ArgumentNullException.ThrowIfNull(side);
+    return _exploredTilesByFaction.TryGetValue(side, out var tiles) ? tiles : EmptyTileSet;
+  }
+
+  internal bool IsUnitVisibleToFaction(Faction side, BattleUnitState target)
+  {
+    ArgumentNullException.ThrowIfNull(side);
+    ArgumentNullException.ThrowIfNull(target);
+
+    if (target.Side == side)
+      return true;
+
+    return GetFactionAliveUnits(side)
+      .Any(unit => unit.VisibleUnits.Contains(target));
   }
 
   internal bool IsUnitStillAvailableThisTurn(BattleUnitState unit)
@@ -376,8 +404,6 @@ public sealed class BattleSession
     return _aliveUnitsByFaction.TryGetValue(side, out var units) && units.Count > 0;
   }
 
-  internal BattleVisibilitySnapshot VisibilitySnapshot => _visibilitySnapshot;
-
   internal void RefreshCurrentFactionAvailability()
   {
     if (Phase != BattlePhase.InProgress)
@@ -396,9 +422,21 @@ public sealed class BattleSession
 
   internal void RefreshVisibility()
   {
-    _visibilitySnapshot = VisibilitySystem
-      .Build(this)
-      .WithMergedExplored(_visibilitySnapshot);
+    VisibilitySystem.Refresh(this);
+  }
+
+  internal void MarkTilesExplored(Faction side, IEnumerable<BattleBoardState.ValidatedPoint> tiles)
+  {
+    ArgumentNullException.ThrowIfNull(side);
+    ArgumentNullException.ThrowIfNull(tiles);
+
+    if (!_exploredTilesByFaction.TryGetValue(side, out var exploredTiles))
+    {
+      exploredTiles = [];
+      _exploredTilesByFaction.Add(side, exploredTiles);
+    }
+
+    exploredTiles.UnionWith(tiles);
   }
 
   private void RebuildRoundQueueFromLivingSides()

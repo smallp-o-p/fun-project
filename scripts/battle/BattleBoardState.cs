@@ -100,6 +100,12 @@ public sealed class BattleBoardState
     return IsInBounds(coordinates) ? Some(new ValidatedPoint(coordinates)) : None;
   }
 
+  public Option<ValidatedPoint> ValidatePoint(Godot.Vector3 coordinates)
+  {
+    Godot.Vector3 floor = coordinates.Floor();
+    return ValidatePoint(new((int)floor.X, (int)floor.Y, (int)floor.Z));
+  }
+
   public Option<List<ValidatedPoint>> ValidatePath(IEnumerable<Vector3I> path)
   {
     List<ValidatedPoint> validatedPts = new()

@@ -7,13 +7,10 @@ This plan tracks the refactor from the transitional `IBattleSessionQuery` facade
 Controllers, HUD code, AI, and tests should ask battle-state questions by executing concrete query objects:
 
 ```csharp
-BattleQueryResult<Vector3I[]> pathResult =
+Either<BattleQueryFailure, BattleBoardState.ValidatedPoint[]> pathResult =
   session.Queries.Execute(new FindPathForUnit(unitId, destination));
 
-if (pathResult is BattleQuerySuccess<Vector3I[]> pathSuccess)
-{
-  Vector3I[] path = pathSuccess.Value;
-}
+// Successful results carry validated board points. Read `.Raw` only at presentation boundaries.
 ```
 
 `BattleSession` remains the authoritative state owner. Query objects are read-only and do not bypass the mutation path for state changes.
@@ -85,7 +82,7 @@ Do not combine these into one configurable query class. Each concrete type shoul
 
 4. Move visibility and fog queries.
    - Implement per-unit visibility, per-faction visibility, visible enemies, visible tiles, and explored tiles.
-   - Queries should read the current `BattleVisibilitySnapshot`.
+   - Queries should read current per-unit visibility from `BattleUnitState` and explored-tile memory from `BattleSession`.
    - Preserve explored-tile memory semantics.
 
 5. Remove the transitional facade.
@@ -102,10 +99,10 @@ Do not combine these into one configurable query class. Each concrete type shoul
 ## Design Rules
 
 - Query objects are read-only.
-- Query objects may read session internals, board state, unit state, and visibility snapshots.
+- Query objects may read session internals, board state, unit state, and current visibility state.
 - Query objects must not raise events.
 - Query objects must not call mutation execution.
-- Query objects must not mutate `BattleSession`, `BattleBoardState`, `BattleUnitState`, or visibility snapshots.
+- Query objects must not mutate `BattleSession`, `BattleBoardState`, `BattleUnitState`, or visibility state.
 - Avoid out params.
 - Check null-returning and failure-prone helpers before continuing.
 - Do not enable nullable for the query API.

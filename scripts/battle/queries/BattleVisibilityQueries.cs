@@ -1,4 +1,3 @@
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,9 +39,7 @@ public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>
             if (ObserverUnitId == TargetUnitId)
               return Succeed(true);
 
-            return Succeed(session.VisibilitySnapshot
-              .GetVisibleUnitsForObserverOrEmpty(ObserverUnitId)
-              .Contains(TargetUnitId));
+            return Succeed(ObserverUnit.VisibleUnits.Contains(TargetUnit));
           });
       });
   }
@@ -86,10 +83,7 @@ public sealed class IsUnitVisibleToFaction : BattleSessionQuery<bool>
     if (TargetUnit.Side == Faction)
       return Succeed(true);
 
-    return Succeed(session.VisibilitySnapshot
-      .GetFactionStateOrEmpty(Faction)
-      .VisibleForeignUnitIds
-      .Contains(TargetUnitId));
+    return Succeed(session.IsUnitVisibleToFaction(Faction, TargetUnit));
   }
 }
 
@@ -98,9 +92,9 @@ public sealed class IsTileVisibleToFaction : BattleSessionQuery<bool>
   public const string Id = "is_tile_visible_to_faction";
 
   public Faction Faction { get; }
-  public Vector3I Tile { get; }
+  public BattleBoardState.ValidatedPoint Tile { get; }
 
-  public IsTileVisibleToFaction(Faction faction, Vector3I tile)
+  public IsTileVisibleToFaction(Faction faction, BattleBoardState.ValidatedPoint tile)
     : base(Id)
   {
     ArgumentNullException.ThrowIfNull(faction);
@@ -111,14 +105,7 @@ public sealed class IsTileVisibleToFaction : BattleSessionQuery<bool>
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
-
-    if (session.Board.ValidatePoint(Tile).IsNone)
-      return Fail(BattleQueryFailureReason.InvalidTile, $"Tile {Tile} is outside the battle board.");
-
-    return Succeed(session.VisibilitySnapshot
-      .GetFactionStateOrEmpty(Faction)
-      .VisibleTiles
-      .Contains(Tile));
+    return Succeed(session.GetFactionVisibleTiles(Faction).Contains(Tile));
   }
 }
 
@@ -127,9 +114,9 @@ public sealed class HasFactionExploredTile : BattleSessionQuery<bool>
   public const string Id = "has_faction_explored_tile";
 
   public Faction Faction { get; }
-  public Vector3I Tile { get; }
+  public BattleBoardState.ValidatedPoint Tile { get; }
 
-  public HasFactionExploredTile(Faction faction, Vector3I tile)
+  public HasFactionExploredTile(Faction faction, BattleBoardState.ValidatedPoint tile)
     : base(Id)
   {
     ArgumentNullException.ThrowIfNull(faction);
@@ -140,14 +127,7 @@ public sealed class HasFactionExploredTile : BattleSessionQuery<bool>
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
-
-    if (session.Board.ValidatePoint(Tile).IsNone)
-      return Fail(BattleQueryFailureReason.InvalidTile, $"Tile {Tile} is outside the battle board.");
-
-    return Succeed(session.VisibilitySnapshot
-      .GetFactionStateOrEmpty(Faction)
-      .ExploredTiles
-      .Contains(Tile));
+    return Succeed(session.GetFactionExploredTiles(Faction).Contains(Tile));
   }
 }
 
@@ -174,10 +154,7 @@ public sealed class GetVisibleUnitsForUnit : BattleSessionQuery<IReadOnlyCollect
     if (!ObserverUnit.IsAlive)
       return Fail(BattleQueryFailureReason.UnitNotAlive, $"Observer unit {ObserverUnitId} could not be resolved. Unit {ObserverUnitId} is not alive.");
 
-    IReadOnlySet<int> visibleUnitIds = session.VisibilitySnapshot.GetVisibleUnitsForObserverOrEmpty(ObserverUnitId);
-    return Succeed(session.AliveUnits
-      .Where(unit => visibleUnitIds.Contains(unit.Id))
-      .ToArray());
+    return Succeed(ObserverUnit.VisibleUnits.ToArray());
   }
 }
 
@@ -204,9 +181,8 @@ public sealed class GetVisibleEnemiesForUnit : BattleSessionQuery<IReadOnlyColle
     if (!ObserverUnit.IsAlive)
       return Fail(BattleQueryFailureReason.UnitNotAlive, $"Observer unit {ObserverUnitId} could not be resolved. Unit {ObserverUnitId} is not alive.");
 
-    IReadOnlySet<int> visibleUnitIds = session.VisibilitySnapshot.GetVisibleUnitsForObserverOrEmpty(ObserverUnitId);
-    return Succeed(session.AliveUnits
-      .Where(unit => unit.Side != ObserverUnit.Side && visibleUnitIds.Contains(unit.Id))
+    return Succeed(ObserverUnit.VisibleUnits
+      .Where(unit => unit.Side != ObserverUnit.Side)
       .ToArray());
   }
 }
@@ -228,17 +204,13 @@ public sealed class GetVisibleUnitsForFaction : BattleSessionQuery<IReadOnlyColl
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    IReadOnlySet<int> visibleForeignUnitIds = session.VisibilitySnapshot
-      .GetFactionStateOrEmpty(Faction)
-      .VisibleForeignUnitIds;
-
     return Succeed(session.AliveUnits
-      .Where(unit => unit.Side == Faction || visibleForeignUnitIds.Contains(unit.Id))
+      .Where(unit => session.IsUnitVisibleToFaction(Faction, unit))
       .ToArray());
   }
 }
 
-public sealed class GetVisibleTilesForFaction : BattleSessionQuery<IReadOnlyCollection<Vector3I>>
+public sealed class GetVisibleTilesForFaction : BattleSessionQuery<IReadOnlyCollection<BattleBoardState.ValidatedPoint>>
 {
   public const string Id = "get_visible_tiles_for_faction";
 
@@ -251,14 +223,14 @@ public sealed class GetVisibleTilesForFaction : BattleSessionQuery<IReadOnlyColl
     Faction = faction;
   }
 
-  internal override Either<BattleQueryFailure, IReadOnlyCollection<Vector3I>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleBoardState.ValidatedPoint>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
-    return Succeed(session.VisibilitySnapshot.GetFactionStateOrEmpty(Faction).VisibleTiles.ToArray());
+    return Succeed(session.GetFactionVisibleTiles(Faction).ToArray());
   }
 }
 
-public sealed class GetExploredTilesForFaction : BattleSessionQuery<IReadOnlyCollection<Vector3I>>
+public sealed class GetExploredTilesForFaction : BattleSessionQuery<IReadOnlyCollection<BattleBoardState.ValidatedPoint>>
 {
   public const string Id = "get_explored_tiles_for_faction";
 
@@ -271,9 +243,9 @@ public sealed class GetExploredTilesForFaction : BattleSessionQuery<IReadOnlyCol
     Faction = faction;
   }
 
-  internal override Either<BattleQueryFailure, IReadOnlyCollection<Vector3I>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleBoardState.ValidatedPoint>> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
-    return Succeed(session.VisibilitySnapshot.GetFactionStateOrEmpty(Faction).ExploredTiles.ToArray());
+    return Succeed(session.GetFactionExploredTiles(Faction).ToArray());
   }
 }

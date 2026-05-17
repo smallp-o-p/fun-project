@@ -1,5 +1,6 @@
 using FunProject.Combatants;
 using Godot;
+using LanguageExt.UnsafeValueAccess;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,40 +12,35 @@ internal sealed class BattleVisibilitySystem
   private const float RayStepEpsilon = 0.0001f;
   private static readonly Vector3 TileCenterOffset = new(0.5f, 0.5f, 0.5f);
 
-  public BattleVisibilitySnapshot Build(BattleSession session)
+  public void Refresh(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
     var board = session.Board;
-    var livingUnits = session.AliveUnits.ToArray();
-    Dictionary<Vector3I, BattleUnitState> livingUnitsByPosition = GetLivingUnitsByPosition(session, livingUnits);
-    Dictionary<Faction, SysColGeneric.HashSet<Vector3I>> visibleTilesByFaction = [];
-    Dictionary<Faction, SysColGeneric.HashSet<int>> visibleForeignUnitsByFaction = [];
-    Dictionary<int, IReadOnlySet<int>> visibleUnitsByObserver = [];
+    foreach (var unit in session.Units)
+      unit.ClearVisibility();
 
-    foreach (var faction in GetParticipatingFactions(session))
-    {
-      visibleTilesByFaction[faction] = [];
-      visibleForeignUnitsByFaction[faction] = [];
-    }
+    var livingUnits = session.AliveUnits.ToArray();
+    Dictionary<BattleBoardState.ValidatedPoint, BattleUnitState> livingUnitsByPosition = GetLivingUnitsByPosition(session, livingUnits);
 
     foreach (var observer in livingUnits)
     {
-      SysColGeneric.HashSet<Vector3I> observerVisibleTiles = [];
-      SysColGeneric.HashSet<int> visibleUnits = [];
-      visibleUnitsByObserver[observer.Id] = visibleUnits;
+      SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> observerVisibleTiles = [];
       Option<BattleBoardState.ValidatedPoint> observerPointOption = session.GetUnitPosition(observer);
       if (observerPointOption.IsNone)
         continue;
-      Vector3I observerPosition = observerPointOption.IfNone(default(BattleBoardState.ValidatedPoint)).Raw;
+      BattleBoardState.ValidatedPoint observerPosition = observerPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
 
       foreach (var targetTile in EnumerateTileCandidates(board, observer, observerPosition))
       {
         if (CanSeeTile(board, observer, observerPosition, targetTile))
+        {
           observerVisibleTiles.Add(targetTile);
+          observer.AddVisibleTile(targetTile);
+        }
       }
 
-      visibleTilesByFaction[observer.Side].UnionWith(observerVisibleTiles);
+      session.MarkTilesExplored(observer.Side, observerVisibleTiles);
 
       foreach (var visibleTile in observerVisibleTiles)
       {
@@ -53,52 +49,35 @@ internal sealed class BattleVisibilitySystem
         if (target.Id == observer.Id)
           continue;
 
-        visibleUnits.Add(target.Id);
-        if (target.Side != observer.Side)
-          visibleForeignUnitsByFaction[observer.Side].Add(target.Id);
+        observer.AddVisibleUnit(target);
       }
     }
-
-    Dictionary<Faction, BattleFactionVisibilityState> factionStates = [];
-    foreach (var faction in visibleTilesByFaction.Keys)
-    {
-      var visibleTiles = visibleTilesByFaction[faction];
-      factionStates[faction] = new BattleFactionVisibilityState(
-        visibleTiles,
-        visibleTiles,
-        visibleForeignUnitsByFaction[faction]);
-    }
-
-    return new BattleVisibilitySnapshot(factionStates, visibleUnitsByObserver);
   }
 
-  private static Dictionary<Vector3I, BattleUnitState> GetLivingUnitsByPosition(
+  private static Dictionary<BattleBoardState.ValidatedPoint, BattleUnitState> GetLivingUnitsByPosition(
     BattleSession session,
     IReadOnlyCollection<BattleUnitState> livingUnits)
   {
     ArgumentNullException.ThrowIfNull(session);
     ArgumentNullException.ThrowIfNull(livingUnits);
 
-    Dictionary<Vector3I, BattleUnitState> livingUnitsByPosition = [];
+    Dictionary<BattleBoardState.ValidatedPoint, BattleUnitState> livingUnitsByPosition = [];
     foreach (var unit in livingUnits)
     {
       Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(unit);
       if (unitPointOption.IsNone)
         continue;
 
-      livingUnitsByPosition[unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint)).Raw] = unit;
+      livingUnitsByPosition[unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint))] = unit;
     }
 
     return livingUnitsByPosition;
   }
 
-  private static IEnumerable<Faction> GetParticipatingFactions(BattleSession session)
-  {
-    ArgumentNullException.ThrowIfNull(session);
-    return [.. session.GlobalFactionTurnOrder];
-  }
-
-  private static IEnumerable<Vector3I> EnumerateTileCandidates(BattleBoardState board, BattleUnitState observer, Vector3I observerPosition)
+  private static IEnumerable<BattleBoardState.ValidatedPoint> EnumerateTileCandidates(
+    BattleBoardState board,
+    BattleUnitState observer,
+    BattleBoardState.ValidatedPoint observerPosition)
   {
     ArgumentNullException.ThrowIfNull(board);
     ArgumentNullException.ThrowIfNull(observer);
@@ -106,24 +85,24 @@ internal sealed class BattleVisibilitySystem
     if (observer.Vision <= 0)
       yield break;
 
-    int minX = Math.Max(0, observerPosition.X - observer.Vision);
-    int maxX = Math.Min(board.Dimensions.X - 1, observerPosition.X + observer.Vision);
-    int minY = Math.Max(0, observerPosition.Y - observer.Vision);
-    int maxY = Math.Min(board.Dimensions.Y - 1, observerPosition.Y + observer.Vision);
-    int minZ = Math.Max(0, observerPosition.Z - observer.Vision);
-    int maxZ = Math.Min(board.Dimensions.Z - 1, observerPosition.Z + observer.Vision);
-
-    for (int y = minY; y <= maxY; y++)
+    foreach (var point in board.EnumerateBoardPoints())
     {
-      for (int z = minZ; z <= maxZ; z++)
-      {
-        for (int x = minX; x <= maxX; x++)
-          yield return new Vector3I(x, y, z);
-      }
+      if (Math.Abs(point.X - observerPosition.X) > observer.Vision)
+        continue;
+      if (Math.Abs(point.Y - observerPosition.Y) > observer.Vision)
+        continue;
+      if (Math.Abs(point.Z - observerPosition.Z) > observer.Vision)
+        continue;
+
+      yield return point;
     }
   }
 
-  private static bool CanSeeTile(BattleBoardState board, BattleUnitState observer, Vector3I observerPosition, Vector3I targetTile)
+  private static bool CanSeeTile(
+    BattleBoardState board,
+    BattleUnitState observer,
+    BattleBoardState.ValidatedPoint observerPosition,
+    BattleBoardState.ValidatedPoint targetTile)
   {
     ArgumentNullException.ThrowIfNull(board);
     ArgumentNullException.ThrowIfNull(observer);
@@ -131,12 +110,7 @@ internal sealed class BattleVisibilitySystem
     if (observer.IsDead)
       return false;
 
-    Option<BattleBoardState.ValidatedPoint> observerCell = board.ValidatePoint(observerPosition);
-    Option<BattleBoardState.ValidatedPoint> targetCell = board.ValidatePoint(targetTile);
-
-    if (observerCell.IsNone || targetCell.IsNone)
-      return false;
-    if (targetTile != observerPosition && targetCell.Match(point => board.GetTile(point).BlocksLineOfSight, () => false))
+    if (targetTile != observerPosition && board.GetTile(targetTile).BlocksLineOfSight)
       return false;
 
     var observerPoint = ToWorldPoint(observerPosition);
@@ -156,7 +130,7 @@ internal sealed class BattleVisibilitySystem
     return observerPoint.DistanceTo(targetPoint) <= observer.Vision;
   }
 
-  private static Vector3 ToWorldPoint(Vector3I cell)
+  private static Vector3 ToWorldPoint(BattleBoardState.ValidatedPoint cell)
   {
     return new Vector3(cell.X + TileCenterOffset.X, cell.Y + TileCenterOffset.Y, cell.Z + TileCenterOffset.Z);
   }
@@ -165,13 +139,14 @@ internal sealed class BattleVisibilitySystem
   {
     ArgumentNullException.ThrowIfNull(board);
 
-    var originCell = ToTileCoordinates(origin);
-    var targetCell = ToTileCoordinates(target);
-    Option<BattleBoardState.ValidatedPoint> originPoint = board.ValidatePoint(originCell);
-    Option<BattleBoardState.ValidatedPoint> targetPoint = board.ValidatePoint(targetCell);
-    if (originPoint.IsNone || targetPoint.IsNone)
+    Option<BattleBoardState.ValidatedPoint> originPointOption = board.ValidatePoint(origin);
+    Option<BattleBoardState.ValidatedPoint> targetPointOption = board.ValidatePoint(target);
+    if (originPointOption.IsNone || targetPointOption.IsNone)
       return false;
-    if (originCell == targetCell)
+
+    BattleBoardState.ValidatedPoint originPoint = originPointOption.Value();
+    BattleBoardState.ValidatedPoint targetPoint = targetPointOption.Value();
+    if (originPoint == targetPoint)
       return true;
 
     var delta = target - origin;
@@ -179,18 +154,18 @@ internal sealed class BattleVisibilitySystem
     int stepY = Math.Sign(delta.Y);
     int stepZ = Math.Sign(delta.Z);
 
-    float tMaxX = GetInitialTraversalDistance(origin.X, delta.X, originCell.X);
-    float tMaxY = GetInitialTraversalDistance(origin.Y, delta.Y, originCell.Y);
-    float tMaxZ = GetInitialTraversalDistance(origin.Z, delta.Z, originCell.Z);
+    float tMaxX = GetInitialTraversalDistance(origin.X, delta.X, originPoint.X);
+    float tMaxY = GetInitialTraversalDistance(origin.Y, delta.Y, originPoint.Y);
+    float tMaxZ = GetInitialTraversalDistance(origin.Z, delta.Z, originPoint.Z);
     float tDeltaX = GetTraversalDelta(delta.X);
     float tDeltaY = GetTraversalDelta(delta.Y);
     float tDeltaZ = GetTraversalDelta(delta.Z);
 
-    int currentX = originCell.X;
-    int currentY = originCell.Y;
-    int currentZ = originCell.Z;
+    int currentX = originPoint.X;
+    int currentY = originPoint.Y;
+    int currentZ = originPoint.Z;
 
-    while (currentX != targetCell.X || currentY != targetCell.Y || currentZ != targetCell.Z)
+    while (currentX != targetPoint.X || currentY != targetPoint.Y || currentZ != targetPoint.Z)
     {
       float nextCrossing = Mathf.Min(tMaxX, Mathf.Min(tMaxY, tMaxZ));
       if (float.IsPositiveInfinity(nextCrossing))
@@ -214,12 +189,11 @@ internal sealed class BattleVisibilitySystem
         tMaxZ += tDeltaZ;
       }
 
-      var currentCell = new Vector3I(currentX, currentY, currentZ);
-      Option<BattleBoardState.ValidatedPoint> currentPointOption = board.ValidatePoint(currentCell);
+      Option<BattleBoardState.ValidatedPoint> currentPointOption = board.ValidatePoint(new(currentX, currentY, currentZ));
       if (currentPointOption.IsNone)
         return false;
       BattleBoardState.ValidatedPoint currentPoint = currentPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
-      if (currentCell == targetCell)
+      if (currentPoint == targetPoint)
         return true;
 
       if (board.GetTile(currentPoint).BlocksLineOfSight)
@@ -227,14 +201,6 @@ internal sealed class BattleVisibilitySystem
     }
 
     return true;
-  }
-
-  private static Vector3I ToTileCoordinates(Vector3 point)
-  {
-    return new Vector3I(
-      Mathf.FloorToInt(point.X),
-      Mathf.FloorToInt(point.Y),
-      Mathf.FloorToInt(point.Z));
   }
 
   private static float GetInitialTraversalDistance(float originComponent, float deltaComponent, int originCell)

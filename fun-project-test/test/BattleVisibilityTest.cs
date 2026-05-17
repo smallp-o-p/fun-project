@@ -25,6 +25,21 @@ public class BattleVisibilityTest
     Assert.True(GetValue(Query(session, new IsUnitVisibleToFaction(playerFaction, target.State))));
   }
 
+  [TestCase(TestName = "Unit state tracks currently visible units")]
+  public void UnitStateTracksCurrentlyVisibleUnits()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
+    var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
+
+    StartBattle(session);
+
+    Assert.True(observer.State.VisibleUnits.Contains(target.State));
+    Assert.True(observer.State.VisibleTiles.Contains(ValidateTile(session, new Vector3I(2, 0, 0))));
+  }
+
   [TestCase(TestName = "Blocking tiles break line of sight")]
   public void BlockingTilesBreakLineOfSight()
   {
@@ -81,9 +96,9 @@ public class BattleVisibilityTest
 
     StartBattle(session);
 
-    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, new Vector3I(1, 0, 0)))));
-    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, new Vector3I(4, 0, 3)))));
-    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, new Vector3I(2, 0, 2)))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(1, 0, 0))))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(4, 0, 3))))));
+    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(2, 0, 2))))));
   }
 
   [TestCase(TestName = "Tile visibility includes tiles at the edge of vision range")]
@@ -95,8 +110,8 @@ public class BattleVisibilityTest
 
     StartBattle(session);
 
-    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, new Vector3I(3, 0, 0)))));
-    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, new Vector3I(4, 0, 0)))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(3, 0, 0))))));
+    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(4, 0, 0))))));
   }
 
   [TestCase(TestName = "Explored tiles persist after they leave current visibility")]
@@ -105,7 +120,7 @@ public class BattleVisibilityTest
     var playerFaction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 3), [playerFaction]);
     var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Scout", playerFaction, vision: 2), new Vector3I(1, 0, 1));
-    var tile = new Vector3I(3, 0, 1);
+    BattleBoardState.ValidatedPoint tile = ValidateTile(session, new Vector3I(3, 0, 1));
 
     StartBattle(session);
     Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, tile))));
@@ -200,6 +215,11 @@ public class BattleVisibilityTest
 
     Assert.False(GetValue(Query(session, new IsUnitVisibleToFaction(playerFaction, target.State))));
     Assert.Equal(0, GetValue(Query(session, new GetVisibleUnitsForFaction(playerFaction))).Count);
+  }
+
+  private static BattleBoardState.ValidatedPoint ValidateTile(BattleSession session, Vector3I tile)
+  {
+    return session.Board.ValidatePoint(tile).RequireSome();
   }
 
 }
