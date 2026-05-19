@@ -44,6 +44,7 @@ flowchart LR
 
     subgraph Presentation["Godot Presentation / Input"]
         SceneController["BattleSceneController\ninput translation,\nselection UX, camera"]
+        EventSignalHandler["BattleEventSignalHandler\nruntime binding,\nGodot signals"]
         BattleScene["BattleScene / scene nodes\nmap visuals, units, VFX"]
         HUD["Battle HUD\naction buttons, turn controls,\npreviews"]
     end
@@ -71,8 +72,9 @@ flowchart LR
     Actions -->|"execute against"| BattleSession
     QueryRunner -->|"invoke"| Queries
 
-    EventStream -->|"BattleEventCommitted"| BattleScene
-    EventStream -->|"BattleEventCommitted"| HUD
+    EventStream -->|"BattleEventCommitted"| EventSignalHandler
+    EventSignalHandler -->|"Godot signal"| BattleScene
+    EventSignalHandler -->|"Godot signal"| HUD
 ```
 
 ## Ownership Rules
@@ -121,6 +123,10 @@ flowchart LR
   - previews
   - camera behavior
   - presentation timing
+- `BattleEventSignalHandler` owns:
+  - binding and unbinding a `BattleRuntime`
+  - adapting runtime events into Godot signals
+  - wrapping domain events and action results in Godot-compatible signal payloads
 - `BattleSession` does not track a selected unit. Selection is presentation state.
 - `BattleSession` should not grow a public method for every controller, HUD, or AI question.
 - Inventory currently lives on `BattleUnitState`. There is no separate `BattleItemState` runtime layer yet.
@@ -297,6 +303,22 @@ The executor does not currently:
 
 - own selection logic
 - mutate session state directly outside action execution
+
+### BattleEventSignalHandler
+
+`BattleEventSignalHandler` is the current Godot-side signal boundary over `BattleRuntime`. Scene code binds it to a runtime and listens to Godot signals instead of subscribing directly to pure C# backend events.
+
+Current responsibilities:
+
+- `Bind(BattleRuntime runtime)`
+- `Unbind()`
+- `PresentationEventCommitted` Godot signal
+- `ActionStarted` Godot signal
+- `ActionCompleted` Godot signal
+
+The handler wraps committed `BattleEvent` values in a single `BattleEventAdapter` `RefCounted` envelope. That keeps signal payloads Godot-compatible while preserving access to the original committed event for C# presentation code. Scene components that need read data should call `BattleRuntime.Query(...)` directly and handle the query result shape from the backend.
+
+The handler should stay focused on signal adaptation. It should not validate battle legality, mutate `BattleSession`, cache authoritative state, own query helpers, or become the owner of selected-unit UX. Those responsibilities belong to actions, the session, read queries, and scene controllers respectively.
 
 ## Representative Flow: Current Move Command
 
