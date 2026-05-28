@@ -18,4 +18,4 @@ This project is a turn-based, X-COM style game made with Godot 4 and C# .NET 10.
 - Design for simplicity, reusability and ease of expansion
 - Before implementing a change, iterate on the implementation details with the developer
 - For larger changes, split the task into multiple subtasks and use subagents if they can meaningfully accelerate implementation time
-- After implementing a change, launch a review agent that focuses on code simplicity, clarity, and maintainability and implement its suggested changes
+- After implementing a change, launch a review agent that focuses on code simplicity, clarity, and maintainability and implement its suggested changes. Explain to the subagent the intent of the change, and the implementation strategy.

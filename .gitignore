@@ -17,3 +17,4 @@ fun-project-test/obj
 docs/superpowers/**
 DemoBattle*
 *.lscache
+graphify-out/
