@@ -22,7 +22,7 @@ public class WeaponSystemTest
     CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
     RangeStat = new RangeStat { BaseValue = 1 },
     AmmunitionStat = new AmmunitionStat { BaseValue = 12 },
-    DefaultAmmoData = new AmmunitionData(),
+    DefaultAmmoData = new Ammunition(),
     ModSlotCount = 1
   };
 
@@ -64,7 +64,7 @@ public class WeaponSystemTest
       DamageStat = new DamageStat { BaseValue = 15 },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 10 },
       RangeStat = new RangeStat { BaseValue = 20 },
-      DefaultAmmoData = new AmmunitionData(),
+      DefaultAmmoData = new Ammunition(),
       AmmunitionStat = new AmmunitionStat { BaseValue = 12 },
       ModSlotCount = 0,
     };
@@ -454,10 +454,9 @@ public class WeaponSystemTest
   [TestCase(TestName = "Ammunition struct copies data from AmmunitionData")]
   public void AmmunitionStructCopiesDataFromAmmunitionData()
   {
-    var ammoData = new AmmunitionData { Name = "AP Round", Description = "Armor-piercing ammo" };
-    var ammo = new Ammunition(ammoData);
-    Assert.Equal("AP Round", ammo.AmmoName);
-    Assert.Equal("Armor-piercing ammo", ammo.AmmoDescription);
+    var ammo = new Ammunition { Name = "AP Round", Description = "Armor-piercing ammo" };
+    Assert.Equal("AP Round", ammo.Name);
+    Assert.Equal("Armor-piercing ammo", ammo.Description);
   }
 
   [TestCase(TestName = "FirearmWeapon initializes AmmoType from DefaultAmmoData")]
@@ -465,7 +464,7 @@ public class WeaponSystemTest
   {
     var data = new FirearmWeaponData
     {
-      DefaultAmmoData = new AmmunitionData { Name = "Standard", Description = "Standard issue rounds" },
+      DefaultAmmoData = new Ammunition { Name = "Standard", Description = "Standard issue rounds" },
       DamageStat = new DamageStat { BaseValue = 10 },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
       RangeStat = new RangeStat { BaseValue = 15 },
@@ -473,23 +472,23 @@ public class WeaponSystemTest
       ModSlotCount = 0,
     };
     var weapon = new FirearmWeapon(data);
-    Assert.Equal("Standard", weapon.AmmoType.AmmoName);
-    Assert.Equal("Standard issue rounds", weapon.AmmoType.AmmoDescription);
+    Assert.Equal("Standard", weapon.AmmoType.Name);
+    Assert.Equal("Standard issue rounds", weapon.AmmoType.Description);
   }
 
   [TestCase(TestName = "FirearmWeapon AmmoType can be reassigned")]
   public void FirearmWeaponAmmoTypeCanBeReassigned()
   {
     var weapon = new FirearmWeapon(MakeFirearmWeaponData());
-    var newAmmo = new Ammunition(new AmmunitionData { Name = "Incendiary" });
+    var newAmmo = new Ammunition { Name = "Incendiary" };
     weapon.AmmoType = newAmmo;
-    Assert.Equal("Incendiary", weapon.AmmoType.AmmoName);
+    Assert.Equal("Incendiary", weapon.AmmoType.Name);
   }
 
   [TestCase(TestName = "Ammunition struct inherits StatModifier array from AmmunitionData")]
   public void AmmunitionStructInheritsStatModifierArrayFromAmmunitionData()
   {
-    var ammoData = new AmmunitionData
+    var ammo = new Ammunition
     {
       Name = "+Damage Ammo",
       Modifiers =
@@ -500,8 +499,7 @@ public class WeaponSystemTest
         }
       ]
     };
-    var ammo = new Ammunition(ammoData);
-    Assert.Equal(1, ammo.statModifiers.Count);
+    Assert.Equal(1, ammo.Modifiers.Count);
   }
 
   [TestCase(TestName = "AmmunitionedWeaponData holds AmmunitionStat and DefaultAmmoData")]
@@ -510,7 +508,7 @@ public class WeaponSystemTest
     var data = new AmmunitionedWeaponData
     {
       AmmunitionStat = new AmmunitionStat { BaseValue = 6 },
-      DefaultAmmoData = new AmmunitionData { Name = "Test Ammo" },
+      DefaultAmmoData = new Ammunition { Name = "Test Ammo" },
       DamageStat = new DamageStat { BaseValue = 20 },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 10 },
       RangeStat = new RangeStat { BaseValue = 5 },

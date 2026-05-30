@@ -5,5 +5,5 @@ namespace FunProject.Weapons;
 public partial class AmmunitionedWeaponData : WeaponData
 {
   [Export] required public Stats.AmmunitionStat AmmunitionStat { get; set; }
-  [Export] required public AmmunitionData DefaultAmmoData { get; set; }
+  [Export] required public Ammunition DefaultAmmoData { get; set; }
 }

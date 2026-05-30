@@ -1,12 +1,13 @@
-using System;
+using System.Diagnostics.CodeAnalysis;
+using FunProject.Core;
 using FunProject.Stats;
+using Godot;
 using Godot.Collections;
-
 namespace FunProject.Weapons;
 
-public struct Ammunition(AmmunitionData data)
+[GlobalClass]
+[method: SetsRequiredMembers]
+public partial class Ammunition() : NamedEntityData
 {
-  public Array<StatMod> statModifiers = data.Modifiers;
-  public string AmmoName = data.Name;
-  public string AmmoDescription = data.Description;
+  [Export] required public Array<StatMod> Modifiers { get; set; } = [];
 };

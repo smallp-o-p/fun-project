@@ -1,7 +1,7 @@
+using FunProject.Combatants;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
 namespace FunProject.Battle;
 
 public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>

@@ -1,8 +1,9 @@
-using FunProject.Combatants;
 using FunProject.Core;
 using FunProject.Stats;
 using Godot;
 using Godot.Collections;
+
+namespace FunProject.Combatants;
 
 [GlobalClass]
 public partial class FactionData : NamedEntityData

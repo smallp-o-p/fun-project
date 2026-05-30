@@ -71,5 +71,5 @@ public class AmmunitionedWeapon : Weapon
 public class FirearmWeapon(FirearmWeaponData data) : AmmunitionedWeapon(data)
 {
   public FirearmArchetype Archetype { get; set; } = data.Archetype;
-  public Ammunition AmmoType { get; set; } = new Ammunition(data.DefaultAmmoData);
+  public Ammunition AmmoType { get; set; } = data.DefaultAmmoData;
 }

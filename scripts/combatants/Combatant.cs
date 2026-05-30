@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using FunProject.Stats;
-using Godot;
 
 namespace FunProject.Combatants;
 
