@@ -450,8 +450,16 @@ public class BattleSessionTest
     Assert.True(moved.Succeeded);
     Assert.Equal(new Vector3I(1, 0, 0), session.GetUnitPosition(unit.State).RequireSome().Raw);
 
+    BattleBoardState.ValidatedPoint destination = session.Board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome();
+    Assert.Equal(unit.State, session.GetUnitAt(destination).RequireSome());
+
     ApplyDamage(session, unit.State, 10);
-    Assert.Equal(new Vector3I(1, 0, 0), session.GetUnitPosition(unit.State).RequireSome().Raw);
+    Assert.True(session.GetUnitPosition(unit.State).IsNone);
+    Assert.True(session.GetUnitAt(destination).IsNone);
+
+    var replacement = SpawnUnit(session, BattleTestFactory.MakeCombatant("Replacement", faction, health: 10), new Vector3I(1, 0, 0));
+    Assert.Equal(replacement.State, session.GetUnitAt(destination).RequireSome());
+    Assert.Equal(new Vector3I(1, 0, 0), session.GetUnitPosition(replacement.State).RequireSome().Raw);
   }
 
   [TestCase(TestName = "MoveUnit treats route entries as destinations from the current position")]

@@ -34,7 +34,6 @@ flowchart LR
         BoardState["BattleBoardState\nBattleTileState[x,y,z]\noccupancy + spatial path queries"]
         UnitState["BattleUnitState[]\nAP, health,\ninventory refs,\ncurrent visibility"]
         VisibilityMemory["Explored tile memory\nper faction"]
-        VisibilitySystem["BattleVisibilitySystem\ntile-based LOS + unit FOV refresh"]
         EventStream["BattleEvent stream"]
         Actions["BattleAction\nqueued intent + primitive commands"]
         ActionExecutor["BattleActionExecutor\naction queue + invocation"]
@@ -55,9 +54,7 @@ flowchart LR
     BattleSession --- UnitState
     BattleSession --- VisibilityMemory
     BattleSession --- EventStream
-    VisibilitySystem -->|"refresh"| UnitState
-    VisibilitySystem -->|"merge"| VisibilityMemory
-    Actions -->|"refresh on success"| VisibilitySystem
+    Actions -->|"refresh visibility on success"| BattleSession
     Queries -->|"read only"| BattleSession
     Queries -->|"read only"| BoardState
     Queries -->|"read only"| UnitState
@@ -90,6 +87,7 @@ flowchart LR
   - alive and dead unit bookkeeping
   - current-turn unit availability
   - faction explored-tile memory
+  - tile visibility refresh
   - authoritative battle event emission
 - `BattleBoardState` owns:
   - tile storage
@@ -98,11 +96,6 @@ flowchart LR
   - occupant placement, movement, and removal
   - board-local pathfinding queries
 - `BattleAction` owns action-specific application and any composite action sequencing after executor-side validation succeeds.
-- `BattleVisibilitySystem` owns:
-  - tile-based line-of-sight checks
-  - tile visibility checks
-  - deriving visible units from visible tiles
-  - refreshing current unit visibility from session state
 - `BattleActionExecutor` owns:
   - preview validation for supported primitive actions
   - the pending action queue
@@ -242,14 +235,16 @@ Each query should encode one question. Avoid catch-all query classes with enum m
 
 Pathfinding is currently integrated directly into the board through Godot `AStar3D`. Query objects should be the controller-facing surface for unit-specific path questions, for example `FindPathForUnit` and `GetPossibleMoveTilesForUnit`. If path rules become substantially more unit-specific later, this can be extracted behind a movement-query strategy without changing the controller-facing query contract.
 
-### BattleVisibilitySystem
+### BattleSession Visibility
 
-`BattleVisibilitySystem` is now a first-class runtime subsystem.
+`BattleSession` owns visibility refresh because visibility is derived from session-owned unit positions, tile state, and faction explored-tile memory.
 
 Current behavior:
 
 - uses `VisionStat` as the maximum sight range per unit
-- traces LOS from tile center to tile center
+- flood-fills visible tiles through same-level orthogonal neighbors inside the observer's vision range
+- treats whole-tile LOS blockers as visible, then stops visibility expansion past that blocker
+- includes same-level adjacent diagonal tiles as visible without using them as flood-fill expansion points
 - treats units as visible when they stand on a currently visible tile
 - stores each unit's current visible `BattleBoardState.ValidatedPoint`s and visible `BattleUnitState` handles on `BattleUnitState`
 - stores explored `BattleBoardState.ValidatedPoint` memory per faction on `BattleSession`

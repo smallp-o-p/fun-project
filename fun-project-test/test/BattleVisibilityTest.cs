@@ -2,7 +2,6 @@ using FunProject.Battle;
 using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using System.Linq;
 using static BattleActionTestHelper;
 using static BattleQueryTestHelper;
 
@@ -56,8 +55,110 @@ public class BattleVisibilityTest
     Assert.False(GetValue(Query(session, new IsUnitVisibleToFaction(playerFaction, target.State))));
   }
 
-  [TestCase(TestName = "Vertical line of sight works across levels")]
-  public void VerticalLineOfSightWorksAcrossLevels()
+  [TestCase(TestName = "Blocking tiles are visible but flood fill can route around them")]
+  public void BlockingTilesAreVisibleButFloodFillCanRouteAroundThem()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 2), [playerFaction]);
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 0, 0));
+    BattleBoardState.ValidatedPoint blockingTile = ValidateTile(session, new Vector3I(1, 0, 0));
+    BattleBoardState.ValidatedPoint shadowedTile = ValidateTile(session, new Vector3I(2, 0, 0));
+    BattleBoardState.ValidatedPoint adjacentDirectionTile = ValidateTile(session, new Vector3I(0, 0, 1));
+
+    session.Board.GetTile(blockingTile).BlocksLineOfSight = true;
+    StartBattle(session);
+
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, blockingTile))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, shadowedTile))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, adjacentDirectionTile))));
+  }
+
+  [TestCase(TestName = "Zero vision units see only their own tile")]
+  public void ZeroVisionUnitsSeeOnlyTheirOwnTile()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 1), [playerFaction]);
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 0), new Vector3I(0, 0, 0));
+    BattleBoardState.ValidatedPoint observerTile = ValidateTile(session, new Vector3I(0, 0, 0));
+    BattleBoardState.ValidatedPoint adjacentTile = ValidateTile(session, new Vector3I(1, 0, 0));
+
+    StartBattle(session);
+
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, observerTile))));
+    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, adjacentTile))));
+  }
+
+  [TestCase(TestName = "Adjacent diagonal tiles remain visible around corners")]
+  public void AdjacentDiagonalTilesRemainVisibleAroundCorners()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2), [playerFaction]);
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 0, 0));
+    BattleBoardState.ValidatedPoint blockingTile = ValidateTile(session, new Vector3I(1, 0, 0));
+    BattleBoardState.ValidatedPoint diagonalTile = ValidateTile(session, new Vector3I(1, 0, 1));
+
+    session.Board.GetTile(blockingTile).BlocksLineOfSight = true;
+    StartBattle(session);
+
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, blockingTile))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, diagonalTile))));
+  }
+
+  [TestCase(TestName = "Diagonal corner peeking does not reveal tiles behind blockers")]
+  public void DiagonalCornerPeekingDoesNotRevealTilesBehindBlockers()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 2), [playerFaction]);
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 0, 0));
+    BattleBoardState.ValidatedPoint firstBlockingTile = ValidateTile(session, new Vector3I(1, 0, 0));
+    BattleBoardState.ValidatedPoint secondBlockingTile = ValidateTile(session, new Vector3I(1, 0, 1));
+    BattleBoardState.ValidatedPoint hiddenTile = ValidateTile(session, new Vector3I(2, 0, 1));
+
+    session.Board.GetTile(firstBlockingTile).BlocksLineOfSight = true;
+    session.Board.GetTile(secondBlockingTile).BlocksLineOfSight = true;
+    StartBattle(session);
+
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, firstBlockingTile))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, secondBlockingTile))));
+    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, hiddenTile))));
+  }
+
+  [TestCase(TestName = "Adjacent diagonal peeking does not see through sealed corners")]
+  public void AdjacentDiagonalPeekingDoesNotSeeThroughSealedCorners()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2), [playerFaction]);
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 0, 0));
+    BattleBoardState.ValidatedPoint firstBlockingTile = ValidateTile(session, new Vector3I(1, 0, 0));
+    BattleBoardState.ValidatedPoint secondBlockingTile = ValidateTile(session, new Vector3I(0, 0, 1));
+    BattleBoardState.ValidatedPoint sealedCornerTile = ValidateTile(session, new Vector3I(1, 0, 1));
+
+    session.Board.GetTile(firstBlockingTile).BlocksLineOfSight = true;
+    session.Board.GetTile(secondBlockingTile).BlocksLineOfSight = true;
+    StartBattle(session);
+
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, firstBlockingTile))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, secondBlockingTile))));
+    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, sealedCornerTile))));
+  }
+
+  [TestCase(TestName = "Visibility does not spread below the observer")]
+  public void VisibilityDoesNotSpreadBelowTheObserver()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(1, 2, 1), [playerFaction, enemyFaction]);
+    var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 1, 0));
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(0, 0, 0));
+
+    StartBattle(session);
+
+    Assert.False(GetValue(Query(session, new IsUnitVisibleToUnit(observer.State, target.State))));
+    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(0, 0, 0))))));
+  }
+
+  [TestCase(TestName = "Visibility does not spread above the observer")]
+  public void VisibilityDoesNotSpreadAboveTheObserver()
   {
     var playerFaction = BattleTestFactory.MakeFaction("Player");
     var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
@@ -67,7 +168,8 @@ public class BattleVisibilityTest
 
     StartBattle(session);
 
-    Assert.True(GetValue(Query(session, new IsUnitVisibleToUnit(observer.State, target.State))));
+    Assert.False(GetValue(Query(session, new IsUnitVisibleToUnit(observer.State, target.State))));
+    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(0, 2, 0))))));
   }
 
   [TestCase(TestName = "Vision stat changes which targets are visible")]

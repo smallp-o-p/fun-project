@@ -30,7 +30,7 @@ The current runtime already treats the battlescape as a 3D tile board:
 
 - `BattleBoardState` owns a `BattleTileState` for every `Vector3I` coordinate
 - `BattleTileState` already owns walkability, line-of-sight blocking, hazard state, and occupancy
-- `BattleVisibilitySystem` already performs tile-based line-of-sight queries from tile center to tile center
+- visibility flood-fills through same-level orthogonal neighbors inside the observer's vision range, with adjacent diagonals visible for corner peeking
 
 This means the tile system is not a new abstraction. It is an extension of the runtime model that already exists.
 

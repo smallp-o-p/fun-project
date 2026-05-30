@@ -20,13 +20,26 @@ public sealed class BattleSession
   internal readonly record struct SpawnedBattleUnit(BattleUnitState Unit);
 
   public const int DefaultMovementStepActionPointCost = 1;
-  private static readonly BattleVisibilitySystem VisibilitySystem = new();
   private static readonly IReadOnlySet<BattleBoardState.ValidatedPoint> EmptyTileSet = new SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>();
+  private static readonly Vector3I[] OrthogonalDirections =
+  [
+    new(1, 0, 0),
+    new(-1, 0, 0),
+    new(0, 0, 1),
+    new(0, 0, -1),
+  ];
+  private static readonly Vector3I[] AdjacentDiagonalOffsets =
+  [
+    new(-1, 0, -1),
+    new(-1, 0, 1),
+    new(1, 0, -1),
+    new(1, 0, 1),
+  ];
 
   private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleUnitState>> _aliveUnitsByFaction = [];
   private readonly Dictionary<Faction, IReadOnlyList<Combatant>> _factionRosters = [];
   private readonly List<BattleUnitState> _units = [];
-  private readonly Dictionary<BattleUnitState, BattleBoardState.ValidatedPoint> _unitToPosition = [];
+  private readonly UnitPositionIndex _unitPositions = new();
   private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>> _exploredTilesByFaction = [];
   private readonly Queue<Faction> _globalFactionOrder = [];
   private Queue<Faction> _turnQueue = [];
@@ -174,7 +187,7 @@ public sealed class BattleSession
       throw new InvalidOperationException($"Could not place unit {unit.Id} at {position.Raw}.");
 
     _units.Add(unit);
-    _unitToPosition.Add(unit, position);
+    _unitPositions.Add(unit, position);
 
     if (!_aliveUnitsByFaction.TryGetValue(unit.Side, out var unitsForSide))
     {
@@ -218,6 +231,8 @@ public sealed class BattleSession
     bool occupantCleared = Board.TryClearOccupant(unitPoint, unit.Id);
     if (!occupantCleared)
       throw new InvalidOperationException($"Could not clear unit {unit.Id} from {unitPoint.Raw}.");
+    if (!_unitPositions.Remove(unit))
+      throw new InvalidOperationException($"Could not remove unit {unit.Id} from the session position index.");
 
     if (!_aliveUnitsByFaction.TryGetValue(unit.Side, out var units))
       throw new InvalidOperationException($"Faction {unit.Side.Name} does not have living units to remove.");
@@ -332,7 +347,7 @@ public sealed class BattleSession
     if (!unit.BelongsTo(this))
       throw new InvalidOperationException($"Unit {unit.Id} does not belong to this battle session.");
 
-    if (!_unitToPosition.TryGetValue(unit, out var position))
+    if (!_unitPositions.TryGetUnitPosition(unit, out var position))
       return None;
 
     return Some(position);
@@ -340,17 +355,7 @@ public sealed class BattleSession
 
   internal Option<BattleUnitState> GetUnitAt(BattleBoardState.ValidatedPoint point)
   {
-    BattleTileState tile = Board.GetTile(point);
-
-    return tile.OccupantUnitId.Match(
-      unitId =>
-      {
-        if (unitId < 0 || unitId >= _units.Count)
-          return None;
-
-        return Some(_units[unitId]);
-      },
-      () => None);
+    return _unitPositions.TryGetUnitAt(point, out var unit) ? Some(unit) : None;
   }
 
   internal Option<BattleUnitState> GetUnitAt(Vector3I position)
@@ -365,14 +370,14 @@ public sealed class BattleSession
     ArgumentNullException.ThrowIfNull(unit);
     if (!unit.BelongsTo(this))
       return false;
-    if (!_unitToPosition.TryGetValue(unit, out var trackedPosition))
+    if (!_unitPositions.TryGetUnitPosition(unit, out var trackedPosition))
       return false;
     if (trackedPosition != source)
       return false;
     if (!Board.TryMoveOccupant(source, destination, unit.Id))
       return false;
 
-    _unitToPosition[unit] = destination;
+    _unitPositions.Move(unit, source, destination);
 
     RaiseEvent(new UnitMovedBattleEvent(unit, destination, source));
     RaiseEvent(new TileOccupiedBattleEvent(unit, destination));
@@ -422,7 +427,30 @@ public sealed class BattleSession
 
   internal void RefreshVisibility()
   {
-    VisibilitySystem.Refresh(this);
+    foreach (var unit in Units)
+      unit.ClearVisibility();
+
+    foreach (var observer in AliveUnits)
+    {
+      if (!_unitPositions.TryGetUnitPosition(observer, out var observerPosition))
+        throw new InvalidOperationException($"Living unit {observer.Id} is missing from the session position index.");
+
+      SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> observerVisibleTiles = GetVisibleTiles(observer, observerPosition);
+      foreach (var visibleTile in observerVisibleTiles)
+        observer.AddVisibleTile(visibleTile);
+
+      MarkTilesExplored(observer.Side, observerVisibleTiles);
+
+      foreach (var visibleTile in observerVisibleTiles)
+      {
+        if (!_unitPositions.TryGetUnitAt(visibleTile, out var target))
+          continue;
+        if (ReferenceEquals(target, observer) || target.IsDead)
+          continue;
+
+        observer.AddVisibleUnit(target);
+      }
+    }
   }
 
   internal void MarkTilesExplored(Faction side, IEnumerable<BattleBoardState.ValidatedPoint> tiles)
@@ -437,6 +465,90 @@ public sealed class BattleSession
     }
 
     exploredTiles.UnionWith(tiles);
+  }
+
+  private SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> GetVisibleTiles(
+    BattleUnitState observer,
+    BattleBoardState.ValidatedPoint observerPosition)
+  {
+    ArgumentNullException.ThrowIfNull(observer);
+
+    Queue<BattleBoardState.ValidatedPoint> frontier = new([observerPosition]);
+    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> visited = [];
+    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> visibleTiles = [];
+
+    while (frontier.Count > 0)
+    {
+      var current = frontier.Dequeue();
+      if (!visited.Add(current))
+        continue;
+      if (!IsWithinSameLevelVisionRange(observerPosition, current, observer.Vision))
+        continue;
+
+      visibleTiles.Add(current);
+      bool currentBlocksLineOfSight = current != observerPosition && Board.GetTile(current).BlocksLineOfSight;
+      if (!currentBlocksLineOfSight)
+      {
+        AddAdjacentDiagonalVisibleTiles(observerPosition, current, observer.Vision, visibleTiles);
+        foreach (var neighbor in EnumerateOrthogonalNeighbors(current))
+          frontier.Enqueue(neighbor);
+      }
+    }
+
+    return visibleTiles;
+  }
+
+  private IEnumerable<BattleBoardState.ValidatedPoint> EnumerateOrthogonalNeighbors(BattleBoardState.ValidatedPoint point)
+  {
+    foreach (var direction in OrthogonalDirections)
+    {
+      var neighborOption = Board.ValidatePoint(point.Raw + direction);
+      if (neighborOption.IsSome)
+        yield return neighborOption.Value();
+    }
+  }
+
+  private void AddAdjacentDiagonalVisibleTiles(
+    BattleBoardState.ValidatedPoint observerPosition,
+    BattleBoardState.ValidatedPoint visibleTile,
+    int vision,
+    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> visibleTiles)
+  {
+    foreach (var offset in AdjacentDiagonalOffsets)
+    {
+      Board.ValidatePoint(visibleTile.Raw + offset).IfSome((diagonal) =>
+      {
+        if (IsWithinSameLevelVisionRange(observerPosition, diagonal, vision) && HasOpenDiagonalSide(visibleTile, offset))
+          visibleTiles.Add(diagonal);
+      });
+    }
+  }
+
+  private bool HasOpenDiagonalSide(BattleBoardState.ValidatedPoint source, Vector3I diagonalOffset)
+  {
+    return IsOpenSide(source.Raw + new Vector3I(diagonalOffset.X, 0, 0))
+      || IsOpenSide(source.Raw + new Vector3I(0, 0, diagonalOffset.Z));
+  }
+
+  private bool IsOpenSide(Vector3I coordinates)
+  {
+    return Board.ValidatePoint(coordinates).Match(
+      side => !Board.GetTile(side).BlocksLineOfSight,
+      () => false);
+  }
+
+  private static bool IsWithinSameLevelVisionRange(
+    BattleBoardState.ValidatedPoint observerPosition,
+    BattleBoardState.ValidatedPoint target,
+    int vision)
+  {
+    if (target == observerPosition)
+      return true;
+    if (vision < 0 || target.Y != observerPosition.Y)
+      return false;
+
+    Vector3I delta = target.Raw - observerPosition.Raw;
+    return delta.LengthSquared() <= vision * vision;
   }
 
   private void RebuildRoundQueueFromLivingSides()
@@ -536,5 +648,66 @@ public sealed class BattleSession
     RaiseEvent(new TurnStartedBattleEvent(
       nextSide,
       TurnNumber));
+  }
+
+  private sealed class UnitPositionIndex
+  {
+    private readonly Dictionary<BattleUnitState, BattleBoardState.ValidatedPoint> _positionByUnit = [];
+    private readonly Dictionary<BattleBoardState.ValidatedPoint, BattleUnitState> _unitByPosition = [];
+
+    internal void Add(BattleUnitState unit, BattleBoardState.ValidatedPoint position)
+    {
+      ArgumentNullException.ThrowIfNull(unit);
+      if (_positionByUnit.ContainsKey(unit))
+        throw new InvalidOperationException($"Unit {unit.Id} is already in the session position index.");
+      if (_unitByPosition.ContainsKey(position))
+        throw new InvalidOperationException($"Position {position.Raw} is already occupied in the session position index.");
+
+      _positionByUnit.Add(unit, position);
+      _unitByPosition.Add(position, unit);
+    }
+
+    internal bool TryGetUnitPosition(BattleUnitState unit, out BattleBoardState.ValidatedPoint position)
+    {
+      ArgumentNullException.ThrowIfNull(unit);
+      return _positionByUnit.TryGetValue(unit, out position);
+    }
+
+    internal bool TryGetUnitAt(BattleBoardState.ValidatedPoint position, out BattleUnitState unit)
+    {
+      return _unitByPosition.TryGetValue(position, out unit!);
+    }
+
+    internal void Move(
+      BattleUnitState unit,
+      BattleBoardState.ValidatedPoint source,
+      BattleBoardState.ValidatedPoint destination)
+    {
+      ArgumentNullException.ThrowIfNull(unit);
+      if (!_positionByUnit.TryGetValue(unit, out var indexedSource) || indexedSource != source)
+        throw new InvalidOperationException($"Unit {unit.Id} is not indexed at source position {source.Raw}.");
+      if (!_unitByPosition.TryGetValue(source, out var indexedUnit) || !ReferenceEquals(indexedUnit, unit))
+        throw new InvalidOperationException($"Source position {source.Raw} is not indexed to unit {unit.Id}.");
+      if (source == destination)
+        return;
+      if (_unitByPosition.ContainsKey(destination))
+        throw new InvalidOperationException($"Destination position {destination.Raw} is already occupied in the session position index.");
+
+      _unitByPosition.Remove(source);
+      _unitByPosition.Add(destination, unit);
+      _positionByUnit[unit] = destination;
+    }
+
+    internal bool Remove(BattleUnitState unit)
+    {
+      ArgumentNullException.ThrowIfNull(unit);
+      if (!_positionByUnit.TryGetValue(unit, out var position))
+        return false;
+      if (!_unitByPosition.TryGetValue(position, out var indexedUnit) || !ReferenceEquals(indexedUnit, unit))
+        throw new InvalidOperationException($"Position {position.Raw} is not indexed to unit {unit.Id}.");
+
+      _positionByUnit.Remove(unit);
+      return _unitByPosition.Remove(position);
+    }
   }
 }
