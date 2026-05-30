@@ -5,7 +5,6 @@
 .claude/
 .vscode/
 addons/**/*
-Godot-MCP/**/*
 handoffs/*
 test/TestResults/
 fun-project-test/TestResults/
@@ -18,3 +17,5 @@ docs/superpowers/**
 DemoBattle*
 *.lscache
 graphify-out/
+.openxcom-research/
+Godot-MCP/
