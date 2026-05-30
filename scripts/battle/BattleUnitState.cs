@@ -9,13 +9,11 @@ namespace FunProject.Battle;
 
 public sealed class BattleUnitState
 {
-  private readonly BattleSession _session;
   private readonly List<EquippableItem> _inventory = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
 
   internal int Id { get; }
-  public Option<BattleBoardState.ValidatedPoint> Position => _session.GetUnitPosition(this);
   public Combatant Combatant { get; }
   public Faction Side => Combatant.OwningFaction;
   public Option<Weapon> EquippedWeapon { get; private set; }
@@ -32,34 +30,24 @@ public sealed class BattleUnitState
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
 
-  internal BattleUnitState(BattleSession session, int unitId, Combatant combatant)
-    : this(session, unitId, combatant, None)
+  internal static BattleUnitState Create(
+    int unitId,
+    Combatant combatant,
+    Option<Weapon> equippedWeapon)
   {
+    return new BattleUnitState(unitId, combatant, equippedWeapon);
   }
 
-  internal BattleUnitState(BattleSession session, int unitId, Combatant combatant, Weapon equippedWeapon)
-    : this(session, unitId, combatant, Some(equippedWeapon))
+  private BattleUnitState(int unitId, Combatant combatant, Option<Weapon> equippedWeapon)
   {
-  }
-
-  internal BattleUnitState(BattleSession session, int unitId, Combatant combatant, Option<Weapon> equippedWeapon)
-  {
-    ArgumentNullException.ThrowIfNull(session);
     ArgumentOutOfRangeException.ThrowIfLessThan(unitId, 0);
 
-    _session = session;
     Id = unitId;
     ArgumentNullException.ThrowIfNull(combatant);
     Combatant = combatant;
     EquippedWeapon = equippedWeapon;
     CurrentHealth = MaxHealth;
     CurrentActionPoints = MaxActionPoints;
-  }
-
-  internal bool BelongsTo(BattleSession session)
-  {
-    ArgumentNullException.ThrowIfNull(session);
-    return ReferenceEquals(_session, session);
   }
 
   public void RefreshForNewTurn()

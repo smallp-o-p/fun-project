@@ -23,8 +23,6 @@ public sealed class FindPathForUnit : BattleSessionQuery<BattleBoardState.Valida
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    if (!Unit.BelongsTo(session))
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {Unit.Id}.");
     if (!Unit.IsAlive)
       return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {Unit.Id} is not alive.");
 
@@ -67,8 +65,6 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    if (!Unit.BelongsTo(session))
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {Unit.Id}.");
     if (!Unit.IsAlive)
       return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {Unit.Id} is not alive.");
     if (Unit.CurrentActionPoints < ActionPointCostPerStep)

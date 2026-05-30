@@ -62,10 +62,6 @@ public abstract class BattleAction
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentOutOfRangeException.ThrowIfLessThan(actionPointCost, 0);
 
-    if (!unit.BelongsTo(session))
-      return Left<BattleActionResult, BattleUnitState>(
-        BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unknown unit id {unit.Id}."));
-
     if (session.Phase != BattlePhase.InProgress)
       return Left<BattleActionResult, BattleUnitState>(
         BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, "Battle is not in progress."));
@@ -216,7 +212,7 @@ public sealed class MoveUnit : BattleAction
         return None;
       }
 
-      if (!Unit.BelongsTo(session) || !Unit.IsAlive)
+      if (!Unit.IsAlive)
       {
         MarkCancelled();
         return None;

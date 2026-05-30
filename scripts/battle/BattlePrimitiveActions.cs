@@ -199,8 +199,6 @@ public sealed class ApplyDamage : BattleAction
   public override BattleActionResult Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
-    if (!Unit.BelongsTo(session))
-      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unknown unit id {Unit.Id}.");
     if (!Unit.IsAlive)
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit {Unit.Id} is not alive.");
 

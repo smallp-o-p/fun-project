@@ -128,7 +128,7 @@ public sealed class BattleSession
   internal bool IsUnitStillAvailableThisTurn(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
-    return unit.BelongsTo(this) && _activeFactionUnitsAvailable.Contains(unit);
+    return _activeFactionUnitsAvailable.Contains(unit);
   }
 
   internal bool TryStartBattle()
@@ -181,7 +181,7 @@ public sealed class BattleSession
   {
     ArgumentNullException.ThrowIfNull(combatant);
 
-    var unit = new BattleUnitState(this, _units.Count, combatant, equippedWeapon);
+    var unit = BattleUnitState.Create(_units.Count, combatant, equippedWeapon);
     bool occupantSet = Board.TryPlaceOccupant(position, unit.Id);
     if (!occupantSet)
       throw new InvalidOperationException($"Could not place unit {unit.Id} at {position.Raw}.");
@@ -247,8 +247,6 @@ public sealed class BattleSession
   internal void RemoveAvailableUnit(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
-    if (!unit.BelongsTo(this))
-      throw new InvalidOperationException("Unit does not belong to this battle session.");
 
     if (!_activeFactionUnitsAvailable.Remove(unit))
       throw new InvalidOperationException($"Unit {unit.Id} is not available this turn.");
@@ -344,8 +342,6 @@ public sealed class BattleSession
   internal Option<BattleBoardState.ValidatedPoint> GetUnitPosition(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
-    if (!unit.BelongsTo(this))
-      throw new InvalidOperationException($"Unit {unit.Id} does not belong to this battle session.");
 
     if (!_unitPositions.TryGetUnitPosition(unit, out var position))
       return None;
@@ -368,8 +364,6 @@ public sealed class BattleSession
   internal bool TryMoveUnit(BattleUnitState unit, BattleBoardState.ValidatedPoint source, BattleBoardState.ValidatedPoint destination)
   {
     ArgumentNullException.ThrowIfNull(unit);
-    if (!unit.BelongsTo(this))
-      return false;
     if (!_unitPositions.TryGetUnitPosition(unit, out var trackedPosition))
       return false;
     if (trackedPosition != source)

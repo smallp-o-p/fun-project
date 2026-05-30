@@ -11,21 +11,6 @@ using static BattleQueryTestHelper;
 [RequireGodotRuntime]
 public class BattleSessionQueriesTest
 {
-  [TestCase(TestName = "Query runner returns failure object for foreign unit")]
-  public void QueryRunnerReturnsFailureObjectForForeignUnit()
-  {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var foreignSession = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var foreignUnit = SpawnUnit(foreignSession, BattleTestFactory.MakeCombatant("Foreign", faction), new Vector3I(0, 0, 0));
-
-    Either<BattleQueryFailure, BattleBoardState.ValidatedPoint> result = Query(session, new GetUnitPosition(foreignUnit.State));
-
-    Assert.True(result.IsLeft);
-    BattleQueryFailure failure = GetFailure(result);
-    Assert.Equal(BattleQueryFailureReason.UnknownUnit, failure.Reason);
-  }
-
   [TestCase(TestName = "FindPathForUnit returns a successful path result")]
   public void FindPathForUnitReturnsASuccessfulPathResult()
   {

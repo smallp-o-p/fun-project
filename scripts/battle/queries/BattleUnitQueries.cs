@@ -21,8 +21,6 @@ public sealed class GetUnitPosition : BattleSessionQuery<BattleBoardState.Valida
   internal override Either<BattleQueryFailure, BattleBoardState.ValidatedPoint> Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
-    if (!Unit.BelongsTo(session))
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {Unit.Id}.");
 
     return session.GetUnitPosition(Unit).Match(
       Succeed,
@@ -110,8 +108,6 @@ public sealed class CanUnitActNow : BattleSessionQuery<bool>
 
     if (session.Phase != BattlePhase.InProgress)
       return Fail(BattleQueryFailureReason.InvalidBattleState, "Cannot query active unit state while the battle is not in progress.");
-    if (!Unit.BelongsTo(session))
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {Unit.Id}.");
     if (!Unit.IsAlive)
       return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {Unit.Id} is not alive.");
 
@@ -138,8 +134,6 @@ public sealed class IsUnitStillAvailableThisTurn : BattleSessionQuery<bool>
 
     if (session.Phase != BattlePhase.InProgress)
       return Fail(BattleQueryFailureReason.InvalidBattleState, "Cannot query unit turn availability while the battle is not in progress.");
-    if (!Unit.BelongsTo(session))
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Unknown unit id {Unit.Id}.");
     if (!Unit.IsAlive)
       return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {Unit.Id} is not alive.");
 

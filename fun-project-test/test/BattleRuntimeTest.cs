@@ -23,15 +23,12 @@ public sealed partial class BattleRuntimeTest
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var foreignSession = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var foreignUnit = SpawnUnit(foreignSession, BattleTestFactory.MakeCombatant("Foreign", faction), new Vector3I(0, 0, 0));
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 0));
     var runtime = new BattleRuntime(session);
 
-    Either<BattleQueryFailure, BattleBoardState.ValidatedPoint> result = runtime.Query(new GetUnitPosition(foreignUnit.State));
+    BattleBoardState.ValidatedPoint result = GetValue(runtime.Query(new GetUnitPosition(unit.State)));
 
-    Assert.True(result.IsLeft);
-    BattleQueryFailure failure = GetFailure(result);
-    Assert.Equal(BattleQueryFailureReason.UnknownUnit, failure.Reason);
+    Assert.Equal(new Vector3I(1, 0, 0), result.Raw);
   }
 
   [TestCase(TestName = "BattleSession does not expose Queries as public property")]

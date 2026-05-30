@@ -53,34 +53,6 @@ public class BattleSessionTest
     Assert.Equal(1, second.UnitId);
   }
 
-  [TestCase(TestName = "BattleUnitState reads its current position from the owning session")]
-  public void BattleUnitStateReadsItsCurrentPositionFromTheOwningSession()
-  {
-    var faction = BattleTestFactory.MakeFaction("City Guard");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 4), new Vector3I(0, 0, 0));
-    StartBattle(session);
-
-    Assert.Equal(new Vector3I(0, 0, 0), unit.State.Position.RequireSome().Raw);
-
-    var result = new BattleActionExecutor(session)
-      .Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 0, 0)]))
-      .RequireSingleResult();
-
-    Assert.True(result.Succeeded);
-    Assert.Equal(new Vector3I(1, 0, 0), unit.State.Position.RequireSome().Raw);
-  }
-
-  [TestCase(TestName = "GetUnitPosition throws when the unit belongs to another session")]
-  public void GetUnitPositionThrowsWhenTheUnitBelongsToAnotherSession()
-  {
-    var faction = BattleTestFactory.MakeFaction("City Guard");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var foreignSession = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var foreignUnit = SpawnUnit(foreignSession, BattleTestFactory.MakeCombatant("Foreign", faction), new Vector3I(0, 0, 0));
-
-    Assert.Throws<InvalidOperationException>(() => session.GetUnitPosition(foreignUnit.State));
-  }
 
   [TestCase(TestName = "SpawnUnit rejects occupied tile")]
   public void SpawnUnitRejectsOccupiedTile()
@@ -653,18 +625,6 @@ public class BattleSessionTest
     Assert.Equal(1, session.AliveUnits.Count());
     Assert.True(session.AliveUnits.Contains(occupiedUnit));
     Assert.False(session.AliveUnits.Any(unit => unit.Combatant.Name == "Bravo"));
-  }
-
-  [TestCase(TestName = "HandleUnitDeath throws when the unit is not tracked as alive")]
-  public void HandleUnitDeathThrowsWhenUnitIsNotTrackedAsAlive()
-  {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var foreignSession = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var unit = SpawnUnit(foreignSession, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
-
-    Assert.Throws<InvalidOperationException>(() => session.HandleUnitDeath(unit));
-    Assert.False(session.DeadUnits.Contains(unit));
   }
 
   [TestCase(TestName = "RemoveAvailableUnit throws when the unit is already unavailable")]

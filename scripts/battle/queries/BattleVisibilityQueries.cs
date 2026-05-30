@@ -26,12 +26,12 @@ public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    Option<BattleQueryFailure> observerFailure = ValidateLivingUnit(session, ObserverUnit, "Observer");
+    Option<BattleQueryFailure> observerFailure = ValidateLivingUnit(ObserverUnit, "Observer");
     return observerFailure.Match(
       Fail,
       () =>
       {
-        Option<BattleQueryFailure> targetFailure = ValidateLivingUnit(session, TargetUnit, "Target");
+        Option<BattleQueryFailure> targetFailure = ValidateLivingUnit(TargetUnit, "Target");
         return targetFailure.Match(
           Fail,
           () =>
@@ -44,10 +44,8 @@ public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>
       });
   }
 
-  private static Option<BattleQueryFailure> ValidateLivingUnit(BattleSession session, BattleUnitState unit, string role)
+  private static Option<BattleQueryFailure> ValidateLivingUnit(BattleUnitState unit, string role)
   {
-    if (!unit.BelongsTo(session))
-      return Some(new BattleQueryFailure(BattleQueryFailureReason.UnknownUnit, $"{role} unit {unit.Id} could not be resolved. Unknown unit id {unit.Id}."));
     if (!unit.IsAlive)
       return Some(new BattleQueryFailure(BattleQueryFailureReason.UnitNotAlive, $"{role} unit {unit.Id} could not be resolved. Unit {unit.Id} is not alive."));
 
@@ -76,8 +74,6 @@ public sealed class IsUnitVisibleToFaction : BattleSessionQuery<bool>
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    if (!TargetUnit.BelongsTo(session))
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Target unit {TargetUnitId} could not be resolved. Unknown unit id {TargetUnitId}.");
     if (!TargetUnit.IsAlive)
       return Fail(BattleQueryFailureReason.UnitNotAlive, $"Target unit {TargetUnitId} could not be resolved. Unit {TargetUnitId} is not alive.");
     if (TargetUnit.Side == Faction)
@@ -149,8 +145,6 @@ public sealed class GetVisibleUnitsForUnit : BattleSessionQuery<IReadOnlyCollect
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    if (!ObserverUnit.BelongsTo(session))
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Observer unit {ObserverUnitId} could not be resolved. Unknown unit id {ObserverUnitId}.");
     if (!ObserverUnit.IsAlive)
       return Fail(BattleQueryFailureReason.UnitNotAlive, $"Observer unit {ObserverUnitId} could not be resolved. Unit {ObserverUnitId} is not alive.");
 
@@ -176,8 +170,6 @@ public sealed class GetVisibleEnemiesForUnit : BattleSessionQuery<IReadOnlyColle
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    if (!ObserverUnit.BelongsTo(session))
-      return Fail(BattleQueryFailureReason.UnknownUnit, $"Observer unit {ObserverUnitId} could not be resolved. Unknown unit id {ObserverUnitId}.");
     if (!ObserverUnit.IsAlive)
       return Fail(BattleQueryFailureReason.UnitNotAlive, $"Observer unit {ObserverUnitId} could not be resolved. Unit {ObserverUnitId} is not alive.");
 
