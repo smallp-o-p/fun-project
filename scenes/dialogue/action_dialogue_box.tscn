@@ -1,8 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://ddx602u1vf3cj"]
-
-[ext_resource type="Script" uid="uid://ft26mn6p3rh1" path="res://ActionDialogueBox.cs" id="1_senjy"]
-
-[node name="DialogueBox" type="VBoxContainer"]
-size_flags_horizontal = 3
-tooltip_text = "Hello!"
-script = ExtResource("1_senjy")
