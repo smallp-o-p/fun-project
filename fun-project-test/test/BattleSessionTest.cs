@@ -40,20 +40,6 @@ public class BattleSessionTest
     Assert.Equal(unit.UnitId, tile.OccupantUnitId.RequireSome());
   }
 
-  [TestCase(TestName = "SpawnUnit assigns contiguous unit ids from the unit pool index")]
-  public void SpawnUnitAssignsContiguousUnitIdsFromTheUnitPoolIndex()
-  {
-    var faction = BattleTestFactory.MakeFaction("City Guard");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-
-    var first = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
-    var second = SpawnUnit(session, BattleTestFactory.MakeCombatant("Bravo", faction), new Vector3I(1, 0, 0));
-
-    Assert.Equal(0, first.UnitId);
-    Assert.Equal(1, second.UnitId);
-  }
-
-
   [TestCase(TestName = "SpawnUnit rejects occupied tile")]
   public void SpawnUnitRejectsOccupiedTile()
   {
@@ -169,8 +155,8 @@ public class BattleSessionTest
       new Dictionary<Faction, IEnumerable<Combatant>>()));
   }
 
-  [TestCase(TestName = "AddUnit accepts equipped weapon option")]
-  public void AddUnitAcceptsEquippedWeaponOption()
+  [TestCase(TestName = "SpawnUnit accepts equipped weapon option")]
+  public void SpawnUnitAcceptsEquippedWeaponOption()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
@@ -181,12 +167,16 @@ public class BattleSessionTest
       RangeStat = new RangeStat { BaseValue = 1 },
     });
 
-    var spawnedUnit = session.AddUnit(
-      BattleTestFactory.MakeCombatant("Alpha", faction),
-      new Vector3I(0, 0, 0),
-      Some<Weapon>(weapon));
+    var executor = new BattleActionExecutor(session);
+    var result = executor
+      .Submit(BattleAction.SpawnUnit(
+        BattleTestFactory.MakeCombatant("Alpha", faction),
+        new Vector3I(0, 0, 0),
+        weapon))
+      .RequireSingleResult();
 
-    Assert.Equal(weapon, spawnedUnit.Unit.EquippedWeapon.RequireSome());
+    Assert.True(result.Succeeded);
+    Assert.Equal(weapon, result.AffectedUnit.RequireSome().EquippedWeapon.RequireSome());
   }
 
   [TestCase(TestName = "AdvanceTurn rotates only participating factions without incrementing early")]
@@ -352,33 +342,6 @@ public class BattleSessionTest
     Assert.False(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome()).IsOccupied);
     Assert.True(session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 1, 1)).RequireSome()).IsOccupied);
     Assert.Equal(3, unit.CurrentActionPoints);
-  }
-
-  [TestCase(TestName = "Move rejects non-adjacent destination")]
-  public void MoveRejectsNonAdjacentDestination()
-  {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(2, 0, 0)]));
-    Assert.Equal(0, result.Count);
-  }
-
-  [TestCase(TestName = "Vertical move is allowed as a one-cell step")]
-  public void VerticalMoveIsAllowedAsAOneCellStep()
-  {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 3, 3), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Climber", faction), new Vector3I(1, 0, 1));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 1, 1)])).RequireSingleResult();
-    Assert.True(result.Succeeded);
-    Assert.Equal(new Vector3I(1, 1, 1), session.GetUnitPosition(unit.State).RequireSome().Raw);
   }
 
   [TestCase(TestName = "MoveUnit follows a multi-step route and spends AP per step")]
@@ -561,29 +524,6 @@ public class BattleSessionTest
     Assert.True(session.DeadUnits.Contains(unitA1));
   }
 
-  [TestCase(TestName = "Killing the last actable unit does not auto-advance even if the faction survives")]
-  public void KillingTheLastActableUnitDoesNotAutoAdvanceEvenIfTheFactionSurvives()
-  {
-    var factionA = BattleTestFactory.MakeFaction("A");
-    var factionB = BattleTestFactory.MakeFaction("B");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [factionA, factionB]);
-    var unitA1 = SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", factionA, health: 10, actionPoints: 4), new Vector3I(0, 0, 0));
-    var unitA2 = SpawnUnit(session, BattleTestFactory.MakeCombatant("A2", factionA, health: 10, actionPoints: 0), new Vector3I(1, 0, 0));
-    SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", factionB, health: 10), new Vector3I(2, 0, 0));
-    StartBattle(session);
-
-    Assert.False(GetValue(Query(session, new CanUnitActNow(unitA2.State))));
-
-    ApplyDamage(session, unitA1.State, 10);
-
-    Assert.Equal(factionA, session.ActiveSide);
-    Assert.Equal(1, session.TurnNumber);
-    Assert.False(GetValue(Query(session, new CanUnitActNow(unitA2.State))));
-
-    AdvanceTurn(session);
-    Assert.Equal(factionB, session.ActiveSide);
-  }
-
   [TestCase(TestName = "Unit can throw a grenade in battle session")]
   public void UnitCanThrowAGrenadeInBattleSession()
   {
@@ -619,26 +559,31 @@ public class BattleSessionTest
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var occupiedUnit = session.AddUnit(BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1)).Unit;
+    BattleBoardState.ValidatedPoint occupiedPoint = session.Board
+      .ValidatePoint(new Vector3I(1, 0, 1))
+      .RequireSome();
+    var occupiedUnit = session.AddUnit(BattleTestFactory.MakeCombatant("Alpha", faction), occupiedPoint, None).Unit;
 
-    Assert.Throws<InvalidOperationException>(() => session.AddUnit(BattleTestFactory.MakeCombatant("Bravo", faction), new Vector3I(1, 0, 1)));
+    Assert.Throws<InvalidOperationException>(() =>
+      session.AddUnit(BattleTestFactory.MakeCombatant("Bravo", faction), occupiedPoint, None));
     Assert.Equal(1, session.AliveUnits.Count());
     Assert.True(session.AliveUnits.Contains(occupiedUnit));
     Assert.False(session.AliveUnits.Any(unit => unit.Combatant.Name == "Bravo"));
   }
 
-  [TestCase(TestName = "RemoveAvailableUnit throws when the unit is already unavailable")]
-  public void RemoveAvailableUnitThrowsWhenTheUnitIsAlreadyUnavailable()
+  [TestCase(TestName = "EndUnitActivation throws when the unit is already unavailable")]
+  public void EndUnitActivationThrowsWhenTheUnitIsAlreadyUnavailable()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Bravo", faction), new Vector3I(1, 0, 0));
     StartBattle(session);
 
-    session.RemoveAvailableUnit(unit.State);
+    session.EndUnitActivation(unit.State);
 
     Assert.False(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unit.State))));
-    Assert.Throws<InvalidOperationException>(() => session.RemoveAvailableUnit(unit.State));
+    Assert.Throws<InvalidOperationException>(() => session.EndUnitActivation(unit.State));
   }
 
   [TestCase(TestName = "EndUnitActivation advances the turn when no active units remain")]

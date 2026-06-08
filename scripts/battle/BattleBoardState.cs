@@ -262,13 +262,21 @@ public sealed class BattleBoardState
   {
     Vector3I coordinates = point.Raw;
     long pointId = CoordinatesToPointId(point);
-    _pathGraph.AddPoint(pointId, BattleGridMath.CellToLocalCenter(coordinates));
+    _pathGraph.AddPoint(pointId, ToPathGraphPosition(coordinates));
 
     ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(-1, 0, 0));
     ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, 0, -1));
     ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, -1, 0));
 
     UpdatePathPointState(point, GetTile(point));
+  }
+
+  private static Vector3 ToPathGraphPosition(Vector3I coordinates)
+  {
+    return new Vector3(
+      coordinates.X + 0.5f,
+      coordinates.Y + 0.5f,
+      coordinates.Z + 0.5f);
   }
 
   private void ConnectPathGraphPointToExistingNeighbor(long pointId, Vector3I neighborCoordinates)

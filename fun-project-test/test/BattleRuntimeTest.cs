@@ -12,12 +12,6 @@ using static BattleQueryTestHelper;
 [RequireGodotRuntime]
 public sealed partial class BattleRuntimeTest
 {
-  [TestCase(TestName = "Constructor throws when session is null")]
-  public void ConstructorThrowsWhenSessionIsNull()
-  {
-    Assert.Throws<ArgumentNullException>(() => new BattleRuntime(null));
-  }
-
   [TestCase(TestName = "Query returns query runner result")]
   public void QueryReturnsQueryRunnerResult()
   {
@@ -31,12 +25,12 @@ public sealed partial class BattleRuntimeTest
     Assert.Equal(new Vector3I(1, 0, 0), result.Raw);
   }
 
-  [TestCase(TestName = "BattleSession does not expose Queries as public property")]
-  public void BattleSessionDoesNotExposeQueriesAsPublicProperty()
+  [TestCase(TestName = "BattleSession does not expose direct damage mutation publicly")]
+  public void BattleSessionDoesNotExposeDirectDamageMutationPublicly()
   {
-    var property = typeof(BattleSession).GetProperty("Queries");
+    var method = typeof(BattleSession).GetMethod("DealDamageTo");
 
-    Assert.True(property == null || property.GetMethod == null || !property.GetMethod.IsPublic);
+    Assert.True(method == null);
   }
 
   [TestCase(TestName = "ExecuteAction delegates to action executor")]

@@ -50,7 +50,6 @@ public sealed class BattleSession
   public BattlePhase Phase { get; private set; } = BattlePhase.Setup;
   public int TurnNumber { get; private set; } = 1;
   public Faction ActiveSide { get; private set; }
-  internal IEnumerable<BattleUnitState> Units => _units;
   public IEnumerable<BattleUnitState> AliveUnits => _units.Where((unit) => unit.IsAlive);
   public IEnumerable<BattleUnitState> DeadUnits => _units.Where((unit) => unit.IsDead);
   public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _globalFactionOrder;
@@ -96,6 +95,7 @@ public sealed class BattleSession
 
   internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
   {
+    ArgumentNullException.ThrowIfNull(side);
     return _aliveUnitsByFaction.TryGetValue(side, out var units) ? units : [];
   }
 
@@ -131,14 +131,14 @@ public sealed class BattleSession
     return _activeFactionUnitsAvailable.Contains(unit);
   }
 
-  internal bool TryStartBattle()
+  internal void StartBattle()
   {
     if (Phase != BattlePhase.Setup)
-      return false;
+      throw new InvalidOperationException("Battle session can only be started from setup.");
 
     RebuildRoundQueueFromLivingSides();
     if (_turnQueue.Count == 0)
-      return false;
+      throw new InvalidOperationException("Cannot start a battle without at least one living faction in the session.");
 
     Phase = BattlePhase.InProgress;
     TurnNumber = 1;
@@ -154,32 +154,13 @@ public sealed class BattleSession
     RaiseEvent(new TurnStartedBattleEvent(
       ActiveSide,
       TurnNumber));
-    return true;
-  }
-
-  internal SpawnedBattleUnit AddUnit(Combatant combatant, Vector3I position)
-  {
-    return AddUnit(combatant, position, None);
-  }
-
-  internal SpawnedBattleUnit AddUnit(Combatant combatant, BattleBoardState.ValidatedPoint position)
-  {
-    return AddUnit(combatant, position, None);
-  }
-
-  internal SpawnedBattleUnit AddUnit(Combatant combatant, Vector3I position, Option<Weapon> equippedWeapon)
-  {
-    Option<BattleBoardState.ValidatedPoint> positionPointOption = Board.ValidatePoint(position);
-    if (positionPointOption.IsNone)
-      throw new InvalidOperationException($"Could not place unit at invalid board position {position}.");
-    BattleBoardState.ValidatedPoint positionPoint = positionPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
-
-    return AddUnit(combatant, positionPoint, equippedWeapon);
   }
 
   internal SpawnedBattleUnit AddUnit(Combatant combatant, BattleBoardState.ValidatedPoint position, Option<Weapon> equippedWeapon)
   {
     ArgumentNullException.ThrowIfNull(combatant);
+    if (Phase == BattlePhase.Ended)
+      throw new InvalidOperationException("Cannot add units after the battle has ended.");
 
     var unit = BattleUnitState.Create(_units.Count, combatant, equippedWeapon);
     bool occupantSet = Board.TryPlaceOccupant(position, unit.Id);
@@ -201,26 +182,34 @@ public sealed class BattleSession
     if (Phase == BattlePhase.Setup && !_turnQueue.Contains(unit.Side))
       _turnQueue.Enqueue(unit.Side);
     if (Phase == BattlePhase.InProgress)
-      RegisterSpawnedUnitForCurrentRound(unit);
+      AddSpawnedUnitToCurrentRound(unit);
 
     RaiseEvent(new UnitAddedBattleEvent(unit, position));
 
     return new SpawnedBattleUnit(unit);
   }
 
-  public void DealDamageTo(BattleUnitState unit, int dmg)
+  internal void ApplyDamageTo(BattleUnitState unit, int amount)
   {
-    unit.ReceiveDamage(dmg);
-    RaiseEvent(new UnitDamagedBattleEvent(unit, dmg));
+    ArgumentNullException.ThrowIfNull(unit);
+    if (unit.IsDead)
+      throw new InvalidOperationException($"Cannot damage unit {unit.Id} because it is already dead.");
+    if (!_unitPositions.TryGetUnitPosition(unit, out _))
+      throw new InvalidOperationException($"Cannot damage unit {unit.Id} because it is not on the board.");
+
+    unit.ReceiveDamage(amount);
+    RaiseEvent(new UnitDamagedBattleEvent(unit, amount));
     if (unit.IsDead)
     {
       HandleUnitDeath(unit);
     }
   }
 
-  internal void HandleUnitDeath(BattleUnitState unit)
+  private void HandleUnitDeath(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
+    if (unit.IsAlive)
+      throw new InvalidOperationException($"Cannot remove unit {unit.Id} as dead because it is still alive.");
 
     var unitSide = unit.Side;
     Option<BattleBoardState.ValidatedPoint> unitPointOption = GetUnitPosition(unit);
@@ -244,16 +233,9 @@ public sealed class BattleSession
     HandleFactionLoss(unitSide);
   }
 
-  internal void RemoveAvailableUnit(BattleUnitState unit)
-  {
-    ArgumentNullException.ThrowIfNull(unit);
-
-    if (!_activeFactionUnitsAvailable.Remove(unit))
-      throw new InvalidOperationException($"Unit {unit.Id} is not available this turn.");
-  }
-
   internal void EndUnitActivation(BattleUnitState unit)
   {
+    ArgumentNullException.ThrowIfNull(unit);
     if (Phase != BattlePhase.InProgress)
       throw new InvalidOperationException("Cannot end a unit activation while the battle is not in progress.");
 
@@ -266,23 +248,24 @@ public sealed class BattleSession
       throw new InvalidOperationException($"Cannot end activation for unit {unit.Id} because it is not on the board.");
     BattleBoardState.ValidatedPoint unitPoint = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
 
-    RemoveAvailableUnit(unit);
+    if (!_activeFactionUnitsAvailable.Remove(unit))
+      throw new InvalidOperationException($"Unit {unit.Id} is not available this turn.");
+
     RaiseEvent(new UnitActivationEndedBattleEvent(unit, unitPoint));
 
     if (!GetFactionAliveUnits(activeSide).Any(CanUnitActNow))
       EndFactionTurn(activeSide);
   }
 
-  internal void AdvanceTurn()
+  private void AdvanceTurn()
   {
     if (Phase != BattlePhase.InProgress)
       return;
 
-    var activeSide = ActiveSide;
     RaiseEvent(new TurnEndedBattleEvent(
-      activeSide,
+      ActiveSide,
       TurnNumber));
-    _sidesActedThisRound.Add(activeSide);
+    _sidesActedThisRound.Add(ActiveSide);
 
     if (_turnQueue.Count > 0)
       _turnQueue.Dequeue();
@@ -309,7 +292,7 @@ public sealed class BattleSession
     AdvanceTurn();
   }
 
-  internal void EndBattle()
+  private void EndBattle()
   {
     if (Phase == BattlePhase.Ended)
       return;
@@ -321,7 +304,7 @@ public sealed class BattleSession
     RaiseEvent(new SessionEndedBattleEvent());
   }
 
-  internal void RegisterSpawnedUnitForCurrentRound(BattleUnitState unit)
+  private void AddSpawnedUnitToCurrentRound(BattleUnitState unit)
   {
     if (Phase != BattlePhase.InProgress)
       throw new InvalidOperationException("Trying to spawn unit while battle hasn't started or is done.");
@@ -354,29 +337,22 @@ public sealed class BattleSession
     return _unitPositions.TryGetUnitAt(point, out var unit) ? Some(unit) : None;
   }
 
-  internal Option<BattleUnitState> GetUnitAt(Vector3I position)
-  {
-    return Board.ValidatePoint(position).Match(
-      GetUnitAt,
-      () => None);
-  }
-
-  internal bool TryMoveUnit(BattleUnitState unit, BattleBoardState.ValidatedPoint source, BattleBoardState.ValidatedPoint destination)
+  internal void MoveUnit(BattleUnitState unit, BattleBoardState.ValidatedPoint source, BattleBoardState.ValidatedPoint destination)
   {
     ArgumentNullException.ThrowIfNull(unit);
+    if (unit.IsDead)
+      throw new InvalidOperationException($"Cannot move unit {unit.Id} because it is dead.");
     if (!_unitPositions.TryGetUnitPosition(unit, out var trackedPosition))
-      return false;
+      throw new InvalidOperationException($"Unit {unit.Id} is not tracked in the session position index.");
     if (trackedPosition != source)
-      return false;
+      throw new InvalidOperationException($"Unit {unit.Id} is indexed at {trackedPosition.Raw}, not {source.Raw}.");
     if (!Board.TryMoveOccupant(source, destination, unit.Id))
-      return false;
+      throw new InvalidOperationException($"Could not move unit {unit.Id} from {source.Raw} to {destination.Raw}.");
 
     _unitPositions.Move(unit, source, destination);
 
     RaiseEvent(new UnitMovedBattleEvent(unit, destination, source));
     RaiseEvent(new TileOccupiedBattleEvent(unit, destination));
-
-    return true;
   }
 
   internal bool CanUnitActNow(BattleUnitState unit)
@@ -398,12 +374,12 @@ public sealed class BattleSession
     return Mathf.Abs(delta.X) + Mathf.Abs(delta.Y) + Mathf.Abs(delta.Z);
   }
 
-  internal bool HasLivingUnits(Faction side)
+  private bool HasLivingUnits(Faction side)
   {
     return _aliveUnitsByFaction.TryGetValue(side, out var units) && units.Count > 0;
   }
 
-  internal void RefreshCurrentFactionAvailability()
+  private void RefreshCurrentFactionAvailability()
   {
     if (Phase != BattlePhase.InProgress)
       return;
@@ -415,13 +391,15 @@ public sealed class BattleSession
 
   internal void RaiseEvent(BattleEvent battleEvent)
   {
+    ArgumentNullException.ThrowIfNull(battleEvent);
+
     RefreshVisibility();
     BattleEventCommitted.Invoke(battleEvent);
   }
 
-  internal void RefreshVisibility()
+  private void RefreshVisibility()
   {
-    foreach (var unit in Units)
+    foreach (var unit in _units)
       unit.ClearVisibility();
 
     foreach (var observer in AliveUnits)
@@ -447,7 +425,7 @@ public sealed class BattleSession
     }
   }
 
-  internal void MarkTilesExplored(Faction side, IEnumerable<BattleBoardState.ValidatedPoint> tiles)
+  private void MarkTilesExplored(Faction side, IEnumerable<BattleBoardState.ValidatedPoint> tiles)
   {
     ArgumentNullException.ThrowIfNull(side);
     ArgumentNullException.ThrowIfNull(tiles);
@@ -585,13 +563,7 @@ public sealed class BattleSession
       return;
 
     _sidesActedThisRound.Remove(side);
-    if (Phase != BattlePhase.InProgress)
-    {
-      RemoveSideFromQueue(side);
-      return;
-    }
-
-    if (ActiveSide != side)
+    if (Phase != BattlePhase.InProgress || ActiveSide != side)
     {
       RemoveSideFromQueue(side);
       return;
@@ -607,12 +579,6 @@ public sealed class BattleSession
 
   private void StartNextRound()
   {
-    if (_aliveUnitsByFaction.Count == 0)
-    {
-      EndBattle();
-      return;
-    }
-
     TurnNumber++;
     _sidesActedThisRound.Clear();
     RebuildRoundQueueFromLivingSides();

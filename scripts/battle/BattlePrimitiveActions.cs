@@ -3,6 +3,7 @@ using FunProject.Items;
 using FunProject.Weapons;
 using Godot;
 using System;
+using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -19,9 +20,10 @@ public sealed class StartBattle : BattleAction
   {
     if (session.Phase != BattlePhase.Setup)
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, "BattleSession can only be started from setup.");
-    if (!session.TryStartBattle())
+    if (!session.AliveUnits.Any())
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, "Cannot start a battle without at least one living faction in the session.");
 
+    session.StartBattle();
     return BattleActionResult.Success(this);
   }
 }
@@ -115,8 +117,7 @@ internal sealed class MoveUnitStep : BattleAction
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Destination} cannot be occupied.");
         if (!unit.TrySpendActionPoints(ActionPointCost))
           return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Move unit step action could not spend {ActionPointCost} action points for unit {UnitId}.");
-        if (!session.TryMoveUnit(Unit, Source, Destination))
-          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Move unit step action could not move unit {UnitId} to {Destination.Raw}.");
+        session.MoveUnit(Unit, Source, Destination);
 
         return BattleActionResult.Success(this, unit);
       });
@@ -206,7 +207,7 @@ public sealed class ApplyDamage : BattleAction
     if (unitPointOption.IsNone)
       return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Damage action could not resolve position for unit {Unit.Id}.");
 
-    session.DealDamageTo(Unit, Amount);
+    session.ApplyDamageTo(Unit, Amount);
 
     return BattleActionResult.Success(this, Unit);
   }
