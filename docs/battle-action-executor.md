@@ -47,8 +47,7 @@ The important split is:
 The current executor API is:
 
 - `Submit(BattleAction action)`
-- `RegisterTrigger(BattleTrigger trigger, BattleEventType eventType)`
-- `RegisterTrigger(BattleTrigger trigger, IEnumerable<BattleEventType> eventTypes)`
+- `RegisterTrigger<TEventKey>(BattleTrigger trigger) where TEventKey : BattleEventTag`
 - `PendingCount`
 - `LastResult`
 

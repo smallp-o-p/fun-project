@@ -31,11 +31,11 @@ These event types describe committed state changes. Consequences are resolved fr
 
 The first implementation slice now exists in code:
 
-- `BattleEventType.TileOccupied` is emitted after successful movement steps.
+- `TileOccupiedBattleEvent` is emitted after successful movement steps.
 - `MoveUnitStep` publishes committed `UnitMoved` and `TileOccupied` after a successful move.
 - `ApplyDamage` publishes committed `UnitDamaged` and lethal `UnitKilled`.
 - `EndFactionTurn` publishes committed `TurnEnded` and `TurnStarted` transition events.
-- `BattleTrigger` and the executor's internal trigger registry provide mediated, deterministic trigger evaluation with event-type buckets.
+- `BattleTrigger` and the executor's internal trigger registry provide mediated, deterministic trigger evaluation bucketed by `BattleEventTag` type.
 - `BattleAction` and `MoveUnit` give the executor explicit high-level queued work and primitive action commits.
 - `BattleActionExecutor` accepts a submitted `BattleAction`, commits primitive actions until the submitted action and its reactions settle, resolves trigger responses from committed events, and inserts interrupt response actions ahead of paused work.
 
@@ -44,7 +44,7 @@ Current limitations:
 - Concrete overwatch and proximity mine rules are not implemented yet; tests use simple damage triggers as proof-of-concept trigger responses.
 - Runtime trigger responses require a persistent `BattleActionExecutor` when a composite action needs to pause and resume around reactions.
 - The old predictive command surfaces have been removed. Queued player/AI intent must be expressed as `BattleAction` values such as `MoveUnit`, and primitive actions are the commit layer.
-- The executor indexes triggers by event type. It does not yet index by tile, faction, owner, or source item.
+- The executor indexes triggers by `BattleEventTag` type (concrete event records and the marker interfaces they implement). It does not yet index by tile, faction, owner, or source item.
 
 ## Core Runtime Shape
 
@@ -171,7 +171,7 @@ High-level movement should be represented by composite actions such as `MoveUnit
 
 ### BattleEvent
 
-`BattleEvent` describes a committed battle fact. The base event carries the stable `BattleEventType` used for trigger registration, while concrete event subclasses carry only the payload that applies to that event.
+`BattleEvent` describes a committed battle fact. Trigger registration keys on `BattleEventTag` types — the concrete event record type plus any `BattleEventTag` marker interfaces it implements (such as `IPositionedBattleEvent`) — while concrete event subclasses carry only the payload that applies to that event.
 
 Events need enough context for triggers to evaluate without guessing:
 
@@ -238,14 +238,14 @@ The normal response for event observers is "after commit." This means an event s
 
 ### Trigger Registration
 
-`BattleActionExecutor` owns registered triggers and provides efficient lookup through an internal registry. Registration chooses the event-type bucket:
+`BattleActionExecutor` owns registered triggers and provides efficient lookup through an internal registry. Registration chooses the event-tag bucket through a type parameter:
 
 ```csharp
-executor.RegisterTrigger(trigger, BattleEventType.TileOccupied);
-executor.RegisterTrigger(trigger, new[] { BattleEventType.UnitMoved, BattleEventType.TileOccupied });
+executor.RegisterTrigger<TileOccupiedBattleEvent>(trigger);
+executor.RegisterTrigger<IPositionedBattleEvent>(trigger); // fires for every positioned event
 ```
 
-`BattleTrigger` still owns detailed matching through `Matches(...)`, but the registry only calls `Matches(...)` on triggers registered for the committed event type.
+`BattleTrigger` still owns detailed matching through `Matches(...)`, but the registry only calls `Matches(...)` on triggers registered for one of the committed event's tag types.
 
 For tile-based events, it should be able to answer:
 
@@ -257,7 +257,7 @@ This supports proximity mines and overwatch without broadcasting every event to 
 
 The registry currently indexes by:
 
-- event type
+- event tag type (the concrete event record type plus the `BattleEventTag` marker interfaces it implements)
 
 Later indices can include:
 
@@ -410,8 +410,8 @@ Useful patterns for this model:
 1. `BattleAction` is the executor-facing action abstraction.
 2. `MoveUnitStep` is the internal primitive movement commit.
 3. Multi-step movement orchestration lives in `MoveUnit`.
-4. The executor stores triggers by committed event type.
-5. Tile triggers can register against `TileOccupied`.
+4. The executor stores triggers by `BattleEventTag` type.
+5. Tile triggers can register against `TileOccupiedBattleEvent` (or a shared tag interface such as `IPositionedBattleEvent`).
 6. Primitive actions publish committed events as they change state.
 7. The executor resolves triggers from committed events and queues response actions.
 8. Tests cover proof-of-concept trigger responses such as damage after tile occupation.

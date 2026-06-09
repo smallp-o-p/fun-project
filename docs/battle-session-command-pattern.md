@@ -8,7 +8,7 @@ This document describes the command-pattern shape currently used around `BattleS
 - `BattleActionExecutor` = trigger mediator, queue, and invoker
 - `BattleSessionQuery<TResult>` = read-side query command
 - `BattleQueryRunner` = read-side query invoker
-- `BattleQueryResult<TResult>` = explicit read-side success/failure result
+- `Either<BattleQueryFailure, TResult>` = explicit read-side success/failure result
 - `BattleSession` = receiver and aggregate root
 
 ## Current Flow
@@ -73,9 +73,9 @@ Read-side queries should mirror the command side without pretending reads are ac
 Controllers and AI should use queries for read-only decisions, for example:
 
 ```csharp
-session.Queries.Execute(new GetPossibleMoveTilesForUnit(unit));
-session.Queries.Execute(new FindPathForUnit(unit, destination));
-session.Queries.Execute(new IsUnitStillAvailableThisTurn(unit));
+runtime.Query(new GetPossibleMoveTilesForUnit(unit));
+runtime.Query(new FindPathForUnit(unit, destination));
+runtime.Query(new IsUnitStillAvailableThisTurn(unit));
 ```
 
 Commands should remain explicit `BattleAction` values executed through `BattleActionExecutor.Submit`.

@@ -161,7 +161,7 @@ The session owns:
 The target public read-side surface is a query runner, not a growing method list:
 
 ```csharp
-var result = session.Queries.Execute(new SomeBattleQuery(...));
+var result = runtime.Query(new SomeBattleQuery(...));
 ```
 
 The session may keep internal helpers for actions and query objects, but controllers and AI should not depend on those helpers directly.
@@ -185,7 +185,7 @@ public abstract class BattleSessionQuery<TResult>
     QueryId = queryId;
   }
 
-  internal abstract BattleQueryResult<TResult> Execute(BattleSession session);
+  internal abstract Either<BattleQueryFailure, TResult> Execute(BattleSession session);
 }
 ```
 
@@ -201,7 +201,7 @@ public sealed class BattleQueryRunner
     _session = session ?? throw new ArgumentNullException(nameof(session));
   }
 
-  public BattleQueryResult<TResult> Execute<TResult>(BattleSessionQuery<TResult> query)
+  public Either<BattleQueryFailure, TResult> Execute<TResult>(BattleSessionQuery<TResult> query)
   {
     ArgumentNullException.ThrowIfNull(query);
     return query.Execute(_session);
@@ -209,7 +209,7 @@ public sealed class BattleQueryRunner
 }
 ```
 
-`BattleQueryResult<TResult>` has explicit success and failure shapes. Query callers should handle `BattleQueryFailureResult<TResult>` before using a `BattleQuerySuccess<TResult>.Value`; missing units, invalid tiles, and invalid battle-state questions are failures, not nullable query values.
+The query runner is exposed through `BattleRuntime.Query(...)`; `BattleSession` does not expose a public query surface directly. Results are `Either<BattleQueryFailure, TResult>`. Query callers should handle the `Left` `BattleQueryFailure` before using the `Right` value; missing units, invalid tiles, and invalid battle-state questions are failures, not nullable query values.
 
 Example query types:
 
@@ -380,7 +380,7 @@ The current event stream is intentionally small and authoritative. Presentation 
 
 Presentation code should react to these events instead of inferring state changes from executor internals.
 
-`BattleEventType` is the stable event bucket used by trigger registration. Concrete event subclasses, such as `UnitMovedBattleEvent` and `TurnStartedBattleEvent`, carry event-specific payloads.
+Trigger registration keys on `BattleEventTag` types, not an enum. A trigger can register against a concrete event such as `TileOccupiedBattleEvent`, or against a shared marker interface such as `IPositionedBattleEvent` or `IUnitBattleEvent`, in which case it fires for every committed event implementing that tag. Concrete event subclasses, such as `UnitMovedBattleEvent` and `TurnStartedBattleEvent`, carry event-specific payloads.
 
 ## Future Extensions
 
@@ -412,8 +412,9 @@ Use these names consistently in future tactical work:
 - `BattleTrigger`
 - `BattleSessionQuery<TResult>`
 - `BattleQueryRunner`
-- `BattleQueryResult<TResult>`
+- `Either<BattleQueryFailure, TResult>`
 - `BattleQueryFailure`
+- `BattleEventTag`
 - `BattleBoardState`
 - `BattleTileState`
 - `BattleUnitState`
