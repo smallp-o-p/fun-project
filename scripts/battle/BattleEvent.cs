@@ -4,86 +4,60 @@ using System;
 
 namespace FunProject.Battle;
 
-public enum BattleEventType
+public interface BattleEventTag
 {
-  SessionStarted,
-  SessionEnded,
-  TurnStarted,
-  TurnEnded,
-  ActiveSideChanged,
-  UnitAdded,
-  UnitActivationEnded,
-  UnitMoved,
-  TileOccupied,
-  UnitDamaged,
-  UnitKilled,
-  ItemThrown,
 }
 
-public abstract record BattleEvent
+public abstract record BattleEvent : BattleEventTag
 {
-  public BattleEventType Type { get; }
-
-  protected BattleEvent(BattleEventType type)
-  {
-    Type = type;
-  }
-
+  public abstract string EventName { get; }
   public abstract string ToDisplayString();
 }
 
-public interface IUnitBattleEvent
+public interface IUnitBattleEvent : BattleEventTag
 {
   BattleUnitState Unit { get; }
 }
 
-public interface IPositionedBattleEvent
+public interface IPositionedBattleEvent : BattleEventTag
 {
   BattleBoardState.ValidatedPoint Position { get; }
 }
 
-public interface ISourcePositionedBattleEvent
+public interface ISourcePositionedBattleEvent : BattleEventTag
 {
   BattleBoardState.ValidatedPoint SourcePosition { get; }
 }
 
-public interface IFactionBattleEvent
+public interface IFactionBattleEvent : BattleEventTag
 {
   Faction Faction { get; }
 }
 
-public interface ITurnBattleEvent
+public interface ITurnBattleEvent : BattleEventTag
 {
   int TurnNumber { get; }
 }
 
 public sealed record SessionStartedBattleEvent : BattleEvent
 {
-  public SessionStartedBattleEvent()
-    : base(BattleEventType.SessionStarted)
-  {
-  }
-
+  public override string EventName => "session_started";
   public override string ToDisplayString() => "Battle started.";
 }
 
 public sealed record SessionEndedBattleEvent : BattleEvent
 {
-  public SessionEndedBattleEvent()
-    : base(BattleEventType.SessionEnded)
-  {
-  }
-
+  public override string EventName => "session_ended";
   public override string ToDisplayString() => "Battle ended.";
 }
 
 public sealed record TurnStartedBattleEvent : BattleEvent, IFactionBattleEvent, ITurnBattleEvent
 {
+  public override string EventName => "turn_started";
   public Faction Faction { get; }
   public int TurnNumber { get; }
 
   public TurnStartedBattleEvent(Faction faction, int turnNumber)
-    : base(BattleEventType.TurnStarted)
   {
     Faction = faction;
     TurnNumber = turnNumber;
@@ -94,11 +68,11 @@ public sealed record TurnStartedBattleEvent : BattleEvent, IFactionBattleEvent, 
 
 public sealed record TurnEndedBattleEvent : BattleEvent, IFactionBattleEvent, ITurnBattleEvent
 {
+  public override string EventName => "turn_ended";
   public Faction Faction { get; }
   public int TurnNumber { get; }
 
   public TurnEndedBattleEvent(Faction faction, int turnNumber)
-    : base(BattleEventType.TurnEnded)
   {
     Faction = faction;
     TurnNumber = turnNumber;
@@ -109,10 +83,10 @@ public sealed record TurnEndedBattleEvent : BattleEvent, IFactionBattleEvent, IT
 
 public sealed record ActiveSideChangedBattleEvent : BattleEvent, IFactionBattleEvent
 {
+  public override string EventName => "active_side_changed";
   public Faction Faction { get; }
 
   public ActiveSideChangedBattleEvent(Faction faction)
-    : base(BattleEventType.ActiveSideChanged)
   {
     Faction = faction;
   }
@@ -122,11 +96,11 @@ public sealed record ActiveSideChangedBattleEvent : BattleEvent, IFactionBattleE
 
 public sealed record UnitAddedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
+  public override string EventName => "unit_added";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
 
   public UnitAddedBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position)
-    : base(BattleEventType.UnitAdded)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
@@ -138,11 +112,11 @@ public sealed record UnitAddedBattleEvent : BattleEvent, IUnitBattleEvent, IPosi
 
 public sealed record UnitActivationEndedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
+  public override string EventName => "unit_activation_ended";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
 
   public UnitActivationEndedBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position)
-    : base(BattleEventType.UnitActivationEnded)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
@@ -154,6 +128,7 @@ public sealed record UnitActivationEndedBattleEvent : BattleEvent, IUnitBattleEv
 
 public sealed record UnitMovedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, ISourcePositionedBattleEvent
 {
+  public override string EventName => "unit_moved";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
   public BattleBoardState.ValidatedPoint SourcePosition { get; }
@@ -162,7 +137,6 @@ public sealed record UnitMovedBattleEvent : BattleEvent, IUnitBattleEvent, IPosi
     BattleUnitState unit,
     BattleBoardState.ValidatedPoint position,
     BattleBoardState.ValidatedPoint sourcePosition)
-    : base(BattleEventType.UnitMoved)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
@@ -175,13 +149,13 @@ public sealed record UnitMovedBattleEvent : BattleEvent, IUnitBattleEvent, IPosi
 
 public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
+  public override string EventName => "tile_occupied";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
 
   public TileOccupiedBattleEvent(
     BattleUnitState unit,
     BattleBoardState.ValidatedPoint position)
-    : base(BattleEventType.TileOccupied)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
@@ -193,11 +167,11 @@ public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IP
 
 public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent
 {
+  public override string EventName => "unit_damaged";
   public BattleUnitState Unit { get; }
   public int Amount { get; }
 
   public UnitDamagedBattleEvent(BattleUnitState unit, int amount)
-    : base(BattleEventType.UnitDamaged)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
@@ -209,11 +183,11 @@ public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent
 
 public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
+  public override string EventName => "unit_killed";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
 
   public UnitKilledBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position)
-    : base(BattleEventType.UnitKilled)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
@@ -225,12 +199,12 @@ public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPos
 
 public sealed record ItemThrownBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
+  public override string EventName => "item_thrown";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
   public ThrowableItem Item { get; }
 
   public ItemThrownBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position, ThrowableItem item)
-    : base(BattleEventType.ItemThrown)
   {
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(item);

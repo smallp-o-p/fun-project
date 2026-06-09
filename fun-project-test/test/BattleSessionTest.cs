@@ -549,7 +549,6 @@ public class BattleSessionTest
     Assert.Equal(3, unit.CurrentActionPoints);
     Assert.True(thrownEvent.IsSome);
     ItemThrownBattleEvent itemThrownEvent = thrownEvent.RequireSome();
-    Assert.Equal(BattleEventType.ItemThrown, itemThrownEvent.Type);
     Assert.Equal(unit.UnitId, itemThrownEvent.Unit.Id);
     Assert.Equal(new Vector3I(3, 0, 1), itemThrownEvent.Position.Raw);
   }

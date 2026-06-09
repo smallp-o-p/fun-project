@@ -57,16 +57,11 @@ public sealed class BattleRuntime : IDisposable
     return _actions.Submit(action);
   }
 
-  public void RegisterTrigger(BattleTrigger trigger, BattleEventType eventType)
+  public void RegisterTrigger<TEventKey>(BattleTrigger trigger)
+    where TEventKey : BattleEventTag
   {
     ThrowIfDisposed();
-    _actions.RegisterTrigger(trigger, eventType);
-  }
-
-  public void RegisterTrigger(BattleTrigger trigger, IEnumerable<BattleEventType> eventTypes)
-  {
-    ThrowIfDisposed();
-    _actions.RegisterTrigger(trigger, eventTypes);
+    _actions.RegisterTrigger<TEventKey>(trigger);
   }
 
   public void Dispose()

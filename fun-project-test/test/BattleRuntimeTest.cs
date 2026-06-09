@@ -2,9 +2,6 @@ using FunProject.Battle;
 using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using static BattleActionTestHelper;
 using static BattleQueryTestHelper;
 
@@ -88,7 +85,7 @@ public sealed partial class BattleRuntimeTest
     var runtime = new BattleRuntime(session);
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    runtime.RegisterTrigger(new RuntimeRecordingTrigger("runtime_trigger", targetPosition, log), BattleEventType.UnitMoved);
+    runtime.RegisterTrigger<UnitMovedBattleEvent>(new RuntimeRecordingTrigger("runtime_trigger", targetPosition, log));
 
     BattleActionResult result = runtime
       .ExecuteAction(BattleAction.MoveUnit(unit.State, [targetPosition]))
@@ -99,8 +96,8 @@ public sealed partial class BattleRuntimeTest
     Assert.Equal("runtime_trigger", log[0]);
   }
 
-  [TestCase(TestName = "RegisterTrigger collection overload affects runtime action execution")]
-  public void RegisterTriggerCollectionOverloadAffectsRuntimeActionExecution()
+  [TestCase(TestName = "RegisterTrigger event shape affects runtime action execution")]
+  public void RegisterTriggerEventShapeAffectsRuntimeActionExecution()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
@@ -109,9 +106,8 @@ public sealed partial class BattleRuntimeTest
     var runtime = new BattleRuntime(session);
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    runtime.RegisterTrigger(
-      new RuntimeRecordingTrigger("runtime_collection_trigger", targetPosition, log),
-      new[] { BattleEventType.UnitMoved });
+    runtime.RegisterTrigger<IPositionedBattleEvent>(
+      new RuntimeRecordingTrigger("runtime_shape_trigger", targetPosition, log));
 
     BattleActionResult result = runtime
       .ExecuteAction(BattleAction.MoveUnit(unit.State, [targetPosition]))
@@ -119,7 +115,7 @@ public sealed partial class BattleRuntimeTest
 
     Assert.True(result.Succeeded);
     Assert.Equal(1, log.Count);
-    Assert.Equal("runtime_collection_trigger", log[0]);
+    Assert.Equal("runtime_shape_trigger", log[0]);
   }
 
   [TestCase(TestName = "Disposed runtime no longer republishes session events")]
@@ -154,12 +150,10 @@ public sealed partial class BattleRuntimeTest
     Assert.Throws<ObjectDisposedException>(() => runtime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", faction),
       new Vector3I(1, 0, 1))));
-    Assert.Throws<ObjectDisposedException>(() => runtime.RegisterTrigger(
-      new RuntimeRecordingTrigger("runtime_trigger", new Vector3I(1, 0, 0), []),
-      BattleEventType.UnitMoved));
-    Assert.Throws<ObjectDisposedException>(() => runtime.RegisterTrigger(
-      new RuntimeRecordingTrigger("runtime_collection_trigger", new Vector3I(1, 0, 0), []),
-      new[] { BattleEventType.UnitMoved }));
+    Assert.Throws<ObjectDisposedException>(() => runtime.RegisterTrigger<UnitMovedBattleEvent>(
+      new RuntimeRecordingTrigger("runtime_trigger", new Vector3I(1, 0, 0), [])));
+    Assert.Throws<ObjectDisposedException>(() => runtime.RegisterTrigger<IPositionedBattleEvent>(
+      new RuntimeRecordingTrigger("runtime_shape_trigger", new Vector3I(1, 0, 0), [])));
   }
 
   [TestCase(TestName = "Dispose is idempotent")]
@@ -175,12 +169,13 @@ public sealed partial class BattleRuntimeTest
 
   private sealed partial class RuntimeRecordingTrigger : BattleTrigger
   {
+    private readonly string _message;
     private readonly Vector3I _targetPosition;
     private readonly List<string> _log;
 
-    public RuntimeRecordingTrigger(string triggerId, Vector3I targetPosition, List<string> log)
-      : base(triggerId)
+    public RuntimeRecordingTrigger(string message, Vector3I targetPosition, List<string> log)
     {
+      _message = message;
       _targetPosition = targetPosition;
       _log = log;
     }
@@ -193,7 +188,7 @@ public sealed partial class BattleRuntimeTest
 
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
-      _log.Add(TriggerId);
+      _log.Add(_message);
       return BattleTriggerResult.NoReaction();
     }
   }

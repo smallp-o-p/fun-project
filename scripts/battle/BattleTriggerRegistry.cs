@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace FunProject.Battle;
 
@@ -9,52 +10,42 @@ internal sealed class BattleTriggerRegistry
   private sealed record RegisteredTrigger(
     BattleTrigger Trigger,
     long RegistrationOrder,
-    IReadOnlyList<BattleEventType> EventTypes);
+    Type EventType);
 
-  private readonly Dictionary<BattleEventType, List<RegisteredTrigger>> _registeredTriggersByEventType = [];
+  private readonly Dictionary<Type, List<RegisteredTrigger>> _registeredTriggersByEventType = [];
   private long _nextRegistrationOrder;
 
-  internal void Register(BattleTrigger trigger, BattleEventType eventType)
+  public BattleTriggerRegistry()
   {
-    Register(trigger, [eventType]);
-  }
+    Assembly assembly = typeof(BattleEventTag).Assembly;
+    IEnumerable<Type> arr = assembly.GetTypes().Where(t => typeof(BattleEventTag).IsAssignableFrom(t));
 
-  internal void Register(BattleTrigger trigger, IEnumerable<BattleEventType> eventTypes)
-  {
-    ArgumentNullException.ThrowIfNull(trigger);
-    ArgumentNullException.ThrowIfNull(eventTypes);
-    ArgumentException.ThrowIfNullOrWhiteSpace(trigger.TriggerId);
-
-    IReadOnlyList<BattleEventType> distinctEventTypes = GetDistinctEventTypes(eventTypes);
-    RegisteredTrigger registeredTrigger = new(trigger, _nextRegistrationOrder++, distinctEventTypes);
-
-    foreach (BattleEventType eventType in distinctEventTypes)
+    foreach (Type eventType in arr)
     {
-      if (!_registeredTriggersByEventType.TryGetValue(eventType, out List<RegisteredTrigger> registeredTriggers))
-      {
-        registeredTriggers = [];
-        _registeredTriggersByEventType.Add(eventType, registeredTriggers);
-      }
-
-      registeredTriggers.Add(registeredTrigger);
+      _registeredTriggersByEventType.Add(eventType, []);
     }
   }
 
-  private bool Unregister(RegisteredTrigger registeredTrigger)
+  internal void Register<TEventKey>(BattleTrigger trigger)
+    where TEventKey : BattleEventTag
+  {
+    ArgumentNullException.ThrowIfNull(trigger);
+    Type eventKey = typeof(TEventKey);
+
+    if (!_registeredTriggersByEventType.TryGetValue(eventKey, out var registeredTriggers))
+      throw new InvalidOperationException("Register: BattleTriggerRegistry doesn't have a subscription for this particular BattleEvent");
+
+    registeredTriggers.Add(new(trigger, _nextRegistrationOrder++, eventKey));
+  }
+
+  private void Unregister(RegisteredTrigger registeredTrigger)
   {
     ArgumentNullException.ThrowIfNull(registeredTrigger);
 
-    foreach (BattleEventType eventType in registeredTrigger.EventTypes)
-    {
-      if (!_registeredTriggersByEventType.TryGetValue(eventType, out List<RegisteredTrigger> registeredTriggers))
-        continue;
+    if (!_registeredTriggersByEventType.TryGetValue(registeredTrigger.EventType, out var registeredTriggers))
+      throw new InvalidOperationException("Unregister: BattleTriggerRegistry doesn't have a subscription for this particular BattleEvent");
 
-      registeredTriggers.Remove(registeredTrigger);
-      if (registeredTriggers.Count == 0)
-        _registeredTriggersByEventType.Remove(eventType);
-    }
-
-    return true;
+    registeredTriggers.Remove(registeredTrigger);
   }
 
   internal IReadOnlyList<BattleAction> EvaluateInterruptActions(
@@ -66,44 +57,59 @@ internal sealed class BattleTriggerRegistry
     ArgumentNullException.ThrowIfNull(battleEvent);
     ArgumentNullException.ThrowIfNull(sourceAction);
 
-    if (!_registeredTriggersByEventType.TryGetValue(battleEvent.Type, out List<RegisteredTrigger> eventTypeTriggers))
+    IReadOnlyList<RegisteredTrigger> matchingTriggers = GetMatchingTriggers(battleEvent);
+    if (matchingTriggers.Count == 0)
       return [];
-
-    List<RegisteredTrigger> matchingTriggers =
-    [
-      .. eventTypeTriggers
-        .Where(entry => entry.Trigger.Matches(battleEvent))
-        .OrderBy(entry => entry.Trigger.Priority)
-        .ThenBy(entry => entry.RegistrationOrder),
-    ];
 
     List<BattleAction> interruptActions = [];
     foreach (var registeredTrigger in matchingTriggers)
     {
       BattleTriggerResult result = registeredTrigger.Trigger.Evaluate(session, battleEvent, sourceAction);
-      ArgumentNullException.ThrowIfNull(result.InterruptActions);
-      interruptActions.AddRange(result.InterruptActions);
+      interruptActions.AddRange(result.InterruptActions ?? []);
 
-      if (result.ShouldConsumeTrigger)
+      if (result.Consumed)
         Unregister(registeredTrigger);
     }
 
     return interruptActions;
   }
 
-  private static IReadOnlyList<BattleEventType> GetDistinctEventTypes(IEnumerable<BattleEventType> eventTypes)
+  private IReadOnlyList<RegisteredTrigger> GetMatchingTriggers(BattleEvent battleEvent)
   {
-    List<BattleEventType> distinctEventTypes = [];
-    SysColGeneric.HashSet<BattleEventType> seenEventTypes = [];
-    foreach (BattleEventType eventType in eventTypes)
+    List<RegisteredTrigger> matchingTriggers = [];
+    foreach (Type eventKey in GetEventKeys(battleEvent))
     {
-      if (seenEventTypes.Add(eventType))
-        distinctEventTypes.Add(eventType);
+      if (!_registeredTriggersByEventType.TryGetValue(eventKey, out var registeredTriggers))
+        continue;
+
+      foreach (RegisteredTrigger registeredTrigger in registeredTriggers)
+      {
+        if (registeredTrigger.Trigger.Matches(battleEvent))
+          matchingTriggers.Add(registeredTrigger);
+      }
     }
 
-    if (distinctEventTypes.Count == 0)
-      throw new ArgumentException("At least one event type must be provided.", nameof(eventTypes));
+    return [.. matchingTriggers
+        .OrderBy(entry => entry.Trigger.Priority)
+        .ThenBy(entry => entry.RegistrationOrder)];
+  }
 
-    return distinctEventTypes;
+  /*
+  * This function gets all the keys associated with a particular BattleEvent.
+  * E.g. For UnitMovedBattleEvent which implements BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, ISourcePositionedBattleEvent
+  * This will return a list of [UnitMovedBattleEvent, BattleEvent, IUnitBattleEvent, IPositionedBattleEvent], so that any registered triggers for the
+  * abstract base classes get tripped.
+  */
+  private static IReadOnlyList<Type> GetEventKeys(BattleEvent battleEvent)
+  {
+
+    Type eventType = battleEvent.GetType();
+    return
+    [
+      eventType,
+      .. eventType
+        .GetInterfaces()
+        .Where(interfaceType => typeof(BattleEventTag).IsAssignableFrom(interfaceType)),
+    ];
   }
 }

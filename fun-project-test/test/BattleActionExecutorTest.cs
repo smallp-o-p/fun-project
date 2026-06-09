@@ -20,7 +20,7 @@ public partial class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
     var targetPosition = new Vector3I(1, 0, 0);
-    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", targetPosition, unit.State, 3, shouldConsume: true), BattleEventType.TileOccupied);
+    executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 3, shouldConsume: true));
     var resolvedActions = new List<BattleAction>();
     executor.OnActionComplete += result => resolvedActions.Add(result.Action);
 
@@ -53,7 +53,7 @@ public partial class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", mid, unit.State, 3, shouldConsume: true), BattleEventType.TileOccupied);
+    executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(mid, unit.State, 3, shouldConsume: true));
     var resolvedActions = new List<BattleAction>();
     executor.OnActionComplete += result => resolvedActions.Add(result.Action);
 
@@ -170,10 +170,10 @@ public partial class BattleActionExecutorTest
     var executor = new BattleActionExecutor(session);
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    executor.RegisterTrigger(new RecordingTrigger("late", 10, targetPosition, log, "late"), BattleEventType.UnitMoved);
-    executor.RegisterTrigger(new RecordingTrigger("first", 0, targetPosition, log, "first"), BattleEventType.UnitMoved);
-    executor.RegisterTrigger(new RecordingTrigger("second", 0, targetPosition, log, "second"), BattleEventType.UnitMoved);
-    executor.RegisterTrigger(new RecordingTrigger("ignored", -10, targetPosition, log, "ignored"), BattleEventType.UnitDamaged);
+    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(10, targetPosition, log, "late"));
+    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(0, targetPosition, log, "first"));
+    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(0, targetPosition, log, "second"));
+    executor.RegisterTrigger<UnitDamagedBattleEvent>(new RecordingTrigger(-10, targetPosition, log, "ignored"));
 
     BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition])).RequireSingleResult();
 
@@ -181,8 +181,8 @@ public partial class BattleActionExecutorTest
     Assert.True(log.SequenceEqual(["first", "second", "late"]));
   }
 
-  [TestCase(TestName = "Executor only evaluates registered event type bucket")]
-  public void ExecutorOnlyEvaluatesRegisteredEventTypeBucket()
+  [TestCase(TestName = "Executor only evaluates registered event key bucket")]
+  public void ExecutorOnlyEvaluatesRegisteredEventKeyBucket()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
@@ -192,10 +192,10 @@ public partial class BattleActionExecutorTest
     var executor = new BattleActionExecutor(session);
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    var ignoredTrigger = new CountingTrigger("ignored", targetPosition, log, "ignored");
-    var matchingTrigger = new CountingTrigger("matching", targetPosition, log, "matching");
-    executor.RegisterTrigger(ignoredTrigger, BattleEventType.UnitDamaged);
-    executor.RegisterTrigger(matchingTrigger, BattleEventType.UnitMoved);
+    var ignoredTrigger = new CountingTrigger(targetPosition, log, "ignored");
+    var matchingTrigger = new CountingTrigger(targetPosition, log, "matching");
+    executor.RegisterTrigger<UnitDamagedBattleEvent>(ignoredTrigger);
+    executor.RegisterTrigger<UnitMovedBattleEvent>(matchingTrigger);
 
     BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition])).RequireSingleResult();
 
@@ -205,8 +205,8 @@ public partial class BattleActionExecutorTest
     Assert.True(log.SequenceEqual(["matching"]));
   }
 
-  [TestCase(TestName = "Executor supports one trigger subscribed to multiple event types")]
-  public void ExecutorSupportsOneTriggerSubscribedToMultipleEventTypes()
+  [TestCase(TestName = "Executor supports trigger registered to event shape")]
+  public void ExecutorSupportsTriggerRegisteredToEventShape()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
@@ -216,9 +216,7 @@ public partial class BattleActionExecutorTest
     var executor = new BattleActionExecutor(session);
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    executor.RegisterTrigger(
-      new RecordingTrigger("movement-or-occupation", 0, targetPosition, log, "matched"),
-      [BattleEventType.UnitMoved, BattleEventType.TileOccupied]);
+    executor.RegisterTrigger<IPositionedBattleEvent>(new RecordingTrigger(0, targetPosition, log, "matched"));
 
     BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition])).RequireSingleResult();
 
@@ -238,7 +236,7 @@ public partial class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
     var log = new List<string>();
-    executor.RegisterTrigger(new ConsumingTrigger("mine", targetPosition, log, "matched"), BattleEventType.UnitMoved);
+    executor.RegisterTrigger<UnitMovedBattleEvent>(new ConsumingTrigger(targetPosition, log, "matched"));
 
     BattleActionResult[] results =
     [
@@ -263,12 +261,10 @@ public partial class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger(
-      new DamageOnTileOccupiedTrigger("late", targetPosition, unit.State, 2, shouldConsume: true) { Priority = 10 },
-      BattleEventType.UnitMoved);
-    executor.RegisterTrigger(
-      new DamageOnTileOccupiedTrigger("first", targetPosition, unit.State, 1, shouldConsume: true) { Priority = 0 },
-      BattleEventType.UnitMoved);
+    executor.RegisterTrigger<UnitMovedBattleEvent>(
+      new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 2, shouldConsume: true) { Priority = 10 });
+    executor.RegisterTrigger<UnitMovedBattleEvent>(
+      new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 1, shouldConsume: true) { Priority = 0 });
 
     IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition]));
     int[] damageAmounts = results
@@ -293,8 +289,8 @@ public partial class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
     var targetPosition = new Vector3I(1, 0, 0);
-    var trigger = new DamageOnTileOccupiedTrigger("mine", targetPosition, unit.State, 3, shouldConsume: true);
-    executor.RegisterTrigger(trigger, BattleEventType.TileOccupied);
+    var trigger = new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 3, shouldConsume: true);
+    executor.RegisterTrigger<TileOccupiedBattleEvent>(trigger);
 
     IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition]));
 
@@ -318,7 +314,7 @@ public partial class BattleActionExecutorTest
 
     var executor = new BattleActionExecutor(session);
     var targetPosition = new Vector3I(2, 0, 0);
-    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", targetPosition, unit.State, 3, shouldConsume: true), BattleEventType.TileOccupied);
+    executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 3, shouldConsume: true));
 
     IReadOnlyList<BattleActionResult> rejectedResults = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition]));
 
@@ -341,8 +337,8 @@ public partial class BattleActionExecutorTest
     Assert.Equal(0, executor.PendingCount);
   }
 
-  [TestCase(TestName = "Executor supports multiple trigger instances with the same trigger id")]
-  public void ExecutorSupportsMultipleTriggerInstancesWithTheSameTriggerId()
+  [TestCase(TestName = "Executor supports multiple consumed trigger instances")]
+  public void ExecutorSupportsMultipleConsumedTriggerInstances()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
@@ -353,12 +349,10 @@ public partial class BattleActionExecutorTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger(
-      new DamageOnTileOccupiedTrigger("mine", firstTrap, unit.State, 2, shouldConsume: true),
-      BattleEventType.TileOccupied);
-    executor.RegisterTrigger(
-      new DamageOnTileOccupiedTrigger("mine", secondTrap, unit.State, 3, shouldConsume: true),
-      BattleEventType.TileOccupied);
+    executor.RegisterTrigger<TileOccupiedBattleEvent>(
+      new DamageOnTileOccupiedTrigger(firstTrap, unit.State, 2, shouldConsume: true));
+    executor.RegisterTrigger<TileOccupiedBattleEvent>(
+      new DamageOnTileOccupiedTrigger(secondTrap, unit.State, 3, shouldConsume: true));
 
     IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [firstTrap, secondTrap]));
 
@@ -428,7 +422,7 @@ public partial class BattleActionExecutorTest
 
     var action = new MoveUnit(unit.State, [mid, end]);
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", mid, unit.State, 3, shouldConsume: true), BattleEventType.TileOccupied);
+    executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(mid, unit.State, 3, shouldConsume: true));
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
     Assert.Equal(2, results.Count);
@@ -455,9 +449,8 @@ public partial class BattleActionExecutorTest
 
     var action = new MoveUnit(unit.State, [mid, end]);
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger(
-      new SpawnUnitOnTileOccupiedTrigger("blocker", mid, end, enemyFaction),
-      BattleEventType.TileOccupied);
+    executor.RegisterTrigger<TileOccupiedBattleEvent>(
+      new SpawnUnitOnTileOccupiedTrigger(mid, end, enemyFaction));
 
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
@@ -485,9 +478,8 @@ public partial class BattleActionExecutorTest
 
     var action = new MoveUnit(unit.State, [mid, end]);
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger(
-      new PassUnitOnTileOccupiedTrigger("stop", mid, unit.State),
-      BattleEventType.TileOccupied);
+    executor.RegisterTrigger<TileOccupiedBattleEvent>(
+      new PassUnitOnTileOccupiedTrigger(mid, unit.State));
 
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
@@ -514,7 +506,7 @@ public partial class BattleActionExecutorTest
 
     var action = new MoveUnit(unit.State, [mid, end]);
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger(new DamageOnTileOccupiedTrigger("mine", mid, unit.State, 3, shouldConsume: true), BattleEventType.TileOccupied);
+    executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(mid, unit.State, 3, shouldConsume: true));
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
     BattleActionResult result = results.RequireSingleResult();
@@ -761,9 +753,9 @@ public partial class BattleActionExecutorTest
     private readonly List<string> _log;
     private readonly string _message;
 
-    public RecordingTrigger(string triggerId, int priority, Vector3I position, List<string> log, string message)
-      : base(triggerId, priority)
+    public RecordingTrigger(int priority, Vector3I position, List<string> log, string message)
     {
+      Priority = priority;
       _position = position;
       _log = log;
       _message = message;
@@ -789,8 +781,7 @@ public partial class BattleActionExecutorTest
 
     public int MatchCallCount { get; private set; }
 
-    public CountingTrigger(string triggerId, Vector3I position, List<string> log, string message)
-      : base(triggerId)
+    public CountingTrigger(Vector3I position, List<string> log, string message)
     {
       _position = position;
       _log = log;
@@ -816,8 +807,7 @@ public partial class BattleActionExecutorTest
     private readonly List<string> _log;
     private readonly string _message;
 
-    public ConsumingTrigger(string triggerId, Vector3I position, List<string> log, string message)
-      : base(triggerId)
+    public ConsumingTrigger(Vector3I position, List<string> log, string message)
     {
       _position = position;
       _log = log;
@@ -846,12 +836,10 @@ public partial class BattleActionExecutorTest
     public Option<Vector3I> ObservedTargetPositionDuringEvaluation { get; private set; }
 
     public DamageOnTileOccupiedTrigger(
-      string triggerId,
       Vector3I position,
       BattleUnitState targetUnit,
       int damage,
       bool shouldConsume)
-      : base(triggerId)
     {
       _position = position;
       _targetUnit = targetUnit;
@@ -882,11 +870,9 @@ public partial class BattleActionExecutorTest
     private readonly Faction _faction;
 
     public SpawnUnitOnTileOccupiedTrigger(
-      string triggerId,
       Vector3I triggerPosition,
       Vector3I spawnPosition,
       Faction faction)
-      : base(triggerId)
     {
       _triggerPosition = triggerPosition;
       _spawnPosition = spawnPosition;
@@ -912,10 +898,8 @@ public partial class BattleActionExecutorTest
     private readonly BattleUnitState _unit;
 
     public PassUnitOnTileOccupiedTrigger(
-      string triggerId,
       Vector3I triggerPosition,
       BattleUnitState unit)
-      : base(triggerId)
     {
       _triggerPosition = triggerPosition;
       _unit = unit;
@@ -941,11 +925,9 @@ public partial class BattleActionExecutorTest
     private readonly int _damage;
 
     public DamageOnMovementEventTrigger(
-      string triggerId,
       Vector3I position,
       BattleUnitState targetUnit,
       int damage)
-      : base(triggerId)
     {
       _position = position;
       _targetUnit = targetUnit;

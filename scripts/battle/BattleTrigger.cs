@@ -6,20 +6,10 @@ namespace FunProject.Battle;
 
 public abstract partial class BattleTrigger : Resource
 {
-  public string TriggerId { get; set; } = string.Empty;
   public int Priority { get; set; }
 
   protected BattleTrigger()
   {
-  }
-
-  protected BattleTrigger(string triggerId, int priority = 0)
-  {
-    if (string.IsNullOrWhiteSpace(triggerId))
-      throw new ArgumentException("Trigger id cannot be null or whitespace.", nameof(triggerId));
-
-    TriggerId = triggerId;
-    Priority = priority;
   }
 
   public abstract bool Matches(BattleEvent battleEvent);
@@ -28,7 +18,7 @@ public abstract partial class BattleTrigger : Resource
 
 public readonly record struct BattleTriggerResult(
   IReadOnlyList<BattleAction> InterruptActions,
-  bool ShouldConsumeTrigger
+  bool Consumed
 )
 {
   public static BattleTriggerResult NoReaction()

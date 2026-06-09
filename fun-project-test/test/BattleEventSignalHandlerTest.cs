@@ -2,9 +2,6 @@ using FunProject.Battle;
 using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using static BattleActionTestHelper;
 
 [TestSuite]
@@ -35,7 +32,7 @@ public sealed partial class BattleEventSignalHandlerTest
       BattleEvent committedEvent = committedEvents.Single();
       BattleEventAdapter presentationEvent = events.Single();
       Assert.True(ReferenceEquals(committedEvent, presentationEvent.BattleEvent));
-      Assert.Equal(BattleEventType.UnitAdded, presentationEvent.Type);
+      Assert.Equal("unit_added", presentationEvent.EventName);
       Assert.Equal("Alpha entered the battle at (1, 0, 1).", presentationEvent.Message);
       Assert.True(presentationEvent.BattleEvent is UnitAddedBattleEvent);
 

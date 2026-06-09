@@ -37,6 +37,40 @@ public class BattleEventTest
     Assert.Equal("Alpha threw Frag Grenade.", new ItemThrownBattleEvent(unit.State, position, grenade).ToDisplayString());
   }
 
+  [TestCase(TestName = "Battle events expose stable event names")]
+  public void BattleEventsExposeStableEventNames()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var runtime = new BattleRuntime(session);
+    var sourcePosition = session.Board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome();
+    var position = session.Board.ValidatePoint(new Vector3I(1, 0, 2)).RequireSome();
+    var unit = BattleActionTestHelper.SpawnUnit(
+      runtime,
+      BattleTestFactory.MakeCombatant("Alpha", faction),
+      sourcePosition.Raw);
+    var grenade = BattleTestFactory.MakeGrenade("Frag Grenade");
+
+    (BattleEvent Event, string ExpectedName)[] events =
+    [
+      (new SessionStartedBattleEvent(), "session_started"),
+      (new SessionEndedBattleEvent(), "session_ended"),
+      (new TurnStartedBattleEvent(faction, 2), "turn_started"),
+      (new TurnEndedBattleEvent(faction, 2), "turn_ended"),
+      (new ActiveSideChangedBattleEvent(faction), "active_side_changed"),
+      (new UnitAddedBattleEvent(unit.State, position), "unit_added"),
+      (new UnitActivationEndedBattleEvent(unit.State, position), "unit_activation_ended"),
+      (new UnitMovedBattleEvent(unit.State, position, sourcePosition), "unit_moved"),
+      (new TileOccupiedBattleEvent(unit.State, position), "tile_occupied"),
+      (new UnitDamagedBattleEvent(unit.State, 3), "unit_damaged"),
+      (new UnitKilledBattleEvent(unit.State, position), "unit_killed"),
+      (new ItemThrownBattleEvent(unit.State, position, grenade), "item_thrown"),
+    ];
+
+    foreach ((BattleEvent battleEvent, string expectedName) in events)
+      Assert.Equal(expectedName, battleEvent.EventName);
+  }
+
   [TestCase(TestName = "Committed battle events expose session domain objects")]
   public void CommittedBattleEventsExposeSessionDomainObjects()
   {

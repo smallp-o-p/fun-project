@@ -22,14 +22,10 @@ public sealed class BattleActionExecutor
     _session = session;
   }
 
-  public void RegisterTrigger(BattleTrigger trigger, BattleEventType eventType)
+  public void RegisterTrigger<TEventKey>(BattleTrigger trigger)
+    where TEventKey : BattleEventTag
   {
-    _triggerRegistry.Register(trigger, eventType);
-  }
-
-  public void RegisterTrigger(BattleTrigger trigger, IEnumerable<BattleEventType> eventTypes)
-  {
-    _triggerRegistry.Register(trigger, eventTypes);
+    _triggerRegistry.Register<TEventKey>(trigger);
   }
 
   public IReadOnlyList<BattleActionResult> Submit(BattleAction action)
