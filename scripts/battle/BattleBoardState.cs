@@ -280,6 +280,37 @@ public sealed class BattleBoardState
     return !GetTile(point).IsWalkable || _occupants.ContainsKey(point);
   }
 
+  public IReadOnlyCollection<ValidatedPoint> GetReachableTiles(ValidatedPoint origin, int maxSteps)
+  {
+    // Walks the cached path graph so connectivity and blocking stay defined in one place.
+    // The origin is enqueued unconditionally: its own disabled state (the mover standing
+    // on it) must not block the search, mirroring FindPath's source handling.
+    List<ValidatedPoint> reachable = [];
+    SysColGeneric.HashSet<long> visited = [CoordinatesToPointId(origin)];
+    Queue<(long id, int steps)> frontier = new();
+    frontier.Enqueue((CoordinatesToPointId(origin), 0));
+
+    while (frontier.Count > 0)
+    {
+      var (currentId, steps) = frontier.Dequeue();
+      if (steps >= maxSteps)
+        continue;
+
+      foreach (long neighborId in _pathGraph.GetPointConnections(currentId))
+      {
+        if (!visited.Add(neighborId))
+          continue;
+        if (_pathGraph.IsPointDisabled(neighborId))
+          continue;
+
+        reachable.Add(PointIdToCoordinates(neighborId));
+        frontier.Enqueue((neighborId, steps + 1));
+      }
+    }
+
+    return reachable;
+  }
+
   private ValidatedPoint PointIdToCoordinates(long pointId)
   {
     long layerSize = (long)Dimensions.X * Dimensions.Z;

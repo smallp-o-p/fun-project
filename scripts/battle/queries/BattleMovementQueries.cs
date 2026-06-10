@@ -69,67 +69,6 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
     int maxSteps = ActionPointCostPerStep == 0
       ? int.MaxValue
       : Unit.CurrentActionPoints / ActionPointCostPerStep;
-    return Succeed(FloodFillReachableTiles(session.Board, unitPointOption.Value(), Unit.Id, maxSteps));
-  }
-
-  private static List<BattleBoardState.ValidatedPoint> FloodFillReachableTiles(
-    BattleBoardState board,
-    BattleBoardState.ValidatedPoint origin,
-    int movingUnitId,
-    int maxSteps)
-  {
-    List<BattleBoardState.ValidatedPoint> reachable = [];
-    System.Collections.Generic.HashSet<BattleBoardState.ValidatedPoint> visited = [origin];
-    Queue<(BattleBoardState.ValidatedPoint point, int steps)> queue = new();
-    queue.Enqueue((origin, 0));
-
-    while (queue.Count > 0)
-    {
-      var (current, steps) = queue.Dequeue();
-      if (steps >= maxSteps)
-        continue;
-
-      foreach (BattleBoardState.ValidatedPoint neighbor in EnumerateOrthogonalNeighbors(board, current))
-      {
-        if (!visited.Add(neighbor))
-          continue;
-
-        BattleTileState tile = board.GetTile(neighbor);
-        if (!tile.IsWalkable)
-          continue;
-        Option<int> occupant = board.GetOccupant(neighbor);
-        if (occupant.IsSome && occupant.Value() != movingUnitId)
-          continue;
-
-        if (occupant.IsNone)
-          reachable.Add(neighbor);
-
-        queue.Enqueue((neighbor, steps + 1));
-      }
-    }
-
-    return reachable;
-  }
-
-  private static readonly Vector3I[] OrthogonalOffsets =
-  [
-    new Vector3I(1, 0, 0),
-    new Vector3I(-1, 0, 0),
-    new Vector3I(0, 0, 1),
-    new Vector3I(0, 0, -1),
-    new Vector3I(0, 1, 0),
-    new Vector3I(0, -1, 0),
-  ];
-
-  private static IEnumerable<BattleBoardState.ValidatedPoint> EnumerateOrthogonalNeighbors(
-    BattleBoardState board,
-    BattleBoardState.ValidatedPoint point)
-  {
-    foreach (Vector3I offset in OrthogonalOffsets)
-    {
-      Option<BattleBoardState.ValidatedPoint> neighbor = board.ValidatePoint(point.Raw + offset);
-      if (neighbor.IsSome)
-        yield return neighbor.Value();
-    }
+    return Succeed(session.Board.GetReachableTiles(unitPointOption.Value(), maxSteps));
   }
 }
