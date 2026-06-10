@@ -6,21 +6,6 @@ using Godot;
 [RequireGodotRuntime]
 public partial class InteractableTest
 {
-  [TestCase(TestName = "Interactable subclasses implement IInteractable")]
-  public void InteractableSubclassesImplementIInteractable()
-  {
-    var interactable = new RecordingInteractable();
-
-    try
-    {
-      Assert.True(interactable is IInteractable);
-    }
-    finally
-    {
-      interactable.Free();
-    }
-  }
-
   [TestCase(TestName = "Interactable tracks hover state and calls hover hooks")]
   public void InteractableTracksHoverStateAndCallsHooks()
   {

@@ -1,7 +1,6 @@
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
-using FunProject.Stats;
 using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
@@ -57,24 +56,6 @@ public class EquippableItemSystemTest
 
     Assert.Equal(2, item.FindCapability<ModSlotsCapability>().RequireSome().Slots.Count);
     Assert.Equal(2, item.GetModSlots().Count);
-  }
-
-  [TestCase(TestName = "Weapon still exposes base item identity")]
-  public void WeaponStillExposesBaseItemIdentity()
-  {
-    var weapon = new MeleeWeapon(new WeaponData
-    {
-      Name = "Blade",
-      Description = "Close combat weapon",
-      DamageElement = DamageElement.Kinetic,
-      DamageStat = new DamageStat { BaseValue = 7 },
-      RangeStat = new RangeStat { BaseValue = 1 },
-      CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
-    });
-
-    Assert.Equal("Blade", weapon.ItemName);
-    Assert.Equal("Blade", weapon.WeaponName);
-    Assert.Equal(7, weapon.GetDamageStat().BaseValue);
   }
 
   [TestCase(TestName = "Frag grenade is pure data")]

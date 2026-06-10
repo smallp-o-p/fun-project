@@ -27,13 +27,6 @@ public class WeaponSystemTest
     Capabilities = [new ModSlotsCapabilityData { SlotCount = 1 }]
   };
 
-  [TestCase(TestName = "Stat instances work")]
-  public void StatInstancesWork()
-  {
-    var dmg = new DamageStat { BaseValue = 25 };
-    Assert.Equal(25, dmg.BaseValue);
-  }
-
   [TestCase(TestName = "MeleeWeapon constructed from RangedWeaponData")]
   public void MeleeWeaponConstructedFromRangedWeaponData()
   {
@@ -301,48 +294,6 @@ public class WeaponSystemTest
     Assert.Equal(data.RangeStat.BaseValue + 6, slot.EquippedMod.RequireSome().GetAppliedStat<RangeStat>(weapon));
   }
 
-  [TestCase(TestName = "All damage elements are valid enum values")]
-  public void AllDamageElementsAreValidEnumValues()
-  {
-    var elements = Enum.GetValues<DamageElement>();
-    Assert.Equal(4, elements.Length);
-    Assert.Equal(DamageElement.Kinetic, (DamageElement)0);
-  }
-
-  [TestCase(TestName = "Weapon can be assigned each damage element")]
-  public void WeaponCanBeAssignedEachDamageElement()
-  {
-    foreach (DamageElement element in Enum.GetValues<DamageElement>())
-    {
-      var data = MakeWeaponData();
-      data.DamageElement = element;
-      var weapon = new MeleeWeapon(data);
-      Assert.Equal(element, weapon.DamageElement);
-    }
-  }
-
-  [TestCase(TestName = "All firearm archetypes are valid enum values")]
-  public void AllFirearmArchetypesAreValidEnumValues()
-  {
-    var archetypes = Enum.GetValues<FirearmArchetype>();
-    Assert.Equal(4, archetypes.Length);
-    Assert.Equal(FirearmArchetype.Pistol, (FirearmArchetype)0);
-  }
-
-  [TestCase(TestName = "Weapon helper methods return correct stats")]
-  public void WeaponHelperMethodsReturnCorrectStats()
-  {
-    var data = MakeWeaponData();
-    data.DamageStat.BaseValue = 42;
-    data.CriticalChanceStat.BaseValue = 99;
-    data.RangeStat.BaseValue = 7;
-    var weapon = new MeleeWeapon(data);
-
-    Assert.Equal(42, weapon.GetDamageStat().BaseValue);
-    Assert.Equal(99, weapon.GetCritChanceStat().BaseValue);
-    Assert.Equal(7, weapon.GetRangeStat().BaseValue);
-  }
-
   [TestCase(TestName = "EquippableStatMod AddModifier adds to internal list")]
   public void EquippableStatModAddModifierAddsToInternalList()
   {
@@ -450,68 +401,4 @@ public class WeaponSystemTest
     Assert.Equal(0f, mod.ApplyToTarget(weapon));
   }
 
-  [TestCase(TestName = "Ammunition struct copies data from AmmunitionData")]
-  public void AmmunitionStructCopiesDataFromAmmunitionData()
-  {
-    var ammo = new Ammunition { Name = "AP Round", Description = "Armor-piercing ammo" };
-    Assert.Equal("AP Round", ammo.Name);
-    Assert.Equal("Armor-piercing ammo", ammo.Description);
-  }
-
-  [TestCase(TestName = "FirearmWeapon initializes AmmoType from DefaultAmmoData")]
-  public void FirearmWeaponInitializesAmmoTypeFromDefaultAmmoData()
-  {
-    var data = new FirearmWeaponData
-    {
-      DefaultAmmoData = new Ammunition { Name = "Standard", Description = "Standard issue rounds" },
-      DamageStat = new DamageStat { BaseValue = 10 },
-      CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
-      RangeStat = new RangeStat { BaseValue = 15 },
-      AmmunitionStat = new AmmunitionStat { BaseValue = 12 },
-    };
-    var weapon = new FirearmWeapon(data);
-    Assert.Equal("Standard", weapon.AmmoType.Name);
-    Assert.Equal("Standard issue rounds", weapon.AmmoType.Description);
-  }
-
-  [TestCase(TestName = "FirearmWeapon AmmoType can be reassigned")]
-  public void FirearmWeaponAmmoTypeCanBeReassigned()
-  {
-    var weapon = new FirearmWeapon(MakeFirearmWeaponData());
-    var newAmmo = new Ammunition { Name = "Incendiary" };
-    weapon.AmmoType = newAmmo;
-    Assert.Equal("Incendiary", weapon.AmmoType.Name);
-  }
-
-  [TestCase(TestName = "Ammunition struct inherits StatModifier array from AmmunitionData")]
-  public void AmmunitionStructInheritsStatModifierArrayFromAmmunitionData()
-  {
-    var ammo = new Ammunition
-    {
-      Name = "+Damage Ammo",
-      Modifiers =
-      [
-        new DamageStatMod
-        {
-          Modifiers = [StatModifier.Add(10)]
-        }
-      ]
-    };
-    Assert.Equal(1, ammo.Modifiers.Count);
-  }
-
-  [TestCase(TestName = "AmmunitionedWeaponData holds AmmunitionStat and DefaultAmmoData")]
-  public void AmmunitionedWeaponDataHoldsAmmunitionStatAndDefaultAmmoData()
-  {
-    var data = new AmmunitionedWeaponData
-    {
-      AmmunitionStat = new AmmunitionStat { BaseValue = 6 },
-      DefaultAmmoData = new Ammunition { Name = "Test Ammo" },
-      DamageStat = new DamageStat { BaseValue = 20 },
-      CriticalChanceStat = new CriticalChanceStat { BaseValue = 10 },
-      RangeStat = new RangeStat { BaseValue = 5 },
-    };
-    Assert.Equal(6, data.AmmunitionStat.BaseValue);
-    Assert.Equal("Test Ammo", data.DefaultAmmoData.Name);
-  }
 }

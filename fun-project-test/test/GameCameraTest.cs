@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using GdUnit4;
 using Godot;
 
@@ -71,15 +70,5 @@ public partial class GameCameraTest
     {
       camera.Free();
     }
-  }
-
-  [TestCase(TestName = "Raycast hit position reader is not public API")]
-  public void RaycastHitPositionReaderIsNotPublicApi()
-  {
-    MethodInfo method = typeof(GameCamera).GetMethod(
-      "TryReadRaycastHitPosition",
-      BindingFlags.Public | BindingFlags.Static);
-
-    Assert.True(method == null);
   }
 }

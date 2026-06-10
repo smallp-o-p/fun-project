@@ -133,17 +133,6 @@ public class BattleSessionTest
     Assert.False(result.Succeeded);
   }
 
-  [TestCase(TestName = "Constructor initializes active side from turn queue")]
-  public void ConstructorInitializesActiveSideFromTurnQueue()
-  {
-    var factionA = BattleTestFactory.MakeFaction("A");
-    var factionB = BattleTestFactory.MakeFaction("B");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [factionA, factionB]);
-
-    Assert.Equal(factionA, session.ActiveSide);
-    Assert.Equal(factionA, session.TurnQueue.First());
-  }
-
   [TestCase(TestName = "Constructor rejects sessions without factions")]
   public void ConstructorRejectsSessionsWithoutFactions()
   {

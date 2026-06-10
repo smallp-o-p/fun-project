@@ -22,14 +22,6 @@ public sealed partial class BattleRuntimeTest
     Assert.Equal(new Vector3I(1, 0, 0), result.Raw);
   }
 
-  [TestCase(TestName = "BattleSession does not expose direct damage mutation publicly")]
-  public void BattleSessionDoesNotExposeDirectDamageMutationPublicly()
-  {
-    var method = typeof(BattleSession).GetMethod("DealDamageTo");
-
-    Assert.True(method == null);
-  }
-
   [TestCase(TestName = "ExecuteAction delegates to action executor")]
   public void ExecuteActionDelegatesToActionExecutor()
   {

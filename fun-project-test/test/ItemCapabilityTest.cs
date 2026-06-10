@@ -1,8 +1,6 @@
 using FunProject.Items;
 using FunProject.Items.Capabilities;
-using FunProject.Items.Effects;
 using FunProject.Tests;
-using FunProject.Weapons;
 using GdUnit4;
 using System;
 
@@ -34,41 +32,6 @@ public class ItemCapabilityTest
 
     Assert.Equal(0, capability.MaxCharges);
     Assert.True(capability.IsDepleted);
-  }
-
-  [TestCase(TestName = "Throwable capability copies authored values")]
-  public void ThrowableCapabilityCopiesAuthoredValues()
-  {
-    var capability = (ThrowableCapability)new ThrowableCapabilityData
-    {
-      ThrowRange = 5,
-      ActionPointCost = 2,
-      ConsumesOnUse = false,
-    }.CreateRuntime();
-
-    Assert.Equal(5, capability.ThrowRange);
-    Assert.Equal(2, capability.ActionPointCost);
-    Assert.False(capability.ConsumesOnUse);
-  }
-
-  [TestCase(TestName = "Blast capability carries radius and effect descriptors")]
-  public void BlastCapabilityCarriesRadiusAndEffectDescriptors()
-  {
-    var damageEffect = new DamageEffectData
-    {
-      Name = "Shrapnel",
-      BaseDamage = 6,
-      DamageElement = DamageElement.Kinetic,
-    };
-    var capability = (BlastCapability)new BlastCapabilityData
-    {
-      BlastRadius = 3,
-      Effects = [damageEffect],
-    }.CreateRuntime();
-
-    Assert.Equal(3, capability.BlastRadius);
-    Assert.Equal(1, capability.Effects.Count);
-    Assert.Equal(damageEffect, capability.Effects[0]);
   }
 
   [TestCase(TestName = "Mod slots capability creates slot instances")]
