@@ -9,15 +9,12 @@ namespace FunProject.Battle;
 public partial class BattleMapData : Resource
 {
   [Export] public Vector3I Dimensions { get; set; } = new(8, 1, 8);
-  [Export] public float TileSize { get; set; } = 1.0f;
   [Export] public Array<BattleMapTileData> TileOverrides { get; set; } = [];
 
   public BattleBoardState CreateBoardState()
   {
     if (!HasValidDimensions(Dimensions))
       throw new InvalidOperationException($"{nameof(BattleMapData)} requires positive dimensions.");
-    if (TileSize <= 0.0f)
-      throw new InvalidOperationException($"{nameof(BattleMapData)} requires a positive tile size.");
 
     BattleBoardState board = new(Dimensions);
 
@@ -61,7 +58,7 @@ public partial class BattleMapData : Resource
     }
   }
 
-  public Option<BattleMapTileData> GetTileOverrideOrNone(Vector3I coordinates)
+  private Option<BattleMapTileData> GetTileOverrideOrNone(Vector3I coordinates)
   {
     Option<BattleMapTileData> matchedTile = None;
 

@@ -39,7 +39,8 @@ public partial class BattleBoardStateTest
 
     BattleBoardState.ValidatedPoint[] path = board.FindPath(
       board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(),
-      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome());
+      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome(),
+      -1);
 
     Assert.Equal(new Vector3I(0, 0, 1), path[0].Raw);
     Assert.Equal(new Vector3I(2, 0, 1), path[^1].Raw);
@@ -57,7 +58,8 @@ public partial class BattleBoardStateTest
 
     BattleBoardState.ValidatedPoint[] path = board.FindPath(
       board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(),
-      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome());
+      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome(),
+      -1);
 
     Assert.Equal(0, path.Length);
   }
@@ -71,7 +73,8 @@ public partial class BattleBoardStateTest
 
     BattleBoardState.ValidatedPoint[] pathAroundOccupant = board.FindPath(
       board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(),
-      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome());
+      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome(),
+      -1);
     BattleBoardState.ValidatedPoint[] pathFromOccupiedSource = board.FindPath(
       board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome(),
       board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome(),
@@ -87,7 +90,8 @@ public partial class BattleBoardStateTest
 
     BattleBoardState.ValidatedPoint[] pathAfterClearingOccupant = board.FindPath(
       board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(),
-      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome());
+      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome(),
+      -1);
     Assert.Equal(3, pathAfterClearingOccupant.Length);
   }
 

@@ -10,15 +10,6 @@ public sealed class BattleRuntime : IDisposable
   private readonly BattleActionExecutor _actions;
   private bool _disposed;
 
-  public int PendingActionCount
-  {
-    get
-    {
-      ThrowIfDisposed();
-      return _actions.PendingCount;
-    }
-  }
-
   public Option<BattleActionResult> LastActionResult
   {
     get

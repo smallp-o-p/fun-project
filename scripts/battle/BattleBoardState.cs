@@ -7,7 +7,7 @@ namespace FunProject.Battle;
 
 public sealed class BattleBoardState
 {
-  public readonly struct ValidatedPoint : IEquatable<ValidatedPoint>, IEquatable<Vector3I>
+  public readonly struct ValidatedPoint : IEquatable<ValidatedPoint>
   {
     public readonly Vector3I Raw;
     public int X => Raw.X;
@@ -24,14 +24,9 @@ public sealed class BattleBoardState
       return Raw == other.Raw;
     }
 
-    public bool Equals(Vector3I other)
-    {
-      return Raw == other;
-    }
-
     public override bool Equals(object? obj)
     {
-      return (obj is ValidatedPoint other && Equals(other)) || (obj is Vector3I other2 && Equals(other2));
+      return obj is ValidatedPoint other && Equals(other);
     }
 
     public override int GetHashCode()
@@ -57,6 +52,7 @@ public sealed class BattleBoardState
 
   private readonly BattleTileState[,,] _tiles;
   private readonly AStar3D _pathGraph = new();
+  private readonly Dictionary<int, ValidatedPoint> _occupantPositions = [];
 
   public Vector3I Dimensions { get; }
 
@@ -100,40 +96,13 @@ public sealed class BattleBoardState
     return IsInBounds(coordinates) ? Some(new ValidatedPoint(coordinates)) : None;
   }
 
-  public Option<ValidatedPoint> ValidatePoint(Godot.Vector3 coordinates)
-  {
-    Godot.Vector3 floor = coordinates.Floor();
-    return ValidatePoint(new((int)floor.X, (int)floor.Y, (int)floor.Z));
-  }
-
-  public Option<List<ValidatedPoint>> ValidatePath(IEnumerable<Vector3I> path)
-  {
-    List<ValidatedPoint> validatedPts = new()
-    {
-      Capacity = path.Count()
-    };
-
-    foreach (var pt in path)
-    {
-      bool validated = ValidatePoint(pt).Match(
-        (validated) =>
-        {
-          validatedPts.Add(validated);
-          return true;
-        },
-        () => false
-      );
-
-      if (!validated)
-        return None;
-    }
-
-    return Some(validatedPts);
-  }
-
   public bool TryPlaceOccupant(ValidatedPoint point, int unitId)
   {
-    return GetTile(point).TrySetOccupant(unitId);
+    if (!GetTile(point).TrySetOccupant(unitId))
+      return false;
+
+    _occupantPositions[unitId] = point;
+    return true;
   }
 
   public bool TryMoveOccupant(ValidatedPoint source, ValidatedPoint destination, int unitId)
@@ -148,6 +117,7 @@ public sealed class BattleBoardState
       return false;
 
     sourceTile.ClearOccupant();
+    _occupantPositions[unitId] = destination;
     return true;
   }
 
@@ -158,10 +128,16 @@ public sealed class BattleBoardState
       return false;
 
     tile.ClearOccupant();
+    _occupantPositions.Remove(unitId);
     return true;
   }
 
-  public ValidatedPoint[] FindPath(ValidatedPoint source, ValidatedPoint destination, int movingUnitId = 0)
+  public Option<ValidatedPoint> FindOccupantPosition(int unitId)
+  {
+    return _occupantPositions.TryGetValue(unitId, out var position) ? Some(position) : None;
+  }
+
+  public ValidatedPoint[] FindPath(ValidatedPoint source, ValidatedPoint destination, int movingUnitId)
   {
     if (!CanUsePathEndpoint(source, movingUnitId) || !CanUsePathEndpoint(destination, movingUnitId))
       return [];
@@ -190,10 +166,15 @@ public sealed class BattleBoardState
     return tile.IsWalkable && !tile.IsOccupied;
   }
 
+  public static int GetGridDistance(Vector3I source, Vector3I destination)
+  {
+    var delta = source - destination;
+    return Mathf.Abs(delta.X) + Mathf.Abs(delta.Y) + Mathf.Abs(delta.Z);
+  }
+
   public static bool AreAdjacent(ValidatedPoint source, ValidatedPoint destination)
   {
-    Vector3I delta = source.Raw - destination.Raw;
-    return Mathf.Abs(delta.X) + Mathf.Abs(delta.Y) + Mathf.Abs(delta.Z) == 1;
+    return GetGridDistance(source.Raw, destination.Raw) == 1;
   }
 
   public IEnumerable<ValidatedPoint> EnumerateBoardPoints()
@@ -227,12 +208,7 @@ public sealed class BattleBoardState
     return tile.HasOccupant(movingUnitId);
   }
 
-  private long CoordinatesToPointId(ValidatedPoint point)
-  {
-    return point.X
-      + ((long)Dimensions.X * point.Z)
-      + ((long)Dimensions.X * Dimensions.Z * point.Y);
-  }
+  private long CoordinatesToPointId(ValidatedPoint point) => CoordinatesToPointId(point.Raw);
 
   private long CoordinatesToPointId(Vector3I coordinates)
   {

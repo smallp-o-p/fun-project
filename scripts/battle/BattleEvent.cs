@@ -24,21 +24,6 @@ public interface IPositionedBattleEvent : BattleEventTag
   BattleBoardState.ValidatedPoint Position { get; }
 }
 
-public interface ISourcePositionedBattleEvent : BattleEventTag
-{
-  BattleBoardState.ValidatedPoint SourcePosition { get; }
-}
-
-public interface IFactionBattleEvent : BattleEventTag
-{
-  Faction Faction { get; }
-}
-
-public interface ITurnBattleEvent : BattleEventTag
-{
-  int TurnNumber { get; }
-}
-
 public sealed record SessionStartedBattleEvent : BattleEvent
 {
   public override string EventName => "session_started";
@@ -51,7 +36,7 @@ public sealed record SessionEndedBattleEvent : BattleEvent
   public override string ToDisplayString() => "Battle ended.";
 }
 
-public sealed record TurnStartedBattleEvent : BattleEvent, IFactionBattleEvent, ITurnBattleEvent
+public sealed record TurnStartedBattleEvent : BattleEvent
 {
   public override string EventName => "turn_started";
   public Faction Faction { get; }
@@ -66,7 +51,7 @@ public sealed record TurnStartedBattleEvent : BattleEvent, IFactionBattleEvent, 
   public override string ToDisplayString() => $"Turn {TurnNumber} started for {Faction.Name}.";
 }
 
-public sealed record TurnEndedBattleEvent : BattleEvent, IFactionBattleEvent, ITurnBattleEvent
+public sealed record TurnEndedBattleEvent : BattleEvent
 {
   public override string EventName => "turn_ended";
   public Faction Faction { get; }
@@ -81,7 +66,7 @@ public sealed record TurnEndedBattleEvent : BattleEvent, IFactionBattleEvent, IT
   public override string ToDisplayString() => $"Turn {TurnNumber} ended for {Faction.Name}.";
 }
 
-public sealed record ActiveSideChangedBattleEvent : BattleEvent, IFactionBattleEvent
+public sealed record ActiveSideChangedBattleEvent : BattleEvent
 {
   public override string EventName => "active_side_changed";
   public Faction Faction { get; }
@@ -126,7 +111,7 @@ public sealed record UnitActivationEndedBattleEvent : BattleEvent, IUnitBattleEv
   public override string ToDisplayString() => $"{Unit.Combatant.Name} ended their activation.";
 }
 
-public sealed record UnitMovedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, ISourcePositionedBattleEvent
+public sealed record UnitMovedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
   public override string EventName => "unit_moved";
   public BattleUnitState Unit { get; }

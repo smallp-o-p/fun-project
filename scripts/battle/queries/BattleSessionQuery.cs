@@ -4,16 +4,6 @@ namespace FunProject.Battle;
 
 public abstract class BattleSessionQuery<TResult>
 {
-  public string QueryId { get; }
-
-  protected BattleSessionQuery(string queryId)
-  {
-    if (string.IsNullOrWhiteSpace(queryId))
-      throw new ArgumentException("Query id cannot be null or whitespace.", nameof(queryId));
-
-    QueryId = queryId;
-  }
-
   internal abstract Either<BattleQueryFailure, TResult> Execute(BattleSession session);
 
   protected Either<BattleQueryFailure, TResult> Succeed(TResult value)
@@ -30,5 +20,10 @@ public abstract class BattleSessionQuery<TResult>
   {
     ArgumentNullException.ThrowIfNull(failure);
     return Left<BattleQueryFailure, TResult>(failure);
+  }
+
+  protected Either<BattleQueryFailure, TResult> FailUnitNotAlive(BattleUnitState unit)
+  {
+    return Fail(BattleQueryFailureReason.UnitNotAlive, $"Unit {unit.Id} is not alive.");
   }
 }

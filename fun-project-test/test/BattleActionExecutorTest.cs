@@ -35,7 +35,6 @@ public partial class BattleActionExecutorTest
     Assert.True(results[1].Action is ApplyDamage);
     Assert.Equal(targetPosition, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(7, unit.State.CurrentHealth);
-    Assert.Equal(0, executor.PendingCount);
     Assert.True(resolvedActions.Select(action => action.ActionId).SequenceEqual([
       "move_unit",
       ApplyDamage.ApplyDamageActionId,
@@ -67,7 +66,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal(submittedAction, results[1].Action);
     Assert.Equal(end, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(7, unit.State.CurrentHealth);
-    Assert.Equal(0, executor.PendingCount);
     Assert.True(submittedAction.IsDone());
     Assert.True(resolvedActions.Select(action => action.ActionId).SequenceEqual([
       ApplyDamage.ApplyDamageActionId,
@@ -277,7 +275,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal(3, results.Count);
     Assert.True(results.All(result => result.Succeeded));
     Assert.True(damageAmounts.SequenceEqual([1, 2]));
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "Executor queues trigger response after committed tile occupation")]
@@ -302,7 +299,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal(targetPosition, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(targetPosition, trigger.ObservedTargetPositionDuringEvaluation.RequireSome());
     Assert.Equal(7, unit.State.CurrentHealth);
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "Executor rejected source action does not consume trigger or enqueue response")]
@@ -322,7 +318,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal(0, rejectedResults.Count);
     Assert.Equal(new Vector3I(0, 0, 0), session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(10, unit.State.CurrentHealth);
-    Assert.Equal(0, executor.PendingCount);
 
     BattleActionResult approachResult = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 0, 0)])).RequireSingleResult();
     IReadOnlyList<BattleActionResult> sourceResults = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition]));
@@ -335,7 +330,6 @@ public partial class BattleActionExecutorTest
     Assert.True(responseResult.Succeeded);
     Assert.True(responseResult.Action is ApplyDamage);
     Assert.Equal(7, unit.State.CurrentHealth);
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "Executor supports multiple consumed trigger instances")]
@@ -363,7 +357,6 @@ public partial class BattleActionExecutorTest
     Assert.True(results[1].Action is MoveUnit);
     Assert.True(results[2].Action is ApplyDamage);
     Assert.Equal(5, unit.State.CurrentHealth);
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "Executor discards non producing action and resolves later queued work")]
@@ -383,7 +376,6 @@ public partial class BattleActionExecutorTest
     Assert.True(moveResult.Succeeded);
     Assert.True(moveResult.Action is MoveUnit);
     Assert.Equal(new Vector3I(1, 0, 0), session.GetUnitPosition(unit.State).RequireSome().Raw);
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "MoveUnit submit reports only the composite action")]
@@ -407,7 +399,6 @@ public partial class BattleActionExecutorTest
     Assert.True(result.Action.IsDone());
     Assert.Equal(end, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.True(action.IsDone());
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "MoveUnit resolves trigger response before resuming")]
@@ -433,7 +424,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal(end, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(7, unit.State.CurrentHealth);
     Assert.True(action.IsDone());
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "MoveUnit reports composite failure when an internal step fails")]
@@ -462,7 +452,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal(action, results[1].Action);
     Assert.Equal(mid, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.True(action.IsDone());
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "MoveUnit stops when trigger response makes mover unavailable")]
@@ -491,7 +480,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal(action, results[1].Action);
     Assert.Equal(mid, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.True(action.IsDone());
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "MoveUnit cancels when trigger response kills mover")]
@@ -515,7 +503,6 @@ public partial class BattleActionExecutorTest
     Assert.True(result.Action is ApplyDamage);
     Assert.True(action.IsDone());
     Assert.Equal(0, unit.State.CurrentHealth);
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "MoveUnit fails malformed route before moving")]
@@ -537,7 +524,6 @@ public partial class BattleActionExecutorTest
     Assert.True(action.IsDone());
     Assert.Equal(start, session.GetUnitPosition(unit.State).RequireSome().Raw);
     Assert.Equal(5, unit.State.CurrentActionPoints);
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "MoveUnit fails empty destinations before moving")]
@@ -556,7 +542,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal(0, result.Count);
     Assert.True(action.IsDone());
     Assert.Equal(start, session.GetUnitPosition(unit.State).RequireSome().Raw);
-    Assert.Equal(0, executor.PendingCount);
   }
 
   [TestCase(TestName = "EndFactionTurn emits turn transition events after commit")]
@@ -993,12 +978,12 @@ public partial class BattleActionExecutorTest
     {
     }
 
-    public override Option<BattleAction> NextAction(BattleSession session)
+    internal override Option<BattleAction> NextAction(BattleSession session)
     {
       return None;
     }
 
-    public override void ConsumeResult(BattleActionResult result)
+    internal override void ConsumeResult(BattleActionResult result)
     {
     }
   }

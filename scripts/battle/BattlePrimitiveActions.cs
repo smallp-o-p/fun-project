@@ -3,6 +3,7 @@ using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Weapons;
 using Godot;
+using LanguageExt.UnsafeValueAccess;
 using System;
 using System.Linq;
 
@@ -12,12 +13,12 @@ public sealed class StartBattle : BattleAction
 {
   public const string StartBattleActionId = "start_battle";
 
-  public StartBattle()
+  internal StartBattle()
     : base(StartBattleActionId)
   {
   }
 
-  public override BattleActionResult Execute(BattleSession session)
+  internal override BattleActionResult Execute(BattleSession session)
   {
     if (session.Phase != BattlePhase.Setup)
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, "BattleSession can only be started from setup.");
@@ -37,17 +38,17 @@ public sealed class SpawnUnit : BattleAction
   public Vector3I Position { get; }
   public Option<Weapon> EquippedWeapon { get; }
 
-  public SpawnUnit(Combatant combatant, Vector3I position)
+  internal SpawnUnit(Combatant combatant, Vector3I position)
     : this(combatant, position, None)
   {
   }
 
-  public SpawnUnit(Combatant combatant, Vector3I position, Weapon equippedWeapon)
+  internal SpawnUnit(Combatant combatant, Vector3I position, Weapon equippedWeapon)
     : this(combatant, position, Some(equippedWeapon))
   {
   }
 
-  public SpawnUnit(Combatant combatant, Vector3I position, Option<Weapon> equippedWeapon)
+  internal SpawnUnit(Combatant combatant, Vector3I position, Option<Weapon> equippedWeapon)
     : base(SpawnUnitActionId)
   {
     ArgumentNullException.ThrowIfNull(combatant);
@@ -56,7 +57,7 @@ public sealed class SpawnUnit : BattleAction
     EquippedWeapon = equippedWeapon;
   }
 
-  public override BattleActionResult Execute(BattleSession session)
+  internal override BattleActionResult Execute(BattleSession session)
   {
     if (session.Phase == BattlePhase.Ended)
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, "Cannot add units after the battle has ended.");
@@ -64,7 +65,7 @@ public sealed class SpawnUnit : BattleAction
     Option<BattleBoardState.ValidatedPoint> positionPointOption = session.Board.ValidatePoint(Position);
     if (positionPointOption.IsNone)
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Cannot place a unit at {Position}.");
-    BattleBoardState.ValidatedPoint positionPoint = positionPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+    BattleBoardState.ValidatedPoint positionPoint = positionPointOption.Value();
     if (!session.Board.CanOccupy(positionPoint))
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Cannot place a unit at {Position}.");
 
@@ -99,7 +100,7 @@ internal sealed class MoveUnitStep : BattleAction
     ActionPointCost = actionPointCost;
   }
 
-  public override BattleActionResult Execute(BattleSession session)
+  internal override BattleActionResult Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
@@ -110,7 +111,7 @@ internal sealed class MoveUnitStep : BattleAction
         Option<BattleBoardState.ValidatedPoint> sourcePointOption = session.GetUnitPosition(unit);
         if (sourcePointOption.IsNone)
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {UnitId} is not on a valid tile.");
-        BattleBoardState.ValidatedPoint sourcePoint = sourcePointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+        BattleBoardState.ValidatedPoint sourcePoint = sourcePointOption.Value();
 
         if (sourcePoint != Source)
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {UnitId} is no longer at {Source.Raw}.");
@@ -135,7 +136,7 @@ public sealed class ThrowItem : BattleAction
 
   public EquippableItem Item => Throwable.Item;
 
-  public ThrowItem(BattleUnitState unit, ItemWith<ThrowableCapability> throwable, Vector3I targetCell)
+  internal ThrowItem(BattleUnitState unit, ItemWith<ThrowableCapability> throwable, Vector3I targetCell)
     : base(ThrowItemActionId)
   {
     ArgumentNullException.ThrowIfNull(unit);
@@ -147,7 +148,7 @@ public sealed class ThrowItem : BattleAction
     TargetCell = targetCell;
   }
 
-  public override BattleActionResult Execute(BattleSession session)
+  internal override BattleActionResult Execute(BattleSession session)
   {
     return ValidateActingUnit(session, Unit, Throwable.Capability.ActionPointCost).Match(
       failure => failure,
@@ -156,12 +157,12 @@ public sealed class ThrowItem : BattleAction
         Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(unit);
         if (unitPointOption.IsNone)
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {unit.Id} is not on a valid tile.");
-        Vector3I unitPosition = unitPointOption.IfNone(default(BattleBoardState.ValidatedPoint)).Raw;
+        Vector3I unitPosition = unitPointOption.Value().Raw;
 
         Option<BattleBoardState.ValidatedPoint> targetPointOption = session.Board.ValidatePoint(TargetCell);
         if (targetPointOption.IsNone)
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{TargetCell} is outside the battle board.");
-        BattleBoardState.ValidatedPoint targetPoint = targetPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
+        BattleBoardState.ValidatedPoint targetPoint = targetPointOption.Value();
         if (!unit.HasInventoryItem(Item))
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} does not have {Item.ItemName}.");
 
@@ -175,19 +176,17 @@ public sealed class ThrowItem : BattleAction
 
         if (Throwable.Capability.ConsumesOnUse)
         {
-          if (charges.Case is ChargesCapability chargeState)
-          {
-            if (!chargeState.TrySpend())
-              return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{Item.ItemName} could not spend a charge.");
+          charges.Match(
+            chargeState =>
+            {
+              if (!chargeState.TrySpend())
+                throw new InvalidOperationException($"{Item.ItemName} could not spend a charge after passing the depletion check.");
 
-            if (chargeState.IsDepleted)
-              unit.RemoveInventoryItem(Item);
-          }
-          else
-          {
+              if (chargeState.IsDepleted)
+                unit.RemoveInventoryItem(Item);
+            },
             // No charges capability: consumable items are implicitly single-use.
-            unit.RemoveInventoryItem(Item);
-          }
+            () => unit.RemoveInventoryItem(Item));
         }
 
         session.RaiseEvent(new ItemThrownBattleEvent(unit, targetPoint, Item));
@@ -203,7 +202,7 @@ public sealed class ApplyDamage : BattleAction
   public BattleUnitState Unit { get; }
   public int Amount { get; }
 
-  public ApplyDamage(BattleUnitState unit, int amount)
+  internal ApplyDamage(BattleUnitState unit, int amount)
     : base(ApplyDamageActionId)
   {
     ArgumentNullException.ThrowIfNull(unit);
@@ -211,7 +210,7 @@ public sealed class ApplyDamage : BattleAction
     Amount = amount;
   }
 
-  public override BattleActionResult Execute(BattleSession session)
+  internal override BattleActionResult Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     if (!Unit.IsAlive)
@@ -232,16 +231,15 @@ public sealed class PassUnit : BattleAction
   public const string PassUnitActionId = "pass_unit";
 
   public BattleUnitState Unit { get; }
-  internal int UnitId => Unit.Id;
 
-  public PassUnit(BattleUnitState unit)
+  internal PassUnit(BattleUnitState unit)
     : base(PassUnitActionId)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
   }
 
-  public override BattleActionResult Execute(BattleSession session)
+  internal override BattleActionResult Execute(BattleSession session)
   {
     return ValidateActingUnit(session, Unit).Match(
       failure => failure,
@@ -259,14 +257,14 @@ public sealed class EndFactionTurn : BattleAction
 
   public Faction ExpectedActiveSide { get; }
 
-  public EndFactionTurn(Faction expectedActiveSide)
+  internal EndFactionTurn(Faction expectedActiveSide)
     : base(EndFactionTurnActionId)
   {
     ArgumentNullException.ThrowIfNull(expectedActiveSide);
     ExpectedActiveSide = expectedActiveSide;
   }
 
-  public override BattleActionResult Execute(BattleSession session)
+  internal override BattleActionResult Execute(BattleSession session)
   {
     if (session.Phase != BattlePhase.InProgress)
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, "Battle is not in progress.");

@@ -25,20 +25,11 @@ public sealed class BattleUnitState
   public int CurrentHealth { get; private set; }
   public int MaxActionPoints => GetBaseStatValue<ActionPointsStat>();
   public int CurrentActionPoints { get; private set; }
-  public int Movement => GetBaseStatValue<MovementStat>();
   public int Vision => GetBaseStatValue<VisionStat>();
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
 
-  internal static BattleUnitState Create(
-    int unitId,
-    Combatant combatant,
-    Option<Weapon> equippedWeapon)
-  {
-    return new BattleUnitState(unitId, combatant, equippedWeapon);
-  }
-
-  private BattleUnitState(int unitId, Combatant combatant, Option<Weapon> equippedWeapon)
+  internal BattleUnitState(int unitId, Combatant combatant, Option<Weapon> equippedWeapon)
   {
     ArgumentOutOfRangeException.ThrowIfLessThan(unitId, 0);
 
@@ -70,11 +61,6 @@ public sealed class BattleUnitState
       return;
 
     CurrentHealth = Math.Max(CurrentHealth - amount, 0);
-  }
-
-  public void EquipWeapon(Weapon weapon)
-  {
-    EquippedWeapon = Some(weapon);
   }
 
   public void AddInventoryItem(EquippableItem item)

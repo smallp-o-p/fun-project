@@ -5,7 +5,7 @@ This document describes the tactical runtime shape in the repo and the nearby ex
 ## Design Goals
 
 - `BattleSession` is the single source of truth for live tactical state.
-- `BattleSession` is constructed from battle setup data: a prepared board state, stable faction order, and faction rosters.
+- `BattleSession` is constructed from battle setup data: a prepared board state and stable faction order.
 - `BattleAction` is the authoritative command layer.
 - `BattleActionExecutor` validates primitive actions produced by queued `BattleAction` values.
 - Read-side battle questions are represented as typed query objects, executed through a single query runner.
@@ -138,15 +138,13 @@ flowchart LR
 - `DeadUnits`
 - `GlobalFactionTurnOrder`
 - `TurnQueue`
-- `FactionRosters`
 
 It is initialized with:
 
 - `BattleBoardState board`
 - `IEnumerable<Faction> globalFactionOrder`
-- `IDictionary<Faction, IEnumerable<Combatant>> factionRosters`
 
-The configured faction order must contain at least one faction after rosters are included. The setup turn queue and `ActiveSide` are initialized from the first faction in that order.
+The configured faction order must contain at least one faction. The setup turn queue and `ActiveSide` are initialized from the first faction in that order.
 
 The session owns:
 
@@ -175,16 +173,6 @@ Current base shape:
 ```csharp
 public abstract class BattleSessionQuery<TResult>
 {
-  public string QueryId { get; }
-
-  protected BattleSessionQuery(string queryId)
-  {
-    if (string.IsNullOrWhiteSpace(queryId))
-      throw new ArgumentException("Query id cannot be null or whitespace.", nameof(queryId));
-
-    QueryId = queryId;
-  }
-
   internal abstract Either<BattleQueryFailure, TResult> Execute(BattleSession session);
 }
 ```
@@ -231,7 +219,7 @@ Each query should encode one question. Avoid catch-all query classes with enum m
 - `TryMoveOccupant(...)`
 - `TryClearOccupant(...)`
 - `FindPath(...)`
-- `IsAdjacent(...)`
+- `AreAdjacent(...)`
 
 Pathfinding is currently integrated directly into the board through Godot `AStar3D`. Query objects should be the controller-facing surface for unit-specific path questions, for example `FindPathForUnit` and `GetPossibleMoveTilesForUnit`. If path rules become substantially more unit-specific later, this can be extracted behind a movement-query strategy without changing the controller-facing query contract.
 
@@ -425,5 +413,4 @@ Detailed design notes:
 
 - [BattleActionExecutor Design](./battle-action-executor.md)
 - [BattleSession Command Pattern](./battle-session-command-pattern.md)
-- [Battle Query Interface Implementation Plan](./battle-query-interface-implementation-plan.md)
 - [Battlescape Tile System Design](./battlescape-tile-system.md)

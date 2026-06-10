@@ -14,9 +14,7 @@ internal enum BattleActionState
 {
   Pending,
   Running,
-  Completed,
-  Cancelled,
-  Failed,
+  Done,
 }
 
 public abstract class BattleAction
@@ -35,10 +33,10 @@ public abstract class BattleAction
 
   public bool IsDone()
   {
-    return _state is BattleActionState.Completed or BattleActionState.Cancelled or BattleActionState.Failed;
+    return _state == BattleActionState.Done;
   }
 
-  public virtual Option<BattleAction> NextAction(BattleSession session)
+  internal virtual Option<BattleAction> NextAction(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     if (_state != BattleActionState.Pending)
@@ -48,7 +46,7 @@ public abstract class BattleAction
     return Some(this);
   }
 
-  public virtual BattleActionResult Execute(BattleSession session)
+  internal virtual BattleActionResult Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     return BattleActionResult.Failure(this, BattleActionFailureReason.UnsupportedAction, $"{ActionId} cannot be executed directly.");
@@ -63,53 +61,34 @@ public abstract class BattleAction
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentOutOfRangeException.ThrowIfLessThan(actionPointCost, 0);
 
+    Either<BattleActionResult, BattleUnitState> Reject(string message) =>
+      Left<BattleActionResult, BattleUnitState>(BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, message));
+
     if (session.Phase != BattlePhase.InProgress)
-      return Left<BattleActionResult, BattleUnitState>(
-        BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, "Battle is not in progress."));
+      return Reject("Battle is not in progress.");
 
     Faction activeSide = session.ActiveSide;
 
     if (!unit.IsAlive)
-    {
-      return Left<BattleActionResult, BattleUnitState>(
-        BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit {unit.Id} is not alive."));
-    }
+      return Reject($"Unit {unit.Id} is not alive.");
 
     if (unit.Side != activeSide)
-    {
-      return Left<BattleActionResult, BattleUnitState>(
-        BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} is not on the active side."));
-    }
+      return Reject($"{unit.Combatant.Name} is not on the active side.");
 
     if (!session.IsUnitStillAvailableThisTurn(unit))
-    {
-      return Left<BattleActionResult, BattleUnitState>(
-        BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} is no longer available this turn."));
-    }
+      return Reject($"{unit.Combatant.Name} is no longer available this turn.");
 
     if (unit.CurrentActionPoints < actionPointCost)
-    {
-      return Left<BattleActionResult, BattleUnitState>(
-        BattleActionResult.Failure(
-          this,
-          BattleActionFailureReason.Rejected,
-          $"{unit.Combatant.Name} needs {actionPointCost} action points but only has {unit.CurrentActionPoints}."));
-    }
+      return Reject($"{unit.Combatant.Name} needs {actionPointCost} action points but only has {unit.CurrentActionPoints}.");
 
     return Right<BattleActionResult, BattleUnitState>(unit);
   }
 
-  public virtual void ConsumeResult(BattleActionResult result)
-  {
-    if (result.Succeeded)
-      MarkCompleted();
-    else
-      MarkFailed();
-  }
+  internal bool HasStarted => _state != BattleActionState.Pending;
 
-  private protected void MarkPending()
+  internal virtual void ConsumeResult(BattleActionResult result)
   {
-    _state = BattleActionState.Pending;
+    MarkDone();
   }
 
   private protected void MarkRunning()
@@ -117,19 +96,9 @@ public abstract class BattleAction
     _state = BattleActionState.Running;
   }
 
-  private protected void MarkCompleted()
+  private protected void MarkDone()
   {
-    _state = BattleActionState.Completed;
-  }
-
-  private protected void MarkCancelled()
-  {
-    _state = BattleActionState.Cancelled;
-  }
-
-  private protected void MarkFailed()
-  {
-    _state = BattleActionState.Failed;
+    _state = BattleActionState.Done;
   }
 
   public static StartBattle StartBattle()
@@ -179,12 +148,13 @@ public abstract class BattleAction
 
 public sealed class MoveUnit : BattleAction
 {
-  private Either<IReadOnlyList<Vector3I>, Queue<BattleBoardState.ValidatedPoint>> _routeState;
+  private readonly IReadOnlyList<Vector3I> _requestedDestinations;
+  private Queue<BattleBoardState.ValidatedPoint>? _validatedRoute;
 
   public BattleUnitState Unit { get; }
   public int StepAPCost { get; }
 
-  public MoveUnit(
+  internal MoveUnit(
     BattleUnitState unit,
     IEnumerable<Vector3I> destinations,
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost)
@@ -195,126 +165,120 @@ public sealed class MoveUnit : BattleAction
     ArgumentOutOfRangeException.ThrowIfLessThan(actionPointCostPerStep, 0);
 
     Unit = unit;
-    _routeState = Left<IReadOnlyList<Vector3I>, Queue<BattleBoardState.ValidatedPoint>>([.. destinations]);
+    _requestedDestinations = [.. destinations];
     StepAPCost = actionPointCostPerStep;
   }
 
-  public override Option<BattleAction> NextAction(BattleSession session)
+  internal override Option<BattleAction> NextAction(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     if (IsDone())
       return None;
 
-    Option<BattleAction> NextValidatedStep(Queue<BattleBoardState.ValidatedPoint> remainingSteps)
-    {
-      if (remainingSteps.Count == 0)
-      {
-        MarkCompleted();
-        return None;
-      }
+    var route = _validatedRoute ?? ValidateRoute(session);
+    if (route is null)
+      return None;
 
-      if (!Unit.IsAlive)
-      {
-        MarkCancelled();
-        return None;
-      }
-
-      return session.GetUnitPosition(Unit).Match((currUnitPos) =>
-      {
-        MarkRunning();
-        return Some<BattleAction>(
-          new MoveUnitStep(
-            Unit,
-            currUnitPos,
-            remainingSteps.Peek(),
-            StepAPCost)
-        );
-      }, () =>
-      {
-        MarkCancelled();
-        return Option<BattleAction>.None;
-      });
-    }
-
-    return _routeState.Match(
-      rawDestinations => ValidateRoute(session, rawDestinations).Match(NextValidatedStep, None),
-      NextValidatedStep);
+    return NextValidatedStep(session, route);
   }
 
-  private Option<Queue<BattleBoardState.ValidatedPoint>> ValidateRoute(BattleSession session, IReadOnlyList<Vector3I> tilesToOccupy)
+  private Option<BattleAction> NextValidatedStep(BattleSession session, Queue<BattleBoardState.ValidatedPoint> remainingSteps)
   {
-    ArgumentNullException.ThrowIfNull(session);
-
-    if (tilesToOccupy.Count == 0)
+    if (remainingSteps.Count == 0)
     {
-      MarkFailed();
+      MarkDone();
       return None;
     }
 
-    long apCost = tilesToOccupy.Count * StepAPCost;
+    if (!Unit.IsAlive)
+    {
+      MarkDone();
+      return None;
+    }
+
+    return session.GetUnitPosition(Unit).Match((currUnitPos) =>
+    {
+      MarkRunning();
+      return Some<BattleAction>(
+        new MoveUnitStep(
+          Unit,
+          currUnitPos,
+          remainingSteps.Peek(),
+          StepAPCost)
+      );
+    }, () =>
+    {
+      MarkDone();
+      return Option<BattleAction>.None;
+    });
+  }
+
+  private Queue<BattleBoardState.ValidatedPoint>? ValidateRoute(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(session);
+
+    if (_requestedDestinations.Count == 0)
+    {
+      MarkDone();
+      return null;
+    }
+
+    long apCost = _requestedDestinations.Count * StepAPCost;
 
     return ValidateActingUnit(session, Unit, apCost).Match(
       failure =>
       {
-        MarkFailed();
-        return None;
+        MarkDone();
+        return (Queue<BattleBoardState.ValidatedPoint>?)null;
       },
       _ =>
       {
         Option<BattleBoardState.ValidatedPoint> currentPointOption = session.GetUnitPosition(Unit);
         if (currentPointOption.IsNone)
         {
-          MarkCancelled();
-          return None;
+          MarkDone();
+          return null;
         }
 
         BattleBoardState.ValidatedPoint previousPoint = currentPointOption.Value();
         Queue<BattleBoardState.ValidatedPoint> validatedSteps = [];
 
-        foreach (Vector3I tile in tilesToOccupy)
+        foreach (Vector3I tile in _requestedDestinations)
         {
           Option<BattleBoardState.ValidatedPoint> stepPointOption = session.Board.ValidatePoint(tile);
           if (stepPointOption.IsNone)
           {
-            MarkFailed();
-            return None;
+            MarkDone();
+            return null;
           }
 
           BattleBoardState.ValidatedPoint stepPoint = stepPointOption.Value();
           if (!BattleBoardState.AreAdjacent(previousPoint, stepPoint) || !session.Board.CanOccupy(stepPoint))
           {
-            MarkFailed();
-            return None;
+            MarkDone();
+            return null;
           }
 
           validatedSteps.Enqueue(stepPoint);
           previousPoint = stepPoint;
         }
 
-        _routeState = Right<IReadOnlyList<Vector3I>, Queue<BattleBoardState.ValidatedPoint>>(validatedSteps);
-        return Some(validatedSteps);
+        _validatedRoute = validatedSteps;
+        return validatedSteps;
       });
   }
 
-  public override void ConsumeResult(BattleActionResult result)
+  internal override void ConsumeResult(BattleActionResult result)
   {
     if (!result.Succeeded)
     {
-      MarkFailed();
+      MarkDone();
       return;
     }
 
-    bool routeComplete = _routeState.Match(
-      _ => throw new InvalidOperationException("Move route must be validated before consuming step results."),
-      remainingSteps =>
-      {
-        remainingSteps.Dequeue();
-        return remainingSteps.Count == 0;
-      });
-
-    if (routeComplete)
-      MarkCompleted();
-    else
-      MarkPending();
+    var route = _validatedRoute ?? throw new InvalidOperationException("Move route must be validated before consuming step results.");
+    route.Dequeue();
+    if (route.Count == 0)
+      MarkDone();
   }
 }

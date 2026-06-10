@@ -15,16 +15,6 @@ public sealed class BattleQueryRunner
   public Either<BattleQueryFailure, TResult> Execute<TResult>(BattleSessionQuery<TResult> query)
   {
     ArgumentNullException.ThrowIfNull(query);
-
-    try
-    {
-      return query.Execute(_session);
-    }
-    catch (Exception exception)
-    {
-      return Left<BattleQueryFailure, TResult>(new BattleQueryFailure(
-        BattleQueryFailureReason.UnexpectedError,
-        exception.Message));
-    }
+    return query.Execute(_session);
   }
 }

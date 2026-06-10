@@ -19,7 +19,6 @@ public sealed class BattleTileState
   }
 
   public bool BlocksLineOfSight { get; set; }
-  public bool HasHazard { get; set; }
   public Option<int> OccupantUnitId { get; private set; }
   public bool IsOccupied => OccupantUnitId.IsSome;
 

@@ -48,7 +48,6 @@ The current executor API is:
 
 - `Submit(BattleAction action)`
 - `RegisterTrigger<TEventKey>(BattleTrigger trigger) where TEventKey : BattleEventTag`
-- `PendingCount`
 - `LastResult`
 
 And events:

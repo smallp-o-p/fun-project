@@ -9,9 +9,7 @@ public sealed class BattleActionExecutor
   private readonly BattleSession _session;
   private readonly LinkedList<BattleAction> _pending = [];
   private readonly BattleTriggerRegistry _triggerRegistry = new();
-  private readonly SysColGeneric.HashSet<BattleAction> _started = [];
 
-  public int PendingCount => _pending.Count;
   public Option<BattleActionResult> LastResult { get; private set; }
 
   public event Action<BattleAction> OnActionStart = delegate { };
@@ -49,38 +47,35 @@ public sealed class BattleActionExecutor
       BattleAction currentAction = _pending.First!.Value;
       _pending.RemoveFirst();
 
-      currentAction.NextAction(_session)
-        .IfSome((sub) =>
-        {
-          BattleActionResult result = new Func<BattleActionResult>(() =>
-          {
-            try
-            {
-              // The submitted action is the unit of the start/complete contract;
-              // per-step detail flows through the committed BattleEvent stream.
-              if (_started.Add(currentAction))
-                OnActionStart.Invoke(currentAction);
-              return ExecuteQueuedAction(sub, currentAction);
-            }
-            catch (Exception exception)
-            {
-              var res = BattleActionResult.Failure(
-               sub,
-               BattleActionFailureReason.UnexpectedError,
-               exception.Message);
-              ConsumeResult(sub, currentAction, res);
-              return res;
-            }
-          })();
+      // Capture before NextAction may transition state away from Pending.
+      bool isFirstStart = !currentAction.HasStarted;
+      if (currentAction.NextAction(_session).Case is not BattleAction sub)
+        continue;
 
-          ReportResult(result, sub, currentAction)
-            .IfSome(reportedResult =>
-            {
-              _started.Remove(currentAction);
-              LastResult = Some(reportedResult);
-              OnActionComplete.Invoke(reportedResult);
-              results.Add(reportedResult);
-            });
+      BattleActionResult result;
+      try
+      {
+        // The submitted action is the unit of the start/complete contract;
+        // per-step detail flows through the committed BattleEvent stream.
+        if (isFirstStart)
+          OnActionStart.Invoke(currentAction);
+        result = ExecuteQueuedAction(sub, currentAction);
+      }
+      catch (Exception exception)
+      {
+        result = BattleActionResult.Failure(
+          sub,
+          BattleActionFailureReason.UnexpectedError,
+          exception.Message);
+        ConsumeResult(sub, currentAction, result);
+      }
+
+      ReportResult(result, sub, currentAction)
+        .IfSome(reportedResult =>
+        {
+          LastResult = Some(reportedResult);
+          OnActionComplete.Invoke(reportedResult);
+          results.Add(reportedResult);
         });
     }
 
@@ -131,15 +126,7 @@ public sealed class BattleActionExecutor
     if (!activeAction.IsDone())
       return None;
 
-    return result.Succeeded
-      ? Some(BattleActionResult.Success(
-        activeAction,
-        result.AffectedUnit,
-        result.Message))
-      : Some(BattleActionResult.Failure(
-        activeAction,
-        result.FailureReason,
-        result.Message));
+    return Some(result with { Action = activeAction });
   }
 
   private static void ConsumeResult(BattleAction primitiveAction, BattleAction activeAction, BattleActionResult result)

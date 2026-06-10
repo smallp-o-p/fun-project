@@ -21,6 +21,8 @@ public readonly record struct BattleTriggerResult(
   bool Consumed
 )
 {
+  public IReadOnlyList<BattleAction> InterruptActions { get; init; } = InterruptActions ?? [];
+
   public static BattleTriggerResult NoReaction()
   {
     return new BattleTriggerResult([], false);
@@ -30,12 +32,6 @@ public readonly record struct BattleTriggerResult(
   {
     ArgumentNullException.ThrowIfNull(action);
     return new BattleTriggerResult([action], shouldConsumeTrigger);
-  }
-
-  public static BattleTriggerResult QueueInterruptAfterCommit(IReadOnlyList<BattleAction> actions, bool shouldConsumeTrigger = false)
-  {
-    ArgumentNullException.ThrowIfNull(actions);
-    return new BattleTriggerResult(actions, shouldConsumeTrigger);
   }
 
   public static BattleTriggerResult ConsumeTrigger()

@@ -87,27 +87,18 @@ public class BattleSessionTest
     Assert.Equal(factionB, session.TurnQueue.Last());
   }
 
-  [TestCase(TestName = "Constructor seeds global faction order and faction rosters")]
-  public void ConstructorSeedsGlobalFactionOrderAndFactionRosters()
+  [TestCase(TestName = "Constructor seeds global faction order")]
+  public void ConstructorSeedsGlobalFactionOrder()
   {
     var factionA = BattleTestFactory.MakeFaction("A");
     var factionB = BattleTestFactory.MakeFaction("B");
-    var combatantA = BattleTestFactory.MakeCombatant("A1", factionA);
-    var combatantB = BattleTestFactory.MakeCombatant("B1", factionB);
     var session = new BattleSession(
       new BattleBoardState(new Vector3I(4, 1, 4)),
-      [factionB, factionA, factionB],
-      new Dictionary<Faction, IEnumerable<Combatant>>
-      {
-        [factionA] = [combatantA],
-        [factionB] = [combatantB],
-      });
+      [factionB, factionA, factionB]);
 
     Assert.Equal(2, session.GlobalFactionTurnOrder.Count);
     Assert.Equal(factionB, session.GlobalFactionTurnOrder.First());
     Assert.Equal(factionA, session.GlobalFactionTurnOrder.Last());
-    Assert.True(session.FactionRosters[factionA].Contains(combatantA));
-    Assert.True(session.FactionRosters[factionB].Contains(combatantB));
     Assert.Equal(factionB, session.ActiveSide);
     Assert.Equal(factionB, session.TurnQueue.First());
     Assert.Equal(0, session.AliveUnits.Count());
@@ -123,8 +114,7 @@ public class BattleSessionTest
 
     var session = new BattleSession(
       board,
-      [faction],
-      new Dictionary<Faction, IEnumerable<Combatant>>());
+      [faction]);
 
     var executor = new BattleActionExecutor(session);
     var result = executor.Submit(BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("A1", faction), new Vector3I(1, 0, 0))).RequireSingleResult();
@@ -140,8 +130,7 @@ public class BattleSessionTest
 
     Assert.Throws<ArgumentException>(() => new BattleSession(
       board,
-      [],
-      new Dictionary<Faction, IEnumerable<Combatant>>()));
+      []));
   }
 
   [TestCase(TestName = "SpawnUnit accepts equipped weapon option")]

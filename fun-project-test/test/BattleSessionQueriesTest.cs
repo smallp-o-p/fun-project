@@ -120,4 +120,26 @@ public class BattleSessionQueriesTest
     Assert.False(enemies.Contains(hiddenEnemy));
   }
 
+  [TestCase(TestName = "GetFactionDeadUnits filters by faction")]
+  public void GetFactionDeadUnitsFiltersByFaction()
+  {
+    var factionA = BattleTestFactory.MakeFaction("A");
+    var factionB = BattleTestFactory.MakeFaction("B");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [factionA, factionB]);
+    var unitA = SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", factionA, health: 10), new Vector3I(0, 0, 0));
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", factionB, health: 10), new Vector3I(1, 0, 0));
+    StartBattle(session);
+
+    var executor = new BattleActionExecutor(session);
+    var result = executor.Submit(BattleAction.ApplyDamage(unitA.State, 10)).RequireSingleResult();
+    Assert.True(result.Succeeded);
+
+    IEnumerable<BattleUnitState> factionADead = GetValue(Query(session, new GetFactionDeadUnits(factionA)));
+    IEnumerable<BattleUnitState> factionBDead = GetValue(Query(session, new GetFactionDeadUnits(factionB)));
+
+    Assert.True(factionADead.Contains(unitA));
+    Assert.False(factionBDead.Contains(unitA));
+    Assert.True(!factionBDead.Any());
+  }
+
 }

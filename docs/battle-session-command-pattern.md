@@ -40,7 +40,6 @@ The queue and replay surface stay focused on explicit battle actions. Composite 
 The executor API is:
 
 - `Submit(BattleAction action)`
-- `PendingCount`
 - `LastResult`
 
 And events:

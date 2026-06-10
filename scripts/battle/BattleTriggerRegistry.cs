@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 
 namespace FunProject.Battle;
 
@@ -15,17 +14,6 @@ internal sealed class BattleTriggerRegistry
   private readonly Dictionary<Type, List<RegisteredTrigger>> _registeredTriggersByEventType = [];
   private long _nextRegistrationOrder;
 
-  public BattleTriggerRegistry()
-  {
-    Assembly assembly = typeof(BattleEventTag).Assembly;
-    IEnumerable<Type> arr = assembly.GetTypes().Where(t => typeof(BattleEventTag).IsAssignableFrom(t));
-
-    foreach (Type eventType in arr)
-    {
-      _registeredTriggersByEventType.Add(eventType, []);
-    }
-  }
-
   internal void Register<TEventKey>(BattleTrigger trigger)
     where TEventKey : BattleEventTag
   {
@@ -33,19 +21,14 @@ internal sealed class BattleTriggerRegistry
     Type eventKey = typeof(TEventKey);
 
     if (!_registeredTriggersByEventType.TryGetValue(eventKey, out var registeredTriggers))
-      throw new InvalidOperationException("Register: BattleTriggerRegistry doesn't have a subscription for this particular BattleEvent");
+      _registeredTriggersByEventType[eventKey] = registeredTriggers = [];
 
     registeredTriggers.Add(new(trigger, _nextRegistrationOrder++, eventKey));
   }
 
   private void Unregister(RegisteredTrigger registeredTrigger)
   {
-    ArgumentNullException.ThrowIfNull(registeredTrigger);
-
-    if (!_registeredTriggersByEventType.TryGetValue(registeredTrigger.EventType, out var registeredTriggers))
-      throw new InvalidOperationException("Unregister: BattleTriggerRegistry doesn't have a subscription for this particular BattleEvent");
-
-    registeredTriggers.Remove(registeredTrigger);
+    _registeredTriggersByEventType[registeredTrigger.EventType].Remove(registeredTrigger);
   }
 
   internal IReadOnlyList<BattleAction> EvaluateInterruptActions(
@@ -65,7 +48,7 @@ internal sealed class BattleTriggerRegistry
     foreach (var registeredTrigger in matchingTriggers)
     {
       BattleTriggerResult result = registeredTrigger.Trigger.Evaluate(session, battleEvent, sourceAction);
-      interruptActions.AddRange(result.InterruptActions ?? []);
+      interruptActions.AddRange(result.InterruptActions);
 
       if (result.Consumed)
         Unregister(registeredTrigger);
@@ -96,8 +79,8 @@ internal sealed class BattleTriggerRegistry
 
   /*
   * This function gets all the keys associated with a particular BattleEvent.
-  * E.g. For UnitMovedBattleEvent which implements BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, ISourcePositionedBattleEvent
-  * This will return a list of [UnitMovedBattleEvent, BattleEvent, IUnitBattleEvent, IPositionedBattleEvent], so that any registered triggers for the
+  * E.g. For UnitMovedBattleEvent which implements BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
+  * This will return a list of [UnitMovedBattleEvent, IUnitBattleEvent, IPositionedBattleEvent], so that any registered triggers for the
   * abstract base classes get tripped.
   */
   private static IReadOnlyList<Type> GetEventKeys(BattleEvent battleEvent)

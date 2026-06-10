@@ -36,7 +36,6 @@ public sealed partial class BattleRuntimeTest
     Assert.True(result.Succeeded);
     BattleUnitState unit = result.AffectedUnit.RequireSome();
     Assert.True(session.GetUnitPosition(unit).IsSome);
-    Assert.Equal(0, runtime.PendingActionCount);
     Assert.Equal(result, runtime.LastActionResult.RequireSome());
   }
 
@@ -136,7 +135,6 @@ public sealed partial class BattleRuntimeTest
 
     runtime.Dispose();
 
-    Assert.Throws<ObjectDisposedException>(() => _ = runtime.PendingActionCount);
     Assert.Throws<ObjectDisposedException>(() => _ = runtime.LastActionResult);
     Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetFactionAliveUnits(faction)));
     Assert.Throws<ObjectDisposedException>(() => runtime.ExecuteAction(BattleAction.SpawnUnit(

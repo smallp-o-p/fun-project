@@ -5,7 +5,7 @@ using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using FunProject.Tests;
 using Godot;
-using System.Collections.Generic;
+using System.Collections.Generic; // retained for IEnumerable<T>
 
 internal static class BattleTestFactory
 {
@@ -71,20 +71,8 @@ internal static class BattleTestFactory
     Vector3I dimensions,
     IEnumerable<Faction> globalFactionOrder)
   {
-    return MakeSession(
-      dimensions,
-      globalFactionOrder,
-      new Dictionary<Faction, IEnumerable<Combatant>>());
-  }
-
-  public static BattleSession MakeSession(
-    Vector3I dimensions,
-    IEnumerable<Faction> globalFactionOrder,
-    IDictionary<Faction, IEnumerable<Combatant>> factionRosters)
-  {
     return new BattleSession(
       new BattleBoardState(dimensions),
-      globalFactionOrder,
-      factionRosters);
+      globalFactionOrder);
   }
 }
