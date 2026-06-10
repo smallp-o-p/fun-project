@@ -1,6 +1,7 @@
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Tests;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
@@ -10,6 +11,15 @@ internal static class BattleActionTestHelper
   {
     var executor = new BattleActionExecutor(session);
     var result = executor.Submit(BattleAction.SpawnUnit(combatant, position)).RequireSingleResult();
+    Assert.True(result.Succeeded);
+    Assert.True(result.AffectedUnit.IsSome);
+    return new BattleTestUnit(result.AffectedUnit.RequireSome());
+  }
+
+  public static BattleTestUnit SpawnUnit(BattleSession session, Combatant combatant, Vector3I position, Weapon weapon)
+  {
+    var executor = new BattleActionExecutor(session);
+    var result = executor.Submit(BattleAction.SpawnUnit(combatant, position, weapon)).RequireSingleResult();
     Assert.True(result.Succeeded);
     Assert.True(result.AffectedUnit.IsSome);
     return new BattleTestUnit(result.AffectedUnit.RequireSome());

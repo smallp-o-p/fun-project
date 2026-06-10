@@ -130,6 +130,11 @@ public abstract class BattleAction
     return new ThrowItem(unit, throwable, targetCell);
   }
 
+  public static AttackUnit AttackUnit(BattleUnitState unit, BattleUnitState target)
+  {
+    return new AttackUnit(unit, target);
+  }
+
   public static ApplyDamage ApplyDamage(BattleUnitState unit, int amount)
   {
     return new ApplyDamage(unit, amount);

@@ -1,5 +1,6 @@
 using FunProject.Combatants;
 using FunProject.Items;
+using FunProject.Weapons;
 using System;
 
 namespace FunProject.Battle;
@@ -199,4 +200,41 @@ public sealed record ItemThrownBattleEvent : BattleEvent, IUnitBattleEvent, IPos
   }
 
   public override string ToDisplayString() => $"{Unit.Combatant.Name} threw {Item.ItemName}.";
+}
+
+public sealed record UnitAttackedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
+{
+  public override string EventName => "unit_attacked";
+  public BattleUnitState Unit { get; }
+  public BattleUnitState Target { get; }
+  public BattleBoardState.ValidatedPoint Position { get; }
+  public Weapon Weapon { get; }
+  public HitChanceBreakdown Breakdown { get; }
+  public int Roll { get; }
+  public bool IsHit { get; }
+
+  public UnitAttackedBattleEvent(
+    BattleUnitState unit,
+    BattleUnitState target,
+    BattleBoardState.ValidatedPoint position,
+    Weapon weapon,
+    HitChanceBreakdown breakdown,
+    int roll,
+    bool isHit)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(target);
+    ArgumentNullException.ThrowIfNull(weapon);
+    ArgumentNullException.ThrowIfNull(breakdown);
+    Unit = unit;
+    Target = target;
+    Position = position;
+    Weapon = weapon;
+    Breakdown = breakdown;
+    Roll = roll;
+    IsHit = isHit;
+  }
+
+  public override string ToDisplayString() =>
+    $"{Unit.Combatant.Name} attacked {Target.Combatant.Name} ({Breakdown.FinalChance}% to hit, rolled {Roll}): {(IsHit ? "hit" : "miss")}.";
 }

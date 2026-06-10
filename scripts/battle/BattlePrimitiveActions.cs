@@ -195,6 +195,69 @@ public sealed class ThrowItem : BattleAction
   }
 }
 
+public sealed class AttackUnit : BattleAction
+{
+  public const string AttackUnitActionId = "attack_unit";
+
+  public BattleUnitState Unit { get; }
+  public BattleUnitState Target { get; }
+
+  internal AttackUnit(BattleUnitState unit, BattleUnitState target)
+    : base(AttackUnitActionId)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(target);
+    Unit = unit;
+    Target = target;
+  }
+
+  internal override BattleActionResult Execute(BattleSession session)
+  {
+    return ValidateActingUnit(session, Unit, BattleSession.DefaultAttackActionPointCost).Match(
+      failure => failure,
+      attacker =>
+      {
+        if (attacker.EquippedWeapon.IsNone)
+          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{attacker.Combatant.Name} has no equipped weapon.");
+        Weapon weapon = attacker.EquippedWeapon.Match(w => w, () => throw new InvalidOperationException("Weapon option was None after IsSome check."));
+
+        if (Target == attacker)
+          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{attacker.Combatant.Name} cannot attack itself.");
+        if (Target.Side == attacker.Side)
+          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{attacker.Combatant.Name} cannot attack allied unit {Target.Combatant.Name}.");
+        if (!Target.IsAlive)
+          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Target.Combatant.Name} is not alive.");
+        if (!attacker.VisibleUnits.Contains(Target))
+          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{attacker.Combatant.Name} cannot see {Target.Combatant.Name}.");
+
+        Option<BattleBoardState.ValidatedPoint> attackerPointOption = session.GetUnitPosition(attacker);
+        if (attackerPointOption.IsNone)
+          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Attack action could not resolve position for unit {attacker.Id}.");
+        Option<BattleBoardState.ValidatedPoint> targetPointOption = session.GetUnitPosition(Target);
+        if (targetPointOption.IsNone)
+          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Attack action could not resolve position for unit {Target.Id}.");
+        BattleBoardState.ValidatedPoint attackerPoint = attackerPointOption.Value();
+        BattleBoardState.ValidatedPoint targetPoint = targetPointOption.Value();
+
+        if (BattleSession.GetGridDistance(attackerPoint.Raw, targetPoint.Raw) > weapon.GetRangeStat().BaseValue)
+          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Target.Combatant.Name} is out of range for {weapon.WeaponName}.");
+        if (!attacker.TrySpendActionPoints(BattleSession.DefaultAttackActionPointCost))
+          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{attacker.Combatant.Name} could not spend {BattleSession.DefaultAttackActionPointCost} action points.");
+
+        AttackContext context = new(attacker, Target, attackerPoint, targetPoint, weapon, session.Board);
+        HitChanceBreakdown breakdown = session.HitChanceCalculator.Calculate(context);
+        int roll = session.RollPercent();
+        bool isHit = roll < breakdown.FinalChance;
+
+        session.RaiseEvent(new UnitAttackedBattleEvent(attacker, Target, targetPoint, weapon, breakdown, roll, isHit));
+        if (isHit)
+          session.ApplyDamageTo(Target, weapon.GetDamageStat().BaseValue);
+
+        return BattleActionResult.Success(this, attacker);
+      });
+  }
+}
+
 public sealed class ApplyDamage : BattleAction
 {
   public const string ApplyDamageActionId = "apply_damage";

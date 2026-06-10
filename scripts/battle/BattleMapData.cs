@@ -26,6 +26,9 @@ public partial class BattleMapData : Resource
           BattleTileState tile = board.GetTile(point);
           tile.IsWalkable = tileOverride.IsPresent && tileOverride.IsWalkable;
           tile.BlocksLineOfSight = tileOverride.IsPresent && tileOverride.BlocksLineOfSight;
+          tile.Cover = tileOverride.IsPresent
+            ? new TileCover(tileOverride.CoverDirections, tileOverride.CoverAmount)
+            : TileCover.None;
         },
         () =>
         {

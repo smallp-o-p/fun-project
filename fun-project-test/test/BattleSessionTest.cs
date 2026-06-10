@@ -617,4 +617,29 @@ public class BattleSessionTest
     Assert.True(result.Succeeded);
   }
 
+  [TestCase(TestName = "RollPercent with the same seed produces the same in-range sequence")]
+  public void RollPercentWithTheSameSeedProducesTheSameInRangeSequence()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var first = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2), [faction], randomSeed: 1234);
+    var second = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2), [faction], randomSeed: 1234);
+
+    for (int i = 0; i < 20; i++)
+    {
+      int roll = first.RollPercent();
+      Assert.True(roll >= 0);
+      Assert.True(roll < 100);
+      Assert.Equal(roll, second.RollPercent());
+    }
+  }
+
+  [TestCase(TestName = "Session defaults to the standard hit chance calculator")]
+  public void SessionDefaultsToTheStandardHitChanceCalculator()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2), [faction]);
+
+    Assert.True(session.HitChanceCalculator is StandardHitChanceCalculator);
+  }
+
 }

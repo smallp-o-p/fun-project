@@ -20,6 +20,7 @@ public sealed class BattleSession
   internal readonly record struct SpawnedBattleUnit(BattleUnitState Unit);
 
   public const int DefaultMovementStepActionPointCost = 1;
+  public const int DefaultAttackActionPointCost = 1;
   private static readonly IReadOnlySet<BattleBoardState.ValidatedPoint> EmptyTileSet = new SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>();
   private static readonly Vector3I[] OrthogonalDirections =
   [
@@ -36,6 +37,8 @@ public sealed class BattleSession
     new(1, 0, 1),
   ];
 
+  private readonly IHitChanceCalculator _hitChanceCalculator;
+  private readonly Random _random;
   private readonly List<BattleUnitState> _units = [];
   private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>> _exploredTilesByFaction = [];
   private readonly Queue<Faction> _globalFactionOrder = [];
@@ -56,10 +59,15 @@ public sealed class BattleSession
 
   public BattleSession(
     BattleBoardState board,
-    IEnumerable<Faction> globalFactionOrder)
+    IEnumerable<Faction> globalFactionOrder,
+    IHitChanceCalculator? hitChanceCalculator = null,
+    int? randomSeed = null)
   {
     ArgumentNullException.ThrowIfNull(board);
     ArgumentNullException.ThrowIfNull(globalFactionOrder);
+
+    _hitChanceCalculator = hitChanceCalculator ?? new StandardHitChanceCalculator();
+    _random = randomSeed is null ? new Random() : new Random(randomSeed.Value);
 
     Board = board;
 
@@ -332,6 +340,13 @@ public sealed class BattleSession
   internal static int GetGridDistance(Vector3I source, Vector3I destination)
   {
     return BattleBoardState.GetGridDistance(source, destination);
+  }
+
+  internal IHitChanceCalculator HitChanceCalculator => _hitChanceCalculator;
+
+  internal int RollPercent()
+  {
+    return _random.Next(100);
   }
 
   private bool HasLivingUnits(Faction side)

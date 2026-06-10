@@ -4,6 +4,7 @@ using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using FunProject.Tests;
+using FunProject.Weapons;
 using Godot;
 using System.Collections.Generic; // retained for IEnumerable<T>
 
@@ -15,7 +16,8 @@ internal static class BattleTestFactory
     int health = 20,
     int actionPoints = 4,
     int movement = 12,
-    int vision = 20)
+    int vision = 20,
+    int aim = 65)
   {
     return new Combatant(new CombatantData
     {
@@ -25,7 +27,7 @@ internal static class BattleTestFactory
       WillStat = new WillStat { BaseValue = 50 },
       MovementStat = new MovementStat { BaseValue = movement },
       VisionStat = new VisionStat { BaseValue = vision },
-      AimStat = new AimStat { BaseValue = 65 },
+      AimStat = new AimStat { BaseValue = aim },
       BaseArmorStat = new BaseArmorStat { BaseValue = 0 },
       ModSlotCount = 0,
     }, faction);
@@ -56,6 +58,18 @@ internal static class BattleTestFactory
     return item.With<ThrowableCapability>().RequireSome();
   }
 
+  public static Weapon MakeWeapon(string name, int damage = 5, int range = 10)
+  {
+    return new Weapon(new WeaponData
+    {
+      Name = name,
+      Description = $"{name} weapon",
+      DamageStat = new DamageStat { BaseValue = damage },
+      RangeStat = new RangeStat { BaseValue = range },
+      CriticalChanceStat = new CriticalChanceStat { BaseValue = 0 },
+    });
+  }
+
   public static ItemWith<ThrowableCapability> MakeThrowable(string name, int throwRange = 4, int actionPointCost = 1, bool consumesOnUse = true)
   {
     var item = new EquippableItem(new EquippableItemData
@@ -69,10 +83,19 @@ internal static class BattleTestFactory
 
   public static BattleSession MakeSession(
     Vector3I dimensions,
-    IEnumerable<Faction> globalFactionOrder)
+    IEnumerable<Faction> globalFactionOrder,
+    IHitChanceCalculator hitChanceCalculator = null,
+    int? randomSeed = null)
   {
-    return new BattleSession(
-      new BattleBoardState(dimensions),
-      globalFactionOrder);
+    return MakeSession(new BattleBoardState(dimensions), globalFactionOrder, hitChanceCalculator, randomSeed);
+  }
+
+  public static BattleSession MakeSession(
+    BattleBoardState board,
+    IEnumerable<Faction> globalFactionOrder,
+    IHitChanceCalculator hitChanceCalculator = null,
+    int? randomSeed = null)
+  {
+    return new BattleSession(board, globalFactionOrder, hitChanceCalculator, randomSeed);
   }
 }

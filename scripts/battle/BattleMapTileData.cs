@@ -12,22 +12,11 @@ public enum BattleMapTileFlags
   BlocksLineOfSight = 1 << 2
 }
 
-public enum CoverDirection
-{
-  NorthSouth,
-  EastWest,
-  NorthWest,
-  NorthEast,
-  SouthWest,
-  SouthEast,
-  None
-};
-
 [Tool]
 [GlobalClass]
 public partial class BattleMapTileData : Resource
 {
-  private CoverDirection _coverDescription = CoverDirection.None;
+  private CoverDirections _coverDirections = CoverDirections.None;
   private int _coverAmount;
 
   [Export] public Vector3I Coordinates { get; set; } = Vector3I.Zero;
@@ -35,14 +24,14 @@ public partial class BattleMapTileData : Resource
   [Export(PropertyHint.Flags, "Present,Walkable,Blocks Line Of Sight")]
   public BattleMapTileFlags Flags { get; set; } = BattleMapTileFlags.Present | BattleMapTileFlags.Walkable;
 
-  [Export]
-  public CoverDirection CoverDescription
+  [Export(PropertyHint.Flags, "North,South,East,West")]
+  public CoverDirections CoverDirections
   {
-    get => _coverDescription;
+    get => _coverDirections;
     set
     {
-      _coverDescription = value;
-      if (_coverDescription == CoverDirection.None)
+      _coverDirections = value;
+      if (_coverDirections == CoverDirections.None)
         _coverAmount = 0;
 
       NotifyPropertyListChanged();
@@ -55,7 +44,7 @@ public partial class BattleMapTileData : Resource
     get => _coverAmount;
     set
     {
-      _coverAmount = _coverDescription != CoverDirection.None ? Math.Clamp(value, 0, 100) : 0;
+      _coverAmount = _coverDirections != CoverDirections.None ? Math.Clamp(value, 0, 100) : 0;
     }
   }
 
@@ -81,7 +70,7 @@ public partial class BattleMapTileData : Resource
   {
     if (property["name"].AsStringName() != PropertyName.CoverAmount)
       return;
-    if (_coverDescription != CoverDirection.None)
+    if (_coverDirections != CoverDirections.None)
       return;
 
     var usage = property["usage"].As<PropertyUsageFlags>() | PropertyUsageFlags.ReadOnly;

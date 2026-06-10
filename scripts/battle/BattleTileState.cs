@@ -20,5 +20,7 @@ public sealed class BattleTileState
 
   public bool BlocksLineOfSight { get; set; }
 
+  public TileCover Cover { get; set; } = TileCover.None;
+
   public event Action<BattleTileState> TraversalStateChanged = delegate { };
 }
