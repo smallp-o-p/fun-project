@@ -3,6 +3,7 @@ using FunProject.Combatants;
 using FunProject.Tests;
 using GdUnit4;
 using Godot;
+using System.Collections.Generic;
 using static BattleActionTestHelper;
 using static BattleQueryTestHelper;
 
@@ -720,6 +721,27 @@ public partial class BattleActionExecutorTest
     Assert.False(second.Succeeded);
     Assert.Equal(BattleActionFailureReason.Rejected, second.FailureReason);
     Assert.Equal(factionB, session.ActiveSide);
+  }
+
+  [TestCase(TestName = "Executor reports the composite action for both start and completion")]
+  public void ExecutorReportsTheCompositeActionForBothStartAndCompletion()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 6), new Vector3I(1, 0, 1));
+    StartBattle(session);
+
+    var executor = new BattleActionExecutor(session);
+    var startedActions = new List<BattleAction>();
+    executor.OnActionStart += startedActions.Add;
+
+    var move = BattleAction.MoveUnit(unit.State, [new Vector3I(1, 0, 2), new Vector3I(1, 0, 3)], 1);
+    var result = executor.Submit(move).RequireSingleResult();
+
+    Assert.True(result.Succeeded);
+    Assert.Equal(1, startedActions.Count);
+    Assert.True(ReferenceEquals(move, startedActions[0]));
+    Assert.True(ReferenceEquals(move, result.Action));
   }
 
   [TestCase(TestName = "Executor recovers when OnActionStart handler throws")]

@@ -9,6 +9,7 @@ public sealed class BattleActionExecutor
   private readonly BattleSession _session;
   private readonly LinkedList<BattleAction> _pending = [];
   private readonly BattleTriggerRegistry _triggerRegistry = new();
+  private readonly SysColGeneric.HashSet<BattleAction> _started = [];
 
   public int PendingCount => _pending.Count;
   public Option<BattleActionResult> LastResult { get; private set; }
@@ -55,7 +56,10 @@ public sealed class BattleActionExecutor
           {
             try
             {
-              OnActionStart.Invoke(sub);
+              // The submitted action is the unit of the start/complete contract;
+              // per-step detail flows through the committed BattleEvent stream.
+              if (_started.Add(currentAction))
+                OnActionStart.Invoke(currentAction);
               return ExecuteQueuedAction(sub, currentAction);
             }
             catch (Exception exception)
@@ -72,6 +76,7 @@ public sealed class BattleActionExecutor
           ReportResult(result, sub, currentAction)
             .IfSome(reportedResult =>
             {
+              _started.Remove(currentAction);
               LastResult = Some(reportedResult);
               OnActionComplete.Invoke(reportedResult);
               results.Add(reportedResult);
