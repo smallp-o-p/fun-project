@@ -65,23 +65,11 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
     if (unitPointOption.IsNone)
       return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {Unit.Id} is not on the board.");
 
-    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.Value();
-
-    if (ActionPointCostPerStep == 0)
-    {
-      List<BattleBoardState.ValidatedPoint> allReachable = [];
-      foreach (BattleBoardState.ValidatedPoint point in session.Board.EnumerateBoardPoints())
-      {
-        if (point == unitPoint || !session.Board.CanOccupy(point))
-          continue;
-        if (session.Board.FindPath(unitPoint, point, Unit.Id).Length > 0)
-          allReachable.Add(point);
-      }
-      return Succeed(allReachable);
-    }
-
-    int maxSteps = Unit.CurrentActionPoints / ActionPointCostPerStep;
-    return Succeed(FloodFillReachableTiles(session.Board, unitPoint, Unit.Id, maxSteps));
+    // Zero step cost means an unlimited budget; the visited set still bounds the fill to the board.
+    int maxSteps = ActionPointCostPerStep == 0
+      ? int.MaxValue
+      : Unit.CurrentActionPoints / ActionPointCostPerStep;
+    return Succeed(FloodFillReachableTiles(session.Board, unitPointOption.Value(), Unit.Id, maxSteps));
   }
 
   private static List<BattleBoardState.ValidatedPoint> FloodFillReachableTiles(
