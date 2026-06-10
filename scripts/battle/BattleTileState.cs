@@ -19,34 +19,6 @@ public sealed class BattleTileState
   }
 
   public bool BlocksLineOfSight { get; set; }
-  public Option<int> OccupantUnitId { get; private set; }
-  public bool IsOccupied => OccupantUnitId.IsSome;
 
   public event Action<BattleTileState> TraversalStateChanged = delegate { };
-
-  public bool TrySetOccupant(int unitId)
-  {
-    if (OccupantUnitId.IsSome || !IsWalkable)
-      return false;
-
-    OccupantUnitId = Some(unitId);
-    TraversalStateChanged.Invoke(this);
-    return true;
-  }
-
-  public bool HasOccupant(int unitId)
-  {
-    return OccupantUnitId.Match(
-      occupantUnitId => occupantUnitId == unitId,
-      () => false);
-  }
-
-  public void ClearOccupant()
-  {
-    if (OccupantUnitId.IsNone)
-      return;
-
-    OccupantUnitId = None;
-    TraversalStateChanged.Invoke(this);
-  }
 }

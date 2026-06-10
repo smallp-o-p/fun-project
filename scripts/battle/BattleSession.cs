@@ -294,7 +294,7 @@ public sealed class BattleSession
 
   internal Option<BattleUnitState> GetUnitAt(BattleBoardState.ValidatedPoint point)
   {
-    return Board.GetTile(point).OccupantUnitId.Bind(id =>
+    return Board.GetOccupant(point).Bind(id =>
       id < _units.Count && _units[id].IsAlive ? Some(_units[id]) : None);
   }
 
@@ -381,7 +381,7 @@ public sealed class BattleSession
 
       foreach (var visibleTile in observerVisibleTiles)
       {
-        var occupantId = Board.GetTile(visibleTile).OccupantUnitId;
+        var occupantId = Board.GetOccupant(visibleTile);
         if (occupantId.IsNone)
           continue;
         var target = _units[occupantId.Value()];

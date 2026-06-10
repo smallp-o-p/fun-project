@@ -109,10 +109,11 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
         BattleTileState tile = board.GetTile(neighbor);
         if (!tile.IsWalkable)
           continue;
-        if (tile.IsOccupied && !tile.HasOccupant(movingUnitId))
+        Option<int> occupant = board.GetOccupant(neighbor);
+        if (occupant.IsSome && occupant.Value() != movingUnitId)
           continue;
 
-        if (!tile.IsOccupied)
+        if (occupant.IsNone)
           reachable.Add(neighbor);
 
         queue.Enqueue((neighbor, steps + 1));

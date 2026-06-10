@@ -52,7 +52,7 @@ public sealed class BattleBoardState
 
   private readonly BattleTileState[,,] _tiles;
   private readonly AStar3D _pathGraph = new();
-  private readonly Dictionary<int, ValidatedPoint> _occupantPositions = [];
+  private readonly Dictionary<ValidatedPoint, int> _occupants = [];
 
   public Vector3I Dimensions { get; }
 
@@ -96,45 +96,60 @@ public sealed class BattleBoardState
     return IsInBounds(coordinates) ? Some(new ValidatedPoint(coordinates)) : None;
   }
 
+  public bool IsOccupied(ValidatedPoint point)
+  {
+    return _occupants.ContainsKey(point);
+  }
+
+  public Option<int> GetOccupant(ValidatedPoint point)
+  {
+    return _occupants.TryGetValue(point, out int unitId) ? Some(unitId) : None;
+  }
+
   public bool TryPlaceOccupant(ValidatedPoint point, int unitId)
   {
-    if (!GetTile(point).TrySetOccupant(unitId))
+    if (!GetTile(point).IsWalkable || _occupants.ContainsKey(point))
       return false;
 
-    _occupantPositions[unitId] = point;
+    _occupants[point] = unitId;
+    UpdatePathPointState(point);
     return true;
   }
 
   public bool TryMoveOccupant(ValidatedPoint source, ValidatedPoint destination, int unitId)
   {
-    BattleTileState sourceTile = GetTile(source), destinationTile = GetTile(destination);
-
-    if (!sourceTile.HasOccupant(unitId))
+    if (!_occupants.TryGetValue(source, out int sourceOccupant) || sourceOccupant != unitId)
       return false;
     if (source.Equals(destination))
       return true;
-    if (!destinationTile.TrySetOccupant(unitId))
+    if (_occupants.ContainsKey(destination))
       return false;
 
-    sourceTile.ClearOccupant();
-    _occupantPositions[unitId] = destination;
+    _occupants.Remove(source);
+    _occupants[destination] = unitId;
+    UpdatePathPointState(source);
+    UpdatePathPointState(destination);
     return true;
   }
 
   public bool TryClearOccupant(ValidatedPoint point, int unitId)
   {
-    BattleTileState tile = GetTile(point);
-    if (!tile.HasOccupant(unitId))
+    if (!_occupants.TryGetValue(point, out int occupant) || occupant != unitId)
       return false;
 
-    tile.ClearOccupant();
-    _occupantPositions.Remove(unitId);
+    _occupants.Remove(point);
+    UpdatePathPointState(point);
     return true;
   }
 
   public Option<ValidatedPoint> FindOccupantPosition(int unitId)
   {
-    return _occupantPositions.TryGetValue(unitId, out var position) ? Some(position) : None;
+    foreach (var kvp in _occupants)
+    {
+      if (kvp.Value == unitId)
+        return Some(kvp.Key);
+    }
+    return None;
   }
 
   public ValidatedPoint[] FindPath(ValidatedPoint source, ValidatedPoint destination, int movingUnitId)
@@ -144,10 +159,10 @@ public sealed class BattleBoardState
 
     long sourceId = CoordinatesToPointId(source);
     long destinationId = CoordinatesToPointId(destination);
-    BattleTileState sourceTile = GetTile(source);
     bool restoreSourceDisabled = false;
 
-    if (sourceTile.HasOccupant(movingUnitId) && _pathGraph.IsPointDisabled(sourceId))
+    if (_occupants.TryGetValue(source, out int sourceOccupant) && sourceOccupant == movingUnitId
+      && _pathGraph.IsPointDisabled(sourceId))
     {
       _pathGraph.SetPointDisabled(sourceId, false);
       restoreSourceDisabled = true;
@@ -155,15 +170,14 @@ public sealed class BattleBoardState
 
     ValidatedPoint[] path = System.Array.ConvertAll(_pathGraph.GetIdPath(sourceId, destinationId), PointIdToCoordinates);
     if (restoreSourceDisabled)
-      _pathGraph.SetPointDisabled(sourceId, ShouldDisablePathPoint(sourceTile));
+      _pathGraph.SetPointDisabled(sourceId, ShouldDisablePathPoint(source));
 
     return path;
   }
 
   public bool CanOccupy(ValidatedPoint point)
   {
-    BattleTileState tile = GetTile(point);
-    return tile.IsWalkable && !tile.IsOccupied;
+    return GetTile(point).IsWalkable && !_occupants.ContainsKey(point);
   }
 
   public static int GetGridDistance(Vector3I source, Vector3I destination)
@@ -199,13 +213,12 @@ public sealed class BattleBoardState
 
   private bool CanUsePathEndpoint(ValidatedPoint point, int movingUnitId)
   {
-    BattleTileState tile = GetTile(point);
-    if (!tile.IsWalkable)
+    if (!GetTile(point).IsWalkable)
       return false;
-    if (!tile.IsOccupied)
+    if (!_occupants.TryGetValue(point, out int occupant))
       return true;
 
-    return tile.HasOccupant(movingUnitId);
+    return occupant == movingUnitId;
   }
 
   private long CoordinatesToPointId(ValidatedPoint point) => CoordinatesToPointId(point.Raw);
@@ -225,13 +238,12 @@ public sealed class BattleBoardState
   private void OnTileTraversalStateChanged(ValidatedPoint point, BattleTileState tile)
   {
     ArgumentNullException.ThrowIfNull(tile);
-    UpdatePathPointState(point, tile);
+    UpdatePathPointState(point);
   }
 
-  private void UpdatePathPointState(ValidatedPoint point, BattleTileState tile)
+  private void UpdatePathPointState(ValidatedPoint point)
   {
-    ArgumentNullException.ThrowIfNull(tile);
-    _pathGraph.SetPointDisabled(CoordinatesToPointId(point), ShouldDisablePathPoint(tile));
+    _pathGraph.SetPointDisabled(CoordinatesToPointId(point), ShouldDisablePathPoint(point));
   }
 
   private void InitializePathGraphPoint(ValidatedPoint point)
@@ -244,7 +256,7 @@ public sealed class BattleBoardState
     ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, 0, -1));
     ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, -1, 0));
 
-    UpdatePathPointState(point, GetTile(point));
+    UpdatePathPointState(point);
   }
 
   private static Vector3 ToPathGraphPosition(Vector3I coordinates)
@@ -263,9 +275,9 @@ public sealed class BattleBoardState
     _pathGraph.ConnectPoints(pointId, CoordinatesToPointId(neighborCoordinates));
   }
 
-  private static bool ShouldDisablePathPoint(BattleTileState tile)
+  private bool ShouldDisablePathPoint(ValidatedPoint point)
   {
-    return !tile.IsWalkable || tile.IsOccupied;
+    return !GetTile(point).IsWalkable || _occupants.ContainsKey(point);
   }
 
   private ValidatedPoint PointIdToCoordinates(long pointId)

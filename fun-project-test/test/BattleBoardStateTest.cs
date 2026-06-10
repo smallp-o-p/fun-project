@@ -109,8 +109,8 @@ public partial class BattleBoardStateTest
       board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome(),
       board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(),
       7));
-    Assert.False(board.GetTile(board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()).IsOccupied);
-    Assert.True(board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).OccupantUnitId.IsSome);
-    Assert.Equal(7, board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).OccupantUnitId.RequireSome());
+    Assert.False(board.IsOccupied(board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()));
+    Assert.True(board.GetOccupant(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).IsSome);
+    Assert.Equal(7, board.GetOccupant(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).RequireSome());
   }
 }
