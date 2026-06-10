@@ -1,48 +1,49 @@
 using FunProject.Core;
+using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using Godot.Collections;
 using System;
+using System.Linq;
 
 namespace FunProject.Items;
 
 public class EquippableItem : HasModSlots, HasNameAndDescription
 {
-  protected readonly Array<ModSlot> ModSlots = [];
+  private readonly System.Collections.Generic.List<ItemCapability> _capabilities = [];
 
   public string ItemName { get; }
   public string ItemDescription { get; }
-  public int MaxCharges { get; }
-  public int CurrentCharges { get; private set; }
-  public bool IsDepleted => CurrentCharges <= 0;
 
   public EquippableItem(EquippableItemData data)
   {
     ItemName = data.Name;
     ItemDescription = data.Description;
-    MaxCharges = Math.Max(0, data.MaxCharges);
-    CurrentCharges = MaxCharges;
 
-    for (int i = 0; i < data.ModSlotCount; i++)
+    foreach (ItemCapabilityData capabilityData in data.Capabilities)
     {
-      ModSlots.Add(new ModSlot());
+      ItemCapability capability = capabilityData.CreateRuntime();
+      if (_capabilities.Any(existing => existing.GetType().IsAssignableTo(capability.GetType())
+                                     || capability.GetType().IsAssignableTo(existing.GetType())))
+        throw new InvalidOperationException($"Item '{ItemName}' has more than one {capability.GetType().Name}.");
+      _capabilities.Add(capability);
     }
   }
 
-  public Array<ModSlot> GetModSlots() => ModSlots;
   public string GetName() => ItemName;
   public string GetDescription() => ItemDescription;
 
-  public bool TrySpendCharge(int amount = 1)
+  public Option<TCap> FindCapability<TCap>() where TCap : ItemCapability
   {
-    if (amount < 0 || CurrentCharges < amount)
-      return false;
-
-    CurrentCharges -= amount;
-    return true;
+    foreach (var capability in _capabilities.OfType<TCap>())
+      return capability;
+    return None;
   }
 
-  public void RestoreCharges()
-  {
-    CurrentCharges = MaxCharges;
-  }
+  public Option<ItemWith<TCap>> With<TCap>() where TCap : ItemCapability
+    => FindCapability<TCap>().Map(capability => new ItemWith<TCap>(this, capability));
+
+  public Array<ModSlot> GetModSlots()
+    => FindCapability<ModSlotsCapability>().Match(
+        capability => capability.Slots,
+        () => new Array<ModSlot>());
 }

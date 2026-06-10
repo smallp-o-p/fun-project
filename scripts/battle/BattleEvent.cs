@@ -202,9 +202,9 @@ public sealed record ItemThrownBattleEvent : BattleEvent, IUnitBattleEvent, IPos
   public override string EventName => "item_thrown";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
-  public ThrowableItem Item { get; }
+  public EquippableItem Item { get; }
 
-  public ItemThrownBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position, ThrowableItem item)
+  public ItemThrownBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position, EquippableItem item)
   {
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(item);

@@ -1,7 +1,9 @@
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Stats;
+using FunProject.Tests;
 using Godot;
 using System.Collections.Generic;
 
@@ -38,18 +40,31 @@ internal static class BattleTestFactory
     });
   }
 
-  public static Grenade MakeGrenade(string name, int throwRange = 4, int actionPointCost = 1)
+  public static ItemWith<ThrowableCapability> MakeGrenade(string name, int throwRange = 4, int actionPointCost = 1)
   {
-    return new Grenade(new GrenadeData
+    var item = new EquippableItem(new EquippableItemData
     {
       Name = name,
       Description = $"{name} grenade",
-      ThrowRange = throwRange,
-      ActionPointCost = actionPointCost,
-      MaxCharges = 1,
-      ConsumesOnUse = true,
-      BlastRadius = 1,
+      Capabilities =
+      [
+        new ThrowableCapabilityData { ThrowRange = throwRange, ActionPointCost = actionPointCost, ConsumesOnUse = true },
+        new BlastCapabilityData { BlastRadius = 1 },
+        new ChargesCapabilityData { MaxCharges = 1 },
+      ],
     });
+    return item.With<ThrowableCapability>().RequireSome();
+  }
+
+  public static ItemWith<ThrowableCapability> MakeThrowable(string name, int throwRange = 4, int actionPointCost = 1, bool consumesOnUse = true)
+  {
+    var item = new EquippableItem(new EquippableItemData
+    {
+      Name = name,
+      Description = $"{name} throwable",
+      Capabilities = [new ThrowableCapabilityData { ThrowRange = throwRange, ActionPointCost = actionPointCost, ConsumesOnUse = consumesOnUse }],
+    });
+    return item.With<ThrowableCapability>().RequireSome();
   }
 
   public static BattleSession MakeSession(

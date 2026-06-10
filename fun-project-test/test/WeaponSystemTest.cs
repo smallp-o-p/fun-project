@@ -1,4 +1,5 @@
 using FunProject.Combatants;
+using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using FunProject.Tests;
 using FunProject.Weapons;
@@ -23,7 +24,7 @@ public class WeaponSystemTest
     RangeStat = new RangeStat { BaseValue = 1 },
     AmmunitionStat = new AmmunitionStat { BaseValue = 12 },
     DefaultAmmoData = new Ammunition(),
-    ModSlotCount = 1
+    Capabilities = [new ModSlotsCapabilityData { SlotCount = 1 }]
   };
 
   [TestCase(TestName = "Stat instances work")]
@@ -43,7 +44,6 @@ public class WeaponSystemTest
       DamageStat = new DamageStat { BaseValue = 10 },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
       RangeStat = new RangeStat { BaseValue = 1 },
-      ModSlotCount = 0,
       AmmunitionStat = default,
       DefaultAmmoData = default
     };
@@ -66,7 +66,6 @@ public class WeaponSystemTest
       RangeStat = new RangeStat { BaseValue = 20 },
       DefaultAmmoData = new Ammunition(),
       AmmunitionStat = new AmmunitionStat { BaseValue = 12 },
-      ModSlotCount = 0,
     };
     var weapon = new FirearmWeapon(data);
 
@@ -392,7 +391,7 @@ public class WeaponSystemTest
   public void MultipleModSlotsWithDifferentStatTargets()
   {
     var data = MakeFirearmWeaponData();
-    data.ModSlotCount = 2;
+    data.Capabilities = [new ModSlotsCapabilityData { SlotCount = 2 }];
 
     var weapon = new FirearmWeapon(data);
     weapon.GetModSlots()[0].EquippedMod = Some<EquippableMod>(new RangeEquippableStatMod
@@ -469,7 +468,6 @@ public class WeaponSystemTest
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
       RangeStat = new RangeStat { BaseValue = 15 },
       AmmunitionStat = new AmmunitionStat { BaseValue = 12 },
-      ModSlotCount = 0,
     };
     var weapon = new FirearmWeapon(data);
     Assert.Equal("Standard", weapon.AmmoType.Name);

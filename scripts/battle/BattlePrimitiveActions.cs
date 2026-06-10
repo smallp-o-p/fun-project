@@ -1,5 +1,6 @@
 using FunProject.Combatants;
 using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Weapons;
 using Godot;
 using System;
@@ -129,23 +130,26 @@ public sealed class ThrowItem : BattleAction
   public const string ThrowItemActionId = "throw_item";
 
   public BattleUnitState Unit { get; }
-  public ThrowableItem Item { get; }
+  public ItemWith<ThrowableCapability> Throwable { get; }
   public Vector3I TargetCell { get; }
 
-  public ThrowItem(BattleUnitState unit, ThrowableItem item, Vector3I targetCell)
+  public EquippableItem Item => Throwable.Item;
+
+  public ThrowItem(BattleUnitState unit, ItemWith<ThrowableCapability> throwable, Vector3I targetCell)
     : base(ThrowItemActionId)
   {
     ArgumentNullException.ThrowIfNull(unit);
-    ArgumentNullException.ThrowIfNull(item);
+    ArgumentNullException.ThrowIfNull(throwable.Item); // guards default-constructed proof structs
+    ArgumentNullException.ThrowIfNull(throwable.Capability);
 
     Unit = unit;
-    Item = item;
+    Throwable = throwable;
     TargetCell = targetCell;
   }
 
   public override BattleActionResult Execute(BattleSession session)
   {
-    return ValidateActingUnit(session, Unit, Item.ActionPointCost).Match(
+    return ValidateActingUnit(session, Unit, Throwable.Capability.ActionPointCost).Match(
       failure => failure,
       unit =>
       {
@@ -160,20 +164,30 @@ public sealed class ThrowItem : BattleAction
         BattleBoardState.ValidatedPoint targetPoint = targetPointOption.IfNone(default(BattleBoardState.ValidatedPoint));
         if (!unit.HasInventoryItem(Item))
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} does not have {Item.ItemName}.");
-        if (Item.ConsumesOnUse && Item.IsDepleted)
+
+        Option<ChargesCapability> charges = Item.FindCapability<ChargesCapability>();
+        if (Throwable.Capability.ConsumesOnUse && charges.Match(c => c.IsDepleted, () => false))
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Item.ItemName} has no charges remaining.");
-        if (BattleSession.GetGridDistance(unitPosition, TargetCell) > Item.ThrowRange)
+        if (BattleSession.GetGridDistance(unitPosition, TargetCell) > Throwable.Capability.ThrowRange)
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{TargetCell} is out of range for {Item.ItemName}.");
-        if (!unit.TrySpendActionPoints(Item.ActionPointCost))
-          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{unit.Combatant.Name} could not spend {Item.ActionPointCost} action points.");
+        if (!unit.TrySpendActionPoints(Throwable.Capability.ActionPointCost))
+          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{unit.Combatant.Name} could not spend {Throwable.Capability.ActionPointCost} action points.");
 
-        if (Item.ConsumesOnUse)
+        if (Throwable.Capability.ConsumesOnUse)
         {
-          if (!Item.TrySpendCharge())
-            return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{Item.ItemName} could not spend a charge.");
+          if (charges.Case is ChargesCapability chargeState)
+          {
+            if (!chargeState.TrySpend())
+              return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{Item.ItemName} could not spend a charge.");
 
-          if (Item.IsDepleted)
+            if (chargeState.IsDepleted)
+              unit.RemoveInventoryItem(Item);
+          }
+          else
+          {
+            // No charges capability: consumable items are implicitly single-use.
             unit.RemoveInventoryItem(Item);
+          }
         }
 
         session.RaiseEvent(new ItemThrownBattleEvent(unit, targetPoint, Item));

@@ -531,7 +531,7 @@ public class BattleSessionTest
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Thrower", faction, actionPoints: 4), new Vector3I(1, 0, 1));
     var grenade = BattleTestFactory.MakeGrenade("Practice Grenade", throwRange: 4);
-    unit.AddInventoryItem(grenade);
+    unit.AddInventoryItem(grenade.Item);
 
     Option<ItemThrownBattleEvent> thrownEvent = None;
     session.BattleEventCommitted += battleEvent =>
@@ -545,7 +545,7 @@ public class BattleSessionTest
     var threw = executor.Submit(BattleAction.ThrowItem(unit.State, grenade, new Vector3I(3, 0, 1))).RequireSingleResult();
 
     Assert.True(threw.Succeeded);
-    Assert.False(unit.HasInventoryItem(grenade));
+    Assert.False(unit.HasInventoryItem(grenade.Item));
     Assert.Equal(3, unit.CurrentActionPoints);
     Assert.True(thrownEvent.IsSome);
     ItemThrownBattleEvent itemThrownEvent = thrownEvent.RequireSome();

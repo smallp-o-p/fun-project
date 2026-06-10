@@ -665,7 +665,7 @@ public partial class BattleActionExecutorTest
     var unitA = SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", factionA, actionPoints: 5), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", factionB), new Vector3I(3, 0, 0));
     var grenade = BattleTestFactory.MakeGrenade("Practice");
-    unitA.AddInventoryItem(grenade);
+    unitA.AddInventoryItem(grenade.Item);
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
@@ -681,7 +681,24 @@ public partial class BattleActionExecutorTest
     Assert.True(results[1].Succeeded);
     Assert.True(results[2].Succeeded);
     Assert.Equal(factionB, session.ActiveSide);
-    Assert.False(unitA.HasInventoryItem(grenade));
+    Assert.False(unitA.HasInventoryItem(grenade.Item));
+  }
+
+  [TestCase(TestName = "Consumable throwable without charges is removed after one throw")]
+  public void ConsumableThrowableWithoutChargesIsRemovedAfterOneThrow()
+  {
+    var faction = BattleTestFactory.MakeFaction("A");
+    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", faction, actionPoints: 4), new Vector3I(1, 0, 1));
+    var throwable = BattleTestFactory.MakeThrowable("Flare");
+    unit.AddInventoryItem(throwable.Item);
+    StartBattle(session);
+
+    var executor = new BattleActionExecutor(session);
+    var result = executor.Submit(BattleAction.ThrowItem(unit.State, throwable, new Vector3I(3, 0, 1))).RequireSingleResult();
+
+    Assert.True(result.Succeeded);
+    Assert.False(unit.HasInventoryItem(throwable.Item));
   }
 
   [TestCase(TestName = "Executor rejects stale end faction turn action after auto-advance")]

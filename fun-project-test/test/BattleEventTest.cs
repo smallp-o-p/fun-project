@@ -34,7 +34,7 @@ public class BattleEventTest
     Assert.Equal($"Unit ID {unit.UnitId} occupied {position}.", new TileOccupiedBattleEvent(unit.State, position).ToDisplayString());
     Assert.Equal("Damage: 3", new UnitDamagedBattleEvent(unit.State, 3).ToDisplayString());
     Assert.Equal($"Unit ID {unit.UnitId} was killed!", new UnitKilledBattleEvent(unit.State, position).ToDisplayString());
-    Assert.Equal("Alpha threw Frag Grenade.", new ItemThrownBattleEvent(unit.State, position, grenade).ToDisplayString());
+    Assert.Equal("Alpha threw Frag Grenade.", new ItemThrownBattleEvent(unit.State, position, grenade.Item).ToDisplayString());
   }
 
   [TestCase(TestName = "Battle events expose stable event names")]
@@ -64,7 +64,7 @@ public class BattleEventTest
       (new TileOccupiedBattleEvent(unit.State, position), "tile_occupied"),
       (new UnitDamagedBattleEvent(unit.State, 3), "unit_damaged"),
       (new UnitKilledBattleEvent(unit.State, position), "unit_killed"),
-      (new ItemThrownBattleEvent(unit.State, position, grenade), "item_thrown"),
+      (new ItemThrownBattleEvent(unit.State, position, grenade.Item), "item_thrown"),
     ];
 
     foreach ((BattleEvent battleEvent, string expectedName) in events)
@@ -88,7 +88,7 @@ public class BattleEventTest
       BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 6),
       start.Raw);
     var grenade = BattleTestFactory.MakeGrenade("Frag Grenade", throwRange: 4, actionPointCost: 1);
-    unit.State.AddInventoryItem(grenade);
+    unit.State.AddInventoryItem(grenade.Item);
     BattleActionTestHelper.StartBattle(runtime);
 
     runtime.ExecuteAction(BattleAction.MoveUnit(unit.State, [destination.Raw])).RequireSingleResult();
@@ -106,7 +106,7 @@ public class BattleEventTest
 
     var thrownEvent = raisedEvents.OfType<ItemThrownBattleEvent>().Single();
     Assert.True(ReferenceEquals(unit.State, thrownEvent.Unit));
-    Assert.True(ReferenceEquals(grenade, thrownEvent.Item));
+    Assert.True(ReferenceEquals(grenade.Item, thrownEvent.Item));
     Assert.Equal(target, thrownEvent.Position);
 
     var damagedEvent = raisedEvents.OfType<UnitDamagedBattleEvent>().Single();

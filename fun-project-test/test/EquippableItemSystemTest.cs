@@ -1,53 +1,66 @@
 using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
 using FunProject.Stats;
+using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
-using Godot;
 
 [TestSuite]
 [RequireGodotRuntime]
 public class EquippableItemSystemTest
 {
-  [TestCase(TestName = "EquippableItem initializes charges and mod slots from data")]
-  public void EquippableItemInitializesChargesAndModSlotsFromData()
+  [TestCase(TestName = "Bare item has identity and no capabilities")]
+  public void BareItemHasIdentityAndNoCapabilities()
   {
     var item = new EquippableItem(new EquippableItemData
     {
       Name = "Toolkit",
       Description = "General utility kit",
-      MaxCharges = 3,
-      ModSlotCount = 2,
     });
 
     Assert.Equal("Toolkit", item.ItemName);
     Assert.Equal("General utility kit", item.ItemDescription);
-    Assert.Equal(3, item.MaxCharges);
-    Assert.Equal(3, item.CurrentCharges);
-    Assert.Equal(2, item.GetModSlots().Count);
+    Assert.True(item.FindCapability<ChargesCapability>().IsNone);
+    Assert.True(item.With<ThrowableCapability>().IsNone);
+    Assert.Equal(0, item.GetModSlots().Count);
   }
 
-  [TestCase(TestName = "EquippableItem can spend and restore charges")]
-  public void EquippableItemCanSpendAndRestoreCharges()
+  [TestCase(TestName = "Item spends and restores charges through its capability")]
+  public void ItemSpendsAndRestoresChargesThroughItsCapability()
   {
     var item = new EquippableItem(new EquippableItemData
     {
       Name = "Charge Pack",
-      MaxCharges = 2,
+      Capabilities = [new ChargesCapabilityData { MaxCharges = 2 }],
     });
 
-    Assert.True(item.TrySpendCharge());
-    Assert.Equal(1, item.CurrentCharges);
-    Assert.True(item.TrySpendCharge());
-    Assert.True(item.IsDepleted);
-    Assert.False(item.TrySpendCharge());
+    var charges = item.FindCapability<ChargesCapability>().RequireSome();
+    Assert.True(charges.TrySpend());
+    Assert.Equal(1, charges.Current);
+    Assert.True(charges.TrySpend());
+    Assert.True(charges.IsDepleted);
+    Assert.False(charges.TrySpend());
 
-    item.RestoreCharges();
-    Assert.Equal(2, item.CurrentCharges);
+    charges.Restore();
+    Assert.Equal(2, charges.Current);
   }
 
-  [TestCase(TestName = "Weapon inherits base equippable item behavior")]
-  public void WeaponInheritsBaseEquippableItemBehavior()
+  [TestCase(TestName = "Mod slots capability exposes slots")]
+  public void ModSlotsCapabilityExposesSlots()
+  {
+    var item = new EquippableItem(new EquippableItemData
+    {
+      Name = "Rig",
+      Capabilities = [new ModSlotsCapabilityData { SlotCount = 2 }],
+    });
+
+    Assert.Equal(2, item.FindCapability<ModSlotsCapability>().RequireSome().Slots.Count);
+    Assert.Equal(2, item.GetModSlots().Count);
+  }
+
+  [TestCase(TestName = "Weapon still exposes base item identity")]
+  public void WeaponStillExposesBaseItemIdentity()
   {
     var weapon = new MeleeWeapon(new WeaponData
     {
@@ -57,17 +70,15 @@ public class EquippableItemSystemTest
       DamageStat = new DamageStat { BaseValue = 7 },
       RangeStat = new RangeStat { BaseValue = 1 },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
-      ModSlotCount = 1,
     });
 
     Assert.Equal("Blade", weapon.ItemName);
     Assert.Equal("Blade", weapon.WeaponName);
-    Assert.Equal(1, weapon.GetModSlots().Count);
     Assert.Equal(7, weapon.GetDamageStat().BaseValue);
   }
 
-  [TestCase(TestName = "Grenade copies serializable data and effect descriptors")]
-  public void GrenadeCopiesSerializableDataAndEffectDescriptors()
+  [TestCase(TestName = "Frag grenade is pure data")]
+  public void FragGrenadeIsPureData()
   {
     var damageEffect = new DamageEffectData
     {
@@ -76,22 +87,25 @@ public class EquippableItemSystemTest
       DamageElement = DamageElement.Kinetic,
     };
 
-    var grenade = new Grenade(new GrenadeData
+    var grenade = new EquippableItem(new EquippableItemData
     {
       Name = "Frag Grenade",
       Description = "Explodes into fragments",
-      ThrowRange = 5,
-      ActionPointCost = 2,
-      BlastRadius = 3,
-      MaxCharges = 1,
-      Effects = [damageEffect],
+      Capabilities =
+      [
+        new ThrowableCapabilityData { ThrowRange = 5, ActionPointCost = 2 },
+        new BlastCapabilityData { BlastRadius = 3, Effects = [damageEffect] },
+        new ChargesCapabilityData { MaxCharges = 1 },
+      ],
     });
 
     Assert.Equal("Frag Grenade", grenade.ItemName);
-    Assert.Equal(5, grenade.ThrowRange);
-    Assert.Equal(2, grenade.ActionPointCost);
-    Assert.Equal(3, grenade.BlastRadius);
-    Assert.Equal(1, grenade.Effects.Count);
-    Assert.Equal(damageEffect, grenade.Effects[0]);
+    var throwable = grenade.FindCapability<ThrowableCapability>().RequireSome();
+    Assert.Equal(5, throwable.ThrowRange);
+    Assert.Equal(2, throwable.ActionPointCost);
+    var blast = grenade.FindCapability<BlastCapability>().RequireSome();
+    Assert.Equal(3, blast.BlastRadius);
+    Assert.Equal(1, blast.Effects.Count);
+    Assert.Equal(damageEffect, blast.Effects[0]);
   }
 }

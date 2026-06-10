@@ -23,7 +23,7 @@ public class Weapon : EquippableItem, HasStats
     };
   }
 
-  public int NumModslots() => ModSlots.Count;
+  public int NumModslots() => GetModSlots().Count;
 
   public Option<Stat> TryGetStat(Type statType)
   {

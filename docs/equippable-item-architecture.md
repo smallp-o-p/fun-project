@@ -1,91 +1,89 @@
 # Equippable Item Architecture
 
-This document describes the target architecture for authored equippable items and their runtime counterparts.
+Items are composed from capabilities, not subclassed. One authored
+`EquippableItemData` resource plus an array of capability resources defines any
+item; no new C# classes are needed to create a new kind of item.
+Design spec: `docs/superpowers/specs/2026-06-09-item-composition-design.md`.
 
 ## Design Goals
 
-- Follow the same pattern used elsewhere in the project: serializable `Resource` data for authored content and runtime objects for mutable state.
-- Support weapons, grenades, armor, and utility items under one consistent item model.
-- Keep battle behavior serializable as data wherever possible.
-- Allow complex items such as grenades, smoke canisters, mines, medkits, and deployables without hardcoding each item as a special-case class.
+- Same Data/Runtime split as the rest of the project, applied per capability:
+  authored `Resource` data is immutable; runtime objects own mutable state.
+- A new item kind (throwable scanner beacon, multi-use medkit) is data-only:
+  compose capabilities in the inspector.
+- Battle actions that require a capability take a typed proof, making
+  "throw a non-throwable item" a compile error rather than a runtime check.
 
-## Item Hierarchy
+## Shape
 
-Use the same split everywhere: serializable `Resource` data for authoring and lightweight runtime wrappers for mutable use.
+### Data layer (authored, `[GlobalClass]` resources)
 
-### Data Layer
+- `EquippableItemData : NamedEntityData` — name/description plus
+  `Capabilities : Array<ItemCapabilityData>`.
+- `ItemCapabilityData : Resource` (abstract) — `CreateRuntime()` factory.
+- Concrete capabilities (in `scripts/items/capabilities/`):
+  - `ThrowableCapabilityData` — throw range, action point cost, consumes-on-use
+  - `BlastCapabilityData` — blast radius, `Array<BattleEffectData>` payload
+  - `ChargesCapabilityData` — max charges
+  - `ModSlotsCapabilityData` — slot count
+- Weapons still subclass: `WeaponData → AmmunitionedWeaponData →
+  FirearmWeaponData` extend `EquippableItemData` and inherit the capability
+  array (their stats may become capabilities in a later pass).
 
-```text
-NamedEntityData
-\-- EquippableItemData
-    +-- WeaponData
-    |   \-- FirearmWeaponData
-    +-- ThrowableItemData
-    |   \-- GrenadeData
-    +-- ArmorItemData
-    \-- UtilityItemData
-```
+### Runtime layer (plain C#)
 
-### Runtime Layer
+- `EquippableItem` — identity + capability list built via `CreateRuntime()`.
+  Duplicate capability types throw `InvalidOperationException` at construction
+  (one-per-type invariant).
+- Runtime capabilities mirror the data and OWN their state: `ChargesCapability`
+  (current charges), `ModSlotsCapability` (the `ModSlot` instances),
+  `BlastCapability` (defensively copies the effects list into an
+  `IReadOnlyList`), `ThrowableCapability` (clamped numeric values).
+- Lookup: `item.FindCapability<TCap>()` returns `Option<TCap>` (linear scan —
+  capability counts are single-digit; do not add a Type-keyed dictionary
+  without profiling evidence).
+- `HasModSlots` is implemented by delegation: `GetModSlots()` returns the
+  `ModSlotsCapability` slots, or an empty array when the capability is absent.
 
-```text
-EquippableItem
-+-- Weapon
-|   \-- FirearmWeapon
-+-- ThrowableItem
-|   \-- Grenade
-+-- ArmorItem
-\-- UtilityItem
-```
+## Capability proofs ("parse, don't validate")
 
-## Responsibilities
+`item.With<TCap>()` returns `Option<ItemWith<TCap>>` — a proof binding the item
+to its capability. Actions that require a capability take the proof type:
+`ThrowItem` takes `ItemWith<ThrowableCapability>`, so non-throwable items are
+rejected by the compiler, not at runtime. Proofs cannot go stale because
+capability sets are fixed at item construction. This is the same pattern as
+`BattleBoardState.ValidatedPoint`.
 
-- `EquippableItemData` defines authored, serializable item data such as:
-  - name and description
-  - icon or presentation metadata
-  - inventory or slot constraints
-  - weight or economy metadata
-  - authored effect payloads
-- `EquippableItem` holds mutable runtime state such as:
-  - current charges
-  - current ammo
-  - active mods
-  - battle- or mission-specific state
-- `WeaponData` and `Weapon` remain specific to attack-capable gear.
-- `ThrowableItemData` and `ThrowableItem` cover thrown battle-usable gear without forcing every throwable to look like a firearm.
-- `ArmorItemData` and `UtilityItemData` allow passive or activated equipment to fit the same authoring pattern.
+`Execute` still re-validates state-dependent facts (possession, action points,
+range) as `Rejected` results — those can change between action construction
+and execution.
 
-## Grenade And Throwable Serialization
+## Consumption semantics
 
-Grenades and similar consumables should be composed from serializable effect resources rather than bespoke hardcoded booleans or embedded behavior code.
+For a throwable with `ConsumesOnUse`:
+- With a `ChargesCapability`: spend one charge per throw; remove from
+  inventory when depleted.
+- Without: implicitly single-use — removed from inventory after one throw.
 
-### Recommended Shape
+## Adding a capability
 
-- `GrenadeData`
-  - throw range
-  - blast radius or area shape
-  - fuse or detonation mode
-  - friendly-fire policy if needed
-  - array of `BattleEffectData`
-- `BattleEffectData`
-  - abstract base for authored effect payloads
-- concrete effect resources, for example:
-  - `DamageEffectData`
-  - `StatusEffectData`
-  - `TerrainEffectData`
-  - `VisibilityEffectData`
-  - `SpawnHazardEffectData`
+1. Add `FooCapabilityData` (`[GlobalClass]`, file name = class name, defaults
+   in exports) and `FooCapability` (runtime state) under
+   `scripts/items/capabilities/`.
+2. Wire `CreateRuntime() => new FooCapability(this)`.
+3. Build before expecting it in the inspector picker (Godot registers global
+   classes from compiled assemblies; restart the editor if it doesn't appear).
+4. Keep numeric tuning in the stat system — a capability wrapping a single
+   stat is the wrong granularity. Capabilities earn their place by cutting
+   across item kinds or carrying designer-tuned data groups.
 
-### Serialization Principle
+## Known constraints
 
-- Serialize effect descriptors as data.
-- Interpret them through the tactical battle-effect pipeline at runtime.
-- Do not serialize grenade behavior as delegates or ad hoc embedded scripts by default.
-
-This keeps authored items flexible while preserving deterministic combat logic and makes grenades, smoke canisters, mines, medkits, deployables, and other equippables fit the same runtime pipeline.
-
-## Integration Notes
-
-- Weapon mods and grenade payloads should both flow through battle-effect resources instead of separate one-off systems.
-- Inventory or equipment code should depend on `EquippableItemData` and `EquippableItem`, not directly on `WeaponData` and `Weapon`.
-- Tactical execution should consume runtime items and effect descriptors, not raw authored resources alone.
+- Godot cannot export interfaces; capability-as-Resource is the supported
+  composition mechanism for designer-authored data.
+- Nested capability sub-resources are shared by reference if copy-pasted in
+  the inspector; immutable data + runtime wrappers make this safe, but save
+  shared capability presets as standalone `.tres` files when reuse is intended.
+- Export builds with .NET trimming can strip capability classes that are only
+  referenced from `.tres` files. No export pipeline exists yet; when one does,
+  add trimmer root descriptors (or disable trimming) for the game assembly.

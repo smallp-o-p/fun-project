@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using FunProject.Combatants;
-using Godot;
 using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Weapons;
+using Godot;
 using System.Linq;
 using LanguageExt.UnsafeValueAccess;
 
@@ -155,9 +156,9 @@ public abstract class BattleAction
     return new MoveUnit(unit, destinations, actionPointCostPerStep);
   }
 
-  public static ThrowItem ThrowItem(BattleUnitState unit, ThrowableItem item, Vector3I targetCell)
+  public static ThrowItem ThrowItem(BattleUnitState unit, ItemWith<ThrowableCapability> throwable, Vector3I targetCell)
   {
-    return new ThrowItem(unit, item, targetCell);
+    return new ThrowItem(unit, throwable, targetCell);
   }
 
   public static ApplyDamage ApplyDamage(BattleUnitState unit, int amount)
