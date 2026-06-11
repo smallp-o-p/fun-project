@@ -1,6 +1,7 @@
 using System;
 using FunProject.Combatants;
 using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using FunProject.Weapons;
 using System.Collections.Generic;
@@ -17,6 +18,7 @@ public sealed class BattleUnitState
   public Combatant Combatant { get; }
   public Faction Side => Combatant.OwningFaction;
   public Option<Weapon> EquippedWeapon { get; private set; }
+  public Option<ItemWith<ArmorCapability>> EquippedArmor { get; }
   public IReadOnlyList<EquippableItem> Inventory => _inventory;
   internal IReadOnlySet<BattleUnitState> VisibleUnits => _visibleUnits;
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> VisibleTiles => _visibleTiles;
@@ -29,7 +31,11 @@ public sealed class BattleUnitState
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
 
-  internal BattleUnitState(int unitId, Combatant combatant, Option<Weapon> equippedWeapon)
+  internal BattleUnitState(
+    int unitId,
+    Combatant combatant,
+    Option<Weapon> equippedWeapon,
+    Option<ItemWith<ArmorCapability>> equippedArmor)
   {
     ArgumentOutOfRangeException.ThrowIfLessThan(unitId, 0);
 
@@ -37,6 +43,7 @@ public sealed class BattleUnitState
     ArgumentNullException.ThrowIfNull(combatant);
     Combatant = combatant;
     EquippedWeapon = equippedWeapon;
+    EquippedArmor = equippedArmor;
     CurrentHealth = MaxHealth;
     CurrentActionPoints = MaxActionPoints;
   }

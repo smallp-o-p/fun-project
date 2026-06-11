@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Core;
 using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
@@ -11,14 +12,6 @@ using static BattleActionTestHelper;
 [RequireGodotRuntime]
 public partial class AttackUnitTest
 {
-  private sealed class AlwaysHitCalculator : IHitChanceCalculator
-  {
-    public HitChanceBreakdown Calculate(AttackContext context)
-    {
-      return new HitChanceBreakdown(100, []);
-    }
-  }
-
   [TestCase(TestName = "Guaranteed hit damages the target and raises attack then damage events")]
   public void GuaranteedHitDamagesTargetAndRaisesAttackThenDamageEvents()
   {
@@ -167,7 +160,7 @@ public partial class AttackUnitTest
     var weapon = new Weapon(new WeaponData
     {
       Name = "Plasma Pistol",
-      Frame = BattleTestFactory.MakeFrame((DamageElement.Thermal, 0.7f), (DamageElement.Electrical, 0.3f)),
+      Frame = BattleTestFactory.MakeFrame((Element.Thermal, 0.7f), (Element.Electrical, 0.3f)),
       DamageStat = new FunProject.Stats.DamageStat { BaseValue = 6 },
       RangeStat = new FunProject.Stats.RangeStat { BaseValue = 10 },
       CriticalChanceStat = new FunProject.Stats.CriticalChanceStat { BaseValue = 0 },
@@ -186,7 +179,7 @@ public partial class AttackUnitTest
     Assert.Equal(6, damagedEvent.TotalAmount); // 4 Thermal + 2 Electrical
     Assert.Equal(target.State.MaxHealth - 6, target.State.CurrentHealth);
     Assert.True(damagedEvent.Bundle.SequenceEqual(
-      new[] { new Damage(4, DamageElement.Thermal), new Damage(2, DamageElement.Electrical) }));
+      new[] { new Damage(4, Element.Thermal), new Damage(2, Element.Electrical) }));
   }
 
   [TestCase(TestName = "Int damage path wraps the amount as a single Kinetic packet")]
@@ -205,7 +198,7 @@ public partial class AttackUnitTest
 
     var damagedEvent = raisedEvents.OfType<UnitDamagedBattleEvent>().Single();
     Assert.Equal(3, damagedEvent.TotalAmount);
-    Assert.True(damagedEvent.Bundle.SequenceEqual(new[] { new Damage(3, DamageElement.Kinetic) }));
+    Assert.True(damagedEvent.Bundle.SequenceEqual(new[] { new Damage(3, Element.Kinetic) }));
   }
 
   private static List<bool> RunSeededAttackOutcomes(int seed)

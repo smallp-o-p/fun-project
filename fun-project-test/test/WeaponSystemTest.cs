@@ -99,8 +99,8 @@ public class WeaponSystemTest
     Assert.True(weapon.TryGetStat(typeof(HealthStat)).IsNone);
   }
 
-  [TestCase(TestName = "Combatant exposes all concrete stat types through lookup")]
-  public void CombatantExposesAllConcreteStatTypesThroughLookup()
+  [TestCase(TestName = "Combatant exposes its concrete stat types and no armor stat")]
+  public void CombatantExposesConcreteStatTypesAndNoArmorStat()
   {
     var combatant = new Combatant(new CombatantData
     {
@@ -111,16 +111,13 @@ public class WeaponSystemTest
       MovementStat = new MovementStat { BaseValue = 12 },
       VisionStat = new VisionStat { BaseValue = 20 },
       AimStat = new AimStat { BaseValue = 65 },
-      BaseArmorStat = new BaseArmorStat { BaseValue = 3 },
       ModSlotCount = 0,
     }, new Faction(new FactionData { Name = "City Guard" }));
 
     Assert.Equal(20, combatant.GetStat<HealthStat>().BaseValue);
     Assert.Equal(20, combatant.GetStat<VisionStat>().BaseValue);
     Assert.Equal(65, combatant.GetStat<AimStat>().BaseValue);
-    Option<Stat> armorStat = combatant.TryGetStat(typeof(BaseArmorStat));
-    Assert.True(armorStat.IsSome);
-    Assert.Equal(3, armorStat.RequireSome().BaseValue);
+    Assert.True(combatant.TryGetStat(typeof(BaseArmorStat)).IsNone);
   }
 
   [TestCase(TestName = "ModSlot starts empty")]

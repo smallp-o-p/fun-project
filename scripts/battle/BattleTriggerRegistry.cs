@@ -60,7 +60,7 @@ internal sealed class BattleTriggerRegistry
   private IReadOnlyList<RegisteredTrigger> GetMatchingTriggers(BattleEvent battleEvent)
   {
     List<RegisteredTrigger> matchingTriggers = [];
-    foreach (Type eventKey in GetEventKeys(battleEvent))
+    foreach (Type eventKey in BattleEventKeys.For(battleEvent))
     {
       if (!_registeredTriggersByEventType.TryGetValue(eventKey, out var registeredTriggers))
         continue;
@@ -75,24 +75,5 @@ internal sealed class BattleTriggerRegistry
     return [.. matchingTriggers
         .OrderBy(entry => entry.Trigger.Priority)
         .ThenBy(entry => entry.RegistrationOrder)];
-  }
-
-  /*
-  * This function gets all the keys associated with a particular BattleEvent.
-  * E.g. For UnitMovedBattleEvent which implements BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
-  * This will return a list of [UnitMovedBattleEvent, IUnitBattleEvent, IPositionedBattleEvent], so that any registered triggers for the
-  * abstract base classes get tripped.
-  */
-  private static IReadOnlyList<Type> GetEventKeys(BattleEvent battleEvent)
-  {
-
-    Type eventType = battleEvent.GetType();
-    return
-    [
-      eventType,
-      .. eventType
-        .GetInterfaces()
-        .Where(interfaceType => typeof(BattleEventTag).IsAssignableFrom(interfaceType)),
-    ];
   }
 }

@@ -190,6 +190,8 @@ UnitDamagedBattleEvent
   UnitId
   Bundle (list of Damage packets)
   TotalAmount
+  ArmorDamage
+  HealthDamage
 
 UnitKilledBattleEvent
   UnitId
@@ -267,6 +269,18 @@ Later indices can include:
 - faction
 
 This supports the current runtime without broadcasting every event to every trigger, while leaving room for spatial indexing if tile-based trigger counts grow.
+
+## Listeners vs Triggers
+
+`BattleTrigger` and `BattleEventListener` both observe committed events but serve different roles.
+
+**Triggers** are serializable, designer-authored gameplay reactions. They are evaluated by `BattleActionExecutor` between primitive commits, returning interrupt actions that are inserted into the action queue. They have explicit priority and consumption semantics, and they must not mutate `BattleSession` directly — they only queue follow-up `BattleAction` values.
+
+**`BattleEventListener`s** are plain-C# session-internal bookkeeping observers registered via internal `BattleSession.RegisterListener<TEventKey>()`. They share the same tag-type routing (`BattleEventKeys`) as triggers but run inside the session's own dispatch loop. Listeners may mutate session state directly and raise follow-up events. Dispatch is queue-drained: an event raised mid-dispatch is deferred to run after the current event finishes (breadth-first). A throwing observer clears the queue and the exception surfaces. Listeners must not call `BattleActionExecutor.Submit` — the executor throws if called during dispatch.
+
+`ArmorRegenSystem` is the first registered listener. It observes `TurnEndedBattleEvent`, ticks the regen delay and current armor for every living unit on that faction whose armor can regenerate, and raises `UnitArmorRegeneratedBattleEvent` only when armor is actually restored.
+
+The rule of thumb: use a trigger when you want a gameplay *reaction* mediated by the executor (overwatch, mines, traps). Use a listener when you want deterministic session bookkeeping that runs every time an event commits (turn-lifecycle upkeep, stat regeneration, status-effect ticking).
 
 ## Observer Rule
 

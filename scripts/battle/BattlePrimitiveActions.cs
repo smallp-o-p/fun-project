@@ -37,24 +37,30 @@ public sealed class SpawnUnit : BattleAction
   public Combatant Combatant { get; }
   public Vector3I Position { get; }
   public Option<Weapon> EquippedWeapon { get; }
+  public Option<ItemWith<ArmorCapability>> EquippedArmor { get; }
 
   internal SpawnUnit(Combatant combatant, Vector3I position)
-    : this(combatant, position, None)
+    : this(combatant, position, None, None)
   {
   }
 
   internal SpawnUnit(Combatant combatant, Vector3I position, Weapon equippedWeapon)
-    : this(combatant, position, Some(equippedWeapon))
+    : this(combatant, position, Some(equippedWeapon), None)
   {
   }
 
-  internal SpawnUnit(Combatant combatant, Vector3I position, Option<Weapon> equippedWeapon)
+  internal SpawnUnit(
+    Combatant combatant,
+    Vector3I position,
+    Option<Weapon> equippedWeapon,
+    Option<ItemWith<ArmorCapability>> equippedArmor)
     : base(SpawnUnitActionId)
   {
     ArgumentNullException.ThrowIfNull(combatant);
     Combatant = combatant;
     Position = position;
     EquippedWeapon = equippedWeapon;
+    EquippedArmor = equippedArmor;
   }
 
   internal override BattleActionResult Execute(BattleSession session)
@@ -69,7 +75,7 @@ public sealed class SpawnUnit : BattleAction
     if (!session.Board.CanOccupy(positionPoint))
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Cannot place a unit at {Position}.");
 
-    var spawnedUnit = session.AddUnit(Combatant, positionPoint, EquippedWeapon);
+    var spawnedUnit = session.AddUnit(Combatant, positionPoint, EquippedWeapon, EquippedArmor);
     return BattleActionResult.Success(this, spawnedUnit.Unit);
   }
 }

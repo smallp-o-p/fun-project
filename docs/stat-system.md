@@ -45,9 +45,10 @@ Examples:
   - `WillStat`
   - `MovementStat`
   - `AimStat`
-  - `BaseArmorStat`
 
 This keeps the serialized data small while giving the inspector strong type restrictions.
+
+`BaseArmorStat` (armor value + `Element` for elemental matching) is no longer authored on `CombatantData`. Armor lives on items: `ArmorCapabilityData` holds the `BaseArmorStat` and regen config, and `BattleUnitState.EquippedArmor` carries the per-battle proof that a unit has armor equipped.
 
 ## Runtime Access
 

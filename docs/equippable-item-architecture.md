@@ -26,6 +26,7 @@ Design spec: `docs/superpowers/specs/2026-06-09-item-composition-design.md`.
   - `BlastCapabilityData` — blast radius, `Array<BattleEffectData>` payload
   - `ChargesCapabilityData` — max charges
   - `ModSlotsCapabilityData` — slot count
+  - `ArmorCapabilityData` — armor value via `BaseArmorStat` (which carries the `Element` for elemental matching), plus regen config (`RegenDelayTurns`, `RegenPerTurn`)
 - Weapons still subclass: `WeaponData → AmmunitionedWeaponData →
   FirearmWeaponData` extend `EquippableItemData` and inherit the capability
   array (their stats may become capabilities in a later pass).
@@ -38,7 +39,11 @@ Design spec: `docs/superpowers/specs/2026-06-09-item-composition-design.md`.
 - Runtime capabilities mirror the data and OWN their state: `ChargesCapability`
   (current charges), `ModSlotsCapability` (the `ModSlot` instances),
   `BlastCapability` (defensively copies the effects list into an
-  `IReadOnlyList`), `ThrowableCapability` (clamped numeric values).
+  `IReadOnlyList`), `ThrowableCapability` (clamped numeric values),
+  `ArmorCapability` (`Max`, `Current`, `Element`, `RegenDelayRemaining`; methods
+  `Reduce`, `RearmRegenDelay`, `TickRegen`). `BattleUnitState.EquippedArmor`
+  holds the capability proof as `Option<ItemWith<ArmorCapability>>`, threaded
+  through `SpawnUnit`/`AddUnit`.
 - Lookup: `item.FindCapability<TCap>()` returns `Option<TCap>` (linear scan —
   capability counts are single-digit; do not add a Type-keyed dictionary
   without profiling evidence).

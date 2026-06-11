@@ -29,6 +29,8 @@ public sealed class BattleActionExecutor
 
   public IReadOnlyList<BattleActionResult> Submit(BattleAction action)
   {
+    if (_session.IsDispatchingEvents)
+      throw new InvalidOperationException("Cannot submit actions while battle events are dispatching; listeners raise follow-up events through the session instead.");
     Enqueue(action);
     return Tick();
   }

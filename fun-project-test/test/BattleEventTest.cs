@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Core;
 using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
@@ -33,7 +34,7 @@ public class BattleEventTest
     Assert.Equal("Alpha ended their activation.", new UnitActivationEndedBattleEvent(unit.State, position).ToDisplayString());
     Assert.Equal($"Unit ID {unit.UnitId} moved from {sourcePosition} to {position}.", new UnitMovedBattleEvent(unit.State, position, sourcePosition).ToDisplayString());
     Assert.Equal($"Unit ID {unit.UnitId} occupied {position}.", new TileOccupiedBattleEvent(unit.State, position).ToDisplayString());
-    Assert.Equal("Damage: 3", new UnitDamagedBattleEvent(unit.State, [new Damage(3, DamageElement.Kinetic)]).ToDisplayString());
+    Assert.Equal("Damage: 3 (0 armor, 3 health)", new UnitDamagedBattleEvent(unit.State, [new Damage(3, Element.Kinetic)], 0, 3).ToDisplayString());
     Assert.Equal($"Unit ID {unit.UnitId} was killed!", new UnitKilledBattleEvent(unit.State, position).ToDisplayString());
     Assert.Equal("Alpha threw Frag Grenade.", new ItemThrownBattleEvent(unit.State, position, grenade.Item).ToDisplayString());
   }
@@ -63,7 +64,7 @@ public class BattleEventTest
       (new UnitActivationEndedBattleEvent(unit.State, position), "unit_activation_ended"),
       (new UnitMovedBattleEvent(unit.State, position, sourcePosition), "unit_moved"),
       (new TileOccupiedBattleEvent(unit.State, position), "tile_occupied"),
-      (new UnitDamagedBattleEvent(unit.State, [new Damage(3, DamageElement.Kinetic)]), "unit_damaged"),
+      (new UnitDamagedBattleEvent(unit.State, [new Damage(3, Element.Kinetic)], 0, 3), "unit_damaged"),
       (new UnitKilledBattleEvent(unit.State, position), "unit_killed"),
       (new ItemThrownBattleEvent(unit.State, position, grenade.Item), "item_thrown"),
     ];

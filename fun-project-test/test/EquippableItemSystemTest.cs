@@ -1,3 +1,4 @@
+using FunProject.Core;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
@@ -65,7 +66,7 @@ public class EquippableItemSystemTest
     {
       Name = "Shrapnel",
       BaseDamage = 6,
-      DamageElement = DamageElement.Kinetic,
+      Element = Element.Kinetic,
     };
 
     var grenade = new EquippableItem(new EquippableItemData

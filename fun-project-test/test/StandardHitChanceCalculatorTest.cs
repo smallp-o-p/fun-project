@@ -22,8 +22,8 @@ public partial class StandardHitChanceCalculatorTest
     board.GetTile(defenderPoint).Cover = defenderCover;
 
     var weapon = BattleTestFactory.MakeWeapon("Rifle");
-    var attacker = new BattleUnitState(1, BattleTestFactory.MakeCombatant("Alpha", attackerFaction, aim: aim), Some(weapon));
-    var defender = new BattleUnitState(2, BattleTestFactory.MakeCombatant("Hostile", defenderFaction), None);
+    var attacker = new BattleUnitState(1, BattleTestFactory.MakeCombatant("Alpha", attackerFaction, aim: aim), Some(weapon), None);
+    var defender = new BattleUnitState(2, BattleTestFactory.MakeCombatant("Hostile", defenderFaction), None, None);
 
     return new AttackContext(attacker, defender, attackerPoint, defenderPoint, weapon, board);
   }

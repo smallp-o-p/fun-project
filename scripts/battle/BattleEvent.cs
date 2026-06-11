@@ -153,23 +153,55 @@ public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IP
   public override string ToDisplayString() => $"Unit ID {Unit.Id} occupied {Position}.";
 }
 
+/// <summary>
+/// Carries one resolved damage application. Bundle and TotalAmount describe the
+/// pre-mitigation payload; ArmorDamage and HealthDamage are the amounts actually
+/// applied after armor resolution. They need not reconcile: an element-matched hit
+/// strips armor at 1.5x, so ArmorDamage can exceed TotalAmount.
+/// </summary>
 public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent
 {
   public override string EventName => "unit_damaged";
   public BattleUnitState Unit { get; }
   public IReadOnlyList<Damage> Bundle { get; }
   public int TotalAmount { get; }
+  public int ArmorDamage { get; }
+  public int HealthDamage { get; }
 
-  public UnitDamagedBattleEvent(BattleUnitState unit, IReadOnlyList<Damage> bundle)
+  public UnitDamagedBattleEvent(BattleUnitState unit, IReadOnlyList<Damage> bundle, int armorDamage, int healthDamage)
   {
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(bundle);
+    ArgumentOutOfRangeException.ThrowIfNegative(armorDamage);
+    ArgumentOutOfRangeException.ThrowIfNegative(healthDamage);
     Unit = unit;
     Bundle = bundle;
     TotalAmount = bundle.Sum(damage => damage.Amount);
+    ArmorDamage = armorDamage;
+    HealthDamage = healthDamage;
   }
 
-  public override string ToDisplayString() => $"Damage: {TotalAmount}";
+  public override string ToDisplayString() => $"Damage: {TotalAmount} ({ArmorDamage} armor, {HealthDamage} health)";
+}
+
+public sealed record UnitArmorRegeneratedBattleEvent : BattleEvent, IUnitBattleEvent
+{
+  public override string EventName => "unit_armor_regenerated";
+  public BattleUnitState Unit { get; }
+  public int AmountRegenerated { get; }
+  public int CurrentArmor { get; }
+
+  public UnitArmorRegeneratedBattleEvent(BattleUnitState unit, int amountRegenerated, int currentArmor)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountRegenerated);
+    ArgumentOutOfRangeException.ThrowIfNegative(currentArmor);
+    Unit = unit;
+    AmountRegenerated = amountRegenerated;
+    CurrentArmor = currentArmor;
+  }
+
+  public override string ToDisplayString() => $"Unit ID {Unit.Id} regenerated {AmountRegenerated} armor ({CurrentArmor} current).";
 }
 
 public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent

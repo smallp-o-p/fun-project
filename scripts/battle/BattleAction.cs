@@ -116,6 +116,15 @@ public abstract class BattleAction
     return new SpawnUnit(combatant, position, equippedWeapon);
   }
 
+  public static SpawnUnit SpawnUnit(
+    Combatant combatant,
+    Vector3I position,
+    Weapon equippedWeapon,
+    ItemWith<ArmorCapability> equippedArmor)
+  {
+    return new SpawnUnit(combatant, position, Some(equippedWeapon), Some(equippedArmor));
+  }
+
   public static MoveUnit MoveUnit(
     BattleUnitState unit,
     IEnumerable<Vector3I> destinations,

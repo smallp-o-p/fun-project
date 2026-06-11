@@ -13,6 +13,5 @@ public partial class CombatantData : NamedEntityData
   [Export] required public MovementStat MovementStat { get; set; }
   [Export] required public VisionStat VisionStat { get; set; } = new VisionStat { BaseValue = 20 };
   [Export] required public AimStat AimStat { get; set; }
-  [Export] required public BaseArmorStat BaseArmorStat { get; set; }
   [Export] public int ModSlotCount { get; set; }
 }

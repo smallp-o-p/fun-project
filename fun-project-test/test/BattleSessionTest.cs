@@ -540,10 +540,10 @@ public class BattleSessionTest
     BattleBoardState.ValidatedPoint occupiedPoint = session.Board
       .ValidatePoint(new Vector3I(1, 0, 1))
       .RequireSome();
-    var occupiedUnit = session.AddUnit(BattleTestFactory.MakeCombatant("Alpha", faction), occupiedPoint, None).Unit;
+    var occupiedUnit = session.AddUnit(BattleTestFactory.MakeCombatant("Alpha", faction), occupiedPoint, None, None).Unit;
 
     Assert.Throws<InvalidOperationException>(() =>
-      session.AddUnit(BattleTestFactory.MakeCombatant("Bravo", faction), occupiedPoint, None));
+      session.AddUnit(BattleTestFactory.MakeCombatant("Bravo", faction), occupiedPoint, None, None));
     Assert.Equal(1, session.AliveUnits.Count());
     Assert.True(session.AliveUnits.Contains(occupiedUnit));
     Assert.False(session.AliveUnits.Any(unit => unit.Combatant.Name == "Bravo"));

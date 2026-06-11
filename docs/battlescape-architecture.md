@@ -362,13 +362,19 @@ The current event stream is intentionally small and authoritative. Presentation 
 - `UnitActivationEnded`
 - `UnitMoved`
 - `TileOccupied`
-- `UnitDamaged`
+- `UnitAttacked` — carries attacker, target, weapon, hit-chance breakdown, roll, and whether the attack hit
+- `UnitDamaged` — carries the pre-mitigation damage bundle plus the post-mitigation `ArmorDamage` and `HealthDamage` split
+- `UnitArmorRegenerated` — raised at the owning faction's turn end only when armor is actually restored; carries unit, amount regenerated, and current armor
 - `UnitKilled`
 - `ItemThrown`
 
 Presentation code should react to these events instead of inferring state changes from executor internals.
 
 Trigger registration keys on `BattleEventTag` types, not an enum. A trigger can register against a concrete event such as `TileOccupiedBattleEvent`, or against a shared marker interface such as `IPositionedBattleEvent` or `IUnitBattleEvent`, in which case it fires for every committed event implementing that tag. Concrete event subclasses, such as `UnitMovedBattleEvent` and `TurnStartedBattleEvent`, carry event-specific payloads.
+
+Event dispatch is queue-drained: an event raised mid-dispatch is deferred until after the current event finishes processing (breadth-first, not inline). A throwing observer clears the queue and surfaces the exception. `BattleActionExecutor.Submit` throws if called during dispatch, because listeners are not allowed to inject executor actions — that is the trigger system's role.
+
+In addition to triggers, the session supports `BattleEventListener` registrations (internal `RegisterListener<TEventKey>()`, same `BattleEventKeys` tag routing). Listeners are plain-C# session-internal bookkeeping observers that may mutate state directly and raise follow-up events; `ArmorRegenSystem` is the first listener, ticking armor regen on `TurnEndedBattleEvent` and raising `UnitArmorRegeneratedBattleEvent`. Damage to an armored unit flows through the pure `DamageResolver` (scripts/battle/combat/) inside `BattleSession.ApplyDamageTo`: each bundle packet is split into armor damage (1.5x floored on element match) and health damage (always from the un-multiplied amount); `UnitDamagedBattleEvent` carries the `ArmorDamage`/`HealthDamage` split alongside the pre-mitigation bundle.
 
 ## Future Extensions
 

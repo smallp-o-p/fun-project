@@ -26,7 +26,6 @@ public class Combatant : HasStats, HasModSlots
       [typeof(MovementStat)] = data.MovementStat,
       [typeof(VisionStat)] = data.VisionStat,
       [typeof(AimStat)] = data.AimStat,
-      [typeof(BaseArmorStat)] = data.BaseArmorStat,
     };
 
     for (int i = 0; i < data.ModSlotCount; i++)

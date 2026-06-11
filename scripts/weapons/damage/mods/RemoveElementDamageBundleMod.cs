@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using FunProject.Core;
 using Godot;
 
 namespace FunProject.Weapons;
@@ -7,7 +8,7 @@ namespace FunProject.Weapons;
 [GlobalClass]
 public partial class RemoveElementDamageBundleMod : DamageBundleMod
 {
-  [Export] public DamageElement Element { get; set; } = DamageElement.Kinetic;
+  [Export] public Element Element { get; set; } = Element.Kinetic;
 
   public override List<Damage> Apply(List<Damage> bundle, DamageEmissionContext context)
     => bundle.Where(damage => damage.Element != Element).ToList();

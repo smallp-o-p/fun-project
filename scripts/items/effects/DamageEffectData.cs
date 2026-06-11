@@ -1,4 +1,4 @@
-using FunProject.Weapons;
+using FunProject.Core;
 using Godot;
 
 namespace FunProject.Items.Effects;
@@ -7,6 +7,6 @@ namespace FunProject.Items.Effects;
 public partial class DamageEffectData : BattleEffectData
 {
   [Export] public int BaseDamage { get; set; }
-  [Export] public DamageElement DamageElement { get; set; } = DamageElement.Kinetic;
+  [Export] public Element Element { get; set; } = Element.Kinetic;
   [Export] public bool DamageTerrain { get; set; }
 }

@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Core;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Stats;
@@ -28,7 +29,6 @@ internal static class BattleTestFactory
       MovementStat = new MovementStat { BaseValue = movement },
       VisionStat = new VisionStat { BaseValue = vision },
       AimStat = new AimStat { BaseValue = aim },
-      BaseArmorStat = new BaseArmorStat { BaseValue = 0 },
       ModSlotCount = 0,
     }, faction);
   }
@@ -58,12 +58,36 @@ internal static class BattleTestFactory
     return item.With<ThrowableCapability>().RequireSome();
   }
 
-  public static WeaponFrameData MakeFrame(params (DamageElement element, float multiplier)[] packets)
+  public static ItemWith<ArmorCapability> MakeArmor(
+    string name,
+    int armor = 10,
+    Element element = Element.Kinetic,
+    int regenDelayTurns = 0,
+    int regenPerTurn = 0)
+  {
+    var item = new EquippableItem(new EquippableItemData
+    {
+      Name = name,
+      Description = $"{name} armor",
+      Capabilities =
+      [
+        new ArmorCapabilityData
+        {
+          ArmorStat = new BaseArmorStat { BaseValue = armor, Element = element },
+          RegenDelayTurns = regenDelayTurns,
+          RegenPerTurn = regenPerTurn,
+        },
+      ],
+    });
+    return item.With<ArmorCapability>().RequireSome();
+  }
+
+  public static WeaponFrameData MakeFrame(params (Element element, float multiplier)[] packets)
   {
     var frame = new WeaponFrameData { Name = "Test Frame", Packets = [] };
     if (packets.Length == 0)
       frame.Packets.Add(new DamagePacketData());
-    foreach ((DamageElement element, float multiplier) in packets)
+    foreach ((Element element, float multiplier) in packets)
       frame.Packets.Add(new DamagePacketData { Element = element, Multiplier = multiplier });
     return frame;
   }

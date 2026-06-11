@@ -1,4 +1,7 @@
 using FunProject.Combatants;
+using FunProject.Core;
+using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Weapons;
 using Godot;
 using LanguageExt.UnsafeValueAccess;
@@ -45,6 +48,9 @@ public sealed class BattleSession
   private Queue<Faction> _turnQueue = [];
   private readonly SysColGeneric.HashSet<Faction> _sidesActedThisRound = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _activeFactionUnitsAvailable = [];
+  private readonly BattleEventListenerRegistry _listenerRegistry = new();
+  private readonly Queue<BattleEvent> _eventDispatchQueue = [];
+  private bool _isDispatchingEvents;
 
   public BattleBoardState Board { get; }
   public BattlePhase Phase { get; private set; } = BattlePhase.Setup;
@@ -81,6 +87,7 @@ public sealed class BattleSession
 
     _turnQueue = new Queue<Faction>(_globalFactionOrder);
     ActiveSide = _turnQueue.Peek();
+    RegisterListener<TurnEndedBattleEvent>(new ArmorRegenSystem());
   }
 
   internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
@@ -151,13 +158,17 @@ public sealed class BattleSession
       new TurnStartedBattleEvent(ActiveSide, TurnNumber));
   }
 
-  internal SpawnedBattleUnit AddUnit(Combatant combatant, BattleBoardState.ValidatedPoint position, Option<Weapon> equippedWeapon)
+  internal SpawnedBattleUnit AddUnit(
+    Combatant combatant,
+    BattleBoardState.ValidatedPoint position,
+    Option<Weapon> equippedWeapon,
+    Option<ItemWith<ArmorCapability>> equippedArmor)
   {
     ArgumentNullException.ThrowIfNull(combatant);
     if (Phase == BattlePhase.Ended)
       throw new InvalidOperationException("Cannot add units after the battle has ended.");
 
-    var unit = new BattleUnitState(_units.Count, combatant, equippedWeapon);
+    var unit = new BattleUnitState(_units.Count, combatant, equippedWeapon, equippedArmor);
     bool occupantSet = Board.TryPlaceOccupant(position, unit.Id);
     if (!occupantSet)
       throw new InvalidOperationException($"Could not place unit {unit.Id} at {position.Raw}.");
@@ -176,7 +187,7 @@ public sealed class BattleSession
   }
 
   internal void ApplyDamageTo(BattleUnitState unit, int amount)
-    => ApplyDamageTo(unit, [new Damage(amount, DamageElement.Kinetic)]);
+    => ApplyDamageTo(unit, [new Damage(amount, Element.Kinetic)]);
 
   internal void ApplyDamageTo(BattleUnitState unit, IReadOnlyList<Damage> bundle)
   {
@@ -187,8 +198,19 @@ public sealed class BattleSession
     if (Board.FindOccupantPosition(unit.Id).IsNone)
       throw new InvalidOperationException($"Cannot damage unit {unit.Id} because it is not on the board.");
 
-    unit.ReceiveDamage(bundle.Sum(damage => damage.Amount));
-    RaiseEvent(new UnitDamagedBattleEvent(unit, bundle));
+    Option<ArmorState> armorState = unit.EquippedArmor.Map(
+      armor => new ArmorState(armor.Capability.Current, armor.Capability.Element));
+    DamageResolution resolution = DamageResolver.Resolve(bundle, armorState);
+
+    unit.EquippedArmor.IfSome(armor =>
+    {
+      armor.Capability.Reduce(resolution.ArmorDamage);
+      if (resolution.ArmorDamage > 0 || resolution.HealthDamage > 0)
+        armor.Capability.RearmRegenDelay();
+    });
+    unit.ReceiveDamage(resolution.HealthDamage);
+
+    RaiseEvent(new UnitDamagedBattleEvent(unit, bundle, resolution.ArmorDamage, resolution.HealthDamage));
     if (unit.IsDead)
     {
       HandleUnitDeath(unit);
@@ -365,19 +387,60 @@ public sealed class BattleSession
       _activeFactionUnitsAvailable.Add(unit);
   }
 
+  internal bool IsDispatchingEvents => _isDispatchingEvents;
+
+  internal void RegisterListener<TEventKey>(BattleEventListener listener)
+    where TEventKey : BattleEventTag
+  {
+    _listenerRegistry.Register<TEventKey>(listener);
+  }
+
   internal void RaiseEvent(BattleEvent battleEvent)
   {
     ArgumentNullException.ThrowIfNull(battleEvent);
-
-    RefreshVisibility();
-    BattleEventCommitted.Invoke(battleEvent);
+    _eventDispatchQueue.Enqueue(battleEvent);
+    DispatchQueuedEvents();
   }
 
   private void RaiseEvents(params BattleEvent[] events)
   {
-    RefreshVisibility();
     foreach (var battleEvent in events)
-      BattleEventCommitted.Invoke(battleEvent);
+    {
+      ArgumentNullException.ThrowIfNull(battleEvent);
+      _eventDispatchQueue.Enqueue(battleEvent);
+    }
+
+    DispatchQueuedEvents();
+  }
+
+  private void DispatchQueuedEvents()
+  {
+    if (_isDispatchingEvents)
+      return;
+
+    _isDispatchingEvents = true;
+    try
+    {
+      while (_eventDispatchQueue.Count > 0)
+      {
+        BattleEvent battleEvent = _eventDispatchQueue.Dequeue();
+        // Per-event refresh is deliberate: a listener may mutate state between events.
+        RefreshVisibility();
+        BattleEventCommitted.Invoke(battleEvent);
+        foreach (BattleEventListener listener in _listenerRegistry.GetMatchingListeners(battleEvent))
+          listener.OnEventCommitted(this, battleEvent);
+      }
+    }
+    catch
+    {
+      // A throwing observer aborts the drain; stale events must not dispatch later.
+      _eventDispatchQueue.Clear();
+      throw;
+    }
+    finally
+    {
+      _isDispatchingEvents = false;
+    }
   }
 
   private void RefreshVisibility()
