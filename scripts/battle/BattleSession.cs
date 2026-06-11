@@ -176,15 +176,19 @@ public sealed class BattleSession
   }
 
   internal void ApplyDamageTo(BattleUnitState unit, int amount)
+    => ApplyDamageTo(unit, [new Damage(amount, DamageElement.Kinetic)]);
+
+  internal void ApplyDamageTo(BattleUnitState unit, IReadOnlyList<Damage> bundle)
   {
     ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(bundle);
     if (unit.IsDead)
       throw new InvalidOperationException($"Cannot damage unit {unit.Id} because it is already dead.");
     if (Board.FindOccupantPosition(unit.Id).IsNone)
       throw new InvalidOperationException($"Cannot damage unit {unit.Id} because it is not on the board.");
 
-    unit.ReceiveDamage(amount);
-    RaiseEvent(new UnitDamagedBattleEvent(unit, amount));
+    unit.ReceiveDamage(bundle.Sum(damage => damage.Amount));
+    RaiseEvent(new UnitDamagedBattleEvent(unit, bundle));
     if (unit.IsDead)
     {
       HandleUnitDeath(unit);

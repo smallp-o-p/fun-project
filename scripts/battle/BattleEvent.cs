@@ -2,6 +2,8 @@ using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Weapons;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -155,16 +157,19 @@ public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent
 {
   public override string EventName => "unit_damaged";
   public BattleUnitState Unit { get; }
-  public int Amount { get; }
+  public IReadOnlyList<Damage> Bundle { get; }
+  public int TotalAmount { get; }
 
-  public UnitDamagedBattleEvent(BattleUnitState unit, int amount)
+  public UnitDamagedBattleEvent(BattleUnitState unit, IReadOnlyList<Damage> bundle)
   {
     ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(bundle);
     Unit = unit;
-    Amount = amount;
+    Bundle = bundle;
+    TotalAmount = bundle.Sum(damage => damage.Amount);
   }
 
-  public override string ToDisplayString() => $"Damage: {Amount}";
+  public override string ToDisplayString() => $"Damage: {TotalAmount}";
 }
 
 public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent

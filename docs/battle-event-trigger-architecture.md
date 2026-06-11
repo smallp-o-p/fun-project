@@ -188,8 +188,8 @@ TileOccupiedBattleEvent
 
 UnitDamagedBattleEvent
   UnitId
-  Position
-  Amount
+  Bundle (list of Damage packets)
+  TotalAmount
 
 UnitKilledBattleEvent
   UnitId

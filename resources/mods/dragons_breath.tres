@@ -1,9 +1,32 @@
-[gd_resource type="Resource" script_class="DamageEquippableStatMod" load_steps=2 format=3 uid="uid://bfusnhkbqteha"]
+[gd_resource type="Resource" script_class="DamageBundleEquippableMod" load_steps=10 format=3 uid="uid://bfusnhkbqteha"]
 
-[ext_resource type="Script" uid="uid://jbd352ookl8g" path="res://scripts/stats/concrete_mods/DamageEquippableStatMod.cs" id="1_mod"]
+[ext_resource type="Script" path="res://scripts/weapons/damage/mods/DamageBundleEquippableMod.cs" id="1_mod"]
+[ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="2_statmod"]
+[ext_resource type="Script" path="res://scripts/weapons/damage/mods/ElementFilterDamageBundleMod.cs" id="3_filter"]
+[ext_resource type="Script" path="res://scripts/weapons/damage/mods/AddPacketDamageBundleMod.cs" id="4_add"]
+[ext_resource type="Script" path="res://scripts/weapons/damage/DamagePacketData.cs" id="5_packet"]
+
+[sub_resource type="Resource" id="Resource_kineticScale"]
+script = ExtResource("2_statmod")
+Operation = 1
+Value = 0.8
+
+[sub_resource type="Resource" id="Resource_filterKinetic"]
+script = ExtResource("3_filter")
+Element = 0
+Ops = Array[Object]([SubResource("Resource_kineticScale")])
+
+[sub_resource type="Resource" id="Resource_thermalPacket"]
+script = ExtResource("5_packet")
+Element = 1
+Multiplier = 0.5
+
+[sub_resource type="Resource" id="Resource_addThermal"]
+script = ExtResource("4_add")
+Packet = SubResource("Resource_thermalPacket")
 
 [resource]
 script = ExtResource("1_mod")
-Modifiers = []
 Name = "Dragons Breath Cartridge"
 Description = "Alchemical shells packed with incendiary powder. Each round burns hotter, trading raw damage for a vicious multiplier on impact."
+BundleMods = Array[Object]([SubResource("Resource_filterKinetic"), SubResource("Resource_addThermal")])

@@ -251,7 +251,7 @@ public sealed class AttackUnit : BattleAction
 
         session.RaiseEvent(new UnitAttackedBattleEvent(attacker, Target, targetPoint, weapon, breakdown, roll, isHit));
         if (isHit)
-          session.ApplyDamageTo(Target, weapon.GetDamageStat().BaseValue);
+          session.ApplyDamageTo(Target, weapon.EmitDamage());
 
         return BattleActionResult.Success(this, attacker);
       });

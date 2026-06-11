@@ -12,6 +12,7 @@ public class WeaponSystemTest
 {
   private WeaponData MakeWeaponData() => new()
   {
+    Frame = BattleTestFactory.MakeFrame(),
     DamageStat = new DamageStat { BaseValue = 10 },
     CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
     RangeStat = new RangeStat { BaseValue = 1 },
@@ -19,6 +20,7 @@ public class WeaponSystemTest
 
   private FirearmWeaponData MakeFirearmWeaponData() => new()
   {
+    Frame = BattleTestFactory.MakeFrame(),
     DamageStat = new DamageStat { BaseValue = 10 },
     CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
     RangeStat = new RangeStat { BaseValue = 1 },
@@ -33,7 +35,7 @@ public class WeaponSystemTest
     var data = new FirearmWeaponData
     {
       Name = "Fists",
-      DamageElement = DamageElement.Kinetic,
+      Frame = BattleTestFactory.MakeFrame(),
       DamageStat = new DamageStat { BaseValue = 10 },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
       RangeStat = new RangeStat { BaseValue = 1 },
@@ -43,7 +45,6 @@ public class WeaponSystemTest
     var weapon = new MeleeWeapon(data);
 
     Assert.Equal("Fists", weapon.WeaponName);
-    Assert.Equal(DamageElement.Kinetic, weapon.DamageElement);
     Assert.Equal(10, weapon.GetDamageStat().BaseValue);
     Assert.Equal(5, weapon.GetCritChanceStat().BaseValue);
     Assert.Equal(0, weapon.NumModslots());
@@ -54,6 +55,7 @@ public class WeaponSystemTest
   {
     var data = new FirearmWeaponData
     {
+      Frame = BattleTestFactory.MakeFrame(),
       DamageStat = new DamageStat { BaseValue = 15 },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 10 },
       RangeStat = new RangeStat { BaseValue = 20 },
@@ -132,7 +134,7 @@ public class WeaponSystemTest
   public void ModSlotCanEquipAndUnequip()
   {
     var slot = new ModSlot();
-    var mod = new DamageEquippableStatMod();
+    var mod = new RangeEquippableStatMod();
     slot.Equip(mod);
     Assert.True(slot.HasMod);
     var returned = slot.Unequip();
@@ -173,11 +175,11 @@ public class WeaponSystemTest
   [TestCase(TestName = "EquippableStatMod applies modifiers in order")]
   public void EquippableStatModAppliesModifiersInOrder()
   {
-    var mod = new DamageEquippableStatMod();
+    var mod = new RangeEquippableStatMod();
     mod.AddModifier(StatModifier.Add(10));
     mod.AddModifier(StatModifier.Multiply(2f));
     var data = MakeWeaponData();
-    data.DamageStat.BaseValue = 5;
+    data.RangeStat.BaseValue = 5;
     var weapon = new MeleeWeapon(data);
 
     Assert.Equal(30f, mod.ApplyToTarget(weapon));
@@ -211,7 +213,7 @@ public class WeaponSystemTest
     {
       StatMods =
       [
-        new DamageStatMod { Modifiers = [StatModifier.Add(5)] },
+        new CriticalChanceStatMod { Modifiers = [StatModifier.Add(5)] },
         new RangeStatMod { Modifiers = [StatModifier.Multiply(3f)] },
       ]
     };
@@ -219,7 +221,7 @@ public class WeaponSystemTest
 
     var results = mod.Apply(weapon);
 
-    Assert.Equal(15f, results[typeof(DamageStat)]);
+    Assert.Equal(10f, results[typeof(CriticalChanceStat)]);
     Assert.Equal(3f, results[typeof(RangeStat)]);
   }
 
@@ -227,13 +229,13 @@ public class WeaponSystemTest
   public void MultiStatModAddRemoveAndClearManageInternalList()
   {
     var mod = new MultiStatMod();
-    var damage = new DamageStatMod();
+    var crit = new CriticalChanceStatMod();
     var range = new RangeStatMod();
 
-    mod.AddStatMod(damage);
+    mod.AddStatMod(crit);
     mod.AddStatMod(range);
     Assert.Equal(2, mod.StatMods.Count);
-    Assert.True(mod.RemoveStatMod(damage));
+    Assert.True(mod.RemoveStatMod(crit));
     Assert.Equal(1, mod.StatMods.Count);
     mod.ClearStatMods();
     Assert.Equal(0, mod.StatMods.Count);
@@ -246,8 +248,8 @@ public class WeaponSystemTest
     {
       StatMods =
       [
-        new DamageStatMod { Modifiers = [StatModifier.Add(5)] },
-        new DamageStatMod { Modifiers = [StatModifier.Multiply(2f)] },
+        new RangeStatMod { Modifiers = [StatModifier.Add(5)] },
+        new RangeStatMod { Modifiers = [StatModifier.Multiply(2f)] },
       ]
     };
     var weapon = new MeleeWeapon(MakeWeaponData());
@@ -255,14 +257,15 @@ public class WeaponSystemTest
     Assert.Throws<InvalidOperationException>(() => mod.Apply(weapon));
   }
 
-  [TestCase(TestName = "Weapon with mod slot produces correct damage")]
-  public void WeaponWithModSlotProducesCorrectDamage()
+  [TestCase(TestName = "Weapon with mod slot produces correct range")]
+  public void WeaponWithModSlotProducesCorrectRange()
   {
     var data = MakeFirearmWeaponData();
+    data.RangeStat.BaseValue = 10;
     var weapon = new FirearmWeapon(data);
-    weapon.GetModSlots()[0].Equip(new DamageEquippableStatMod
+    weapon.GetModSlots()[0].Equip(new RangeEquippableStatMod
     {
-      Name = "+20% Damage",
+      Name = "+20% Range",
       Modifiers =
       [
         StatModifier.Multiply(1.2f),
@@ -271,7 +274,7 @@ public class WeaponSystemTest
     });
 
     var slot = weapon.GetModSlots()[0];
-    Assert.Equal((data.DamageStat.BaseValue * 1.2) + 5, slot.EquippedMod.RequireSome().GetAppliedStat<DamageStat>(weapon));
+    Assert.Equal((data.RangeStat.BaseValue * 1.2) + 5, slot.EquippedMod.RequireSome().GetAppliedStat<RangeStat>(weapon));
   }
 
   [TestCase(TestName = "Weapon mod slot can equip multi-stat mod")]
@@ -284,20 +287,20 @@ public class WeaponSystemTest
       Name = "Tactical Overhaul",
       StatMods =
       [
-        new DamageStatMod { Modifiers = [StatModifier.Add(2)] },
+        new CriticalChanceStatMod { Modifiers = [StatModifier.Add(2)] },
         new RangeStatMod { Modifiers = [StatModifier.Add(6)] },
       ]
     });
 
     var slot = weapon.GetModSlots()[0];
-    Assert.Equal(data.DamageStat.BaseValue + 2, slot.EquippedMod.RequireSome().GetAppliedStat<DamageStat>(weapon));
+    Assert.Equal(data.CriticalChanceStat.BaseValue + 2, slot.EquippedMod.RequireSome().GetAppliedStat<CriticalChanceStat>(weapon));
     Assert.Equal(data.RangeStat.BaseValue + 6, slot.EquippedMod.RequireSome().GetAppliedStat<RangeStat>(weapon));
   }
 
   [TestCase(TestName = "EquippableStatMod AddModifier adds to internal list")]
   public void EquippableStatModAddModifierAddsToInternalList()
   {
-    var mod = new DamageEquippableStatMod();
+    var mod = new RangeEquippableStatMod();
     mod.AddModifier(StatModifier.Add(5));
     Assert.Equal(1, mod.Modifiers.Count);
   }
@@ -305,7 +308,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "EquippableStatMod RemoveModifier removes specific modifier")]
   public void EquippableStatModRemoveModifierRemovesSpecificModifier()
   {
-    var mod = new DamageEquippableStatMod();
+    var mod = new RangeEquippableStatMod();
     var add = StatModifier.Add(5);
     mod.AddModifier(add);
     Assert.True(mod.RemoveModifier(add));
@@ -315,14 +318,14 @@ public class WeaponSystemTest
   [TestCase(TestName = "EquippableStatMod RemoveModifier returns false for non-existent")]
   public void EquippableStatModRemoveModifierReturnsFalseForNonExistent()
   {
-    var mod = new DamageEquippableStatMod();
+    var mod = new RangeEquippableStatMod();
     Assert.False(mod.RemoveModifier(StatModifier.Add(5)));
   }
 
   [TestCase(TestName = "EquippableStatMod ClearModifiers clears all")]
   public void EquippableStatModClearModifiersClearsAll()
   {
-    var mod = new DamageEquippableStatMod();
+    var mod = new RangeEquippableStatMod();
     mod.AddModifier(StatModifier.Add(5));
     mod.AddModifier(StatModifier.Multiply(2f));
     mod.ClearModifiers();
@@ -332,9 +335,9 @@ public class WeaponSystemTest
   [TestCase(TestName = "EquippableStatMod with no modifiers returns base value")]
   public void EquippableStatModWithNoModifiersReturnsBaseValue()
   {
-    var mod = new DamageEquippableStatMod();
+    var mod = new RangeEquippableStatMod();
     var data = MakeWeaponData();
-    data.DamageStat.BaseValue = 42;
+    data.RangeStat.BaseValue = 42;
     Assert.Equal(42f, mod.ApplyToTarget(new MeleeWeapon(data)));
   }
 
@@ -349,20 +352,20 @@ public class WeaponSystemTest
     {
       Modifiers = [StatModifier.Add(10)],
     });
-    weapon.GetModSlots()[1].EquippedMod = Some<EquippableMod>(new DamageEquippableStatMod
+    weapon.GetModSlots()[1].EquippedMod = Some<EquippableMod>(new CriticalChanceEquippableStatMod
     {
       Modifiers = [StatModifier.Multiply(1.5f)],
     });
 
     Assert.Equal(data.RangeStat.BaseValue + 10, weapon.GetModSlots()[0].EquippedMod.RequireSome().GetAppliedStat<RangeStat>(weapon));
-    Assert.Equal(data.DamageStat.BaseValue * 1.5, weapon.GetModSlots()[1].EquippedMod.RequireSome().GetAppliedStat<DamageStat>(weapon));
+    Assert.Equal(data.CriticalChanceStat.BaseValue * 1.5, weapon.GetModSlots()[1].EquippedMod.RequireSome().GetAppliedStat<CriticalChanceStat>(weapon));
   }
 
   [TestCase(TestName = "Multiply by zero zeroes the value")]
   public void MultiplyByZeroZeroesTheValue()
   {
     var weapon = new MeleeWeapon(MakeWeaponData());
-    var mod = new DamageEquippableStatMod
+    var mod = new RangeEquippableStatMod
     {
       Modifiers = [StatModifier.Multiply(0f)],
     };
@@ -373,7 +376,7 @@ public class WeaponSystemTest
   public void AddThenCapMaxChain()
   {
     var weapon = new MeleeWeapon(MakeWeaponData());
-    var mod = new DamageEquippableStatMod
+    var mod = new RangeEquippableStatMod
     {
       Modifiers =
       [
@@ -388,9 +391,9 @@ public class WeaponSystemTest
   public void CapMinPreventsNegativeResult()
   {
     var data = MakeWeaponData();
-    data.DamageStat.BaseValue = 5;
+    data.RangeStat.BaseValue = 5;
     var weapon = new MeleeWeapon(data);
-    var mod = new DamageEquippableStatMod
+    var mod = new RangeEquippableStatMod
     {
       Modifiers =
       [

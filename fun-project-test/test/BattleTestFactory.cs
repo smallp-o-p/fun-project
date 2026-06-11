@@ -58,12 +58,23 @@ internal static class BattleTestFactory
     return item.With<ThrowableCapability>().RequireSome();
   }
 
+  public static WeaponFrameData MakeFrame(params (DamageElement element, float multiplier)[] packets)
+  {
+    var frame = new WeaponFrameData { Name = "Test Frame", Packets = [] };
+    if (packets.Length == 0)
+      frame.Packets.Add(new DamagePacketData());
+    foreach ((DamageElement element, float multiplier) in packets)
+      frame.Packets.Add(new DamagePacketData { Element = element, Multiplier = multiplier });
+    return frame;
+  }
+
   public static Weapon MakeWeapon(string name, int damage = 5, int range = 10)
   {
     return new Weapon(new WeaponData
     {
       Name = name,
       Description = $"{name} weapon",
+      Frame = MakeFrame(),
       DamageStat = new DamageStat { BaseValue = damage },
       RangeStat = new RangeStat { BaseValue = range },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 0 },

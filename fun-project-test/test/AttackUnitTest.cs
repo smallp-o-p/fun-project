@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Tests;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
@@ -155,6 +156,56 @@ public partial class AttackUnitTest
   public void SameSeedProducesTheSameAttackOutcomeSequence()
   {
     Assert.True(RunSeededAttackOutcomes(1234).SequenceEqual(RunSeededAttackOutcomes(1234)));
+  }
+
+  [TestCase(TestName = "Damage event carries the weapon's emitted bundle")]
+  public void DamageEventCarriesEmittedBundle()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction], new AlwaysHitCalculator());
+    var weapon = new Weapon(new WeaponData
+    {
+      Name = "Plasma Pistol",
+      Frame = BattleTestFactory.MakeFrame((DamageElement.Thermal, 0.7f), (DamageElement.Electrical, 0.3f)),
+      DamageStat = new FunProject.Stats.DamageStat { BaseValue = 6 },
+      RangeStat = new FunProject.Stats.RangeStat { BaseValue = 10 },
+      CriticalChanceStat = new FunProject.Stats.CriticalChanceStat { BaseValue = 0 },
+    });
+    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, aim: 100), new Vector3I(4, 0, 1), weapon);
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
+    StartBattle(session);
+
+    var raisedEvents = new List<BattleEvent>();
+    session.BattleEventCommitted += raisedEvents.Add;
+
+    var executor = new BattleActionExecutor(session);
+    Assert.True(executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult().Succeeded);
+
+    var damagedEvent = raisedEvents.OfType<UnitDamagedBattleEvent>().Single();
+    Assert.Equal(6, damagedEvent.TotalAmount); // 4 Thermal + 2 Electrical
+    Assert.Equal(target.State.MaxHealth - 6, target.State.CurrentHealth);
+    Assert.True(damagedEvent.Bundle.SequenceEqual(
+      new[] { new Damage(4, DamageElement.Thermal), new Damage(2, DamageElement.Electrical) }));
+  }
+
+  [TestCase(TestName = "Int damage path wraps the amount as a single Kinetic packet")]
+  public void IntDamagePathWrapsAsKineticPacket()
+  {
+    var faction = BattleTestFactory.MakeFaction("Player");
+    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
+    StartBattle(session);
+
+    var raisedEvents = new List<BattleEvent>();
+    session.BattleEventCommitted += raisedEvents.Add;
+
+    var executor = new BattleActionExecutor(session);
+    Assert.True(executor.Submit(BattleAction.ApplyDamage(unit.State, 3)).RequireSingleResult().Succeeded);
+
+    var damagedEvent = raisedEvents.OfType<UnitDamagedBattleEvent>().Single();
+    Assert.Equal(3, damagedEvent.TotalAmount);
+    Assert.True(damagedEvent.Bundle.SequenceEqual(new[] { new Damage(3, DamageElement.Kinetic) }));
   }
 
   private static List<bool> RunSeededAttackOutcomes(int seed)

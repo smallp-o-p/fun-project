@@ -10,4 +10,5 @@ namespace FunProject.Weapons;
 public partial class Ammunition() : NamedEntityData
 {
   [Export] required public Array<StatMod> Modifiers { get; set; } = [];
+  [Export] public Array<DamageBundleMod> DamageMods { get; set; } = [];
 };

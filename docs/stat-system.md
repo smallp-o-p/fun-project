@@ -99,7 +99,7 @@ This class does not know anything about which stat it is affecting.
   - applies each `StatModifier` in order
   - returns the resulting float
 
-Concrete subclasses such as `DamageStatMod` and `AimStatMod` bind the target stat at the type level.
+Concrete subclasses such as `RangeStatMod` and `AimStatMod` bind the target stat at the type level.
 
 ### `EquippableMod`
 
@@ -125,7 +125,7 @@ There are currently two equippable mod shapes.
 - It still targets one concrete stat type.
 - It exposes `ApplyToTarget()` for direct single-stat use.
 
-Concrete equippable modifier resources such as `DamageEquippableStatMod` and `RangeEquippableStatMod` are what authored item mods use.
+Concrete equippable modifier resources such as `RangeEquippableStatMod` and `AimEquippableStatMod` are what authored item mods use.
 
 ### `MultiStatMod`
 
@@ -144,7 +144,7 @@ var mod = new MultiStatMod
   Name = "Tactical Overhaul",
   StatMods =
   [
-    new DamageStatMod { Modifiers = [StatModifier.Add(2)] },
+    new CriticalChanceStatMod { Modifiers = [StatModifier.Add(2)] },
     new RangeStatMod { Modifiers = [StatModifier.Add(6)] },
   ]
 };
@@ -152,11 +152,11 @@ var mod = new MultiStatMod
 
 Examples in `resources/mods/`:
 
-- `dragons_breath.tres`
-- `suppressor_coil.tres`
-- `long_barrel.tres`
+- `long_barrel.tres` — a single-target `EquippableStatMod` that increases `RangeStat`.
 
-These shipped examples currently use the single-target `EquippableStatMod` path, but weapon slots now support either single-target or multi-target equippable mods.
+`dragons_breath.tres` and `suppressor_coil.tres` are now `DamageBundleEquippableMod` resources that belong to the weapon damage pipeline, not the stat-mod system. They shape damage packets at emission time rather than modifying a `DamageStat` value.
+
+Weapon slots support either single-target (`EquippableStatMod`) or multi-target (`MultiStatMod`) equippable mods, as well as `DamageBundleEquippableMod` for damage-pipeline mods.
 
 ## Composition Already In Use
 
@@ -176,19 +176,20 @@ That means ammunition, faction bonuses, and slot-mounted equippable mods can all
 
 That means a slot can equip:
 
-- a single-target mod such as `DamageEquippableStatMod`
+- a single-target mod such as `RangeEquippableStatMod`
 - a multi-target mod such as `MultiStatMod`
+- a damage-pipeline mod such as `DamageBundleEquippableMod`
 
 Typical runtime usage:
 
 ```csharp
 var slot = weapon.GetModSlots()[0];
 
-float damage = slot.EquippedMod!.GetAppliedStat<DamageStat>(weapon);
+float range = slot.EquippedMod!.GetAppliedStat<RangeStat>(weapon);
 
-if (slot.EquippedMod.TryGetAppliedStat<RangeStat>(weapon, out var range))
+if (slot.EquippedMod.TryGetAppliedStat<AimStat>(weapon, out var aim))
 {
-  GD.Print(range);
+  GD.Print(aim);
 }
 ```
 
@@ -219,6 +220,8 @@ That keeps:
 Multi-stat behavior exists one level up through `MultiStatMod`, not by weakening `StatMod` itself.
 
 The main remaining limitation is that higher-level gameplay systems still need to decide how and when to consume these resolved stat maps. The stat system now supports multi-stat slot mods, but it does not yet define a broader effect pipeline for non-numeric or battle-event-driven mod behavior.
+
+Weapon damage modification is a deliberate exception to the stat-mod pipeline: it flows entirely through `DamageBundleMod`s (`DamageBundleEquippableMod` in weapon mod slots, `Ammunition.DamageMods` for ammo effects) and is applied at `Weapon.EmitDamage()` emission time. `DamageStat` still exists as the read-only base-damage input to that pipeline. `DamageStatMod` and `DamageEquippableStatMod` were removed; see `docs/superpowers/specs/2026-06-10-weapon-damage-pipeline-design.md` for the full design.
 
 ## Summary
 

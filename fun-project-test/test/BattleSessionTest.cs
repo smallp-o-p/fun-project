@@ -140,6 +140,7 @@ public class BattleSessionTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
     var weapon = new MeleeWeapon(new WeaponData
     {
+      Frame = BattleTestFactory.MakeFrame(),
       DamageStat = new DamageStat { BaseValue = 10 },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
       RangeStat = new RangeStat { BaseValue = 1 },

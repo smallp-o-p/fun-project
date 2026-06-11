@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="FirearmWeaponData" load_steps=11 format=3 uid="uid://xilu3cj030eu"]
+[gd_resource type="Resource" script_class="FirearmWeaponData" load_steps=12 format=3 uid="uid://xilu3cj030eu"]
 
 [ext_resource type="Script" uid="uid://dnk85ukx4hsk8" path="res://scripts/stats/concrete_stats/AmmunitionStat.cs" id="1_ammo"]
 [ext_resource type="Script" uid="uid://cogsdmnfr7ro4" path="res://scripts/stats/concrete_stats/CriticalChanceStat.cs" id="1_crit"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://cei4l4eg05jg1" path="res://scripts/weapons/FirearmWeaponData.cs" id="1_fvdq8"]
 [ext_resource type="Script" uid="uid://pkqahop342cp" path="res://scripts/stats/concrete_stats/RangeStat.cs" id="1_range"]
 [ext_resource type="Resource" uid="uid://djtse040feqhb" path="res://resources/weapons/ammo/standard.tres" id="2_bg1dx"]
+[ext_resource type="Resource" path="res://resources/weapons/frames/standard_kinetic.tres" id="3_frame"]
 
 [sub_resource type="Resource" id="Resource_vj6ow"]
 script = ExtResource("1_ammo")
@@ -27,6 +28,7 @@ BaseValue = 4
 script = ExtResource("1_fvdq8")
 AmmunitionStat = SubResource("Resource_vj6ow")
 DefaultAmmoData = ExtResource("2_bg1dx")
+Frame = ExtResource("3_frame")
 DamageStat = SubResource("Resource_eu4gj")
 RangeStat = SubResource("Resource_4vjy0")
 CriticalChanceStat = SubResource("Resource_q7nbd")
