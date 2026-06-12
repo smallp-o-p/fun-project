@@ -44,10 +44,10 @@ public class WeaponSystemTest
     };
     var weapon = new MeleeWeapon(data);
 
-    Assert.Equal("Fists", weapon.WeaponName);
+    Assert.Equal("Fists", weapon.ItemName);
     Assert.Equal(10, weapon.GetDamageStat().BaseValue);
     Assert.Equal(5, weapon.GetCritChanceStat().BaseValue);
-    Assert.Equal(0, weapon.NumModslots());
+    Assert.Equal(0, weapon.GetModSlots().Count);
   }
 
   [TestCase(TestName = "FirearmWeapon constructed from FirearmWeaponData")]

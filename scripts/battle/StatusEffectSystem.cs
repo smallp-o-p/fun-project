@@ -18,7 +18,7 @@ public sealed class StatusEffectSystem : BattleEventListener
     if (battleEvent is not TurnEndedBattleEvent turnEnded)
       return;
 
-    foreach (BattleUnitState unit in session.GetFactionAliveUnits(turnEnded.Faction).ToList())
+    foreach (BattleUnitState unit in session.GetFactionAliveUnits(turnEnded.Faction).ToList()) // snapshot: a lethal tick removes the unit from AliveUnits mid-iteration
     {
       foreach (ActiveStatusEffect active in unit.ActiveStatusEffects.ToList())
       {
@@ -31,7 +31,7 @@ public sealed class StatusEffectSystem : BattleEventListener
         if (unit.IsDead)
           break;
 
-        if (active.RemainingTurns == 0)
+        if (active.IsExpired)
         {
           unit.RemoveStatusEffect(active.Spec);
           session.RaiseEvent(new UnitStatusEffectExpiredBattleEvent(unit, active.Spec));

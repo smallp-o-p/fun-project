@@ -240,7 +240,7 @@ public sealed class MoveUnit : BattleAction
       return null;
     }
 
-    long apCost = _requestedDestinations.Count * StepAPCost;
+    long apCost = (long)_requestedDestinations.Count * StepAPCost;
 
     return ValidateActingUnit(session, Unit, apCost).Match(
       failure =>

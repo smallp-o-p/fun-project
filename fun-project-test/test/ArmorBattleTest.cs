@@ -1,6 +1,10 @@
 using FunProject.Battle;
+using FunProject.Combatants;
 using FunProject.Core;
+using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Tests;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
@@ -11,6 +15,15 @@ using static BattleActionTestHelper;
 [RequireGodotRuntime]
 public partial class ArmorBattleTest
 {
+  private static BattleUnitState SpawnArmoredUnit(
+    BattleActionExecutor executor,
+    Combatant combatant,
+    Vector3I position,
+    Weapon weapon,
+    ItemWith<ArmorCapability> armor) =>
+    executor.Submit(BattleAction.SpawnUnit(combatant, position, weapon, armor))
+      .RequireSingleResult().AffectedUnit.RequireSome();
+
   [TestCase(TestName = "Spawned unit exposes its equipped armor at full pool")]
   public void SpawnedUnitExposesEquippedArmor()
   {
@@ -54,10 +67,8 @@ public partial class ArmorBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [playerFaction]);
     var armor = BattleTestFactory.MakeArmor("Plate", armor: 10, element: Element.Thermal);
     var executor = new BattleActionExecutor(session);
-    var unit = executor.Submit(BattleAction.SpawnUnit(
-        BattleTestFactory.MakeCombatant("Alpha", playerFaction, health: 20),
-        new Vector3I(1, 0, 1), BattleTestFactory.MakeWeapon("Rifle"), armor))
-      .RequireSingleResult().AffectedUnit.RequireSome();
+    var unit = SpawnArmoredUnit(executor, BattleTestFactory.MakeCombatant("Alpha", playerFaction, health: 20),
+      new Vector3I(1, 0, 1), BattleTestFactory.MakeWeapon("Rifle"), armor);
     StartBattle(session);
 
     var raisedEvents = new List<BattleEvent>();
@@ -80,10 +91,8 @@ public partial class ArmorBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [playerFaction]);
     var armor = BattleTestFactory.MakeArmor("Vest", armor: 3, element: Element.Thermal);
     var executor = new BattleActionExecutor(session);
-    var unit = executor.Submit(BattleAction.SpawnUnit(
-        BattleTestFactory.MakeCombatant("Alpha", playerFaction, health: 5),
-        new Vector3I(1, 0, 1), BattleTestFactory.MakeWeapon("Rifle"), armor))
-      .RequireSingleResult().AffectedUnit.RequireSome();
+    var unit = SpawnArmoredUnit(executor, BattleTestFactory.MakeCombatant("Alpha", playerFaction, health: 5),
+      new Vector3I(1, 0, 1), BattleTestFactory.MakeWeapon("Rifle"), armor);
     StartBattle(session);
 
     var raisedEvents = new List<BattleEvent>();
@@ -106,10 +115,8 @@ public partial class ArmorBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [playerFaction]);
     var armor = BattleTestFactory.MakeArmor("Recharger", armor: 10, element: Element.Thermal, regenDelayTurns: 2, regenPerTurn: 3);
     var executor = new BattleActionExecutor(session);
-    var unit = executor.Submit(BattleAction.SpawnUnit(
-        BattleTestFactory.MakeCombatant("Alpha", playerFaction),
-        new Vector3I(1, 0, 1), BattleTestFactory.MakeWeapon("Rifle"), armor))
-      .RequireSingleResult().AffectedUnit.RequireSome();
+    var unit = SpawnArmoredUnit(executor, BattleTestFactory.MakeCombatant("Alpha", playerFaction),
+      new Vector3I(1, 0, 1), BattleTestFactory.MakeWeapon("Rifle"), armor);
     StartBattle(session);
 
     Assert.Equal(0, armor.Capability.RegenDelayRemaining);
@@ -127,10 +134,8 @@ public partial class ArmorBattleTest
     var armor = BattleTestFactory.MakeArmor("Plate", armor: 6, element: Element.Kinetic);
     var executor = new BattleActionExecutor(session);
     var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction), new Vector3I(4, 0, 1), BattleTestFactory.MakeWeapon("Rifle", damage: 5));
-    var target = executor.Submit(BattleAction.SpawnUnit(
-        BattleTestFactory.MakeCombatant("Hostile", enemyFaction, health: 20),
-        new Vector3I(4, 0, 4), BattleTestFactory.MakeWeapon("Pistol"), armor))
-      .RequireSingleResult().AffectedUnit.RequireSome();
+    var target = SpawnArmoredUnit(executor, BattleTestFactory.MakeCombatant("Hostile", enemyFaction, health: 20),
+      new Vector3I(4, 0, 4), BattleTestFactory.MakeWeapon("Pistol"), armor);
     StartBattle(session);
 
     var raisedEvents = new List<BattleEvent>();

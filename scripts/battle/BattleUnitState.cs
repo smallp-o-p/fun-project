@@ -95,6 +95,13 @@ public sealed class BattleUnitState
     return _activeStatusEffects.Remove(spec);
   }
 
+  internal Weapon RequireEquippedWeapon()
+  {
+    return EquippedWeapon.Match(
+      weapon => weapon,
+      () => throw new InvalidOperationException($"Unit {Id} has no equipped weapon."));
+  }
+
   public void AddInventoryItem(EquippableItem item)
   {
     _inventory.Add(item);

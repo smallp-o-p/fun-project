@@ -1,4 +1,5 @@
 using FunProject.Items.Capabilities;
+using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -14,7 +15,7 @@ public sealed class ArmorRegenSystem : BattleEventListener
     if (battleEvent is not TurnEndedBattleEvent turnEnded)
       return;
 
-    foreach (BattleUnitState unit in session.GetFactionAliveUnits(turnEnded.Faction))
+    foreach (BattleUnitState unit in session.GetFactionAliveUnits(turnEnded.Faction).ToList())
     {
       unit.EquippedArmor.IfSome(armor =>
       {

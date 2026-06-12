@@ -205,23 +205,17 @@ public sealed class BattleSession
     Option<ArmorState> armorState = unit.EquippedArmor.Map(
       armor => new ArmorState(armor.Capability.Current, armor.Capability.Element));
     IReadOnlyList<PacketResolution> packetResolutions = DamageResolver.ResolvePackets(bundle, armorState);
-    int armorDamage = 0;
-    int healthDamage = 0;
-    foreach (PacketResolution packetResolution in packetResolutions)
-    {
-      armorDamage += packetResolution.ArmorDamage;
-      healthDamage += packetResolution.HealthDamage;
-    }
+    DamageResolution resolution = DamageResolver.Resolve(packetResolutions);
 
     unit.EquippedArmor.IfSome(armor =>
     {
-      armor.Capability.Reduce(armorDamage);
-      if (armorDamage > 0 || healthDamage > 0)
+      armor.Capability.Reduce(resolution.ArmorDamage);
+      if (resolution.ArmorDamage > 0 || resolution.HealthDamage > 0)
         armor.Capability.RearmRegenDelay();
     });
-    unit.ReceiveDamage(healthDamage);
+    unit.ReceiveDamage(resolution.HealthDamage);
 
-    RaiseEvent(new UnitDamagedBattleEvent(unit, bundle, armorDamage, healthDamage));
+    RaiseEvent(new UnitDamagedBattleEvent(unit, bundle, resolution.ArmorDamage, resolution.HealthDamage));
     if (unit.IsDead)
     {
       HandleUnitDeath(unit);
@@ -236,15 +230,14 @@ public sealed class BattleSession
     IReadOnlyList<Damage> bundle,
     IReadOnlyList<PacketResolution> packetResolutions)
   {
-    for (int i = 0; i < bundle.Count; i++)
+    foreach ((Damage damage, PacketResolution resolution) in bundle.Zip(packetResolutions))
     {
-      if (bundle[i].Amount <= 0)
+      if (damage.Amount <= 0)
         continue;
 
-      int index = i;
-      bundle[i].Status.IfSome(spec =>
+      damage.Status.IfSome(spec =>
       {
-        if (spec.RequiresHealthDamage && packetResolutions[index].HealthDamage <= 0)
+        if (spec.RequiresHealthDamage && resolution.HealthDamage <= 0)
           return;
         if (spec.ApplyChancePercent < 100 && RollPercent() >= spec.ApplyChancePercent)
           return;

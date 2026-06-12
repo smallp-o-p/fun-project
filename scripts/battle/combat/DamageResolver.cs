@@ -20,10 +20,15 @@ public readonly record struct PacketResolution(int ArmorDamage, int HealthDamage
 public static class DamageResolver
 {
   public static DamageResolution Resolve(IReadOnlyList<Damage> bundle, Option<ArmorState> armor)
+    => Resolve(ResolvePackets(bundle, armor));
+
+  public static DamageResolution Resolve(IReadOnlyList<PacketResolution> packets)
   {
+    ArgumentNullException.ThrowIfNull(packets);
+
     int armorDamage = 0;
     int healthDamage = 0;
-    foreach (PacketResolution packet in ResolvePackets(bundle, armor))
+    foreach (PacketResolution packet in packets)
     {
       armorDamage += packet.ArmorDamage;
       healthDamage += packet.HealthDamage;

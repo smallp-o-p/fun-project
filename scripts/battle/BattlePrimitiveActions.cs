@@ -225,7 +225,7 @@ public sealed class AttackUnit : BattleAction
       {
         if (attacker.EquippedWeapon.IsNone)
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{attacker.Combatant.Name} has no equipped weapon.");
-        Weapon weapon = attacker.EquippedWeapon.Match(w => w, () => throw new InvalidOperationException("Weapon option was None after IsSome check."));
+        Weapon weapon = attacker.RequireEquippedWeapon();
 
         if (Target == attacker)
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{attacker.Combatant.Name} cannot attack itself.");
@@ -246,7 +246,7 @@ public sealed class AttackUnit : BattleAction
         BattleBoardState.ValidatedPoint targetPoint = targetPointOption.Value();
 
         if (BattleSession.GetGridDistance(attackerPoint.Raw, targetPoint.Raw) > weapon.GetRangeStat().BaseValue)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Target.Combatant.Name} is out of range for {weapon.WeaponName}.");
+          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Target.Combatant.Name} is out of range for {weapon.ItemName}.");
         if (!attacker.TrySpendActionPoints(BattleSession.DefaultAttackActionPointCost))
           return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{attacker.Combatant.Name} could not spend {BattleSession.DefaultAttackActionPointCost} action points.");
 

@@ -56,9 +56,7 @@ public partial class StatusEffectBattleTest
       .RequireSingleResult().AffectedUnit.RequireSome();
     var targetCombatant = BattleTestFactory.MakeCombatant("Hostile", enemyFaction, health: targetHealth);
     var targetWeapon = BattleTestFactory.MakeWeapon("Enemy Rifle");
-    var target = (targetArmor is null
-        ? executor.Submit(BattleAction.SpawnUnit(targetCombatant, new Vector3I(4, 0, 4), targetWeapon))
-        : executor.Submit(BattleAction.SpawnUnit(targetCombatant, new Vector3I(4, 0, 4), targetWeapon, targetArmor.Value)))
+    var target = executor.Submit(new SpawnUnit(targetCombatant, new Vector3I(4, 0, 4), Some(targetWeapon), Optional(targetArmor)))
       .RequireSingleResult().AffectedUnit.RequireSome();
     StartBattle(session);
     return new Fixture(session, executor, playerFaction, enemyFaction, attacker, target);

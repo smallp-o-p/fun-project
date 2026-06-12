@@ -8,8 +8,7 @@ namespace FunProject.Weapons;
 
 public class Weapon : EquippableItem, HasStats
 {
-  public string WeaponName => ItemName;
-  protected readonly Dictionary<Type, Stat> _stats;
+  protected readonly StatSheet _stats;
   private readonly WeaponFrameData _frame;
 
   public Weapon(WeaponData data) : base(data)
@@ -17,40 +16,22 @@ public class Weapon : EquippableItem, HasStats
     _frame = data.Frame ?? throw new InvalidOperationException($"Weapon '{ItemName}' has no frame.");
     if (_frame.Packets.Count == 0)
       throw new InvalidOperationException($"Weapon '{ItemName}' frame '{_frame.Name}' has no damage packets.");
+    foreach (DamagePacketData packet in _frame.Packets)
+      ArgumentNullException.ThrowIfNull(packet);
 
-    _stats = new Dictionary<Type, Stat>
+    _stats = new StatSheet(new Dictionary<Type, Stat>
     {
       [typeof(DamageStat)] = data.DamageStat,
       [typeof(RangeStat)] = data.RangeStat,
       [typeof(CriticalChanceStat)] = data.CriticalChanceStat,
-    };
+    });
   }
 
-  public int NumModslots() => GetModSlots().Count;
+  public Option<Stat> TryGetStat(Type statType) => _stats.TryGetStat(statType);
 
-  public Option<Stat> TryGetStat(Type statType)
-  {
-    return _stats.TryGetValue(statType, out var stat)
-      ? Some(stat)
-      : None;
-  }
+  public Option<TStat> TryGetStat<TStat>() where TStat : Stat => _stats.TryGetStat<TStat>();
 
-  public Option<TStat> TryGetStat<TStat>() where TStat : Stat
-  {
-    if (_stats.TryGetValue(typeof(TStat), out var foundStat))
-    {
-      return Some((TStat)foundStat);
-    }
-
-    return None;
-  }
-
-  public TStat GetStat<TStat>() where TStat : Stat
-  {
-    return TryGetStat<TStat>().Match(
-      stat => stat,
-      () => throw new InvalidOperationException());
-  }
+  public TStat GetStat<TStat>() where TStat : Stat => _stats.GetStat<TStat>();
 
   public List<Damage> EmitDamage()
   {
@@ -58,11 +39,7 @@ public class Weapon : EquippableItem, HasStats
     var context = new DamageEmissionContext(baseDamage);
 
     List<Damage> bundle = _frame.Packets
-      .Select(packet =>
-      {
-        ArgumentNullException.ThrowIfNull(packet);
-        return packet.Derive(baseDamage);
-      })
+      .Select(packet => packet.Derive(baseDamage))
       .ToList();
 
     foreach (DamageBundleMod mod in BundleModsFromSlots().Concat(AmmunitionBundleMods()))
@@ -104,7 +81,7 @@ public class AmmunitionedWeapon : Weapon
 {
   public AmmunitionedWeapon(AmmunitionedWeaponData data) : base(data)
   {
-    _stats[typeof(AmmunitionStat)] = data.AmmunitionStat;
+    _stats.Set(data.AmmunitionStat);
   }
 
   public AmmunitionStat GetMagAmmoStat() => GetStat<AmmunitionStat>();
@@ -113,12 +90,8 @@ public class AmmunitionedWeapon : Weapon
 public class FirearmWeapon(FirearmWeaponData data) : AmmunitionedWeapon(data)
 {
   public FirearmArchetype Archetype { get; set; } = data.Archetype;
-  public Ammunition AmmoType { get; set; } = data.DefaultAmmoData;
+  public Option<Ammunition> AmmoType { get; set; } = Optional(data.DefaultAmmoData);
 
   protected override IEnumerable<DamageBundleMod> AmmunitionBundleMods()
-  {
-    if (AmmoType is null)
-      return [];
-    return AmmoType.DamageMods;
-  }
+    => AmmoType.Match(ammo => (IEnumerable<DamageBundleMod>)ammo.DamageMods, () => []);
 }

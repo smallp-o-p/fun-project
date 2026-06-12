@@ -24,17 +24,18 @@ public sealed class GetHitChanceForAttack : BattleSessionQuery<HitChanceBreakdow
   {
     if (!Attacker.IsAlive)
       return FailUnitNotAlive(Attacker);
-    if (!Target.IsAlive)
-      return FailUnitNotAlive(Target);
 
     if (Attacker.EquippedWeapon.IsNone)
       return Fail(BattleQueryFailureReason.InvalidBattleState, $"{Attacker.Combatant.Name} has no equipped weapon.");
-    Weapon weapon = Attacker.EquippedWeapon.Match(w => w, () => throw new InvalidOperationException("Weapon option was None after IsSome check."));
+    Weapon weapon = Attacker.RequireEquippedWeapon();
 
     // AttackUnit rejects allied targets (and self, which shares the
     // attacker's side), so those shots have no defined odds to preview.
     if (Target.Side == Attacker.Side)
       return Fail(BattleQueryFailureReason.InvalidBattleState, $"{Attacker.Combatant.Name} cannot attack allied unit {Target.Combatant.Name}.");
+
+    if (!Target.IsAlive)
+      return FailUnitNotAlive(Target);
 
     Option<BattleBoardState.ValidatedPoint> attackerPointOption = session.GetUnitPosition(Attacker);
     if (attackerPointOption.IsNone)
@@ -48,7 +49,7 @@ public sealed class GetHitChanceForAttack : BattleSessionQuery<HitChanceBreakdow
     if (!Attacker.VisibleUnits.Contains(Target))
       return Fail(BattleQueryFailureReason.InvalidBattleState, $"{Attacker.Combatant.Name} cannot see {Target.Combatant.Name}.");
     if (BattleSession.GetGridDistance(attackerPoint.Raw, targetPoint.Raw) > weapon.GetRangeStat().BaseValue)
-      return Fail(BattleQueryFailureReason.InvalidBattleState, $"{Target.Combatant.Name} is out of range for {weapon.WeaponName}.");
+      return Fail(BattleQueryFailureReason.InvalidBattleState, $"{Target.Combatant.Name} is out of range for {weapon.ItemName}.");
 
     AttackContext context = new(Attacker, Target, attackerPoint, targetPoint, weapon, session.Board);
     return Succeed(session.HitChanceCalculator.Calculate(context));

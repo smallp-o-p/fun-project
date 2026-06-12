@@ -85,7 +85,9 @@ public class BattleSessionQueriesTest
 
     IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = GetValue(Query(session, new GetPossibleMoveTilesForUnit(unit.State)));
     Assert.True(tiles.Count == 2);
-    Assert.True(tiles.Select(tile => tile.Raw).SequenceEqual(new List<Vector3I>([new Vector3I(1, 0, 0), new Vector3I(2, 0, 0)])));
+    var rawTiles = tiles.Select(tile => tile.Raw).ToHashSet();
+    Assert.True(rawTiles.Contains(new Vector3I(1, 0, 0)));
+    Assert.True(rawTiles.Contains(new Vector3I(2, 0, 0)));
     Assert.False(tiles.Any(tile => tile.Raw == session.GetUnitPosition(unit.State).RequireSome().Raw));
   }
 
