@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="DamageOverTimeStatusSpecData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/items/effects/DamageOverTimeStatusSpecData.cs" id="1_spec"]
+
+[resource]
+script = ExtResource("1_spec")
+DurationTurns = 2
+ApplyChancePercent = 100
+RequiresHealthDamage = false
+TickDamage = 2
+TickElement = 1
+Name = "Burn"
+Description = "Searing flames deal thermal damage at the end of each of the victim's turns."

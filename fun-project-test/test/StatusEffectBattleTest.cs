@@ -327,4 +327,51 @@ public partial class StatusEffectBattleTest
     Assert.False(fixture.Target.IsImmobilized);
     Assert.True(raisedEvents.OfType<UnitStatusEffectExpiredBattleEvent>().Any());
   }
+
+  [TestCase(TestName = "A lethal tick stops the unit's remaining statuses")]
+  public void LethalTickStopsRemainingStatuses()
+  {
+    var fixture = MakeFixture(BattleTestFactory.MakeWeapon("Rifle"), targetHealth: 2);
+    // Both lethal, so the assertion holds regardless of status iteration order.
+    var burn = new DamageOverTimeStatusSpecData { Name = "Burn", DurationTurns = 2, TickDamage = 5, TickElement = Element.Thermal };
+    var acid = new DamageOverTimeStatusSpecData { Name = "Acid", DurationTurns = 2, TickDamage = 5, TickElement = Element.Chem };
+    fixture.Target.ApplyStatusEffect(burn);
+    fixture.Target.ApplyStatusEffect(acid);
+
+    EndTurn(fixture, fixture.PlayerFaction);
+    var raisedEvents = new List<BattleEvent>();
+    fixture.Session.BattleEventCommitted += raisedEvents.Add;
+    EndTurn(fixture, fixture.EnemyFaction);           // first tick kills; the second status never ticks
+
+    Assert.True(fixture.Target.IsDead);
+    Assert.Equal(1, raisedEvents.OfType<UnitStatusEffectTickedBattleEvent>().Count());
+    Assert.True(raisedEvents.OfType<UnitKilledBattleEvent>().Any());
+    Assert.False(raisedEvents.OfType<UnitStatusEffectExpiredBattleEvent>().Any());
+    Assert.Equal(2, fixture.Target.ActiveStatusEffects.Count);
+    Assert.Equal(1, fixture.Target.ActiveStatusEffects.Count(effect => effect.RemainingTurns == 1));
+    Assert.Equal(1, fixture.Target.ActiveStatusEffects.Count(effect => effect.RemainingTurns == 2));
+    Assert.Equal(BattlePhase.InProgress, fixture.Session.Phase);
+    Assert.Equal(fixture.PlayerFaction, fixture.Session.ActiveSide);
+  }
+
+  [TestCase(TestName = "Multiple statuses on one unit each tick at the owner's turn end")]
+  public void MultipleStatusesEachTick()
+  {
+    var fixture = MakeFixture(BattleTestFactory.MakeWeapon("Rifle"), targetHealth: 20);
+    var burn = new DamageOverTimeStatusSpecData { Name = "Burn", DurationTurns = 2, TickDamage = 2, TickElement = Element.Thermal };
+    var poison = new DamageOverTimeStatusSpecData { Name = "Poison", DurationTurns = 3, TickDamage = 1, TickElement = Element.Chem };
+    fixture.Target.ApplyStatusEffect(burn);
+    fixture.Target.ApplyStatusEffect(poison);
+
+    EndTurn(fixture, fixture.PlayerFaction);
+    var raisedEvents = new List<BattleEvent>();
+    fixture.Session.BattleEventCommitted += raisedEvents.Add;
+    EndTurn(fixture, fixture.EnemyFaction);           // both tick: 2 + 1 damage
+
+    Assert.Equal(17, fixture.Target.CurrentHealth);
+    Assert.Equal(2, raisedEvents.OfType<UnitStatusEffectTickedBattleEvent>().Count());
+    Assert.Equal(2, fixture.Target.ActiveStatusEffects.Count);
+    Assert.Equal(1, fixture.Target.ActiveStatusEffects.Count(effect => effect.RemainingTurns == 1));
+    Assert.Equal(1, fixture.Target.ActiveStatusEffects.Count(effect => effect.RemainingTurns == 2));
+  }
 }

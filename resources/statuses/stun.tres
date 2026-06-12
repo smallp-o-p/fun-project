@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ImmobilizeStatusSpecData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/items/effects/ImmobilizeStatusSpecData.cs" id="1_spec"]
+
+[resource]
+script = ExtResource("1_spec")
+DurationTurns = 1
+ApplyChancePercent = 100
+RequiresHealthDamage = false
+Name = "Stun"
+Description = "Overloaded reflexes leave the victim unable to act for a turn."
