@@ -2,6 +2,7 @@ using FunProject.Combatants;
 using FunProject.Core;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
+using FunProject.Items.Effects;
 using FunProject.Weapons;
 using Godot;
 using LanguageExt.UnsafeValueAccess;
@@ -87,6 +88,9 @@ public sealed class BattleSession
 
     _turnQueue = new Queue<Faction>(_globalFactionOrder);
     ActiveSide = _turnQueue.Peek();
+    // Status ticks run before armor regen: a DoT tick re-arms the regen delay and
+    // suppresses that same turn's shield recharge.
+    RegisterListener<TurnEndedBattleEvent>(new StatusEffectSystem());
     RegisterListener<TurnEndedBattleEvent>(new ArmorRegenSystem());
   }
 
@@ -200,20 +204,54 @@ public sealed class BattleSession
 
     Option<ArmorState> armorState = unit.EquippedArmor.Map(
       armor => new ArmorState(armor.Capability.Current, armor.Capability.Element));
-    DamageResolution resolution = DamageResolver.Resolve(bundle, armorState);
+    IReadOnlyList<PacketResolution> packetResolutions = DamageResolver.ResolvePackets(bundle, armorState);
+    int armorDamage = 0;
+    int healthDamage = 0;
+    foreach (PacketResolution packetResolution in packetResolutions)
+    {
+      armorDamage += packetResolution.ArmorDamage;
+      healthDamage += packetResolution.HealthDamage;
+    }
 
     unit.EquippedArmor.IfSome(armor =>
     {
-      armor.Capability.Reduce(resolution.ArmorDamage);
-      if (resolution.ArmorDamage > 0 || resolution.HealthDamage > 0)
+      armor.Capability.Reduce(armorDamage);
+      if (armorDamage > 0 || healthDamage > 0)
         armor.Capability.RearmRegenDelay();
     });
-    unit.ReceiveDamage(resolution.HealthDamage);
+    unit.ReceiveDamage(healthDamage);
 
-    RaiseEvent(new UnitDamagedBattleEvent(unit, bundle, resolution.ArmorDamage, resolution.HealthDamage));
+    RaiseEvent(new UnitDamagedBattleEvent(unit, bundle, armorDamage, healthDamage));
     if (unit.IsDead)
     {
       HandleUnitDeath(unit);
+      return;
+    }
+
+    ApplyStatusEffectsFrom(unit, bundle, packetResolutions);
+  }
+
+  private void ApplyStatusEffectsFrom(
+    BattleUnitState unit,
+    IReadOnlyList<Damage> bundle,
+    IReadOnlyList<PacketResolution> packetResolutions)
+  {
+    for (int i = 0; i < bundle.Count; i++)
+    {
+      if (bundle[i].Amount <= 0)
+        continue;
+
+      int index = i;
+      bundle[i].Status.IfSome(spec =>
+      {
+        if (spec.RequiresHealthDamage && packetResolutions[index].HealthDamage <= 0)
+          return;
+        if (spec.ApplyChancePercent < 100 && RollPercent() >= spec.ApplyChancePercent)
+          return;
+
+        ActiveStatusEffect applied = unit.ApplyStatusEffect(spec);
+        RaiseEvent(new UnitStatusEffectAppliedBattleEvent(unit, spec, applied.RemainingTurns));
+      });
     }
   }
 
@@ -360,7 +398,7 @@ public sealed class BattleSession
     if (!_activeFactionUnitsAvailable.Contains(unit))
       return false;
 
-    return unit.CurrentActionPoints > 0;
+    return unit.CurrentActionPoints > 0 && !unit.IsImmobilized;
   }
 
   internal static int GetGridDistance(Vector3I source, Vector3I destination)

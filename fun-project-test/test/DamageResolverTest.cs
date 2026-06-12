@@ -96,4 +96,28 @@ public class DamageResolverTest
     Assert.Throws<ArgumentOutOfRangeException>(
       () => DamageResolver.Resolve([new Damage(1, Element.Kinetic)], Some(new ArmorState(-1, Element.Kinetic))));
   }
+
+  [TestCase(TestName = "ResolvePackets reports each packet's armor and health split")]
+  public void ResolvePacketsReportsPerPacketSplit()
+  {
+    var packets = DamageResolver.ResolvePackets(
+      [new Damage(6, Element.Thermal), new Damage(4, Element.Kinetic)],
+      Some(new ArmorState(10, Element.Thermal)));
+
+    Assert.Equal(2, packets.Count);
+    Assert.Equal(new PacketResolution(9, 0), packets[0]);
+    Assert.Equal(new PacketResolution(1, 3), packets[1]);
+  }
+
+  [TestCase(TestName = "ResolvePackets keeps zero and negative packets aligned")]
+  public void ResolvePacketsKeepsAlignmentForIgnoredPackets()
+  {
+    var packets = DamageResolver.ResolvePackets(
+      [new Damage(0, Element.Kinetic), new Damage(5, Element.Kinetic)],
+      Some(new ArmorState(2, Element.Thermal)));
+
+    Assert.Equal(2, packets.Count);
+    Assert.Equal(new PacketResolution(0, 0), packets[0]);
+    Assert.Equal(new PacketResolution(2, 3), packets[1]);
+  }
 }

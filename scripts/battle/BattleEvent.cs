@@ -1,5 +1,6 @@
 using FunProject.Combatants;
 using FunProject.Items;
+using FunProject.Items.Effects;
 using FunProject.Weapons;
 using System;
 using System.Collections.Generic;
@@ -274,4 +275,61 @@ public sealed record UnitAttackedBattleEvent : BattleEvent, IUnitBattleEvent, IP
 
   public override string ToDisplayString() =>
     $"{Unit.Combatant.Name} attacked {Target.Combatant.Name} ({Breakdown.FinalChance}% to hit, rolled {Roll}): {(IsHit ? "hit" : "miss")}.";
+}
+
+public sealed record UnitStatusEffectAppliedBattleEvent : BattleEvent, IUnitBattleEvent
+{
+  public override string EventName => "unit_status_effect_applied";
+  public BattleUnitState Unit { get; }
+  public StatusEffectSpecData Spec { get; }
+  public int RemainingTurns { get; }
+
+  public UnitStatusEffectAppliedBattleEvent(BattleUnitState unit, StatusEffectSpecData spec, int remainingTurns)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(spec);
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(remainingTurns);
+    Unit = unit;
+    Spec = spec;
+    RemainingTurns = remainingTurns;
+  }
+
+  public override string ToDisplayString() => $"{Unit.Combatant.Name} is afflicted by {Spec.Name} ({RemainingTurns} turns).";
+}
+
+public sealed record UnitStatusEffectTickedBattleEvent : BattleEvent, IUnitBattleEvent
+{
+  public override string EventName => "unit_status_effect_ticked";
+  public BattleUnitState Unit { get; }
+  public StatusEffectSpecData Spec { get; }
+  public int RemainingTurns { get; }
+
+  public UnitStatusEffectTickedBattleEvent(BattleUnitState unit, StatusEffectSpecData spec, int remainingTurns)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(spec);
+    ArgumentOutOfRangeException.ThrowIfNegative(remainingTurns);
+    Unit = unit;
+    Spec = spec;
+    RemainingTurns = remainingTurns;
+  }
+
+  public override string ToDisplayString() => $"{Spec.Name} ticks on {Unit.Combatant.Name} ({RemainingTurns} turns left).";
+}
+
+public sealed record UnitStatusEffectExpiredBattleEvent : BattleEvent, IUnitBattleEvent
+{
+  public override string EventName => "unit_status_effect_expired";
+  public BattleUnitState Unit { get; }
+  public StatusEffectSpecData Spec { get; }
+
+  public UnitStatusEffectExpiredBattleEvent(BattleUnitState unit, StatusEffectSpecData spec)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(spec);
+    Unit = unit;
+    Spec = spec;
+  }
+
+  public override string ToDisplayString() => $"{Spec.Name} wore off {Unit.Combatant.Name}.";
 }

@@ -78,6 +78,9 @@ public abstract class BattleAction
     if (!session.IsUnitStillAvailableThisTurn(unit))
       return Reject($"{unit.Combatant.Name} is no longer available this turn.");
 
+    if (unit.IsImmobilized)
+      return Reject($"{unit.Combatant.Name} is immobilized and cannot act.");
+
     if (unit.CurrentActionPoints < actionPointCost)
       return Reject($"{unit.Combatant.Name} needs {actionPointCost} action points but only has {unit.CurrentActionPoints}.");
 
