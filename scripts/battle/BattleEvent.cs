@@ -345,3 +345,82 @@ public sealed record UnitStatusEffectExpiredBattleEvent : BattleEvent, IUnitBatt
 
   public override string ToDisplayString() => $"{Spec.Name} wore off {Unit.Combatant.Name}.";
 }
+
+public sealed record ObjectiveAddedBattleEvent : BattleEvent
+{
+  public override string EventName => "objective_added";
+  public Faction Faction { get; }
+  public Objective Objective { get; }
+
+  public ObjectiveAddedBattleEvent(Faction faction, Objective objective)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    ArgumentNullException.ThrowIfNull(objective);
+    Faction = faction;
+    Objective = objective;
+  }
+
+  public override string ToDisplayString() => $"{Faction.Name} received objective {Objective.Data.Name}.";
+}
+
+public sealed record ObjectiveCompletedBattleEvent : BattleEvent
+{
+  public override string EventName => "objective_completed";
+  public Faction Faction { get; }
+  public Objective Objective { get; }
+
+  public ObjectiveCompletedBattleEvent(Faction faction, Objective objective)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    ArgumentNullException.ThrowIfNull(objective);
+    Faction = faction;
+    Objective = objective;
+  }
+
+  public override string ToDisplayString() => $"{Faction.Name} completed objective {Objective.Data.Name}.";
+}
+
+public sealed record ObjectiveFailedBattleEvent : BattleEvent
+{
+  public override string EventName => "objective_failed";
+  public Faction Faction { get; }
+  public Objective Objective { get; }
+
+  public ObjectiveFailedBattleEvent(Faction faction, Objective objective)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    ArgumentNullException.ThrowIfNull(objective);
+    Faction = faction;
+    Objective = objective;
+  }
+
+  public override string ToDisplayString() => $"{Faction.Name} failed objective {Objective.Data.Name}.";
+}
+
+public sealed record OperationCompletedBattleEvent : BattleEvent
+{
+  public override string EventName => "operation_completed";
+  public Faction Faction { get; }
+
+  public OperationCompletedBattleEvent(Faction faction)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    Faction = faction;
+  }
+
+  public override string ToDisplayString() => $"{Faction.Name} completed its operation.";
+}
+
+public sealed record OperationFailedBattleEvent : BattleEvent
+{
+  public override string EventName => "operation_failed";
+  public Faction Faction { get; }
+
+  public OperationFailedBattleEvent(Faction faction)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    Faction = faction;
+  }
+
+  public override string ToDisplayString() => $"{Faction.Name}'s operation failed.";
+}

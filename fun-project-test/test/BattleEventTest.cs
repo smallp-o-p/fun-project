@@ -24,6 +24,8 @@ public class BattleEventTest
       BattleTestFactory.MakeCombatant("Alpha", faction),
       sourcePosition.Raw);
     var grenade = BattleTestFactory.MakeGrenade("Frag Grenade");
+    var objective = new Objective(new FakeObjectiveData());
+    objective.Owner = faction;
 
     Assert.Equal("Battle started.", new SessionStartedBattleEvent().ToDisplayString());
     Assert.Equal("Battle ended.", new SessionEndedBattleEvent().ToDisplayString());
@@ -39,6 +41,11 @@ public class BattleEventTest
     Assert.Equal("Damage: 3 (0 armor, 3 health)", new UnitDamagedBattleEvent(unit.State, [new Damage(3, Element.Kinetic)], 0, 3).ToDisplayString());
     Assert.Equal($"Unit ID {unit.UnitId} was killed!", new UnitKilledBattleEvent(unit.State, position).ToDisplayString());
     Assert.Equal("Alpha threw Frag Grenade.", new ItemThrownBattleEvent(unit.State, position, grenade.Item).ToDisplayString());
+    Assert.Equal("Player received objective Name.", new ObjectiveAddedBattleEvent(faction, objective).ToDisplayString());
+    Assert.Equal("Player completed objective Name.", new ObjectiveCompletedBattleEvent(faction, objective).ToDisplayString());
+    Assert.Equal("Player failed objective Name.", new ObjectiveFailedBattleEvent(faction, objective).ToDisplayString());
+    Assert.Equal("Player completed its operation.", new OperationCompletedBattleEvent(faction).ToDisplayString());
+    Assert.Equal("Player's operation failed.", new OperationFailedBattleEvent(faction).ToDisplayString());
   }
 
   [TestCase(TestName = "Battle events expose stable event names")]
@@ -54,6 +61,8 @@ public class BattleEventTest
       BattleTestFactory.MakeCombatant("Alpha", faction),
       sourcePosition.Raw);
     var grenade = BattleTestFactory.MakeGrenade("Frag Grenade");
+    var objective = new Objective(new FakeObjectiveData());
+    objective.Owner = faction;
 
     (BattleEvent Event, string ExpectedName)[] events =
     [
@@ -71,6 +80,11 @@ public class BattleEventTest
       (new UnitDamagedBattleEvent(unit.State, [new Damage(3, Element.Kinetic)], 0, 3), "unit_damaged"),
       (new UnitKilledBattleEvent(unit.State, position), "unit_killed"),
       (new ItemThrownBattleEvent(unit.State, position, grenade.Item), "item_thrown"),
+      (new ObjectiveAddedBattleEvent(faction, objective), "objective_added"),
+      (new ObjectiveCompletedBattleEvent(faction, objective), "objective_completed"),
+      (new ObjectiveFailedBattleEvent(faction, objective), "objective_failed"),
+      (new OperationCompletedBattleEvent(faction), "operation_completed"),
+      (new OperationFailedBattleEvent(faction), "operation_failed"),
     ];
 
     foreach ((BattleEvent battleEvent, string expectedName) in events)

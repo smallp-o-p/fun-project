@@ -24,8 +24,8 @@ public class BattleOutcomeTest
     Assert.True(session.Outcome.IsNone);
   }
 
-  [TestCase(TestName = "Player wipe resolves to Defeat at the end of the turn, not on the kill")]
-  public void PlayerWipeResolvesToDefeatAtTurnEnd()
+  [TestCase(TestName = "A wiped player loses immediately")]
+  public void PlayerWipeLosesImmediately()
   {
     var player = BattleTestFactory.MakeFaction("Player");
     var enemy = BattleTestFactory.MakeFaction("Enemy");
@@ -38,10 +38,6 @@ public class BattleOutcomeTest
     StartBattle(session);
 
     ApplyDamage(session, playerUnit.State, 999);
-    Assert.Equal(BattlePhase.InProgress, session.Phase);
-    Assert.True(session.Outcome.IsNone);
-
-    AdvanceTurn(session);
 
     Assert.Equal(BattlePhase.Ended, session.Phase);
     Assert.Equal(BattleOutcome.Defeat, session.Outcome.RequireSome());

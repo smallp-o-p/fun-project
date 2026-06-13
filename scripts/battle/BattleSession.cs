@@ -45,6 +45,7 @@ public sealed class BattleSession
   private readonly Random _random;
   private readonly List<BattleUnitState> _units = [];
   private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>> _exploredTilesByFaction = [];
+  private readonly Dictionary<Faction, Operation> _operations = [];
   private readonly Queue<Faction> _globalFactionOrder = [];
   private Queue<Faction> _turnQueue = [];
   private readonly SysColGeneric.HashSet<Faction> _sidesActedThisRound = [];
@@ -90,12 +91,15 @@ public sealed class BattleSession
     if (_globalFactionOrder.Count == 0)
       throw new ArgumentException("Battle session requires at least one faction in the global order.");
 
+    PlayerFaction.IfSome(EnqueueFactionInGlobalOrder);
+
     _turnQueue = new Queue<Faction>(_globalFactionOrder);
     ActiveSide = _turnQueue.Peek();
     // Status ticks run before armor regen: a DoT tick re-arms the regen delay and
     // suppresses that same turn's shield recharge.
     RegisterListener<TurnEndedBattleEvent>(new StatusEffectSystem());
     RegisterListener<TurnEndedBattleEvent>(new ArmorRegenSystem());
+    RegisterListener<TurnEndedBattleEvent>(new ObjectiveSystem());
   }
 
   internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
@@ -150,6 +154,9 @@ public sealed class BattleSession
     RebuildRoundQueueFromLivingSides();
     if (_turnQueue.Count == 0)
       throw new InvalidOperationException("Cannot start a battle without at least one living faction in the session.");
+
+    foreach (var side in _globalFactionOrder)
+      EnsureDefaultObjective(side);
 
     Phase = BattlePhase.InProgress;
     TurnNumber = 1;
@@ -271,6 +278,11 @@ public sealed class BattleSession
     _activeFactionUnitsAvailable.Remove(unit);
     RaiseEvent(new UnitKilledBattleEvent(unit, unitPoint));
     HandleFactionLoss(unitSide);
+
+    if (Phase == BattlePhase.InProgress
+        && PlayerFaction.Match(Some: player => player == unitSide, None: () => false)
+        && !HasLivingUnits(unitSide))
+      EndBattle(BattleOutcome.Defeat);
   }
 
   internal void EndUnitActivation(BattleUnitState unit)
@@ -303,8 +315,15 @@ public sealed class BattleSession
       ActiveSide,
       TurnNumber));
 
-    // Single battle-end chokepoint: evaluate once the turn and its end-of-turn
-    // ticks have fully resolved, before any turn-queue mutation.
+    // A turn-end DoT can wipe the player during the dispatch above, ending the
+    // battle immediately; bail before mutating the turn queue.
+    if (Phase == BattlePhase.Ended)
+      return;
+
+    // End-of-turn outcome. This runs after RaiseEvent above has fully drained the
+    // dispatch queue, so ObjectiveSystem has updated operation statuses AND any
+    // reaction listeners (e.g. a fail -> add-and-reactivate handler) have already
+    // run before we read the status. Resolve before any turn-queue mutation.
     if (TryEndBattleIfDecided())
       return;
 
@@ -358,14 +377,13 @@ public sealed class BattleSession
     return PlayerFaction.Match(
       Some: player =>
       {
-        if (!HasLivingUnits(player))
+        Operation op = _operations[player];
+        if (op.Status == OperationStatus.Failed)
         {
           EndBattle(BattleOutcome.Defeat);
           return true;
         }
-
-        bool playerIsSoleSurvivor = _globalFactionOrder.All(side => side == player || !HasLivingUnits(side));
-        if (playerIsSoleSurvivor)
+        if (op.Status == OperationStatus.Completed)
         {
           EndBattle(BattleOutcome.Victory);
           return true;
@@ -458,7 +476,7 @@ public sealed class BattleSession
     return _random.Next(100);
   }
 
-  private bool HasLivingUnits(Faction side)
+  internal bool HasLivingUnits(Faction side)
   {
     return GetFactionAliveUnits(side).Any();
   }
@@ -678,6 +696,9 @@ public sealed class BattleSession
       return;
 
     _globalFactionOrder.Enqueue(side);
+    _operations[side] = new Operation(side);
+    if (Phase == BattlePhase.InProgress)
+      EnsureDefaultObjective(side);
   }
 
   private void HandleFactionLoss(Faction side)
@@ -698,6 +719,73 @@ public sealed class BattleSession
   private void RemoveSideFromQueue(Faction side)
   {
     _turnQueue = new Queue<Faction>(_turnQueue.Where(faction => faction != side));
+  }
+
+  private void EnsureDefaultObjective(Faction faction)
+  {
+    Operation op = _operations[faction];
+    if (op.PendingObjectives.Count == 0)
+      op.AddObjective(new Objective(new EliminateAllOpposingForcesObjectiveData()));
+  }
+
+  internal void AddObjective(Faction faction, Objective objective)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    ArgumentNullException.ThrowIfNull(objective);
+
+    if (!_operations.TryGetValue(faction, out Operation? op))
+    {
+      op = new Operation(faction);
+      _operations[faction] = op;
+      if (!_globalFactionOrder.Contains(faction))
+        _globalFactionOrder.Enqueue(faction);
+    }
+
+    op!.AddObjective(objective);
+    RaiseEvent(new ObjectiveAddedBattleEvent(faction, objective));
+  }
+
+  internal void EvaluateOperationAtTurnEnd(Faction faction)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    if (Phase != BattlePhase.InProgress)
+      return;
+    if (!_operations.TryGetValue(faction, out Operation? found))
+      return;
+
+    Operation op = found!;
+    while (op.Status == OperationStatus.Active)
+    {
+      Option<Objective> currentOption = op.Current;
+      if (currentOption.IsNone)
+        break;
+      Objective current = currentOption.Match(c => c, () => throw new InvalidOperationException("Current objective vanished."));
+
+      if (current.IsFailed(this))
+      {
+        RaiseEvent(new ObjectiveFailedBattleEvent(faction, current));
+        op.FailCurrent();
+        RaiseEvent(new OperationFailedBattleEvent(faction));
+        break;
+      }
+
+      if (current.IsComplete(this))
+      {
+        RaiseEvent(new ObjectiveCompletedBattleEvent(faction, current));
+        op.CompleteCurrent();
+        if (op.Status == OperationStatus.Completed)
+          RaiseEvent(new OperationCompletedBattleEvent(faction));
+        continue;
+      }
+
+      break;
+    }
+  }
+
+  internal Option<Operation> GetOperation(Faction faction)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    return _operations.TryGetValue(faction, out Operation? op) ? Some(op!) : None;
   }
 
   private void StartNextRound()
