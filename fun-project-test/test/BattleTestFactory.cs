@@ -120,17 +120,19 @@ internal static class BattleTestFactory
     Vector3I dimensions,
     IEnumerable<Faction> globalFactionOrder,
     IHitChanceCalculator hitChanceCalculator = null,
-    int? randomSeed = null)
+    int? randomSeed = null,
+    Option<Faction> playerFaction = default)
   {
-    return MakeSession(new BattleBoardState(dimensions), globalFactionOrder, hitChanceCalculator, randomSeed);
+    return MakeSession(new BattleBoardState(dimensions), globalFactionOrder, hitChanceCalculator, randomSeed, playerFaction);
   }
 
   public static BattleSession MakeSession(
     BattleBoardState board,
     IEnumerable<Faction> globalFactionOrder,
     IHitChanceCalculator hitChanceCalculator = null,
-    int? randomSeed = null)
+    int? randomSeed = null,
+    Option<Faction> playerFaction = default)
   {
-    return new BattleSession(board, globalFactionOrder, hitChanceCalculator, randomSeed);
+    return new BattleSession(board, globalFactionOrder, hitChanceCalculator, randomSeed, playerFaction);
   }
 }

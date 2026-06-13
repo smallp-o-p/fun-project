@@ -27,6 +27,8 @@ public class BattleEventTest
 
     Assert.Equal("Battle started.", new SessionStartedBattleEvent().ToDisplayString());
     Assert.Equal("Battle ended.", new SessionEndedBattleEvent().ToDisplayString());
+    Assert.Equal("Battle won.", new SessionEndedBattleEvent(BattleOutcome.Victory).ToDisplayString());
+    Assert.Equal("Battle lost.", new SessionEndedBattleEvent(BattleOutcome.Defeat).ToDisplayString());
     Assert.Equal("Turn 2 started for Player.", new TurnStartedBattleEvent(faction, 2).ToDisplayString());
     Assert.Equal("Turn 2 ended for Player.", new TurnEndedBattleEvent(faction, 2).ToDisplayString());
     Assert.Equal("Active side is now Player.", new ActiveSideChangedBattleEvent(faction).ToDisplayString());
@@ -57,6 +59,8 @@ public class BattleEventTest
     [
       (new SessionStartedBattleEvent(), "session_started"),
       (new SessionEndedBattleEvent(), "session_ended"),
+      (new SessionEndedBattleEvent(BattleOutcome.Victory), "session_ended"),
+      (new SessionEndedBattleEvent(BattleOutcome.Defeat), "session_ended"),
       (new TurnStartedBattleEvent(faction, 2), "turn_started"),
       (new TurnEndedBattleEvent(faction, 2), "turn_ended"),
       (new ActiveSideChangedBattleEvent(faction), "active_side_changed"),

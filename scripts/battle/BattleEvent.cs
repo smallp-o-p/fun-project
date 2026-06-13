@@ -37,7 +37,19 @@ public sealed record SessionStartedBattleEvent : BattleEvent
 public sealed record SessionEndedBattleEvent : BattleEvent
 {
   public override string EventName => "session_ended";
-  public override string ToDisplayString() => "Battle ended.";
+  public BattleOutcome Outcome { get; }
+
+  public SessionEndedBattleEvent(BattleOutcome outcome = BattleOutcome.Draw)
+  {
+    Outcome = outcome;
+  }
+
+  public override string ToDisplayString() => Outcome switch
+  {
+    BattleOutcome.Victory => "Battle won.",
+    BattleOutcome.Defeat => "Battle lost.",
+    _ => "Battle ended.",
+  };
 }
 
 public sealed record TurnStartedBattleEvent : BattleEvent

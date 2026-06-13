@@ -57,6 +57,8 @@ public sealed class BattleSession
   public BattlePhase Phase { get; private set; } = BattlePhase.Setup;
   public int TurnNumber { get; private set; } = 1;
   public Faction ActiveSide { get; private set; }
+  public Option<Faction> PlayerFaction { get; }
+  public Option<BattleOutcome> Outcome { get; private set; }
   public IEnumerable<BattleUnitState> AliveUnits => _units.Where((unit) => unit.IsAlive);
   public IEnumerable<BattleUnitState> DeadUnits => _units.Where((unit) => unit.IsDead);
   public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _globalFactionOrder;
@@ -68,7 +70,8 @@ public sealed class BattleSession
     BattleBoardState board,
     IEnumerable<Faction> globalFactionOrder,
     IHitChanceCalculator? hitChanceCalculator = null,
-    int? randomSeed = null)
+    int? randomSeed = null,
+    Option<Faction> playerFaction = default)
   {
     ArgumentNullException.ThrowIfNull(board);
     ArgumentNullException.ThrowIfNull(globalFactionOrder);
@@ -77,6 +80,7 @@ public sealed class BattleSession
     _random = randomSeed is null ? new Random() : new Random(randomSeed.Value);
 
     Board = board;
+    PlayerFaction = playerFaction;
 
     foreach (var faction in globalFactionOrder)
     {
@@ -298,6 +302,12 @@ public sealed class BattleSession
     RaiseEvent(new TurnEndedBattleEvent(
       ActiveSide,
       TurnNumber));
+
+    // Single battle-end chokepoint: evaluate once the turn and its end-of-turn
+    // ticks have fully resolved, before any turn-queue mutation.
+    if (TryEndBattleIfDecided())
+      return;
+
     _sidesActedThisRound.Add(ActiveSide);
 
     _turnQueue.Dequeue();
@@ -324,13 +334,55 @@ public sealed class BattleSession
     AdvanceTurn();
   }
 
-  private void EndBattle()
+  private void EndBattle(BattleOutcome outcome)
   {
+    if (Phase == BattlePhase.Ended)
+      return;
+
     _activeFactionUnitsAvailable.Clear();
     _turnQueue.Clear();
+    Outcome = Some(outcome);
     Phase = BattlePhase.Ended;
 
-    RaiseEvent(new SessionEndedBattleEvent());
+    RaiseEvent(new SessionEndedBattleEvent(outcome));
+  }
+
+  // Provisional win/lose rules and the single place a battle can end. To be
+  // replaced wholesale by the planned rules rework; keep all outcome logic here.
+  // Returns true iff it ended the battle.
+  private bool TryEndBattleIfDecided()
+  {
+    if (Phase != BattlePhase.InProgress)
+      return false;
+
+    return PlayerFaction.Match(
+      Some: player =>
+      {
+        if (!HasLivingUnits(player))
+        {
+          EndBattle(BattleOutcome.Defeat);
+          return true;
+        }
+
+        bool playerIsSoleSurvivor = _globalFactionOrder.All(side => side == player || !HasLivingUnits(side));
+        if (playerIsSoleSurvivor)
+        {
+          EndBattle(BattleOutcome.Victory);
+          return true;
+        }
+
+        return false;
+      },
+      None: () =>
+      {
+        if (!_globalFactionOrder.Any(HasLivingUnits))
+        {
+          EndBattle(BattleOutcome.Draw);
+          return true;
+        }
+
+        return false;
+      });
   }
 
   private void AddSpawnedUnitToCurrentRound(BattleUnitState unit)
@@ -655,10 +707,8 @@ public sealed class BattleSession
     RebuildRoundQueueFromLivingSides();
 
     if (_turnQueue.Count == 0)
-    {
-      EndBattle();
-      return;
-    }
+      throw new InvalidOperationException(
+        "StartNextRound reached with no living factions; TryEndBattleIfDecided ends the battle at the prior turn end.");
 
     BeginNextQueuedSideTurn();
   }
