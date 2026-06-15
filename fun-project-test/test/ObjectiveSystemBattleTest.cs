@@ -18,11 +18,11 @@ public class ObjectiveSystemBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [a, b]);
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", b), new Vector3I(2, 0, 0));
-    session.AddObjective(a, new FakeObjectiveData().CreateRuntime());
+    session.AddObjective(a, new FakeObjective());
     StartBattle(session);
 
     Operation op = session.GetOperation(a).RequireSome();
-    Assert.True(op.Current.RequireSome().Data is FakeObjectiveData);
+    Assert.True(op.Current.RequireSome() is FakeObjective);
   }
 
   [TestCase(TestName = "AddObjective raises an ObjectiveAdded event")]
@@ -34,7 +34,7 @@ public class ObjectiveSystemBattleTest
     var raised = new List<BattleEvent>();
     session.BattleEventCommitted += raised.Add;
 
-    session.AddObjective(a, new FakeObjectiveData().CreateRuntime());
+    session.AddObjective(a, new FakeObjective());
 
     Assert.Equal(1, raised.OfType<ObjectiveAddedBattleEvent>().Count());
   }
@@ -47,7 +47,7 @@ public class ObjectiveSystemBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [a, b]); // no player faction
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", b), new Vector3I(2, 0, 0));
-    session.AddObjective(a, new FakeObjectiveData { Complete = true }.CreateRuntime());
+    session.AddObjective(a, new FakeObjective { Complete = true });
     var raised = new List<BattleEvent>();
     session.BattleEventCommitted += raised.Add;
     StartBattle(session);
@@ -68,7 +68,7 @@ public class ObjectiveSystemBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [a, b]); // no player faction
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", b), new Vector3I(2, 0, 0));
-    session.AddObjective(a, new FakeObjectiveData { Failed = true }.CreateRuntime());
+    session.AddObjective(a, new FakeObjective { Failed = true });
     var raised = new List<BattleEvent>();
     session.BattleEventCommitted += raised.Add;
     StartBattle(session);

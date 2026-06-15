@@ -18,7 +18,7 @@ public class ObjectiveTest
     var enemyUnit = SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
     StartBattle(session);
 
-    var objective = new EliminateAllOpposingForcesObjective(new EliminateAllOpposingForcesObjectiveData()) { Owner = player };
+    var objective = new EliminateAllOpposingForcesObjective(new ObjectiveData()) { Owner = player };
 
     Assert.False(objective.IsComplete(session));
     Assert.False(objective.IsFailed(session));
@@ -39,7 +39,7 @@ public class ObjectiveTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
     StartBattle(session);
 
-    var objective = new EliminateAllOpposingForcesObjective(new EliminateAllOpposingForcesObjectiveData()) { Owner = player };
+    var objective = new EliminateAllOpposingForcesObjective(new ObjectiveData()) { Owner = player };
     new BattleActionExecutor(session).Submit(BattleAction.ApplyDamage(playerUnit.State, 999)).RequireSingleResult();
 
     Assert.True(objective.IsFailed(session));
@@ -54,10 +54,10 @@ public class ObjectiveTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    var objective = new SurviveUntilTurnObjective(new SurviveUntilTurnObjectiveData { TargetTurn = 1 }) { Owner = player };
+    var objective = new SurviveUntilTurnObjective(new ObjectiveData(), targetTurn: 1) { Owner = player };
     Assert.True(objective.IsComplete(session)); // TurnNumber starts at 1
 
-    var later = new SurviveUntilTurnObjective(new SurviveUntilTurnObjectiveData { TargetTurn = 5 }) { Owner = player };
+    var later = new SurviveUntilTurnObjective(new ObjectiveData(), targetTurn: 5) { Owner = player };
     Assert.False(later.IsComplete(session));
   }
 }

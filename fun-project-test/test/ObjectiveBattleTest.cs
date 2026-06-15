@@ -19,7 +19,7 @@ public class ObjectiveBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    session.AddObjective(player, new FakeObjectiveData { Complete = true }.CreateRuntime());
+    session.AddObjective(player, new FakeObjective { Complete = true });
     var raised = new List<BattleEvent>();
     session.BattleEventCommitted += raised.Add;
     StartBattle(session);
@@ -39,7 +39,7 @@ public class ObjectiveBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    session.AddObjective(player, new SurviveUntilTurnObjectiveData { TargetTurn = 2 }.CreateRuntime());
+    session.AddObjective(player, new SurviveUntilTurnObjective(new ObjectiveData(), targetTurn: 2));
     StartBattle(session);
 
     AdvanceTurn(session); // player turn 1 ends — TurnNumber still 1, not yet complete
@@ -59,7 +59,7 @@ public class ObjectiveBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    session.AddObjective(player, new FakeObjectiveData { Failed = true }.CreateRuntime());
+    session.AddObjective(player, new FakeObjective { Failed = true });
     StartBattle(session);
 
     AdvanceTurn(session);
@@ -97,11 +97,11 @@ public class ObjectiveBattleTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
 
-    var task = new FakeObjectiveData { Failed = true };
-    var exfil = new FakeObjectiveData { Complete = false };
-    session.AddObjective(player, task.CreateRuntime());
+    var task = new FakeObjective { Failed = true };
+    var exfil = new FakeObjective { Complete = false };
+    session.AddObjective(player, task);
     // When the operation fails, hand the player an exfiltrate objective inline.
-    session.RegisterListener<OperationFailedBattleEvent>(new AddObjectiveOnOperationFailed(player, exfil.CreateRuntime()));
+    session.RegisterListener<OperationFailedBattleEvent>(new AddObjectiveOnOperationFailed(player, exfil));
     StartBattle(session);
 
     AdvanceTurn(session); // player's task fails -> exfil added -> operation reactivated (Active)
@@ -123,7 +123,7 @@ public class ObjectiveBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [player, enemy]);
     SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    session.AddObjective(player, new FakeObjectiveData().CreateRuntime());
+    session.AddObjective(player, new FakeObjective());
     // enemy has no objective; bypass the auto-filling StartBattle helper to exercise the guard.
 
     Assert.Throws<InvalidOperationException>(() => session.StartBattle());

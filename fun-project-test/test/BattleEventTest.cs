@@ -24,7 +24,7 @@ public class BattleEventTest
       BattleTestFactory.MakeCombatant("Alpha", faction),
       sourcePosition.Raw);
     var grenade = BattleTestFactory.MakeGrenade("Frag Grenade");
-    var objective = new FakeObjectiveData().CreateRuntime();
+    var objective = new FakeObjective();
     objective.Owner = faction;
 
     Assert.Equal("Battle started.", new SessionStartedBattleEvent().ToDisplayString());
@@ -61,7 +61,7 @@ public class BattleEventTest
       BattleTestFactory.MakeCombatant("Alpha", faction),
       sourcePosition.Raw);
     var grenade = BattleTestFactory.MakeGrenade("Frag Grenade");
-    var objective = new FakeObjectiveData().CreateRuntime();
+    var objective = new FakeObjective();
     objective.Owner = faction;
 
     (BattleEvent Event, string ExpectedName)[] events =

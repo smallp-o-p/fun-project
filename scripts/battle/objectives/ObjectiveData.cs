@@ -3,10 +3,10 @@ using Godot;
 
 namespace FunProject.Battle;
 
-// Authored objective template. Config only; CreateRuntime() builds the runtime
-// instance that owns behavior and per-instance state (mirrors ItemCapabilityData).
+// Authored display data for an objective: name + description only (inherited).
+// Objective behavior and parameters live in code (the runtime Objective subclasses);
+// this resource carries just the designer-facing text. Not subclassed per kind.
 [GlobalClass]
-public abstract partial class ObjectiveData : NamedEntityData
+public sealed partial class ObjectiveData : NamedEntityData
 {
-  public abstract Objective CreateRuntime();
 }

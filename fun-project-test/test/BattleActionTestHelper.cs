@@ -39,7 +39,7 @@ internal static class BattleActionTestHelper
       session.GetOperation(faction).IfSome(op =>
       {
         if (op.PendingObjectives.Count == 0)
-          op.AddObjective(new EliminateAllOpposingForcesObjectiveData().CreateRuntime());
+          op.AddObjective(new EliminateAllOpposingForcesObjective(new ObjectiveData()));
       });
   }
 
