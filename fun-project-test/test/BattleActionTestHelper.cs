@@ -33,8 +33,19 @@ internal static class BattleActionTestHelper
     return new BattleTestUnit(result.AffectedUnit.RequireSome());
   }
 
+  public static void EnsureEveryFactionHasObjective(BattleSession session)
+  {
+    foreach (var faction in session.GlobalFactionTurnOrder)
+      session.GetOperation(faction).IfSome(op =>
+      {
+        if (op.PendingObjectives.Count == 0)
+          op.AddObjective(new EliminateAllOpposingForcesObjectiveData().CreateRuntime());
+      });
+  }
+
   public static void StartBattle(BattleSession session)
   {
+    EnsureEveryFactionHasObjective(session);
     var executor = new BattleActionExecutor(session);
     var result = executor.Submit(BattleAction.StartBattle()).RequireSingleResult();
     Assert.True(result.Succeeded);

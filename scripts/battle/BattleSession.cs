@@ -156,7 +156,11 @@ public sealed class BattleSession
       throw new InvalidOperationException("Cannot start a battle without at least one living faction in the session.");
 
     foreach (var side in _globalFactionOrder)
-      EnsureDefaultObjective(side);
+    {
+      if (_operations[side].PendingObjectives.Count == 0)
+        throw new InvalidOperationException(
+          $"Faction {side.Name} has no objective; assign every faction at least one objective before starting the battle.");
+    }
 
     Phase = BattlePhase.InProgress;
     TurnNumber = 1;
@@ -697,8 +701,6 @@ public sealed class BattleSession
 
     _globalFactionOrder.Enqueue(side);
     _operations[side] = new Operation(side);
-    if (Phase == BattlePhase.InProgress)
-      EnsureDefaultObjective(side);
   }
 
   private void HandleFactionLoss(Faction side)
@@ -719,13 +721,6 @@ public sealed class BattleSession
   private void RemoveSideFromQueue(Faction side)
   {
     _turnQueue = new Queue<Faction>(_turnQueue.Where(faction => faction != side));
-  }
-
-  private void EnsureDefaultObjective(Faction faction)
-  {
-    Operation op = _operations[faction];
-    if (op.PendingObjectives.Count == 0)
-      op.AddObjective(new Objective(new EliminateAllOpposingForcesObjectiveData()));
   }
 
   internal void AddObjective(Faction faction, Objective objective)

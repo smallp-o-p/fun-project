@@ -177,6 +177,7 @@ public sealed partial class BattleEventSignalHandlerTest
         runtime,
         BattleTestFactory.MakeCombatant("Alpha", faction, health: 3),
         new Vector3I(1, 0, 1));
+      EnsureEveryFactionHasObjective(session);
       StartBattle(runtime);
 
       runtime.ExecuteAction(BattleAction.ApplyDamage(unit.State, 3)).RequireSingleResult();

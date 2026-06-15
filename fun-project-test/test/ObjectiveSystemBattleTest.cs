@@ -10,21 +10,7 @@ using static BattleActionTestHelper;
 [RequireGodotRuntime]
 public class ObjectiveSystemBattleTest
 {
-  [TestCase(TestName = "Factions with no authored objectives are seeded with eliminate-all at StartBattle")]
-  public void DefaultObjectiveSeededAtStartBattle()
-  {
-    var a = BattleTestFactory.MakeFaction("A");
-    var b = BattleTestFactory.MakeFaction("B");
-    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [a, b]);
-    SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
-    SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", b), new Vector3I(2, 0, 0));
-    StartBattle(session);
-
-    Operation op = session.GetOperation(a).RequireSome();
-    Assert.True(op.Current.RequireSome().Data is EliminateAllOpposingForcesObjectiveData);
-  }
-
-  [TestCase(TestName = "An authored objective is not overwritten by the default")]
+  [TestCase(TestName = "An authored objective is the current objective after StartBattle")]
   public void AuthoredObjectiveSuppressesDefault()
   {
     var a = BattleTestFactory.MakeFaction("A");
@@ -32,7 +18,7 @@ public class ObjectiveSystemBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [a, b]);
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", b), new Vector3I(2, 0, 0));
-    session.AddObjective(a, new Objective(new FakeObjectiveData()));
+    session.AddObjective(a, new FakeObjectiveData().CreateRuntime());
     StartBattle(session);
 
     Operation op = session.GetOperation(a).RequireSome();
@@ -48,7 +34,7 @@ public class ObjectiveSystemBattleTest
     var raised = new List<BattleEvent>();
     session.BattleEventCommitted += raised.Add;
 
-    session.AddObjective(a, new Objective(new FakeObjectiveData()));
+    session.AddObjective(a, new FakeObjectiveData().CreateRuntime());
 
     Assert.Equal(1, raised.OfType<ObjectiveAddedBattleEvent>().Count());
   }
@@ -61,7 +47,7 @@ public class ObjectiveSystemBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [a, b]); // no player faction
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", b), new Vector3I(2, 0, 0));
-    session.AddObjective(a, new Objective(new FakeObjectiveData { Complete = true }));
+    session.AddObjective(a, new FakeObjectiveData { Complete = true }.CreateRuntime());
     var raised = new List<BattleEvent>();
     session.BattleEventCommitted += raised.Add;
     StartBattle(session);
@@ -82,7 +68,7 @@ public class ObjectiveSystemBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [a, b]); // no player faction
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", b), new Vector3I(2, 0, 0));
-    session.AddObjective(a, new Objective(new FakeObjectiveData { Failed = true }));
+    session.AddObjective(a, new FakeObjectiveData { Failed = true }.CreateRuntime());
     var raised = new List<BattleEvent>();
     session.BattleEventCommitted += raised.Add;
     StartBattle(session);

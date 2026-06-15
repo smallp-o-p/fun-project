@@ -6,7 +6,7 @@ using static BattleActionTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
-public class ObjectiveDataTest
+public class ObjectiveTest
 {
   [TestCase(TestName = "EliminateAll is complete only once all other factions are wiped")]
   public void EliminateAllCompletesWhenOpponentsWiped()
@@ -18,7 +18,7 @@ public class ObjectiveDataTest
     var enemyUnit = SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
     StartBattle(session);
 
-    var objective = new Objective(new EliminateAllOpposingForcesObjectiveData()) { Owner = player };
+    var objective = new EliminateAllOpposingForcesObjective(new EliminateAllOpposingForcesObjectiveData()) { Owner = player };
 
     Assert.False(objective.IsComplete(session));
     Assert.False(objective.IsFailed(session));
@@ -39,7 +39,7 @@ public class ObjectiveDataTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
     StartBattle(session);
 
-    var objective = new Objective(new EliminateAllOpposingForcesObjectiveData()) { Owner = player };
+    var objective = new EliminateAllOpposingForcesObjective(new EliminateAllOpposingForcesObjectiveData()) { Owner = player };
     new BattleActionExecutor(session).Submit(BattleAction.ApplyDamage(playerUnit.State, 999)).RequireSingleResult();
 
     Assert.True(objective.IsFailed(session));
@@ -54,10 +54,10 @@ public class ObjectiveDataTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    var objective = new Objective(new SurviveUntilTurnObjectiveData { TargetTurn = 1 }) { Owner = player };
+    var objective = new SurviveUntilTurnObjective(new SurviveUntilTurnObjectiveData { TargetTurn = 1 }) { Owner = player };
     Assert.True(objective.IsComplete(session)); // TurnNumber starts at 1
 
-    var later = new Objective(new SurviveUntilTurnObjectiveData { TargetTurn = 5 }) { Owner = player };
+    var later = new SurviveUntilTurnObjective(new SurviveUntilTurnObjectiveData { TargetTurn = 5 }) { Owner = player };
     Assert.False(later.IsComplete(session));
   }
 }

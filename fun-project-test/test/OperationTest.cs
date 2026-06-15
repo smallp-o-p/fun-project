@@ -12,7 +12,7 @@ public class OperationTest
   {
     var faction = BattleTestFactory.MakeFaction("A");
     var op = new Operation(faction);
-    var objective = new Objective(new FakeObjectiveData());
+    var objective = new FakeObjectiveData().CreateRuntime();
 
     op.AddObjective(objective);
 
@@ -25,8 +25,8 @@ public class OperationTest
   public void CompletingAdvancesThenCompletes()
   {
     var op = new Operation(BattleTestFactory.MakeFaction("A"));
-    var first = new Objective(new FakeObjectiveData());
-    var second = new Objective(new FakeObjectiveData());
+    var first = new FakeObjectiveData().CreateRuntime();
+    var second = new FakeObjectiveData().CreateRuntime();
     op.AddObjective(first);
     op.AddObjective(second);
 
@@ -43,7 +43,7 @@ public class OperationTest
   public void FailingHaltsTheOperation()
   {
     var op = new Operation(BattleTestFactory.MakeFaction("A"));
-    op.AddObjective(new Objective(new FakeObjectiveData()));
+    op.AddObjective(new FakeObjectiveData().CreateRuntime());
 
     op.FailCurrent();
 
@@ -55,11 +55,11 @@ public class OperationTest
   public void AddingToAFailedOperationReactivatesIt()
   {
     var op = new Operation(BattleTestFactory.MakeFaction("A"));
-    op.AddObjective(new Objective(new FakeObjectiveData()));
+    op.AddObjective(new FakeObjectiveData().CreateRuntime());
     op.FailCurrent();
     Assert.Equal(OperationStatus.Failed, op.Status);
 
-    var exfiltrate = new Objective(new FakeObjectiveData());
+    var exfiltrate = new FakeObjectiveData().CreateRuntime();
     op.AddObjective(exfiltrate);
 
     Assert.Equal(OperationStatus.Active, op.Status);

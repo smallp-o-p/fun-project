@@ -24,7 +24,7 @@ public class BattleEventTest
       BattleTestFactory.MakeCombatant("Alpha", faction),
       sourcePosition.Raw);
     var grenade = BattleTestFactory.MakeGrenade("Frag Grenade");
-    var objective = new Objective(new FakeObjectiveData());
+    var objective = new FakeObjectiveData().CreateRuntime();
     objective.Owner = faction;
 
     Assert.Equal("Battle started.", new SessionStartedBattleEvent().ToDisplayString());
@@ -61,7 +61,7 @@ public class BattleEventTest
       BattleTestFactory.MakeCombatant("Alpha", faction),
       sourcePosition.Raw);
     var grenade = BattleTestFactory.MakeGrenade("Frag Grenade");
-    var objective = new Objective(new FakeObjectiveData());
+    var objective = new FakeObjectiveData().CreateRuntime();
     objective.Owner = faction;
 
     (BattleEvent Event, string ExpectedName)[] events =
@@ -109,6 +109,7 @@ public class BattleEventTest
       start.Raw);
     var grenade = BattleTestFactory.MakeGrenade("Frag Grenade", throwRange: 4, actionPointCost: 1);
     unit.State.AddInventoryItem(grenade.Item);
+    BattleActionTestHelper.EnsureEveryFactionHasObjective(session);
     BattleActionTestHelper.StartBattle(runtime);
 
     runtime.ExecuteAction(BattleAction.MoveUnit(unit.State, [destination.Raw])).RequireSingleResult();
