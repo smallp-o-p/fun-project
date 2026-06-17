@@ -16,21 +16,21 @@ public partial class BattleMapDataTest
     return new BattleMapData { Dimensions = new Vector3I(4, 1, 4), Tiles = dict };
   }
 
-  [TestCase(TestName = "CreateBoardState applies tile data to runtime tiles")]
-  public void CreateBoardStateAppliesTileDataToRuntimeTiles()
+  [TestCase(TestName = "Board from map data applies tile data to runtime tiles")]
+  public void BoardFromMapDataAppliesTileDataToRuntimeTiles()
   {
     BattleMapData mapData = MapWith(
       (new Vector3I(1, 0, 1), new BattleMapTileData { Walkable = false, BlocksLineOfSight = true }));
 
-    BattleBoardState board = mapData.CreateBoardState();
+    BattleBoardState board = new(mapData);
     BattleTileState tile = board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
 
     Assert.False(tile.IsWalkable);
     Assert.True(tile.BlocksLineOfSight);
   }
 
-  [TestCase(TestName = "CreateBoardState copies cover into runtime tiles")]
-  public void CreateBoardStateCopiesCoverIntoRuntimeTiles()
+  [TestCase(TestName = "Board from map data copies cover into runtime tiles")]
+  public void BoardFromMapDataCopiesCoverIntoRuntimeTiles()
   {
     BattleMapData mapData = MapWith(
       (new Vector3I(1, 0, 1), new BattleMapTileData
@@ -39,7 +39,7 @@ public partial class BattleMapDataTest
         CoverAmount = 40
       }));
 
-    BattleBoardState board = mapData.CreateBoardState();
+    BattleBoardState board = new(mapData);
     BattleTileState coveredTile = board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
     BattleTileState absentTile = board.GetTile(board.ValidatePoint(new Vector3I(2, 0, 2)).RequireSome());
 
@@ -53,7 +53,7 @@ public partial class BattleMapDataTest
     BattleMapData mapData = MapWith(
       (new Vector3I(1, 0, 1), new BattleMapTileData { Walkable = true }));
 
-    BattleBoardState board = mapData.CreateBoardState();
+    BattleBoardState board = new(mapData);
     BattleTileState listed = board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
     BattleTileState unlisted = board.GetTile(board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome());
 
@@ -61,8 +61,8 @@ public partial class BattleMapDataTest
     Assert.False(unlisted.IsWalkable);
   }
 
-  [TestCase(TestName = "CreateBoardState supports stacked levels")]
-  public void CreateBoardStateSupportsStackedLevels()
+  [TestCase(TestName = "Board from map data supports stacked levels")]
+  public void BoardFromMapDataSupportsStackedLevels()
   {
     var dict = new Godot.Collections.Dictionary<Vector3I, BattleMapTileData>
     {
@@ -71,7 +71,7 @@ public partial class BattleMapDataTest
     };
     var mapData = new BattleMapData { Dimensions = new Vector3I(2, 2, 2), Tiles = dict };
 
-    BattleBoardState board = mapData.CreateBoardState();
+    BattleBoardState board = new(mapData);
     BattleTileState ground = board.GetTile(board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome());
     BattleTileState upper = board.GetTile(board.ValidatePoint(new Vector3I(0, 1, 0)).RequireSome());
     BattleTileState empty = board.GetTile(board.ValidatePoint(new Vector3I(1, 1, 1)).RequireSome());

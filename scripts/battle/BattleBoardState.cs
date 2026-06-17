@@ -1,7 +1,6 @@
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -79,6 +78,32 @@ public sealed class BattleBoardState
     }
 
     InitializePathGraph();
+  }
+
+  public BattleBoardState(BattleMapData map) : this(map.Dimensions)
+  {
+    foreach (ValidatedPoint point in EnumerateBoardPoints())
+      GetTile(point).IsWalkable = false;
+
+    foreach (var entry in map.Tiles)
+    {
+      BattleMapTileData data = entry.Value;
+      if (data is null)
+        continue;
+
+      ValidatePoint(entry.Key).Match(
+        point =>
+        {
+          BattleTileState tile = GetTile(point);
+          tile.IsWalkable = data.Walkable;
+          tile.BlocksLineOfSight = data.BlocksLineOfSight;
+          tile.Cover = new TileCover(data.CoverDirections, data.CoverAmount);
+        },
+        () =>
+        {
+          GD.PushError($"{nameof(BattleMapData)} tile at '{entry.Key}' is out of bounds for dimensions '{map.Dimensions}'.");
+        });
+    }
   }
 
   private bool IsInBounds(Vector3I coordinates)

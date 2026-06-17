@@ -68,7 +68,7 @@ public static class BattleFactory
     if (slotFailure is not null)
       return Left<BattleSetupFailure, BattleRuntime>(slotFailure);
 
-    BattleBoardState board = setup.Map.CreateBoardState();
+    BattleBoardState board = new(setup.Map);
 
     var rostersBySlot = new Dictionary<int, IReadOnlyList<Combatant>>();
     var loadoutByCombatant = new Dictionary<Combatant, UnitLoadout>();
