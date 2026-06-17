@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bnasvcnx1dtrg"]
+
+[ext_resource type="Script" uid="uid://b7o483mxqmumq" path="res://scenes/battle/authoring/BattleMapAuthoring.cs" id="1_ouqxw"]
+
+[node name="BattleMapAuthoring" type="GridMap" unique_id=1566391189]
+script = ExtResource("1_ouqxw")

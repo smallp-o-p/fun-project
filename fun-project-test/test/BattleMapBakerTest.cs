@@ -1,0 +1,88 @@
+using FunProject.Battle;
+using GdUnit4;
+using Godot;
+using System.Collections.Generic;
+
+[TestSuite]
+[RequireGodotRuntime]
+public partial class BattleMapBakerTest
+{
+  private static BattleMapTileData Floor() => new() { Walkable = true };
+  private static BattleMapTileData Wall() => new() { Walkable = false, BlocksLineOfSight = true };
+
+  [TestCase(TestName = "Bake normalizes negative coordinates to a zero origin")]
+  public void BakeNormalizesNegativeCoordinatesToZeroOrigin()
+  {
+    var cells = new List<(Vector3I, BattleMapTileData)>
+    {
+      (new Vector3I(-2, 0, -3), Floor()),
+      (new Vector3I(-1, 0, -3), Floor()),
+    };
+
+    BattleMapData map = BattleMapAuthoring.BuildMap(cells);
+
+    Assert.Equal(new Vector3I(2, 1, 1), map.Dimensions);
+    Assert.True(map.Tiles.ContainsKey(new Vector3I(0, 0, 0)));
+    Assert.True(map.Tiles.ContainsKey(new Vector3I(1, 0, 0)));
+  }
+
+  [TestCase(TestName = "Bake keys each painted cell to its brush")]
+  public void BakeKeysEachPaintedCellToItsBrush()
+  {
+    var cells = new List<(Vector3I, BattleMapTileData)>
+    {
+      (new Vector3I(0, 0, 0), Floor()),
+      (new Vector3I(1, 0, 0), Wall()),
+    };
+
+    BattleMapData map = BattleMapAuthoring.BuildMap(cells);
+    BattleMapTileData floor = map.Tiles[new Vector3I(0, 0, 0)];
+    BattleMapTileData wall = map.Tiles[new Vector3I(1, 0, 0)];
+
+    Assert.True(floor.Walkable);
+    Assert.False(floor.BlocksLineOfSight);
+
+    Assert.False(wall.Walkable);
+    Assert.True(wall.BlocksLineOfSight);
+  }
+
+  [TestCase(TestName = "Bake preserves cover on the tile")]
+  public void BakePreservesCoverOnTheTile()
+  {
+    var coverBrush = new BattleMapTileData
+    {
+      Walkable = true,
+      CoverDirections = CoverDirections.North | CoverDirections.East,
+      CoverAmount = 40,
+    };
+    var cells = new List<(Vector3I, BattleMapTileData)> { (new Vector3I(0, 0, 0), coverBrush) };
+
+    BattleMapData map = BattleMapAuthoring.BuildMap(cells);
+    BattleMapTileData tile = map.Tiles[new Vector3I(0, 0, 0)];
+
+    Assert.Equal(CoverDirections.North | CoverDirections.East, tile.CoverDirections);
+    Assert.Equal(40, tile.CoverAmount);
+  }
+
+  [TestCase(TestName = "Bake sets multi-level dimensions")]
+  public void BakeSetsMultiLevelDimensions()
+  {
+    var cells = new List<(Vector3I, BattleMapTileData)>
+    {
+      (new Vector3I(0, 0, 0), Floor()),
+      (new Vector3I(0, 1, 0), Floor()),
+    };
+
+    BattleMapData map = BattleMapAuthoring.BuildMap(cells);
+
+    Assert.Equal(new Vector3I(1, 2, 1), map.Dimensions);
+    Assert.Equal(2, map.Tiles.Count);
+  }
+
+  [TestCase(TestName = "Bake throws on empty input")]
+  public void BakeThrowsOnEmptyInput()
+  {
+    Assert.Throws<System.InvalidOperationException>(
+      () => BattleMapAuthoring.BuildMap(new List<(Vector3I, BattleMapTileData)>()));
+  }
+}

@@ -5,7 +5,8 @@ namespace FunProject.Core;
 public partial class NamedEntityData : Resource
 {
   [Export] public string Name { get; set; } = "Name";
-  [Export] public string Description { get; set; } = "Description";
+
+  [Export(PropertyHint.MultilineText)] public string Description { get; set; } = "Description";
 }
 
 public interface HasNameAndDescription

@@ -51,6 +51,7 @@ public sealed class BattleUnitState
     EquippedArmor = equippedArmor;
     CurrentHealth = MaxHealth;
     CurrentActionPoints = MaxActionPoints;
+    _inventory = combatant.Inventory;
   }
 
   public void RefreshForNewTurn()

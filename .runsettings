@@ -46,6 +46,6 @@
         <CaptureStdOut>true</CaptureStdOut>
 
         <!-- Compilation timeout for large projects (milliseconds) -->
-        <CompileProcessTimeout>20000</CompileProcessTimeout>
+        <CompileProcessTimeout>120000</CompileProcessTimeout>
     </GdUnit4>
 </RunSettings>

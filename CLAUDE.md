@@ -52,3 +52,6 @@ Godot scene scripts live in `scenes/` — currently `GameCamera`, `MovementLine`
 
 ## Codebase queries
 A `graphify` code graph exists at `graphify-out/graph.json`. For "where is X / what calls Y" questions run `graphify query "<question>"`; after non-trivial code changes run `graphify update .` to refresh it.
+
+## Superpowers
+- The `docs/superpowers` directory is intentionally ignored in Git. Directly save plans and specs to that directory without attempting to commit them.

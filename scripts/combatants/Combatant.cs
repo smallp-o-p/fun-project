@@ -1,15 +1,18 @@
 using System;
 using System.Collections.Generic;
+using FunProject.Items;
 using FunProject.Stats;
 
 namespace FunProject.Combatants;
 
 public class Combatant : HasStats, HasModSlots
 {
+  public int MaxInventorySize = 5;
   public string Name { get; }
   public Faction OwningFaction { get; }
   private readonly StatSheet _stats;
   private readonly Godot.Collections.Array<ModSlot> _modSlots = [];
+  public List<EquippableItem> Inventory { get; private set; } = [];
 
   public Combatant(CombatantData data, Faction faction)
   {
@@ -41,4 +44,12 @@ public class Combatant : HasStats, HasModSlots
   public TStat GetStat<TStat>() where TStat : Stat => _stats.GetStat<TStat>();
 
   public Godot.Collections.Array<ModSlot> GetModSlots() => _modSlots;
+
+  public void EquipItem(EquippableItem item)
+  {
+    if (Inventory.Count < MaxInventorySize)
+    {
+      Inventory.Add(item);
+    }
+  }
 }
