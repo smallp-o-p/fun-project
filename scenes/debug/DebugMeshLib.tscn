@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://cneqjybwyhbvw"]
+
+[ext_resource type="PackedScene" uid="uid://ykgkdypha2jh" path="res://scenes/debug/DebugFloor.tscn" id="1_4m2ej"]
+[ext_resource type="PackedScene" uid="uid://bwugnqqhnygq3" path="res://scenes/debug/DebugBox.tscn" id="2_r6qhd"]
+[ext_resource type="PackedScene" uid="uid://degeqlqv8cvqf" path="res://scenes/debug/DebugSpawnFloor.tscn" id="3_r6qhd"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4m2ej"]
+size = Vector3(1, 0.1, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_r6qhd"]
+size = Vector3(1, 0.6, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_jniom"]
+size = Vector3(1, 0.1, 1)
+
+[node name="DebugMeshLib" type="Node3D" unique_id=1868496781]
+
+[node name="DebugFloor" parent="." unique_id=733859224 instance=ExtResource("1_4m2ej")]
+visible = false
+
+[node name="StaticBody3D" type="StaticBody3D" parent="DebugFloor" unique_id=855742151]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DebugFloor/StaticBody3D" unique_id=629808416]
+shape = SubResource("BoxShape3D_4m2ej")
+
+[node name="DebugBox" parent="." unique_id=531613056 instance=ExtResource("2_r6qhd")]
+
+[node name="StaticBody3D" type="StaticBody3D" parent="DebugBox" unique_id=981747393]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DebugBox/StaticBody3D" unique_id=1270953222]
+shape = SubResource("BoxShape3D_r6qhd")
+
+[node name="DebugSpawnFloor" parent="." unique_id=953275389 instance=ExtResource("3_r6qhd")]
+
+[node name="StaticBody3D" type="StaticBody3D" parent="DebugSpawnFloor" unique_id=701886516]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DebugSpawnFloor/StaticBody3D" unique_id=656485295]
+shape = SubResource("BoxShape3D_jniom")

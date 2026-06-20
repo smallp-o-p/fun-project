@@ -30,5 +30,5 @@ curve = SubResource("Curve3D_2gju5")
 mesh = SubResource("SphereMesh_qy4fe")
 
 [node name="Camera" type="Camera3D" parent="CameraPath/PathFollow3D" unique_id=470511089]
-transform = Transform3D(-1, 0, 8.940697e-08, 6.322027e-08, 0.7071068, 0.7071068, -6.322027e-08, 0.7071068, -0.7071068, 0, 0.3123808, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3123808, 0)
 current = true

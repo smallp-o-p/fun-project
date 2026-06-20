@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://degeqlqv8cvqf"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_iist8"]
+albedo_color = Color(0, 1, 0, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_iist8"]
+material = SubResource("StandardMaterial3D_iist8")
+size = Vector3(1, 0.1, 1)
+
+[node name="DebugSpawnFloor" type="MeshInstance3D" unique_id=953275389]
+mesh = SubResource("BoxMesh_iist8")
