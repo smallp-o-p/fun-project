@@ -1,39 +1,48 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace FunProject.Battle;
 
+public enum ListenerPriority
+{
+  High,
+  Regular,
+  Low,
+}
+
 internal sealed class BattleEventListenerRegistry
 {
-  private readonly Dictionary<Type, List<BattleEventListener>> _listenersByEventType = [];
+  private sealed record RegisteredListener(
+    BattleEventListener Listener,
+    ListenerPriority Priority,
+    long RegistrationOrder);
 
-  internal void Register<TEventKey>(BattleEventListener listener)
+  private readonly EventKeyedRegistry<RegisteredListener> _registry = new();
+  private long _nextRegistrationOrder;
+
+  internal void Register<TEventKey>(BattleEventListener listener, ListenerPriority priority)
     where TEventKey : BattleEventTag
   {
     ArgumentNullException.ThrowIfNull(listener);
-    Type eventKey = typeof(TEventKey);
-
-    if (!_listenersByEventType.TryGetValue(eventKey, out var listeners))
-      _listenersByEventType[eventKey] = listeners = [];
-
-    listeners.Add(listener);
+    _registry.Register<TEventKey>(new(listener, priority, _nextRegistrationOrder++));
   }
 
   /// <summary>
-  /// Listeners fire in key order — the event's concrete type first, then its tag
-  /// interfaces in reflection order — and in registration order within each key.
+  /// Listeners fire in coarse priority bucket order (High -> Regular -> Low), with registration
+  /// order winning within a bucket. The monotonic registration stamp makes the cross-key merge
+  /// (an event matches its concrete type AND its tag interfaces) one global stable sort rather
+  /// than a per-key one.
   /// </summary>
   internal IReadOnlyList<BattleEventListener> GetMatchingListeners(BattleEvent battleEvent)
   {
-    if (_listenersByEventType.Count == 0)
+    if (_registry.Count == 0)
       return [];
-    List<BattleEventListener> matching = [];
-    foreach (Type eventKey in BattleEventKeys.For(battleEvent))
-    {
-      if (_listenersByEventType.TryGetValue(eventKey, out var listeners))
-        matching.AddRange(listeners);
-    }
 
-    return matching;
+    return [.. _registry
+        .GetMatching(battleEvent)
+        .OrderBy(entry => entry.Priority)
+        .ThenBy(entry => entry.RegistrationOrder)
+        .Select(entry => entry.Listener)];
   }
 }

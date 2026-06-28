@@ -1,5 +1,3 @@
-using FunProject.Weapons;
-using LanguageExt.UnsafeValueAccess;
 using System;
 
 namespace FunProject.Battle;
@@ -22,36 +20,26 @@ public sealed class GetHitChanceForAttack : BattleSessionQuery<HitChanceBreakdow
 
   internal override Either<BattleQueryFailure, HitChanceBreakdown> Execute(BattleSession session)
   {
+    // Attacker liveness is the read side's own gate (it deliberately skips the
+    // phase/turn/AP checks AttackUnit gets from ValidateActingUnit), so it must
+    // run before the shared target-feasibility resolver. A dead attacker has no
+    // odds even against an ally.
     if (!Attacker.IsAlive)
       return FailUnitNotAlive(Attacker);
 
-    if (Attacker.EquippedWeapon.IsNone)
-      return Fail(BattleQueryFailureReason.InvalidBattleState, $"{Attacker.Combatant.Name} has no equipped weapon.");
-    Weapon weapon = Attacker.RequireEquippedWeapon();
-
-    // AttackUnit rejects allied targets (and self, which shares the
-    // attacker's side), so those shots have no defined odds to preview.
-    if (Target.Side == Attacker.Side)
-      return Fail(BattleQueryFailureReason.InvalidBattleState, $"{Attacker.Combatant.Name} cannot attack allied unit {Target.Combatant.Name}.");
-
-    if (!Target.IsAlive)
-      return FailUnitNotAlive(Target);
-
-    Option<BattleBoardState.ValidatedPoint> attackerPointOption = session.GetUnitPosition(Attacker);
-    if (attackerPointOption.IsNone)
-      return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {Attacker.Id} is not on a valid tile.");
-    Option<BattleBoardState.ValidatedPoint> targetPointOption = session.GetUnitPosition(Target);
-    if (targetPointOption.IsNone)
-      return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {Target.Id} is not on a valid tile.");
-    BattleBoardState.ValidatedPoint attackerPoint = attackerPointOption.Value();
-    BattleBoardState.ValidatedPoint targetPoint = targetPointOption.Value();
-
-    if (!Attacker.VisibleUnits.Contains(Target))
-      return Fail(BattleQueryFailureReason.InvalidBattleState, $"{Attacker.Combatant.Name} cannot see {Target.Combatant.Name}.");
-    if (BattleSession.GetGridDistance(attackerPoint.Raw, targetPoint.Raw) > weapon.EffectiveRange)
-      return Fail(BattleQueryFailureReason.InvalidBattleState, $"{Target.Combatant.Name} is out of range for {weapon.ItemName}.");
-
-    AttackContext context = new(Attacker, Target, attackerPoint, targetPoint, weapon, session.Board);
-    return Succeed(session.HitChanceCalculator.Calculate(context));
+    return AttackFeasibility.Resolve(session, Attacker, Target).Match(
+      Left: failure => Fail(MapFailureReason(failure.Kind), failure.Message),
+      Right: resolved =>
+      {
+        AttackContext context = new(Attacker, resolved.AttackerPoint, resolved.TargetPoint, session.Board);
+        return Succeed(session.HitChanceCalculator.Calculate(context));
+      });
   }
+
+  private static BattleQueryFailureReason MapFailureReason(AttackFeasibilityFailureKind kind) => kind switch
+  {
+    AttackFeasibilityFailureKind.TargetNotAlive => BattleQueryFailureReason.UnitNotAlive,
+    AttackFeasibilityFailureKind.PositionUnresolved => BattleQueryFailureReason.InvalidTile,
+    _ => BattleQueryFailureReason.InvalidBattleState,
+  };
 }

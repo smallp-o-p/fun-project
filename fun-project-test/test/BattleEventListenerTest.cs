@@ -20,11 +20,7 @@ public partial class BattleEventListenerTest
       => Received.Add(battleEvent);
   }
 
-  private sealed record ProbeBattleEvent : BattleEvent
-  {
-    public override string EventName => "test_probe";
-    public override string ToDisplayString() => "Probe event.";
-  }
+  private sealed record ProbeBattleEvent : BattleEvent;
 
   private sealed class RaiseProbeOnTurnEndedListener : BattleEventListener
   {
@@ -39,10 +35,11 @@ public partial class BattleEventListenerTest
   {
     public int Evaluations { get; private set; }
 
-    public override bool Matches(BattleEvent battleEvent) => battleEvent is ProbeBattleEvent;
-
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
+      if (battleEvent is not ProbeBattleEvent)
+        return BattleTriggerResult.NoReaction();
+
       Evaluations++;
       return BattleTriggerResult.NoReaction();
     }

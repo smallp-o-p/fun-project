@@ -109,10 +109,48 @@ public class ObjectiveBattleTest
     Assert.Equal(OperationStatus.Active, session.GetOperation(player).RequireSome().Status);
 
     exfil.Complete = true; // player reaches the extraction point
-    AdvanceTurn(session); // enemy turn end
-    AdvanceTurn(session); // player turn end -> exfil completes -> Victory
+    // The player's reactivated operation is now evaluated at EVERY turn end, not only the
+    // player's own. So it completes at the enemy's turn end (cross-faction evaluation) ->
+    // Victory, a full round earlier than the old owner-only timing.
+    AdvanceTurn(session); // enemy turn end -> exfil completes -> Victory
 
+    Assert.Equal(BattlePhase.Ended, session.Phase);
     Assert.Equal(BattleOutcome.Victory, session.Outcome.RequireSome());
+  }
+
+  [TestCase(TestName = "The player's eliminate-all completes at the enemy's turn end when a reaction kills the last enemy")]
+  public void CrossFactionCompletionResolvesAtTheTurnItHappens()
+  {
+    var player = BattleTestFactory.MakeFaction("Player");
+    var enemy = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
+    var enemyUnit = SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
+    // The player wins by eliminating all opposing forces; the enemy gets the auto-filled objective.
+    session.AddObjective(player, new EliminateAllOpposingForcesObjective(new ObjectiveData()));
+    var raised = new List<BattleEvent>();
+    session.BattleEventCommitted += raised.Add;
+    StartBattle(session);
+
+    AdvanceTurn(session); // player's turn ends: an enemy still lives, so nothing resolves
+    Assert.Equal(BattlePhase.InProgress, session.Phase);
+    Assert.Equal(enemy, session.ActiveSide); // it is now the enemy's turn
+
+    // A reaction (overwatch/mine) kills the last enemy DURING the enemy's own turn. The
+    // player's eliminate-all becomes complete, but it is not the player's turn.
+    new BattleActionExecutor(session).Submit(BattleAction.ApplyDamage(enemyUnit.State, 999)).RequireSingleResult();
+    Assert.False(session.HasLivingUnits(enemy));
+    Assert.Equal(BattlePhase.InProgress, session.Phase); // a non-player wipe does not end the battle immediately
+
+    AdvanceTurn(session); // enemy's turn ends: the player's operation is evaluated cross-faction -> Victory
+
+    // Old (owner-only) timing would not resolve this until the player's NEXT turn end, a full
+    // round later. With global evaluation it resolves at the turn the kill happened on.
+    Assert.Equal(BattlePhase.Ended, session.Phase);
+    Assert.Equal(BattleOutcome.Victory, session.Outcome.RequireSome());
+    Assert.Equal(1, raised.OfType<ObjectiveCompletedBattleEvent>().Count(e => e.Faction == player));
+    Assert.Equal(1, raised.OfType<OperationCompletedBattleEvent>().Count(e => e.Faction == player));
+    Assert.Equal(BattleOutcome.Victory, raised.OfType<SessionEndedBattleEvent>().Single().Outcome);
   }
 
   [TestCase(TestName = "StartBattle throws when a faction has no objective")]

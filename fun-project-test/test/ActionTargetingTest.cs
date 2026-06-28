@@ -49,9 +49,10 @@ public class ActionTargetingTest
     Assert.True(reachable.Contains(new Vector3I(2, 0, 1)));
 
     ActionPreview preview = QueryRight(move.Preview(new Vector3I(2, 0, 1)));
-    Assert.Equal(TargetingKind.TilePath, preview.Kind);
-    Assert.Equal(new Vector3I(0, 0, 0), preview.Path[0]);
-    Assert.Equal(new Vector3I(2, 0, 1), preview.Path[^1]);
+    Assert.True(preview is PathPreview);
+    PathPreview pathPreview = (PathPreview)preview;
+    Assert.Equal(new Vector3I(0, 0, 0), pathPreview.Path[0]);
+    Assert.Equal(new Vector3I(2, 0, 1), pathPreview.Path[^1]);
 
     Assert.True(move.CanCommit(new Vector3I(2, 0, 1)));
     runtime.ExecuteAction(move.Build(new Vector3I(2, 0, 1)));
@@ -68,9 +69,7 @@ public class ActionTargetingTest
     Assert.True(candidates.Contains(new Vector3I(3, 0, 0)));   // the enemy's tile, in range + visible
 
     ActionPreview preview = QueryRight(attack.Preview(new Vector3I(3, 0, 0)));
-    Assert.Equal(TargetingKind.EnemyTarget, preview.Kind);
-    Assert.True(preview.HitChance is not null);
-    Assert.Equal(new Vector3I(3, 0, 0), preview.Target);
+    Assert.True(preview is AttackPreview);
 
     Assert.True(attack.CanCommit(new Vector3I(3, 0, 0)));
     Assert.False(attack.CanCommit(new Vector3I(1, 0, 0)));     // empty tile is not a candidate

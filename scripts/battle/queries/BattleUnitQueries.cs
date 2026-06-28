@@ -18,9 +18,7 @@ public sealed class GetUnitPosition : BattleSessionQuery<BattleBoardState.Valida
 
   internal override Either<BattleQueryFailure, BattleBoardState.ValidatedPoint> Execute(BattleSession session)
   {
-    return session.GetUnitPosition(Unit).Match(
-      Succeed,
-      () => Fail(BattleQueryFailureReason.InvalidTile, $"Unit {Unit.Id} is not on the board."));
+    return RequirePosition(session, Unit);
   }
 }
 
@@ -84,12 +82,12 @@ public sealed class CanUnitActNow : BattleSessionQuery<bool>
 
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
-    if (session.Phase != BattlePhase.InProgress)
-      return Fail(BattleQueryFailureReason.InvalidBattleState, "Cannot query active unit state while the battle is not in progress.");
-    if (!Unit.IsAlive)
-      return FailUnitNotAlive(Unit);
-
-    return Succeed(session.CanUnitActNow(Unit));
+    return RequireInProgress(session).Bind(_ =>
+    {
+      if (!Unit.IsAlive)
+        return FailUnitNotAlive(Unit);
+      return Succeed(session.CanUnitActNow(Unit));
+    });
   }
 }
 
@@ -105,11 +103,11 @@ public sealed class IsUnitStillAvailableThisTurn : BattleSessionQuery<bool>
 
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
-    if (session.Phase != BattlePhase.InProgress)
-      return Fail(BattleQueryFailureReason.InvalidBattleState, "Cannot query unit turn availability while the battle is not in progress.");
-    if (!Unit.IsAlive)
-      return FailUnitNotAlive(Unit);
-
-    return Succeed(session.IsUnitStillAvailableThisTurn(Unit));
+    return RequireInProgress(session).Bind(_ =>
+    {
+      if (!Unit.IsAlive)
+        return FailUnitNotAlive(Unit);
+      return Succeed(session.IsUnitStillAvailableThisTurn(Unit));
+    });
   }
 }

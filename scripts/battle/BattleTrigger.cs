@@ -1,18 +1,12 @@
-using Godot;
 using System;
 using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
-public abstract partial class BattleTrigger : Resource
+public abstract class BattleTrigger
 {
   public int Priority { get; set; }
 
-  protected BattleTrigger()
-  {
-  }
-
-  public abstract bool Matches(BattleEvent battleEvent);
   public abstract BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction);
 }
 

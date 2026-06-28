@@ -15,7 +15,6 @@ public partial class StandardHitChanceCalculatorTest
     Vector3I defenderPosition)
   {
     var attackerFaction = BattleTestFactory.MakeFaction("Player");
-    var defenderFaction = BattleTestFactory.MakeFaction("Enemy");
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
     var attackerPoint = board.ValidatePoint(attackerPosition).RequireSome();
     var defenderPoint = board.ValidatePoint(defenderPosition).RequireSome();
@@ -23,9 +22,8 @@ public partial class StandardHitChanceCalculatorTest
 
     var weapon = BattleTestFactory.MakeWeapon("Rifle");
     var attacker = new BattleUnitState(1, BattleTestFactory.MakeCombatant("Alpha", attackerFaction, aim: aim), Some(weapon), None);
-    var defender = new BattleUnitState(2, BattleTestFactory.MakeCombatant("Hostile", defenderFaction), None, None);
 
-    return new AttackContext(attacker, defender, attackerPoint, defenderPoint, weapon, board);
+    return new AttackContext(attacker, attackerPoint, defenderPoint, board);
   }
 
   [TestCase(TestName = "Base chance is the attacker's aim when no cover applies")]

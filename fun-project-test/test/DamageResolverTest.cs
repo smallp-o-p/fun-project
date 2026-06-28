@@ -105,8 +105,8 @@ public class DamageResolverTest
       Some(new ArmorState(10, Element.Thermal)));
 
     Assert.Equal(2, packets.Count);
-    Assert.Equal(new PacketResolution(9, 0), packets[0]);
-    Assert.Equal(new PacketResolution(1, 3), packets[1]);
+    Assert.Equal(new DamageResolution(9, 0), packets[0]);
+    Assert.Equal(new DamageResolution(1, 3), packets[1]);
   }
 
   [TestCase(TestName = "ResolvePackets keeps zero and negative packets aligned")]
@@ -117,7 +117,7 @@ public class DamageResolverTest
       Some(new ArmorState(2, Element.Thermal)));
 
     Assert.Equal(2, packets.Count);
-    Assert.Equal(new PacketResolution(0, 0), packets[0]);
-    Assert.Equal(new PacketResolution(2, 3), packets[1]);
+    Assert.Equal(new DamageResolution(0, 0), packets[0]);
+    Assert.Equal(new DamageResolution(2, 3), packets[1]);
   }
 }

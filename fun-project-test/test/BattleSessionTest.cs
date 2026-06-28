@@ -110,7 +110,7 @@ public class BattleSessionTest
   {
     var faction = BattleTestFactory.MakeFaction("A");
     var board = new BattleBoardState(new Vector3I(3, 1, 3));
-    board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).IsWalkable = false;
+    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(), false);
 
     var session = new BattleSession(
       board,

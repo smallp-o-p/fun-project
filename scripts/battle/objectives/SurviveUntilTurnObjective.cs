@@ -10,5 +10,4 @@ public sealed class SurviveUntilTurnObjective : Objective
   }
 
   public override bool IsComplete(BattleSession session) => session.TurnNumber >= _targetTurn;
-  public override bool IsFailed(BattleSession session) => !session.HasLivingUnits(Owner);
 }

@@ -170,14 +170,12 @@ public sealed partial class BattleRuntimeTest
       _log = log;
     }
 
-    public override bool Matches(BattleEvent battleEvent)
-    {
-      return battleEvent is UnitMovedBattleEvent movedEvent
-        && movedEvent.Position.Raw == _targetPosition;
-    }
-
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
+      if (battleEvent is not UnitMovedBattleEvent movedEvent
+        || movedEvent.Position.Raw != _targetPosition)
+        return BattleTriggerResult.NoReaction();
+
       _log.Add(_message);
       return BattleTriggerResult.NoReaction();
     }

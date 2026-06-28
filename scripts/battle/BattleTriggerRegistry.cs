@@ -11,24 +11,19 @@ internal sealed class BattleTriggerRegistry
     long RegistrationOrder,
     Type EventType);
 
-  private readonly Dictionary<Type, List<RegisteredTrigger>> _registeredTriggersByEventType = [];
+  private readonly EventKeyedRegistry<RegisteredTrigger> _registry = new();
   private long _nextRegistrationOrder;
 
   internal void Register<TEventKey>(BattleTrigger trigger)
     where TEventKey : BattleEventTag
   {
     ArgumentNullException.ThrowIfNull(trigger);
-    Type eventKey = typeof(TEventKey);
-
-    if (!_registeredTriggersByEventType.TryGetValue(eventKey, out var registeredTriggers))
-      _registeredTriggersByEventType[eventKey] = registeredTriggers = [];
-
-    registeredTriggers.Add(new(trigger, _nextRegistrationOrder++, eventKey));
+    _registry.Register<TEventKey>(new(trigger, _nextRegistrationOrder++, typeof(TEventKey)));
   }
 
   private void Unregister(RegisteredTrigger registeredTrigger)
   {
-    _registeredTriggersByEventType[registeredTrigger.EventType].Remove(registeredTrigger);
+    _registry.Remove(registeredTrigger.EventType, registeredTrigger);
   }
 
   internal IReadOnlyList<BattleAction> EvaluateInterruptActions(
@@ -59,20 +54,8 @@ internal sealed class BattleTriggerRegistry
 
   private IReadOnlyList<RegisteredTrigger> GetMatchingTriggers(BattleEvent battleEvent)
   {
-    List<RegisteredTrigger> matchingTriggers = [];
-    foreach (Type eventKey in BattleEventKeys.For(battleEvent))
-    {
-      if (!_registeredTriggersByEventType.TryGetValue(eventKey, out var registeredTriggers))
-        continue;
-
-      foreach (RegisteredTrigger registeredTrigger in registeredTriggers)
-      {
-        if (registeredTrigger.Trigger.Matches(battleEvent))
-          matchingTriggers.Add(registeredTrigger);
-      }
-    }
-
-    return [.. matchingTriggers
+    return [.. _registry
+        .GetMatching(battleEvent)
         .OrderBy(entry => entry.Trigger.Priority)
         .ThenBy(entry => entry.RegistrationOrder)];
   }

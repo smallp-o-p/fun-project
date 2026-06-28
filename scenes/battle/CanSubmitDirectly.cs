@@ -1,4 +1,4 @@
-namespace FunProject.Battle;
+using FunProject.Battle;
 
 interface CanActDirectly
 {

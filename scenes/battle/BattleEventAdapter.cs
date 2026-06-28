@@ -5,8 +5,7 @@ using System;
 public sealed partial class BattleEventAdapter : RefCounted
 {
   public BattleEvent BattleEvent { get; init; }
-  public string EventName => BattleEvent.EventName;
-  public string Message => BattleEvent.ToDisplayString();
+  public string EventName => BattleEvent.GetType().Name;
 
   public BattleEventAdapter(BattleEvent battleEvent)
   {

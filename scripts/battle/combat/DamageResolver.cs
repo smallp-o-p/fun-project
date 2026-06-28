@@ -9,8 +9,6 @@ public readonly record struct ArmorState(int Current, Element Element);
 
 public readonly record struct DamageResolution(int ArmorDamage, int HealthDamage);
 
-public readonly record struct PacketResolution(int ArmorDamage, int HealthDamage);
-
 /// <summary>
 /// Pure armor-vs-health damage split. Packets resolve in bundle order; each packet
 /// sees the armor remaining after earlier packets. A packet whose element matches the
@@ -22,13 +20,13 @@ public static class DamageResolver
   public static DamageResolution Resolve(IReadOnlyList<Damage> bundle, Option<ArmorState> armor)
     => Resolve(ResolvePackets(bundle, armor));
 
-  public static DamageResolution Resolve(IReadOnlyList<PacketResolution> packets)
+  public static DamageResolution Resolve(IReadOnlyList<DamageResolution> packets)
   {
     ArgumentNullException.ThrowIfNull(packets);
 
     int armorDamage = 0;
     int healthDamage = 0;
-    foreach (PacketResolution packet in packets)
+    foreach (DamageResolution packet in packets)
     {
       armorDamage += packet.ArmorDamage;
       healthDamage += packet.HealthDamage;
@@ -41,7 +39,7 @@ public static class DamageResolver
   /// Per-packet splits, index-aligned with the input bundle. Packets with a
   /// non-positive amount resolve to (0, 0) so alignment holds.
   /// </summary>
-  public static IReadOnlyList<PacketResolution> ResolvePackets(IReadOnlyList<Damage> bundle, Option<ArmorState> armor)
+  public static IReadOnlyList<DamageResolution> ResolvePackets(IReadOnlyList<Damage> bundle, Option<ArmorState> armor)
   {
     ArgumentNullException.ThrowIfNull(bundle);
 
@@ -53,12 +51,12 @@ public static class DamageResolver
       },
       () => (0, default(Element)));
 
-    List<PacketResolution> resolutions = new(bundle.Count);
+    List<DamageResolution> resolutions = new(bundle.Count);
     foreach (Damage packet in bundle)
     {
       if (packet.Amount <= 0)
       {
-        resolutions.Add(new PacketResolution(0, 0));
+        resolutions.Add(new DamageResolution(0, 0));
         continue;
       }
 
@@ -71,7 +69,7 @@ public static class DamageResolver
         armorRemaining -= armorLoss;
       }
 
-      resolutions.Add(new PacketResolution(armorLoss, healthDamage));
+      resolutions.Add(new DamageResolution(armorLoss, healthDamage));
     }
 
     return resolutions;

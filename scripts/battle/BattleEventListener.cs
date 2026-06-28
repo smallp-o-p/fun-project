@@ -10,3 +10,17 @@ public abstract class BattleEventListener
 {
   public abstract void OnEventCommitted(BattleSession session, BattleEvent battleEvent);
 }
+
+/// <summary>
+/// Listener base for a single event tag type. Routing already guarantees the committed event
+/// is a <typeparamref name="TEvent"/>, so the cast is safe and subclasses skip the manual
+/// is/cast guard, implementing <see cref="OnEvent"/> instead.
+/// </summary>
+public abstract class BattleEventListener<TEvent> : BattleEventListener
+  where TEvent : BattleEvent
+{
+  protected abstract void OnEvent(BattleSession session, TEvent evt);
+
+  public sealed override void OnEventCommitted(BattleSession session, BattleEvent battleEvent)
+    => OnEvent(session, (TEvent)battleEvent);
+}

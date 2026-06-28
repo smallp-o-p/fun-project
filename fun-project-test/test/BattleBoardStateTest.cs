@@ -35,7 +35,7 @@ public partial class BattleBoardStateTest
   public void FindPathRoutesAroundBlockedCells()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
-    board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome()).IsWalkable = false;
+    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome(), false);
 
     BattleBoardState.ValidatedPoint[] path = board.FindPath(
       board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(),
@@ -52,9 +52,9 @@ public partial class BattleBoardStateTest
   public void FindPathReturnsAnEmptyPathWhenNoTraversableRouteExists()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
-    board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).IsWalkable = false;
-    board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome()).IsWalkable = false;
-    board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 2)).RequireSome()).IsWalkable = false;
+    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(), false);
+    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome(), false);
+    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 2)).RequireSome(), false);
 
     BattleBoardState.ValidatedPoint[] path = board.FindPath(
       board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(),

@@ -147,16 +147,16 @@ public sealed partial class BattleInputController : Node
 
   private void RenderPreview(ActionPreview preview)
   {
-    switch (preview.Kind)
+    switch (preview)
     {
-      case TargetingKind.TilePath:
+      case PathPreview p:
         _hitChanceLabel.Visible = false;
-        DrawLine(preview.Path);
+        DrawLine(p.Path);
         break;
-      case TargetingKind.EnemyTarget:
+      case AttackPreview a:
         _movementLine.Visible = false;
-        _hitChanceLabel.Text = preview.HitChance is { } hc ? $"{hc.FinalChance}%" : "";
-        _hitChanceLabel.Visible = preview.HitChance is not null;
+        _hitChanceLabel.Text = $"{a.HitChance.FinalChance}%";
+        _hitChanceLabel.Visible = true;
         break;
     }
   }

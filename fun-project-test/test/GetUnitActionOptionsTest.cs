@@ -47,47 +47,49 @@ public class GetUnitActionOptionsTest
     var (runtime, player, _) = MakeBattle(BattleTestFactory.MakeWeapon("Rifle"));
     BattleUnitState hero = UnitOf(runtime, player);
 
-    IReadOnlyList<UnitActionOption> options = QueryRight(runtime.Query(new GetUnitActionOptions(hero)));
+    UnitActionAvailability availability = QueryRight(runtime.Query(new GetUnitActionOptions(hero)));
 
-    Assert.True(options.OfType<MoveActionOption>().Single().IsAvailable);
-    Assert.True(options.OfType<AttackActionOption>().Single().IsAvailable);
-    Assert.True(options.OfType<PassActionOption>().Single().IsAvailable);
-    Assert.True(options.OfType<EndTurnActionOption>().Single().IsAvailable);
+    Assert.True(availability.CanMove);
+    Assert.True(availability.CanAttack);
+    Assert.True(availability.CanPass);
+    Assert.True(availability.CanEndTurn);
   }
 
-  [TestCase(TestName = "Unarmed unit has no AttackActionOption in the possible set")]
-  public void UnarmedUnitHasNoAttackOption()
+  [TestCase(TestName = "Unarmed unit: CanAttack is false (no weapon), Move still available")]
+  public void UnarmedUnitCannotAttack()
   {
     var (runtime, player, _) = MakeBattle(None);
     BattleUnitState hero = UnitOf(runtime, player);
 
-    IReadOnlyList<UnitActionOption> options = QueryRight(runtime.Query(new GetUnitActionOptions(hero)));
+    UnitActionAvailability availability = QueryRight(runtime.Query(new GetUnitActionOptions(hero)));
 
-    Assert.False(options.OfType<AttackActionOption>().Any());
-    Assert.True(options.OfType<MoveActionOption>().Single().IsAvailable);
+    Assert.False(availability.CanAttack);
+    Assert.True(availability.CanMove);
   }
 
-  [TestCase(TestName = "A not-active-side unit returns the full possible set, all unavailable")]
+  [TestCase(TestName = "A not-active-side unit: no verb is available")]
   public void NotActiveSideAllUnavailable()
   {
     var (runtime, _, enemy) = MakeBattle(BattleTestFactory.MakeWeapon("Rifle"));
     BattleUnitState goon = UnitOf(runtime, enemy); // enemy is not the active side at turn 1
 
-    IReadOnlyList<UnitActionOption> options = QueryRight(runtime.Query(new GetUnitActionOptions(goon)));
+    UnitActionAvailability availability = QueryRight(runtime.Query(new GetUnitActionOptions(goon)));
 
-    Assert.True(options.Count >= 3);
-    Assert.False(options.Any(o => o.IsAvailable));
+    Assert.False(availability.CanMove);
+    Assert.False(availability.CanAttack);
+    Assert.False(availability.CanPass);
+    Assert.False(availability.CanEndTurn);
   }
 
-  [TestCase(TestName = "Boxed-in unit: MoveActionOption present but unavailable")]
+  [TestCase(TestName = "Boxed-in unit: CanMove is false")]
   public void BoxedInUnitMoveUnavailable()
   {
     var player = BattleTestFactory.MakeFaction("Player");
     var enemy = BattleTestFactory.MakeFaction("Enemy");
     var board = new BattleBoardState(new Vector3I(5, 1, 5));
     // Wall off the corner unit's only two in-bounds neighbours so it cannot move.
-    board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).IsWalkable = false;
-    board.GetTile(board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome()).IsWalkable = false;
+    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(), false);
+    board.SetTileWalkable(board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(), false);
     var placements = new List<UnitPlacement>
     {
       new(new UnitLoadout(BattleTestFactory.MakeCombatant("Hero", player)), new Vector3I(0, 0, 0)),
@@ -102,9 +104,8 @@ public class GetUnitActionOptionsTest
       .Match(Right: r => r, Left: f => throw new Exception($"Setup failed: {f.Message}"));
     BattleUnitState hero = QueryRight(runtime.Query(new GetFactionAliveUnits(player))).Single();
 
-    MoveActionOption move = QueryRight(runtime.Query(new GetUnitActionOptions(hero)))
-      .OfType<MoveActionOption>().Single();
-    Assert.False(move.IsAvailable);
+    UnitActionAvailability availability = QueryRight(runtime.Query(new GetUnitActionOptions(hero)));
+    Assert.False(availability.CanMove);
   }
 
   [TestCase(TestName = "Out-of-AP unit: only EndTurn is available")]
@@ -127,10 +128,10 @@ public class GetUnitActionOptionsTest
       .Match(Right: r => r, Left: f => throw new Exception($"Setup failed: {f.Message}"));
     BattleUnitState hero = QueryRight(runtime.Query(new GetFactionAliveUnits(player))).Single();
 
-    IReadOnlyList<UnitActionOption> options = QueryRight(runtime.Query(new GetUnitActionOptions(hero)));
-    Assert.False(options.OfType<MoveActionOption>().Single().IsAvailable);
-    Assert.False(options.OfType<AttackActionOption>().Single().IsAvailable);
-    Assert.False(options.OfType<PassActionOption>().Single().IsAvailable);
-    Assert.True(options.OfType<EndTurnActionOption>().Single().IsAvailable);
+    UnitActionAvailability availability = QueryRight(runtime.Query(new GetUnitActionOptions(hero)));
+    Assert.False(availability.CanMove);
+    Assert.False(availability.CanAttack);
+    Assert.False(availability.CanPass);
+    Assert.True(availability.CanEndTurn);
   }
 }

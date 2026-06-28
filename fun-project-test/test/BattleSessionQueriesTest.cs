@@ -97,7 +97,7 @@ public class BattleSessionQueriesTest
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 4), new Vector3I(0, 0, 0));
-    session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).IsWalkable = false;
+    session.Board.SetTileWalkable(session.Board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(), false);
     StartBattle(session);
 
     IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = GetValue(Query(session, new GetPossibleMoveTilesForUnit(unit.State)));

@@ -51,11 +51,24 @@ public sealed class BattleBoardState
 
   private readonly BattleTileState[,,] _tiles;
   private readonly AStar3D _pathGraph = new();
+  // Managed adjacency for every existing path-graph point, kept in sync as points/edges are added.
+  // The key set is exactly the set of AStar points (sparse: void cells have no entry), so GetReachableTiles
+  // can walk connectivity without per-node Godot interop allocations.
+  private readonly Dictionary<long, List<long>> _neighborsById = [];
   private readonly Dictionary<ValidatedPoint, int> _occupants = [];
+  private readonly Dictionary<int, ValidatedPoint> _positionByUnit = [];
 
   public Vector3I Dimensions { get; }
 
-  public BattleBoardState(Vector3I dim)
+  public BattleBoardState(Vector3I dim) : this(dim, null)
+  {
+  }
+
+  public BattleBoardState(BattleMapData map) : this(map.Dimensions, map)
+  {
+  }
+
+  private BattleBoardState(Vector3I dim, BattleMapData? map)
   {
     if (dim.X <= 0 || dim.Y <= 0 || dim.Z <= 0)
       throw new ArgumentOutOfRangeException(nameof(dim));
@@ -63,24 +76,17 @@ public sealed class BattleBoardState
     Dimensions = dim;
     _tiles = new BattleTileState[Dimensions.X, Dimensions.Y, Dimensions.Z];
 
-    for (int y = 0; y < Dimensions.Y; y++)
-    {
-      for (int z = 0; z < Dimensions.Z; z++)
-      {
-        for (int x = 0; x < Dimensions.X; x++)
-        {
-          ValidatedPoint point = new(new Vector3I(x, y, z));
-          BattleTileState tile = new();
-          tile.TraversalStateChanged += changedTile => OnTileTraversalStateChanged(point, changedTile);
-          _tiles[x, y, z] = tile;
-        }
-      }
-    }
+    foreach (ValidatedPoint point in EnumerateBoardPoints())
+      _tiles[point.X, point.Y, point.Z] = new BattleTileState();
 
-    InitializePathGraph();
+    if (map is not null)
+      ApplyMapData(map);
+
+    // Build the path graph once, after final walkability is known, so void cells never allocate a node.
+    BuildPathGraph();
   }
 
-  public BattleBoardState(BattleMapData map) : this(map.Dimensions)
+  private void ApplyMapData(BattleMapData map)
   {
     foreach (ValidatedPoint point in EnumerateBoardPoints())
       GetTile(point).IsWalkable = false;
@@ -104,6 +110,17 @@ public sealed class BattleBoardState
           GD.PushError($"{nameof(BattleMapData)} tile at '{entry.Key}' is out of bounds for dimensions '{map.Dimensions}'.");
         });
     }
+  }
+
+  // Sets a tile's walkability and resyncs the path graph: a tile becoming walkable that has no node yet
+  // is added and wired to its existing neighbors; otherwise only its disabled flag is refreshed.
+  public void SetTileWalkable(ValidatedPoint point, bool walkable)
+  {
+    GetTile(point).IsWalkable = walkable;
+    if (walkable)
+      EnsurePathGraphPoint(point);
+
+    UpdatePathPointState(point);
   }
 
   private bool IsInBounds(Vector3I coordinates)
@@ -137,6 +154,7 @@ public sealed class BattleBoardState
       return false;
 
     _occupants[point] = unitId;
+    _positionByUnit[unitId] = point;
     UpdatePathPointState(point);
     return true;
   }
@@ -152,6 +170,7 @@ public sealed class BattleBoardState
 
     _occupants.Remove(source);
     _occupants[destination] = unitId;
+    _positionByUnit[unitId] = destination;
     UpdatePathPointState(source);
     UpdatePathPointState(destination);
     return true;
@@ -163,18 +182,14 @@ public sealed class BattleBoardState
       return false;
 
     _occupants.Remove(point);
+    _positionByUnit.Remove(unitId);
     UpdatePathPointState(point);
     return true;
   }
 
   public Option<ValidatedPoint> FindOccupantPosition(int unitId)
   {
-    foreach (var kvp in _occupants)
-    {
-      if (kvp.Value == unitId)
-        return Some(kvp.Key);
-    }
-    return None;
+    return _positionByUnit.TryGetValue(unitId, out ValidatedPoint point) ? Some(point) : None;
   }
 
   public ValidatedPoint[] FindPath(ValidatedPoint source, ValidatedPoint destination, int movingUnitId)
@@ -184,20 +199,27 @@ public sealed class BattleBoardState
 
     long sourceId = CoordinatesToPointId(source);
     long destinationId = CoordinatesToPointId(destination);
-    bool restoreSourceDisabled = false;
 
-    if (_occupants.TryGetValue(source, out int sourceOccupant) && sourceOccupant == movingUnitId
-      && _pathGraph.IsPointDisabled(sourceId))
-    {
-      _pathGraph.SetPointDisabled(sourceId, false);
-      restoreSourceDisabled = true;
-    }
+    // AStar3D offers no "treat this start point as enabled for one query" option, so when the moving
+    // unit stands on (and thus disables) the source we clear that flag for the duration of the query
+    // and restore it in finally — leaving no residue even if GetIdPath throws. Assumes single-threaded
+    // access to the board (the whole battle runtime is single-threaded).
+    bool restoreSourceDisabled =
+      _occupants.TryGetValue(source, out int sourceOccupant) && sourceOccupant == movingUnitId
+      && _pathGraph.IsPointDisabled(sourceId);
 
-    ValidatedPoint[] path = System.Array.ConvertAll(_pathGraph.GetIdPath(sourceId, destinationId), PointIdToCoordinates);
     if (restoreSourceDisabled)
-      _pathGraph.SetPointDisabled(sourceId, ShouldDisablePathPoint(source));
+      _pathGraph.SetPointDisabled(sourceId, false);
 
-    return path;
+    try
+    {
+      return System.Array.ConvertAll(_pathGraph.GetIdPath(sourceId, destinationId), PointIdToCoordinates);
+    }
+    finally
+    {
+      if (restoreSourceDisabled)
+        _pathGraph.SetPointDisabled(sourceId, ShouldDisablePathPoint(source));
+    }
   }
 
   public bool CanOccupy(ValidatedPoint point)
@@ -228,12 +250,24 @@ public sealed class BattleBoardState
     }
   }
 
-  private void InitializePathGraph()
+  private void BuildPathGraph()
   {
-    _pathGraph.ReserveSpace(Dimensions.X * Dimensions.Y * Dimensions.Z);
+    // Sparse: only walkable cells become nodes. Void/hole cells get no node or edges, mirroring
+    // the previous "non-walkable point is permanently disabled" behavior at a fraction of the cost.
+    int walkableCount = 0;
+    foreach (ValidatedPoint point in EnumerateBoardPoints())
+    {
+      if (GetTile(point).IsWalkable)
+        walkableCount++;
+    }
+
+    _pathGraph.ReserveSpace(Math.Max(1, walkableCount));
 
     foreach (ValidatedPoint point in EnumerateBoardPoints())
-      InitializePathGraphPoint(point);
+    {
+      if (GetTile(point).IsWalkable)
+        AddPathGraphPoint(point);
+    }
   }
 
   private bool CanUsePathEndpoint(ValidatedPoint point, int movingUnitId)
@@ -260,26 +294,36 @@ public sealed class BattleBoardState
     return _tiles[point.X, point.Y, point.Z];
   }
 
-  private void OnTileTraversalStateChanged(ValidatedPoint point, BattleTileState tile)
-  {
-    ArgumentNullException.ThrowIfNull(tile);
-    UpdatePathPointState(point);
-  }
-
   private void UpdatePathPointState(ValidatedPoint point)
   {
-    _pathGraph.SetPointDisabled(CoordinatesToPointId(point), ShouldDisablePathPoint(point));
+    long pointId = CoordinatesToPointId(point);
+    if (!_pathGraph.HasPoint(pointId))
+      return;
+
+    _pathGraph.SetPointDisabled(pointId, ShouldDisablePathPoint(point));
   }
 
-  private void InitializePathGraphPoint(ValidatedPoint point)
+  private void EnsurePathGraphPoint(ValidatedPoint point)
+  {
+    if (!_pathGraph.HasPoint(CoordinatesToPointId(point)))
+      AddPathGraphPoint(point);
+  }
+
+  private void AddPathGraphPoint(ValidatedPoint point)
   {
     Vector3I coordinates = point.Raw;
     long pointId = CoordinatesToPointId(point);
     _pathGraph.AddPoint(pointId, ToPathGraphPosition(coordinates));
+    _neighborsById[pointId] = [];
 
+    // Connect to every in-bounds neighbor that already has a node. During construction only the
+    // backward neighbors exist yet; for a point added later (SetTileWalkable) any of the six may.
     ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(-1, 0, 0));
+    ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(1, 0, 0));
     ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, 0, -1));
+    ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, 0, 1));
     ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, -1, 0));
+    ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, 1, 0));
 
     UpdatePathPointState(point);
   }
@@ -297,7 +341,13 @@ public sealed class BattleBoardState
     if (!IsInBounds(neighborCoordinates))
       return;
 
-    _pathGraph.ConnectPoints(pointId, CoordinatesToPointId(neighborCoordinates));
+    long neighborId = CoordinatesToPointId(neighborCoordinates);
+    if (!_neighborsById.TryGetValue(neighborId, out List<long>? neighborList))
+      return;
+
+    _pathGraph.ConnectPoints(pointId, neighborId);
+    _neighborsById[pointId].Add(neighborId);
+    neighborList.Add(pointId);
   }
 
   private bool ShouldDisablePathPoint(ValidatedPoint point)
@@ -320,8 +370,10 @@ public sealed class BattleBoardState
       var (currentId, steps) = frontier.Dequeue();
       if (steps >= maxSteps)
         continue;
+      if (!_neighborsById.TryGetValue(currentId, out List<long>? neighbors))
+        continue;
 
-      foreach (long neighborId in _pathGraph.GetPointConnections(currentId))
+      foreach (long neighborId in neighbors)
       {
         if (!visited.Add(neighborId))
           continue;

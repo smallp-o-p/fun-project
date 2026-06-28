@@ -1,15 +1,24 @@
 using FunProject.Weapons;
 using Godot;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace FunProject.Battle;
 
-// Returns the unit's full POSSIBLE action set (capability-derived), each tagged IsAvailable
-// (currently legal + affordable + has a valid target). Cheap: no board BFS; the expensive target
-// sets are computed later by the per-verb targeting handlers. Callers cache the result on selection.
-public sealed class GetUnitActionOptions : BattleSessionQuery<IReadOnlyList<UnitActionOption>>
+// Cheap, no-BFS availability fact for a unit's verbs: legal + affordable + (for Attack) a target in
+// range. Pure domain value — carries NO presentation taxonomy. Presentation maps it to concrete verb
+// options/targeting strategies. The expensive candidate sets (reachable tiles, attackable enemies) are
+// computed later by the per-verb targeting handlers on the presentation side.
+public sealed record UnitActionAvailability(
+  bool CanMove,
+  bool CanAttack,
+  bool CanPass,
+  bool CanEndTurn);
+
+// Reports the acting unit's verb availability as a domain fact. Cheap: no board BFS; uses only
+// session-internal members (CanUnitActNow, AP costs, board occupancy, visible-enemies). Callers cache
+// the result on selection.
+public sealed class GetUnitActionOptions : BattleSessionQuery<UnitActionAvailability>
 {
   private static readonly Vector3I[] OrthogonalNeighbors =
     [new(1, 0, 0), new(-1, 0, 0), new(0, 0, 1), new(0, 0, -1)];
@@ -22,7 +31,7 @@ public sealed class GetUnitActionOptions : BattleSessionQuery<IReadOnlyList<Unit
     Unit = unit;
   }
 
-  internal override Either<BattleQueryFailure, IReadOnlyList<UnitActionOption>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, UnitActionAvailability> Execute(BattleSession session)
   {
     if (!Unit.IsAlive)
       return FailUnitNotAlive(Unit);
@@ -31,18 +40,12 @@ public sealed class GetUnitActionOptions : BattleSessionQuery<IReadOnlyList<Unit
     bool canAct = inProgress && session.CanUnitActNow(Unit);
     bool isActiveSide = inProgress && Unit.Side == session.ActiveSide;
 
-    var options = new List<UnitActionOption>
-    {
-      new MoveActionOption(Unit, canAct && CanMove(session)),
-    };
+    bool canMove = canAct && CanMove(session);
+    bool canAttack = canAct && Unit.EquippedWeapon.Match(
+      Some: weapon => HasTargetInRange(session, weapon),
+      None: () => false);
 
-    Unit.EquippedWeapon.IfSome(weapon =>
-      options.Add(new AttackActionOption(Unit, weapon, canAct && HasTargetInRange(session, weapon))));
-
-    options.Add(new PassActionOption(Unit, canAct));
-    options.Add(new EndTurnActionOption(Unit, isActiveSide));
-
-    return Succeed(options);
+    return Succeed(new UnitActionAvailability(canMove, canAttack, canAct, isActiveSide));
   }
 
   private bool CanMove(BattleSession session)

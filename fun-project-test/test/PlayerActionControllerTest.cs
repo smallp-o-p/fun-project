@@ -16,14 +16,18 @@ public class PlayerActionControllerTest
     result.Match(Right: v => v, Left: f => throw new Exception($"Query failed: {f.Message}"));
 
   // 5x1x5 open board. Player "Hero" (armed) at (0,0,0), enemy "Goon" at (3,0,0).
-  private static (BattleRuntime Runtime, Faction Player, BattleUnitState Hero) MakeArmedBattle()
+  private static (BattleRuntime Runtime, Faction Player, BattleUnitState Hero) MakeArmedBattle() =>
+    MakeBattle(BattleTestFactory.MakeWeapon("Rifle"));
+
+  // 5x1x5 open board. Player "Hero" at (0,0,0) with the given weapon (or none), enemy "Goon" at (3,0,0).
+  private static (BattleRuntime Runtime, Faction Player, BattleUnitState Hero) MakeBattle(Option<Weapon> heroWeapon)
   {
     var player = BattleTestFactory.MakeFaction("Player");
     var enemy = BattleTestFactory.MakeFaction("Enemy");
     var board = new BattleBoardState(new Vector3I(5, 1, 5));
     var placements = new List<UnitPlacement>
     {
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Hero", player), BattleTestFactory.MakeWeapon("Rifle")), new Vector3I(0, 0, 0)),
+      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Hero", player), heroWeapon), new Vector3I(0, 0, 0)),
       new(new UnitLoadout(BattleTestFactory.MakeCombatant("Goon", enemy)), new Vector3I(3, 0, 0)),
     };
     var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
@@ -49,6 +53,17 @@ public class PlayerActionControllerTest
     Assert.True(c.TrySelectUnitAt(new Vector3I(0, 0, 0)));
     Assert.True(OptionOf<MoveActionOption>(c).IsAvailable);
     Assert.True(OptionOf<AttackActionOption>(c).IsAvailable);
+  }
+
+  [TestCase(TestName = "Unarmed unit: presentation builds no AttackActionOption")]
+  public void UnarmedUnitHasNoAttackOption()
+  {
+    var (runtime, player, _) = MakeBattle(None);
+    var c = new PlayerActionController(runtime, player);
+
+    Assert.True(c.TrySelectUnitAt(new Vector3I(0, 0, 0)));
+    Assert.False(c.ActionOptions.OfType<AttackActionOption>().Any());
+    Assert.True(OptionOf<MoveActionOption>(c).IsAvailable);
   }
 
   [TestCase(TestName = "BeginAction(Move) -> targeting -> Confirm relocates the unit")]
@@ -79,7 +94,7 @@ public class PlayerActionControllerTest
     c.BeginAction(OptionOf<AttackActionOption>(c));
     Assert.Equal(PlayerActionController.TargetingMode.ActionTargeting, c.Mode);
     ActionPreview preview = QueryRight(c.PreviewAt(new Vector3I(3, 0, 0)));
-    Assert.Equal(TargetingKind.EnemyTarget, preview.Kind);
+    Assert.True(preview is AttackPreview);
     Assert.True(c.SetPending(new Vector3I(3, 0, 0)));
     var results = c.Confirm();
 

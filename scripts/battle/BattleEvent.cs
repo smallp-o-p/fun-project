@@ -14,8 +14,6 @@ public interface BattleEventTag
 
 public abstract record BattleEvent : BattleEventTag
 {
-  public abstract string EventName { get; }
-  public abstract string ToDisplayString();
 }
 
 public interface IUnitBattleEvent : BattleEventTag
@@ -30,31 +28,20 @@ public interface IPositionedBattleEvent : BattleEventTag
 
 public sealed record SessionStartedBattleEvent : BattleEvent
 {
-  public override string EventName => "session_started";
-  public override string ToDisplayString() => "Battle started.";
 }
 
 public sealed record SessionEndedBattleEvent : BattleEvent
 {
-  public override string EventName => "session_ended";
   public BattleOutcome Outcome { get; }
 
   public SessionEndedBattleEvent(BattleOutcome outcome = BattleOutcome.Draw)
   {
     Outcome = outcome;
   }
-
-  public override string ToDisplayString() => Outcome switch
-  {
-    BattleOutcome.Victory => "Battle won.",
-    BattleOutcome.Defeat => "Battle lost.",
-    _ => "Battle ended.",
-  };
 }
 
 public sealed record TurnStartedBattleEvent : BattleEvent
 {
-  public override string EventName => "turn_started";
   public Faction Faction { get; }
   public int TurnNumber { get; }
 
@@ -63,13 +50,10 @@ public sealed record TurnStartedBattleEvent : BattleEvent
     Faction = faction;
     TurnNumber = turnNumber;
   }
-
-  public override string ToDisplayString() => $"Turn {TurnNumber} started for {Faction.Name}.";
 }
 
 public sealed record TurnEndedBattleEvent : BattleEvent
 {
-  public override string EventName => "turn_ended";
   public Faction Faction { get; }
   public int TurnNumber { get; }
 
@@ -78,26 +62,20 @@ public sealed record TurnEndedBattleEvent : BattleEvent
     Faction = faction;
     TurnNumber = turnNumber;
   }
-
-  public override string ToDisplayString() => $"Turn {TurnNumber} ended for {Faction.Name}.";
 }
 
 public sealed record ActiveSideChangedBattleEvent : BattleEvent
 {
-  public override string EventName => "active_side_changed";
   public Faction Faction { get; }
 
   public ActiveSideChangedBattleEvent(Faction faction)
   {
     Faction = faction;
   }
-
-  public override string ToDisplayString() => $"Active side is now {Faction.Name}.";
 }
 
 public sealed record UnitAddedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
-  public override string EventName => "unit_added";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
 
@@ -107,13 +85,10 @@ public sealed record UnitAddedBattleEvent : BattleEvent, IUnitBattleEvent, IPosi
     Unit = unit;
     Position = position;
   }
-
-  public override string ToDisplayString() => $"{Unit.Combatant.Name} entered the battle at {Position}.";
 }
 
 public sealed record UnitActivationEndedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
-  public override string EventName => "unit_activation_ended";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
 
@@ -123,13 +98,10 @@ public sealed record UnitActivationEndedBattleEvent : BattleEvent, IUnitBattleEv
     Unit = unit;
     Position = position;
   }
-
-  public override string ToDisplayString() => $"{Unit.Combatant.Name} ended their activation.";
 }
 
 public sealed record UnitMovedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
-  public override string EventName => "unit_moved";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
   public BattleBoardState.ValidatedPoint SourcePosition { get; }
@@ -144,13 +116,10 @@ public sealed record UnitMovedBattleEvent : BattleEvent, IUnitBattleEvent, IPosi
     Position = position;
     SourcePosition = sourcePosition;
   }
-
-  public override string ToDisplayString() => $"Unit ID {Unit.Id} moved from {SourcePosition} to {Position}.";
 }
 
 public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
-  public override string EventName => "tile_occupied";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
 
@@ -162,8 +131,6 @@ public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IP
     Unit = unit;
     Position = position;
   }
-
-  public override string ToDisplayString() => $"Unit ID {Unit.Id} occupied {Position}.";
 }
 
 /// <summary>
@@ -174,7 +141,6 @@ public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IP
 /// </summary>
 public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent
 {
-  public override string EventName => "unit_damaged";
   public BattleUnitState Unit { get; }
   public IReadOnlyList<Damage> Bundle { get; }
   public int TotalAmount { get; }
@@ -193,13 +159,10 @@ public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent
     ArmorDamage = armorDamage;
     HealthDamage = healthDamage;
   }
-
-  public override string ToDisplayString() => $"Damage: {TotalAmount} ({ArmorDamage} armor, {HealthDamage} health)";
 }
 
 public sealed record UnitArmorRegeneratedBattleEvent : BattleEvent, IUnitBattleEvent
 {
-  public override string EventName => "unit_armor_regenerated";
   public BattleUnitState Unit { get; }
   public int AmountRegenerated { get; }
   public int CurrentArmor { get; }
@@ -213,13 +176,10 @@ public sealed record UnitArmorRegeneratedBattleEvent : BattleEvent, IUnitBattleE
     AmountRegenerated = amountRegenerated;
     CurrentArmor = currentArmor;
   }
-
-  public override string ToDisplayString() => $"Unit ID {Unit.Id} regenerated {AmountRegenerated} armor ({CurrentArmor} current).";
 }
 
 public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
-  public override string EventName => "unit_killed";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
 
@@ -229,13 +189,10 @@ public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPos
     Unit = unit;
     Position = position;
   }
-
-  public override string ToDisplayString() => $"Unit ID {Unit.Id} was killed!";
 }
 
 public sealed record ItemThrownBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
-  public override string EventName => "item_thrown";
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
   public EquippableItem Item { get; }
@@ -248,13 +205,28 @@ public sealed record ItemThrownBattleEvent : BattleEvent, IUnitBattleEvent, IPos
     Position = position;
     Item = item;
   }
+}
 
-  public override string ToDisplayString() => $"{Unit.Combatant.Name} threw {Item.ItemName}.";
+/// <summary>
+/// Raised after a thrown item's capability payload (e.g. a blast's effects) has been
+/// resolved against the affected units. Carries the resolved item and the resolution
+/// point so presentation can play an effect at that tile.
+/// </summary>
+public sealed record CapabilityResolvedBattleEvent : BattleEvent, IPositionedBattleEvent
+{
+  public EquippableItem Item { get; }
+  public BattleBoardState.ValidatedPoint Position { get; }
+
+  public CapabilityResolvedBattleEvent(EquippableItem item, BattleBoardState.ValidatedPoint position)
+  {
+    ArgumentNullException.ThrowIfNull(item);
+    Item = item;
+    Position = position;
+  }
 }
 
 public sealed record UnitAttackedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
-  public override string EventName => "unit_attacked";
   public BattleUnitState Unit { get; }
   public BattleUnitState Target { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
@@ -284,14 +256,10 @@ public sealed record UnitAttackedBattleEvent : BattleEvent, IUnitBattleEvent, IP
     Roll = roll;
     IsHit = isHit;
   }
-
-  public override string ToDisplayString() =>
-    $"{Unit.Combatant.Name} attacked {Target.Combatant.Name} ({Breakdown.FinalChance}% to hit, rolled {Roll}): {(IsHit ? "hit" : "miss")}.";
 }
 
 public sealed record UnitStatusEffectAppliedBattleEvent : BattleEvent, IUnitBattleEvent
 {
-  public override string EventName => "unit_status_effect_applied";
   public BattleUnitState Unit { get; }
   public StatusEffectSpecData Spec { get; }
   public int RemainingTurns { get; }
@@ -305,13 +273,10 @@ public sealed record UnitStatusEffectAppliedBattleEvent : BattleEvent, IUnitBatt
     Spec = spec;
     RemainingTurns = remainingTurns;
   }
-
-  public override string ToDisplayString() => $"{Unit.Combatant.Name} is afflicted by {Spec.Name} ({RemainingTurns} turns).";
 }
 
 public sealed record UnitStatusEffectTickedBattleEvent : BattleEvent, IUnitBattleEvent
 {
-  public override string EventName => "unit_status_effect_ticked";
   public BattleUnitState Unit { get; }
   public StatusEffectSpecData Spec { get; }
   public int RemainingTurns { get; }
@@ -325,13 +290,10 @@ public sealed record UnitStatusEffectTickedBattleEvent : BattleEvent, IUnitBattl
     Spec = spec;
     RemainingTurns = remainingTurns;
   }
-
-  public override string ToDisplayString() => $"{Spec.Name} ticks on {Unit.Combatant.Name} ({RemainingTurns} turns left).";
 }
 
 public sealed record UnitStatusEffectExpiredBattleEvent : BattleEvent, IUnitBattleEvent
 {
-  public override string EventName => "unit_status_effect_expired";
   public BattleUnitState Unit { get; }
   public StatusEffectSpecData Spec { get; }
 
@@ -342,13 +304,10 @@ public sealed record UnitStatusEffectExpiredBattleEvent : BattleEvent, IUnitBatt
     Unit = unit;
     Spec = spec;
   }
-
-  public override string ToDisplayString() => $"{Spec.Name} wore off {Unit.Combatant.Name}.";
 }
 
 public sealed record ObjectiveAddedBattleEvent : BattleEvent
 {
-  public override string EventName => "objective_added";
   public Faction Faction { get; }
   public Objective Objective { get; }
 
@@ -359,13 +318,10 @@ public sealed record ObjectiveAddedBattleEvent : BattleEvent
     Faction = faction;
     Objective = objective;
   }
-
-  public override string ToDisplayString() => $"{Faction.Name} received objective {Objective.Data.Name}.";
 }
 
 public sealed record ObjectiveCompletedBattleEvent : BattleEvent
 {
-  public override string EventName => "objective_completed";
   public Faction Faction { get; }
   public Objective Objective { get; }
 
@@ -376,13 +332,10 @@ public sealed record ObjectiveCompletedBattleEvent : BattleEvent
     Faction = faction;
     Objective = objective;
   }
-
-  public override string ToDisplayString() => $"{Faction.Name} completed objective {Objective.Data.Name}.";
 }
 
 public sealed record ObjectiveFailedBattleEvent : BattleEvent
 {
-  public override string EventName => "objective_failed";
   public Faction Faction { get; }
   public Objective Objective { get; }
 
@@ -393,13 +346,10 @@ public sealed record ObjectiveFailedBattleEvent : BattleEvent
     Faction = faction;
     Objective = objective;
   }
-
-  public override string ToDisplayString() => $"{Faction.Name} failed objective {Objective.Data.Name}.";
 }
 
 public sealed record OperationCompletedBattleEvent : BattleEvent
 {
-  public override string EventName => "operation_completed";
   public Faction Faction { get; }
 
   public OperationCompletedBattleEvent(Faction faction)
@@ -407,13 +357,10 @@ public sealed record OperationCompletedBattleEvent : BattleEvent
     ArgumentNullException.ThrowIfNull(faction);
     Faction = faction;
   }
-
-  public override string ToDisplayString() => $"{Faction.Name} completed its operation.";
 }
 
 public sealed record OperationFailedBattleEvent : BattleEvent
 {
-  public override string EventName => "operation_failed";
   public Faction Faction { get; }
 
   public OperationFailedBattleEvent(Faction faction)
@@ -421,6 +368,4 @@ public sealed record OperationFailedBattleEvent : BattleEvent
     ArgumentNullException.ThrowIfNull(faction);
     Faction = faction;
   }
-
-  public override string ToDisplayString() => $"{Faction.Name}'s operation failed.";
 }

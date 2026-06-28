@@ -199,8 +199,8 @@ public partial class BattleActionExecutorTest
     BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition])).RequireSingleResult();
 
     Assert.True(result.Succeeded);
-    Assert.Equal(0, ignoredTrigger.MatchCallCount);
-    Assert.Equal(1, matchingTrigger.MatchCallCount);
+    Assert.Equal(0, ignoredTrigger.EvaluateCallCount);
+    Assert.Equal(1, matchingTrigger.EvaluateCallCount);
     Assert.True(log.SequenceEqual(["matching"]));
   }
 
@@ -785,13 +785,11 @@ public partial class BattleActionExecutorTest
       _message = message;
     }
 
-    public override bool Matches(BattleEvent battleEvent)
-    {
-      return battleEvent is IPositionedBattleEvent positioned && positioned.Position.Raw == _position;
-    }
-
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
+      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
+        return BattleTriggerResult.NoReaction();
+
       _log.Add(_message);
       return BattleTriggerResult.NoReaction();
     }
@@ -803,7 +801,7 @@ public partial class BattleActionExecutorTest
     private readonly List<string> _log;
     private readonly string _message;
 
-    public int MatchCallCount { get; private set; }
+    public int EvaluateCallCount { get; private set; }
 
     public CountingTrigger(Vector3I position, List<string> log, string message)
     {
@@ -812,14 +810,12 @@ public partial class BattleActionExecutorTest
       _message = message;
     }
 
-    public override bool Matches(BattleEvent battleEvent)
-    {
-      MatchCallCount++;
-      return battleEvent is IPositionedBattleEvent positioned && positioned.Position.Raw == _position;
-    }
-
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
+      EvaluateCallCount++;
+      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
+        return BattleTriggerResult.NoReaction();
+
       _log.Add(_message);
       return BattleTriggerResult.NoReaction();
     }
@@ -838,13 +834,11 @@ public partial class BattleActionExecutorTest
       _message = message;
     }
 
-    public override bool Matches(BattleEvent battleEvent)
-    {
-      return battleEvent is IPositionedBattleEvent positioned && positioned.Position.Raw == _position;
-    }
-
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
+      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
+        return BattleTriggerResult.NoReaction();
+
       _log.Add(_message);
       return BattleTriggerResult.ConsumeTrigger();
     }
@@ -871,13 +865,11 @@ public partial class BattleActionExecutorTest
       _shouldConsume = shouldConsume;
     }
 
-    public override bool Matches(BattleEvent battleEvent)
-    {
-      return battleEvent is IPositionedBattleEvent positioned && positioned.Position.Raw == _position;
-    }
-
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
+      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
+        return BattleTriggerResult.NoReaction();
+
       ObservedTargetPositionDuringEvaluation = session.GetUnitPosition(_targetUnit)
         .Match(point => Some(point.Raw), () => None);
 
@@ -903,13 +895,11 @@ public partial class BattleActionExecutorTest
       _faction = faction;
     }
 
-    public override bool Matches(BattleEvent battleEvent)
-    {
-      return battleEvent is IPositionedBattleEvent positioned && positioned.Position.Raw == _triggerPosition;
-    }
-
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
+      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _triggerPosition)
+        return BattleTriggerResult.NoReaction();
+
       return BattleTriggerResult.QueueInterruptAfterCommit(
         BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("Blocker", _faction), _spawnPosition),
         shouldConsumeTrigger: true);
@@ -929,13 +919,11 @@ public partial class BattleActionExecutorTest
       _unit = unit;
     }
 
-    public override bool Matches(BattleEvent battleEvent)
-    {
-      return battleEvent is IPositionedBattleEvent positioned && positioned.Position.Raw == _triggerPosition;
-    }
-
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
+      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _triggerPosition)
+        return BattleTriggerResult.NoReaction();
+
       return BattleTriggerResult.QueueInterruptAfterCommit(
         BattleAction.PassUnit(_unit),
         shouldConsumeTrigger: true);
@@ -958,13 +946,11 @@ public partial class BattleActionExecutorTest
       _damage = damage;
     }
 
-    public override bool Matches(BattleEvent battleEvent)
-    {
-      return battleEvent is IPositionedBattleEvent positioned && positioned.Position.Raw == _position;
-    }
-
     public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
     {
+      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
+        return BattleTriggerResult.NoReaction();
+
       return BattleTriggerResult.QueueInterruptAfterCommit(
         BattleAction.ApplyDamage(_targetUnit, _damage),
         shouldConsumeTrigger: true);

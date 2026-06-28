@@ -110,29 +110,105 @@ internal sealed class MoveUnitStep : BattleAction
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    return ValidateActingUnit(session, Unit, ActionPointCost).Match(
-      failure => failure,
-      unit =>
-      {
-        Option<BattleBoardState.ValidatedPoint> sourcePointOption = session.GetUnitPosition(unit);
-        if (sourcePointOption.IsNone)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {UnitId} is not on a valid tile.");
-        BattleBoardState.ValidatedPoint sourcePoint = sourcePointOption.Value();
+    var validationFailure = ValidateActingUnit(session, Unit, ActionPointCost);
+    if (validationFailure.IsSome)
+      return validationFailure.Value();
 
-        if (sourcePoint != Source)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {UnitId} is no longer at {Source.Raw}.");
-        if (!session.Board.CanOccupy(Destination))
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Destination} cannot be occupied.");
-        if (!unit.TrySpendActionPoints(ActionPointCost))
-          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Move unit step action could not spend {ActionPointCost} action points for unit {UnitId}.");
-        session.MoveUnit(Unit, Source, Destination);
+    Option<BattleBoardState.ValidatedPoint> sourcePointOption = session.GetUnitPosition(Unit);
+    if (sourcePointOption.IsNone)
+      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {UnitId} is not on a valid tile.");
+    BattleBoardState.ValidatedPoint sourcePoint = sourcePointOption.Value();
 
-        return BattleActionResult.Success(this, unit);
-      });
+    if (sourcePoint != Source)
+      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {UnitId} is no longer at {Source.Raw}.");
+    if (!session.Board.CanOccupy(Destination))
+      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Destination} cannot be occupied.");
+    if (!Unit.TrySpendActionPoints(ActionPointCost))
+      return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Move unit step action could not spend {ActionPointCost} action points for unit {UnitId}.");
+    session.MoveUnit(Unit, Source, Destination);
+
+    return BattleActionResult.Success(this, Unit);
   }
 }
 
-public sealed class ThrowItem : BattleAction
+// Shared write-path lifecycle for "use an active item capability" verbs (throw today;
+// future heal/buff/deploy). It owns the parts every active use repeats, in a fixed order:
+// acting-unit validation (AP cost), the inventory-has-item gate, the consume-on-use charge
+// depletion guard, spending action points, consuming a charge (removing the item when it
+// depletes, or treating a charge-less consumable as single-use), and the success result.
+// A verb supplies only its variable pieces via the abstract members below.
+public abstract class UseItemCapabilityAction : BattleAction
+{
+  protected UseItemCapabilityAction(string actionId)
+    : base(actionId)
+  {
+  }
+
+  protected abstract BattleUnitState ActingUnit { get; }
+  protected abstract EquippableItem UsedItem { get; }
+  protected abstract int ActionPointCost { get; }
+  protected abstract bool ConsumesOnUse { get; }
+
+  // Verb target validation that runs before the inventory/charge gates: resolve whatever
+  // the verb needs (positions, target cell, …) and reject illegal targets, stashing any
+  // resolved values the later hooks consume. Some == rejection.
+  protected abstract Option<BattleActionResult> ResolveTarget(BattleSession session);
+
+  // Verb usability check that runs after the item is confirmed present and not depleted,
+  // but before any state is committed (for throw: range). Kept separate from ResolveTarget
+  // so the inventory/charge rejections keep priority over it, preserving the original order.
+  protected abstract Option<BattleActionResult> ValidateUsability(BattleSession session);
+
+  // Commit hook: raise the verb's use event, using values stashed during ResolveTarget.
+  protected abstract void RaiseUseEvent(BattleSession session);
+
+  internal sealed override BattleActionResult Execute(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(session);
+
+    Option<BattleActionResult> validationFailure = ValidateActingUnit(session, ActingUnit, ActionPointCost);
+    if (validationFailure.IsSome)
+      return validationFailure.Value();
+
+    Option<BattleActionResult> targetFailure = ResolveTarget(session);
+    if (targetFailure.IsSome)
+      return targetFailure.Value();
+
+    if (!ActingUnit.HasInventoryItem(UsedItem))
+      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{ActingUnit.Combatant.Name} does not have {UsedItem.ItemName}.");
+
+    Option<ChargesCapability> charges = UsedItem.FindCapability<ChargesCapability>();
+    if (ConsumesOnUse && charges.Match(c => c.IsDepleted, () => false))
+      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{UsedItem.ItemName} has no charges remaining.");
+
+    Option<BattleActionResult> usabilityFailure = ValidateUsability(session);
+    if (usabilityFailure.IsSome)
+      return usabilityFailure.Value();
+
+    if (!ActingUnit.TrySpendActionPoints(ActionPointCost))
+      return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{ActingUnit.Combatant.Name} could not spend {ActionPointCost} action points.");
+
+    if (ConsumesOnUse)
+    {
+      charges.Match(
+        chargeState =>
+        {
+          if (!chargeState.TrySpend())
+            throw new InvalidOperationException($"{UsedItem.ItemName} could not spend a charge after passing the depletion check.");
+
+          if (chargeState.IsDepleted)
+            ActingUnit.RemoveInventoryItem(UsedItem);
+        },
+        // No charges capability: consumable items are implicitly single-use.
+        () => ActingUnit.RemoveInventoryItem(UsedItem));
+    }
+
+    RaiseUseEvent(session);
+    return BattleActionResult.Success(this, ActingUnit);
+  }
+}
+
+public sealed class ThrowItem : UseItemCapabilityAction
 {
   public const string ThrowItemActionId = "throw_item";
 
@@ -141,6 +217,11 @@ public sealed class ThrowItem : BattleAction
   public Vector3I TargetCell { get; }
 
   public EquippableItem Item => Throwable.Item;
+
+  // Values resolved in ResolveTarget and consumed by ValidateUsability / RaiseUseEvent
+  // within the same Execute pass.
+  private Vector3I _unitPosition;
+  private BattleBoardState.ValidatedPoint _targetPoint;
 
   internal ThrowItem(BattleUnitState unit, ItemWith<ThrowableCapability> throwable, Vector3I targetCell)
     : base(ThrowItemActionId)
@@ -154,50 +235,37 @@ public sealed class ThrowItem : BattleAction
     TargetCell = targetCell;
   }
 
-  internal override BattleActionResult Execute(BattleSession session)
+  protected override BattleUnitState ActingUnit => Unit;
+  protected override EquippableItem UsedItem => Item;
+  protected override int ActionPointCost => Throwable.Capability.ActionPointCost;
+  protected override bool ConsumesOnUse => Throwable.Capability.ConsumesOnUse;
+
+  protected override Option<BattleActionResult> ResolveTarget(BattleSession session)
   {
-    return ValidateActingUnit(session, Unit, Throwable.Capability.ActionPointCost).Match(
-      failure => failure,
-      unit =>
-      {
-        Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(unit);
-        if (unitPointOption.IsNone)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {unit.Id} is not on a valid tile.");
-        Vector3I unitPosition = unitPointOption.Value().Raw;
+    Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(Unit);
+    if (unitPointOption.IsNone)
+      return Some(BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {Unit.Id} is not on a valid tile."));
+    _unitPosition = unitPointOption.Value().Raw;
 
-        Option<BattleBoardState.ValidatedPoint> targetPointOption = session.Board.ValidatePoint(TargetCell);
-        if (targetPointOption.IsNone)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{TargetCell} is outside the battle board.");
-        BattleBoardState.ValidatedPoint targetPoint = targetPointOption.Value();
-        if (!unit.HasInventoryItem(Item))
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{unit.Combatant.Name} does not have {Item.ItemName}.");
+    Option<BattleBoardState.ValidatedPoint> targetPointOption = session.Board.ValidatePoint(TargetCell);
+    if (targetPointOption.IsNone)
+      return Some(BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{TargetCell} is outside the battle board."));
+    _targetPoint = targetPointOption.Value();
 
-        Option<ChargesCapability> charges = Item.FindCapability<ChargesCapability>();
-        if (Throwable.Capability.ConsumesOnUse && charges.Match(c => c.IsDepleted, () => false))
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Item.ItemName} has no charges remaining.");
-        if (BattleSession.GetGridDistance(unitPosition, TargetCell) > Throwable.Capability.ThrowRange)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{TargetCell} is out of range for {Item.ItemName}.");
-        if (!unit.TrySpendActionPoints(Throwable.Capability.ActionPointCost))
-          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{unit.Combatant.Name} could not spend {Throwable.Capability.ActionPointCost} action points.");
+    return None;
+  }
 
-        if (Throwable.Capability.ConsumesOnUse)
-        {
-          charges.Match(
-            chargeState =>
-            {
-              if (!chargeState.TrySpend())
-                throw new InvalidOperationException($"{Item.ItemName} could not spend a charge after passing the depletion check.");
+  protected override Option<BattleActionResult> ValidateUsability(BattleSession session)
+  {
+    if (BattleSession.GetGridDistance(_unitPosition, TargetCell) > Throwable.Capability.ThrowRange)
+      return Some(BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{TargetCell} is out of range for {Item.ItemName}."));
 
-              if (chargeState.IsDepleted)
-                unit.RemoveInventoryItem(Item);
-            },
-            // No charges capability: consumable items are implicitly single-use.
-            () => unit.RemoveInventoryItem(Item));
-        }
+    return None;
+  }
 
-        session.RaiseEvent(new ItemThrownBattleEvent(unit, targetPoint, Item));
-        return BattleActionResult.Success(this, unit);
-      });
+  protected override void RaiseUseEvent(BattleSession session)
+  {
+    session.RaiseEvent(new ItemThrownBattleEvent(Unit, _targetPoint, Item));
   }
 }
 
@@ -219,48 +287,41 @@ public sealed class AttackUnit : BattleAction
 
   internal override BattleActionResult Execute(BattleSession session)
   {
-    return ValidateActingUnit(session, Unit, BattleSession.DefaultAttackActionPointCost).Match(
-      failure => failure,
-      attacker =>
-      {
-        if (attacker.EquippedWeapon.IsNone)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{attacker.Combatant.Name} has no equipped weapon.");
-        Weapon weapon = attacker.RequireEquippedWeapon();
+    var validationFailure = ValidateActingUnit(session, Unit, BattleSession.DefaultAttackActionPointCost);
+    if (validationFailure.IsSome)
+      return validationFailure.Value();
 
-        if (Target == attacker)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{attacker.Combatant.Name} cannot attack itself.");
-        if (Target.Side == attacker.Side)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{attacker.Combatant.Name} cannot attack allied unit {Target.Combatant.Name}.");
-        if (!Target.IsAlive)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Target.Combatant.Name} is not alive.");
-        if (!attacker.VisibleUnits.Contains(Target))
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{attacker.Combatant.Name} cannot see {Target.Combatant.Name}.");
+    return AttackFeasibility.Resolve(session, Unit, Target).Match(
+      Left: failure => BattleActionResult.Failure(this, MapFailureReason(failure.Kind), failure.Message),
+      Right: resolved => ResolveAttack(session, resolved));
+  }
 
-        Option<BattleBoardState.ValidatedPoint> attackerPointOption = session.GetUnitPosition(attacker);
-        if (attackerPointOption.IsNone)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Attack action could not resolve position for unit {attacker.Id}.");
-        Option<BattleBoardState.ValidatedPoint> targetPointOption = session.GetUnitPosition(Target);
-        if (targetPointOption.IsNone)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Attack action could not resolve position for unit {Target.Id}.");
-        BattleBoardState.ValidatedPoint attackerPoint = attackerPointOption.Value();
-        BattleBoardState.ValidatedPoint targetPoint = targetPointOption.Value();
+  // PositionUnresolved means a unit that passed validation has no board tile —
+  // an invariant violation rather than a legal rejection; everything else is a
+  // legitimately rejected shot.
+  private static BattleActionFailureReason MapFailureReason(AttackFeasibilityFailureKind kind) =>
+    kind == AttackFeasibilityFailureKind.PositionUnresolved
+      ? BattleActionFailureReason.UnexpectedError
+      : BattleActionFailureReason.Rejected;
 
-        if (BattleSession.GetGridDistance(attackerPoint.Raw, targetPoint.Raw) > weapon.EffectiveRange)
-          return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Target.Combatant.Name} is out of range for {weapon.ItemName}.");
-        if (!attacker.TrySpendActionPoints(BattleSession.DefaultAttackActionPointCost))
-          return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{attacker.Combatant.Name} could not spend {BattleSession.DefaultAttackActionPointCost} action points.");
+  private BattleActionResult ResolveAttack(BattleSession session, ResolvedAttack resolved)
+  {
+    BattleUnitState attacker = Unit;
+    Weapon weapon = resolved.Weapon;
 
-        AttackContext context = new(attacker, Target, attackerPoint, targetPoint, weapon, session.Board);
-        HitChanceBreakdown breakdown = session.HitChanceCalculator.Calculate(context);
-        int roll = session.RollPercent();
-        bool isHit = roll < breakdown.FinalChance;
+    if (!attacker.TrySpendActionPoints(BattleSession.DefaultAttackActionPointCost))
+      return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{attacker.Combatant.Name} could not spend {BattleSession.DefaultAttackActionPointCost} action points.");
 
-        session.RaiseEvent(new UnitAttackedBattleEvent(attacker, Target, targetPoint, weapon, breakdown, roll, isHit));
-        if (isHit)
-          session.ApplyDamageTo(Target, weapon.EmitDamage());
+    AttackContext context = new(attacker, resolved.AttackerPoint, resolved.TargetPoint, session.Board);
+    HitChanceBreakdown breakdown = session.HitChanceCalculator.Calculate(context);
+    int roll = session.RollPercent();
+    bool isHit = roll < breakdown.FinalChance;
 
-        return BattleActionResult.Success(this, attacker);
-      });
+    session.RaiseEvent(new UnitAttackedBattleEvent(attacker, Target, resolved.TargetPoint, weapon, breakdown, roll, isHit));
+    if (isHit)
+      session.ApplyDamageTo(Target, weapon.EmitDamage());
+
+    return BattleActionResult.Success(this, attacker);
   }
 }
 
@@ -310,13 +371,12 @@ public sealed class PassUnit : BattleAction
 
   internal override BattleActionResult Execute(BattleSession session)
   {
-    return ValidateActingUnit(session, Unit).Match(
-      failure => failure,
-      unit =>
-      {
-        session.EndUnitActivation(unit);
-        return BattleActionResult.Success(this, unit);
-      });
+    var validationFailure = ValidateActingUnit(session, Unit);
+    if (validationFailure.IsSome)
+      return validationFailure.Value();
+
+    session.EndUnitActivation(Unit);
+    return BattleActionResult.Success(this, Unit);
   }
 }
 

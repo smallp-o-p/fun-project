@@ -1,5 +1,4 @@
 using Godot;
-using LanguageExt.UnsafeValueAccess;
 using System;
 using System.Collections.Generic;
 
@@ -22,18 +21,10 @@ public sealed class FindPathForUnit : BattleSessionQuery<BattleBoardState.Valida
     if (!Unit.IsAlive)
       return FailUnitNotAlive(Unit);
 
-    Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(Unit);
-    Option<BattleBoardState.ValidatedPoint> destinationPointOption = session.Board.ValidatePoint(Destination);
-
-    if (unitPointOption.IsNone)
-      return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {Unit.Id} is not on the board.");
-    if (destinationPointOption.IsNone)
-      return Fail(BattleQueryFailureReason.InvalidTile, $"Destination {Destination} is outside the battle board.");
-
-    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.Value();
-    BattleBoardState.ValidatedPoint destinationPoint = destinationPointOption.Value();
-
-    return Succeed(session.Board.FindPath(unitPoint, destinationPoint, Unit.Id));
+    return RequirePosition(session, Unit).Bind(unitPoint =>
+      session.Board.ValidatePoint(Destination).Match(
+        Some: destinationPoint => Succeed(session.Board.FindPath(unitPoint, destinationPoint, Unit.Id)),
+        None: () => Fail(BattleQueryFailureReason.InvalidTile, $"Destination {Destination} is outside the battle board.")));
   }
 }
 
@@ -61,14 +52,11 @@ public sealed class GetPossibleMoveTilesForUnit : BattleSessionQuery<IReadOnlyCo
     if (Unit.CurrentActionPoints < ActionPointCostPerStep)
       return Succeed([]);
 
-    Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(Unit);
-    if (unitPointOption.IsNone)
-      return Fail(BattleQueryFailureReason.InvalidTile, $"Unit {Unit.Id} is not on the board.");
-
     // Zero step cost means an unlimited budget; the visited set still bounds the fill to the board.
     int maxSteps = ActionPointCostPerStep == 0
       ? int.MaxValue
       : Unit.CurrentActionPoints / ActionPointCostPerStep;
-    return Succeed(session.Board.GetReachableTiles(unitPointOption.Value(), maxSteps));
+    return RequirePosition(session, Unit).Bind(unitPoint =>
+      Succeed(session.Board.GetReachableTiles(unitPoint, maxSteps)));
   }
 }

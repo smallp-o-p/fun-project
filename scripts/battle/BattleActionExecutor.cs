@@ -86,12 +86,12 @@ public sealed class BattleActionExecutor
 
   private BattleActionResult ExecuteQueuedAction(BattleAction action, BattleAction activeAction)
   {
-    List<BattleEvent> committedEvents = [];
-
-    // TODO: It's a little awkward to go back-and-forth with the session to get reaction events.
-    Action<BattleEvent> captureCommittedEvent = committedEvents.Add;
+    // The session records the events this Execute commits into a reused buffer, so we read
+    // exactly this primitive's committed events — in commit order — without subscribing a
+    // closure to the public BattleEventCommitted broadcast or allocating a List per step.
+    IReadOnlyList<BattleEvent> committedEvents;
     BattleActionResult result;
-    _session.BattleEventCommitted += captureCommittedEvent;
+    _session.BeginCommittedEventCapture();
 
     try
     {
@@ -99,7 +99,7 @@ public sealed class BattleActionExecutor
     }
     finally
     {
-      _session.BattleEventCommitted -= captureCommittedEvent;
+      committedEvents = _session.EndCommittedEventCapture();
     }
 
     ConsumeResult(action, activeAction, result);

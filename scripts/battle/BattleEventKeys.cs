@@ -12,15 +12,22 @@ namespace FunProject.Battle;
 */
 internal static class BattleEventKeys
 {
+  private static readonly Dictionary<Type, Type[]> _keyCache = [];
+
   internal static IReadOnlyList<Type> For(BattleEvent battleEvent)
   {
     Type eventType = battleEvent.GetType();
-    return
+    if (_keyCache.TryGetValue(eventType, out Type[]? cached))
+      return cached;
+
+    Type[] keys =
     [
       eventType,
       .. eventType
         .GetInterfaces()
         .Where(interfaceType => typeof(BattleEventTag).IsAssignableFrom(interfaceType)),
     ];
+    _keyCache[eventType] = keys;
+    return keys;
   }
 }

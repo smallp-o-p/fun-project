@@ -1,8 +1,11 @@
+using FunProject.Battle;
 using FunProject.Weapons;
 using System;
 
-namespace FunProject.Battle;
-
+// Presentation-side verb taxonomy. Each verb is one cohesive strategy: it carries its availability
+// (sourced from the domain UnitActionAvailability fact) AND owns the factory for its targeting handler,
+// which produces that verb's candidate set. Availability and candidates live on the same class so they
+// cannot drift. Targeted verbs implement NeedsTargeting; instant verbs implement CanActDirectly.
 public abstract class UnitActionOption
 {
   public BattleUnitState Unit { get; }

@@ -19,5 +19,8 @@ public abstract class Objective
   }
 
   public abstract bool IsComplete(BattleSession session);
-  public abstract bool IsFailed(BattleSession session);
+
+  // Default failure rule shared by all current objectives: the owning faction has
+  // no living units left. Override only if an objective needs a different rule.
+  public virtual bool IsFailed(BattleSession session) => !session.HasLivingUnits(Owner);
 }

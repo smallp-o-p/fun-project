@@ -1,13 +1,14 @@
+using FunProject.Battle;
 using FunProject.Weapons;
 using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace FunProject.Battle;
-
 // Enemy-target targeting: candidate tiles are visible enemies within weapon range; preview is the
-// hit-chance breakdown for the enemy under the cursor; commit attacks that enemy.
+// hit-chance breakdown for the enemy under the cursor; commit attacks that enemy. Availability of the
+// Attack verb (a target exists) and its candidate set are both derived from this same enemy-in-range
+// computation, so they cannot disagree.
 public sealed class AttackTargeting : IActionTargeting
 {
   private readonly BattleRuntime _runtime;
@@ -25,7 +26,7 @@ public sealed class AttackTargeting : IActionTargeting
     _weapon = weapon;
   }
 
-  public TargetingKind Kind => TargetingKind.EnemyTarget;
+  public IReadOnlyCollection<Vector3I> Candidates => _targetsByTile.Keys;
 
   public IReadOnlyCollection<Vector3I> Begin()
   {
@@ -48,7 +49,7 @@ public sealed class AttackTargeting : IActionTargeting
         _targetsByTile[tp] = enemy;
     }
 
-    return _targetsByTile.Keys.ToArray();
+    return _targetsByTile.Keys;
   }
 
   public Either<BattleQueryFailure, ActionPreview> Preview(Vector3I target)
@@ -58,8 +59,7 @@ public sealed class AttackTargeting : IActionTargeting
         new BattleQueryFailure(BattleQueryFailureReason.InvalidTile, $"No attackable target at {target}."));
 
     return _runtime.Query(new GetHitChanceForAttack(_unit, enemy)).Match(
-      Right: hc => Right<BattleQueryFailure, ActionPreview>(
-        new ActionPreview(TargetingKind.EnemyTarget, [], hc, target)),
+      Right: hc => Right<BattleQueryFailure, ActionPreview>(new AttackPreview(hc)),
       Left: Left<BattleQueryFailure, ActionPreview>);
   }
 

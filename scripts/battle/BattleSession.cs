@@ -25,45 +25,55 @@ public sealed class BattleSession
 
   public const int DefaultMovementStepActionPointCost = 1;
   public const int DefaultAttackActionPointCost = 1;
-  private static readonly IReadOnlySet<BattleBoardState.ValidatedPoint> EmptyTileSet = new SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>();
-  private static readonly Vector3I[] OrthogonalDirections =
-  [
-    new(1, 0, 0),
-    new(-1, 0, 0),
-    new(0, 0, 1),
-    new(0, 0, -1),
-  ];
-  private static readonly Vector3I[] AdjacentDiagonalOffsets =
-  [
-    new(-1, 0, -1),
-    new(-1, 0, 1),
-    new(1, 0, -1),
-    new(1, 0, 1),
-  ];
 
   private readonly IHitChanceCalculator _hitChanceCalculator;
   private readonly Random _random;
   private readonly List<BattleUnitState> _units = [];
-  private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>> _exploredTilesByFaction = [];
+  private readonly VisibilityService _visibility = new();
   private readonly Dictionary<Faction, Operation> _operations = [];
-  private readonly Queue<Faction> _globalFactionOrder = [];
-  private Queue<Faction> _turnQueue = [];
-  private readonly SysColGeneric.HashSet<Faction> _sidesActedThisRound = [];
-  private readonly SysColGeneric.HashSet<BattleUnitState> _activeFactionUnitsAvailable = [];
+  private readonly TurnScheduler _scheduler;
   private readonly BattleEventListenerRegistry _listenerRegistry = new();
   private readonly Queue<BattleEvent> _eventDispatchQueue = [];
   private bool _isDispatchingEvents;
+  // Events committed during the executor's current capture window (a single primitive
+  // action's Execute). The executor brackets each Execute with BeginCommittedEventCapture /
+  // EndCommittedEventCapture and reads this buffer to learn exactly which events that Execute
+  // committed — in commit order — without subscribing a closure to the public
+  // BattleEventCommitted broadcast. Reused across primitives (cleared on Begin); never
+  // allocated per step. The flag scopes capture to the window so events committed outside it
+  // (battle setup, turn-end follow-ups) are never recorded, mirroring the old single-Execute
+  // subscribe/unsubscribe exactly.
+  private readonly List<BattleEvent> _committedEventCapture = [];
+  private bool _capturingCommittedEvents;
+  // Visible sets depend only on board occupancy: a unit's vision range resolves from
+  // stat contributions that are fixed for the battle (combatant + equipped weapon; no
+  // action swaps weapons, equips mods, or applies a vision-affecting effect mid-battle),
+  // and tile BlocksLineOfSight is set during setup. So visibility only needs recomputing
+  // after an occupancy mutation, at two granularities:
+  //   - _visibilityFullRefreshPending forces a clear-and-recompute-everyone pass. Used on
+  //     battle start, where tile BlocksLineOfSight authoring may have changed without any
+  //     occupancy event (so no affected-unit set could capture it). Starts true so the first
+  //     dispatch performs the initial compute.
+  //   - _visibilityAffectedUnits accumulates the units whose own cell changed (move/spawn/
+  //     death) since the last refresh. An incremental pass then recomputes only those units
+  //     and their visibility to others — byte-identical to a full recompute, because an
+  //     unaffected observer's visible-tile set cannot change when some other unit moves.
+  // Both are written at the three Board.Try* occupancy chokepoints (affected) and on battle
+  // start (full). NOTE: if a runtime effect that changes a unit's vision is ever added, force
+  // a full refresh (or mark that unit affected) there too.
+  private bool _visibilityFullRefreshPending = true;
+  private readonly SysColGeneric.HashSet<BattleUnitState> _visibilityAffectedUnits = [];
 
   public BattleBoardState Board { get; }
   public BattlePhase Phase { get; private set; } = BattlePhase.Setup;
   public int TurnNumber { get; private set; } = 1;
-  public Faction ActiveSide { get; private set; }
+  public Faction ActiveSide => _scheduler.ActiveSide;
   public Option<Faction> PlayerFaction { get; }
   public Option<BattleOutcome> Outcome { get; private set; }
   public IEnumerable<BattleUnitState> AliveUnits => _units.Where((unit) => unit.IsAlive);
   public IEnumerable<BattleUnitState> DeadUnits => _units.Where((unit) => unit.IsDead);
-  public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _globalFactionOrder;
-  public IReadOnlyCollection<Faction> TurnQueue => _turnQueue;
+  public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _scheduler.GlobalFactionTurnOrder;
+  public IReadOnlyCollection<Faction> TurnQueue => _scheduler.TurnQueue;
 
   public event Action<BattleEvent> BattleEventCommitted = delegate { };
 
@@ -82,24 +92,30 @@ public sealed class BattleSession
 
     Board = board;
     PlayerFaction = playerFaction;
+    _scheduler = new TurnScheduler(HasLivingUnits, GetFactionAliveUnits);
 
     foreach (var faction in globalFactionOrder)
     {
       EnqueueFactionInGlobalOrder(faction);
     }
 
-    if (_globalFactionOrder.Count == 0)
+    if (_scheduler.GlobalFactionTurnOrder.Count == 0)
       throw new ArgumentException("Battle session requires at least one faction in the global order.");
 
     PlayerFaction.IfSome(EnqueueFactionInGlobalOrder);
 
-    _turnQueue = new Queue<Faction>(_globalFactionOrder);
-    ActiveSide = _turnQueue.Peek();
-    // Status ticks run before armor regen: a DoT tick re-arms the regen delay and
-    // suppresses that same turn's shield recharge.
-    RegisterListener<TurnEndedBattleEvent>(new StatusEffectSystem());
-    RegisterListener<TurnEndedBattleEvent>(new ArmorRegenSystem());
-    RegisterListener<TurnEndedBattleEvent>(new ObjectiveSystem());
+    _scheduler.InitializeQueueFromGlobalOrder();
+    // Order is load-bearing: status-effect tick -> armor regen -> objective evaluation.
+    // Status + armor are High (upkeep runs first); within High, StatusEffect registers
+    // before ArmorRegen because a DoT tick re-arms the regen delay (must precede regen).
+    // Objectives are Low so they evaluate after all upkeep, against post-tick/post-regen state.
+    RegisterListener<TurnEndedBattleEvent>(new StatusEffectSystem(), ListenerPriority.High);
+    RegisterListener<TurnEndedBattleEvent>(new ArmorRegenSystem(), ListenerPriority.High);
+    RegisterListener<TurnEndedBattleEvent>(new ObjectiveSystem(), ListenerPriority.Low);
+    // Reacts to thrown items, independent of the turn-end listener above: it is keyed on
+    // ItemThrownBattleEvent (a different event bucket), so this does not disturb the
+    // StatusEffect -> ArmorRegen -> Objective turn-end ordering.
+    RegisterListener<ItemThrownBattleEvent>(new CapabilityEffectSystem());
   }
 
   internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
@@ -119,7 +135,7 @@ public sealed class BattleSession
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetFactionExploredTiles(Faction side)
   {
     ArgumentNullException.ThrowIfNull(side);
-    return _exploredTilesByFaction.TryGetValue(side, out var tiles) ? tiles : EmptyTileSet;
+    return _visibility.GetExploredTiles(side);
   }
 
   internal bool IsUnitVisibleToFaction(Faction side, BattleUnitState target)
@@ -143,7 +159,7 @@ public sealed class BattleSession
   internal bool IsUnitStillAvailableThisTurn(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
-    return _activeFactionUnitsAvailable.Contains(unit);
+    return _scheduler.IsUnitAvailable(unit);
   }
 
   internal void StartBattle()
@@ -151,11 +167,11 @@ public sealed class BattleSession
     if (Phase != BattlePhase.Setup)
       throw new InvalidOperationException("Battle session can only be started from setup.");
 
-    RebuildRoundQueueFromLivingSides();
-    if (_turnQueue.Count == 0)
+    _scheduler.RebuildRoundQueueFromLivingSides();
+    if (_scheduler.RoundQueueCount == 0)
       throw new InvalidOperationException("Cannot start a battle without at least one living faction in the session.");
 
-    foreach (var side in _globalFactionOrder)
+    foreach (var side in _scheduler.GlobalFactionTurnOrder)
     {
       if (_operations[side].PendingObjectives.Count == 0)
         throw new InvalidOperationException(
@@ -164,13 +180,19 @@ public sealed class BattleSession
 
     Phase = BattlePhase.InProgress;
     TurnNumber = 1;
-    ActiveSide = _turnQueue.Peek();
-    _sidesActedThisRound.Clear();
+    _scheduler.SetActiveSideToQueueHead();
+    _scheduler.ClearSidesActedThisRound();
 
     foreach (var unit in AliveUnits)
       unit.RefreshForNewTurn();
 
-    RefreshCurrentFactionAvailability();
+    _scheduler.RefreshActiveFactionAvailability();
+
+    // Force a FULL recompute so the start events perform an authoritative pass. Board
+    // authoring that affects line of sight (tile BlocksLineOfSight) is finalized during
+    // setup, possibly after the last spawn's refresh, and is not an occupancy change, so
+    // only a full pass is guaranteed to pick it up.
+    _visibilityFullRefreshPending = true;
 
     RaiseEvents(
       new SessionStartedBattleEvent(),
@@ -191,14 +213,15 @@ public sealed class BattleSession
     bool occupantSet = Board.TryPlaceOccupant(position, unit.Id);
     if (!occupantSet)
       throw new InvalidOperationException($"Could not place unit {unit.Id} at {position.Raw}.");
+    MarkVisibilityAffected(unit);
 
     _units.Add(unit);
     EnqueueFactionInGlobalOrder(unit.Side);
 
-    if (Phase == BattlePhase.Setup && !_turnQueue.Contains(unit.Side))
-      _turnQueue.Enqueue(unit.Side);
+    if (Phase == BattlePhase.Setup)
+      _scheduler.EnqueueSideIfAbsent(unit.Side);
     if (Phase == BattlePhase.InProgress)
-      AddSpawnedUnitToCurrentRound(unit);
+      _scheduler.AddSpawnedUnit(unit);
 
     RaiseEvent(new UnitAddedBattleEvent(unit, position));
 
@@ -219,7 +242,7 @@ public sealed class BattleSession
 
     Option<ArmorState> armorState = unit.EquippedArmor.Map(
       armor => new ArmorState(armor.Capability.Current, armor.Capability.Element));
-    IReadOnlyList<PacketResolution> packetResolutions = DamageResolver.ResolvePackets(bundle, armorState);
+    IReadOnlyList<DamageResolution> packetResolutions = DamageResolver.ResolvePackets(bundle, armorState);
     DamageResolution resolution = DamageResolver.Resolve(packetResolutions);
 
     unit.EquippedArmor.IfSome(armor =>
@@ -243,9 +266,9 @@ public sealed class BattleSession
   private void ApplyStatusEffectsFrom(
     BattleUnitState unit,
     IReadOnlyList<Damage> bundle,
-    IReadOnlyList<PacketResolution> packetResolutions)
+    IReadOnlyList<DamageResolution> packetResolutions)
   {
-    foreach ((Damage damage, PacketResolution resolution) in bundle.Zip(packetResolutions))
+    foreach ((Damage damage, DamageResolution resolution) in bundle.Zip(packetResolutions))
     {
       if (damage.Amount <= 0)
         continue;
@@ -254,13 +277,36 @@ public sealed class BattleSession
       {
         if (spec.RequiresHealthDamage && resolution.HealthDamage <= 0)
           return;
-        if (spec.ApplyChancePercent < 100 && RollPercent() >= spec.ApplyChancePercent)
-          return;
 
-        ActiveStatusEffect applied = unit.ApplyStatusEffect(spec);
-        RaiseEvent(new UnitStatusEffectAppliedBattleEvent(unit, spec, applied.RemainingTurns));
+        TryApplyStatusEffect(unit, spec);
       });
     }
+  }
+
+  // Applies a status effect to a unit, gated by its ApplyChancePercent roll, and raises
+  // the applied event. Shared by the damage pipeline (ApplyStatusEffectsFrom) and direct
+  // application (ApplyStatusEffectTo). Callers are responsible for liveness and any
+  // damage-pipeline gating (e.g. RequiresHealthDamage).
+  private void TryApplyStatusEffect(BattleUnitState unit, StatusEffectSpecData spec)
+  {
+    if (spec.ApplyChancePercent < 100 && RollPercent() >= spec.ApplyChancePercent)
+      return;
+
+    ActiveStatusEffect applied = unit.ApplyStatusEffect(spec);
+    RaiseEvent(new UnitStatusEffectAppliedBattleEvent(unit, spec, applied.RemainingTurns));
+  }
+
+  // Applies a pure status effect (no damage) directly to a unit: the entry point used by
+  // capability/effect resolution (e.g. a thrown grenade's status payload). RequiresHealthDamage
+  // is a damage-pipeline concern and does not apply here. Does nothing if the unit is dead.
+  internal void ApplyStatusEffectTo(BattleUnitState unit, StatusEffectSpecData spec)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(spec);
+    if (unit.IsDead)
+      return;
+
+    TryApplyStatusEffect(unit, spec);
   }
 
   private void HandleUnitDeath(BattleUnitState unit)
@@ -278,8 +324,9 @@ public sealed class BattleSession
     bool occupantCleared = Board.TryClearOccupant(unitPoint, unit.Id);
     if (!occupantCleared)
       throw new InvalidOperationException($"Could not clear unit {unit.Id} from {unitPoint.Raw}.");
+    MarkVisibilityAffected(unit);
 
-    _activeFactionUnitsAvailable.Remove(unit);
+    _scheduler.TryConsumeAvailableUnit(unit);
     RaiseEvent(new UnitKilledBattleEvent(unit, unitPoint));
     HandleFactionLoss(unitSide);
 
@@ -304,7 +351,7 @@ public sealed class BattleSession
       throw new InvalidOperationException($"Cannot end activation for unit {unit.Id} because it is not on the board.");
     BattleBoardState.ValidatedPoint unitPoint = unitPointOption.Value();
 
-    if (!_activeFactionUnitsAvailable.Remove(unit))
+    if (!_scheduler.TryConsumeAvailableUnit(unit))
       throw new InvalidOperationException($"Unit {unit.Id} is not available this turn.");
 
     RaiseEvent(new UnitActivationEndedBattleEvent(unit, unitPoint));
@@ -325,18 +372,16 @@ public sealed class BattleSession
       return;
 
     // End-of-turn outcome. This runs after RaiseEvent above has fully drained the
-    // dispatch queue, so ObjectiveSystem has updated operation statuses AND any
-    // reaction listeners (e.g. a fail -> add-and-reactivate handler) have already
-    // run before we read the status. Resolve before any turn-queue mutation.
+    // dispatch queue, so the turn-end listeners (status -> armor -> ObjectiveSystem)
+    // have updated operation statuses AND any reaction listeners (e.g. a fail ->
+    // add-and-reactivate handler) have already run before we read the status.
+    // Resolve before any turn-queue mutation.
     if (TryEndBattleIfDecided())
       return;
 
-    _sidesActedThisRound.Add(ActiveSide);
+    _scheduler.MarkActiveSideActed();
 
-    _turnQueue.Dequeue();
-
-    RemoveEliminatedSidesFromQueue();
-    if (_turnQueue.Count == 0)
+    if (_scheduler.AdvanceToNextSide())
     {
       StartNextRound();
       return;
@@ -362,16 +407,19 @@ public sealed class BattleSession
     if (Phase == BattlePhase.Ended)
       return;
 
-    _activeFactionUnitsAvailable.Clear();
-    _turnQueue.Clear();
+    _scheduler.ClearActiveFactionAvailability();
+    _scheduler.ClearTurnQueue();
     Outcome = Some(outcome);
     Phase = BattlePhase.Ended;
 
     RaiseEvent(new SessionEndedBattleEvent(outcome));
   }
 
-  // Provisional win/lose rules and the single place a battle can end. To be
-  // replaced wholesale by the planned rules rework; keep all outcome logic here.
+  // Objective/operation-driven outcome decision at turn end: one of the two
+  // intentional places the battle can terminate. The other is the immediate-defeat
+  // branch in HandleUnitDeath, which ends the battle the moment the player faction is
+  // wiped (deliberate shipped behavior: a player wipe ends immediately rather than
+  // waiting for turn end). This method only runs the turn-end operation outcome rules.
   // Returns true iff it ended the battle.
   private bool TryEndBattleIfDecided()
   {
@@ -397,7 +445,7 @@ public sealed class BattleSession
       },
       None: () =>
       {
-        if (!_globalFactionOrder.Any(HasLivingUnits))
+        if (!_scheduler.GlobalFactionTurnOrder.Any(HasLivingUnits))
         {
           EndBattle(BattleOutcome.Draw);
           return true;
@@ -405,24 +453,6 @@ public sealed class BattleSession
 
         return false;
       });
-  }
-
-  private void AddSpawnedUnitToCurrentRound(BattleUnitState unit)
-  {
-    if (Phase != BattlePhase.InProgress)
-      throw new InvalidOperationException("Trying to spawn unit while battle hasn't started or is done.");
-    if (unit.Side == ActiveSide)
-    {
-      _activeFactionUnitsAvailable.Add(unit);
-      return;
-    }
-
-    if (_sidesActedThisRound.Contains(unit.Side))
-      return;
-    if (_turnQueue.Contains(unit.Side))
-      return;
-
-    _turnQueue.Enqueue(unit.Side);
   }
 
   internal Option<BattleBoardState.ValidatedPoint> GetUnitPosition(BattleUnitState unit)
@@ -449,6 +479,7 @@ public sealed class BattleSession
       throw new InvalidOperationException($"Unit {unit.Id} is indexed at {boardPosition.Value().Raw}, not {source.Raw}.");
     if (!Board.TryMoveOccupant(source, destination, unit.Id))
       throw new InvalidOperationException($"Could not move unit {unit.Id} from {source.Raw} to {destination.Raw}.");
+    MarkVisibilityAffected(unit);
 
     RaiseEvents(
       new UnitMovedBattleEvent(unit, destination, source),
@@ -462,7 +493,7 @@ public sealed class BattleSession
 
     if (unit.Side != ActiveSide)
       return false;
-    if (!_activeFactionUnitsAvailable.Contains(unit))
+    if (!_scheduler.IsUnitAvailable(unit))
       return false;
 
     return unit.CurrentActionPoints > 0 && !unit.IsImmobilized;
@@ -485,19 +516,23 @@ public sealed class BattleSession
     return GetFactionAliveUnits(side).Any();
   }
 
-  private void RefreshCurrentFactionAvailability()
-  {
-    _activeFactionUnitsAvailable.Clear();
-    foreach (var unit in GetFactionAliveUnits(ActiveSide))
-      _activeFactionUnitsAvailable.Add(unit);
-  }
-
   internal bool IsDispatchingEvents => _isDispatchingEvents;
 
-  internal void RegisterListener<TEventKey>(BattleEventListener listener)
+  internal void RegisterListener<TEventKey>(
+    BattleEventListener listener,
+    ListenerPriority priority = ListenerPriority.Regular)
     where TEventKey : BattleEventTag
   {
-    _listenerRegistry.Register<TEventKey>(listener);
+    _listenerRegistry.Register<TEventKey>(listener, priority);
+  }
+
+  // Records a unit whose own board cell changed (spawned/moved/removed) so the next dispatch
+  // can scope its visibility recompute to the affected units instead of the whole pool. A
+  // pending full refresh (battle start) still takes priority and clears this set.
+  private void MarkVisibilityAffected(BattleUnitState unit)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    _visibilityAffectedUnits.Add(unit);
   }
 
   internal void RaiseEvent(BattleEvent battleEvent)
@@ -529,9 +564,29 @@ public sealed class BattleSession
       while (_eventDispatchQueue.Count > 0)
       {
         BattleEvent battleEvent = _eventDispatchQueue.Dequeue();
-        // Per-event refresh is deliberate: a listener may mutate state between events.
-        RefreshVisibility();
+        // Refresh before each event's observers run, but only when occupancy actually
+        // changed since the last refresh (both the full flag and the affected set are
+        // written at the Board.Try* mutations / battle start, which always precede the
+        // matching event in this same drain). This preserves the mid-move guarantee — a
+        // step's occupancy mutation marks its unit affected before its event's observers
+        // run — while skipping recompute for non-occupancy events. A pending full refresh
+        // (battle start) supersedes and absorbs any accumulated affected units.
+        if (_visibilityFullRefreshPending)
+        {
+          _visibility.Refresh(Board, _units, AliveUnits);
+          _visibilityFullRefreshPending = false;
+          _visibilityAffectedUnits.Clear();
+        }
+        else if (_visibilityAffectedUnits.Count > 0)
+        {
+          _visibility.RefreshAffected(Board, _units, AliveUnits, _visibilityAffectedUnits);
+          _visibilityAffectedUnits.Clear();
+        }
         BattleEventCommitted.Invoke(battleEvent);
+        // Record into the executor's capture window after the public broadcast and before
+        // listeners run — exactly where the executor's old closure (subscribed last) ran.
+        if (_capturingCommittedEvents)
+          _committedEventCapture.Add(battleEvent);
         foreach (BattleEventListener listener in _listenerRegistry.GetMatchingListeners(battleEvent))
           listener.OnEventCommitted(this, battleEvent);
       }
@@ -548,159 +603,29 @@ public sealed class BattleSession
     }
   }
 
-  private void RefreshVisibility()
+  // Opens a fresh capture window for the executor: committed events are recorded into the
+  // reused buffer until EndCommittedEventCapture. Replaces the executor's old per-Execute
+  // subscribe on BattleEventCommitted without touching the public broadcast. Clears any prior
+  // contents so the window starts empty.
+  internal void BeginCommittedEventCapture()
   {
-    foreach (var unit in _units)
-      unit.ClearVisibility();
-
-    foreach (var observer in AliveUnits)
-    {
-      var observerPositionOption = Board.FindOccupantPosition(observer.Id);
-      if (observerPositionOption.IsNone)
-        throw new InvalidOperationException($"Living unit {observer.Id} is missing from the session position index.");
-      var observerPosition = observerPositionOption.Value();
-
-      SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> observerVisibleTiles = GetVisibleTiles(observer, observerPosition);
-      foreach (var visibleTile in observerVisibleTiles)
-        observer.AddVisibleTile(visibleTile);
-
-      MarkTilesExplored(observer.Side, observerVisibleTiles);
-
-      foreach (var visibleTile in observerVisibleTiles)
-      {
-        var occupantId = Board.GetOccupant(visibleTile);
-        if (occupantId.IsNone)
-          continue;
-        var target = _units[occupantId.Value()];
-        if (ReferenceEquals(target, observer) || target.IsDead)
-          continue;
-
-        observer.AddVisibleUnit(target);
-      }
-    }
+    _committedEventCapture.Clear();
+    _capturingCommittedEvents = true;
   }
 
-  private void MarkTilesExplored(Faction side, IEnumerable<BattleBoardState.ValidatedPoint> tiles)
+  // Closes the current capture window and returns the events committed during it, in commit
+  // order. The returned reference is the reused buffer; callers must consume it before the
+  // next BeginCommittedEventCapture clears it.
+  internal IReadOnlyList<BattleEvent> EndCommittedEventCapture()
   {
-    ArgumentNullException.ThrowIfNull(side);
-    ArgumentNullException.ThrowIfNull(tiles);
-
-    if (!_exploredTilesByFaction.TryGetValue(side, out var exploredTiles))
-    {
-      exploredTiles = [];
-      _exploredTilesByFaction.Add(side, exploredTiles);
-    }
-
-    exploredTiles.UnionWith(tiles);
-  }
-
-  private SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> GetVisibleTiles(
-    BattleUnitState observer,
-    BattleBoardState.ValidatedPoint observerPosition)
-  {
-    ArgumentNullException.ThrowIfNull(observer);
-
-    Queue<BattleBoardState.ValidatedPoint> frontier = new([observerPosition]);
-    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> visited = [];
-    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> visibleTiles = [];
-
-    while (frontier.Count > 0)
-    {
-      var current = frontier.Dequeue();
-      if (!visited.Add(current))
-        continue;
-      if (!IsWithinSameLevelVisionRange(observerPosition, current, observer.Vision))
-        continue;
-
-      visibleTiles.Add(current);
-      bool currentBlocksLineOfSight = current != observerPosition && Board.GetTile(current).BlocksLineOfSight;
-      if (!currentBlocksLineOfSight)
-      {
-        AddAdjacentDiagonalVisibleTiles(observerPosition, current, observer.Vision, visibleTiles);
-        foreach (var neighbor in EnumerateOrthogonalNeighbors(current))
-          frontier.Enqueue(neighbor);
-      }
-    }
-
-    return visibleTiles;
-  }
-
-  private IEnumerable<BattleBoardState.ValidatedPoint> EnumerateOrthogonalNeighbors(BattleBoardState.ValidatedPoint point)
-  {
-    foreach (var direction in OrthogonalDirections)
-    {
-      var neighborOption = Board.ValidatePoint(point.Raw + direction);
-      if (neighborOption.IsSome)
-        yield return neighborOption.Value();
-    }
-  }
-
-  private void AddAdjacentDiagonalVisibleTiles(
-    BattleBoardState.ValidatedPoint observerPosition,
-    BattleBoardState.ValidatedPoint visibleTile,
-    int vision,
-    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> visibleTiles)
-  {
-    foreach (var offset in AdjacentDiagonalOffsets)
-    {
-      Board.ValidatePoint(visibleTile.Raw + offset).IfSome((diagonal) =>
-      {
-        if (IsWithinSameLevelVisionRange(observerPosition, diagonal, vision) && HasOpenDiagonalSide(visibleTile, offset))
-          visibleTiles.Add(diagonal);
-      });
-    }
-  }
-
-  private bool HasOpenDiagonalSide(BattleBoardState.ValidatedPoint source, Vector3I diagonalOffset)
-  {
-    return IsOpenSide(source.Raw + new Vector3I(diagonalOffset.X, 0, 0))
-      || IsOpenSide(source.Raw + new Vector3I(0, 0, diagonalOffset.Z));
-  }
-
-  private bool IsOpenSide(Vector3I coordinates)
-  {
-    return Board.ValidatePoint(coordinates).Match(
-      side => !Board.GetTile(side).BlocksLineOfSight,
-      () => false);
-  }
-
-  private static bool IsWithinSameLevelVisionRange(
-    BattleBoardState.ValidatedPoint observerPosition,
-    BattleBoardState.ValidatedPoint target,
-    int vision)
-  {
-    if (target == observerPosition)
-      return true;
-    if (vision < 0 || target.Y != observerPosition.Y)
-      return false;
-
-    Vector3I delta = target.Raw - observerPosition.Raw;
-    return delta.LengthSquared() <= vision * vision;
-  }
-
-  private void RebuildRoundQueueFromLivingSides()
-  {
-    _turnQueue.Clear();
-
-    foreach (var side in _globalFactionOrder)
-    {
-      if (HasLivingUnits(side))
-        _turnQueue.Enqueue(side);
-    }
-  }
-
-  private void RemoveEliminatedSidesFromQueue()
-  {
-    _turnQueue = new Queue<Faction>(_turnQueue.Where(HasLivingUnits));
+    _capturingCommittedEvents = false;
+    return _committedEventCapture;
   }
 
   private void EnqueueFactionInGlobalOrder(Faction side)
   {
-    if (_globalFactionOrder.Contains(side))
-      return;
-
-    _globalFactionOrder.Enqueue(side);
-    _operations[side] = new Operation(side);
+    if (_scheduler.RegisterFaction(side))
+      _operations[side] = new Operation(side);
   }
 
   private void HandleFactionLoss(Faction side)
@@ -708,19 +633,7 @@ public sealed class BattleSession
     if (HasLivingUnits(side))
       return;
 
-    _sidesActedThisRound.Remove(side);
-    if (Phase != BattlePhase.InProgress || ActiveSide != side)
-    {
-      RemoveSideFromQueue(side);
-      return;
-    }
-
-    _activeFactionUnitsAvailable.Clear();
-  }
-
-  private void RemoveSideFromQueue(Faction side)
-  {
-    _turnQueue = new Queue<Faction>(_turnQueue.Where(faction => faction != side));
+    _scheduler.OnFactionEliminated(side, Phase == BattlePhase.InProgress && ActiveSide == side);
   }
 
   internal void AddObjective(Faction faction, Objective objective)
@@ -732,8 +645,7 @@ public sealed class BattleSession
     {
       op = new Operation(faction);
       _operations[faction] = op;
-      if (!_globalFactionOrder.Contains(faction))
-        _globalFactionOrder.Enqueue(faction);
+      _scheduler.RegisterFaction(faction);
     }
 
     op!.AddObjective(objective);
@@ -777,6 +689,21 @@ public sealed class BattleSession
     }
   }
 
+  // Evaluate EVERY faction's operation at a turn end, in the deterministic
+  // GlobalFactionTurnOrder, not just the faction whose turn just ended. An operation can
+  // become complete/failed because of ANOTHER faction's turn (e.g. an overwatch/mine
+  // reaction killing the last enemy during the enemy's turn completes the player's
+  // eliminate-all objective), so per-faction evaluation would resolve it a full round late
+  // (or never, if the owner cannot take another turn). EvaluateOperationAtTurnEnd guards
+  // Phase == InProgress, only advances an Active operation, and is idempotent for an
+  // already-resolved one, so evaluating all factions every turn end is safe and any
+  // re-evaluation is a no-op.
+  internal void EvaluateAllOperationsAtTurnEnd()
+  {
+    foreach (Faction faction in _scheduler.GlobalFactionTurnOrder)
+      EvaluateOperationAtTurnEnd(faction);
+  }
+
   internal Option<Operation> GetOperation(Faction faction)
   {
     ArgumentNullException.ThrowIfNull(faction);
@@ -786,10 +713,10 @@ public sealed class BattleSession
   private void StartNextRound()
   {
     TurnNumber++;
-    _sidesActedThisRound.Clear();
-    RebuildRoundQueueFromLivingSides();
+    _scheduler.ClearSidesActedThisRound();
+    _scheduler.RebuildRoundQueueFromLivingSides();
 
-    if (_turnQueue.Count == 0)
+    if (_scheduler.RoundQueueCount == 0)
       throw new InvalidOperationException(
         "StartNextRound reached with no living factions; TryEndBattleIfDecided ends the battle at the prior turn end.");
 
@@ -798,12 +725,11 @@ public sealed class BattleSession
 
   private void BeginNextQueuedSideTurn()
   {
-    var nextSide = _turnQueue.Peek();
-    ActiveSide = nextSide;
+    var nextSide = _scheduler.AdvanceActiveSideToQueueHead();
     foreach (var unit in GetFactionAliveUnits(nextSide))
       unit.RefreshForNewTurn();
 
-    RefreshCurrentFactionAvailability();
+    _scheduler.RefreshActiveFactionAvailability();
 
     RaiseEvents(
       new ActiveSideChangedBattleEvent(nextSide),

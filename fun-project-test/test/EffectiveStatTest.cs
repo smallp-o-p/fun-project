@@ -146,8 +146,7 @@ public class EffectiveStatTest
     var defenderPoint = board.ValidatePoint(new Godot.Vector3I(4, 0, 4)).RequireSome();
     var weapon = BattleTestFactory.MakeWeapon("Rifle");
     var attacker = new FunProject.Battle.BattleUnitState(1, combatant, Some(weapon), None);
-    var defender = new FunProject.Battle.BattleUnitState(2, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), None, None);
-    var context = new FunProject.Battle.AttackContext(attacker, defender, attackerPoint, defenderPoint, weapon, board);
+    var context = new FunProject.Battle.AttackContext(attacker, attackerPoint, defenderPoint, board);
 
     var breakdown = new FunProject.Battle.StandardHitChanceCalculator().Calculate(context);
     Assert.Equal(80, breakdown.BaseChance);

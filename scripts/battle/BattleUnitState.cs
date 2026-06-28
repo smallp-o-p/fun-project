@@ -13,7 +13,7 @@ namespace FunProject.Battle;
 
 public sealed class BattleUnitState
 {
-  private readonly List<EquippableItem> _inventory = [];
+  private readonly List<EquippableItem> _inventory;
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
   private readonly Dictionary<StatusEffectSpecData, ActiveStatusEffect> _activeStatusEffects = [];
@@ -35,7 +35,7 @@ public sealed class BattleUnitState
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
   public IReadOnlyCollection<ActiveStatusEffect> ActiveStatusEffects => _activeStatusEffects.Values;
-  public bool IsImmobilized => _activeStatusEffects.Values.Any(effect => !effect.IsExpired && effect.Spec is ImmobilizeStatusSpecData);
+  public bool IsImmobilized => _activeStatusEffects.Values.Any(effect => !effect.IsExpired && effect.BlocksAction);
 
   internal BattleUnitState(
     int unitId,
@@ -52,7 +52,9 @@ public sealed class BattleUnitState
     EquippedArmor = equippedArmor;
     CurrentHealth = MaxHealth;
     CurrentActionPoints = MaxActionPoints;
-    _inventory = combatant.Inventory;
+    // Defensive copy: battle-time inventory mutations must not write through to the
+    // shared, authored Combatant template (Data/Runtime ownership boundary).
+    _inventory = [.. combatant.Inventory];
   }
 
   public void RefreshForNewTurn()
@@ -86,7 +88,7 @@ public sealed class BattleUnitState
       return existing;
     }
 
-    var applied = new ActiveStatusEffect(spec);
+    var applied = ActiveStatusEffect.Create(spec);
     _activeStatusEffects[spec] = applied;
     return applied;
   }
@@ -134,6 +136,12 @@ public sealed class BattleUnitState
   {
     ArgumentNullException.ThrowIfNull(unit);
     _visibleUnits.Add(unit);
+  }
+
+  internal void RemoveVisibleUnit(BattleUnitState unit)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    _visibleUnits.Remove(unit);
   }
 
   public float EffectiveStat<TStat>() where TStat : Stat

@@ -6,7 +6,6 @@ namespace FunProject.Battle;
 public sealed class BattleRuntime : IDisposable
 {
   private readonly BattleSession _session;
-  private readonly BattleQueryRunner _queries;
   private readonly BattleActionExecutor _actions;
   private bool _disposed;
 
@@ -28,7 +27,6 @@ public sealed class BattleRuntime : IDisposable
     ArgumentNullException.ThrowIfNull(session);
 
     _session = session;
-    _queries = new BattleQueryRunner(session);
     _actions = new BattleActionExecutor(session);
 
     _session.BattleEventCommitted += RaiseBattleEventCommitted;
@@ -39,7 +37,8 @@ public sealed class BattleRuntime : IDisposable
   public Either<BattleQueryFailure, TResult> Query<TResult>(BattleSessionQuery<TResult> query)
   {
     ThrowIfDisposed();
-    return _queries.Execute(query);
+    ArgumentNullException.ThrowIfNull(query);
+    return query.Execute(_session);
   }
 
   public IReadOnlyList<BattleActionResult> ExecuteAction(BattleAction action)

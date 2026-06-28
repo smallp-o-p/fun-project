@@ -10,6 +10,4 @@ public sealed class EliminateAllOpposingForcesObjective : Objective
 
   public override bool IsComplete(BattleSession session) =>
     session.GlobalFactionTurnOrder.All(side => side == Owner || !session.HasLivingUnits(side));
-
-  public override bool IsFailed(BattleSession session) => !session.HasLivingUnits(Owner);
 }

@@ -42,9 +42,16 @@ public static class BattleFactory
         placement.Loadout.Weapon,
         placement.Loadout.Armor);
       BattleActionResult result = runtime.ExecuteAction(spawn).Single();
+      // SpawnUnit is the single authority on placement legality: rather than
+      // re-checking occupancy up front and then asserting the commit "can't
+      // fail", surface its rejection as the typed setup failure it represents.
       if (!result.Succeeded)
-        throw new InvalidOperationException(
-          $"Spawn for {placement.Loadout.Combatant.Name} failed after validation: {result.Message}");
+      {
+        runtime.Dispose();
+        return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
+          BattleSetupFailureReason.SpawnCellUnavailable,
+          $"Spawn cell {placement.Position} for {placement.Loadout.Combatant.Name} is out of bounds or not occupiable."));
+      }
     }
 
     BattleActionResult startResult = runtime.ExecuteAction(BattleAction.StartBattle()).Single();
@@ -128,23 +135,27 @@ public static class BattleFactory
     return null;
   }
 
-  private static BattleSetupFailure? Validate(BattleSetup setup) =>
-    CheckPlayerFaction(setup)
-    ?? CheckObjectivesPresent(setup)
-    ?? CheckObjectiveFactionsKnown(setup)
-    ?? CheckPlacementFactions(setup)
-    ?? CheckDuplicateCells(setup)
-    ?? CheckSpawnCells(setup);
-
-  private static BattleSetupFailure? CheckPlayerFaction(BattleSetup setup)
+  // Spawn-cell occupancy is intentionally NOT pre-validated here: SpawnUnit owns
+  // that decision, and the Start spawn loop surfaces its rejection as a typed
+  // SpawnCellUnavailable failure. Duplicate cells stay a factory-level check so
+  // a shared cell reports the specific DuplicateSpawnCell reason instead of the
+  // generic "occupied" rejection SpawnUnit would give for the second unit.
+  private static BattleSetupFailure? Validate(BattleSetup setup)
   {
     var factionSet = new SysColGeneric.HashSet<Faction>(setup.FactionOrder);
-    return setup.PlayerFaction.Match(
+    return CheckPlayerFaction(setup, factionSet)
+      ?? CheckObjectivesPresent(setup)
+      ?? CheckObjectiveFactionsKnown(setup, factionSet)
+      ?? CheckPlacementFactions(setup, factionSet)
+      ?? CheckDuplicateCells(setup);
+  }
+
+  private static BattleSetupFailure? CheckPlayerFaction(BattleSetup setup, SysColGeneric.HashSet<Faction> factionSet) =>
+    setup.PlayerFaction.Match(
       Some: player => factionSet.Contains(player)
         ? null
         : new BattleSetupFailure(BattleSetupFailureReason.UnknownFaction, $"PlayerFaction {player.Name} is not in FactionOrder."),
       None: () => (BattleSetupFailure?)null);
-  }
 
   private static BattleSetupFailure? CheckObjectivesPresent(BattleSetup setup)
   {
@@ -157,9 +168,8 @@ public static class BattleFactory
     return null;
   }
 
-  private static BattleSetupFailure? CheckObjectiveFactionsKnown(BattleSetup setup)
+  private static BattleSetupFailure? CheckObjectiveFactionsKnown(BattleSetup setup, SysColGeneric.HashSet<Faction> factionSet)
   {
-    var factionSet = new SysColGeneric.HashSet<Faction>(setup.FactionOrder);
     foreach (Faction faction in setup.Objectives.Keys)
     {
       if (!factionSet.Contains(faction))
@@ -169,9 +179,8 @@ public static class BattleFactory
     return null;
   }
 
-  private static BattleSetupFailure? CheckPlacementFactions(BattleSetup setup)
+  private static BattleSetupFailure? CheckPlacementFactions(BattleSetup setup, SysColGeneric.HashSet<Faction> factionSet)
   {
-    var factionSet = new SysColGeneric.HashSet<Faction>(setup.FactionOrder);
     foreach (UnitPlacement placement in setup.Placements)
     {
       Combatant combatant = placement.Loadout.Combatant;
@@ -193,22 +202,6 @@ public static class BattleFactory
         return new BattleSetupFailure(
           BattleSetupFailureReason.DuplicateSpawnCell,
           $"Two units share spawn cell {placement.Position}.");
-    }
-
-    return null;
-  }
-
-  private static BattleSetupFailure? CheckSpawnCells(BattleSetup setup)
-  {
-    foreach (UnitPlacement placement in setup.Placements)
-    {
-      bool occupiable = setup.Board.ValidatePoint(placement.Position).Match(
-        Some: point => setup.Board.CanOccupy(point),
-        None: () => false);
-      if (!occupiable)
-        return new BattleSetupFailure(
-          BattleSetupFailureReason.SpawnCellUnavailable,
-          $"Spawn cell {placement.Position} for {placement.Loadout.Combatant.Name} is out of bounds or not occupiable.");
     }
 
     return null;

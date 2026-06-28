@@ -8,8 +8,6 @@ public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>
 {
   public BattleUnitState ObserverUnit { get; }
   public BattleUnitState TargetUnit { get; }
-  internal int ObserverUnitId => ObserverUnit.Id;
-  internal int TargetUnitId => TargetUnit.Id;
 
   public IsUnitVisibleToUnit(BattleUnitState observerUnit, BattleUnitState targetUnit)
   {
@@ -25,7 +23,7 @@ public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>
       return FailUnitNotAlive(ObserverUnit);
     if (!TargetUnit.IsAlive)
       return FailUnitNotAlive(TargetUnit);
-    if (ObserverUnitId == TargetUnitId)
+    if (ReferenceEquals(ObserverUnit, TargetUnit))
       return Succeed(true);
 
     return Succeed(ObserverUnit.VisibleUnits.Contains(TargetUnit));
@@ -36,7 +34,6 @@ public sealed class IsUnitVisibleToFaction : BattleSessionQuery<bool>
 {
   public Faction Faction { get; }
   public BattleUnitState TargetUnit { get; }
-  internal int TargetUnitId => TargetUnit.Id;
 
   public IsUnitVisibleToFaction(Faction faction, BattleUnitState targetUnit)
   {
@@ -94,7 +91,6 @@ public sealed class HasFactionExploredTile : BattleSessionQuery<bool>
 public sealed class GetVisibleEnemiesForUnit : BattleSessionQuery<IReadOnlyCollection<BattleUnitState>>
 {
   public BattleUnitState ObserverUnit { get; }
-  internal int ObserverUnitId => ObserverUnit.Id;
 
   public GetVisibleEnemiesForUnit(BattleUnitState observerUnit)
   {
@@ -125,8 +121,20 @@ public sealed class GetVisibleUnitsForFaction : BattleSessionQuery<IReadOnlyColl
 
   internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
   {
+    // Union the already-materialized per-observer visible-unit sets instead of asking
+    // IsUnitVisibleToFaction for every unit in the pool (that pass rescanned all observers
+    // per unit: O(units x observers)). Each alive faction observer's VisibleUnits already
+    // enumerates exactly the units it currently sees.
+    var visibleToObservers = new SysColGeneric.HashSet<BattleUnitState>();
+    foreach (var observer in session.GetFactionAliveUnits(Faction))
+      visibleToObservers.UnionWith(observer.VisibleUnits);
+
+    // Same result set and ordering as before: iterate AliveUnits in pool order, keep every
+    // own-side unit unconditionally (mirrors IsUnitVisibleToFaction's same-side short circuit)
+    // plus any other unit seen by some observer. Filtering AliveUnits also drops any stale
+    // dead reference exactly as the prior AliveUnits.Where did.
     return Succeed(session.AliveUnits
-      .Where(unit => session.IsUnitVisibleToFaction(Faction, unit))
+      .Where(unit => unit.Side == Faction || visibleToObservers.Contains(unit))
       .ToArray());
   }
 }

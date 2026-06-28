@@ -15,7 +15,6 @@ public sealed class PlayerActionController
 
   private readonly BattleRuntime _runtime;
   private readonly Faction _playerFaction;
-  private readonly SysColGeneric.HashSet<Vector3I> _candidateCells = [];
   private IReadOnlyList<UnitActionOption> _options = [];
   private Option<IActionTargeting> _currentActionTargeter;
   private Option<Vector3I> _pendingTarget;
@@ -24,7 +23,13 @@ public sealed class PlayerActionController
   public Option<BattleUnitState> SelectedUnit { get; private set; }
   public TargetingMode Mode { get; private set; } = TargetingMode.None;
   public IReadOnlyList<UnitActionOption> ActionOptions => _options;
-  public IReadOnlyCollection<Vector3I> CandidateCells => _candidateCells;
+
+  // The active targeting handler owns its candidate set; render from it directly (no local duplicate).
+  public IReadOnlyCollection<Vector3I> CandidateCells =>
+    _currentActionTargeter.Match(
+      Some: handler => handler.Candidates,
+      None: () => System.Array.Empty<Vector3I>());
+
   public Option<Vector3I> PendingTarget => _pendingTarget;
   public Option<ActionPreview> LastPreview => _lastPreview;
 
@@ -130,9 +135,7 @@ public sealed class PlayerActionController
   private void StartTargeting(IActionTargeting handler)
   {
     _currentActionTargeter = Some(handler);
-    _candidateCells.Clear();
-    foreach (Vector3I cell in handler.Begin())
-      _candidateCells.Add(cell);
+    handler.Begin(); // populates the handler's own candidate set, which CandidateCells reads from
     _pendingTarget = None;
     _lastPreview = None;
     Mode = TargetingMode.ActionTargeting;
@@ -150,15 +153,32 @@ public sealed class PlayerActionController
   {
     _options = SelectedUnit.Match(
       Some: unit => _runtime.Query(new GetUnitActionOptions(unit)).Match(
-        Right: o => o,
+        Right: availability => BuildOptions(unit, availability),
         Left: []),
       None: []);
+  }
+
+  // Presentation-side mapping: turn the domain availability fact into concrete verb options. Each verb
+  // takes its availability straight from the fact (single source) and supplies its own targeting handler.
+  // Attack is included only when a weapon is equipped (matching the verb's capability requirement).
+  private static IReadOnlyList<UnitActionOption> BuildOptions(BattleUnitState unit, UnitActionAvailability availability)
+  {
+    var options = new List<UnitActionOption>
+    {
+      new MoveActionOption(unit, availability.CanMove),
+    };
+
+    unit.EquippedWeapon.IfSome(weapon =>
+      options.Add(new AttackActionOption(unit, weapon, availability.CanAttack)));
+
+    options.Add(new PassActionOption(unit, availability.CanPass));
+    options.Add(new EndTurnActionOption(unit, availability.CanEndTurn));
+    return options;
   }
 
   private void ResetTargeting()
   {
     _currentActionTargeter = None;
-    _candidateCells.Clear();
     _pendingTarget = None;
     _lastPreview = None;
     Mode = TargetingMode.None;
