@@ -1,9 +1,14 @@
-[gd_resource type="Resource" script_class="CriticalChanceEquippableStatMod" load_steps=2 format=3 uid="uid://qjy7hpvmcbex"]
+[gd_resource type="Resource" script_class="MultiStatMod" load_steps=4 format=3 uid="uid://qjy7hpvmcbex"]
 
-[ext_resource type="Script" uid="uid://ctjfkj0qkbtvg" path="res://scripts/stats/concrete_mods/CriticalChanceEquippableStatMod.cs" id="1_mod"]
+[ext_resource type="Script" path="res://scripts/stats/MultiStatMod.cs" id="1_multi"]
+[ext_resource type="Script" path="res://scripts/stats/concrete_mods/CriticalChanceStatMod.cs" id="2_crit"]
+
+[sub_resource type="Resource" id="crit_statmod"]
+script = ExtResource("2_crit")
+Modifiers = []
 
 [resource]
-script = ExtResource("1_mod")
+script = ExtResource("1_multi")
 Name = "Tungsten Penetrator Rounds"
 Description = "Density over diameter. These slugs punch through what steel hides, sacrificing raw splash for a guaranteed floor on critical rolls."
-Modifiers = []
+StatMods = [SubResource("crit_statmod")]

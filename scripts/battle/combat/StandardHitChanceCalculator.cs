@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FunProject.Stats;
+using Godot;
 
 namespace FunProject.Battle;
 
@@ -15,8 +16,8 @@ public sealed class StandardHitChanceCalculator : IHitChanceCalculator
   {
     ArgumentNullException.ThrowIfNull(context);
 
-    int baseChance = context.Attacker.Combatant.TryGetStat<AimStat>().Match(
-      stat => stat.BaseValue,
+    int baseChance = context.Attacker.TryEffectiveStat<AimStat>().Match(
+      value => Mathf.RoundToInt(value),
       () => 0);
 
     List<HitChanceModifier> modifiers = [];

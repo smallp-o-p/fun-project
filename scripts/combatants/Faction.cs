@@ -17,6 +17,7 @@ public class Faction : HasNameAndDescription
   public string Name { get; set; } = "Faction";
   public string Description { get; set; } = "Faction Description";
   public Dictionary<Faction, Stat> FriendlinessToOthers { get; set; } = [];
+  public IReadOnlyList<StatMod> StatBonuses { get; }
 
   public string GetName()
   {
@@ -32,5 +33,6 @@ public class Faction : HasNameAndDescription
   {
     Name = data.Name;
     Description = data.Description;
+    StatBonuses = new List<StatMod>(data.FactionBonuses);
   }
 }

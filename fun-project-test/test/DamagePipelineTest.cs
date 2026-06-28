@@ -4,6 +4,7 @@ using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
 using System;
+using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -26,10 +27,10 @@ public class DamagePipelineTest
     Assert.Equal(new Damage(5, Element.Kinetic), new DamagePacketData().Derive(5));
   }
 
-  [TestCase(TestName = "UniformDamageBundleMod folds ops over every packet")]
+  [TestCase(TestName = "PacketModifier scaling all elements folds ops over every packet")]
   public void UniformFoldsOpsOverEveryPacket()
   {
-    var mod = new UniformDamageBundleMod { Ops = [StatModifier.Add(2), StatModifier.Multiply(2f)] };
+    var mod = new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(2), StatModifier.Multiply(2f)] }] };
 
     var result = mod.Apply(
       [new Damage(4, Element.Kinetic), new Damage(3, Element.Thermal)],
@@ -40,13 +41,12 @@ public class DamagePipelineTest
     Assert.Equal(new Damage(10, Element.Thermal), result[1]);
   }
 
-  [TestCase(TestName = "ElementFilterDamageBundleMod only touches matching packets")]
+  [TestCase(TestName = "PacketModifier element filter only touches matching packets")]
   public void ElementFilterOnlyTouchesMatchingPackets()
   {
-    var mod = new ElementFilterDamageBundleMod
+    var mod = new DamageBundleMod
     {
-      Element = Element.Thermal,
-      Ops = [StatModifier.Add(5)],
+      PacketModifiers = [new PacketModifier { Element = Element.Thermal, Ops = [StatModifier.Add(5)] }],
     };
 
     var result = mod.Apply(
@@ -57,12 +57,12 @@ public class DamagePipelineTest
     Assert.Equal(new Damage(8, Element.Thermal), result[1]);
   }
 
-  [TestCase(TestName = "AddPacketDamageBundleMod appends a packet derived from base damage")]
+  [TestCase(TestName = "DamageBundleMod AddedPackets appends a packet derived from base damage")]
   public void AddPacketAppendsDerivedPacket()
   {
-    var mod = new AddPacketDamageBundleMod
+    var mod = new DamageBundleMod
     {
-      Packet = new DamagePacketData { Element = Element.Chem, Multiplier = 0.5f },
+      AddedPackets = [new DamagePacketData { Element = Element.Chem, Multiplier = 0.5f }],
     };
 
     var result = mod.Apply([new Damage(6, Element.Kinetic)], new DamageEmissionContext(6));
@@ -71,18 +71,18 @@ public class DamagePipelineTest
     Assert.Equal(new Damage(3, Element.Chem), result[1]);
   }
 
-  [TestCase(TestName = "AddPacketDamageBundleMod with no packet authored throws")]
+  [TestCase(TestName = "DamageBundleMod with a null added packet throws")]
   public void AddPacketWithoutPacketThrows()
   {
-    var mod = new AddPacketDamageBundleMod();
+    var mod = new DamageBundleMod { AddedPackets = [null] };
     Assert.Throws<ArgumentNullException>(
       () => mod.Apply([new Damage(6, Element.Kinetic)], new DamageEmissionContext(6)));
   }
 
-  [TestCase(TestName = "RemoveElementDamageBundleMod removes all matching packets")]
+  [TestCase(TestName = "PacketModifier remove drops all matching packets")]
   public void RemoveElementRemovesAllMatchingPackets()
   {
-    var mod = new RemoveElementDamageBundleMod { Element = Element.Kinetic };
+    var mod = new DamageBundleMod { PacketModifiers = [new PacketModifier { Element = Element.Kinetic, Remove = true }] };
 
     var result = mod.Apply(
       [new Damage(4, Element.Kinetic), new Damage(2, Element.Thermal), new Damage(1, Element.Kinetic)],
@@ -98,7 +98,7 @@ public class DamagePipelineTest
     var mod = new DamageBundleEquippableMod
     {
       Name = "Test Damage Mod",
-      BundleMods = [new UniformDamageBundleMod { Ops = [StatModifier.Add(1)] }],
+      BundleMods = [new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(1)] }] }],
     };
 
     var slot = new ModSlot();
@@ -106,7 +106,7 @@ public class DamagePipelineTest
 
     Assert.True(slot.HasMod);
     Assert.Equal(1, mod.BundleMods.Count);
-    Assert.Equal(0, mod.Apply(new FirearmWeapon(MakeFirearmData(damage: 4, BattleTestFactory.MakeFrame()))).Count);
+    Assert.False(mod.StatContributions.Any());
   }
 
   private static FirearmWeaponData MakeFirearmData(int damage, WeaponFrameData frame, Ammunition ammo = null, int modSlots = 0) => new()
@@ -142,8 +142,8 @@ public class DamagePipelineTest
     {
       BundleMods =
       [
-        new UniformDamageBundleMod { Ops = [StatModifier.Add(2)] },
-        new UniformDamageBundleMod { Ops = [StatModifier.Multiply(2f)] },
+        new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(2)] }] },
+        new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Multiply(2f)] }] },
       ],
     });
 
@@ -156,12 +156,12 @@ public class DamagePipelineTest
   {
     var ammo = new Ammunition
     {
-      DamageMods = [new UniformDamageBundleMod { Ops = [StatModifier.Add(1)] }],
+      DamageMods = [new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(1)] }] }],
     };
     var weapon = new FirearmWeapon(MakeFirearmData(damage: 4, BattleTestFactory.MakeFrame(), ammo, modSlots: 1));
     weapon.GetModSlots()[0].Equip(new DamageBundleEquippableMod
     {
-      BundleMods = [new UniformDamageBundleMod { Ops = [StatModifier.Multiply(2f)] }],
+      BundleMods = [new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Multiply(2f)] }] }],
     });
 
     // slots first: 4 * 2 = 8, then ammo: 8 + 1 = 9. Ammo-first would give (4 + 1) * 2 = 10.
@@ -176,8 +176,8 @@ public class DamagePipelineTest
     {
       BundleMods =
       [
-        new UniformDamageBundleMod { Ops = [StatModifier.Add(-10)] },  // 4 -> -6 mid-pipeline
-        new UniformDamageBundleMod { Ops = [StatModifier.Add(20)] },   // -6 -> 14: restored
+        new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(-10)] }] },  // 4 -> -6 mid-pipeline
+        new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(20)] }] },   // -6 -> 14: restored
       ],
     });
 
@@ -191,7 +191,7 @@ public class DamagePipelineTest
     var weapon = new FirearmWeapon(MakeFirearmData(damage: 4, frame, modSlots: 1));
     weapon.GetModSlots()[0].Equip(new DamageBundleEquippableMod
     {
-      BundleMods = [new ElementFilterDamageBundleMod { Element = Element.Kinetic, Ops = [StatModifier.Multiply(0f)] }],
+      BundleMods = [new DamageBundleMod { PacketModifiers = [new PacketModifier { Element = Element.Kinetic, Ops = [StatModifier.Multiply(0f)] }] }],
     });
 
     var bundle = weapon.EmitDamage();
@@ -212,7 +212,7 @@ public class DamagePipelineTest
   public void StatModsOnOtherStatsLeaveBundleUntouched()
   {
     var weapon = new FirearmWeapon(MakeFirearmData(damage: 4, BattleTestFactory.MakeFrame(), modSlots: 1));
-    weapon.GetModSlots()[0].Equip(new RangeEquippableStatMod { Modifiers = [StatModifier.Add(10)] });
+    weapon.GetModSlots()[0].Equip(new MultiStatMod { StatMods = [new RangeStatMod { Modifiers = [StatModifier.Add(10)] }] });
 
     Assert.Equal(new Damage(4, Element.Kinetic), weapon.EmitDamage()[0]);
   }

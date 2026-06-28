@@ -1,12 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using Godot;
 using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
 using FunProject.Stats;
 using FunProject.Weapons;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -26,11 +27,11 @@ public sealed class BattleUnitState
   internal IReadOnlySet<BattleUnitState> VisibleUnits => _visibleUnits;
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> VisibleTiles => _visibleTiles;
 
-  public int MaxHealth => GetBaseStatValue<HealthStat>();
+  public int MaxHealth => Mathf.RoundToInt(EffectiveStat<HealthStat>());
   public int CurrentHealth { get; private set; }
-  public int MaxActionPoints => GetBaseStatValue<ActionPointsStat>();
+  public int MaxActionPoints => Mathf.RoundToInt(EffectiveStat<ActionPointsStat>());
   public int CurrentActionPoints { get; private set; }
-  public int Vision => GetBaseStatValue<VisionStat>();
+  public int Vision => Mathf.RoundToInt(EffectiveStat<VisionStat>());
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
   public IReadOnlyCollection<ActiveStatusEffect> ActiveStatusEffects => _activeStatusEffects.Values;
@@ -135,10 +136,13 @@ public sealed class BattleUnitState
     _visibleUnits.Add(unit);
   }
 
-  private int GetBaseStatValue<TStat>() where TStat : Stat
-  {
-    return Combatant.TryGetStat<TStat>().Match(
-      stat => stat.BaseValue,
-      () => 0);
-  }
+  public float EffectiveStat<TStat>() where TStat : Stat
+    => ((HasStats)Combatant).Resolve<TStat>(GatherStatContributions());
+
+  public Option<float> TryEffectiveStat<TStat>() where TStat : Stat
+    => ((HasStats)Combatant).TryResolve<TStat>(GatherStatContributions());
+
+  private IEnumerable<StatMod> GatherStatContributions()
+    => Combatant.StatContributions()
+         .Concat(EquippedWeapon.Match(w => w.StatContributions, () => System.Linq.Enumerable.Empty<StatMod>()));
 }

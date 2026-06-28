@@ -1,14 +1,20 @@
-[gd_resource type="Resource" script_class="RangeEquippableStatMod" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="MultiStatMod" load_steps=6 format=3]
 
-[ext_resource type="Script" path="res://scripts/stats/concrete_mods/RangeEquippableStatMod.cs" id="1_mod"]
-[ext_resource type="Script" path="res://scripts/stats/Modifier.cs" id="2_modifier"]
+[ext_resource type="Script" path="res://scripts/stats/MultiStatMod.cs" id="1_multi"]
+[ext_resource type="Script" path="res://scripts/stats/concrete_mods/RangeStatMod.cs" id="2_range"]
+[ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="3_modifier"]
 
-[sub_resource type="StatModifier_Add" id="1"]
-script = ExtResource("2_modifier")
+[sub_resource type="Resource" id="mod_add10"]
+script = ExtResource("3_modifier")
+Operation = 0
 Value = 10.0
 
+[sub_resource type="Resource" id="range_statmod"]
+script = ExtResource("2_range")
+Modifiers = [SubResource("mod_add10")]
+
 [resource]
-script = ExtResource("1_mod")
+script = ExtResource("1_multi")
 Name = "Long Barrel Forging"
 Description = "Cold-hammered extension that lets the propellant burn longer. More muzzle energy translates to flatter trajectories and harder hits at distance."
-Modifiers = [SubResource("1")]
+StatMods = [SubResource("range_statmod")]

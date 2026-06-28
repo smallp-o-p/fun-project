@@ -48,7 +48,7 @@ public sealed class GetHitChanceForAttack : BattleSessionQuery<HitChanceBreakdow
 
     if (!Attacker.VisibleUnits.Contains(Target))
       return Fail(BattleQueryFailureReason.InvalidBattleState, $"{Attacker.Combatant.Name} cannot see {Target.Combatant.Name}.");
-    if (BattleSession.GetGridDistance(attackerPoint.Raw, targetPoint.Raw) > weapon.GetRangeStat().BaseValue)
+    if (BattleSession.GetGridDistance(attackerPoint.Raw, targetPoint.Raw) > weapon.EffectiveRange)
       return Fail(BattleQueryFailureReason.InvalidBattleState, $"{Target.Combatant.Name} is out of range for {weapon.ItemName}.");
 
     AttackContext context = new(Attacker, Target, attackerPoint, targetPoint, weapon, session.Board);

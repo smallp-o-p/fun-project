@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="DamageBundleEquippableMod" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="DamageBundleEquippableMod" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/weapons/damage/mods/DamageBundleEquippableMod.cs" id="1_mod"]
 [ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="2_statmod"]
-[ext_resource type="Script" path="res://scripts/weapons/damage/mods/UniformDamageBundleMod.cs" id="3_uniform"]
+[ext_resource type="Script" path="res://scripts/weapons/damage/mods/DamageBundleMod.cs" id="3_bundle"]
+[ext_resource type="Script" path="res://scripts/weapons/damage/mods/PacketModifier.cs" id="4_packetmod"]
 
 [sub_resource type="Resource" id="Resource_scale"]
 script = ExtResource("2_statmod")
@@ -10,11 +11,16 @@ Operation = 1
 Value = 0.85
 
 [sub_resource type="Resource" id="Resource_uniform"]
-script = ExtResource("3_uniform")
+script = ExtResource("4_packetmod")
+AffectAllElements = true
 Ops = Array[Object]([SubResource("Resource_scale")])
+
+[sub_resource type="Resource" id="Resource_bundle"]
+script = ExtResource("3_bundle")
+PacketModifiers = Array[Object]([SubResource("Resource_uniform")])
 
 [resource]
 script = ExtResource("1_mod")
 Name = "Suppressor Coil"
 Description = "A coiled baffle stack that swallows the report. Quieter pull at the cost of muzzle velocity and long-range bite."
-BundleMods = Array[Object]([SubResource("Resource_uniform")])
+BundleMods = Array[Object]([SubResource("Resource_bundle")])

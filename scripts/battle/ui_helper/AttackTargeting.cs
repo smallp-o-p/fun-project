@@ -36,7 +36,7 @@ public sealed class AttackTargeting : IActionTargeting
     if (from is null)
       return System.Array.Empty<Vector3I>();
 
-    int range = _weapon.GetRangeStat().BaseValue;
+    int range = _weapon.EffectiveRange;
     IReadOnlyCollection<BattleUnitState> enemies = _runtime.Query(new GetVisibleEnemiesForUnit(_unit)).Match(
       Right: e => e, Left: _ => System.Array.Empty<BattleUnitState>());
 

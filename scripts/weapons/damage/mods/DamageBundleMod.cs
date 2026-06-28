@@ -1,24 +1,32 @@
 using System;
 using System.Collections.Generic;
-using FunProject.Stats;
+using System.Linq;
 using Godot;
 
 namespace FunProject.Weapons;
 
-public abstract partial class DamageBundleMod : Resource
+[GlobalClass]
+public partial class DamageBundleMod : Resource
 {
-  // Bundle in, bundle out — each concrete decides its own packet selection.
-  public abstract List<Damage> Apply(List<Damage> bundle, DamageEmissionContext context);
+  [Export] public Godot.Collections.Array<PacketModifier> PacketModifiers { get; set; } = [];
+  [Export] public Godot.Collections.Array<DamagePacketData> AddedPackets { get; set; } = [];
 
-  protected static int FoldOps(int amount, IEnumerable<StatModifier> ops)
+  public List<Damage> Apply(List<Damage> bundle, DamageEmissionContext context)
   {
-    float value = amount;
-    foreach (StatModifier op in ops)
+    IEnumerable<Damage> result = bundle;
+    foreach (PacketModifier modifier in PacketModifiers)
     {
-      ArgumentNullException.ThrowIfNull(op);
-      value = op.Apply(value);
+      ArgumentNullException.ThrowIfNull(modifier);
+      result = modifier.Apply(result);
     }
 
-    return Mathf.RoundToInt(value);
+    List<Damage> emitted = result.ToList();
+    foreach (DamagePacketData packet in AddedPackets)
+    {
+      ArgumentNullException.ThrowIfNull(packet);
+      emitted.Add(packet.Derive(context.BaseDamage));
+    }
+
+    return emitted;
   }
 }

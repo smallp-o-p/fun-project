@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace FunProject.Stats;
@@ -24,4 +26,10 @@ public partial class ModSlot : Resource
 public interface HasModSlots
 {
   Godot.Collections.Array<ModSlot> GetModSlots();
+}
+
+public static class HasModSlotsExtensions
+{
+  public static IEnumerable<EquippableMod> EquippedMods(this HasModSlots host)
+    => host.GetModSlots().Select(slot => slot.EquippedMod).Somes();
 }

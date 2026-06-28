@@ -8,6 +8,8 @@ public enum ModifierOperation
   Multiply,
   CapMin,
   CapMax,
+  PercentAdd,
+  Override,
 }
 
 [GlobalClass]
@@ -20,16 +22,6 @@ public partial class StatModifier : Resource
   public static StatModifier Multiply(float multiplier) => new StatModifier { Operation = ModifierOperation.Multiply, Value = multiplier };
   public static StatModifier CapMin(float min) => new StatModifier { Operation = ModifierOperation.CapMin, Value = min };
   public static StatModifier CapMax(float max) => new StatModifier { Operation = ModifierOperation.CapMax, Value = max };
-
-  public float Apply(float value)
-  {
-    return Operation switch
-    {
-      ModifierOperation.Add => value + Value,
-      ModifierOperation.Multiply => value * Value,
-      ModifierOperation.CapMin => Mathf.Max(value, Value),
-      ModifierOperation.CapMax => Mathf.Min(value, Value),
-      _ => value,
-    };
-  }
+  public static StatModifier PercentAdd(float fraction) => new StatModifier { Operation = ModifierOperation.PercentAdd, Value = fraction };
+  public static StatModifier Override(float value) => new StatModifier { Operation = ModifierOperation.Override, Value = value };
 }

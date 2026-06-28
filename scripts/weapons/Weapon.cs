@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Godot;
 using FunProject.Items;
 using FunProject.Stats;
 
@@ -27,13 +28,21 @@ public class Weapon : EquippableItem, HasStats
     });
   }
 
-  public Option<Stat> TryGetStat(Type statType) => _stats.TryGetStat(statType);
-
   public Option<TStat> TryGetStat<TStat>() where TStat : Stat => _stats.TryGetStat<TStat>();
 
   public TStat GetStat<TStat>() where TStat : Stat => _stats.GetStat<TStat>();
 
-  public List<Damage> EmitDamage()
+  /// <summary>
+  /// Emit this weapon's damage bundle. Override to give a weapon type its own emission;
+  /// the common case (contributing extra bundle mods) should delegate to <see cref="EmitDamageWith"/>.
+  /// </summary>
+  public virtual List<Damage> EmitDamage() => EmitDamageWith([]);
+
+  /// <summary>
+  /// Derive the frame's packets from base damage, fold the weapon's slot bundle mods followed by
+  /// <paramref name="additionalMods"/>, and drop non-positive packets at emission.
+  /// </summary>
+  protected List<Damage> EmitDamageWith(IEnumerable<DamageBundleMod> additionalMods)
   {
     int baseDamage = GetDamageStat().BaseValue;
     var context = new DamageEmissionContext(baseDamage);
@@ -42,7 +51,7 @@ public class Weapon : EquippableItem, HasStats
       .Select(packet => packet.Derive(baseDamage))
       .ToList();
 
-    foreach (DamageBundleMod mod in BundleModsFromSlots().Concat(AmmunitionBundleMods()))
+    foreach (DamageBundleMod mod in BundleModsFromSlots().Concat(additionalMods))
     {
       ArgumentNullException.ThrowIfNull(mod);
       bundle = mod.Apply(bundle, context);
@@ -51,22 +60,17 @@ public class Weapon : EquippableItem, HasStats
     return bundle.Where(damage => damage.Amount > 0).ToList();
   }
 
-  protected virtual IEnumerable<DamageBundleMod> AmmunitionBundleMods() => [];
+  public float EffectiveStat<TStat>() where TStat : Stat
+    => ((HasStats)this).Resolve<TStat>(StatContributions);
+
+  public int EffectiveRange => Mathf.RoundToInt(EffectiveStat<RangeStat>());
+
+  /// <summary>StatMods this weapon contributes to resolution; override to add more (e.g. ammunition).</summary>
+  public virtual IEnumerable<StatMod> StatContributions
+    => this.EquippedMods().SelectMany(m => m.StatContributions);
 
   private IEnumerable<DamageBundleMod> BundleModsFromSlots()
-  {
-    foreach (ModSlot slot in GetModSlots())
-    {
-      if (slot.EquippedMod.IsNone)
-        continue;
-      EquippableMod equipped = slot.EquippedMod.Match(
-        mod => mod,
-        () => throw new InvalidOperationException("EquippedMod option was None after IsNone check."));
-      if (equipped is DamageBundleEquippableMod bundleEquippable)
-        foreach (DamageBundleMod mod in bundleEquippable.BundleMods)
-          yield return mod;
-    }
-  }
+    => this.EquippedMods().OfType<DamageBundleEquippableMod>().SelectMany(m => m.BundleMods);
 
   public DamageStat GetDamageStat() => GetStat<DamageStat>();
   public RangeStat GetRangeStat() => GetStat<RangeStat>();
@@ -92,6 +96,13 @@ public class FirearmWeapon(FirearmWeaponData data) : AmmunitionedWeapon(data)
   public FirearmArchetype Archetype { get; set; } = data.Archetype;
   public Option<Ammunition> AmmoType { get; set; } = Optional(data.DefaultAmmoData);
 
-  protected override IEnumerable<DamageBundleMod> AmmunitionBundleMods()
+  public override List<Damage> EmitDamage() => EmitDamageWith(AmmunitionBundleMods());
+
+  public override IEnumerable<StatMod> StatContributions => base.StatContributions.Concat(AmmunitionStatMods());
+
+  private IEnumerable<DamageBundleMod> AmmunitionBundleMods()
     => AmmoType.Match(ammo => (IEnumerable<DamageBundleMod>)ammo.DamageMods, () => []);
+
+  private IEnumerable<StatMod> AmmunitionStatMods()
+    => AmmoType.Match(ammo => (IEnumerable<StatMod>)ammo.Modifiers, () => []);
 }

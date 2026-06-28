@@ -13,14 +13,11 @@ public sealed class StatSheet
   public StatSheet(Dictionary<Type, Stat> stats)
   {
     ArgumentNullException.ThrowIfNull(stats);
+    foreach (var (statType, stat) in stats)
+      if (!statType.IsInstanceOfType(stat))
+        throw new ArgumentException(
+          $"StatSheet entry for key {statType.Name} holds a {stat?.GetType().Name ?? "null"}.");
     _stats = stats;
-  }
-
-  public Option<Stat> TryGetStat(Type statType)
-  {
-    return _stats.TryGetValue(statType, out var stat)
-      ? Some(stat)
-      : None;
   }
 
   public Option<TStat> TryGetStat<TStat>() where TStat : Stat

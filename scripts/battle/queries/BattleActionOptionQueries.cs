@@ -62,7 +62,7 @@ public sealed class GetUnitActionOptions : BattleSessionQuery<IReadOnlyList<Unit
     if (Unit.CurrentActionPoints < BattleSession.DefaultAttackActionPointCost)
       return false;
 
-    int range = weapon.GetRangeStat().BaseValue;
+    int range = weapon.EffectiveRange;
     return session.GetUnitPosition(Unit).Match(
       Some: from => Unit.VisibleUnits.Any(other =>
         other.Side != Unit.Side

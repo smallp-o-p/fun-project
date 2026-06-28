@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using FunProject.Items;
 using FunProject.Stats;
 
@@ -37,13 +38,14 @@ public class Combatant : HasStats, HasModSlots
     }
   }
 
-  public Option<Stat> TryGetStat(Type statType) => _stats.TryGetStat(statType);
-
   public Option<TStat> TryGetStat<TStat>() where TStat : Stat => _stats.TryGetStat<TStat>();
 
   public TStat GetStat<TStat>() where TStat : Stat => _stats.GetStat<TStat>();
 
   public Godot.Collections.Array<ModSlot> GetModSlots() => _modSlots;
+
+  public IEnumerable<StatMod> StatContributions()
+    => this.EquippedMods().SelectMany(m => m.StatContributions).Concat(OwningFaction.StatBonuses);
 
   public void EquipItem(EquippableItem item)
   {

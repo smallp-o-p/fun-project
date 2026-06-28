@@ -245,7 +245,7 @@ public sealed class AttackUnit : BattleAction
         BattleBoardState.ValidatedPoint attackerPoint = attackerPointOption.Value();
         BattleBoardState.ValidatedPoint targetPoint = targetPointOption.Value();
 
-        if (BattleSession.GetGridDistance(attackerPoint.Raw, targetPoint.Raw) > weapon.GetRangeStat().BaseValue)
+        if (BattleSession.GetGridDistance(attackerPoint.Raw, targetPoint.Raw) > weapon.EffectiveRange)
           return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Target.Combatant.Name} is out of range for {weapon.ItemName}.");
         if (!attacker.TrySpendActionPoints(BattleSession.DefaultAttackActionPointCost))
           return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{attacker.Combatant.Name} could not spend {BattleSession.DefaultAttackActionPointCost} action points.");
