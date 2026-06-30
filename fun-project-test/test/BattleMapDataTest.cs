@@ -106,4 +106,22 @@ public partial class BattleMapDataTest
     Assert.False(wall.Walkable);
     Assert.Equal(0, wall.CoverAmount);
   }
+
+  [TestCase(TestName = "BlocksVerticalLineOfSight bakes into runtime tile")]
+  public void BlocksVerticalLineOfSightBakesIntoRuntimeTile()
+  {
+    BattleMapData mapWithFlag = MapWith(
+      (new Vector3I(1, 0, 1), new BattleMapTileData { BlocksVerticalLineOfSight = true }));
+    BattleMapData mapWithoutFlag = MapWith(
+      (new Vector3I(1, 0, 1), new BattleMapTileData { BlocksVerticalLineOfSight = false }));
+
+    BattleBoardState boardWith = new(mapWithFlag);
+    BattleBoardState boardWithout = new(mapWithoutFlag);
+
+    BattleTileState tileWith = boardWith.GetTile(boardWith.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
+    BattleTileState tileWithout = boardWithout.GetTile(boardWithout.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
+
+    Assert.True(tileWith.BlocksVerticalLineOfSight);
+    Assert.False(tileWithout.BlocksVerticalLineOfSight);
+  }
 }

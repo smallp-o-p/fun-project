@@ -8,23 +8,11 @@ namespace FunProject.Battle;
 
 internal sealed class VisibilityService
 {
-  private static readonly IReadOnlySet<BattleBoardState.ValidatedPoint> EmptyTileSet = new SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>();
-  private static readonly Vector3I[] OrthogonalDirections =
-  [
-    new(1, 0, 0),
-    new(-1, 0, 0),
-    new(0, 0, 1),
-    new(0, 0, -1),
-  ];
-  private static readonly Vector3I[] AdjacentDiagonalOffsets =
-  [
-    new(-1, 0, -1),
-    new(-1, 0, 1),
-    new(1, 0, -1),
-    new(1, 0, 1),
-  ];
+  private static readonly IReadOnlySet<BattleBoardState.ValidatedPoint> EmptyTileSet =
+    new SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>();
 
-  private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>> _exploredTilesByFaction = [];
+  private readonly Dictionary<Faction, SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>>
+    _exploredTilesByFaction = [];
 
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetExploredTiles(Faction side)
   {
@@ -32,7 +20,7 @@ internal sealed class VisibilityService
     return _exploredTilesByFaction.TryGetValue(side, out var tiles) ? tiles : EmptyTileSet;
   }
 
-  internal void Refresh(
+  internal IReadOnlyList<(BattleUnitState Observer, BattleUnitState Target)> RefreshAllUnits(
     BattleBoardState board,
     IReadOnlyList<BattleUnitState> allUnits,
     IEnumerable<BattleUnitState> aliveUnits)
@@ -41,14 +29,11 @@ internal sealed class VisibilityService
     ArgumentNullException.ThrowIfNull(allUnits);
     ArgumentNullException.ThrowIfNull(aliveUnits);
 
-    foreach (var unit in allUnits)
-      unit.ClearVisibility();
-
-    foreach (var observer in aliveUnits)
-      RecomputeObserver(board, allUnits, observer);
+    var alive = new SysColGeneric.HashSet<BattleUnitState>(aliveUnits);
+    return RefreshAffected(board, allUnits, alive, alive);
   }
 
-  // Incremental counterpart to Refresh, applied after an occupancy change that touches only a
+  // Incremental counterpart to a full recompute (RefreshAllUnits), applied after an occupancy change that touches only a
   // known set of units (a move/spawn/death). Line-of-sight blocking is a tile property and the
   // position/vision of every UNaffected observer is unchanged, so their visible-TILE sets are
   // invariant under another unit moving, spawning, or dying. Therefore we only:
@@ -57,9 +42,10 @@ internal sealed class VisibilityService
   //   (2) refresh, for each unaffected alive observer, whether every affected unit now belongs
   //       to its visible-UNIT set (the only membership that can flip is that of a unit whose own
   //       cell changed or that left the board), leaving all other memberships untouched.
-  // The resulting per-unit sets and per-faction explored memory are byte-identical to a full
-  // Refresh against the same board state.
-  internal void RefreshAffected(
+  // The resulting per-unit sets and per-faction explored memory are byte-identical to recomputing
+  // every alive unit from scratch (which RefreshAllUnits does by calling this with affected == alive).
+  // NOTE: units don't occlude, only tiles — an unaffected observer's visible-tile set is stable.
+  internal IReadOnlyList<(BattleUnitState Observer, BattleUnitState Target)> RefreshAffected(
     BattleBoardState board,
     IReadOnlyList<BattleUnitState> allUnits,
     IEnumerable<BattleUnitState> aliveUnits,
@@ -70,8 +56,13 @@ internal sealed class VisibilityService
     ArgumentNullException.ThrowIfNull(aliveUnits);
     ArgumentNullException.ThrowIfNull(affectedUnits);
 
+    var spotted = new List<(BattleUnitState, BattleUnitState)>();
+
+    // Snapshot affected units' visible-unit sets BEFORE clearing, then clear and recompute.
+    var priors = new Dictionary<BattleUnitState, SysColGeneric.HashSet<BattleUnitState>>();
     foreach (var affected in affectedUnits)
     {
+      priors[affected] = new SysColGeneric.HashSet<BattleUnitState>(affected.VisibleUnits);
       affected.ClearVisibility();
       // A living unit is always indexed on the board (Refresh enforces the same invariant);
       // a dead/removed unit sees nothing, so its just-cleared sets are already correct.
@@ -79,6 +70,13 @@ internal sealed class VisibilityService
         RecomputeObserver(board, allUnits, affected);
     }
 
+    // Diff affected observers against their snapshots.
+    foreach (var (observer, prior) in priors)
+      foreach (var target in observer.VisibleUnits)
+        if (!prior.Contains(target))
+          spotted.Add((observer, target));
+
+    // For each unaffected alive observer, re-test membership of every affected unit.
     foreach (var observer in aliveUnits)
     {
       if (affectedUnits.Contains(observer))
@@ -89,16 +87,24 @@ internal sealed class VisibilityService
         if (ReferenceEquals(affected, observer))
           continue;
 
+        bool wasVisible = observer.VisibleUnits.Contains(affected);
         bool visible = affected.IsAlive
           && board.FindOccupantPosition(affected.Id).Match(
                position => observer.VisibleTiles.Contains(position),
                () => false);
+
         if (visible)
           observer.AddVisibleUnit(affected);
         else
           observer.RemoveVisibleUnit(affected);
+
+        if (visible && !wasVisible)
+          spotted.Add((observer, affected));
       }
     }
+
+    spotted.Sort(CompareSpottedDelta);
+    return spotted;
   }
 
   private void RecomputeObserver(
@@ -108,10 +114,12 @@ internal sealed class VisibilityService
   {
     var observerPositionOption = board.FindOccupantPosition(observer.Id);
     if (observerPositionOption.IsNone)
-      throw new InvalidOperationException($"Living unit {observer.Id} is missing from the session position index.");
+      throw new InvalidOperationException(
+        $"Living unit {observer.Id} is missing from the session position index.");
     var observerPosition = observerPositionOption.Value();
 
-    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> observerVisibleTiles = GetVisibleTiles(board, observer, observerPosition);
+    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> observerVisibleTiles =
+      GetVisibleTiles(board, observer, observerPosition);
     foreach (var visibleTile in observerVisibleTiles)
       observer.AddVisibleTile(visibleTile);
 
@@ -144,6 +152,19 @@ internal sealed class VisibilityService
     exploredTiles.UnionWith(tiles);
   }
 
+  // Newly-spotted pairs are enqueued into the committed event stream, so their order must be
+  // deterministic — reference-keyed Dictionary/HashSet iteration is not. Order by observer id
+  // then target id (matches the seedable-RNG determinism discipline elsewhere in the runtime).
+  private static int CompareSpottedDelta(
+    (BattleUnitState Observer, BattleUnitState Target) a,
+    (BattleUnitState Observer, BattleUnitState Target) b)
+  {
+    int byObserver = a.Observer.Id.CompareTo(b.Observer.Id);
+    return byObserver != 0 ? byObserver : a.Target.Id.CompareTo(b.Target.Id);
+  }
+
+  // Computes the set of tiles visible from observerPosition using a 3D Euclidean range check
+  // over a bounding-box scan, with a per-candidate LOS raytrace.
   private SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> GetVisibleTiles(
     BattleBoardState board,
     BattleUnitState observer,
@@ -151,82 +172,135 @@ internal sealed class VisibilityService
   {
     ArgumentNullException.ThrowIfNull(observer);
 
-    Queue<BattleBoardState.ValidatedPoint> frontier = new([observerPosition]);
-    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> visited = [];
-    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> visibleTiles = [];
+    var visibleTiles = new SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>();
+    visibleTiles.Add(observerPosition);
 
-    while (frontier.Count > 0)
-    {
-      var current = frontier.Dequeue();
-      if (!visited.Add(current))
-        continue;
-      if (!IsWithinSameLevelVisionRange(observerPosition, current, observer.Vision))
-        continue;
+    int vision = observer.Vision;
+    if (vision < 0)
+      return visibleTiles;
 
-      visibleTiles.Add(current);
-      bool currentBlocksLineOfSight = current != observerPosition && board.GetTile(current).BlocksLineOfSight;
-      if (!currentBlocksLineOfSight)
-      {
-        AddAdjacentDiagonalVisibleTiles(board, observerPosition, current, observer.Vision, visibleTiles);
-        foreach (var neighbor in EnumerateOrthogonalNeighbors(board, current))
-          frontier.Enqueue(neighbor);
-      }
-    }
+    int visionSq = vision * vision;
+    Vector3I pos = observerPosition.Raw;
+
+    // Iterate the bounding box [pos-vision, pos+vision] clamped to the board.
+    for (int dy = -vision; dy <= vision; dy++)
+      for (int dz = -vision; dz <= vision; dz++)
+        for (int dx = -vision; dx <= vision; dx++)
+        {
+          if (dx == 0 && dy == 0 && dz == 0)
+            continue;
+
+          // 3D Euclidean distance check (includes Y).
+          if (dx * dx + dy * dy + dz * dz > visionSq)
+            continue;
+
+          var candidateOption = board.ValidatePoint(new Vector3I(pos.X + dx, pos.Y + dy, pos.Z + dz));
+          if (candidateOption.IsNone)
+            continue;
+          var candidate = candidateOption.Value();
+
+          if (IsLineOfSightClear(board, observerPosition, candidate))
+            visibleTiles.Add(candidate);
+        }
 
     return visibleTiles;
   }
 
-  private IEnumerable<BattleBoardState.ValidatedPoint> EnumerateOrthogonalNeighbors(BattleBoardState board, BattleBoardState.ValidatedPoint point)
+  // Orders two axes' rational crossing times a=aNum/aDen and b=bNum/bDen (denominators > 0):
+  // returns sign(a − b). A long.MaxValue numerator represents +∞ (that axis never crosses).
+  private static int CompareCrossingTime(long aNum, long aDen, long bNum, long bDen)
   {
-    foreach (var direction in OrthogonalDirections)
-    {
-      var neighborOption = board.ValidatePoint(point.Raw + direction);
-      if (neighborOption.IsSome)
-        yield return neighborOption.Value();
-    }
+    if (aNum == long.MaxValue)
+      return bNum == long.MaxValue ? 0 : 1;
+    if (bNum == long.MaxValue)
+      return -1;
+    return (aNum * bDen).CompareTo(bNum * aDen);
   }
 
-  private void AddAdjacentDiagonalVisibleTiles(
+  // Deterministic integer 3D supercover voxel traversal (Amanatides–Woo style).
+  // Crossing times are represented as exact rationals (numerator / denominator) so there is no
+  // floating-point jitter. Three blocking rules are applied at each traversal step:
+  //   1. Solid intermediate cell: any strictly-intermediate cell with BlocksLineOfSight blocks.
+  //   2. Horizontal diagonal corner: when X and Z both cross at the same Y, the passage is sealed
+  //      iff BOTH horizontally-flanking cells block.
+  //   3. Vertical floor/ceiling: when Y changes, the upper cell's BlocksVerticalLineOfSight seals
+  //      the passage (applies to ALL steps, including those adjacent to endpoints).
+  // Precondition: `from` and `to` are validated (in-bounds) points. The walk moves each coordinate
+  // monotonically from `from` toward `to`, so every cell it touches — intermediate cells, both
+  // diagonal flanks, and the vertical upper/lower cell — lies within their bounding box and is in
+  // bounds. Tiles are therefore read via GetTileUnchecked with no per-step bounds validation.
+  private bool IsLineOfSightClear(
     BattleBoardState board,
-    BattleBoardState.ValidatedPoint observerPosition,
-    BattleBoardState.ValidatedPoint visibleTile,
-    int vision,
-    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> visibleTiles)
+    BattleBoardState.ValidatedPoint from,
+    BattleBoardState.ValidatedPoint to)
   {
-    foreach (var offset in AdjacentDiagonalOffsets)
-    {
-      board.ValidatePoint(visibleTile.Raw + offset).IfSome((diagonal) =>
-      {
-        if (IsWithinSameLevelVisionRange(observerPosition, diagonal, vision) && HasOpenDiagonalSide(board, visibleTile, offset))
-          visibleTiles.Add(diagonal);
-      });
-    }
-  }
-
-  private bool HasOpenDiagonalSide(BattleBoardState board, BattleBoardState.ValidatedPoint source, Vector3I diagonalOffset)
-  {
-    return IsOpenSide(board, source.Raw + new Vector3I(diagonalOffset.X, 0, 0))
-      || IsOpenSide(board, source.Raw + new Vector3I(0, 0, diagonalOffset.Z));
-  }
-
-  private bool IsOpenSide(BattleBoardState board, Vector3I coordinates)
-  {
-    return board.ValidatePoint(coordinates).Match(
-      side => !board.GetTile(side).BlocksLineOfSight,
-      () => false);
-  }
-
-  private static bool IsWithinSameLevelVisionRange(
-    BattleBoardState.ValidatedPoint observerPosition,
-    BattleBoardState.ValidatedPoint target,
-    int vision)
-  {
-    if (target == observerPosition)
+    if (from == to)
       return true;
-    if (vision < 0 || target.Y != observerPosition.Y)
-      return false;
 
-    Vector3I delta = target.Raw - observerPosition.Raw;
-    return delta.LengthSquared() <= vision * vision;
+    int cx = from.X, cy = from.Y, cz = from.Z;
+    int ex = to.X, ey = to.Y, ez = to.Z;
+
+    int signX = Math.Sign(ex - cx);
+    int signY = Math.Sign(ey - cy);
+    int signZ = Math.Sign(ez - cz);
+    int adx = Math.Abs(ex - cx);
+    int ady = Math.Abs(ey - cy);
+    int adz = Math.Abs(ez - cz);
+
+    // Each axis's crossing times are the rational sequence (2k+1)/(2·aDelta) for k=0,1,…
+    // Represent as numerator and denominator; long.MaxValue numerator = axis never crosses.
+    // Safe within game-scale boards: adx,ady,adz ≤ ~200, so products fit in long easily.
+    long tNumX = adx > 0 ? 1L : long.MaxValue;
+    long tNumY = ady > 0 ? 1L : long.MaxValue;
+    long tNumZ = adz > 0 ? 1L : long.MaxValue;
+    long tDenX = adx > 0 ? 2L * adx : 1L;
+    long tDenY = ady > 0 ? 2L * ady : 1L;
+    long tDenZ = adz > 0 ? 2L * adz : 1L;
+
+    while (cx != ex || cy != ey || cz != ez)
+    {
+      // Cross the axis (or axes, on a tie) with the minimum crossing time. Ties advance multiple
+      // axes in one iteration (a diagonal step), which Rules 2 and 3 resolve for occlusion.
+      int cmpXY = CompareCrossingTime(tNumX, tDenX, tNumY, tDenY);
+      int cmpXZ = CompareCrossingTime(tNumX, tDenX, tNumZ, tDenZ);
+      int cmpYZ = CompareCrossingTime(tNumY, tDenY, tNumZ, tDenZ);
+
+      bool crossX = cmpXY <= 0 && cmpXZ <= 0;
+      bool crossY = cmpXY >= 0 && cmpYZ <= 0;
+      bool crossZ = cmpXZ >= 0 && cmpYZ >= 0;
+
+      int prevX = cx, prevY = cy, prevZ = cz;
+
+      if (crossX) { cx += signX; tNumX += 2; }
+      if (crossY) { cy += signY; tNumY += 2; }
+      if (crossZ) { cz += signZ; tNumZ += 2; }
+
+      bool isEndpoint = cx == ex && cy == ey && cz == ez;
+
+      // Rule 1: strictly-intermediate cells with BlocksLineOfSight stop sight.
+      // Endpoints (from and to) are exempt.
+      if (!isEndpoint && board.GetTileUnchecked(cx, cy, cz).BlocksLineOfSight)
+        return false;
+
+      // Rule 2: horizontal diagonal corner (X and Z both cross, Y unchanged). Passage is sealed
+      // iff BOTH flanking cells block. Each flank shares one coordinate with the previous cell and
+      // one with the current cell, so both are in bounds.
+      if (crossX && crossZ && !crossY
+          && board.GetTileUnchecked(prevX + signX, prevY, prevZ).BlocksLineOfSight
+          && board.GetTileUnchecked(prevX, prevY, prevZ + signZ).BlocksLineOfSight)
+        return false;
+
+      // Rule 3: vertical floor/ceiling — applies to every step where Y changes, including those
+      // adjacent to endpoints. The floor belongs to the upper cell (larger Y); both candidate
+      // cells (prev and current) are visited, so both are in bounds.
+      if (crossY)
+      {
+        (int ux, int uy, int uz) = prevY > cy ? (prevX, prevY, prevZ) : (cx, cy, cz);
+        if (board.GetTileUnchecked(ux, uy, uz).BlocksVerticalLineOfSight)
+          return false;
+      }
+    }
+
+    return true;
   }
 }

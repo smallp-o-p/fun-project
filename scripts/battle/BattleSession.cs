@@ -60,7 +60,10 @@ public sealed class BattleSession
   //     unaffected observer's visible-tile set cannot change when some other unit moves.
   // Both are written at the three Board.Try* occupancy chokepoints (affected) and on battle
   // start (full). NOTE: if a runtime effect that changes a unit's vision is ever added, force
-  // a full refresh (or mark that unit affected) there too.
+  // a full refresh (or mark that unit affected) there too. Likewise, any runtime mutation to
+  // a tile's BlocksLineOfSight or BlocksVerticalLineOfSight (e.g. destructible terrain) must
+  // call InvalidateVisibility() — tile flag changes are NOT occupancy events and are not
+  // otherwise caught by the refresh machinery.
   private bool _visibilityFullRefreshPending = true;
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibilityAffectedUnits = [];
 
@@ -535,6 +538,15 @@ public sealed class BattleSession
     _visibilityAffectedUnits.Add(unit);
   }
 
+  // Forces a full clear-and-recompute of all faction visibility on the next event dispatch.
+  // Call this after any runtime mutation to a tile's BlocksLineOfSight or
+  // BlocksVerticalLineOfSight (e.g. destructible terrain) — those flag changes are NOT
+  // occupancy events and are not otherwise caught by the incremental refresh machinery.
+  internal void InvalidateVisibility()
+  {
+    _visibilityFullRefreshPending = true;
+  }
+
   internal void RaiseEvent(BattleEvent battleEvent)
   {
     ArgumentNullException.ThrowIfNull(battleEvent);
@@ -564,24 +576,9 @@ public sealed class BattleSession
       while (_eventDispatchQueue.Count > 0)
       {
         BattleEvent battleEvent = _eventDispatchQueue.Dequeue();
-        // Refresh before each event's observers run, but only when occupancy actually
-        // changed since the last refresh (both the full flag and the affected set are
-        // written at the Board.Try* mutations / battle start, which always precede the
-        // matching event in this same drain). This preserves the mid-move guarantee — a
-        // step's occupancy mutation marks its unit affected before its event's observers
-        // run — while skipping recompute for non-occupancy events. A pending full refresh
-        // (battle start) supersedes and absorbs any accumulated affected units.
-        if (_visibilityFullRefreshPending)
-        {
-          _visibility.Refresh(Board, _units, AliveUnits);
-          _visibilityFullRefreshPending = false;
-          _visibilityAffectedUnits.Clear();
-        }
-        else if (_visibilityAffectedUnits.Count > 0)
-        {
-          _visibility.RefreshAffected(Board, _units, AliveUnits, _visibilityAffectedUnits);
-          _visibilityAffectedUnits.Clear();
-        }
+        // Recompute visibility from any occupancy/tile change since the last dispatch and queue
+        // first-time spottings, before this event is broadcast (preserves the mid-move guarantee).
+        RefreshVisibilityAndQueueSpottings();
         BattleEventCommitted.Invoke(battleEvent);
         // Record into the executor's capture window after the public broadcast and before
         // listeners run — exactly where the executor's old closure (subscribed last) ran.
@@ -601,6 +598,30 @@ public sealed class BattleSession
     {
       _isDispatchingEvents = false;
     }
+  }
+
+  private void RefreshVisibilityAndQueueSpottings()
+  {
+    IReadOnlyList<(BattleUnitState Observer, BattleUnitState Target)> spottedDelta;
+    if (_visibilityFullRefreshPending)
+    {
+      spottedDelta = _visibility.RefreshAllUnits(Board, _units, AliveUnits);
+      _visibilityFullRefreshPending = false;
+      _visibilityAffectedUnits.Clear();
+    }
+    else if (_visibilityAffectedUnits.Count > 0)
+    {
+      spottedDelta = _visibility.RefreshAffected(Board, _units, AliveUnits, _visibilityAffectedUnits);
+      _visibilityAffectedUnits.Clear();
+    }
+    else
+    {
+      spottedDelta = [];
+    }
+
+    foreach (var (observer, target) in spottedDelta)
+      if (observer.RecordFirstSpotting(target))
+        _eventDispatchQueue.Enqueue(new UnitSpottedBattleEvent(observer, target));
   }
 
   // Opens a fresh capture window for the executor: committed events are recorded into the

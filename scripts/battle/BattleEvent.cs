@@ -258,6 +258,25 @@ public sealed record UnitAttackedBattleEvent : BattleEvent, IUnitBattleEvent, IP
   }
 }
 
+/// <summary>
+/// Raised the first time an observer spots a target this battle. First-spotting is tracked PER
+/// OBSERVER, so a second observer spotting an already-team-known target still raises this once for
+/// that observer. <see cref="Unit"/> is the observer; <see cref="Target"/> is the unit it spotted.
+/// </summary>
+public sealed record UnitSpottedBattleEvent : BattleEvent, IUnitBattleEvent
+{
+  public BattleUnitState Unit { get; }
+  public BattleUnitState Target { get; }
+
+  public UnitSpottedBattleEvent(BattleUnitState unit, BattleUnitState target)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(target);
+    Unit = unit;
+    Target = target;
+  }
+}
+
 public sealed record UnitStatusEffectAppliedBattleEvent : BattleEvent, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }

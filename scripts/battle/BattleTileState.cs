@@ -8,5 +8,7 @@ public sealed class BattleTileState
 
   public bool BlocksLineOfSight { get; set; }
 
+  public bool BlocksVerticalLineOfSight { get; set; }
+
   public TileCover Cover { get; set; } = TileCover.None;
 }

@@ -15,6 +15,7 @@ public partial class BattleMapTileData : Resource
 
   [Export] public bool Walkable { get; set; } = true;
   [Export] public bool BlocksLineOfSight { get; set; }
+  [Export] public bool BlocksVerticalLineOfSight { get; set; }
 
   [Export(PropertyHint.Flags, "North,South,East,West")]
   public CoverDirections CoverDirections

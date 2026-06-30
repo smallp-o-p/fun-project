@@ -103,6 +103,7 @@ public sealed class BattleBoardState
           BattleTileState tile = GetTile(point);
           tile.IsWalkable = data.Walkable;
           tile.BlocksLineOfSight = data.BlocksLineOfSight;
+          tile.BlocksVerticalLineOfSight = data.BlocksVerticalLineOfSight;
           tile.Cover = new TileCover(data.CoverDirections, data.CoverAmount);
         },
         () =>
@@ -292,6 +293,12 @@ public sealed class BattleBoardState
   public BattleTileState GetTile(ValidatedPoint point)
   {
     return _tiles[point.X, point.Y, point.Z];
+  }
+
+  // Unchecked Tile access, do NOT call this unless you've proven that the input is valid.
+  internal BattleTileState GetTileUnchecked(int x, int y, int z)
+  {
+    return _tiles[x, y, z];
   }
 
   private void UpdatePathPointState(ValidatedPoint point)

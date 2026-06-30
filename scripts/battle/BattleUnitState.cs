@@ -16,6 +16,7 @@ public sealed class BattleUnitState
   private readonly List<EquippableItem> _inventory;
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
+  private readonly SysColGeneric.HashSet<BattleUnitState> _spottedUnits = [];
   private readonly Dictionary<StatusEffectSpecData, ActiveStatusEffect> _activeStatusEffects = [];
 
   internal int Id { get; }
@@ -142,6 +143,12 @@ public sealed class BattleUnitState
   {
     ArgumentNullException.ThrowIfNull(unit);
     _visibleUnits.Remove(unit);
+  }
+
+  internal bool RecordFirstSpotting(BattleUnitState unit)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    return _spottedUnits.Add(unit);
   }
 
   public float EffectiveStat<TStat>() where TStat : Stat
