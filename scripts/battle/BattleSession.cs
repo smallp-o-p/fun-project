@@ -21,6 +21,16 @@ public enum BattlePhase
 
 public sealed class BattleSession
 {
+  public record FactionEndOfBattleSummary
+  {
+    public required Faction Faction { get; set; }
+    public required Dictionary<Combatant, List<Combatant>> DefeatedPerCombatant { get; set; }
+    public BattleOutcome Outcome { get; set; }
+    public required SysColGeneric.HashSet<Combatant> CombatantsDead { get; set; }
+    public required SysColGeneric.HashSet<Combatant> CombatantsWounded { get; set; }
+    public int TurnCount { get; set; }
+  };
+
   internal readonly record struct SpawnedBattleUnit(BattleUnitState Unit);
 
   public const int DefaultMovementStepActionPointCost = 1;
@@ -34,7 +44,9 @@ public sealed class BattleSession
   private readonly TurnScheduler _scheduler;
   private readonly BattleEventListenerRegistry _listenerRegistry = new();
   private readonly Queue<BattleEvent> _eventDispatchQueue = [];
+
   private bool _isDispatchingEvents;
+
   // Events committed during the executor's current capture window (a single primitive
   // action's Execute). The executor brackets each Execute with BeginCommittedEventCapture /
   // EndCommittedEventCapture and reads this buffer to learn exactly which events that Execute
@@ -44,7 +56,9 @@ public sealed class BattleSession
   // (battle setup, turn-end follow-ups) are never recorded, mirroring the old single-Execute
   // subscribe/unsubscribe exactly.
   private readonly List<BattleEvent> _committedEventCapture = [];
+
   private bool _capturingCommittedEvents;
+
   // Visible sets depend only on board occupancy: a unit's vision range resolves from
   // stat contributions that are fixed for the battle (combatant + equipped weapon; no
   // action swaps weapons, equips mods, or applies a vision-affecting effect mid-battle),
@@ -77,6 +91,7 @@ public sealed class BattleSession
   public IEnumerable<BattleUnitState> DeadUnits => _units.Where((unit) => unit.IsDead);
   public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _scheduler.GlobalFactionTurnOrder;
   public IReadOnlyCollection<Faction> TurnQueue => _scheduler.TurnQueue;
+  private readonly Dictionary<BattleUnitState, List<BattleUnitState>> killsByUnit = [];
 
   public event Action<BattleEvent> BattleEventCommitted = delegate { };
 
@@ -232,9 +247,9 @@ public sealed class BattleSession
   }
 
   internal void ApplyDamageTo(BattleUnitState unit, int amount)
-    => ApplyDamageTo(unit, [new Damage(amount, Element.Kinetic)]);
+    => ApplyDamageTo(unit, [new Damage(amount, Element.Kinetic)], None);
 
-  internal void ApplyDamageTo(BattleUnitState unit, IReadOnlyList<Damage> bundle)
+  internal void ApplyDamageTo(BattleUnitState unit, IReadOnlyList<Damage> bundle, Option<BattleUnitState> cause)
   {
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(bundle);
@@ -243,8 +258,8 @@ public sealed class BattleSession
     if (Board.FindOccupantPosition(unit.Id).IsNone)
       throw new InvalidOperationException($"Cannot damage unit {unit.Id} because it is not on the board.");
 
-    Option<ArmorState> armorState = unit.EquippedArmor.Map(
-      armor => new ArmorState(armor.Capability.Current, armor.Capability.Element));
+    Option<ArmorState> armorState =
+      unit.EquippedArmor.Map(armor => new ArmorState(armor.Capability.Current, armor.Capability.Element));
     IReadOnlyList<DamageResolution> packetResolutions = DamageResolver.ResolvePackets(bundle, armorState);
     DamageResolution resolution = DamageResolver.Resolve(packetResolutions);
 
@@ -256,10 +271,10 @@ public sealed class BattleSession
     });
     unit.ReceiveDamage(resolution.HealthDamage);
 
-    RaiseEvent(new UnitDamagedBattleEvent(unit, bundle, resolution.ArmorDamage, resolution.HealthDamage));
+    RaiseEvent(new UnitDamagedBattleEvent(unit, cause, bundle, resolution.ArmorDamage, resolution.HealthDamage));
     if (unit.IsDead)
     {
-      HandleUnitDeath(unit);
+      HandleUnitDeath(unit, cause);
       return;
     }
 
@@ -312,7 +327,7 @@ public sealed class BattleSession
     TryApplyStatusEffect(unit, spec);
   }
 
-  private void HandleUnitDeath(BattleUnitState unit)
+  private void HandleUnitDeath(BattleUnitState unit, Option<BattleUnitState> killedBy)
   {
     ArgumentNullException.ThrowIfNull(unit);
     if (unit.IsAlive)
@@ -332,6 +347,12 @@ public sealed class BattleSession
     _scheduler.TryConsumeAvailableUnit(unit);
     RaiseEvent(new UnitKilledBattleEvent(unit, unitPoint));
     HandleFactionLoss(unitSide);
+
+    killedBy.IfSome((killer) =>
+    {
+      killsByUnit.TryAdd(killer, []);
+      killsByUnit[killer].Add(unit);
+    });
 
     if (Phase == BattlePhase.InProgress
         && PlayerFaction.Match(Some: player => player == unitSide, None: () => false)
@@ -400,7 +421,8 @@ public sealed class BattleSession
 
     var activeSide = ActiveSide;
     if (activeSide != expectedActiveSide)
-      throw new InvalidOperationException($"{expectedActiveSide.Name} cannot end a turn while {activeSide.Name} is active.");
+      throw new InvalidOperationException(
+        $"{expectedActiveSide.Name} cannot end a turn while {activeSide.Name} is active.");
 
     AdvanceTurn();
   }
@@ -438,6 +460,7 @@ public sealed class BattleSession
           EndBattle(BattleOutcome.Defeat);
           return true;
         }
+
         if (op.Status == OperationStatus.Completed)
         {
           EndBattle(BattleOutcome.Victory);
@@ -470,7 +493,8 @@ public sealed class BattleSession
       id < _units.Count && _units[id].IsAlive ? Some(_units[id]) : None);
   }
 
-  internal void MoveUnit(BattleUnitState unit, BattleBoardState.ValidatedPoint source, BattleBoardState.ValidatedPoint destination)
+  internal void MoveUnit(BattleUnitState unit, BattleBoardState.ValidatedPoint source,
+    BattleBoardState.ValidatedPoint destination)
   {
     ArgumentNullException.ThrowIfNull(unit);
     if (unit.IsDead)
@@ -479,7 +503,8 @@ public sealed class BattleSession
     if (boardPosition.IsNone)
       throw new InvalidOperationException($"Unit {unit.Id} is not tracked in the session position index.");
     if (boardPosition.Value() != source)
-      throw new InvalidOperationException($"Unit {unit.Id} is indexed at {boardPosition.Value().Raw}, not {source.Raw}.");
+      throw new InvalidOperationException(
+        $"Unit {unit.Id} is indexed at {boardPosition.Value().Raw}, not {source.Raw}.");
     if (!Board.TryMoveOccupant(source, destination, unit.Id))
       throw new InvalidOperationException($"Could not move unit {unit.Id} from {source.Raw} to {destination.Raw}.");
     MarkVisibilityAffected(unit);
@@ -687,7 +712,8 @@ public sealed class BattleSession
       Option<Objective> currentOption = op.Current;
       if (currentOption.IsNone)
         break;
-      Objective current = currentOption.Match(c => c, () => throw new InvalidOperationException("Current objective vanished."));
+      Objective current =
+        currentOption.Match(c => c, () => throw new InvalidOperationException("Current objective vanished."));
 
       if (current.IsFailed(this))
       {
@@ -757,4 +783,31 @@ public sealed class BattleSession
       new TurnStartedBattleEvent(nextSide, TurnNumber));
   }
 
+  public FactionEndOfBattleSummary GetPlayerSummary()
+  {
+    if (PlayerFaction.IsNone)
+    {
+      throw new InvalidOperationException("No player Faction?");
+    }
+
+    if (Phase != BattlePhase.Ended)
+    {
+      throw new InvalidOperationException("Requesting end-of-battle summary for battle that hasn't ended yet.");
+    }
+
+    var playerFaction = PlayerFaction.ValueUnsafe()!;
+
+    return new FactionEndOfBattleSummary
+    {
+      Faction = playerFaction,
+      Outcome = Outcome.Value(),
+      CombatantsDead = [.. DeadUnits.Where(unit => unit.Side == playerFaction).Select(unit => unit.Combatant)],
+      CombatantsWounded =
+        [.. AliveUnits.Where(unit => unit.MaxHealth > unit.CurrentHealth).Select(unit => unit.Combatant)],
+      DefeatedPerCombatant = killsByUnit.Where(unitKilled => unitKilled.Key.Side == playerFaction)
+        .Select(unitKilled =>
+          (unitKilled.Key.Combatant, unitKilled.Value.Select(killed => killed.Combatant).ToList())).ToDictionary(),
+      TurnCount = TurnNumber
+    };
+  }
 }

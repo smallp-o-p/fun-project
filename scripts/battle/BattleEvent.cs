@@ -40,6 +40,14 @@ public sealed record SessionEndedBattleEvent : BattleEvent
   }
 }
 
+/// <summary>
+/// Event that may have been caused by a unit.
+/// </summary>
+public interface IMaybePerpetratorBattleEvent : BattleEventTag
+{
+  Option<BattleUnitState> MaybeCause { get; }
+}
+
 public sealed record TurnStartedBattleEvent : BattleEvent
 {
   public Faction Faction { get; }
@@ -134,20 +142,18 @@ public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IP
 }
 
 /// <summary>
-/// Carries one resolved damage application. Bundle and TotalAmount describe the
-/// pre-mitigation payload; ArmorDamage and HealthDamage are the amounts actually
-/// applied after armor resolution. They need not reconcile: an element-matched hit
-/// strips armor at 1.5x, so ArmorDamage can exceed TotalAmount.
+/// Carries one resolved damage application.
 /// </summary>
-public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent
+public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent, IMaybePerpetratorBattleEvent
 {
   public BattleUnitState Unit { get; }
   public IReadOnlyList<Damage> Bundle { get; }
   public int TotalAmount { get; }
   public int ArmorDamage { get; }
   public int HealthDamage { get; }
+  public Option<BattleUnitState> MaybeCause { get; }
 
-  public UnitDamagedBattleEvent(BattleUnitState unit, IReadOnlyList<Damage> bundle, int armorDamage, int healthDamage)
+  public UnitDamagedBattleEvent(BattleUnitState unit, Option<BattleUnitState> cause, IReadOnlyList<Damage> bundle, int armorDamage, int healthDamage)
   {
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(bundle);
@@ -158,6 +164,7 @@ public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent
     TotalAmount = bundle.Sum(damage => damage.Amount);
     ArmorDamage = armorDamage;
     HealthDamage = healthDamage;
+    MaybeCause = cause;
   }
 }
 
@@ -178,16 +185,18 @@ public sealed record UnitArmorRegeneratedBattleEvent : BattleEvent, IUnitBattleE
   }
 }
 
-public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
+public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, IMaybePerpetratorBattleEvent
 {
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
+  public Option<BattleUnitState> MaybeCause { get; }
 
-  public UnitKilledBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position)
+  public UnitKilledBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position, Option<BattleUnitState> Perp = default)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
     Position = position;
+    MaybeCause = Perp;
   }
 }
 

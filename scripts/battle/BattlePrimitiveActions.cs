@@ -296,9 +296,6 @@ public sealed class AttackUnit : BattleAction
       Right: resolved => ResolveAttack(session, resolved));
   }
 
-  // PositionUnresolved means a unit that passed validation has no board tile —
-  // an invariant violation rather than a legal rejection; everything else is a
-  // legitimately rejected shot.
   private static BattleActionFailureReason MapFailureReason(AttackFeasibilityFailureKind kind) =>
     kind == AttackFeasibilityFailureKind.PositionUnresolved
       ? BattleActionFailureReason.UnexpectedError
@@ -319,7 +316,7 @@ public sealed class AttackUnit : BattleAction
 
     session.RaiseEvent(new UnitAttackedBattleEvent(attacker, Target, resolved.TargetPoint, weapon, breakdown, roll, isHit));
     if (isHit)
-      session.ApplyDamageTo(Target, weapon.EmitDamage());
+      session.ApplyDamageTo(Target, weapon.EmitDamage(), Some(Unit));
 
     return BattleActionResult.Success(this, attacker);
   }

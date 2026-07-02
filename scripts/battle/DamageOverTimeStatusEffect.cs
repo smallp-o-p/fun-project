@@ -21,6 +21,6 @@ public sealed class DamageOverTimeStatusEffect : ActiveStatusEffect
   internal override void OnFactionTurnEnd(BattleSession session, BattleUnitState unit)
   {
     if (_spec.TickDamage > 0)
-      session.ApplyDamageTo(unit, [new Damage(_spec.TickDamage, _spec.TickElement)]);
+      session.ApplyDamageTo(unit, [new Damage(_spec.TickDamage, _spec.TickElement)], None);
   }
 }

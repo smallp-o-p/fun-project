@@ -47,7 +47,7 @@ public static class CapabilityEffectResolver
         switch (effect)
         {
           case DamageEffectData damage:
-            session.ApplyDamageTo(unit, [new Damage(damage.BaseDamage, damage.Element)]);
+            session.ApplyDamageTo(unit, [new Damage(damage.BaseDamage, damage.Element)], None);
             break;
           case StatusEffectSpecData status:
             session.ApplyStatusEffectTo(unit, status);
