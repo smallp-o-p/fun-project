@@ -201,6 +201,52 @@ public partial class AttackUnitTest
     Assert.True(damagedEvent.Bundle.SequenceEqual(new[] { new Damage(3, Element.Kinetic) }));
   }
 
+  [TestCase(TestName = "An empty magazine rejects the attack without spending AP or raising events")]
+  public void EmptyMagazineRejectsAttack()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction], new AlwaysHitCalculator());
+    var weapon = BattleTestFactory.MakeAmmoWeapon("Pistol", magazine: 1, damage: 2);
+    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction), new Vector3I(4, 0, 1), weapon);
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
+    StartBattle(session);
+
+    var executor = new BattleActionExecutor(session);
+    Assert.True(executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult().Succeeded);
+    Assert.Equal(0, weapon.CurrentAmmo);
+
+    var raisedEvents = new List<BattleEvent>();
+    session.BattleEventCommitted += raisedEvents.Add;
+    int actionPointsBefore = attacker.CurrentActionPoints;
+
+    var result = executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult();
+
+    Assert.False(result.Succeeded);
+    Assert.Equal(BattleActionFailureReason.Rejected, result.FailureReason);
+    Assert.Equal(actionPointsBefore, attacker.CurrentActionPoints);
+    Assert.False(raisedEvents.OfType<UnitAttackedBattleEvent>().Any());
+  }
+
+  [TestCase(TestName = "A missed shot still spends ammunition")]
+  public void MissedShotSpendsAmmo()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
+    var weapon = BattleTestFactory.MakeAmmoWeapon("Pistol", magazine: 3);
+    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, aim: 0), new Vector3I(4, 0, 1), weapon);
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
+    StartBattle(session);
+
+    var executor = new BattleActionExecutor(session);
+    var result = executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult();
+
+    Assert.True(result.Succeeded);
+    Assert.Equal(target.State.MaxHealth, target.State.CurrentHealth); // aim 0 -> guaranteed miss
+    Assert.Equal(2, weapon.CurrentAmmo);
+  }
+
   private static List<bool> RunSeededAttackOutcomes(int seed)
   {
     var playerFaction = BattleTestFactory.MakeFaction("Player");

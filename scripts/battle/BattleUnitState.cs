@@ -151,6 +151,11 @@ public sealed class BattleUnitState
     return _spottedUnits.Add(unit);
   }
 
+  public bool CanAct()
+  {
+    return CurrentActionPoints > 0 && !IsDead && !IsImmobilized;
+  }
+
   public float EffectiveStat<TStat>() where TStat : Stat
     => ((HasStats)Combatant).Resolve<TStat>(GatherStatContributions());
 

@@ -228,6 +228,31 @@ public sealed class BattleBoardState
     return GetTile(point).IsWalkable && !_occupants.ContainsKey(point);
   }
 
+  // The board's single definition of orthogonal adjacency; the path graph and every
+  // adjacency question must share it so movement rules cannot drift.
+  private static readonly Vector3I[] OrthogonalDirections =
+  [
+    new(-1, 0, 0), new(1, 0, 0), new(0, 0, -1), new(0, 0, 1), new(0, -1, 0), new(0, 1, 0),
+  ];
+
+  /// <summary>
+  /// True when any adjacent tile (the same neighborhood the path graph connects) can be
+  /// occupied right now — the cheap no-BFS proxy for "some move exists".
+  /// </summary>
+  public bool HasOccupiableNeighbor(ValidatedPoint point)
+  {
+    foreach (Vector3I direction in OrthogonalDirections)
+    {
+      bool occupiable = ValidatePoint(point.Raw + direction).Match(
+        Some: CanOccupy,
+        None: () => false);
+      if (occupiable)
+        return true;
+    }
+
+    return false;
+  }
+
   public static int GetGridDistance(Vector3I source, Vector3I destination)
   {
     var delta = source - destination;
@@ -325,12 +350,8 @@ public sealed class BattleBoardState
 
     // Connect to every in-bounds neighbor that already has a node. During construction only the
     // backward neighbors exist yet; for a point added later (SetTileWalkable) any of the six may.
-    ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(-1, 0, 0));
-    ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(1, 0, 0));
-    ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, 0, -1));
-    ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, 0, 1));
-    ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, -1, 0));
-    ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + new Vector3I(0, 1, 0));
+    foreach (Vector3I direction in OrthogonalDirections)
+      ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + direction);
 
     UpdatePathPointState(point);
   }

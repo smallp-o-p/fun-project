@@ -1,9 +1,10 @@
-using FunProject;
 using FunProject.Battle;
 using FunProject.Combatants;
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using FunProject.Weapons;
 
 // Presentation-side input/targeting controller. Caches the selected unit's available action options,
 // holds the active per-verb targeting handler, and drives the None -> ActionTargeting -> ActionPending
@@ -152,29 +153,37 @@ public sealed class PlayerActionController
   private void RefreshOptions()
   {
     _options = SelectedUnit.Match(
-      Some: unit => _runtime.Query(new GetUnitActionOptions(unit)).Match(
-        Right: availability => BuildOptions(unit, availability),
+      Some: unit => _runtime.Query(new GetAvailableActionsForUnit(unit)).Match(
+        Right: actions => BuildOptions(unit, actions),
         Left: []),
       None: []);
   }
 
-  // Presentation-side mapping: turn the domain availability fact into concrete verb options. Each verb
-  // takes its availability straight from the fact (single source) and supplies its own targeting handler.
-  // Attack is included only when a weapon is equipped (matching the verb's capability requirement).
-  private static IReadOnlyList<UnitActionOption> BuildOptions(BattleUnitState unit, UnitActionAvailability availability)
+  // Presentation-side mapping: one option per domain verb row, availability straight from the
+  // row. Targeting handlers stay presentation-owned; the domain never sees them.
+  private static IReadOnlyList<UnitActionOption> BuildOptions(
+    BattleUnitState unit, IReadOnlyList<AvailableUnitAction> actions)
   {
-    var options = new List<UnitActionOption>
-    {
-      new MoveActionOption(unit, availability.CanMove),
-    };
-
-    unit.EquippedWeapon.IfSome(weapon =>
-      options.Add(new AttackActionOption(unit, weapon, availability.CanAttack)));
-
-    options.Add(new PassActionOption(unit, availability.CanPass));
-    options.Add(new EndTurnActionOption(unit, availability.CanEndTurn));
-    return options;
+    return actions.Select(action => MakeOption(unit, action)).ToList();
   }
+
+  private static UnitActionOption MakeOption(BattleUnitState unit, AvailableUnitAction action)
+  {
+    return action.Action switch
+    {
+      MoveActionDefinition => new MoveActionOption(unit, action.IsAvailable),
+      AttackActionDefinition => new AttackActionOption(unit, RequireWeapon(unit), action.IsAvailable),
+      ReloadActionDefinition => new ReloadActionOption(unit, action.IsAvailable),
+      PassActionDefinition => new PassActionOption(unit, action.IsAvailable),
+      EndTurnActionDefinition => new EndTurnActionOption(unit, action.IsAvailable),
+      _ => throw new InvalidOperationException($"No presentation option for {action.Action.GetType().Name}."),
+    };
+  }
+
+  private static Weapon RequireWeapon(BattleUnitState unit)
+    => unit.EquippedWeapon.Match(
+      Some: weapon => weapon,
+      None: () => throw new InvalidOperationException("Attack option requires an equipped weapon."));
 
   private void ResetTargeting()
   {

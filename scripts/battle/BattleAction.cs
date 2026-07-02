@@ -131,6 +131,11 @@ public abstract class BattleAction
     return new AttackUnit(unit, target);
   }
 
+  public static ReloadWeapon ReloadWeapon(BattleUnitState unit)
+  {
+    return new ReloadWeapon(unit);
+  }
+
   public static ApplyDamage ApplyDamage(BattleUnitState unit, int amount)
   {
     return new ApplyDamage(unit, amount);

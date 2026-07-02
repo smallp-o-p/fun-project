@@ -21,20 +21,11 @@ public enum BattlePhase
 
 public sealed class BattleSession
 {
-  public record FactionBattleSummary
-  {
-    public required Faction Faction { get; init; }
-    public required IReadOnlyDictionary<Combatant, List<Combatant>> DefeatedPerCombatant { get; init; }
-    public required BattleOutcome Outcome { get; init; }
-    public required IReadOnlySet<Combatant> CombatantsDead { get; init; }
-    public required IReadOnlySet<Combatant> CombatantsWounded { get; init; }
-    public required int TurnCount { get; init; }
-  };
-
   internal readonly record struct SpawnedBattleUnit(BattleUnitState Unit);
 
   public const int DefaultMovementStepActionPointCost = 1;
   public const int DefaultAttackActionPointCost = 1;
+  public const int DefaultReloadActionPointCost = 1;
 
   private readonly IHitChanceCalculator _hitChanceCalculator;
   private readonly Random _random;
@@ -525,7 +516,7 @@ public sealed class BattleSession
     if (!_scheduler.IsUnitAvailable(unit))
       return false;
 
-    return unit.CurrentActionPoints > 0 && !unit.IsImmobilized;
+    return unit.CanAct();
   }
 
   internal static int GetGridDistance(Vector3I source, Vector3I destination)
@@ -791,7 +782,7 @@ public sealed class BattleSession
       Faction = faction,
       Outcome = Outcome.Value(),
       CombatantsDead = (SysColGeneric.HashSet<Combatant>)
-        [..DeadUnits.Where(unit => unit.Side == faction).Select(unit => unit.Combatant)],
+        [.. DeadUnits.Where(unit => unit.Side == faction).Select(unit => unit.Combatant)],
       CombatantsWounded = (SysColGeneric.HashSet<Combatant>)
       [
         ..AliveUnits.Where(unit => unit.Side == faction).Where(unit => unit.MaxHealth > unit.CurrentHealth)

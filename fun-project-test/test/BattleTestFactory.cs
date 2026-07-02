@@ -94,7 +94,7 @@ internal static class BattleTestFactory
 
   public static Weapon MakeWeapon(string name, int damage = 5, int range = 10)
   {
-    return new Weapon(new WeaponData
+    return new MeleeWeapon(new WeaponData
     {
       Name = name,
       Description = $"{name} weapon",
@@ -103,6 +103,26 @@ internal static class BattleTestFactory
       RangeStat = new RangeStat { BaseValue = range },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 0 },
     });
+  }
+
+  public static AmmunitionedWeaponData MakeAmmoWeaponData(string name, int magazine = 6, int damage = 5, int range = 10)
+  {
+    return new AmmunitionedWeaponData
+    {
+      Name = name,
+      Description = $"{name} weapon",
+      Frame = MakeFrame(),
+      DamageStat = new DamageStat { BaseValue = damage },
+      RangeStat = new RangeStat { BaseValue = range },
+      CriticalChanceStat = new CriticalChanceStat { BaseValue = 0 },
+      AmmunitionStat = new AmmunitionStat { BaseValue = magazine },
+      DefaultAmmoData = new Ammunition(),
+    };
+  }
+
+  public static AmmunitionedWeapon MakeAmmoWeapon(string name, int magazine = 6, int damage = 5, int range = 10)
+  {
+    return new AmmunitionedWeapon(MakeAmmoWeaponData(name, magazine, damage, range));
   }
 
   public static ItemWith<ThrowableCapability> MakeThrowable(string name, int throwRange = 4, int actionPointCost = 1, bool consumesOnUse = true)

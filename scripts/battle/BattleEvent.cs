@@ -267,6 +267,20 @@ public sealed record UnitAttackedBattleEvent : BattleEvent, IUnitBattleEvent, IP
   }
 }
 
+public sealed record UnitReloadedWeaponBattleEvent : BattleEvent, IUnitBattleEvent
+{
+  public BattleUnitState Unit { get; }
+  public AmmunitionedWeapon Weapon { get; }
+
+  public UnitReloadedWeaponBattleEvent(BattleUnitState unit, AmmunitionedWeapon weapon)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(weapon);
+    Unit = unit;
+    Weapon = weapon;
+  }
+}
+
 /// <summary>
 /// Raised the first time an observer spots a target this battle. First-spotting is tracked PER
 /// OBSERVER, so a second observer spotting an already-team-known target still raises this once for

@@ -1,21 +1,28 @@
-﻿using System;
+using System.Collections.Generic;
 using FunProject.Combatants;
 
 namespace FunProject.Battle;
 
-public sealed class GetFactionEndOfBattleSummary(Faction faction)
-  : BattleSessionQuery<BattleSession.FactionBattleSummary>
+// End-of-battle summary for one faction: outcome, per-combatant kill attribution, and the
+// faction's dead/wounded roster. Immutable snapshot built from final session state.
+public sealed record FactionBattleSummary
 {
-  internal override Either<BattleQueryFailure, BattleSession.FactionBattleSummary> Execute(BattleSession session)
+  public required Faction Faction { get; init; }
+  public required IReadOnlyDictionary<Combatant, List<Combatant>> DefeatedPerCombatant { get; init; }
+  public required BattleOutcome Outcome { get; init; }
+  public required IReadOnlySet<Combatant> CombatantsDead { get; init; }
+  public required IReadOnlySet<Combatant> CombatantsWounded { get; init; }
+  public required int TurnCount { get; init; }
+}
+
+public sealed class GetFactionEndOfBattleSummary(Faction faction)
+  : BattleSessionQuery<FactionBattleSummary>
+{
+  internal override Either<BattleQueryFailure, FactionBattleSummary> Execute(BattleSession session)
   {
     if (session.Phase != BattlePhase.Ended)
       return Left(new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState, "Battle session isn't over."));
 
     return Right(session.GetFactionSummary(faction));
   }
-}
-
-public class BattleSessionQueries
-{
-  
 }

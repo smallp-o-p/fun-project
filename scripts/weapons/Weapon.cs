@@ -10,7 +10,7 @@ namespace FunProject.Weapons;
 public class Weapon : EquippableItem, HasStats
 {
   protected readonly StatSheet _stats;
-  private readonly WeaponFrameData _frame;
+  protected readonly WeaponFrameData _frame;
 
   public Weapon(WeaponData data) : base(data)
   {
@@ -37,6 +37,22 @@ public class Weapon : EquippableItem, HasStats
   /// the common case (contributing extra bundle mods) should delegate to <see cref="EmitDamageWith"/>.
   /// </summary>
   public virtual List<Damage> EmitDamage() => EmitDamageWith([]);
+
+  /// <summary>
+  /// Spend one shot and emit its damage bundle, or None if the weapon cannot fire.
+  /// Weapons without a magazine never deplete; <see cref="AmmunitionedWeapon"/> overrides
+  /// this with ammunition gating.
+  /// </summary>
+  public virtual Option<List<Damage>> TrySpendShot() => EmitDamage();
+
+  /// <summary>Whether this weapon can fire right now. Weapons without a magazine are always loaded.</summary>
+  public virtual bool IsLoaded => true;
+
+  /// <summary>Whether this weapon carries a reloadable magazine.</summary>
+  public virtual bool HasMagazine => false;
+
+  /// <summary>Whether reloading would change anything. Weapons without a magazine never reload.</summary>
+  public virtual bool CanReload() => false;
 
   /// <summary>
   /// Derive the frame's packets from base damage, fold the weapon's slot bundle mods followed by
@@ -83,12 +99,39 @@ public class MeleeWeapon(WeaponData data) : Weapon(data)
 
 public class AmmunitionedWeapon : Weapon
 {
+  // Runtime magazine state. Plain int on the runtime wrapper — never a Stat resource,
+  // so battle-time spending can never write through to the authored template.
+  public int CurrentAmmo { get; private set; }
+
   public AmmunitionedWeapon(AmmunitionedWeaponData data) : base(data)
   {
     _stats.Set(data.AmmunitionStat);
+    CurrentAmmo = MagazineSize;
   }
 
-  public AmmunitionStat GetMagAmmoStat() => GetStat<AmmunitionStat>();
+  public int MagazineSize => Mathf.RoundToInt(EffectiveStat<AmmunitionStat>());
+
+  // One shot spends one round per frame packet.
+  public int ShotCost => _frame.Packets.Count;
+
+  public override bool IsLoaded => !NeedsToReload();
+
+  public override bool HasMagazine => true;
+
+  public override bool CanReload() => CurrentAmmo < MagazineSize;
+
+  public bool NeedsToReload() => CurrentAmmo < ShotCost;
+
+  public void Reload() => CurrentAmmo = MagazineSize;
+
+  public override Option<List<Damage>> TrySpendShot()
+  {
+    if (NeedsToReload())
+      return None;
+
+    CurrentAmmo -= ShotCost;
+    return EmitDamage();
+  }
 }
 
 public class FirearmWeapon(FirearmWeaponData data) : AmmunitionedWeapon(data)

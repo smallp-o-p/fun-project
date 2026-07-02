@@ -2,10 +2,10 @@ using FunProject.Battle;
 using FunProject.Weapons;
 using System;
 
-// Presentation-side verb taxonomy. Each verb is one cohesive strategy: it carries its availability
-// (sourced from the domain UnitActionAvailability fact) AND owns the factory for its targeting handler,
-// which produces that verb's candidate set. Availability and candidates live on the same class so they
-// cannot drift. Targeted verbs implement NeedsTargeting; instant verbs implement CanActDirectly.
+// Presentation-side verb taxonomy. Each verb carries its availability (sourced from the domain
+// AvailableUnitAction row) AND owns the factory for its targeting handler, which produces that
+// verb's candidate set. Availability and candidates live on the same class so they cannot drift.
+// Targeted verbs implement NeedsTargeting; instant verbs implement CanActDirectly.
 public abstract class UnitActionOption
 {
   public BattleUnitState Unit { get; }
@@ -59,5 +59,14 @@ public sealed class EndTurnActionOption(BattleUnitState unit, bool isAvailable)
   public BattleAction MakeAction()
   {
     return new EndFactionTurn(Unit.Combatant.OwningFaction);
+  }
+}
+
+public sealed class ReloadActionOption(BattleUnitState unit, bool isAvailable)
+  : UnitActionOption(unit, isAvailable), CanActDirectly
+{
+  public BattleAction MakeAction()
+  {
+    return BattleAction.ReloadWeapon(Unit);
   }
 }

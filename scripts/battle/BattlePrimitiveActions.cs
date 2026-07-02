@@ -5,6 +5,7 @@ using FunProject.Weapons;
 using Godot;
 using LanguageExt.UnsafeValueAccess;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace FunProject.Battle;
@@ -303,8 +304,17 @@ public sealed class AttackUnit : BattleAction
 
   private BattleActionResult ResolveAttack(BattleSession session, ResolvedAttack resolved)
   {
+    // Ammo gate comes before the AP spend: an empty magazine is a legal rejection
+    // that must leave the attacker's state fully untouched.
+    return resolved.Weapon.TrySpendShot().Match(
+      Some: bundle => CommitAttack(session, resolved, bundle),
+      None: () => BattleActionResult.Failure(this, BattleActionFailureReason.Rejected,
+        $"{resolved.Weapon.ItemName} has no ammunition loaded."));
+  }
+
+  private BattleActionResult CommitAttack(BattleSession session, ResolvedAttack resolved, List<Damage> bundle)
+  {
     BattleUnitState attacker = Unit;
-    Weapon weapon = resolved.Weapon;
 
     if (!attacker.TrySpendActionPoints(BattleSession.DefaultAttackActionPointCost))
       return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{attacker.Combatant.Name} could not spend {BattleSession.DefaultAttackActionPointCost} action points.");
@@ -314,9 +324,9 @@ public sealed class AttackUnit : BattleAction
     int roll = session.RollPercent();
     bool isHit = roll < breakdown.FinalChance;
 
-    session.RaiseEvent(new UnitAttackedBattleEvent(attacker, Target, resolved.TargetPoint, weapon, breakdown, roll, isHit));
+    session.RaiseEvent(new UnitAttackedBattleEvent(attacker, Target, resolved.TargetPoint, resolved.Weapon, breakdown, roll, isHit));
     if (isHit)
-      session.ApplyDamageTo(Target, weapon.EmitDamage(), Some(Unit));
+      session.ApplyDamageTo(Target, bundle, Some(Unit));
 
     return BattleActionResult.Success(this, attacker);
   }
@@ -401,5 +411,46 @@ public sealed class EndFactionTurn : BattleAction
 
     session.EndFactionTurn(ExpectedActiveSide);
     return BattleActionResult.Success(this);
+  }
+}
+
+public sealed class ReloadWeapon : BattleAction
+{
+  public const string ReloadWeaponActionId = "reload_weapon";
+
+  public BattleUnitState Unit { get; }
+
+  internal ReloadWeapon(BattleUnitState unit) : base(ReloadWeaponActionId)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    Unit = unit;
+  }
+
+  internal override BattleActionResult Execute(BattleSession session)
+  {
+    var validationFailure = ValidateActingUnit(session, Unit, BattleSession.DefaultReloadActionPointCost);
+    if (validationFailure.IsSome)
+      return validationFailure.Value();
+
+    // The reload event carries the concrete magazine weapon, so the write side resolves it here.
+    Option<AmmunitionedWeapon> weaponOption = Unit.EquippedWeapon.Bind(
+      weapon => Optional(weapon as AmmunitionedWeapon));
+    if (weaponOption.IsNone)
+      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected,
+        $"{Unit.Combatant.Name} has no reloadable weapon.");
+    AmmunitionedWeapon reloadable = weaponOption.Match(
+      weapon => weapon,
+      () => throw new InvalidOperationException("Reloadable weapon vanished."));
+
+    if (!reloadable.CanReload())
+      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected,
+        $"{reloadable.ItemName} is already fully loaded.");
+    if (!Unit.TrySpendActionPoints(BattleSession.DefaultReloadActionPointCost))
+      return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError,
+        $"{Unit.Combatant.Name} could not spend {BattleSession.DefaultReloadActionPointCost} action points.");
+
+    reloadable.Reload();
+    session.RaiseEvent(new UnitReloadedWeaponBattleEvent(Unit, reloadable));
+    return BattleActionResult.Success(this, Unit);
   }
 }

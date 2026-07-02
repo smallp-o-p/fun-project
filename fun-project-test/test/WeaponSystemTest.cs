@@ -63,7 +63,7 @@ public class WeaponSystemTest
     };
     var weapon = new FirearmWeapon(data);
 
-    Assert.Equal(12, weapon.GetMagAmmoStat().BaseValue);
+    Assert.Equal(12, weapon.MagazineSize);
     Assert.Equal(FirearmArchetype.Pistol, weapon.Archetype);
   }
 
