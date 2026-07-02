@@ -1,8 +1,6 @@
 using FunProject.Battle;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using static BattleActionTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -11,39 +9,39 @@ public class ObjectiveTest
   [TestCase(TestName = "EliminateAll is complete only once all other factions are wiped")]
   public void EliminateAllCompletesWhenOpponentsWiped()
   {
-    var player = BattleTestFactory.MakeFaction("Player");
-    var enemy = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [player, enemy]);
-    SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    var enemyUnit = SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    StartBattle(session);
+    var battle = new BattleDuelBuilder
+    {
+      Dimensions = new Vector3I(5, 1, 5),
+      Player = new("P1", Position: new Vector3I(0, 0, 0)),
+      Enemy = new("E1", Position: new Vector3I(2, 0, 0)),
+    }.Start();
 
-    var objective = new EliminateAllOpposingForcesObjective(new ObjectiveData()) { Owner = player };
+    var objective = new EliminateAllOpposingForcesObjective(new ObjectiveData()) { Owner = battle.PlayerFaction };
 
-    Assert.False(objective.IsComplete(session));
-    Assert.False(objective.IsFailed(session));
+    Assert.False(objective.IsComplete(battle.Session));
+    Assert.False(objective.IsFailed(battle.Session));
 
-    new BattleActionExecutor(session).Submit(BattleAction.ApplyDamage(enemyUnit.State, 999)).RequireSingleResult();
+    ApplyDamage(battle.Session, battle.EnemyUnit, 999);
 
-    Assert.True(objective.IsComplete(session));
-    Assert.False(objective.IsFailed(session));
+    Assert.True(objective.IsComplete(battle.Session));
+    Assert.False(objective.IsFailed(battle.Session));
   }
 
   [TestCase(TestName = "EliminateAll fails when the owner is wiped")]
   public void EliminateAllFailsWhenOwnerWiped()
   {
-    var player = BattleTestFactory.MakeFaction("Player");
-    var enemy = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [player, enemy]);
-    var playerUnit = SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    StartBattle(session);
+    var battle = new BattleDuelBuilder
+    {
+      Dimensions = new Vector3I(5, 1, 5),
+      Player = new("P1", Position: new Vector3I(0, 0, 0)),
+      Enemy = new("E1", Position: new Vector3I(2, 0, 0)),
+    }.Start();
 
-    var objective = new EliminateAllOpposingForcesObjective(new ObjectiveData()) { Owner = player };
-    new BattleActionExecutor(session).Submit(BattleAction.ApplyDamage(playerUnit.State, 999)).RequireSingleResult();
+    var objective = new EliminateAllOpposingForcesObjective(new ObjectiveData()) { Owner = battle.PlayerFaction };
+    ApplyDamage(battle.Session, battle.PlayerUnit, 999);
 
-    Assert.True(objective.IsFailed(session));
-    Assert.False(objective.IsComplete(session));
+    Assert.True(objective.IsFailed(battle.Session));
+    Assert.False(objective.IsComplete(battle.Session));
   }
 
   [TestCase(TestName = "SurviveUntilTurn completes once the target turn is reached")]

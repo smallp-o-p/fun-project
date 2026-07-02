@@ -1,12 +1,10 @@
 using FunProject.Battle;
 using FunProject.Core;
-using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
 using System.Linq;
-using static BattleActionTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -15,79 +13,65 @@ public partial class AttackUnitTest
   [TestCase(TestName = "Guaranteed hit damages the target and raises attack then damage events")]
   public void GuaranteedHitDamagesTargetAndRaisesAttackThenDamageEvents()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, aim: 100), new Vector3I(4, 0, 1), BattleTestFactory.MakeWeapon("Rifle", damage: 5));
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    StartBattle(session);
+    var battle = new BattleDuelBuilder
+    {
+      Player = new DuelSide("Alpha", Aim: 100, Weapon: BattleTestFactory.MakeWeapon("Rifle", damage: 5)),
+    }.Start();
+    var attacker = battle.PlayerUnit;
+    var target = battle.EnemyUnit;
 
-    var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
-
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult();
+    var recorder = new BattleEventRecorder(battle.Session);
+    var result = battle.Executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
     Assert.Equal(target.State.MaxHealth - 5, target.State.CurrentHealth);
     Assert.Equal(attacker.State.MaxActionPoints - 1, attacker.CurrentActionPoints);
 
-    var attackEvent = raisedEvents.OfType<UnitAttackedBattleEvent>().Single();
+    var attackEvent = recorder.Single<UnitAttackedBattleEvent>();
     Assert.True(attackEvent.IsHit);
     Assert.Equal(100, attackEvent.Breakdown.FinalChance);
     Assert.True(attackEvent.Roll >= 0);
     Assert.True(attackEvent.Roll < 100);
 
-    int attackedIndex = raisedEvents.FindIndex(battleEvent => battleEvent is UnitAttackedBattleEvent);
-    int damagedIndex = raisedEvents.FindIndex(battleEvent => battleEvent is UnitDamagedBattleEvent);
-    Assert.True(attackedIndex >= 0);
-    Assert.True(damagedIndex > attackedIndex);
+    recorder.AssertCommittedBefore<UnitAttackedBattleEvent, UnitDamagedBattleEvent>();
   }
 
   [TestCase(TestName = "Guaranteed miss spends action points without damage")]
   public void GuaranteedMissSpendsActionPointsWithoutDamage()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, aim: 0), new Vector3I(4, 0, 1), BattleTestFactory.MakeWeapon("Rifle"));
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    StartBattle(session);
+    var battle = new BattleDuelBuilder
+    {
+      Player = new DuelSide("Alpha", Aim: 0, Weapon: BattleTestFactory.MakeWeapon("Rifle")),
+    }.Start();
+    var attacker = battle.PlayerUnit;
+    var target = battle.EnemyUnit;
 
-    var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
-
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult();
+    var recorder = new BattleEventRecorder(battle.Session);
+    var result = battle.Executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
     Assert.Equal(target.State.MaxHealth, target.State.CurrentHealth);
     Assert.Equal(attacker.State.MaxActionPoints - 1, attacker.CurrentActionPoints);
-    Assert.False(raisedEvents.OfType<UnitAttackedBattleEvent>().Single().IsHit);
-    Assert.False(raisedEvents.OfType<UnitDamagedBattleEvent>().Any());
+    Assert.False(recorder.Single<UnitAttackedBattleEvent>().IsHit);
+    Assert.False(recorder.OfType<UnitDamagedBattleEvent>().Any());
   }
 
   [TestCase(TestName = "Applicable cover lowers the resolved hit chance")]
   public void ApplicableCoverLowersTheResolvedHitChance()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    var targetPoint = board.ValidatePoint(new Vector3I(4, 0, 4)).RequireSome();
-    board.GetTile(targetPoint).Cover = new TileCover(CoverDirections.North, 60);
-    var session = BattleTestFactory.MakeSession(board, [playerFaction, enemyFaction]);
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, aim: 60), new Vector3I(4, 0, 1), BattleTestFactory.MakeWeapon("Rifle"));
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    StartBattle(session);
+    board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(CoverDirections.North, 60);
+    var battle = new BattleDuelBuilder
+    {
+      Board = board,
+      Player = new DuelSide("Alpha", Aim: 60, Weapon: BattleTestFactory.MakeWeapon("Rifle")),
+    }.Start();
 
-    var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
-
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult();
+    var recorder = new BattleEventRecorder(battle.Session);
+    var result = battle.Executor.Submit(BattleAction.AttackUnit(battle.PlayerUnit.State, battle.EnemyUnit.State)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
-    var attackEvent = raisedEvents.OfType<UnitAttackedBattleEvent>().Single();
+    var attackEvent = recorder.Single<UnitAttackedBattleEvent>();
     Assert.Equal(0, attackEvent.Breakdown.FinalChance);
     Assert.False(attackEvent.IsHit);
     Assert.Equal(StandardHitChanceCalculator.CoverModifierLabel, attackEvent.Breakdown.Modifiers.Single().Label);
@@ -96,18 +80,16 @@ public partial class AttackUnitTest
   [TestCase(TestName = "Injected calculator replaces the hit chance algorithm")]
   public void InjectedCalculatorReplacesTheHitChanceAlgorithm()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction], new AlwaysHitCalculator());
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, aim: 0), new Vector3I(4, 0, 1), BattleTestFactory.MakeWeapon("Rifle", damage: 5));
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    StartBattle(session);
+    var battle = new BattleDuelBuilder
+    {
+      HitChanceCalculator = new AlwaysHitCalculator(),
+      Player = new DuelSide("Alpha", Aim: 0, Weapon: BattleTestFactory.MakeWeapon("Rifle", damage: 5)),
+    }.Start();
 
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult();
+    var result = battle.Executor.Submit(BattleAction.AttackUnit(battle.PlayerUnit.State, battle.EnemyUnit.State)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
-    Assert.Equal(target.State.MaxHealth - 5, target.State.CurrentHealth);
+    Assert.Equal(battle.EnemyUnit.State.MaxHealth - 5, battle.EnemyUnit.State.CurrentHealth);
   }
 
   [TestCase(TestName = "Attack rejections leave action points unspent")]
@@ -154,28 +136,19 @@ public partial class AttackUnitTest
   [TestCase(TestName = "Damage event carries the weapon's emitted bundle")]
   public void DamageEventCarriesEmittedBundle()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction], new AlwaysHitCalculator());
-    var weapon = new Weapon(new WeaponData
+    var weapon = BattleTestFactory.MakeWeapon(
+      "Plasma Pistol", damage: 6, frame: BattleTestFactory.MakeFrame((Element.Thermal, 0.7f), (Element.Electrical, 0.3f)));
+    var battle = new BattleDuelBuilder
     {
-      Name = "Plasma Pistol",
-      Frame = BattleTestFactory.MakeFrame((Element.Thermal, 0.7f), (Element.Electrical, 0.3f)),
-      DamageStat = new FunProject.Stats.DamageStat { BaseValue = 6 },
-      RangeStat = new FunProject.Stats.RangeStat { BaseValue = 10 },
-      CriticalChanceStat = new FunProject.Stats.CriticalChanceStat { BaseValue = 0 },
-    });
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, aim: 100), new Vector3I(4, 0, 1), weapon);
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    StartBattle(session);
+      HitChanceCalculator = new AlwaysHitCalculator(),
+      Player = new DuelSide("Alpha", Aim: 100, Weapon: weapon),
+    }.Start();
+    var target = battle.EnemyUnit;
 
-    var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
+    var recorder = new BattleEventRecorder(battle.Session);
+    Assert.True(battle.Executor.Submit(BattleAction.AttackUnit(battle.PlayerUnit.State, target.State)).RequireSingleResult().Succeeded);
 
-    var executor = new BattleActionExecutor(session);
-    Assert.True(executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult().Succeeded);
-
-    var damagedEvent = raisedEvents.OfType<UnitDamagedBattleEvent>().Single();
+    var damagedEvent = recorder.Single<UnitDamagedBattleEvent>();
     Assert.Equal(6, damagedEvent.TotalAmount); // 4 Thermal + 2 Electrical
     Assert.Equal(target.State.MaxHealth - 6, target.State.CurrentHealth);
     Assert.True(damagedEvent.Bundle.SequenceEqual(
@@ -185,18 +158,12 @@ public partial class AttackUnitTest
   [TestCase(TestName = "Int damage path wraps the amount as a single Kinetic packet")]
   public void IntDamagePathWrapsAsKineticPacket()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
-    StartBattle(session);
+    var solo = StartSoloBattle(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0));
 
-    var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
+    var recorder = new BattleEventRecorder(solo.Session);
+    Assert.True(solo.Executor.Submit(BattleAction.ApplyDamage(solo.Unit.State, 3)).RequireSingleResult().Succeeded);
 
-    var executor = new BattleActionExecutor(session);
-    Assert.True(executor.Submit(BattleAction.ApplyDamage(unit.State, 3)).RequireSingleResult().Succeeded);
-
-    var damagedEvent = raisedEvents.OfType<UnitDamagedBattleEvent>().Single();
+    var damagedEvent = recorder.Single<UnitDamagedBattleEvent>();
     Assert.Equal(3, damagedEvent.TotalAmount);
     Assert.True(damagedEvent.Bundle.SequenceEqual(new[] { new Damage(3, Element.Kinetic) }));
   }
@@ -204,43 +171,40 @@ public partial class AttackUnitTest
   [TestCase(TestName = "An empty magazine rejects the attack without spending AP or raising events")]
   public void EmptyMagazineRejectsAttack()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction], new AlwaysHitCalculator());
     var weapon = BattleTestFactory.MakeAmmoWeapon("Pistol", magazine: 1, damage: 2);
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction), new Vector3I(4, 0, 1), weapon);
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    StartBattle(session);
+    var battle = new BattleDuelBuilder
+    {
+      HitChanceCalculator = new AlwaysHitCalculator(),
+      Player = new DuelSide("Alpha", Weapon: weapon),
+    }.Start();
+    var attacker = battle.PlayerUnit;
+    var target = battle.EnemyUnit;
 
-    var executor = new BattleActionExecutor(session);
-    Assert.True(executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult().Succeeded);
+    Assert.True(battle.Executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult().Succeeded);
     Assert.Equal(0, weapon.CurrentAmmo);
 
-    var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
+    var recorder = new BattleEventRecorder(battle.Session);
     int actionPointsBefore = attacker.CurrentActionPoints;
 
-    var result = executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult();
+    var result = battle.Executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult();
 
     Assert.False(result.Succeeded);
     Assert.Equal(BattleActionFailureReason.Rejected, result.FailureReason);
     Assert.Equal(actionPointsBefore, attacker.CurrentActionPoints);
-    Assert.False(raisedEvents.OfType<UnitAttackedBattleEvent>().Any());
+    Assert.False(recorder.OfType<UnitAttackedBattleEvent>().Any());
   }
 
   [TestCase(TestName = "A missed shot still spends ammunition")]
   public void MissedShotSpendsAmmo()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
     var weapon = BattleTestFactory.MakeAmmoWeapon("Pistol", magazine: 3);
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, aim: 0), new Vector3I(4, 0, 1), weapon);
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    StartBattle(session);
+    var battle = new BattleDuelBuilder
+    {
+      Player = new DuelSide("Alpha", Aim: 0, Weapon: weapon),
+    }.Start();
+    var target = battle.EnemyUnit;
 
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult();
+    var result = battle.Executor.Submit(BattleAction.AttackUnit(battle.PlayerUnit.State, target.State)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
     Assert.Equal(target.State.MaxHealth, target.State.CurrentHealth); // aim 0 -> guaranteed miss
@@ -249,24 +213,17 @@ public partial class AttackUnitTest
 
   private static List<bool> RunSeededAttackOutcomes(int seed)
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction], randomSeed: seed);
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, actionPoints: 5, aim: 50), new Vector3I(4, 0, 1), BattleTestFactory.MakeWeapon("Rifle"));
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction, health: 100), new Vector3I(4, 0, 4));
-    StartBattle(session);
-
-    var outcomes = new List<bool>();
-    session.BattleEventCommitted += battleEvent =>
+    var battle = new BattleDuelBuilder
     {
-      if (battleEvent is UnitAttackedBattleEvent attackEvent)
-        outcomes.Add(attackEvent.IsHit);
-    };
+      RandomSeed = seed,
+      Player = new DuelSide("Alpha", ActionPoints: 5, Aim: 50, Weapon: BattleTestFactory.MakeWeapon("Rifle")),
+      Enemy = new DuelSide("Hostile", Health: 100),
+    }.Start();
 
-    var executor = new BattleActionExecutor(session);
+    var recorder = new BattleEventRecorder(battle.Session);
     for (int i = 0; i < 5; i++)
-      Assert.True(executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult().Succeeded);
+      Assert.True(battle.Executor.Submit(BattleAction.AttackUnit(battle.PlayerUnit.State, battle.EnemyUnit.State)).RequireSingleResult().Succeeded);
 
-    return outcomes;
+    return recorder.OfType<UnitAttackedBattleEvent>().Select(attackEvent => attackEvent.IsHit).ToList();
   }
 }

@@ -1,7 +1,5 @@
-using FunProject.Combatants;
 using FunProject.Items.Capabilities;
 using FunProject.Stats;
-using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
 
@@ -9,25 +7,6 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class WeaponSystemTest
 {
-  private WeaponData MakeWeaponData() => new()
-  {
-    Frame = BattleTestFactory.MakeFrame(),
-    DamageStat = new DamageStat { BaseValue = 10 },
-    CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
-    RangeStat = new RangeStat { BaseValue = 1 },
-  };
-
-  private FirearmWeaponData MakeFirearmWeaponData() => new()
-  {
-    Frame = BattleTestFactory.MakeFrame(),
-    DamageStat = new DamageStat { BaseValue = 10 },
-    CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
-    RangeStat = new RangeStat { BaseValue = 1 },
-    AmmunitionStat = new AmmunitionStat { BaseValue = 12 },
-    DefaultAmmoData = new Ammunition(),
-    Capabilities = [new ModSlotsCapabilityData { SlotCount = 1 }]
-  };
-
   [TestCase(TestName = "MeleeWeapon constructed from RangedWeaponData")]
   public void MeleeWeaponConstructedFromRangedWeaponData()
   {
@@ -70,14 +49,14 @@ public class WeaponSystemTest
   [TestCase(TestName = "MeleeWeapon stats dictionary has no ammo entry")]
   public void MeleeWeaponStatsDictionaryHasNoAmmoEntry()
   {
-    var weapon = new MeleeWeapon(MakeWeaponData());
+    var weapon = new MeleeWeapon(BattleTestFactory.MakeWeaponData());
     Assert.True(weapon.TryGetStat<AmmunitionStat>().IsNone);
   }
 
   [TestCase(TestName = "Weapon generic stat lookup returns concrete stats")]
   public void WeaponGenericStatLookupReturnsConcreteStats()
   {
-    var weapon = new MeleeWeapon(MakeWeaponData());
+    var weapon = new MeleeWeapon(BattleTestFactory.MakeWeaponData());
 
     Assert.Equal(10, weapon.GetStat<DamageStat>().BaseValue);
     Option<RangeStat> range = weapon.TryGetStat<RangeStat>();
@@ -89,33 +68,12 @@ public class WeaponSystemTest
   [TestCase(TestName = "Firearm generic stat lookup returns the ammunition stat")]
   public void FirearmGenericStatLookupReturnsAmmunitionStat()
   {
-    var weapon = new FirearmWeapon(MakeFirearmWeaponData());
+    var weapon = new FirearmWeapon(BattleTestFactory.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1));
 
     Option<AmmunitionStat> ammoStat = weapon.TryGetStat<AmmunitionStat>();
     Assert.True(ammoStat.IsSome);
     Assert.Equal(12, ammoStat.RequireSome().BaseValue);
     Assert.True(weapon.TryGetStat<HealthStat>().IsNone);
-  }
-
-  [TestCase(TestName = "Combatant exposes its concrete stat types and no armor stat")]
-  public void CombatantExposesConcreteStatTypesAndNoArmorStat()
-  {
-    var combatant = new Combatant(new CombatantData
-    {
-      Name = "Captain",
-      HealthStat = new HealthStat { BaseValue = 20 },
-      ActionPointsStat = new ActionPointsStat { BaseValue = 4 },
-      WillStat = new WillStat { BaseValue = 50 },
-      MovementStat = new MovementStat { BaseValue = 12 },
-      VisionStat = new VisionStat { BaseValue = 20 },
-      AimStat = new AimStat { BaseValue = 65 },
-      ModSlotCount = 0,
-    }, new Faction(new FactionData { Name = "City Guard" }));
-
-    Assert.Equal(20, combatant.GetStat<HealthStat>().BaseValue);
-    Assert.Equal(20, combatant.GetStat<VisionStat>().BaseValue);
-    Assert.Equal(65, combatant.GetStat<AimStat>().BaseValue);
-    Assert.True(combatant.TryGetStat<BaseArmorStat>().IsNone);
   }
 
   [TestCase(TestName = "ModSlot starts empty")]
@@ -156,7 +114,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "Concrete stat mods target stats by class without enum metadata")]
   public void ConcreteStatModsTargetStatsByClassWithoutEnumMetadata()
   {
-    var weapon = new MeleeWeapon(MakeWeaponData());
+    var weapon = new MeleeWeapon(BattleTestFactory.MakeWeaponData());
     StatMod[] sources = [new RangeStatMod { Modifiers = [StatModifier.Add(4)] }];
     Assert.Equal(5f, ((HasStats)weapon).Resolve<RangeStat>(sources));
   }
@@ -180,7 +138,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "MultiStatMod stacks two mods on the same stat")]
   public void MultiStatModStacksSameStat()
   {
-    var data = MakeFirearmWeaponData();
+    var data = BattleTestFactory.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
     data.RangeStat.BaseValue = 10;
     var weapon = new FirearmWeapon(data);
     weapon.GetModSlots()[0].Equip(new MultiStatMod
@@ -198,7 +156,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "Weapon with mod slot produces correct effective range")]
   public void WeaponWithModSlotProducesCorrectRange()
   {
-    var data = MakeFirearmWeaponData();
+    var data = BattleTestFactory.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
     data.RangeStat.BaseValue = 10;
     var weapon = new FirearmWeapon(data);
     weapon.GetModSlots()[0].Equip(new MultiStatMod
@@ -213,7 +171,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "Weapon mod slot can equip a multi-stat mod")]
   public void WeaponModSlotCanEquipMultiStatMod()
   {
-    var data = MakeFirearmWeaponData();
+    var data = BattleTestFactory.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
     var weapon = new FirearmWeapon(data);
     weapon.GetModSlots()[0].Equip(new MultiStatMod
     {
@@ -231,7 +189,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "Two slots with different stat targets both apply")]
   public void MultipleModSlotsWithDifferentStatTargets()
   {
-    var data = MakeFirearmWeaponData();
+    var data = BattleTestFactory.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
     data.Capabilities = [new ModSlotsCapabilityData { SlotCount = 2 }];
     var weapon = new FirearmWeapon(data);
     weapon.GetModSlots()[0].Equip(new MultiStatMod { StatMods = [new RangeStatMod { Modifiers = [StatModifier.Add(10)] }] });

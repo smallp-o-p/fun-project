@@ -7,16 +7,13 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public partial class BattleMapBakerTest
 {
-  private static BattleMapTileData Floor() => new() { Walkable = true };
-  private static BattleMapTileData Wall() => new() { Walkable = false, BlocksLineOfSight = true };
-
   [TestCase(TestName = "Bake normalizes negative coordinates to a zero origin")]
   public void BakeNormalizesNegativeCoordinatesToZeroOrigin()
   {
     var cells = new List<(Vector3I, BattleMapTileData)>
     {
-      (new Vector3I(-2, 0, -3), Floor()),
-      (new Vector3I(-1, 0, -3), Floor()),
+      (new Vector3I(-2, 0, -3), FloorTile()),
+      (new Vector3I(-1, 0, -3), FloorTile()),
     };
 
     BattleMapData map = BattleMapAuthoring.BuildMap(cells);
@@ -31,8 +28,8 @@ public partial class BattleMapBakerTest
   {
     var cells = new List<(Vector3I, BattleMapTileData)>
     {
-      (new Vector3I(0, 0, 0), Floor()),
-      (new Vector3I(1, 0, 0), Wall()),
+      (new Vector3I(0, 0, 0), FloorTile()),
+      (new Vector3I(1, 0, 0), WallTile()),
     };
 
     BattleMapData map = BattleMapAuthoring.BuildMap(cells);
@@ -69,8 +66,8 @@ public partial class BattleMapBakerTest
   {
     var cells = new List<(Vector3I, BattleMapTileData)>
     {
-      (new Vector3I(0, 0, 0), Floor()),
-      (new Vector3I(0, 1, 0), Floor()),
+      (new Vector3I(0, 0, 0), FloorTile()),
+      (new Vector3I(0, 1, 0), FloorTile()),
     };
 
     BattleMapData map = BattleMapAuthoring.BuildMap(cells);

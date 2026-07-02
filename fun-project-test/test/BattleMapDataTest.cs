@@ -1,5 +1,4 @@
 using FunProject.Battle;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
 
@@ -7,20 +6,11 @@ using Godot;
 [RequireGodotRuntime]
 public partial class BattleMapDataTest
 {
-  private static BattleMapData MapWith(params (Vector3I Coordinate, BattleMapTileData Tile)[] tiles)
-  {
-    var dict = new Godot.Collections.Dictionary<Vector3I, BattleMapTileData>();
-    foreach (var (coordinate, tile) in tiles)
-      dict[coordinate] = tile;
-
-    return new BattleMapData { Dimensions = new Vector3I(4, 1, 4), Tiles = dict };
-  }
-
   [TestCase(TestName = "Board from map data applies tile data to runtime tiles")]
   public void BoardFromMapDataAppliesTileDataToRuntimeTiles()
   {
-    BattleMapData mapData = MapWith(
-      (new Vector3I(1, 0, 1), new BattleMapTileData { Walkable = false, BlocksLineOfSight = true }));
+    BattleMapData mapData = MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(1, 0, 1), WallTile()));
 
     BattleBoardState board = new(mapData);
     BattleTileState tile = board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
@@ -32,7 +22,7 @@ public partial class BattleMapDataTest
   [TestCase(TestName = "Board from map data copies cover into runtime tiles")]
   public void BoardFromMapDataCopiesCoverIntoRuntimeTiles()
   {
-    BattleMapData mapData = MapWith(
+    BattleMapData mapData = MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(1, 0, 1), new BattleMapTileData
       {
         CoverDirections = CoverDirections.North | CoverDirections.East,
@@ -50,8 +40,8 @@ public partial class BattleMapDataTest
   [TestCase(TestName = "Cells not in the dictionary are holes")]
   public void CellsNotInTheDictionaryAreHoles()
   {
-    BattleMapData mapData = MapWith(
-      (new Vector3I(1, 0, 1), new BattleMapTileData { Walkable = true }));
+    BattleMapData mapData = MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(1, 0, 1), FloorTile()));
 
     BattleBoardState board = new(mapData);
     BattleTileState listed = board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
@@ -64,12 +54,9 @@ public partial class BattleMapDataTest
   [TestCase(TestName = "Board from map data supports stacked levels")]
   public void BoardFromMapDataSupportsStackedLevels()
   {
-    var dict = new Godot.Collections.Dictionary<Vector3I, BattleMapTileData>
-    {
-      [new Vector3I(0, 0, 0)] = new BattleMapTileData { Walkable = true },
-      [new Vector3I(0, 1, 0)] = new BattleMapTileData { Walkable = true },
-    };
-    var mapData = new BattleMapData { Dimensions = new Vector3I(2, 2, 2), Tiles = dict };
+    var mapData = MakeMapData(new Vector3I(2, 2, 2),
+      (new Vector3I(0, 0, 0), FloorTile()),
+      (new Vector3I(0, 1, 0), FloorTile()));
 
     BattleBoardState board = new(mapData);
     BattleTileState ground = board.GetTile(board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome());
@@ -110,9 +97,9 @@ public partial class BattleMapDataTest
   [TestCase(TestName = "BlocksVerticalLineOfSight bakes into runtime tile")]
   public void BlocksVerticalLineOfSightBakesIntoRuntimeTile()
   {
-    BattleMapData mapWithFlag = MapWith(
+    BattleMapData mapWithFlag = MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(1, 0, 1), new BattleMapTileData { BlocksVerticalLineOfSight = true }));
-    BattleMapData mapWithoutFlag = MapWith(
+    BattleMapData mapWithoutFlag = MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(1, 0, 1), new BattleMapTileData { BlocksVerticalLineOfSight = false }));
 
     BattleBoardState boardWith = new(mapWithFlag);

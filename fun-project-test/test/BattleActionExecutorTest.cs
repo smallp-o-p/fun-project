@@ -1,11 +1,8 @@
 using FunProject.Battle;
 using FunProject.Combatants;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
-using static BattleActionTestHelper;
-using static BattleQueryTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -14,12 +11,7 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Submit commits source action and reaction actions")]
   public void SubmitCommitsSourceActionAndReactionActions()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, health: 10, actionPoints: 5), new Vector3I(0, 0, 0));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), health: 10, actionPoints: 5);
     var targetPosition = new Vector3I(1, 0, 0);
     executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 3, shouldConsume: true));
     var resolvedActions = new List<BattleAction>();
@@ -37,22 +29,17 @@ public partial class BattleActionExecutorTest
     Assert.Equal(7, unit.State.CurrentHealth);
     Assert.True(resolvedActions.Select(action => action.ActionId).SequenceEqual([
       "move_unit",
-      ApplyDamage.ApplyDamageActionId,
+      FunProject.Battle.ApplyDamage.ApplyDamageActionId,
     ]));
   }
 
   [TestCase(TestName = "Submit reports composite actions without intermediate primitive actions")]
   public void SubmitReportsCompositeActionsWithoutIntermediatePrimitiveActions()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
     var start = new Vector3I(0, 0, 0);
     var mid = new Vector3I(1, 0, 0);
     var end = new Vector3I(2, 0, 0);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, health: 10, actionPoints: 5), start);
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), start, health: 10, actionPoints: 5);
     executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(mid, unit.State, 3, shouldConsume: true));
     var resolvedActions = new List<BattleAction>();
     executor.OnActionComplete += result => resolvedActions.Add(result.Action);
@@ -68,7 +55,7 @@ public partial class BattleActionExecutorTest
     Assert.Equal(7, unit.State.CurrentHealth);
     Assert.True(submittedAction.IsDone());
     Assert.True(resolvedActions.Select(action => action.ActionId).SequenceEqual([
-      ApplyDamage.ApplyDamageActionId,
+      FunProject.Battle.ApplyDamage.ApplyDamageActionId,
       "move_unit",
     ]));
     Assert.Equal(submittedAction, executor.LastResult.RequireSome().Action);
@@ -77,22 +64,16 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "MoveUnit emits movement and tile occupation events after commit")]
   public void MoveUnitEmitsMovementAndTileOccupationEventsAfterCommit()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), new Vector3I(1, 0, 1));
-    StartBattle(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), new Vector3I(1, 0, 1), actionPoints: 5);
+    var recorder = new BattleEventRecorder(session);
 
-    var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
-
-    var executor = new BattleActionExecutor(session);
     var result = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 0, 2)], 2));
 
     Assert.True(result.First().Succeeded);
-    Assert.True(raisedEvents.OfType<UnitMovedBattleEvent>().Any(battleEvent =>
+    Assert.True(recorder.OfType<UnitMovedBattleEvent>().Any(battleEvent =>
       battleEvent.Position.Raw == new Vector3I(1, 0, 2) &&
       battleEvent.SourcePosition.Raw == new Vector3I(1, 0, 1)));
-    Assert.True(raisedEvents.OfType<TileOccupiedBattleEvent>().Any(battleEvent =>
+    Assert.True(recorder.OfType<TileOccupiedBattleEvent>().Any(battleEvent =>
       battleEvent.Position.Raw == new Vector3I(1, 0, 2)));
   }
 
@@ -119,12 +100,8 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Committed battle event listeners observe committed session state")]
   public void CommittedBattleEventListenersObserveCommittedSessionState()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var source = new Vector3I(1, 0, 1);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), new Vector3I(1, 0, 1), actionPoints: 5);
     var destination = new Vector3I(1, 0, 2);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), source);
-    StartBattle(session);
 
     Option<Vector3I> observedPositionDuringEvent = None;
     session.BattleEventCommitted += battleEvent =>
@@ -133,7 +110,6 @@ public partial class BattleActionExecutorTest
         observedPositionDuringEvent = session.GetUnitPosition(unit.State).Map(point => point.Raw);
     };
 
-    var executor = new BattleActionExecutor(session);
     var result = executor.Submit(BattleAction.MoveUnit(unit.State, [destination], 2)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
@@ -161,18 +137,13 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor evaluates matching triggers deterministically")]
   public void ExecutorEvaluatesMatchingTriggersDeterministically()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(10, targetPosition, log, "late"));
-    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(0, targetPosition, log, "first"));
-    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(0, targetPosition, log, "second"));
-    executor.RegisterTrigger<UnitDamagedBattleEvent>(new RecordingTrigger(-10, targetPosition, log, "ignored"));
+    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(targetPosition, log, "late", priority: 10));
+    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(targetPosition, log, "first"));
+    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(targetPosition, log, "second"));
+    executor.RegisterTrigger<UnitDamagedBattleEvent>(new RecordingTrigger(targetPosition, log, "ignored", priority: -10));
 
     BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition])).RequireSingleResult();
 
@@ -183,16 +154,11 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor only evaluates registered event key bucket")]
   public void ExecutorOnlyEvaluatesRegisteredEventKeyBucket()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    var ignoredTrigger = new CountingTrigger(targetPosition, log, "ignored");
-    var matchingTrigger = new CountingTrigger(targetPosition, log, "matching");
+    var ignoredTrigger = new RecordingTrigger(targetPosition, log, "ignored");
+    var matchingTrigger = new RecordingTrigger(targetPosition, log, "matching");
     executor.RegisterTrigger<UnitDamagedBattleEvent>(ignoredTrigger);
     executor.RegisterTrigger<UnitMovedBattleEvent>(matchingTrigger);
 
@@ -207,15 +173,10 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor supports trigger registered to event shape")]
   public void ExecutorSupportsTriggerRegisteredToEventShape()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    executor.RegisterTrigger<IPositionedBattleEvent>(new RecordingTrigger(0, targetPosition, log, "matched"));
+    executor.RegisterTrigger<IPositionedBattleEvent>(new RecordingTrigger(targetPosition, log, "matched"));
 
     BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [targetPosition])).RequireSingleResult();
 
@@ -226,16 +187,11 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor consumes resolved triggers before later actions")]
   public void ExecutorConsumesResolvedTriggersBeforeLaterActions()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
     var start = new Vector3I(0, 0, 0);
     var targetPosition = new Vector3I(1, 0, 0);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), start);
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), start, actionPoints: 5);
     var log = new List<string>();
-    executor.RegisterTrigger<UnitMovedBattleEvent>(new ConsumingTrigger(targetPosition, log, "matched"));
+    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(targetPosition, log, "matched", consume: true));
 
     BattleActionResult[] results =
     [
@@ -252,14 +208,9 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor queues interrupt actions in trigger priority order")]
   public void ExecutorQueuesInterruptActionsInTriggerPriorityOrder()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
     var start = new Vector3I(0, 0, 0);
     var targetPosition = new Vector3I(1, 0, 0);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, health: 10, actionPoints: 5), start);
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), start, health: 10, actionPoints: 5);
     executor.RegisterTrigger<UnitMovedBattleEvent>(
       new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 2, shouldConsume: true) { Priority = 10 });
     executor.RegisterTrigger<UnitMovedBattleEvent>(
@@ -280,12 +231,7 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor queues trigger response after committed tile occupation")]
   public void ExecutorQueuesTriggerResponseAfterCommittedTileOccupation()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, health: 10, actionPoints: 5), new Vector3I(0, 0, 0));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), health: 10, actionPoints: 5);
     var targetPosition = new Vector3I(1, 0, 0);
     var trigger = new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 3, shouldConsume: true);
     executor.RegisterTrigger<TileOccupiedBattleEvent>(trigger);
@@ -304,12 +250,7 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor rejected source action does not consume trigger or enqueue response")]
   public void ExecutorRejectedSourceActionDoesNotConsumeTriggerOrEnqueueResponse()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, health: 10), new Vector3I(0, 0, 0));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), health: 10);
     var targetPosition = new Vector3I(2, 0, 0);
     executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 3, shouldConsume: true));
 
@@ -335,15 +276,10 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor supports multiple consumed trigger instances")]
   public void ExecutorSupportsMultipleConsumedTriggerInstances()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
     var start = new Vector3I(0, 0, 0);
     var firstTrap = new Vector3I(1, 0, 0);
     var secondTrap = new Vector3I(2, 0, 0);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, health: 10, actionPoints: 5), start);
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), start, health: 10, actionPoints: 5);
     executor.RegisterTrigger<TileOccupiedBattleEvent>(
       new DamageOnTileOccupiedTrigger(firstTrap, unit.State, 2, shouldConsume: true));
     executor.RegisterTrigger<TileOccupiedBattleEvent>(
@@ -362,12 +298,7 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor discards non producing action and resolves later queued work")]
   public void ExecutorDiscardsNonProducingActionAndResolvesLaterQueuedWork()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), new Vector3I(0, 0, 0));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), actionPoints: 5);
     var nonProducingResult = executor.Submit(new NonProducingBattleAction());
     var result = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 0, 0)]));
 
@@ -381,16 +312,12 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "MoveUnit submit reports only the composite action")]
   public void MoveUnitSubmitReportsOnlyTheCompositeAction()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
     var start = new Vector3I(0, 0, 0);
     var mid = new Vector3I(1, 0, 0);
     var end = new Vector3I(2, 0, 0);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), start);
-    StartBattle(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), start, actionPoints: 5);
 
     var action = new MoveUnit(unit.State, [mid, end]);
-    var executor = new BattleActionExecutor(session);
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
     BattleActionResult result = results.RequireSingleResult();
@@ -398,31 +325,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal(action, result.Action);
     Assert.True(result.Action.IsDone());
     Assert.Equal(end, session.GetUnitPosition(unit.State).RequireSome().Raw);
-    Assert.True(action.IsDone());
-  }
-
-  [TestCase(TestName = "MoveUnit resolves trigger response before resuming")]
-  public void MoveUnitResolvesTriggerResponseBeforeResuming()
-  {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var start = new Vector3I(0, 0, 0);
-    var mid = new Vector3I(1, 0, 0);
-    var end = new Vector3I(2, 0, 0);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, health: 10, actionPoints: 5), start);
-    StartBattle(session);
-
-    var action = new MoveUnit(unit.State, [mid, end]);
-    var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(mid, unit.State, 3, shouldConsume: true));
-    IReadOnlyList<BattleActionResult> results = executor.Submit(action);
-
-    Assert.Equal(2, results.Count);
-    Assert.True(results.All(result => result.Succeeded));
-    Assert.True(results[0].Action is ApplyDamage);
-    Assert.Equal(action, results[1].Action);
-    Assert.Equal(end, session.GetUnitPosition(unit.State).RequireSome().Raw);
-    Assert.Equal(7, unit.State.CurrentHealth);
     Assert.True(action.IsDone());
   }
 
@@ -485,16 +387,12 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "MoveUnit cancels when trigger response kills mover")]
   public void MoveUnitCancelsWhenTriggerResponseKillsMover()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
     var start = new Vector3I(0, 0, 0);
     var mid = new Vector3I(1, 0, 0);
     var end = new Vector3I(2, 0, 0);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, health: 3, actionPoints: 5), start);
-    StartBattle(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), start, health: 3, actionPoints: 5);
 
     var action = new MoveUnit(unit.State, [mid, end]);
-    var executor = new BattleActionExecutor(session);
     executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(mid, unit.State, 3, shouldConsume: true));
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
@@ -508,16 +406,12 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "MoveUnit fails malformed route before moving")]
   public void MoveUnitFailsMalformedRouteBeforeMoving()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
     var start = new Vector3I(0, 0, 0);
     var mid = new Vector3I(1, 0, 0);
     var nonAdjacent = new Vector3I(3, 0, 0);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), start);
-    StartBattle(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), start, actionPoints: 5);
 
     var action = new MoveUnit(unit.State, [mid, nonAdjacent]);
-    var executor = new BattleActionExecutor(session);
     var result = executor.Submit(action);
 
     Assert.Equal(0, result.Count);
@@ -529,14 +423,10 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "MoveUnit fails empty destinations before moving")]
   public void MoveUnitFailsEmptyDestinationsBeforeMoving()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
     var start = new Vector3I(0, 0, 0);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), start);
-    StartBattle(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), start, actionPoints: 5);
 
     var action = new MoveUnit(unit.State, []);
-    var executor = new BattleActionExecutor(session);
     var result = executor.Submit(action);
 
     Assert.Equal(0, result.Count);
@@ -554,17 +444,16 @@ public partial class BattleActionExecutorTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
     StartBattle(session);
 
-    var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
+    var recorder = new BattleEventRecorder(session);
 
     var executor = new BattleActionExecutor(session);
     BattleActionResult result = executor.Submit(BattleAction.EndFactionTurn(factionA)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
-    Assert.True(raisedEvents.OfType<TurnEndedBattleEvent>().Any(battleEvent =>
+    Assert.True(recorder.OfType<TurnEndedBattleEvent>().Any(battleEvent =>
       battleEvent.Faction == factionA &&
       battleEvent.TurnNumber == 1));
-    Assert.True(raisedEvents.OfType<TurnStartedBattleEvent>().Any(battleEvent =>
+    Assert.True(recorder.OfType<TurnStartedBattleEvent>().Any(battleEvent =>
       battleEvent.Faction == factionB &&
       battleEvent.TurnNumber == 1));
   }
@@ -609,29 +498,10 @@ public partial class BattleActionExecutorTest
     Assert.Equal(faction, session.ActiveSide);
   }
 
-  [TestCase(TestName = "Executor returns rejected action results cleanly")]
-  public void ExecutorReturnsRejectedActionResultsCleanly()
-  {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
-    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(2, 0, 0)]));
-
-    Assert.Equal(0, results.Count);
-  }
-
   [TestCase(TestName = "Executor emits action complete events")]
   public void ExecutorEmitsActionCompleteEvents()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), new Vector3I(1, 0, 1));
     Option<BattleActionResult> resolvedResult = None;
     executor.OnActionComplete += result => resolvedResult = Some(result);
 
@@ -673,14 +543,10 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Consumable throwable without charges is removed after one throw")]
   public void ConsumableThrowableWithoutChargesIsRemovedAfterOneThrow()
   {
-    var faction = BattleTestFactory.MakeFaction("A");
-    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", faction, actionPoints: 4), new Vector3I(1, 0, 1));
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1), actionPoints: 4);
     var throwable = BattleTestFactory.MakeThrowable("Flare");
     unit.AddInventoryItem(throwable.Item);
-    StartBattle(session);
 
-    var executor = new BattleActionExecutor(session);
     var result = executor.Submit(BattleAction.ThrowItem(unit.State, throwable, new Vector3I(3, 0, 1))).RequireSingleResult();
 
     Assert.True(result.Succeeded);
@@ -711,12 +577,7 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor reports the composite action for both start and completion")]
   public void ExecutorReportsTheCompositeActionForBothStartAndCompletion()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 6), new Vector3I(1, 0, 1));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1), actionPoints: 6);
     var startedActions = new List<BattleAction>();
     executor.OnActionStart += startedActions.Add;
 
@@ -732,12 +593,7 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor recovers when OnActionStart handler throws")]
   public void ExecutorRecoversWhenOnActionStartHandlerThrows()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 2, 4), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), new Vector3I(1, 0, 1));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 2, 4), new Vector3I(1, 0, 1), actionPoints: 5);
     bool shouldThrow = true;
     executor.OnActionStart += _ =>
     {
@@ -769,79 +625,6 @@ public partial class BattleActionExecutorTest
 
     Assert.Equal(0, result.Count);
     Assert.True(executor.LastResult.IsNone);
-  }
-
-  private sealed partial class RecordingTrigger : BattleTrigger
-  {
-    private readonly Vector3I _position;
-    private readonly List<string> _log;
-    private readonly string _message;
-
-    public RecordingTrigger(int priority, Vector3I position, List<string> log, string message)
-    {
-      Priority = priority;
-      _position = position;
-      _log = log;
-      _message = message;
-    }
-
-    public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
-    {
-      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
-        return BattleTriggerResult.NoReaction();
-
-      _log.Add(_message);
-      return BattleTriggerResult.NoReaction();
-    }
-  }
-
-  private sealed partial class CountingTrigger : BattleTrigger
-  {
-    private readonly Vector3I _position;
-    private readonly List<string> _log;
-    private readonly string _message;
-
-    public int EvaluateCallCount { get; private set; }
-
-    public CountingTrigger(Vector3I position, List<string> log, string message)
-    {
-      _position = position;
-      _log = log;
-      _message = message;
-    }
-
-    public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
-    {
-      EvaluateCallCount++;
-      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
-        return BattleTriggerResult.NoReaction();
-
-      _log.Add(_message);
-      return BattleTriggerResult.NoReaction();
-    }
-  }
-
-  private sealed partial class ConsumingTrigger : BattleTrigger
-  {
-    private readonly Vector3I _position;
-    private readonly List<string> _log;
-    private readonly string _message;
-
-    public ConsumingTrigger(Vector3I position, List<string> log, string message)
-    {
-      _position = position;
-      _log = log;
-      _message = message;
-    }
-
-    public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
-    {
-      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
-        return BattleTriggerResult.NoReaction();
-
-      _log.Add(_message);
-      return BattleTriggerResult.ConsumeTrigger();
-    }
   }
 
   private sealed partial class DamageOnTileOccupiedTrigger : BattleTrigger
@@ -926,33 +709,6 @@ public partial class BattleActionExecutorTest
 
       return BattleTriggerResult.QueueInterruptAfterCommit(
         BattleAction.PassUnit(_unit),
-        shouldConsumeTrigger: true);
-    }
-  }
-
-  private sealed partial class DamageOnMovementEventTrigger : BattleTrigger
-  {
-    private readonly Vector3I _position;
-    private readonly BattleUnitState _targetUnit;
-    private readonly int _damage;
-
-    public DamageOnMovementEventTrigger(
-      Vector3I position,
-      BattleUnitState targetUnit,
-      int damage)
-    {
-      _position = position;
-      _targetUnit = targetUnit;
-      _damage = damage;
-    }
-
-    public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
-    {
-      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
-        return BattleTriggerResult.NoReaction();
-
-      return BattleTriggerResult.QueueInterruptAfterCommit(
-        BattleAction.ApplyDamage(_targetUnit, _damage),
         shouldConsumeTrigger: true);
     }
   }

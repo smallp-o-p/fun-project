@@ -1,5 +1,4 @@
-using System;
-using System.Collections.Generic;
+namespace FunProject.Tests;
 
 public static class Assert
 {

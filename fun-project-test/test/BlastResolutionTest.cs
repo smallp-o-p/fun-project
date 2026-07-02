@@ -4,47 +4,21 @@ using FunProject.Core;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using System.Collections.Generic;
 using System.Linq;
-using static BattleActionTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BlastResolutionTest
 {
-  private static ItemWith<ThrowableCapability> MakeBlastGrenade(
-    string name,
-    int blastRadius,
-    int throwRange,
-    params BattleEffectData[] effects)
-  {
-    var blastEffects = new Godot.Collections.Array<BattleEffectData>();
-    foreach (BattleEffectData effect in effects)
-      blastEffects.Add(effect);
-
-    var item = new EquippableItem(new EquippableItemData
-    {
-      Name = name,
-      Description = $"{name} grenade",
-      Capabilities =
-      [
-        new ThrowableCapabilityData { ThrowRange = throwRange, ActionPointCost = 1, ConsumesOnUse = true },
-        new BlastCapabilityData { BlastRadius = blastRadius, Effects = blastEffects },
-      ],
-    });
-    return item.With<ThrowableCapability>().RequireSome();
-  }
-
   private sealed record Fixture(
     BattleSession Session,
     BattleActionExecutor Executor,
     Faction PlayerFaction,
     Faction EnemyFaction,
     BattleTestUnit Thrower,
-    List<BattleEvent> Events);
+    BattleEventRecorder Recorder);
 
   private static Fixture MakeFixture()
   {
@@ -53,9 +27,8 @@ public partial class BlastResolutionTest
     var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
     var executor = new BattleActionExecutor(session);
     var thrower = SpawnUnit(session, BattleTestFactory.MakeCombatant("Thrower", playerFaction, actionPoints: 4), new Vector3I(1, 0, 1));
-    var events = new List<BattleEvent>();
-    session.BattleEventCommitted += events.Add;
-    return new Fixture(session, executor, playerFaction, enemyFaction, thrower, events);
+    var recorder = new BattleEventRecorder(session);
+    return new Fixture(session, executor, playerFaction, enemyFaction, thrower, recorder);
   }
 
   private static void Throw(Fixture fixture, ItemWith<ThrowableCapability> grenade, Vector3I target)
@@ -72,12 +45,12 @@ public partial class BlastResolutionTest
     var enemy = SpawnUnit(fixture.Session, BattleTestFactory.MakeCombatant("Hostile", fixture.EnemyFaction, health: 20), new Vector3I(3, 0, 1));
     StartBattle(fixture.Session);
 
-    var grenade = MakeBlastGrenade("Frag", blastRadius: 1, throwRange: 6, new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic });
+    var grenade = MakeGrenade("Frag", throwRange: 6, blastRadius: 1, effects: [new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic }]);
     Throw(fixture, grenade, new Vector3I(3, 0, 1));
 
     Assert.Equal(12, enemy.State.CurrentHealth);
-    Assert.True(fixture.Events.OfType<UnitDamagedBattleEvent>().Any(e => ReferenceEquals(e.Unit, enemy.State)));
-    Assert.True(fixture.Events.OfType<CapabilityResolvedBattleEvent>().Any());
+    Assert.True(fixture.Recorder.OfType<UnitDamagedBattleEvent>().Any(e => ReferenceEquals(e.Unit, enemy.State)));
+    Assert.True(fixture.Recorder.OfType<CapabilityResolvedBattleEvent>().Any());
   }
 
   [TestCase(TestName = "A unit outside the blast radius is unaffected")]
@@ -88,12 +61,12 @@ public partial class BlastResolutionTest
     var farEnemy = SpawnUnit(fixture.Session, BattleTestFactory.MakeCombatant("Far", fixture.EnemyFaction, health: 20), new Vector3I(3, 0, 4));
     StartBattle(fixture.Session);
 
-    var grenade = MakeBlastGrenade("Frag", blastRadius: 1, throwRange: 6, new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic });
+    var grenade = MakeGrenade("Frag", throwRange: 6, blastRadius: 1, effects: [new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic }]);
     Throw(fixture, grenade, new Vector3I(3, 0, 1));
 
     Assert.Equal(12, nearEnemy.State.CurrentHealth);
     Assert.Equal(20, farEnemy.State.CurrentHealth);
-    Assert.False(fixture.Events.OfType<UnitDamagedBattleEvent>().Any(e => ReferenceEquals(e.Unit, farEnemy.State)));
+    Assert.False(fixture.Recorder.OfType<UnitDamagedBattleEvent>().Any(e => ReferenceEquals(e.Unit, farEnemy.State)));
   }
 
   [TestCase(TestName = "Friendly-fire: an allied unit within the blast radius is also damaged")]
@@ -104,13 +77,13 @@ public partial class BlastResolutionTest
     var enemy = SpawnUnit(fixture.Session, BattleTestFactory.MakeCombatant("Hostile", fixture.EnemyFaction, health: 20), new Vector3I(4, 0, 1));
     StartBattle(fixture.Session);
 
-    var grenade = MakeBlastGrenade("Frag", blastRadius: 1, throwRange: 6, new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic });
+    var grenade = MakeGrenade("Frag", throwRange: 6, blastRadius: 1, effects: [new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic }]);
     Throw(fixture, grenade, new Vector3I(4, 0, 1));
 
     // Target (4,0,1): the enemy (distance 0) and the allied unit (distance 1) are both in radius.
     Assert.Equal(12, enemy.State.CurrentHealth);
     Assert.Equal(12, ally.State.CurrentHealth);
-    Assert.True(fixture.Events.OfType<UnitDamagedBattleEvent>().Any(e => ReferenceEquals(e.Unit, ally.State)));
+    Assert.True(fixture.Recorder.OfType<UnitDamagedBattleEvent>().Any(e => ReferenceEquals(e.Unit, ally.State)));
   }
 
   [TestCase(TestName = "A status effect in the blast applies to an in-radius unit")]
@@ -120,14 +93,14 @@ public partial class BlastResolutionTest
     var enemy = SpawnUnit(fixture.Session, BattleTestFactory.MakeCombatant("Hostile", fixture.EnemyFaction, health: 20), new Vector3I(3, 0, 1));
     StartBattle(fixture.Session);
 
-    var grenade = MakeBlastGrenade(
+    var grenade = MakeGrenade(
       "Glue Bomb",
-      blastRadius: 1,
       throwRange: 6,
-      new ImmobilizeStatusSpecData { DurationTurns = 2, ApplyChancePercent = 100 });
+      blastRadius: 1,
+      effects: [new ImmobilizeStatusSpecData { DurationTurns = 2, ApplyChancePercent = 100 }]);
     Throw(fixture, grenade, new Vector3I(3, 0, 1));
 
     Assert.True(enemy.State.IsImmobilized);
-    Assert.True(fixture.Events.OfType<UnitStatusEffectAppliedBattleEvent>().Any(e => ReferenceEquals(e.Unit, enemy.State)));
+    Assert.True(fixture.Recorder.OfType<UnitStatusEffectAppliedBattleEvent>().Any(e => ReferenceEquals(e.Unit, enemy.State)));
   }
 }

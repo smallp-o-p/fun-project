@@ -1,11 +1,8 @@
 using FunProject.Battle;
 using FunProject.Combatants;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using System.Collections.Generic;
 using System.Linq;
-using static BattleActionTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -20,15 +17,14 @@ public class ObjectiveBattleTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
     session.AddObjective(player, new FakeObjective { Complete = true });
-    var raised = new List<BattleEvent>();
-    session.BattleEventCommitted += raised.Add;
+    var recorder = new BattleEventRecorder(session);
     StartBattle(session);
 
     AdvanceTurn(session); // end the player's turn
 
     Assert.Equal(BattlePhase.Ended, session.Phase);
     Assert.Equal(BattleOutcome.Victory, session.Outcome.RequireSome());
-    Assert.Equal(BattleOutcome.Victory, raised.OfType<SessionEndedBattleEvent>().Single().Outcome);
+    Assert.Equal(BattleOutcome.Victory, recorder.OfType<SessionEndedBattleEvent>().Single().Outcome);
   }
 
   [TestCase(TestName = "A SurviveUntilTurn objective wins once the target turn is reached")]
@@ -66,26 +62,6 @@ public class ObjectiveBattleTest
 
     Assert.Equal(BattlePhase.Ended, session.Phase);
     Assert.Equal(BattleOutcome.Defeat, session.Outcome.RequireSome());
-  }
-
-  [TestCase(TestName = "A wiped player loses immediately, before the turn ends")]
-  public void PlayerWipeEndsImmediately()
-  {
-    var player = BattleTestFactory.MakeFaction("Player");
-    var enemy = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
-    var playerUnit = SpawnUnit(session, BattleTestFactory.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    var raised = new List<BattleEvent>();
-    session.BattleEventCommitted += raised.Add;
-    StartBattle(session);
-
-    // Kill the player's only unit directly (no EndFactionTurn / AdvanceTurn).
-    new BattleActionExecutor(session).Submit(BattleAction.ApplyDamage(playerUnit.State, 999)).RequireSingleResult();
-
-    Assert.Equal(BattlePhase.Ended, session.Phase);
-    Assert.Equal(BattleOutcome.Defeat, session.Outcome.RequireSome());
-    Assert.Equal(BattleOutcome.Defeat, raised.OfType<SessionEndedBattleEvent>().Single().Outcome);
   }
 
   [TestCase(TestName = "A failed operation reactivated with a new objective can still win")]
@@ -128,8 +104,7 @@ public class ObjectiveBattleTest
     var enemyUnit = SpawnUnit(session, BattleTestFactory.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
     // The player wins by eliminating all opposing forces; the enemy gets the auto-filled objective.
     session.AddObjective(player, new EliminateAllOpposingForcesObjective(new ObjectiveData()));
-    var raised = new List<BattleEvent>();
-    session.BattleEventCommitted += raised.Add;
+    var recorder = new BattleEventRecorder(session);
     StartBattle(session);
 
     AdvanceTurn(session); // player's turn ends: an enemy still lives, so nothing resolves
@@ -138,7 +113,7 @@ public class ObjectiveBattleTest
 
     // A reaction (overwatch/mine) kills the last enemy DURING the enemy's own turn. The
     // player's eliminate-all becomes complete, but it is not the player's turn.
-    new BattleActionExecutor(session).Submit(BattleAction.ApplyDamage(enemyUnit.State, 999)).RequireSingleResult();
+    ApplyDamage(session, enemyUnit, 999);
     Assert.False(session.HasLivingUnits(enemy));
     Assert.Equal(BattlePhase.InProgress, session.Phase); // a non-player wipe does not end the battle immediately
 
@@ -148,9 +123,9 @@ public class ObjectiveBattleTest
     // round later. With global evaluation it resolves at the turn the kill happened on.
     Assert.Equal(BattlePhase.Ended, session.Phase);
     Assert.Equal(BattleOutcome.Victory, session.Outcome.RequireSome());
-    Assert.Equal(1, raised.OfType<ObjectiveCompletedBattleEvent>().Count(e => e.Faction == player));
-    Assert.Equal(1, raised.OfType<OperationCompletedBattleEvent>().Count(e => e.Faction == player));
-    Assert.Equal(BattleOutcome.Victory, raised.OfType<SessionEndedBattleEvent>().Single().Outcome);
+    Assert.Equal(1, recorder.OfType<ObjectiveCompletedBattleEvent>().Count(e => e.Faction == player));
+    Assert.Equal(1, recorder.OfType<OperationCompletedBattleEvent>().Count(e => e.Faction == player));
+    Assert.Equal(BattleOutcome.Victory, recorder.OfType<SessionEndedBattleEvent>().Single().Outcome);
   }
 
   [TestCase(TestName = "StartBattle throws when a faction has no objective")]
@@ -189,11 +164,5 @@ public class ObjectiveBattleTest
         session.AddObjective(_faction, _toAdd);
       }
     }
-  }
-
-  private static void AdvanceTurn(BattleSession session)
-  {
-    var result = new BattleActionExecutor(session).Submit(BattleAction.EndFactionTurn(session.ActiveSide)).RequireSingleResult();
-    Assert.True(result.Succeeded);
   }
 }

@@ -1,23 +1,19 @@
 using FunProject.Stats;
-using FunProject.Weapons;
 using GdUnit4;
 
 [TestSuite]
 [RequireGodotRuntime]
 public class StatResolverTest
 {
-  // A weapon is a convenient HasStats with a RangeStat (base 10) and no HealthStat.
-  private static Weapon MakeWeapon(int range = 10) => BattleTestFactory.MakeWeapon("Rifle", range: range);
-
   [TestCase(TestName = "Resolve with no sources returns the base value")]
   public void ResolveNoSources() =>
-    Assert.Equal(10f, ((HasStats)MakeWeapon()).Resolve<RangeStat>([]));
+    Assert.Equal(10f, ((HasStats)MakeWeapon("Rifle")).Resolve<RangeStat>([]));
 
   [TestCase(TestName = "Resolve folds matching-target mods over the base")]
   public void ResolveFoldsMatching()
   {
     StatMod[] sources = [new RangeStatMod { Modifiers = [StatModifier.Add(5)] }];
-    Assert.Equal(15f, ((HasStats)MakeWeapon()).Resolve<RangeStat>(sources));
+    Assert.Equal(15f, ((HasStats)MakeWeapon("Rifle")).Resolve<RangeStat>(sources));
   }
 
   [TestCase(TestName = "Resolve combines same-stat mods from multiple sources")]
@@ -29,19 +25,19 @@ public class StatResolverTest
       new RangeStatMod { Modifiers = [StatModifier.PercentAdd(0.5f)] },
     ];
     // (10 + 5) * 1.5 = 22.5
-    Assert.Equal(22.5f, ((HasStats)MakeWeapon()).Resolve<RangeStat>(sources));
+    Assert.Equal(22.5f, ((HasStats)MakeWeapon("Rifle")).Resolve<RangeStat>(sources));
   }
 
   [TestCase(TestName = "Resolve ignores mods that target a different stat")]
   public void ResolveIgnoresOtherTargets()
   {
     StatMod[] sources = [new CriticalChanceStatMod { Modifiers = [StatModifier.Add(99)] }];
-    Assert.Equal(10f, ((HasStats)MakeWeapon()).Resolve<RangeStat>(sources));
+    Assert.Equal(10f, ((HasStats)MakeWeapon("Rifle")).Resolve<RangeStat>(sources));
   }
 
   [TestCase(TestName = "TryResolve returns None when the owner lacks the stat")]
   public void TryResolveNoneWhenMissing() =>
-    Assert.True(((HasStats)MakeWeapon()).TryResolve<HealthStat>([]).IsNone);
+    Assert.True(((HasStats)MakeWeapon("Rifle")).TryResolve<HealthStat>([]).IsNone);
 
   [TestCase(TestName = "StatSheet ctor rejects a transposed key/value entry")]
   public void StatSheetRejectsTransposed()

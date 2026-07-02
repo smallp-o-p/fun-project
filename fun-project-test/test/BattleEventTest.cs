@@ -1,9 +1,6 @@
 using FunProject.Battle;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -15,8 +12,7 @@ public class BattleEventTest
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
     var runtime = new BattleRuntime(session);
-    var raisedEvents = new List<BattleEvent>();
-    runtime.BattleEventCommitted += raisedEvents.Add;
+    var recorder = new BattleEventRecorder(runtime);
 
     var start = session.Board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome();
     var destination = session.Board.ValidatePoint(new Vector3I(1, 0, 2)).RequireSome();
@@ -34,21 +30,21 @@ public class BattleEventTest
     runtime.ExecuteAction(BattleAction.ThrowItem(unit.State, grenade, target.Raw)).RequireSingleResult();
     runtime.ExecuteAction(BattleAction.ApplyDamage(unit.State, 3)).RequireSingleResult();
 
-    var addedEvent = raisedEvents.OfType<UnitAddedBattleEvent>().Single();
+    var addedEvent = recorder.Single<UnitAddedBattleEvent>();
     Assert.True(ReferenceEquals(unit.State, addedEvent.Unit));
     Assert.Equal(start, addedEvent.Position);
 
-    var movedEvent = raisedEvents.OfType<UnitMovedBattleEvent>().Single();
+    var movedEvent = recorder.Single<UnitMovedBattleEvent>();
     Assert.True(ReferenceEquals(unit.State, movedEvent.Unit));
     Assert.Equal(destination, movedEvent.Position);
     Assert.Equal(start, movedEvent.SourcePosition);
 
-    var thrownEvent = raisedEvents.OfType<ItemThrownBattleEvent>().Single();
+    var thrownEvent = recorder.Single<ItemThrownBattleEvent>();
     Assert.True(ReferenceEquals(unit.State, thrownEvent.Unit));
     Assert.True(ReferenceEquals(grenade.Item, thrownEvent.Item));
     Assert.Equal(target, thrownEvent.Position);
 
-    var damagedEvent = raisedEvents.OfType<UnitDamagedBattleEvent>().Single();
+    var damagedEvent = recorder.Single<UnitDamagedBattleEvent>();
     Assert.True(ReferenceEquals(unit.State, damagedEvent.Unit));
   }
 }

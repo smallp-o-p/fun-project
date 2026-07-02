@@ -1,5 +1,4 @@
 using FunProject.Battle;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
 using System.Linq;
@@ -35,11 +34,11 @@ public partial class BattleBoardStateTest
   public void FindPathRoutesAroundBlockedCells()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
-    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome(), false);
+    board.SetTileWalkable(board.At(1, 0, 1), false);
 
     BattleBoardState.ValidatedPoint[] path = board.FindPath(
-      board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(),
-      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome(),
+      board.At(0, 0, 1),
+      board.At(2, 0, 1),
       -1);
 
     Assert.Equal(new Vector3I(0, 0, 1), path[0].Raw);
@@ -52,13 +51,13 @@ public partial class BattleBoardStateTest
   public void FindPathReturnsAnEmptyPathWhenNoTraversableRouteExists()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
-    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(), false);
-    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome(), false);
-    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 2)).RequireSome(), false);
+    board.SetTileWalkable(board.At(1, 0, 0), false);
+    board.SetTileWalkable(board.At(1, 0, 1), false);
+    board.SetTileWalkable(board.At(1, 0, 2), false);
 
     BattleBoardState.ValidatedPoint[] path = board.FindPath(
-      board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(),
-      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome(),
+      board.At(0, 0, 1),
+      board.At(2, 0, 1),
       -1);
 
     Assert.Equal(0, path.Length);
@@ -69,15 +68,15 @@ public partial class BattleBoardStateTest
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
 
-    Assert.True(board.TryPlaceOccupant(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome(), 7));
+    Assert.True(board.TryPlaceOccupant(board.At(1, 0, 1), 7));
 
     BattleBoardState.ValidatedPoint[] pathAroundOccupant = board.FindPath(
-      board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(),
-      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome(),
+      board.At(0, 0, 1),
+      board.At(2, 0, 1),
       -1);
     BattleBoardState.ValidatedPoint[] pathFromOccupiedSource = board.FindPath(
-      board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome(),
-      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome(),
+      board.At(1, 0, 1),
+      board.At(2, 0, 1),
       7);
 
     Assert.Equal(5, pathAroundOccupant.Length);
@@ -86,11 +85,11 @@ public partial class BattleBoardStateTest
     Assert.Equal(new Vector3I(1, 0, 1), pathFromOccupiedSource[0].Raw);
     Assert.Equal(new Vector3I(2, 0, 1), pathFromOccupiedSource[^1].Raw);
 
-    Assert.True(board.TryClearOccupant(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome(), 7));
+    Assert.True(board.TryClearOccupant(board.At(1, 0, 1), 7));
 
     BattleBoardState.ValidatedPoint[] pathAfterClearingOccupant = board.FindPath(
-      board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(),
-      board.ValidatePoint(new Vector3I(2, 0, 1)).RequireSome(),
+      board.At(0, 0, 1),
+      board.At(2, 0, 1),
       -1);
     Assert.Equal(3, pathAfterClearingOccupant.Length);
   }
@@ -100,17 +99,17 @@ public partial class BattleBoardStateTest
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
 
-    Assert.True(board.TryPlaceOccupant(board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome(), 7));
+    Assert.True(board.TryPlaceOccupant(board.At(0, 0, 0), 7));
     Assert.False(board.TryMoveOccupant(
-      board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome(),
-      board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(),
+      board.At(0, 0, 0),
+      board.At(1, 0, 0),
       8));
     Assert.True(board.TryMoveOccupant(
-      board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome(),
-      board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(),
+      board.At(0, 0, 0),
+      board.At(1, 0, 0),
       7));
-    Assert.False(board.IsOccupied(board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()));
-    Assert.True(board.GetOccupant(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).IsSome);
-    Assert.Equal(7, board.GetOccupant(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).RequireSome());
+    Assert.False(board.IsOccupied(board.At(0, 0, 0)));
+    Assert.True(board.GetOccupant(board.At(1, 0, 0)).IsSome);
+    Assert.Equal(7, board.GetOccupant(board.At(1, 0, 0)).RequireSome());
   }
 }

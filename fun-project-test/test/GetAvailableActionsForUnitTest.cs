@@ -1,6 +1,5 @@
 using FunProject.Battle;
 using FunProject.Combatants;
-using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
@@ -12,35 +11,20 @@ using System.Linq;
 [RequireGodotRuntime]
 public class GetAvailableActionsForUnitTest
 {
-  private static T QueryRight<T>(Either<BattleQueryFailure, T> result) =>
-    result.Match(Right: v => v, Left: f => throw new Exception($"Query failed: {f.Message}"));
-
   // 5x1x5 open board. Player "Hero" at (0,0,0); enemy "Goon" at (3,0,0) (visible, in range 10).
   private static (BattleRuntime Runtime, Faction Player, Faction Enemy) MakeBattle(Option<Weapon> heroWeapon)
   {
     var player = BattleTestFactory.MakeFaction("Player");
     var enemy = BattleTestFactory.MakeFaction("Enemy");
-    var board = new BattleBoardState(new Vector3I(5, 1, 5));
-    var placements = new List<UnitPlacement>
-    {
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Hero", player), heroWeapon), new Vector3I(0, 0, 0)),
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Goon", enemy)), new Vector3I(3, 0, 0)),
-    };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
-    {
-      [player] = new Objective[] { new FakeObjective() },
-      [enemy] = new Objective[] { new FakeObjective() },
-    };
-    var runtime = BattleFactory.Start(new BattleSetup(board, new[] { player, enemy }, placements, objectives))
-      .Match(Right: r => r, Left: f => throw new Exception($"Setup failed: {f.Message}"));
+    var runtime = StartRuntime(
+      new Vector3I(5, 1, 5),
+      new StartPlacement(player, BattleTestFactory.MakeCombatant("Hero", player), new Vector3I(0, 0, 0), heroWeapon),
+      new StartPlacement(enemy, BattleTestFactory.MakeCombatant("Goon", enemy), new Vector3I(3, 0, 0)));
     return (runtime, player, enemy);
   }
 
-  private static BattleUnitState UnitOf(BattleRuntime runtime, Faction faction) =>
-    QueryRight(runtime.Query(new GetFactionAliveUnits(faction))).Single();
-
   private static IReadOnlyList<AvailableUnitAction> ActionsOf(BattleRuntime runtime, BattleUnitState unit) =>
-    QueryRight(runtime.Query(new GetAvailableActionsForUnit(unit)));
+    GetValue(runtime.Query(new GetAvailableActionsForUnit(unit)));
 
   private static AvailableUnitAction Row<TDefinition>(IReadOnlyList<AvailableUnitAction> actions)
     where TDefinition : UnitActionDefinition =>
@@ -50,7 +34,7 @@ public class GetAvailableActionsForUnitTest
   public void ArmedMeleeUnitAllVerbsAvailable()
   {
     var (runtime, player, _) = MakeBattle(BattleTestFactory.MakeWeapon("Rifle"));
-    var actions = ActionsOf(runtime, UnitOf(runtime, player));
+    var actions = ActionsOf(runtime, SingleAliveUnit(runtime, player));
 
     Assert.Equal(4, actions.Count);
     Assert.True(actions.All(action => action.IsAvailable));
@@ -61,7 +45,7 @@ public class GetAvailableActionsForUnitTest
   public void MagazineWeaponAddsReloadRow()
   {
     var (runtime, player, _) = MakeBattle(BattleTestFactory.MakeAmmoWeapon("SMG"));
-    var actions = ActionsOf(runtime, UnitOf(runtime, player));
+    var actions = ActionsOf(runtime, SingleAliveUnit(runtime, player));
 
     Assert.Equal(5, actions.Count);
     Assert.True(actions[0].Action is MoveActionDefinition);
@@ -80,7 +64,7 @@ public class GetAvailableActionsForUnitTest
   public void EmptyMagazineFlipsAttackAndReload()
   {
     var (runtime, player, _) = MakeBattle(BattleTestFactory.MakeAmmoWeapon("Pistol", magazine: 1));
-    BattleUnitState hero = UnitOf(runtime, player);
+    BattleUnitState hero = SingleAliveUnit(runtime, player);
     var weapon = hero.EquippedWeapon.Match(
       Some: w => (AmmunitionedWeapon)w,
       None: () => throw new Exception("Hero should be armed."));
@@ -98,7 +82,7 @@ public class GetAvailableActionsForUnitTest
   public void UnarmedUnitOmitsAttackAndReload()
   {
     var (runtime, player, _) = MakeBattle(None);
-    var actions = ActionsOf(runtime, UnitOf(runtime, player));
+    var actions = ActionsOf(runtime, SingleAliveUnit(runtime, player));
 
     Assert.False(actions.Any(action => action.Action is AttackActionDefinition));
     Assert.False(actions.Any(action => action.Action is ReloadActionDefinition));
@@ -109,7 +93,7 @@ public class GetAvailableActionsForUnitTest
   public void NotActiveSideAllUnavailable()
   {
     var (runtime, _, enemy) = MakeBattle(BattleTestFactory.MakeWeapon("Rifle"));
-    var actions = ActionsOf(runtime, UnitOf(runtime, enemy)); // enemy is not active at turn 1
+    var actions = ActionsOf(runtime, SingleAliveUnit(runtime, enemy)); // enemy is not active at turn 1
 
     Assert.True(actions.All(action => !action.IsAvailable));
     Assert.True(Row<MoveActionDefinition>(actions).FailedCondition.Match(c => c is UnitCanActNowCondition, () => false));
@@ -124,19 +108,11 @@ public class GetAvailableActionsForUnitTest
     var board = new BattleBoardState(new Vector3I(5, 1, 5));
     board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(), false);
     board.SetTileWalkable(board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(), false);
-    var placements = new List<UnitPlacement>
-    {
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Hero", player)), new Vector3I(0, 0, 0)),
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Goon", enemy)), new Vector3I(3, 0, 3)),
-    };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
-    {
-      [player] = new Objective[] { new FakeObjective() },
-      [enemy] = new Objective[] { new FakeObjective() },
-    };
-    var runtime = BattleFactory.Start(new BattleSetup(board, new[] { player, enemy }, placements, objectives))
-      .Match(Right: r => r, Left: f => throw new Exception($"Setup failed: {f.Message}"));
-    BattleUnitState hero = UnitOf(runtime, player);
+    var runtime = StartRuntime(
+      board,
+      new StartPlacement(player, BattleTestFactory.MakeCombatant("Hero", player), new Vector3I(0, 0, 0)),
+      new StartPlacement(enemy, BattleTestFactory.MakeCombatant("Goon", enemy), new Vector3I(3, 0, 3)));
+    BattleUnitState hero = SingleAliveUnit(runtime, player);
 
     var move = Row<MoveActionDefinition>(ActionsOf(runtime, hero));
     Assert.False(move.IsAvailable);
@@ -148,20 +124,11 @@ public class GetAvailableActionsForUnitTest
   {
     var player = BattleTestFactory.MakeFaction("Player");
     var enemy = BattleTestFactory.MakeFaction("Enemy");
-    var board = new BattleBoardState(new Vector3I(5, 1, 5));
-    var placements = new List<UnitPlacement>
-    {
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Hero", player, actionPoints: 0), BattleTestFactory.MakeWeapon("Rifle")), new Vector3I(0, 0, 0)),
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Goon", enemy)), new Vector3I(3, 0, 0)),
-    };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
-    {
-      [player] = new Objective[] { new FakeObjective() },
-      [enemy] = new Objective[] { new FakeObjective() },
-    };
-    var runtime = BattleFactory.Start(new BattleSetup(board, new[] { player, enemy }, placements, objectives))
-      .Match(Right: r => r, Left: f => throw new Exception($"Setup failed: {f.Message}"));
-    BattleUnitState hero = UnitOf(runtime, player);
+    var runtime = StartRuntime(
+      new Vector3I(5, 1, 5),
+      new StartPlacement(player, BattleTestFactory.MakeCombatant("Hero", player, actionPoints: 0), new Vector3I(0, 0, 0), BattleTestFactory.MakeWeapon("Rifle")),
+      new StartPlacement(enemy, BattleTestFactory.MakeCombatant("Goon", enemy), new Vector3I(3, 0, 0)));
+    BattleUnitState hero = SingleAliveUnit(runtime, player);
 
     var actions = ActionsOf(runtime, hero);
     Assert.False(Row<MoveActionDefinition>(actions).IsAvailable);
@@ -179,19 +146,11 @@ public class GetAvailableActionsForUnitTest
     // open — the same vertical adjacency the pathfinder connects, so Move must stay available.
     var board = new BattleBoardState(new Vector3I(2, 2, 1));
     board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(), false);
-    var placements = new List<UnitPlacement>
-    {
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Hero", player)), new Vector3I(0, 0, 0)),
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Goon", enemy)), new Vector3I(1, 1, 0)),
-    };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
-    {
-      [player] = new Objective[] { new FakeObjective() },
-      [enemy] = new Objective[] { new FakeObjective() },
-    };
-    var runtime = BattleFactory.Start(new BattleSetup(board, new[] { player, enemy }, placements, objectives))
-      .Match(Right: r => r, Left: f => throw new Exception($"Setup failed: {f.Message}"));
-    BattleUnitState hero = UnitOf(runtime, player);
+    var runtime = StartRuntime(
+      board,
+      new StartPlacement(player, BattleTestFactory.MakeCombatant("Hero", player), new Vector3I(0, 0, 0)),
+      new StartPlacement(enemy, BattleTestFactory.MakeCombatant("Goon", enemy), new Vector3I(1, 1, 0)));
+    BattleUnitState hero = SingleAliveUnit(runtime, player);
 
     Assert.True(Row<MoveActionDefinition>(ActionsOf(runtime, hero)).IsAvailable);
   }
@@ -200,7 +159,7 @@ public class GetAvailableActionsForUnitTest
   public void DeadUnitQueryFails()
   {
     var (runtime, player, _) = MakeBattle(BattleTestFactory.MakeWeapon("Rifle"));
-    BattleUnitState hero = UnitOf(runtime, player);
+    BattleUnitState hero = SingleAliveUnit(runtime, player);
     runtime.ExecuteAction(BattleAction.ApplyDamage(hero, 999));
 
     var result = runtime.Query(new GetAvailableActionsForUnit(hero));

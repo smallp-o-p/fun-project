@@ -1,5 +1,4 @@
 using FunProject.Battle;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
 

@@ -1,4 +1,8 @@
 using FunProject.Battle;
+using FunProject.Combatants;
+using System.Linq;
+
+namespace FunProject.Tests;
 
 internal static class BattleQueryTestHelper
 {
@@ -9,6 +13,12 @@ internal static class BattleQueryTestHelper
     using var runtime = new BattleRuntime(session);
     return runtime.Query(query);
   }
+
+  public static BattleUnitState SingleAliveUnit(BattleRuntime runtime, Faction faction) =>
+    GetValue(runtime.Query(new GetFactionAliveUnits(faction))).Single();
+
+  public static BattleUnitState SingleAliveUnit(BattleSession session, Faction faction) =>
+    GetValue(Query(session, new GetFactionAliveUnits(faction))).Single();
 
   public static TResult GetValue<TResult>(Either<BattleQueryFailure, TResult> result)
   {

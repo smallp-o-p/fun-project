@@ -1,10 +1,8 @@
 using FunProject.Battle;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
 using System.Linq;
-using static BattleActionTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -13,18 +11,16 @@ public partial class BattleCombatQueriesTest
   [TestCase(TestName = "GetHitChanceForAttack returns the cover-modified breakdown")]
   public void GetHitChanceForAttackReturnsTheCoverModifiedBreakdown()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    var targetPoint = board.ValidatePoint(new Vector3I(4, 0, 4)).RequireSome();
-    board.GetTile(targetPoint).Cover = new TileCover(CoverDirections.North, 40);
-    var session = BattleTestFactory.MakeSession(board, [playerFaction, enemyFaction]);
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, aim: 65), new Vector3I(4, 0, 1), BattleTestFactory.MakeWeapon("Rifle"));
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    StartBattle(session);
+    board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(CoverDirections.North, 40);
+    var battle = new BattleDuelBuilder
+    {
+      Board = board,
+      Player = new DuelSide("Alpha", Weapon: BattleTestFactory.MakeWeapon("Rifle")),
+    }.Start();
 
     var breakdown = BattleQueryTestHelper.GetValue(
-      BattleQueryTestHelper.Query(session, new GetHitChanceForAttack(attacker.State, target.State)));
+      BattleQueryTestHelper.Query(battle.Session, new GetHitChanceForAttack(battle.PlayerUnit.State, battle.EnemyUnit.State)));
 
     Assert.Equal(65, breakdown.BaseChance);
     Assert.Equal(-40, breakdown.Modifiers.Single().Amount);
@@ -52,23 +48,21 @@ public partial class BattleCombatQueriesTest
   [TestCase(TestName = "GetHitChanceForAttack matches the breakdown the attack resolves with")]
   public void GetHitChanceForAttackMatchesTheBreakdownTheAttackResolvesWith()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    var targetPoint = board.ValidatePoint(new Vector3I(4, 0, 4)).RequireSome();
-    board.GetTile(targetPoint).Cover = new TileCover(CoverDirections.North, 40);
-    var session = BattleTestFactory.MakeSession(board, [playerFaction, enemyFaction], randomSeed: 99);
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, aim: 65), new Vector3I(4, 0, 1), BattleTestFactory.MakeWeapon("Rifle"));
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    StartBattle(session);
+    board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(CoverDirections.North, 40);
+    var battle = new BattleDuelBuilder
+    {
+      Board = board,
+      RandomSeed = 99,
+      Player = new DuelSide("Alpha", Weapon: BattleTestFactory.MakeWeapon("Rifle")),
+    }.Start();
 
     var previewed = BattleQueryTestHelper.GetValue(
-      BattleQueryTestHelper.Query(session, new GetHitChanceForAttack(attacker.State, target.State)));
+      BattleQueryTestHelper.Query(battle.Session, new GetHitChanceForAttack(battle.PlayerUnit.State, battle.EnemyUnit.State)));
 
     var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
-    var executor = new BattleActionExecutor(session);
-    Assert.True(executor.Submit(BattleAction.AttackUnit(attacker.State, target.State)).RequireSingleResult().Succeeded);
+    battle.Session.BattleEventCommitted += raisedEvents.Add;
+    Assert.True(battle.Executor.Submit(BattleAction.AttackUnit(battle.PlayerUnit.State, battle.EnemyUnit.State)).RequireSingleResult().Succeeded);
 
     var resolved = raisedEvents.OfType<UnitAttackedBattleEvent>().Single().Breakdown;
     Assert.Equal(previewed.BaseChance, resolved.BaseChance);

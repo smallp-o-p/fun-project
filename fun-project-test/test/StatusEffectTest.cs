@@ -1,9 +1,5 @@
 using FunProject.Battle;
-using FunProject.Combatants;
 using FunProject.Core;
-using FunProject.Items.Effects;
-using FunProject.Stats;
-using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
 
@@ -11,12 +7,6 @@ using GdUnit4;
 [RequireGodotRuntime]
 public partial class StatusEffectTest
 {
-  private static DamageOverTimeStatusSpecData MakeBurn(int duration = 2, int tickDamage = 2) =>
-    new() { Name = "Burn", DurationTurns = duration, TickDamage = tickDamage, TickElement = Element.Thermal };
-
-  private static ImmobilizeStatusSpecData MakeStun(int duration = 1) =>
-    new() { Name = "Stun", DurationTurns = duration };
-
   [TestCase(TestName = "Packets carry their authored status spec into the emitted bundle")]
   public void PacketsCarryStatusSpecIntoBundle()
   {
@@ -24,15 +14,7 @@ public partial class StatusEffectTest
     var frame = new WeaponFrameData { Name = "Frame", Packets = [] };
     frame.Packets.Add(new DamagePacketData { Element = Element.Thermal, Multiplier = 1f, Status = burn });
     frame.Packets.Add(new DamagePacketData { Element = Element.Kinetic, Multiplier = 1f });
-    var weapon = new Weapon(new WeaponData
-    {
-      Name = "Torch",
-      Description = "Burns",
-      Frame = frame,
-      DamageStat = new DamageStat { BaseValue = 5 },
-      RangeStat = new RangeStat { BaseValue = 5 },
-      CriticalChanceStat = new CriticalChanceStat { BaseValue = 0 },
-    });
+    var weapon = MakeWeapon("Torch", frame: frame);
 
     var bundle = weapon.EmitDamage();
 

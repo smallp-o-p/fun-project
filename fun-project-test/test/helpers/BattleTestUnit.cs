@@ -2,6 +2,8 @@ using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Items;
 
+namespace FunProject.Tests;
+
 internal sealed class BattleTestUnit
 {
   public BattleUnitState State { get; }

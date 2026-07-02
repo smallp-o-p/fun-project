@@ -1,9 +1,6 @@
 using FunProject.Battle;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using static BattleActionTestHelper;
-using static BattleQueryTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -45,10 +42,9 @@ public sealed partial class BattleRuntimeTest
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
     var runtime = new BattleRuntime(session);
-    var committedEvents = new List<BattleEvent>();
+    var recorder = new BattleEventRecorder(runtime);
     var startedActions = new List<BattleAction>();
     var completedResults = new List<BattleActionResult>();
-    runtime.BattleEventCommitted += committedEvents.Add;
     runtime.ActionStarted += startedActions.Add;
     runtime.ActionCompleted += completedResults.Add;
 
@@ -63,23 +59,20 @@ public sealed partial class BattleRuntimeTest
     Assert.True(object.ReferenceEquals(action, startedActions[0]));
     Assert.Equal(1, completedResults.Count);
     Assert.Equal(result, completedResults[0]);
-    Assert.True(committedEvents.OfType<UnitAddedBattleEvent>().Any());
+    Assert.True(recorder.OfType<UnitAddedBattleEvent>().Any());
   }
 
   [TestCase(TestName = "RegisterTrigger affects runtime action execution")]
   public void RegisterTriggerAffectsRuntimeActionExecution()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), new Vector3I(0, 0, 0));
-    StartBattle(session);
-    var runtime = new BattleRuntime(session);
+    var solo = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), actionPoints: 5);
+    var runtime = new BattleRuntime(solo.Session);
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
     runtime.RegisterTrigger<UnitMovedBattleEvent>(new RuntimeRecordingTrigger("runtime_trigger", targetPosition, log));
 
     BattleActionResult result = runtime
-      .ExecuteAction(BattleAction.MoveUnit(unit.State, [targetPosition]))
+      .ExecuteAction(BattleAction.MoveUnit(solo.Unit.State, [targetPosition]))
       .RequireSingleResult();
 
     Assert.True(result.Succeeded);
@@ -90,18 +83,15 @@ public sealed partial class BattleRuntimeTest
   [TestCase(TestName = "RegisterTrigger event shape affects runtime action execution")]
   public void RegisterTriggerEventShapeAffectsRuntimeActionExecution()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 5), new Vector3I(0, 0, 0));
-    StartBattle(session);
-    var runtime = new BattleRuntime(session);
+    var solo = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), actionPoints: 5);
+    var runtime = new BattleRuntime(solo.Session);
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
     runtime.RegisterTrigger<IPositionedBattleEvent>(
       new RuntimeRecordingTrigger("runtime_shape_trigger", targetPosition, log));
 
     BattleActionResult result = runtime
-      .ExecuteAction(BattleAction.MoveUnit(unit.State, [targetPosition]))
+      .ExecuteAction(BattleAction.MoveUnit(solo.Unit.State, [targetPosition]))
       .RequireSingleResult();
 
     Assert.True(result.Succeeded);
@@ -115,15 +105,14 @@ public sealed partial class BattleRuntimeTest
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
     var runtime = new BattleRuntime(session);
-    var committedEvents = new List<BattleEvent>();
-    runtime.BattleEventCommitted += committedEvents.Add;
+    var recorder = new BattleEventRecorder(runtime);
 
     runtime.Dispose();
     new BattleActionExecutor(session)
       .Submit(BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1)))
       .RequireSingleResult();
 
-    Assert.Equal(0, committedEvents.Count);
+    Assert.Equal(0, recorder.All.Count);
   }
 
   [TestCase(TestName = "Public methods throw after runtime is disposed")]

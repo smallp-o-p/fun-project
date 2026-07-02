@@ -8,22 +8,15 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public partial class MapDeploymentTest
 {
-  private static BattleMapData MapWithSpawns(int slot, params Vector3I[] cells)
-  {
-    var tiles = new Godot.Collections.Dictionary<Vector3I, BattleMapTileData>();
-    foreach (Vector3I cell in cells)
-      tiles[cell] = new BattleMapTileData { Walkable = true, SpawnFactionSlot = slot };
-
-    return new BattleMapData { Dimensions = new Vector3I(4, 1, 4), Tiles = tiles };
-  }
-
   [TestCase(TestName = "AssignSpawns pairs each combatant with a spawn cell")]
   public void AssignSpawnsPairsEachCombatantWithASpawnCell()
   {
     Faction faction = BattleTestFactory.MakeFaction("Player");
     Combatant a = BattleTestFactory.MakeCombatant("A", faction);
     Combatant b = BattleTestFactory.MakeCombatant("B", faction);
-    BattleMapData map = MapWithSpawns(0, new Vector3I(0, 0, 0), new Vector3I(1, 0, 0));
+    BattleMapData map = MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(0, 0, 0), SpawnTile(0)),
+      (new Vector3I(1, 0, 0), SpawnTile(0)));
     var rosters = new Dictionary<int, IReadOnlyList<Combatant>> { [0] = new[] { a, b } };
 
     var result = MapDeployment.AssignSpawns(map, rosters);
@@ -43,7 +36,8 @@ public partial class MapDeploymentTest
   {
     Faction faction = BattleTestFactory.MakeFaction("Player");
     Combatant a = BattleTestFactory.MakeCombatant("A", faction);
-    BattleMapData map = MapWithSpawns(0, new Vector3I(0, 0, 0));
+    BattleMapData map = MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(0, 0, 0), SpawnTile(0)));
     var rosters = new Dictionary<int, IReadOnlyList<Combatant>> { [1] = new[] { a } };
 
     var result = MapDeployment.AssignSpawns(map, rosters);
@@ -57,7 +51,8 @@ public partial class MapDeploymentTest
     Faction faction = BattleTestFactory.MakeFaction("Player");
     Combatant a = BattleTestFactory.MakeCombatant("A", faction);
     Combatant b = BattleTestFactory.MakeCombatant("B", faction);
-    BattleMapData map = MapWithSpawns(0, new Vector3I(0, 0, 0));
+    BattleMapData map = MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(0, 0, 0), SpawnTile(0)));
     var rosters = new Dictionary<int, IReadOnlyList<Combatant>> { [0] = new[] { a, b } };
 
     var result = MapDeployment.AssignSpawns(map, rosters);
@@ -70,7 +65,8 @@ public partial class MapDeploymentTest
   {
     Faction faction = BattleTestFactory.MakeFaction("Player");
     Combatant a = BattleTestFactory.MakeCombatant("A", faction);
-    BattleMapData map = MapWithSpawns(0, new Vector3I(9, 0, 0)); // dim.X = 4
+    BattleMapData map = MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(9, 0, 0), SpawnTile(0))); // dim.X = 4
     var rosters = new Dictionary<int, IReadOnlyList<Combatant>> { [0] = new[] { a } };
 
     var result = MapDeployment.AssignSpawns(map, rosters);

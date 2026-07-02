@@ -2,7 +2,6 @@ using FunProject.Core;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Stats;
-using FunProject.Tests;
 using GdUnit4;
 using System;
 

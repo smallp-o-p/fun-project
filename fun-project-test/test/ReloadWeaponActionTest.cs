@@ -1,10 +1,6 @@
 using FunProject.Battle;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using System.Collections.Generic;
-using System.Linq;
-using static BattleActionTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -13,28 +9,26 @@ public class ReloadWeaponActionTest
   [TestCase(TestName = "Reload refills the magazine, spends AP, and raises the reload event")]
   public void ReloadRefillsSpendsApAndRaisesEvent()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction], new AlwaysHitCalculator());
     var weapon = BattleTestFactory.MakeAmmoWeapon("SMG", magazine: 3, damage: 1);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction), new Vector3I(4, 0, 1), weapon);
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    StartBattle(session);
+    var battle = new BattleDuelBuilder
+    {
+      HitChanceCalculator = new AlwaysHitCalculator(),
+      Player = new DuelSide("Alpha", Weapon: weapon),
+    }.Start();
+    var unit = battle.PlayerUnit;
 
-    var executor = new BattleActionExecutor(session);
-    Assert.True(executor.Submit(BattleAction.AttackUnit(unit.State, target.State)).RequireSingleResult().Succeeded);
+    Assert.True(battle.Executor.Submit(BattleAction.AttackUnit(unit.State, battle.EnemyUnit.State)).RequireSingleResult().Succeeded);
     Assert.Equal(2, weapon.CurrentAmmo);
 
-    var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
+    var recorder = new BattleEventRecorder(battle.Session);
     int actionPointsBefore = unit.CurrentActionPoints;
 
-    var result = executor.Submit(BattleAction.ReloadWeapon(unit.State)).RequireSingleResult();
+    var result = battle.Executor.Submit(BattleAction.ReloadWeapon(unit.State)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
     Assert.Equal(3, weapon.CurrentAmmo);
     Assert.Equal(actionPointsBefore - BattleSession.DefaultReloadActionPointCost, unit.CurrentActionPoints);
-    var reloadEvent = raisedEvents.OfType<UnitReloadedWeaponBattleEvent>().Single();
+    var reloadEvent = recorder.Single<UnitReloadedWeaponBattleEvent>();
     Assert.Equal(unit.State, reloadEvent.Unit);
   }
 
@@ -71,14 +65,12 @@ public class ReloadWeaponActionTest
   [TestCase(TestName = "An off-turn unit cannot reload")]
   public void OffTurnReloadRejected()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction), new Vector3I(0, 0, 0));
-    var goon = SpawnUnit(session, BattleTestFactory.MakeCombatant("Goon", enemyFaction), new Vector3I(3, 0, 0), BattleTestFactory.MakeAmmoWeapon("SMG"));
-    StartBattle(session); // player faction is active first
+    var battle = new BattleDuelBuilder
+    {
+      Enemy = new DuelSide("Goon", Weapon: BattleTestFactory.MakeAmmoWeapon("SMG")),
+    }.Start();
 
-    var result = new BattleActionExecutor(session).Submit(BattleAction.ReloadWeapon(goon.State)).RequireSingleResult();
+    var result = battle.Executor.Submit(BattleAction.ReloadWeapon(battle.EnemyUnit.State)).RequireSingleResult();
 
     Assert.False(result.Succeeded);
     Assert.Equal(BattleActionFailureReason.Rejected, result.FailureReason);

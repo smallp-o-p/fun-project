@@ -1,25 +1,14 @@
 using FunProject.Battle;
 using FunProject.Combatants;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using static BattleActionTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleEventListenerTest
 {
-  private sealed class RecordingListener : BattleEventListener
-  {
-    public List<BattleEvent> Received { get; } = [];
-
-    public override void OnEventCommitted(BattleSession session, BattleEvent battleEvent)
-      => Received.Add(battleEvent);
-  }
-
   private sealed record ProbeBattleEvent : BattleEvent;
 
   private sealed class RaiseProbeOnTurnEndedListener : BattleEventListener
@@ -58,8 +47,8 @@ public partial class BattleEventListenerTest
   public void ListenerReceivesOnlyItsConcreteEvent()
   {
     var (session, _, _) = MakeSessionWithUnit();
-    var turnStartedListener = new RecordingListener();
-    var damagedListener = new RecordingListener();
+    var turnStartedListener = new RecordingBattleEventListener();
+    var damagedListener = new RecordingBattleEventListener();
     session.RegisterListener<TurnStartedBattleEvent>(turnStartedListener);
     session.RegisterListener<UnitDamagedBattleEvent>(damagedListener);
 
@@ -75,7 +64,7 @@ public partial class BattleEventListenerTest
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var unitEventsListener = new RecordingListener();
+    var unitEventsListener = new RecordingBattleEventListener();
     session.RegisterListener<IUnitBattleEvent>(unitEventsListener);
 
     SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
@@ -92,17 +81,12 @@ public partial class BattleEventListenerTest
     executor.RegisterTrigger<ProbeBattleEvent>(trigger);
     StartBattle(session);
 
-    var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
+    var recorder = new BattleEventRecorder(session);
     var result = executor.Submit(BattleAction.EndFactionTurn(faction)).RequireSingleResult();
 
     Assert.True(result.Succeeded);
-    int turnEndedIndex = raisedEvents.FindIndex(battleEvent => battleEvent is TurnEndedBattleEvent);
-    int probeIndex = raisedEvents.FindIndex(battleEvent => battleEvent is ProbeBattleEvent);
-    int turnStartedIndex = raisedEvents.FindIndex(battleEvent => battleEvent is TurnStartedBattleEvent);
-    Assert.True(turnEndedIndex >= 0);
-    Assert.True(probeIndex > turnEndedIndex);
-    Assert.True(turnStartedIndex > probeIndex);
+    recorder.AssertCommittedBefore<TurnEndedBattleEvent, ProbeBattleEvent>();
+    recorder.AssertCommittedBefore<ProbeBattleEvent, TurnStartedBattleEvent>();
     Assert.Equal(1, trigger.Evaluations);
   }
 
@@ -128,15 +112,14 @@ public partial class BattleEventListenerTest
     session.RegisterListener<TurnEndedBattleEvent>(new RaiseThenThrowOnceOnTurnEndedListener());
     StartBattle(session);
 
-    var raisedEvents = new List<BattleEvent>();
-    session.BattleEventCommitted += raisedEvents.Add;
+    var recorder = new BattleEventRecorder(session);
     var result = executor.Submit(BattleAction.EndFactionTurn(faction)).RequireSingleResult();
 
     Assert.False(result.Succeeded);
-    Assert.False(raisedEvents.OfType<ProbeBattleEvent>().Any());
+    Assert.False(recorder.OfType<ProbeBattleEvent>().Any());
 
     var followUp = executor.Submit(BattleAction.EndFactionTurn(faction)).RequireSingleResult();
     Assert.True(followUp.Succeeded);
-    Assert.False(raisedEvents.OfType<ProbeBattleEvent>().Any());
+    Assert.False(recorder.OfType<ProbeBattleEvent>().Any());
   }
 }

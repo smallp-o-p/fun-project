@@ -1,5 +1,4 @@
 using FunProject.Battle;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
 using System.Linq;
@@ -16,8 +15,8 @@ public partial class StandardHitChanceCalculatorTest
   {
     var attackerFaction = BattleTestFactory.MakeFaction("Player");
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    var attackerPoint = board.ValidatePoint(attackerPosition).RequireSome();
-    var defenderPoint = board.ValidatePoint(defenderPosition).RequireSome();
+    var attackerPoint = board.At(attackerPosition);
+    var defenderPoint = board.At(defenderPosition);
     board.GetTile(defenderPoint).Cover = defenderCover;
 
     var weapon = BattleTestFactory.MakeWeapon("Rifle");

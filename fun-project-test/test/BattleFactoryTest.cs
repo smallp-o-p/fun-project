@@ -1,6 +1,5 @@
 using FunProject.Battle;
 using FunProject.Combatants;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
 using System;
@@ -22,11 +21,6 @@ public class BattleFactoryTest
     result.Match(
       Right: _ => throw new Exception("Expected a setup failure but Start succeeded."),
       Left: failure => failure);
-
-  private static T UnwrapQuery<T>(Either<BattleQueryFailure, T> result) =>
-    result.Match(
-      Right: value => value,
-      Left: _ => throw new Exception("Expected a successful query."));
 
   // Two factions in order [player, enemy], one unit each on distinct cells, an
   // objective for each. A 4x1x4 board has all-walkable tiles by default.
@@ -59,15 +53,15 @@ public class BattleFactoryTest
 
     BattleRuntime runtime = UnwrapStart(BattleFactory.Start(setup));
 
-    var playerUnit = UnwrapQuery(runtime.Query(new GetFactionAliveUnits(player))).Single();
-    var enemyUnit = UnwrapQuery(runtime.Query(new GetFactionAliveUnits(enemy))).Single();
+    var playerUnit = GetValue(runtime.Query(new GetFactionAliveUnits(player))).Single();
+    var enemyUnit = GetValue(runtime.Query(new GetFactionAliveUnits(enemy))).Single();
 
-    Assert.Equal(new Vector3I(0, 0, 0), UnwrapQuery(runtime.Query(new GetUnitPosition(playerUnit))).Raw);
-    Assert.Equal(new Vector3I(3, 0, 3), UnwrapQuery(runtime.Query(new GetUnitPosition(enemyUnit))).Raw);
+    Assert.Equal(new Vector3I(0, 0, 0), GetValue(runtime.Query(new GetUnitPosition(playerUnit))).Raw);
+    Assert.Equal(new Vector3I(3, 0, 3), GetValue(runtime.Query(new GetUnitPosition(enemyUnit))).Raw);
 
     // InProgress + player (FactionOrder[0]) is the active side: it can act, enemy cannot yet.
-    Assert.True(UnwrapQuery(runtime.Query(new CanUnitActNow(playerUnit))));
-    Assert.False(UnwrapQuery(runtime.Query(new CanUnitActNow(enemyUnit))));
+    Assert.True(GetValue(runtime.Query(new CanUnitActNow(playerUnit))));
+    Assert.False(GetValue(runtime.Query(new CanUnitActNow(enemyUnit))));
   }
 
   [TestCase(TestName = "Start fails when a faction has no objective")]
@@ -193,13 +187,10 @@ public class BattleFactoryTest
   // 4x1x4 map with exactly one spawn cell per slot. CreateBoardState() seeds every board cell
   // non-walkable, then makes walkable only the cells present in Tiles (BattleMapTileData.Walkable
   // defaults to true) — so exactly the two cells below are walkable spawn cells, one per slot.
-  private static BattleMapData TwoSlotMap()
-  {
-    var map = new BattleMapData { Dimensions = new Vector3I(4, 1, 4) };
-    map.Tiles[new Vector3I(0, 0, 0)] = new BattleMapTileData { SpawnFactionSlot = 0 };
-    map.Tiles[new Vector3I(3, 0, 3)] = new BattleMapTileData { SpawnFactionSlot = 1 };
-    return map;
-  }
+  private static BattleMapData TwoSlotMap() =>
+    MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(0, 0, 0), SpawnTile(0)),
+      (new Vector3I(3, 0, 3), SpawnTile(1)));
 
   [TestCase(TestName = "StartFromMap builds the board, assigns spawns, and starts")]
   public void StartFromMapHappyPath()
@@ -220,10 +211,10 @@ public class BattleFactoryTest
 
     BattleRuntime runtime = UnwrapStart(BattleFactory.StartFromMap(setup));
 
-    var alpha = UnwrapQuery(runtime.Query(new GetFactionAliveUnits(player))).Single();
-    var bandit = UnwrapQuery(runtime.Query(new GetFactionAliveUnits(enemy))).Single();
-    Assert.Equal(new Vector3I(0, 0, 0), UnwrapQuery(runtime.Query(new GetUnitPosition(alpha))).Raw);
-    Assert.Equal(new Vector3I(3, 0, 3), UnwrapQuery(runtime.Query(new GetUnitPosition(bandit))).Raw);
+    var alpha = GetValue(runtime.Query(new GetFactionAliveUnits(player))).Single();
+    var bandit = GetValue(runtime.Query(new GetFactionAliveUnits(enemy))).Single();
+    Assert.Equal(new Vector3I(0, 0, 0), GetValue(runtime.Query(new GetUnitPosition(alpha))).Raw);
+    Assert.Equal(new Vector3I(3, 0, 3), GetValue(runtime.Query(new GetUnitPosition(bandit))).Raw);
   }
 
   [TestCase(TestName = "StartFromMap fails when a slot has fewer cells than its roster")]
@@ -297,11 +288,11 @@ public class BattleFactoryTest
   {
     var player = BattleTestFactory.MakeFaction("Player");
     var enemy = BattleTestFactory.MakeFaction("Enemy");
-    var map = new BattleMapData { Dimensions = new Vector3I(4, 1, 4) };
     // Slot-0 spawn cell is explicitly non-walkable: AssignSpawns still picks it, but the baked
     // board rejects occupancy, which must surface as a recoverable Left (not a thrown exception).
-    map.Tiles[new Vector3I(0, 0, 0)] = new BattleMapTileData { SpawnFactionSlot = 0, Walkable = false };
-    map.Tiles[new Vector3I(3, 0, 3)] = new BattleMapTileData { SpawnFactionSlot = 1 };
+    var map = MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(0, 0, 0), new BattleMapTileData { SpawnFactionSlot = 0, Walkable = false }),
+      (new Vector3I(3, 0, 3), SpawnTile(1)));
     var rosters = new Dictionary<int, IReadOnlyList<UnitLoadout>>
     {
       [0] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)) },

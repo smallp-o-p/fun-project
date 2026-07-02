@@ -1,6 +1,5 @@
 using GdUnit4;
 using Godot;
-using FunProject.Tests;
 
 [TestSuite]
 [RequireGodotRuntime]

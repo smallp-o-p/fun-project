@@ -1,20 +1,14 @@
 using FunProject.Battle;
 using FunProject.Combatants;
-using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
-using System;
-using System.Collections.Generic;
 using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
 public class PlayerActionControllerTest
 {
-  private static T QueryRight<T>(Either<BattleQueryFailure, T> result) =>
-    result.Match(Right: v => v, Left: f => throw new Exception($"Query failed: {f.Message}"));
-
   // 5x1x5 open board. Player "Hero" (armed) at (0,0,0), enemy "Goon" at (3,0,0).
   private static (BattleRuntime Runtime, Faction Player, BattleUnitState Hero) MakeArmedBattle() =>
     MakeBattle(BattleTestFactory.MakeWeapon("Rifle"));
@@ -24,20 +18,11 @@ public class PlayerActionControllerTest
   {
     var player = BattleTestFactory.MakeFaction("Player");
     var enemy = BattleTestFactory.MakeFaction("Enemy");
-    var board = new BattleBoardState(new Vector3I(5, 1, 5));
-    var placements = new List<UnitPlacement>
-    {
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Hero", player), heroWeapon), new Vector3I(0, 0, 0)),
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Goon", enemy)), new Vector3I(3, 0, 0)),
-    };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
-    {
-      [player] = new Objective[] { new FakeObjective() },
-      [enemy] = new Objective[] { new FakeObjective() },
-    };
-    var runtime = BattleFactory.Start(new BattleSetup(board, new[] { player, enemy }, placements, objectives))
-      .Match(Right: r => r, Left: f => throw new Exception($"Setup failed: {f.Message}"));
-    var hero = QueryRight(runtime.Query(new GetFactionAliveUnits(player))).Single();
+    var runtime = StartRuntime(
+      new Vector3I(5, 1, 5),
+      new StartPlacement(player, BattleTestFactory.MakeCombatant("Hero", player), new Vector3I(0, 0, 0), heroWeapon),
+      new StartPlacement(enemy, BattleTestFactory.MakeCombatant("Goon", enemy), new Vector3I(3, 0, 0)));
+    var hero = SingleAliveUnit(runtime, player);
     return (runtime, player, hero);
   }
 
@@ -79,7 +64,7 @@ public class PlayerActionControllerTest
     Assert.Equal(PlayerActionController.TargetingMode.ActionPending, c.Mode);
     c.Confirm();
 
-    Assert.Equal(new Vector3I(2, 0, 1), QueryRight(runtime.Query(new GetUnitPosition(hero))).Raw);
+    Assert.Equal(new Vector3I(2, 0, 1), GetValue(runtime.Query(new GetUnitPosition(hero))).Raw);
     Assert.Equal(PlayerActionController.TargetingMode.None, c.Mode);
     Assert.True(c.SelectedUnit.IsSome);
   }
@@ -93,7 +78,7 @@ public class PlayerActionControllerTest
 
     c.BeginAction(OptionOf<AttackActionOption>(c));
     Assert.Equal(PlayerActionController.TargetingMode.ActionTargeting, c.Mode);
-    ActionPreview preview = QueryRight(c.PreviewAt(new Vector3I(3, 0, 0)));
+    ActionPreview preview = GetValue(c.PreviewAt(new Vector3I(3, 0, 0)));
     Assert.True(preview is AttackPreview);
     Assert.True(c.SetPending(new Vector3I(3, 0, 0)));
     var results = c.Confirm();
@@ -113,7 +98,7 @@ public class PlayerActionControllerTest
 
     Assert.Equal(PlayerActionController.TargetingMode.None, c.Mode);
     // After passing, the unit is no longer available this turn.
-    Assert.False(QueryRight(runtime.Query(new CanUnitActNow(hero))));
+    Assert.False(GetValue(runtime.Query(new CanUnitActNow(hero))));
   }
 
   [TestCase(TestName = "Cancel steps back one level")]

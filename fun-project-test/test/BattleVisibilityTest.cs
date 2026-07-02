@@ -1,10 +1,7 @@
 using FunProject.Battle;
 using FunProject.Combatants;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using static BattleActionTestHelper;
-using static BattleQueryTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -29,7 +26,7 @@ public class BattleVisibilityTest
     StartBattle(session);
 
     Assert.True(observer.State.VisibleUnits.Contains(target.State));
-    Assert.True(observer.State.VisibleTiles.Contains(ValidateTile(session, new Vector3I(2, 0, 0))));
+    Assert.True(observer.State.VisibleTiles.Contains(session.Board.At(new Vector3I(2, 0, 0))));
   }
 
   [TestCase(TestName = "Blocking tiles break line of sight")]
@@ -37,7 +34,7 @@ public class BattleVisibilityTest
   {
     var (session, playerFaction, _, observer, target) = TwoUnitScenario(new Vector3I(4, 1, 1), new Vector3I(0, 0, 0), 4, new Vector3I(2, 0, 0));
 
-    session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).BlocksLineOfSight = true;
+    session.Board.GetTile(session.Board.At(1, 0, 0)).BlocksLineOfSight = true;
     StartBattle(session);
 
     Assert.False(GetValue(Query(session, new IsUnitVisibleToUnit(observer.State, target.State))));
@@ -52,9 +49,9 @@ public class BattleVisibilityTest
     var playerFaction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 2), [playerFaction]);
     SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 0, 0));
-    BattleBoardState.ValidatedPoint blockingTile = ValidateTile(session, new Vector3I(1, 0, 0));
-    BattleBoardState.ValidatedPoint shadowedTile = ValidateTile(session, new Vector3I(2, 0, 0));
-    BattleBoardState.ValidatedPoint openTile = ValidateTile(session, new Vector3I(0, 0, 1));
+    BattleBoardState.ValidatedPoint blockingTile = session.Board.At(new Vector3I(1, 0, 0));
+    BattleBoardState.ValidatedPoint shadowedTile = session.Board.At(new Vector3I(2, 0, 0));
+    BattleBoardState.ValidatedPoint openTile = session.Board.At(new Vector3I(0, 0, 1));
 
     session.Board.GetTile(blockingTile).BlocksLineOfSight = true;
     StartBattle(session);
@@ -73,8 +70,8 @@ public class BattleVisibilityTest
     var playerFaction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 1), [playerFaction]);
     SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 0), new Vector3I(0, 0, 0));
-    BattleBoardState.ValidatedPoint observerTile = ValidateTile(session, new Vector3I(0, 0, 0));
-    BattleBoardState.ValidatedPoint adjacentTile = ValidateTile(session, new Vector3I(1, 0, 0));
+    BattleBoardState.ValidatedPoint observerTile = session.Board.At(new Vector3I(0, 0, 0));
+    BattleBoardState.ValidatedPoint adjacentTile = session.Board.At(new Vector3I(1, 0, 0));
 
     StartBattle(session);
 
@@ -88,8 +85,8 @@ public class BattleVisibilityTest
     var playerFaction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2), [playerFaction]);
     SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 0, 0));
-    BattleBoardState.ValidatedPoint blockingTile = ValidateTile(session, new Vector3I(1, 0, 0));
-    BattleBoardState.ValidatedPoint diagonalTile = ValidateTile(session, new Vector3I(1, 0, 1));
+    BattleBoardState.ValidatedPoint blockingTile = session.Board.At(new Vector3I(1, 0, 0));
+    BattleBoardState.ValidatedPoint diagonalTile = session.Board.At(new Vector3I(1, 0, 1));
 
     session.Board.GetTile(blockingTile).BlocksLineOfSight = true;
     StartBattle(session);
@@ -104,9 +101,9 @@ public class BattleVisibilityTest
     var playerFaction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 2), [playerFaction]);
     SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 0, 0));
-    BattleBoardState.ValidatedPoint firstBlockingTile = ValidateTile(session, new Vector3I(1, 0, 0));
-    BattleBoardState.ValidatedPoint secondBlockingTile = ValidateTile(session, new Vector3I(1, 0, 1));
-    BattleBoardState.ValidatedPoint hiddenTile = ValidateTile(session, new Vector3I(2, 0, 1));
+    BattleBoardState.ValidatedPoint firstBlockingTile = session.Board.At(new Vector3I(1, 0, 0));
+    BattleBoardState.ValidatedPoint secondBlockingTile = session.Board.At(new Vector3I(1, 0, 1));
+    BattleBoardState.ValidatedPoint hiddenTile = session.Board.At(new Vector3I(2, 0, 1));
 
     session.Board.GetTile(firstBlockingTile).BlocksLineOfSight = true;
     session.Board.GetTile(secondBlockingTile).BlocksLineOfSight = true;
@@ -123,9 +120,9 @@ public class BattleVisibilityTest
     var playerFaction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(2, 1, 2), [playerFaction]);
     SpawnUnit(session, BattleTestFactory.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 0, 0));
-    BattleBoardState.ValidatedPoint firstBlockingTile = ValidateTile(session, new Vector3I(1, 0, 0));
-    BattleBoardState.ValidatedPoint secondBlockingTile = ValidateTile(session, new Vector3I(0, 0, 1));
-    BattleBoardState.ValidatedPoint sealedCornerTile = ValidateTile(session, new Vector3I(1, 0, 1));
+    BattleBoardState.ValidatedPoint firstBlockingTile = session.Board.At(new Vector3I(1, 0, 0));
+    BattleBoardState.ValidatedPoint secondBlockingTile = session.Board.At(new Vector3I(0, 0, 1));
+    BattleBoardState.ValidatedPoint sealedCornerTile = session.Board.At(new Vector3I(1, 0, 1));
 
     session.Board.GetTile(firstBlockingTile).BlocksLineOfSight = true;
     session.Board.GetTile(secondBlockingTile).BlocksLineOfSight = true;
@@ -145,7 +142,7 @@ public class BattleVisibilityTest
     StartBattle(session);
 
     Assert.True(GetValue(Query(session, new IsUnitVisibleToUnit(observer.State, target.State))));
-    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(0, 0, 0))))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, session.Board.At(new Vector3I(0, 0, 0))))));
   }
 
   // BlocksVerticalLineOfSight on the observer's own cell (the floor) seals downward sight.
@@ -154,11 +151,11 @@ public class BattleVisibilityTest
   {
     var (session, playerFaction, _, observer, target) = TwoUnitScenario(new Vector3I(1, 2, 1), new Vector3I(0, 1, 0), 3, new Vector3I(0, 0, 0));
 
-    session.Board.GetTile(ValidateTile(session, new Vector3I(0, 1, 0))).BlocksVerticalLineOfSight = true;
+    session.Board.GetTile(session.Board.At(new Vector3I(0, 1, 0))).BlocksVerticalLineOfSight = true;
     StartBattle(session);
 
     Assert.False(GetValue(Query(session, new IsUnitVisibleToUnit(observer.State, target.State))));
-    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(0, 0, 0))))));
+    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, session.Board.At(new Vector3I(0, 0, 0))))));
   }
 
   // With no vertical blocking flag, a unit can see up an open column to the level above.
@@ -170,7 +167,7 @@ public class BattleVisibilityTest
     StartBattle(session);
 
     Assert.True(GetValue(Query(session, new IsUnitVisibleToUnit(observer.State, target.State))));
-    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(0, 2, 0))))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, session.Board.At(new Vector3I(0, 2, 0))))));
   }
 
   // BlocksVerticalLineOfSight on an intermediate floor cell seals upward sight through it.
@@ -179,11 +176,11 @@ public class BattleVisibilityTest
   {
     var (session, playerFaction, _, observer, target) = TwoUnitScenario(new Vector3I(1, 3, 1), new Vector3I(0, 0, 0), 5, new Vector3I(0, 2, 0));
 
-    session.Board.GetTile(ValidateTile(session, new Vector3I(0, 1, 0))).BlocksVerticalLineOfSight = true;
+    session.Board.GetTile(session.Board.At(new Vector3I(0, 1, 0))).BlocksVerticalLineOfSight = true;
     StartBattle(session);
 
     Assert.False(GetValue(Query(session, new IsUnitVisibleToUnit(observer.State, target.State))));
-    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(0, 2, 0))))));
+    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, session.Board.At(new Vector3I(0, 2, 0))))));
   }
 
   // A 3D-diagonal ray (X and Y both change, simultaneous crossing) is sealed when the mid cell
@@ -192,7 +189,7 @@ public class BattleVisibilityTest
   public void BlocksVerticalLineOfSightSealsDiagonalRay()
   {
     var (session, _, _, observer, target) = TwoUnitScenario(new Vector3I(3, 3, 1), new Vector3I(0, 0, 0), 3, new Vector3I(2, 2, 0));
-    session.Board.GetTile(ValidateTile(session, new Vector3I(1, 1, 0))).BlocksVerticalLineOfSight = true;
+    session.Board.GetTile(session.Board.At(new Vector3I(1, 1, 0))).BlocksVerticalLineOfSight = true;
     StartBattle(session);
     Assert.False(GetValue(Query(session, new IsUnitVisibleToUnit(observer.State, target.State))));
   }
@@ -232,9 +229,9 @@ public class BattleVisibilityTest
 
     StartBattle(session);
 
-    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(1, 0, 0))))));
-    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(4, 0, 3))))));
-    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(2, 0, 2))))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, session.Board.At(new Vector3I(1, 0, 0))))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, session.Board.At(new Vector3I(4, 0, 3))))));
+    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, session.Board.At(new Vector3I(2, 0, 2))))));
   }
 
   [TestCase(TestName = "Tile visibility includes tiles at the edge of vision range")]
@@ -246,8 +243,8 @@ public class BattleVisibilityTest
 
     StartBattle(session);
 
-    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(3, 0, 0))))));
-    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, ValidateTile(session, new Vector3I(4, 0, 0))))));
+    Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, session.Board.At(new Vector3I(3, 0, 0))))));
+    Assert.False(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, session.Board.At(new Vector3I(4, 0, 0))))));
   }
 
   [TestCase(TestName = "Explored tiles persist after they leave current visibility")]
@@ -256,7 +253,7 @@ public class BattleVisibilityTest
     var playerFaction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 3), [playerFaction]);
     var observer = SpawnUnit(session, BattleTestFactory.MakeCombatant("Scout", playerFaction, vision: 2), new Vector3I(1, 0, 1));
-    BattleBoardState.ValidatedPoint tile = ValidateTile(session, new Vector3I(3, 0, 1));
+    BattleBoardState.ValidatedPoint tile = session.Board.At(new Vector3I(3, 0, 1));
 
     StartBattle(session);
     Assert.True(GetValue(Query(session, new IsTileVisibleToFaction(playerFaction, tile))));
@@ -317,7 +314,7 @@ public class BattleVisibilityTest
     var (session, _, _, observer, target) = TwoUnitScenario(new Vector3I(4, 1, 1), new Vector3I(0, 0, 0), 4, new Vector3I(2, 0, 0));
 
     Assert.True(GetValue(Query(session, new IsUnitVisibleToUnit(observer.State, target.State))));
-    session.Board.GetTile(session.Board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome()).BlocksLineOfSight = true;
+    session.Board.GetTile(session.Board.At(1, 0, 0)).BlocksLineOfSight = true;
 
     StartBattle(session);
 
@@ -360,9 +357,9 @@ public class BattleVisibilityTest
     Assert.True(GetValue(Query(session, new IsUnitVisibleToFaction(playerFaction, target.State))));
 
     // Seal the entire x=1 column at runtime so sight cannot reach the target by any route.
-    session.Board.GetTile(ValidateTile(session, new Vector3I(1, 0, 0))).BlocksLineOfSight = true;
-    session.Board.GetTile(ValidateTile(session, new Vector3I(1, 0, 1))).BlocksLineOfSight = true;
-    session.Board.GetTile(ValidateTile(session, new Vector3I(1, 0, 2))).BlocksLineOfSight = true;
+    session.Board.GetTile(session.Board.At(new Vector3I(1, 0, 0))).BlocksLineOfSight = true;
+    session.Board.GetTile(session.Board.At(new Vector3I(1, 0, 1))).BlocksLineOfSight = true;
+    session.Board.GetTile(session.Board.At(new Vector3I(1, 0, 2))).BlocksLineOfSight = true;
     session.InvalidateVisibility();
 
     var moveResult = new BattleActionExecutor(session).Submit(BattleAction.MoveUnit(mover.State, [new Vector3I(0, 0, 1)])).RequireSingleResult();
@@ -474,11 +471,6 @@ public class BattleVisibilityTest
     Assert.True(GetValue(Query(session, new IsUnitVisibleToUnit(observer.State, target.State))));
 
     Assert.Equal(1, spottings.Count);
-  }
-
-  private static BattleBoardState.ValidatedPoint ValidateTile(BattleSession session, Vector3I tile)
-  {
-    return session.Board.ValidatePoint(tile).RequireSome();
   }
 
   private static (BattleSession Session, Faction Player, Faction Enemy, BattleTestUnit Observer, BattleTestUnit Target)

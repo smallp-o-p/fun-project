@@ -1,5 +1,7 @@
 using FunProject.Battle;
 
+namespace FunProject.Tests;
+
 // Test double: completion/failure are controlled by flags rather than session state.
 // Flags are read live, so a test may flip them after construction.
 public sealed class FakeObjective : Objective

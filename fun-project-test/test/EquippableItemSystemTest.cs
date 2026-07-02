@@ -2,7 +2,6 @@ using FunProject.Core;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
-using FunProject.Tests;
 using FunProject.Weapons;
 using GdUnit4;
 
@@ -24,26 +23,6 @@ public class EquippableItemSystemTest
     Assert.True(item.FindCapability<ChargesCapability>().IsNone);
     Assert.True(item.With<ThrowableCapability>().IsNone);
     Assert.Equal(0, item.GetModSlots().Count);
-  }
-
-  [TestCase(TestName = "Item spends and restores charges through its capability")]
-  public void ItemSpendsAndRestoresChargesThroughItsCapability()
-  {
-    var item = new EquippableItem(new EquippableItemData
-    {
-      Name = "Charge Pack",
-      Capabilities = [new ChargesCapabilityData { MaxCharges = 2 }],
-    });
-
-    var charges = item.FindCapability<ChargesCapability>().RequireSome();
-    Assert.True(charges.TrySpend());
-    Assert.Equal(1, charges.Current);
-    Assert.True(charges.TrySpend());
-    Assert.True(charges.IsDepleted);
-    Assert.False(charges.TrySpend());
-
-    charges.Restore();
-    Assert.Equal(2, charges.Current);
   }
 
   [TestCase(TestName = "Mod slots capability exposes slots")]

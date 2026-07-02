@@ -1,10 +1,7 @@
 using FunProject.Battle;
-using FunProject.Tests;
 using GdUnit4;
 using Godot;
-using System.Collections.Generic;
 using System.Linq;
-using static BattleActionTestHelper;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -31,12 +28,11 @@ public class ObjectiveSystemBattleTest
     var a = BattleTestFactory.MakeFaction("A");
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [a]);
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
-    var raised = new List<BattleEvent>();
-    session.BattleEventCommitted += raised.Add;
+    var recorder = new BattleEventRecorder(session);
 
     session.AddObjective(a, new FakeObjective());
 
-    Assert.Equal(1, raised.OfType<ObjectiveAddedBattleEvent>().Count());
+    Assert.Equal(1, recorder.OfType<ObjectiveAddedBattleEvent>().Count());
   }
 
   [TestCase(TestName = "An operation that completes at the owner's turn end raises completion events")]
@@ -48,14 +44,13 @@ public class ObjectiveSystemBattleTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", b), new Vector3I(2, 0, 0));
     session.AddObjective(a, new FakeObjective { Complete = true });
-    var raised = new List<BattleEvent>();
-    session.BattleEventCommitted += raised.Add;
+    var recorder = new BattleEventRecorder(session);
     StartBattle(session);
 
-    new BattleActionExecutor(session).Submit(BattleAction.EndFactionTurn(session.ActiveSide)).RequireSingleResult();
+    AdvanceTurn(session);
 
-    Assert.Equal(1, raised.OfType<ObjectiveCompletedBattleEvent>().Count());
-    Assert.Equal(1, raised.OfType<OperationCompletedBattleEvent>().Count());
+    Assert.Equal(1, recorder.OfType<ObjectiveCompletedBattleEvent>().Count());
+    Assert.Equal(1, recorder.OfType<OperationCompletedBattleEvent>().Count());
     Assert.Equal(OperationStatus.Completed, session.GetOperation(a).RequireSome().Status);
     Assert.Equal(BattlePhase.InProgress, session.Phase); // no player faction => battle keeps going
   }
@@ -69,14 +64,13 @@ public class ObjectiveSystemBattleTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", b), new Vector3I(2, 0, 0));
     session.AddObjective(a, new FakeObjective { Failed = true });
-    var raised = new List<BattleEvent>();
-    session.BattleEventCommitted += raised.Add;
+    var recorder = new BattleEventRecorder(session);
     StartBattle(session);
 
-    new BattleActionExecutor(session).Submit(BattleAction.EndFactionTurn(session.ActiveSide)).RequireSingleResult();
+    AdvanceTurn(session);
 
-    Assert.Equal(1, raised.OfType<ObjectiveFailedBattleEvent>().Count());
-    Assert.Equal(1, raised.OfType<OperationFailedBattleEvent>().Count());
+    Assert.Equal(1, recorder.OfType<ObjectiveFailedBattleEvent>().Count());
+    Assert.Equal(1, recorder.OfType<OperationFailedBattleEvent>().Count());
     Assert.Equal(OperationStatus.Failed, session.GetOperation(a).RequireSome().Status);
   }
 
@@ -87,9 +81,8 @@ public class ObjectiveSystemBattleTest
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [a]);
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     StartBattle(session);
-    var runtime = new BattleRuntime(session);
 
-    Either<BattleQueryFailure, Operation> result = runtime.Query(new GetOperationForFaction(a));
+    Either<BattleQueryFailure, Operation> result = Query(session, new GetOperationForFaction(a));
 
     Assert.True(result.IsRight);
   }
