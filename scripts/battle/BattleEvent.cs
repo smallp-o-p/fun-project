@@ -43,7 +43,7 @@ public sealed record SessionEndedBattleEvent : BattleEvent
 /// <summary>
 /// Event that may have been caused by a unit.
 /// </summary>
-public interface IMaybePerpetratorBattleEvent : BattleEventTag
+public interface ICausedByUnit : BattleEventTag
 {
   Option<BattleUnitState> MaybeCause { get; }
 }
@@ -144,7 +144,7 @@ public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IP
 /// <summary>
 /// Carries one resolved damage application.
 /// </summary>
-public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent, IMaybePerpetratorBattleEvent
+public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent, ICausedByUnit
 {
   public BattleUnitState Unit { get; }
   public IReadOnlyList<Damage> Bundle { get; }
@@ -185,18 +185,18 @@ public sealed record UnitArmorRegeneratedBattleEvent : BattleEvent, IUnitBattleE
   }
 }
 
-public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, IMaybePerpetratorBattleEvent
+public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, ICausedByUnit
 {
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
   public Option<BattleUnitState> MaybeCause { get; }
 
-  public UnitKilledBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position, Option<BattleUnitState> Perp = default)
+  public UnitKilledBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position, Option<BattleUnitState> cause)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
     Position = position;
-    MaybeCause = Perp;
+    MaybeCause = cause;
   }
 }
 

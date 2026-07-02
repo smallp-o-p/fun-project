@@ -21,14 +21,14 @@ public enum BattlePhase
 
 public sealed class BattleSession
 {
-  public record FactionEndOfBattleSummary
+  public record FactionBattleSummary
   {
-    public required Faction Faction { get; set; }
-    public required Dictionary<Combatant, List<Combatant>> DefeatedPerCombatant { get; set; }
-    public BattleOutcome Outcome { get; set; }
-    public required SysColGeneric.HashSet<Combatant> CombatantsDead { get; set; }
-    public required SysColGeneric.HashSet<Combatant> CombatantsWounded { get; set; }
-    public int TurnCount { get; set; }
+    public required Faction Faction { get; init; }
+    public required IReadOnlyDictionary<Combatant, List<Combatant>> DefeatedPerCombatant { get; init; }
+    public required BattleOutcome Outcome { get; init; }
+    public required IReadOnlySet<Combatant> CombatantsDead { get; init; }
+    public required IReadOnlySet<Combatant> CombatantsWounded { get; init; }
+    public required int TurnCount { get; init; }
   };
 
   internal readonly record struct SpawnedBattleUnit(BattleUnitState Unit);
@@ -91,7 +91,7 @@ public sealed class BattleSession
   public IEnumerable<BattleUnitState> DeadUnits => _units.Where((unit) => unit.IsDead);
   public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _scheduler.GlobalFactionTurnOrder;
   public IReadOnlyCollection<Faction> TurnQueue => _scheduler.TurnQueue;
-  private readonly Dictionary<BattleUnitState, List<BattleUnitState>> killsByUnit = [];
+  private readonly Dictionary<BattleUnitState, List<BattleUnitState>> _killsByUnit = [];
 
   public event Action<BattleEvent> BattleEventCommitted = delegate { };
 
@@ -345,14 +345,15 @@ public sealed class BattleSession
     MarkVisibilityAffected(unit);
 
     _scheduler.TryConsumeAvailableUnit(unit);
-    RaiseEvent(new UnitKilledBattleEvent(unit, unitPoint));
-    HandleFactionLoss(unitSide);
-
-    killedBy.IfSome((killer) =>
+    killedBy.IfSome(killer =>
     {
-      killsByUnit.TryAdd(killer, []);
-      killsByUnit[killer].Add(unit);
+      _killsByUnit.TryAdd(killer, []);
+      _killsByUnit[killer].Add(unit);
     });
+
+    RaiseEvent(new UnitKilledBattleEvent(unit, unitPoint, killedBy));
+
+    HandleFactionLoss(unitSide);
 
     if (Phase == BattlePhase.InProgress
         && PlayerFaction.Match(Some: player => player == unitSide, None: () => false)
@@ -783,28 +784,20 @@ public sealed class BattleSession
       new TurnStartedBattleEvent(nextSide, TurnNumber));
   }
 
-  public FactionEndOfBattleSummary GetPlayerSummary()
+  internal FactionBattleSummary GetFactionSummary(Faction faction)
   {
-    if (PlayerFaction.IsNone)
+    return new FactionBattleSummary()
     {
-      throw new InvalidOperationException("No player Faction?");
-    }
-
-    if (Phase != BattlePhase.Ended)
-    {
-      throw new InvalidOperationException("Requesting end-of-battle summary for battle that hasn't ended yet.");
-    }
-
-    var playerFaction = PlayerFaction.ValueUnsafe()!;
-
-    return new FactionEndOfBattleSummary
-    {
-      Faction = playerFaction,
+      Faction = faction,
       Outcome = Outcome.Value(),
-      CombatantsDead = [.. DeadUnits.Where(unit => unit.Side == playerFaction).Select(unit => unit.Combatant)],
-      CombatantsWounded =
-        [.. AliveUnits.Where(unit => unit.MaxHealth > unit.CurrentHealth).Select(unit => unit.Combatant)],
-      DefeatedPerCombatant = killsByUnit.Where(unitKilled => unitKilled.Key.Side == playerFaction)
+      CombatantsDead = (SysColGeneric.HashSet<Combatant>)
+        [..DeadUnits.Where(unit => unit.Side == faction).Select(unit => unit.Combatant)],
+      CombatantsWounded = (SysColGeneric.HashSet<Combatant>)
+      [
+        ..AliveUnits.Where(unit => unit.Side == faction).Where(unit => unit.MaxHealth > unit.CurrentHealth)
+          .Select(unit => unit.Combatant)
+      ],
+      DefeatedPerCombatant = _killsByUnit.Where(unitKilled => unitKilled.Key.Side == faction)
         .Select(unitKilled =>
           (unitKilled.Key.Combatant, unitKilled.Value.Select(killed => killed.Combatant).ToList())).ToDictionary(),
       TurnCount = TurnNumber
