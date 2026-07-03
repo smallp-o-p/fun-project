@@ -6,40 +6,22 @@ using System.Linq;
 
 namespace FunProject.Battle;
 
-public sealed class GetUnitPosition : BattleSessionQuery<BattleBoardState.ValidatedPoint>
-{
-  public BattleUnitState Unit { get; }
-
-  public GetUnitPosition(BattleUnitState unit)
-  {
-    ArgumentNullException.ThrowIfNull(unit);
-    Unit = unit;
-  }
-
-  internal override Either<BattleQueryFailure, BattleBoardState.ValidatedPoint> Execute(BattleSession session)
-  {
-    return RequirePosition(session, Unit);
-  }
-}
-
 public sealed class GetUnitAtTile : BattleSessionQuery<Option<BattleUnitState>>
 {
-  public Vector3I Coordinates { get; }
+  public BattleBoardState.ValidatedPoint Tile { get; }
 
-  public GetUnitAtTile(Vector3I coordinates)
+  public GetUnitAtTile(BattleBoardState.ValidatedPoint tile)
   {
-    Coordinates = coordinates;
+    Tile = tile;
   }
 
   internal override Either<BattleQueryFailure, Option<BattleUnitState>> Execute(BattleSession session)
   {
-    return session.Board.ValidatePoint(Coordinates).Match(
-      point => Succeed(session.GetUnitAt(point)),
-      () => Fail(BattleQueryFailureReason.InvalidTile, $"{Coordinates} is invalid"));
+    return Succeed(session.GetUnitAt(Tile));
   }
 }
 
-public sealed class GetFactionAliveUnits : BattleSessionQuery<IReadOnlyCollection<BattleUnitState>>
+public sealed class GetFactionAliveUnits : BattleSessionQuery<IReadOnlyCollection<AliveUnit>>
 {
   public Faction Side { get; }
 
@@ -49,13 +31,13 @@ public sealed class GetFactionAliveUnits : BattleSessionQuery<IReadOnlyCollectio
     Side = side;
   }
 
-  internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IReadOnlyCollection<AliveUnit>> Execute(BattleSession session)
   {
-    return Succeed(session.GetFactionAliveUnits(Side).ToArray());
+    return Succeed(session.AliveUnits.Where(unit => unit.Side == Side).Select(session.MintAlive).ToArray());
   }
 }
 
-public sealed class GetFactionDeadUnits : BattleSessionQuery<IReadOnlyCollection<BattleUnitState>>
+public sealed class GetFactionDeadUnits : BattleSessionQuery<IReadOnlyCollection<DeadUnit>>
 {
   public Faction Side { get; }
 
@@ -65,49 +47,37 @@ public sealed class GetFactionDeadUnits : BattleSessionQuery<IReadOnlyCollection
     Side = side;
   }
 
-  internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IReadOnlyCollection<DeadUnit>> Execute(BattleSession session)
   {
-    return Succeed(session.DeadUnits.Where(unit => unit.Side == Side).ToArray());
+    return Succeed(session.DeadUnits.Where(unit => unit.Side == Side).Select(session.MintDead).ToArray());
   }
 }
 
 public sealed class CanUnitActNow : BattleSessionQuery<bool>
 {
-  public BattleUnitState Unit { get; }
-  public CanUnitActNow(BattleUnitState unit)
+  public AliveUnit Unit { get; }
+  public CanUnitActNow(AliveUnit unit)
   {
-    ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
   }
 
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
-    return RequireInProgress(session).Bind(_ =>
-    {
-      if (!Unit.IsAlive)
-        return FailUnitNotAlive(Unit);
-      return Succeed(session.CanUnitActNow(Unit));
-    });
+    return RequireInProgress(session).Bind(_ => Succeed(session.CanUnitActNow(Unit.State)));
   }
 }
 
 public sealed class IsUnitStillAvailableThisTurn : BattleSessionQuery<bool>
 {
-  public BattleUnitState Unit { get; }
+  public AliveUnit Unit { get; }
 
-  public IsUnitStillAvailableThisTurn(BattleUnitState unit)
+  public IsUnitStillAvailableThisTurn(AliveUnit unit)
   {
-    ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
   }
 
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
-    return RequireInProgress(session).Bind(_ =>
-    {
-      if (!Unit.IsAlive)
-        return FailUnitNotAlive(Unit);
-      return Succeed(session.IsUnitStillAvailableThisTurn(Unit));
-    });
+    return RequireInProgress(session).Bind(_ => Succeed(session.IsUnitStillAvailableThisTurn(Unit.State)));
   }
 }

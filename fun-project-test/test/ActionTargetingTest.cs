@@ -11,7 +11,7 @@ using System.Linq;
 public class ActionTargetingTest
 {
   // 5x1x5 open board. Player "Hero" (armed) at (0,0,0), enemy "Goon" at (3,0,0).
-  private static (BattleRuntime Runtime, BattleUnitState Hero, BattleUnitState Goon, Weapon Weapon) MakeArmedBattle()
+  private static (BattleRuntime Runtime, AliveUnit Hero, AliveUnit Goon, Weapon Weapon) MakeArmedBattle()
   {
     var player = BattleTestFactory.MakeFaction("Player");
     var enemy = BattleTestFactory.MakeFaction("Enemy");
@@ -29,7 +29,7 @@ public class ActionTargetingTest
   public void MoveTargetingFlow()
   {
     var (runtime, hero, _, _) = MakeArmedBattle();
-    var move = new MoveTargeting(runtime, hero);
+    var move = new MoveTargeting(runtime, hero.State);
 
     IReadOnlyCollection<Vector3I> reachable = move.Begin();
     Assert.True(reachable.Contains(new Vector3I(2, 0, 1)));
@@ -42,14 +42,15 @@ public class ActionTargetingTest
 
     Assert.True(move.CanCommit(new Vector3I(2, 0, 1)));
     runtime.ExecuteAction(move.Build(new Vector3I(2, 0, 1)));
-    Assert.Equal(new Vector3I(2, 0, 1), GetValue(runtime.Query(new GetUnitPosition(hero))).Raw);
+    // The pre-move proof's snapshot is stale after the commit; re-mint to read the new position.
+    Assert.Equal(new Vector3I(2, 0, 1), runtime.TryGetAlive(hero.State).RequireSome().Position.Raw);
   }
 
   [TestCase(TestName = "AttackTargeting: Begin candidate enemy tile, Preview hit chance, Build attacks")]
   public void AttackTargetingFlow()
   {
     var (runtime, hero, goon, rifle) = MakeArmedBattle();
-    var attack = new AttackTargeting(runtime, hero, rifle);
+    var attack = new AttackTargeting(runtime, hero.State, rifle);
 
     IReadOnlyCollection<Vector3I> candidates = attack.Begin();
     Assert.True(candidates.Contains(new Vector3I(3, 0, 0)));   // the enemy's tile, in range + visible

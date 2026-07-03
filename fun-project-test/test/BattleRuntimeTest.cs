@@ -14,9 +14,9 @@ public sealed partial class BattleRuntimeTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 0));
     var runtime = new BattleRuntime(session);
 
-    BattleBoardState.ValidatedPoint result = GetValue(runtime.Query(new GetUnitPosition(unit.State)));
+    Option<BattleUnitState> result = GetValue(runtime.Query(new GetUnitAtTile(session.Board.At(1, 0, 0))));
 
-    Assert.Equal(new Vector3I(1, 0, 0), result.Raw);
+    Assert.Equal(unit.State, result.RequireSome());
   }
 
   [TestCase(TestName = "ExecuteAction delegates to action executor")]
@@ -27,7 +27,7 @@ public sealed partial class BattleRuntimeTest
     var runtime = new BattleRuntime(session);
 
     BattleActionResult result = runtime
-      .ExecuteAction(BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1)))
+      .ExecuteAction(BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("Alpha", faction), session.Board.At(1, 0, 1)))
       .RequireSingleResult();
 
     Assert.True(result.Succeeded);
@@ -50,7 +50,7 @@ public sealed partial class BattleRuntimeTest
 
     BattleAction action = BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", faction),
-      new Vector3I(1, 0, 1));
+      session.Board.At(1, 0, 1));
 
     BattleActionResult result = runtime.ExecuteAction(action).RequireSingleResult();
 
@@ -72,7 +72,7 @@ public sealed partial class BattleRuntimeTest
     runtime.RegisterTrigger<UnitMovedBattleEvent>(new RuntimeRecordingTrigger("runtime_trigger", targetPosition, log));
 
     BattleActionResult result = runtime
-      .ExecuteAction(BattleAction.MoveUnit(solo.Unit.State, [targetPosition]))
+      .ExecuteAction(BattleAction.MoveUnit(solo.Unit.State, [solo.Session.Board.At(targetPosition)]))
       .RequireSingleResult();
 
     Assert.True(result.Succeeded);
@@ -91,7 +91,7 @@ public sealed partial class BattleRuntimeTest
       new RuntimeRecordingTrigger("runtime_shape_trigger", targetPosition, log));
 
     BattleActionResult result = runtime
-      .ExecuteAction(BattleAction.MoveUnit(solo.Unit.State, [targetPosition]))
+      .ExecuteAction(BattleAction.MoveUnit(solo.Unit.State, [solo.Session.Board.At(targetPosition)]))
       .RequireSingleResult();
 
     Assert.True(result.Succeeded);
@@ -109,7 +109,7 @@ public sealed partial class BattleRuntimeTest
 
     runtime.Dispose();
     new BattleActionExecutor(session)
-      .Submit(BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1)))
+      .Submit(BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("Alpha", faction), session.Board.At(1, 0, 1)))
       .RequireSingleResult();
 
     Assert.Equal(0, recorder.All.Count);
@@ -128,7 +128,7 @@ public sealed partial class BattleRuntimeTest
     Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetFactionAliveUnits(faction)));
     Assert.Throws<ObjectDisposedException>(() => runtime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", faction),
-      new Vector3I(1, 0, 1))));
+      session.Board.At(1, 0, 1))));
     Assert.Throws<ObjectDisposedException>(() => runtime.RegisterTrigger<UnitMovedBattleEvent>(
       new RuntimeRecordingTrigger("runtime_trigger", new Vector3I(1, 0, 0), [])));
     Assert.Throws<ObjectDisposedException>(() => runtime.RegisterTrigger<IPositionedBattleEvent>(

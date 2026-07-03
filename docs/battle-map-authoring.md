@@ -49,5 +49,6 @@ MeshLibrary item name isn't in `Brushes` bakes as a plain walkable floor.
 ## Spawning from a baked map
 
 `MapDeployment.AssignSpawns(map, rostersBySlot)` pairs each faction-slot roster with that slot's
-spawn-zone cells, returning `(Combatant, Vector3I)` placements to feed into
-`BattleAction.SpawnUnit`. `FactionSlot` indexes the session's faction order (0 = first faction).
+spawn-zone cells, returning `(Combatant, Vector3I)` placements that `BattleFactory` validates
+into `ValidatedPoint`s and feeds into `BattleAction.SpawnUnit`. `FactionSlot` indexes the
+session's faction order (0 = first faction).

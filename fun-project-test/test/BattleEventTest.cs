@@ -26,8 +26,8 @@ public class BattleEventTest
     BattleActionTestHelper.EnsureEveryFactionHasObjective(session);
     BattleActionTestHelper.StartBattle(runtime);
 
-    runtime.ExecuteAction(BattleAction.MoveUnit(unit.State, [destination.Raw])).RequireSingleResult();
-    runtime.ExecuteAction(BattleAction.ThrowItem(unit.State, grenade, target.Raw)).RequireSingleResult();
+    runtime.ExecuteAction(BattleAction.MoveUnit(unit.State, [destination])).RequireSingleResult();
+    runtime.ExecuteAction(BattleAction.ThrowItem(unit.State, grenade, target)).RequireSingleResult();
     runtime.ExecuteAction(BattleAction.ApplyDamage(unit.State, 3)).RequireSingleResult();
 
     var addedEvent = recorder.Single<UnitAddedBattleEvent>();

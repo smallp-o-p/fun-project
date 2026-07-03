@@ -43,6 +43,24 @@ public sealed class BattleRuntime : IDisposable
     return query.Execute(_session);
   }
 
+  // The interaction door for scene code holding a raw BattleUnitState: mints an aliveness proof
+  // (Some iff the unit is alive in this session). The None path is what used to surface as a
+  // query Left for a dead/foreign unit.
+  public Option<AliveUnit> TryGetAlive(BattleUnitState unit)
+  {
+    ThrowIfDisposed();
+    ArgumentNullException.ThrowIfNull(unit);
+    return _session.TryGetAlive(unit);
+  }
+
+  // The tile mint door for scene code holding a raw coordinate (Some iff the tile is on this
+  // session's board). In-bounds is a stable fact, so this proof cannot go stale.
+  public Option<BattleBoardState.ValidatedPoint> TryGetTile(Godot.Vector3I coordinates)
+  {
+    ThrowIfDisposed();
+    return _session.Board.ValidatePoint(coordinates);
+  }
+
   public IReadOnlyList<BattleActionResult> ExecuteAction(BattleAction action)
   {
     ThrowIfDisposed();

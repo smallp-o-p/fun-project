@@ -3,7 +3,6 @@ using FunProject.Weapons;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 // Enemy-target targeting: candidate tiles are visible enemies within weapon range; preview is the
 // hit-chance breakdown for the enemy under the cursor; commit attacks that enemy. Availability of the
@@ -32,24 +31,24 @@ public sealed class AttackTargeting : IActionTargeting
   {
     _targetsByTile.Clear();
 
-    Vector3I? from = _runtime.Query(new GetUnitPosition(_unit)).Match(
-      Right: p => (Vector3I?)p.Raw, Left: _ => null);
-    if (from is null)
-      return System.Array.Empty<Vector3I>();
+    return _runtime.TryGetAlive(_unit).Match(
+      Some: attacker =>
+      {
+        Vector3I from = attacker.Position.Raw;
+        int range = _weapon.EffectiveRange;
+        IReadOnlyCollection<AliveUnit> enemies = _runtime.Query(new GetVisibleEnemiesForUnit(attacker)).Match(
+          Right: e => e, Left: _ => System.Array.Empty<AliveUnit>());
 
-    int range = _weapon.EffectiveRange;
-    IReadOnlyCollection<BattleUnitState> enemies = _runtime.Query(new GetVisibleEnemiesForUnit(_unit)).Match(
-      Right: e => e, Left: _ => System.Array.Empty<BattleUnitState>());
+        foreach (AliveUnit enemy in enemies)
+        {
+          Vector3I tp = enemy.Position.Raw;
+          if (BattleBoardState.GetGridDistance(from, tp) <= range)
+            _targetsByTile[tp] = enemy.State;
+        }
 
-    foreach (BattleUnitState enemy in enemies)
-    {
-      Vector3I? targetPos = _runtime.Query(new GetUnitPosition(enemy)).Match(
-        Right: p => (Vector3I?)p.Raw, Left: _ => null);
-      if (targetPos is Vector3I tp && BattleBoardState.GetGridDistance(from.Value, tp) <= range)
-        _targetsByTile[tp] = enemy;
-    }
-
-    return _targetsByTile.Keys;
+        return (IReadOnlyCollection<Vector3I>)_targetsByTile.Keys;
+      },
+      None: () => System.Array.Empty<Vector3I>());
   }
 
   public Either<BattleQueryFailure, ActionPreview> Preview(Vector3I target)
@@ -58,9 +57,15 @@ public sealed class AttackTargeting : IActionTargeting
       return Left<BattleQueryFailure, ActionPreview>(
         new BattleQueryFailure(BattleQueryFailureReason.InvalidTile, $"No attackable target at {target}."));
 
-    return _runtime.Query(new GetHitChanceForAttack(_unit, enemy)).Match(
-      Right: hc => Right<BattleQueryFailure, ActionPreview>(new AttackPreview(hc)),
-      Left: Left<BattleQueryFailure, ActionPreview>);
+    return _runtime.TryGetAlive(_unit).Match(
+      Some: attacker => _runtime.TryGetAlive(enemy).Match(
+        Some: enemyProof => _runtime.Query(new GetHitChanceForAttack(attacker, enemyProof)).Match(
+          Right: hc => Right<BattleQueryFailure, ActionPreview>(new AttackPreview(hc)),
+          Left: Left<BattleQueryFailure, ActionPreview>),
+        None: () => Left<BattleQueryFailure, ActionPreview>(
+          new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState, $"Target at {target} is no longer alive."))),
+      None: () => Left<BattleQueryFailure, ActionPreview>(
+        new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState, "Attacking unit is no longer alive.")));
   }
 
   public bool CanCommit(Vector3I target) => _targetsByTile.ContainsKey(target);

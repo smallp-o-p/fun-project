@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -19,21 +18,17 @@ public sealed record AvailableUnitAction(
 // the presentation-side targeting handlers. Callers cache the result on selection.
 public sealed class GetAvailableActionsForUnit : BattleSessionQuery<IReadOnlyList<AvailableUnitAction>>
 {
-  public BattleUnitState Unit { get; }
+  public AliveUnit Unit { get; }
 
-  public GetAvailableActionsForUnit(BattleUnitState unit)
+  public GetAvailableActionsForUnit(AliveUnit unit)
   {
-    ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
   }
 
   internal override Either<BattleQueryFailure, IReadOnlyList<AvailableUnitAction>> Execute(BattleSession session)
   {
-    if (!Unit.IsAlive)
-      return FailUnitNotAlive(Unit);
-
     IReadOnlyList<AvailableUnitAction> actions = UnitActionCatalog.All
-      .Where(definition => definition.ExistsFor(Unit))
+      .Where(definition => definition.ExistsFor(Unit.State))
       .Select(definition => new AvailableUnitAction(
         definition,
         Optional(definition.Conditions.FirstOrDefault(condition => !condition.IsMet(session, Unit)))))

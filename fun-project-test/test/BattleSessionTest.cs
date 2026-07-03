@@ -45,7 +45,7 @@ public class BattleSessionTest
 
     SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
     var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("Bravo", faction), new Vector3I(1, 0, 1))).RequireSingleResult();
+    var result = executor.Submit(BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("Bravo", faction), session.Board.At(1, 0, 1))).RequireSingleResult();
 
     Assert.False(result.Succeeded);
   }
@@ -114,7 +114,7 @@ public class BattleSessionTest
       [faction]);
 
     var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("A1", faction), new Vector3I(1, 0, 0))).RequireSingleResult();
+    var result = executor.Submit(BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("A1", faction), board.At(1, 0, 0))).RequireSingleResult();
 
     Assert.True(ReferenceEquals(board, session.Board));
     Assert.False(result.Succeeded);
@@ -147,7 +147,7 @@ public class BattleSessionTest
     var result = executor
       .Submit(BattleAction.SpawnUnit(
         BattleTestFactory.MakeCombatant("Alpha", faction),
-        new Vector3I(0, 0, 0),
+        session.Board.At(0, 0, 0),
         weapon))
       .RequireSingleResult();
 
@@ -311,7 +311,7 @@ public class BattleSessionTest
     StartBattle(session);
 
     var executor = new BattleActionExecutor(session);
-    var moved = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 1, 1)], 2)).RequireSingleResult();
+    var moved = executor.Submit(BattleAction.MoveUnit(unit.State, [session.Board.At(1, 1, 1)], 2)).RequireSingleResult();
 
     Assert.True(moved.Succeeded);
     Assert.Equal(new Vector3I(1, 1, 1), session.GetUnitPosition(unit.State).RequireSome().Raw);
@@ -328,8 +328,8 @@ public class BattleSessionTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 5), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    BattleBoardState.ValidatedPoint[] validatedPath = GetValue(Query(session, new FindPathForUnit(unit.State, new Vector3I(2, 0, 0))));
-    Vector3I[] path = validatedPath.Skip(1).Select(point => point.Raw).ToArray();
+    BattleBoardState.ValidatedPoint[] validatedPath = GetValue(Query(session, new FindPathForUnit(unit.AliveIn(session), session.Board.At(2, 0, 0))));
+    BattleBoardState.ValidatedPoint[] path = validatedPath.Skip(1).ToArray();
     Assert.Equal(3, validatedPath.Length);
     Assert.Equal(2, path.Length);
 
@@ -356,7 +356,7 @@ public class BattleSessionTest
     Assert.Equal(new Vector3I(0, 0, 0), session.GetUnitPosition(unit.State).RequireSome().Raw);
 
     var executor = new BattleActionExecutor(session);
-    var moved = executor.Submit(BattleAction.MoveUnit(unit.State, [new Vector3I(1, 0, 0)])).RequireSingleResult();
+    var moved = executor.Submit(BattleAction.MoveUnit(unit.State, [session.Board.At(1, 0, 0)])).RequireSingleResult();
 
     Assert.True(moved.Succeeded);
     Assert.Equal(new Vector3I(1, 0, 0), session.GetUnitPosition(unit.State).RequireSome().Raw);
@@ -383,7 +383,7 @@ public class BattleSessionTest
 
     var action = BattleAction.MoveUnit(
       unit.State,
-      [new Vector3I(1, 0, 0), new Vector3I(3, 0, 0)]);
+      [session.Board.At(1, 0, 0), session.Board.At(3, 0, 0)]);
     var executor = new BattleActionExecutor(session);
     var moved = executor.Submit(action);
 
@@ -402,8 +402,8 @@ public class BattleSessionTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 1), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    BattleBoardState.ValidatedPoint[] validatedPath = GetValue(Query(session, new FindPathForUnit(unit.State, new Vector3I(2, 0, 0))));
-    Vector3I[] path = validatedPath.Skip(1).Select(point => point.Raw).ToArray();
+    BattleBoardState.ValidatedPoint[] validatedPath = GetValue(Query(session, new FindPathForUnit(unit.AliveIn(session), session.Board.At(2, 0, 0))));
+    BattleBoardState.ValidatedPoint[] path = validatedPath.Skip(1).ToArray();
     Assert.Equal(3, validatedPath.Length);
     Assert.Equal(2, path.Length);
 
@@ -429,9 +429,9 @@ public class BattleSessionTest
 
     PassUnit(session, unitA.State);
 
-    Assert.False(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitA.State))));
-    Assert.False(GetValue(Query(session, new CanUnitActNow(unitA.State))));
-    Assert.True(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitB.State))));
+    Assert.False(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitA.AliveIn(session)))));
+    Assert.False(GetValue(Query(session, new CanUnitActNow(unitA.AliveIn(session)))));
+    Assert.True(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitB.AliveIn(session)))));
     Assert.Equal(faction, session.ActiveSide);
   }
 
@@ -451,10 +451,10 @@ public class BattleSessionTest
 
     Assert.False(session.Board.IsOccupied(session.Board.At(0, 0, 0)));
     Assert.Equal(factionA, session.ActiveSide);
-    Assert.False(session.AliveUnits.Contains(unitA));
-    Assert.True(session.DeadUnits.Contains(unitA));
-    Assert.False(GetValue(Query(session, new GetFactionAliveUnits(factionA))).Contains(unitA));
-    Assert.True(GetValue(Query(session, new GetFactionDeadUnits(factionA))).Contains(unitA));
+    Assert.False(session.AliveUnits.Contains(unitA.State));
+    Assert.True(session.DeadUnits.Contains(unitA.State));
+    Assert.False(GetValue(Query(session, new GetFactionAliveUnits(factionA))).Select(u => u.State).Contains(unitA));
+    Assert.True(GetValue(Query(session, new GetFactionDeadUnits(factionA))).Select(d => d.State).Contains(unitA));
     Assert.True(session.TurnQueue.Contains(factionA));
     Assert.True(session.TurnQueue.Contains(factionB));
 
@@ -476,9 +476,9 @@ public class BattleSessionTest
     ApplyDamage(session, unitA1.State, 10);
 
     Assert.Equal(factionA, session.ActiveSide);
-    Assert.True(GetValue(Query(session, new CanUnitActNow(unitA2.State))));
+    Assert.True(GetValue(Query(session, new CanUnitActNow(unitA2.AliveIn(session)))));
     Assert.False(session.Board.IsOccupied(session.Board.At(0, 0, 0)));
-    Assert.True(session.DeadUnits.Contains(unitA1));
+    Assert.True(session.DeadUnits.Contains(unitA1.State));
   }
 
   [TestCase(TestName = "Unit can throw a grenade in battle session")]
@@ -499,7 +499,7 @@ public class BattleSessionTest
 
     StartBattle(session);
     var executor = new BattleActionExecutor(session);
-    var threw = executor.Submit(BattleAction.ThrowItem(unit.State, grenade, new Vector3I(3, 0, 1))).RequireSingleResult();
+    var threw = executor.Submit(BattleAction.ThrowItem(unit.State, grenade, session.Board.At(3, 0, 1))).RequireSingleResult();
 
     Assert.True(threw.Succeeded);
     Assert.False(unit.HasInventoryItem(grenade.Item));
@@ -536,7 +536,7 @@ public class BattleSessionTest
 
     session.EndUnitActivation(unit.State);
 
-    Assert.False(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unit.State))));
+    Assert.False(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unit.AliveIn(session)))));
     Assert.Throws<InvalidOperationException>(() => session.EndUnitActivation(unit.State));
   }
 
@@ -552,7 +552,7 @@ public class BattleSessionTest
 
     session.EndUnitActivation(unitA);
 
-    Assert.False(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitA.State))));
+    Assert.False(GetValue(Query(session, new IsUnitStillAvailableThisTurn(unitA.AliveIn(session)))));
     Assert.Equal(factionB, session.ActiveSide);
     Assert.Equal(1, session.TurnNumber);
   }

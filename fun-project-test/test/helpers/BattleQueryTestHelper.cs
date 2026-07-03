@@ -14,10 +14,10 @@ internal static class BattleQueryTestHelper
     return runtime.Query(query);
   }
 
-  public static BattleUnitState SingleAliveUnit(BattleRuntime runtime, Faction faction) =>
+  public static AliveUnit SingleAliveUnit(BattleRuntime runtime, Faction faction) =>
     GetValue(runtime.Query(new GetFactionAliveUnits(faction))).Single();
 
-  public static BattleUnitState SingleAliveUnit(BattleSession session, Faction faction) =>
+  public static AliveUnit SingleAliveUnit(BattleSession session, Faction faction) =>
     GetValue(Query(session, new GetFactionAliveUnits(faction))).Single();
 
   public static TResult GetValue<TResult>(Either<BattleQueryFailure, TResult> result)

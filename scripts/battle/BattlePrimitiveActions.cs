@@ -36,23 +36,23 @@ public sealed class SpawnUnit : BattleAction
   public const string SpawnUnitActionId = "spawn_unit";
 
   public Combatant Combatant { get; }
-  public Vector3I Position { get; }
+  public BattleBoardState.ValidatedPoint Position { get; }
   public Option<Weapon> EquippedWeapon { get; }
   public Option<ItemWith<ArmorCapability>> EquippedArmor { get; }
 
-  internal SpawnUnit(Combatant combatant, Vector3I position)
+  internal SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position)
     : this(combatant, position, None, None)
   {
   }
 
-  internal SpawnUnit(Combatant combatant, Vector3I position, Weapon equippedWeapon)
+  internal SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position, Weapon equippedWeapon)
     : this(combatant, position, Some(equippedWeapon), None)
   {
   }
 
   internal SpawnUnit(
     Combatant combatant,
-    Vector3I position,
+    BattleBoardState.ValidatedPoint position,
     Option<Weapon> equippedWeapon,
     Option<ItemWith<ArmorCapability>> equippedArmor)
     : base(SpawnUnitActionId)
@@ -69,14 +69,11 @@ public sealed class SpawnUnit : BattleAction
     if (session.Phase == BattlePhase.Ended)
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, "Cannot add units after the battle has ended.");
 
-    Option<BattleBoardState.ValidatedPoint> positionPointOption = session.Board.ValidatePoint(Position);
-    if (positionPointOption.IsNone)
-      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Cannot place a unit at {Position}.");
-    BattleBoardState.ValidatedPoint positionPoint = positionPointOption.Value();
-    if (!session.Board.CanOccupy(positionPoint))
-      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Cannot place a unit at {Position}.");
+    // In-bounds is proven by the ValidatedPoint; only occupancy (mutable) is checked here.
+    if (!session.Board.CanOccupy(Position))
+      return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Cannot place a unit at {Position.Raw}.");
 
-    var spawnedUnit = session.AddUnit(Combatant, positionPoint, EquippedWeapon, EquippedArmor);
+    var spawnedUnit = session.AddUnit(Combatant, Position, EquippedWeapon, EquippedArmor);
     return BattleActionResult.Success(this, spawnedUnit.Unit);
   }
 }
@@ -215,16 +212,15 @@ public sealed class ThrowItem : UseItemCapabilityAction
 
   public BattleUnitState Unit { get; }
   public ItemWith<ThrowableCapability> Throwable { get; }
-  public Vector3I TargetCell { get; }
+  public BattleBoardState.ValidatedPoint TargetCell { get; }
 
   public EquippableItem Item => Throwable.Item;
 
-  // Values resolved in ResolveTarget and consumed by ValidateUsability / RaiseUseEvent
-  // within the same Execute pass.
+  // Value resolved in ResolveTarget and consumed by ValidateUsability within the same
+  // Execute pass.
   private Vector3I _unitPosition;
-  private BattleBoardState.ValidatedPoint _targetPoint;
 
-  internal ThrowItem(BattleUnitState unit, ItemWith<ThrowableCapability> throwable, Vector3I targetCell)
+  internal ThrowItem(BattleUnitState unit, ItemWith<ThrowableCapability> throwable, BattleBoardState.ValidatedPoint targetCell)
     : base(ThrowItemActionId)
   {
     ArgumentNullException.ThrowIfNull(unit);
@@ -248,25 +244,20 @@ public sealed class ThrowItem : UseItemCapabilityAction
       return Some(BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {Unit.Id} is not on a valid tile."));
     _unitPosition = unitPointOption.Value().Raw;
 
-    Option<BattleBoardState.ValidatedPoint> targetPointOption = session.Board.ValidatePoint(TargetCell);
-    if (targetPointOption.IsNone)
-      return Some(BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{TargetCell} is outside the battle board."));
-    _targetPoint = targetPointOption.Value();
-
     return None;
   }
 
   protected override Option<BattleActionResult> ValidateUsability(BattleSession session)
   {
-    if (BattleSession.GetGridDistance(_unitPosition, TargetCell) > Throwable.Capability.ThrowRange)
-      return Some(BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{TargetCell} is out of range for {Item.ItemName}."));
+    if (BattleSession.GetGridDistance(_unitPosition, TargetCell.Raw) > Throwable.Capability.ThrowRange)
+      return Some(BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{TargetCell.Raw} is out of range for {Item.ItemName}."));
 
     return None;
   }
 
   protected override void RaiseUseEvent(BattleSession session)
   {
-    session.RaiseEvent(new ItemThrownBattleEvent(Unit, _targetPoint, Item));
+    session.RaiseEvent(new ItemThrownBattleEvent(Unit, TargetCell, Item));
   }
 }
 

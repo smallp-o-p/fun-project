@@ -73,7 +73,7 @@ public class EffectiveStatTest
     var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Godot.Vector3I(0, 0, 8));
     StartBattle(session);
 
-    var result = BattleQueryTestHelper.Query(session, new GetHitChanceForAttack(attacker.State, target.State));
+    var result = BattleQueryTestHelper.Query(session, new GetHitChanceForAttack(attacker.AliveIn(session), target.AliveIn(session)));
     Assert.True(result.IsRight); // would be Left (out of range) without the four production edits
   }
 

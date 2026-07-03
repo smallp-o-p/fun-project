@@ -45,19 +45,21 @@ public sealed class PlayerActionController
   // Selects the controllable (player-faction) unit on the tile and caches its action options.
   public bool TrySelectUnitAt(Vector3I tile)
   {
-    return _runtime.Query(new GetUnitAtTile(tile)).Match(
-      Right: occupant => occupant.Match(
-        Some: unit =>
-        {
-          if (unit.Side != _playerFaction)
-            return false;
-          SelectedUnit = Some(unit);
-          ResetTargeting();
-          RefreshOptions();
-          return true;
-        },
-        None: () => false),
-      Left: _ => false);
+    return _runtime.TryGetTile(tile).Match(
+      Some: point => _runtime.Query(new GetUnitAtTile(point)).Match(
+        Right: occupant => occupant.Match(
+          Some: unit =>
+          {
+            if (unit.Side != _playerFaction)
+              return false;
+            SelectedUnit = Some(unit);
+            ResetTargeting();
+            RefreshOptions();
+            return true;
+          },
+          None: () => false),
+        Left: _ => false),
+      None: () => false);
   }
 
   public void BeginAction(UnitActionOption option)
@@ -152,9 +154,11 @@ public sealed class PlayerActionController
 
   private void RefreshOptions()
   {
-    _options = SelectedUnit.Match(
-      Some: unit => _runtime.Query(new GetAvailableActionsForUnit(unit)).Match(
-        Right: actions => BuildOptions(unit, actions),
+    // Mint the aliveness proof at the query door; a unit that died since selection yields None
+    // (empty options), replacing what used to be a query Left for a dead unit.
+    _options = SelectedUnit.Bind(_runtime.TryGetAlive).Match(
+      Some: proof => _runtime.Query(new GetAvailableActionsForUnit(proof)).Match(
+        Right: actions => BuildOptions(proof.State, actions),
         Left: []),
       None: []);
   }

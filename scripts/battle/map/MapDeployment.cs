@@ -6,7 +6,8 @@ namespace FunProject.Battle;
 
 // Pure: turns a baked map's spawn cells (tiles whose SpawnFactionSlot >= 0) + per-slot rosters
 // into spawn placements. SpawnFactionSlot is the index into the BattleSession faction order.
-// Callers feed each (Combatant, Vector3I) into BattleAction.SpawnUnit.
+// Callers (BattleFactory) validate each (Combatant, Vector3I) against the board before feeding
+// it into BattleAction.SpawnUnit, which takes a ValidatedPoint.
 public static class MapDeployment
 {
   public static Either<string, IReadOnlyList<(Combatant Combatant, Vector3I Position)>> AssignSpawns(

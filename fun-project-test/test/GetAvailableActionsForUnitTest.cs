@@ -23,7 +23,7 @@ public class GetAvailableActionsForUnitTest
     return (runtime, player, enemy);
   }
 
-  private static IReadOnlyList<AvailableUnitAction> ActionsOf(BattleRuntime runtime, BattleUnitState unit) =>
+  private static IReadOnlyList<AvailableUnitAction> ActionsOf(BattleRuntime runtime, AliveUnit unit) =>
     GetValue(runtime.Query(new GetAvailableActionsForUnit(unit)));
 
   private static AvailableUnitAction Row<TDefinition>(IReadOnlyList<AvailableUnitAction> actions)
@@ -64,8 +64,8 @@ public class GetAvailableActionsForUnitTest
   public void EmptyMagazineFlipsAttackAndReload()
   {
     var (runtime, player, _) = MakeBattle(BattleTestFactory.MakeAmmoWeapon("Pistol", magazine: 1));
-    BattleUnitState hero = SingleAliveUnit(runtime, player);
-    var weapon = hero.EquippedWeapon.Match(
+    AliveUnit hero = SingleAliveUnit(runtime, player);
+    var weapon = hero.State.EquippedWeapon.Match(
       Some: w => (AmmunitionedWeapon)w,
       None: () => throw new Exception("Hero should be armed."));
     Assert.True(weapon.TrySpendShot().IsSome); // drain the single round
@@ -112,7 +112,7 @@ public class GetAvailableActionsForUnitTest
       board,
       new StartPlacement(player, BattleTestFactory.MakeCombatant("Hero", player), new Vector3I(0, 0, 0)),
       new StartPlacement(enemy, BattleTestFactory.MakeCombatant("Goon", enemy), new Vector3I(3, 0, 3)));
-    BattleUnitState hero = SingleAliveUnit(runtime, player);
+    AliveUnit hero = SingleAliveUnit(runtime, player);
 
     var move = Row<MoveActionDefinition>(ActionsOf(runtime, hero));
     Assert.False(move.IsAvailable);
@@ -128,7 +128,7 @@ public class GetAvailableActionsForUnitTest
       new Vector3I(5, 1, 5),
       new StartPlacement(player, BattleTestFactory.MakeCombatant("Hero", player, actionPoints: 0), new Vector3I(0, 0, 0), BattleTestFactory.MakeWeapon("Rifle")),
       new StartPlacement(enemy, BattleTestFactory.MakeCombatant("Goon", enemy), new Vector3I(3, 0, 0)));
-    BattleUnitState hero = SingleAliveUnit(runtime, player);
+    AliveUnit hero = SingleAliveUnit(runtime, player);
 
     var actions = ActionsOf(runtime, hero);
     Assert.False(Row<MoveActionDefinition>(actions).IsAvailable);
@@ -150,20 +150,8 @@ public class GetAvailableActionsForUnitTest
       board,
       new StartPlacement(player, BattleTestFactory.MakeCombatant("Hero", player), new Vector3I(0, 0, 0)),
       new StartPlacement(enemy, BattleTestFactory.MakeCombatant("Goon", enemy), new Vector3I(1, 1, 0)));
-    BattleUnitState hero = SingleAliveUnit(runtime, player);
+    AliveUnit hero = SingleAliveUnit(runtime, player);
 
     Assert.True(Row<MoveActionDefinition>(ActionsOf(runtime, hero)).IsAvailable);
-  }
-
-  [TestCase(TestName = "A dead unit fails the query")]
-  public void DeadUnitQueryFails()
-  {
-    var (runtime, player, _) = MakeBattle(BattleTestFactory.MakeWeapon("Rifle"));
-    BattleUnitState hero = SingleAliveUnit(runtime, player);
-    runtime.ExecuteAction(BattleAction.ApplyDamage(hero, 999));
-
-    var result = runtime.Query(new GetAvailableActionsForUnit(hero));
-
-    Assert.True(result.IsLeft);
   }
 }

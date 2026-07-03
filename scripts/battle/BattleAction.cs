@@ -93,19 +93,19 @@ public abstract class BattleAction
     return new StartBattle();
   }
 
-  public static SpawnUnit SpawnUnit(Combatant combatant, Vector3I position)
+  public static SpawnUnit SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position)
   {
     return new SpawnUnit(combatant, position);
   }
 
-  public static SpawnUnit SpawnUnit(Combatant combatant, Vector3I position, Weapon equippedWeapon)
+  public static SpawnUnit SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position, Weapon equippedWeapon)
   {
     return new SpawnUnit(combatant, position, equippedWeapon);
   }
 
   public static SpawnUnit SpawnUnit(
     Combatant combatant,
-    Vector3I position,
+    BattleBoardState.ValidatedPoint position,
     Weapon equippedWeapon,
     ItemWith<ArmorCapability> equippedArmor)
   {
@@ -114,14 +114,14 @@ public abstract class BattleAction
 
   public static MoveUnit MoveUnit(
     BattleUnitState unit,
-    IEnumerable<Vector3I> destinations,
+    IEnumerable<BattleBoardState.ValidatedPoint> destinations,
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost
   )
   {
     return new MoveUnit(unit, destinations, actionPointCostPerStep);
   }
 
-  public static ThrowItem ThrowItem(BattleUnitState unit, ItemWith<ThrowableCapability> throwable, Vector3I targetCell)
+  public static ThrowItem ThrowItem(BattleUnitState unit, ItemWith<ThrowableCapability> throwable, BattleBoardState.ValidatedPoint targetCell)
   {
     return new ThrowItem(unit, throwable, targetCell);
   }
@@ -154,7 +154,7 @@ public abstract class BattleAction
 
 public sealed class MoveUnit : BattleAction
 {
-  private readonly IReadOnlyList<Vector3I> _requestedDestinations;
+  private readonly IReadOnlyList<BattleBoardState.ValidatedPoint> _requestedDestinations;
   private Queue<BattleBoardState.ValidatedPoint>? _validatedRoute;
   private bool _validationAttempted;
 
@@ -163,7 +163,7 @@ public sealed class MoveUnit : BattleAction
 
   internal MoveUnit(
     BattleUnitState unit,
-    IEnumerable<Vector3I> destinations,
+    IEnumerable<BattleBoardState.ValidatedPoint> destinations,
     int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost)
     : base("move_unit")
   {
@@ -232,13 +232,10 @@ public sealed class MoveUnit : BattleAction
     BattleBoardState.ValidatedPoint previousPoint = currentPointOption.Value();
     Queue<BattleBoardState.ValidatedPoint> validatedSteps = [];
 
-    foreach (Vector3I tile in _requestedDestinations)
+    // Steps arrive as ValidatedPoints (in-bounds is proven at the caller's mint door); only
+    // the mutable facts — adjacency to the evolving position and occupancy — are checked here.
+    foreach (BattleBoardState.ValidatedPoint stepPoint in _requestedDestinations)
     {
-      Option<BattleBoardState.ValidatedPoint> stepPointOption = session.Board.ValidatePoint(tile);
-      if (stepPointOption.IsNone)
-        return null;
-
-      BattleBoardState.ValidatedPoint stepPoint = stepPointOption.Value();
       if (!BattleBoardState.AreAdjacent(previousPoint, stepPoint) || !session.Board.CanOccupy(stepPoint))
         return null;
 

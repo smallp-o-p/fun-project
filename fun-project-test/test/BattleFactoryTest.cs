@@ -56,8 +56,8 @@ public class BattleFactoryTest
     var playerUnit = GetValue(runtime.Query(new GetFactionAliveUnits(player))).Single();
     var enemyUnit = GetValue(runtime.Query(new GetFactionAliveUnits(enemy))).Single();
 
-    Assert.Equal(new Vector3I(0, 0, 0), GetValue(runtime.Query(new GetUnitPosition(playerUnit))).Raw);
-    Assert.Equal(new Vector3I(3, 0, 3), GetValue(runtime.Query(new GetUnitPosition(enemyUnit))).Raw);
+    Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw);
+    Assert.Equal(new Vector3I(3, 0, 3), enemyUnit.Position.Raw);
 
     // InProgress + player (FactionOrder[0]) is the active side: it can act, enemy cannot yet.
     Assert.True(GetValue(runtime.Query(new CanUnitActNow(playerUnit))));
@@ -213,8 +213,8 @@ public class BattleFactoryTest
 
     var alpha = GetValue(runtime.Query(new GetFactionAliveUnits(player))).Single();
     var bandit = GetValue(runtime.Query(new GetFactionAliveUnits(enemy))).Single();
-    Assert.Equal(new Vector3I(0, 0, 0), GetValue(runtime.Query(new GetUnitPosition(alpha))).Raw);
-    Assert.Equal(new Vector3I(3, 0, 3), GetValue(runtime.Query(new GetUnitPosition(bandit))).Raw);
+    Assert.Equal(new Vector3I(0, 0, 0), alpha.Position.Raw);
+    Assert.Equal(new Vector3I(3, 0, 3), bandit.Position.Raw);
   }
 
   [TestCase(TestName = "StartFromMap fails when a slot has fewer cells than its roster")]

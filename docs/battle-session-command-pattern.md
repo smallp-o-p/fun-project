@@ -63,7 +63,7 @@ The current built-in actions are:
 - `PassUnit`
 - `EndFactionTurn`
 
-`MoveUnit` is composite. Callers provide ordered destination steps, and the action validates that route from the unit's current session position before yielding an internal `MoveUnitStep` for each tile. This gives the executor a checkpoint where committed movement events can trigger reactions before the route continues inside the same submission. If one of those internal steps fails, the public result is a failed `MoveUnit`, not a failed `MoveUnitStep`.
+`MoveUnit` is composite. Callers provide ordered, board-validated destination steps (`ValidatedPoint`s — in-bounds is proven at the caller's mint door), and the action checks the mutable route facts (adjacency, occupancy) from the unit's current session position before yielding an internal `MoveUnitStep` for each tile. This gives the executor a checkpoint where committed movement events can trigger reactions before the route continues inside the same submission. If one of those internal steps fails, the public result is a failed `MoveUnit`, not a failed `MoveUnitStep`.
 
 ## Read Side
 

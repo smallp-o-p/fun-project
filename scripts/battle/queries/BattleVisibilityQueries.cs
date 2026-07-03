@@ -6,49 +6,39 @@ namespace FunProject.Battle;
 
 public sealed class IsUnitVisibleToUnit : BattleSessionQuery<bool>
 {
-  public BattleUnitState ObserverUnit { get; }
-  public BattleUnitState TargetUnit { get; }
+  public AliveUnit ObserverUnit { get; }
+  public AliveUnit TargetUnit { get; }
 
-  public IsUnitVisibleToUnit(BattleUnitState observerUnit, BattleUnitState targetUnit)
+  public IsUnitVisibleToUnit(AliveUnit observerUnit, AliveUnit targetUnit)
   {
-    ArgumentNullException.ThrowIfNull(observerUnit);
-    ArgumentNullException.ThrowIfNull(targetUnit);
     ObserverUnit = observerUnit;
     TargetUnit = targetUnit;
   }
 
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
-    if (!ObserverUnit.IsAlive)
-      return FailUnitNotAlive(ObserverUnit);
-    if (!TargetUnit.IsAlive)
-      return FailUnitNotAlive(TargetUnit);
-    if (ReferenceEquals(ObserverUnit, TargetUnit))
+    if (ReferenceEquals(ObserverUnit.State, TargetUnit.State))
       return Succeed(true);
 
-    return Succeed(ObserverUnit.VisibleUnits.Contains(TargetUnit));
+    return Succeed(ObserverUnit.State.VisibleUnits.Contains(TargetUnit.State));
   }
 }
 
 public sealed class IsUnitVisibleToFaction : BattleSessionQuery<bool>
 {
   public Faction Faction { get; }
-  public BattleUnitState TargetUnit { get; }
+  public AliveUnit TargetUnit { get; }
 
-  public IsUnitVisibleToFaction(Faction faction, BattleUnitState targetUnit)
+  public IsUnitVisibleToFaction(Faction faction, AliveUnit targetUnit)
   {
     ArgumentNullException.ThrowIfNull(faction);
-    ArgumentNullException.ThrowIfNull(targetUnit);
     Faction = faction;
     TargetUnit = targetUnit;
   }
 
   internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
   {
-    if (!TargetUnit.IsAlive)
-      return FailUnitNotAlive(TargetUnit);
-
-    return Succeed(session.IsUnitVisibleToFaction(Faction, TargetUnit));
+    return Succeed(session.IsUnitVisibleToFaction(Faction, TargetUnit.State));
   }
 }
 
@@ -88,28 +78,26 @@ public sealed class HasFactionExploredTile : BattleSessionQuery<bool>
   }
 }
 
-public sealed class GetVisibleEnemiesForUnit : BattleSessionQuery<IReadOnlyCollection<BattleUnitState>>
+public sealed class GetVisibleEnemiesForUnit : BattleSessionQuery<IReadOnlyCollection<AliveUnit>>
 {
-  public BattleUnitState ObserverUnit { get; }
+  public AliveUnit ObserverUnit { get; }
 
-  public GetVisibleEnemiesForUnit(BattleUnitState observerUnit)
+  public GetVisibleEnemiesForUnit(AliveUnit observerUnit)
   {
-    ArgumentNullException.ThrowIfNull(observerUnit);
     ObserverUnit = observerUnit;
   }
 
-  internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IReadOnlyCollection<AliveUnit>> Execute(BattleSession session)
   {
-    if (!ObserverUnit.IsAlive)
-      return FailUnitNotAlive(ObserverUnit);
-
-    return Succeed(ObserverUnit.VisibleUnits
-      .Where(unit => unit.Side != ObserverUnit.Side)
+    // VisibleUnits only ever holds alive, in-session units, so each is safe to mint.
+    return Succeed(ObserverUnit.State.VisibleUnits
+      .Where(unit => unit.Side != ObserverUnit.State.Side)
+      .Select(session.MintAlive)
       .ToArray());
   }
 }
 
-public sealed class GetVisibleUnitsForFaction : BattleSessionQuery<IReadOnlyCollection<BattleUnitState>>
+public sealed class GetVisibleUnitsForFaction : BattleSessionQuery<IReadOnlyCollection<AliveUnit>>
 {
   public Faction Faction { get; }
 
@@ -119,7 +107,7 @@ public sealed class GetVisibleUnitsForFaction : BattleSessionQuery<IReadOnlyColl
     Faction = faction;
   }
 
-  internal override Either<BattleQueryFailure, IReadOnlyCollection<BattleUnitState>> Execute(BattleSession session)
+  internal override Either<BattleQueryFailure, IReadOnlyCollection<AliveUnit>> Execute(BattleSession session)
   {
     // Union the already-materialized per-observer visible-unit sets instead of asking
     // IsUnitVisibleToFaction for every unit in the pool (that pass rescanned all observers
@@ -135,6 +123,7 @@ public sealed class GetVisibleUnitsForFaction : BattleSessionQuery<IReadOnlyColl
     // dead reference exactly as the prior AliveUnits.Where did.
     return Succeed(session.AliveUnits
       .Where(unit => unit.Side == Faction || visibleToObservers.Contains(unit))
+      .Select(session.MintAlive)
       .ToArray());
   }
 }

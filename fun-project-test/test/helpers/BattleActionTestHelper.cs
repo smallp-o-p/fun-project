@@ -10,10 +10,12 @@ namespace FunProject.Tests;
 
 internal static class BattleActionTestHelper
 {
+  // The Vector3I overloads below are the test-side mint doors: raw literal coordinates are
+  // validated here so tests keep their compact call shape.
   public static BattleTestUnit SpawnUnit(BattleSession session, Combatant combatant, Vector3I position)
   {
     var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.SpawnUnit(combatant, position)).RequireSingleResult();
+    var result = executor.Submit(BattleAction.SpawnUnit(combatant, session.Board.At(position))).RequireSingleResult();
     Assert.True(result.Succeeded);
     Assert.True(result.AffectedUnit.IsSome);
     return new BattleTestUnit(result.AffectedUnit.RequireSome());
@@ -22,7 +24,7 @@ internal static class BattleActionTestHelper
   public static BattleTestUnit SpawnUnit(BattleSession session, Combatant combatant, Vector3I position, Weapon weapon)
   {
     var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.SpawnUnit(combatant, position, weapon)).RequireSingleResult();
+    var result = executor.Submit(BattleAction.SpawnUnit(combatant, session.Board.At(position), weapon)).RequireSingleResult();
     Assert.True(result.Succeeded);
     Assert.True(result.AffectedUnit.IsSome);
     return new BattleTestUnit(result.AffectedUnit.RequireSome());
@@ -36,7 +38,7 @@ internal static class BattleActionTestHelper
     Option<ItemWith<ArmorCapability>> armor)
   {
     var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(new SpawnUnit(combatant, position, weapon, armor)).RequireSingleResult();
+    var result = executor.Submit(new SpawnUnit(combatant, session.Board.At(position), weapon, armor)).RequireSingleResult();
     Assert.True(result.Succeeded);
     Assert.True(result.AffectedUnit.IsSome);
     return new BattleTestUnit(result.AffectedUnit.RequireSome());
@@ -44,7 +46,8 @@ internal static class BattleActionTestHelper
 
   public static BattleTestUnit SpawnUnit(BattleRuntime runtime, Combatant combatant, Vector3I position)
   {
-    var result = runtime.ExecuteAction(BattleAction.SpawnUnit(combatant, position)).RequireSingleResult();
+    var point = runtime.TryGetTile(position).RequireSome();
+    var result = runtime.ExecuteAction(BattleAction.SpawnUnit(combatant, point)).RequireSingleResult();
     Assert.True(result.Succeeded);
     Assert.True(result.AffectedUnit.IsSome);
     return new BattleTestUnit(result.AffectedUnit.RequireSome());

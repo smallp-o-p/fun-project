@@ -1,5 +1,6 @@
 using FunProject.Combatants;
 using Godot;
+using LanguageExt.UnsafeValueAccess;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,21 +37,29 @@ public static class BattleFactory
 
     foreach (UnitPlacement placement in setup.Placements)
     {
+      // This is the mint door for setup input: bounds are proven here, occupancy stays
+      // with SpawnUnit (the authority on mutable placement legality).
+      Option<BattleBoardState.ValidatedPoint> spawnPointOption = setup.Board.ValidatePoint(placement.Position);
+      if (spawnPointOption.IsNone)
+      {
+        runtime.Dispose();
+        return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
+          BattleSetupFailureReason.SpawnCellUnavailable,
+          $"Spawn cell {placement.Position} for {placement.Loadout.Combatant.Name} is out of bounds."));
+      }
+
       var spawn = new SpawnUnit(
         placement.Loadout.Combatant,
-        placement.Position,
+        spawnPointOption.Value(),
         placement.Loadout.Weapon,
         placement.Loadout.Armor);
       BattleActionResult result = runtime.ExecuteAction(spawn).Single();
-      // SpawnUnit is the single authority on placement legality: rather than
-      // re-checking occupancy up front and then asserting the commit "can't
-      // fail", surface its rejection as the typed setup failure it represents.
       if (!result.Succeeded)
       {
         runtime.Dispose();
         return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
           BattleSetupFailureReason.SpawnCellUnavailable,
-          $"Spawn cell {placement.Position} for {placement.Loadout.Combatant.Name} is out of bounds or not occupiable."));
+          $"Spawn cell {placement.Position} for {placement.Loadout.Combatant.Name} is not occupiable."));
       }
     }
 

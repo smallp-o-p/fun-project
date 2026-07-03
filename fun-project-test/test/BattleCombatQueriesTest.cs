@@ -20,7 +20,8 @@ public partial class BattleCombatQueriesTest
     }.Start();
 
     var breakdown = BattleQueryTestHelper.GetValue(
-      BattleQueryTestHelper.Query(battle.Session, new GetHitChanceForAttack(battle.PlayerUnit.State, battle.EnemyUnit.State)));
+      BattleQueryTestHelper.Query(battle.Session, new GetHitChanceForAttack(
+        battle.PlayerUnit.AliveIn(battle.Session), battle.EnemyUnit.AliveIn(battle.Session))));
 
     Assert.Equal(65, breakdown.BaseChance);
     Assert.Equal(-40, breakdown.Modifiers.Single().Amount);
@@ -40,7 +41,8 @@ public partial class BattleCombatQueriesTest
 
     // Player faction is active; the enemy attacker can still preview its odds.
     var breakdown = BattleQueryTestHelper.GetValue(
-      BattleQueryTestHelper.Query(session, new GetHitChanceForAttack(enemyAttacker.State, playerTarget.State)));
+      BattleQueryTestHelper.Query(session, new GetHitChanceForAttack(
+        enemyAttacker.AliveIn(session), playerTarget.AliveIn(session))));
 
     Assert.Equal(70, breakdown.FinalChance);
   }
@@ -58,7 +60,8 @@ public partial class BattleCombatQueriesTest
     }.Start();
 
     var previewed = BattleQueryTestHelper.GetValue(
-      BattleQueryTestHelper.Query(battle.Session, new GetHitChanceForAttack(battle.PlayerUnit.State, battle.EnemyUnit.State)));
+      BattleQueryTestHelper.Query(battle.Session, new GetHitChanceForAttack(
+        battle.PlayerUnit.AliveIn(battle.Session), battle.EnemyUnit.AliveIn(battle.Session))));
 
     var raisedEvents = new List<BattleEvent>();
     battle.Session.BattleEventCommitted += raisedEvents.Add;
@@ -83,25 +86,17 @@ public partial class BattleCombatQueriesTest
     var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
     StartBattle(session);
 
-    void AssertFails(BattleUnitState attacker, BattleUnitState attackTarget, BattleQueryFailureReason expectedReason)
+    void AssertFails(AliveUnit attacker, AliveUnit attackTarget, BattleQueryFailureReason expectedReason)
     {
       var failure = BattleQueryTestHelper.GetFailure(
         BattleQueryTestHelper.Query(session, new GetHitChanceForAttack(attacker, attackTarget)));
       Assert.Equal(expectedReason, failure.Reason);
     }
 
-    AssertFails(unarmedAttacker.State, target.State, BattleQueryFailureReason.InvalidBattleState);   // no weapon
-    AssertFails(armedAttacker.State, armedAttacker.State, BattleQueryFailureReason.InvalidBattleState); // self-target
-    AssertFails(armedAttacker.State, unarmedAttacker.State, BattleQueryFailureReason.InvalidBattleState); // allied target
-    AssertFails(shortSightedAttacker.State, target.State, BattleQueryFailureReason.InvalidBattleState); // not visible
-    AssertFails(shortRangedAttacker.State, target.State, BattleQueryFailureReason.InvalidBattleState);  // out of range
-
-    var executor = new BattleActionExecutor(session);
-    executor.Submit(BattleAction.ApplyDamage(target.State, 999));
-    AssertFails(armedAttacker.State, target.State, BattleQueryFailureReason.UnitNotAlive);           // dead target
-
-    // A dead attacker fails before the ally guard can report InvalidBattleState.
-    executor.Submit(BattleAction.ApplyDamage(armedAttacker.State, 999));
-    AssertFails(armedAttacker.State, unarmedAttacker.State, BattleQueryFailureReason.UnitNotAlive);  // dead attacker
+    AssertFails(unarmedAttacker.AliveIn(session), target.AliveIn(session), BattleQueryFailureReason.InvalidBattleState);   // no weapon
+    AssertFails(armedAttacker.AliveIn(session), armedAttacker.AliveIn(session), BattleQueryFailureReason.InvalidBattleState); // self-target
+    AssertFails(armedAttacker.AliveIn(session), unarmedAttacker.AliveIn(session), BattleQueryFailureReason.InvalidBattleState); // allied target
+    AssertFails(shortSightedAttacker.AliveIn(session), target.AliveIn(session), BattleQueryFailureReason.InvalidBattleState); // not visible
+    AssertFails(shortRangedAttacker.AliveIn(session), target.AliveIn(session), BattleQueryFailureReason.InvalidBattleState);  // out of range
   }
 }

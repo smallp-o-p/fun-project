@@ -10,11 +10,11 @@ using System.Linq;
 public class PlayerActionControllerTest
 {
   // 5x1x5 open board. Player "Hero" (armed) at (0,0,0), enemy "Goon" at (3,0,0).
-  private static (BattleRuntime Runtime, Faction Player, BattleUnitState Hero) MakeArmedBattle() =>
+  private static (BattleRuntime Runtime, Faction Player, AliveUnit Hero) MakeArmedBattle() =>
     MakeBattle(BattleTestFactory.MakeWeapon("Rifle"));
 
   // 5x1x5 open board. Player "Hero" at (0,0,0) with the given weapon (or none), enemy "Goon" at (3,0,0).
-  private static (BattleRuntime Runtime, Faction Player, BattleUnitState Hero) MakeBattle(Option<Weapon> heroWeapon)
+  private static (BattleRuntime Runtime, Faction Player, AliveUnit Hero) MakeBattle(Option<Weapon> heroWeapon)
   {
     var player = BattleTestFactory.MakeFaction("Player");
     var enemy = BattleTestFactory.MakeFaction("Enemy");
@@ -64,7 +64,8 @@ public class PlayerActionControllerTest
     Assert.Equal(PlayerActionController.TargetingMode.ActionPending, c.Mode);
     c.Confirm();
 
-    Assert.Equal(new Vector3I(2, 0, 1), GetValue(runtime.Query(new GetUnitPosition(hero))).Raw);
+    // The pre-move proof's snapshot is stale after the commit; re-mint to read the new position.
+    Assert.Equal(new Vector3I(2, 0, 1), runtime.TryGetAlive(hero.State).RequireSome().Position.Raw);
     Assert.Equal(PlayerActionController.TargetingMode.None, c.Mode);
     Assert.True(c.SelectedUnit.IsSome);
   }

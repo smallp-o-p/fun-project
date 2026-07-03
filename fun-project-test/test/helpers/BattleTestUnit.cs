@@ -28,6 +28,13 @@ internal sealed class BattleTestUnit
     return State.HasInventoryItem(item);
   }
 
+  // Mints an aliveness proof for this unit from the given session (throws if the unit is not
+  // alive in the session). The test-side door to the new AliveUnit-typed read queries.
+  public AliveUnit AliveIn(BattleSession session)
+  {
+    return session.TryGetAlive(State).RequireSome($"Unit {State.Id} is not alive in the session.");
+  }
+
   public static implicit operator BattleUnitState(BattleTestUnit unit)
   {
     return unit.State;

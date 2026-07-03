@@ -130,20 +130,18 @@ public sealed partial class BattleScene : Node3D
 
     foreach (Faction faction in _factions)
     {
-      IReadOnlyCollection<BattleUnitState> units = _runtime.Query(new GetFactionAliveUnits(faction)).Match(
+      IReadOnlyCollection<AliveUnit> units = _runtime.Query(new GetFactionAliveUnits(faction)).Match(
         Right: found => found,
-        Left: _ => System.Array.Empty<BattleUnitState>());
+        Left: _ => System.Array.Empty<AliveUnit>());
 
       var material = new StandardMaterial3D
       {
         AlbedoColor = faction == _playerFaction ? Colors.SteelBlue : Colors.IndianRed,
       };
 
-      foreach (BattleUnitState unit in units)
+      foreach (AliveUnit unit in units)
       {
-        Vector3I tile = _runtime.Query(new GetUnitPosition(unit)).Match(
-          Right: point => point.Raw,
-          Left: _ => Vector3I.Zero);
+        Vector3I tile = unit.Position.Raw;
 
         var mesh = new MeshInstance3D
         {
@@ -152,7 +150,7 @@ public sealed partial class BattleScene : Node3D
           Position = BoardCoordinates.TileToWorldCenter(tile) + new Vector3(0f, 0.5f, 0f),
         };
         AddChild(mesh);
-        _unitMeshes[unit] = mesh;
+        _unitMeshes[unit.State] = mesh;
       }
     }
   }

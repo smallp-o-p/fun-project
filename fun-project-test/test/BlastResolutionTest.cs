@@ -34,7 +34,7 @@ public partial class BlastResolutionTest
   private static void Throw(Fixture fixture, ItemWith<ThrowableCapability> grenade, Vector3I target)
   {
     fixture.Thrower.AddInventoryItem(grenade.Item);
-    var result = fixture.Executor.Submit(BattleAction.ThrowItem(fixture.Thrower.State, grenade, target)).RequireSingleResult();
+    var result = fixture.Executor.Submit(BattleAction.ThrowItem(fixture.Thrower.State, grenade, fixture.Session.Board.At(target))).RequireSingleResult();
     Assert.True(result.Succeeded);
   }
 

@@ -78,8 +78,33 @@ public sealed class BattleSession
   public Faction ActiveSide => _scheduler.ActiveSide;
   public Option<Faction> PlayerFaction { get; }
   public Option<BattleOutcome> Outcome { get; private set; }
+  // Raw views: the session holds and exposes plain unit state; proofs exist only as return
+  // values (TryGetAlive, read-query results), never as session-held collections.
   public IEnumerable<BattleUnitState> AliveUnits => _units.Where((unit) => unit.IsAlive);
   public IEnumerable<BattleUnitState> DeadUnits => _units.Where((unit) => unit.IsDead);
+
+  // Mints a proof iff the unit instance belongs to THIS session's alive storage (provenance +
+  // aliveness in one check). The single door for callers holding a raw BattleUnitState.
+  public Option<AliveUnit> TryGetAlive(BattleUnitState unit)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    return _units.Contains(unit) && unit.IsAlive ? Some(MintAlive(unit)) : None;
+  }
+
+  // Single mint point: snapshots the unit's board position into the one-shot proof. An alive
+  // session unit is always board-indexed (visibility Refresh invariant), so a miss here is a
+  // session bug, not a caller error. Callers must pass a unit already known alive-in-session.
+  internal AliveUnit MintAlive(BattleUnitState unit)
+  {
+    return GetUnitPosition(unit).Match(
+      Some: position => new AliveUnit(unit, position),
+      None: () => throw new InvalidOperationException($"Unit {unit.Id} is alive but not board-indexed."));
+  }
+
+  internal DeadUnit MintDead(BattleUnitState unit)
+  {
+    return new DeadUnit(unit);
+  }
   public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _scheduler.GlobalFactionTurnOrder;
   public IReadOnlyCollection<Faction> TurnQueue => _scheduler.TurnQueue;
   private readonly Dictionary<BattleUnitState, List<BattleUnitState>> _killsByUnit = [];

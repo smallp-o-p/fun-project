@@ -20,7 +20,7 @@ public sealed partial class BattleEventSignalHandlerTest
 
     BattleActionResult result = fixture.Runtime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", fixture.Faction),
-      new Vector3I(1, 0, 1))).RequireSingleResult();
+      fixture.Session.Board.At(1, 0, 1))).RequireSingleResult();
 
     Assert.True(result.Succeeded);
     BattleEvent committedEvent = committedEvents.Single();
@@ -48,7 +48,7 @@ public sealed partial class BattleEventSignalHandlerTest
 
     fixture.Runtime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", fixture.Faction),
-      new Vector3I(1, 0, 1))).RequireSingleResult();
+      fixture.Session.Board.At(1, 0, 1))).RequireSingleResult();
 
     Assert.Equal(1, startedActions.Count);
     Assert.Equal("spawn_unit", startedActions[0]);
@@ -70,7 +70,7 @@ public sealed partial class BattleEventSignalHandlerTest
     fixture.Adapter.Unbind();
     fixture.Runtime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", fixture.Faction),
-      new Vector3I(1, 0, 1))).RequireSingleResult();
+      fixture.Session.Board.At(1, 0, 1))).RequireSingleResult();
 
     Assert.False(fixture.Adapter.IsBound);
     Assert.Equal(0, events.Count);
@@ -90,10 +90,10 @@ public sealed partial class BattleEventSignalHandlerTest
     fixture.Adapter.Bind(secondRuntime);
     fixture.Runtime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Ignored", fixture.Faction),
-      new Vector3I(0, 0, 0))).RequireSingleResult();
+      fixture.Session.Board.At(0, 0, 0))).RequireSingleResult();
     secondRuntime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", fixture.Faction),
-      new Vector3I(1, 0, 1))).RequireSingleResult();
+      secondSession.Board.At(1, 0, 1))).RequireSingleResult();
 
     var addedEvent = (UnitAddedBattleEvent)events.Single().BattleEvent;
     Assert.Equal("Alpha", addedEvent.Unit.Combatant.Name);
@@ -110,7 +110,7 @@ public sealed partial class BattleEventSignalHandlerTest
     fixture.Adapter.Free();
     fixture.Runtime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", fixture.Faction),
-      new Vector3I(1, 0, 1))).RequireSingleResult();
+      fixture.Session.Board.At(1, 0, 1))).RequireSingleResult();
 
     Assert.Equal(0, events.Count);
   }
