@@ -1,3 +1,4 @@
+using FunProject.Buffs;
 using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Effects;
@@ -345,6 +346,34 @@ public sealed record UnitStatusEffectExpiredBattleEvent : BattleEvent, IUnitBatt
     ArgumentNullException.ThrowIfNull(spec);
     Unit = unit;
     Spec = spec;
+  }
+}
+
+public sealed record UnitBuffActivatedBattleEvent : BattleEvent, IUnitBattleEvent
+{
+  public BattleUnitState Unit { get; }
+  public BuffData Buff { get; }
+
+  public UnitBuffActivatedBattleEvent(BattleUnitState unit, BuffData buff)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(buff);
+    Unit = unit;
+    Buff = buff;
+  }
+}
+
+public sealed record UnitBuffDeactivatedBattleEvent : BattleEvent, IUnitBattleEvent
+{
+  public BattleUnitState Unit { get; }
+  public BuffData Buff { get; }
+
+  public UnitBuffDeactivatedBattleEvent(BattleUnitState unit, BuffData buff)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(buff);
+    Unit = unit;
+    Buff = buff;
   }
 }
 

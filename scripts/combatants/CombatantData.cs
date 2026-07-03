@@ -1,3 +1,4 @@
+using FunProject.Buffs;
 using FunProject.Core;
 using FunProject.Stats;
 using Godot;
@@ -14,4 +15,5 @@ public partial class CombatantData : NamedEntityData
   [Export] required public VisionStat VisionStat { get; set; } = new VisionStat { BaseValue = 20 };
   [Export] required public AimStat AimStat { get; set; }
   [Export] public int ModSlotCount { get; set; }
+  [Export] public Godot.Collections.Array<BuffData> InnateBuffs { get; set; } = [];
 }

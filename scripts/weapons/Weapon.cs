@@ -32,18 +32,27 @@ public class Weapon : EquippableItem, HasStats
 
   public TStat GetStat<TStat>() where TStat : Stat => _stats.GetStat<TStat>();
 
-  /// <summary>
-  /// Emit this weapon's damage bundle. Override to give a weapon type its own emission;
-  /// the common case (contributing extra bundle mods) should delegate to <see cref="EmitDamageWith"/>.
-  /// </summary>
-  public virtual List<Damage> EmitDamage() => EmitDamageWith([]);
+  /// <summary>Emit this weapon's damage bundle with no external contributions.</summary>
+  public List<Damage> EmitDamage() => EmitDamage([]);
 
   /// <summary>
-  /// Spend one shot and emit its damage bundle, or None if the weapon cannot fire.
-  /// Weapons without a magazine never deplete; <see cref="AmmunitionedWeapon"/> overrides
-  /// this with ammunition gating.
+  /// Emit this weapon's damage bundle, folding <paramref name="externalMods"/> (e.g. the
+  /// wielder's active buff mods) after the weapon's own. Override to give a weapon type its
+  /// own emission; the common case (contributing extra bundle mods) should delegate to
+  /// <see cref="EmitDamageWith"/>.
   /// </summary>
-  public virtual Option<List<Damage>> TrySpendShot() => EmitDamage();
+  public virtual List<Damage> EmitDamage(IEnumerable<DamageBundleMod> externalMods)
+    => EmitDamageWith(externalMods);
+
+  public Option<List<Damage>> TrySpendShot() => TrySpendShot([]);
+
+  /// <summary>
+  /// Spend one shot and emit its damage bundle (external mods fold last), or None if the
+  /// weapon cannot fire. Weapons without a magazine never deplete; <see cref="AmmunitionedWeapon"/>
+  /// overrides this with ammunition gating.
+  /// </summary>
+  public virtual Option<List<Damage>> TrySpendShot(IEnumerable<DamageBundleMod> externalMods)
+    => EmitDamage(externalMods);
 
   /// <summary>Whether this weapon can fire right now. Weapons without a magazine are always loaded.</summary>
   public virtual bool IsLoaded => true;
@@ -77,7 +86,7 @@ public class Weapon : EquippableItem, HasStats
   }
 
   public float EffectiveStat<TStat>() where TStat : Stat
-    => ((HasStats)this).Resolve<TStat>(StatContributions);
+    => this.Resolve<TStat>(StatContributions);
 
   public int EffectiveRange => Mathf.RoundToInt(EffectiveStat<RangeStat>());
 
@@ -124,13 +133,13 @@ public class AmmunitionedWeapon : Weapon
 
   public void Reload() => CurrentAmmo = MagazineSize;
 
-  public override Option<List<Damage>> TrySpendShot()
+  public override Option<List<Damage>> TrySpendShot(IEnumerable<DamageBundleMod> externalMods)
   {
     if (NeedsToReload())
       return None;
 
     CurrentAmmo -= ShotCost;
-    return EmitDamage();
+    return EmitDamage(externalMods);
   }
 }
 
@@ -139,7 +148,8 @@ public class FirearmWeapon(FirearmWeaponData data) : AmmunitionedWeapon(data)
   public FirearmArchetype Archetype { get; set; } = data.Archetype;
   public Option<Ammunition> AmmoType { get; set; } = Optional(data.DefaultAmmoData);
 
-  public override List<Damage> EmitDamage() => EmitDamageWith(AmmunitionBundleMods());
+  public override List<Damage> EmitDamage(IEnumerable<DamageBundleMod> externalMods)
+    => EmitDamageWith(AmmunitionBundleMods().Concat(externalMods));
 
   public override IEnumerable<StatMod> StatContributions => base.StatContributions.Concat(AmmunitionStatMods());
 

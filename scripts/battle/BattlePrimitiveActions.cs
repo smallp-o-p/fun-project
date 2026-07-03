@@ -297,7 +297,7 @@ public sealed class AttackUnit : BattleAction
   {
     // Ammo gate comes before the AP spend: an empty magazine is a legal rejection
     // that must leave the attacker's state fully untouched.
-    return resolved.Weapon.TrySpendShot().Match(
+    return resolved.Weapon.TrySpendShot(Unit.ActiveBuffDamageMods).Match(
       Some: bundle => CommitAttack(session, resolved, bundle),
       None: () => BattleActionResult.Failure(this, BattleActionFailureReason.Rejected,
         $"{resolved.Weapon.ItemName} has no ammunition loaded."));

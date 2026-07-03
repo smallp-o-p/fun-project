@@ -217,6 +217,10 @@ public sealed class BattleSession
     _scheduler.SetActiveSideToQueueHead();
     _scheduler.ClearSidesActedThisRound();
 
+    // Buff state must be current before the refresh below reads MaxActionPoints
+    // (turn-start evaluation; see BuffSystem).
+    BuffSystem.EvaluateAll(this);
+
     foreach (var unit in AliveUnits)
       unit.RefreshForNewTurn();
 
@@ -258,6 +262,10 @@ public sealed class BattleSession
       _scheduler.AddSpawnedUnit(unit);
 
     RaiseEvent(new UnitAddedBattleEvent(unit, position));
+
+    // Spawn-time evaluation so the unit enters play with correct buff state; the
+    // turn-start passes keep it fresh from here.
+    BuffSystem.EvaluateUnit(this, unit);
 
     return new SpawnedBattleUnit(unit);
   }
@@ -790,6 +798,11 @@ public sealed class BattleSession
   private void BeginNextQueuedSideTurn()
   {
     var nextSide = _scheduler.AdvanceActiveSideToQueueHead();
+
+    // Every side's turn start re-evaluates ALL alive units so conditions that changed
+    // during another faction's turn are fresh; must precede the AP refresh (see BuffSystem).
+    BuffSystem.EvaluateAll(this);
+
     foreach (var unit in GetFactionAliveUnits(nextSide))
       unit.RefreshForNewTurn();
 

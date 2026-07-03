@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Buffs;
 using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
@@ -24,7 +25,8 @@ internal sealed record DuelSide(
   int ActionPoints = 4,
   int Aim = 65,
   Weapon Weapon = null,
-  Option<ItemWith<ArmorCapability>> Armor = default);
+  Option<ItemWith<ArmorCapability>> Armor = default,
+  BuffData[] Buffs = null);
 
 // A started Player-vs-Enemy battle with one unit per side and a shared reusable executor.
 internal sealed record TwoFactionBattle(
@@ -70,7 +72,7 @@ internal sealed class BattleDuelBuilder
   private static BattleTestUnit SpawnSide(BattleSession session, Faction faction, DuelSide side, Vector3I defaultPosition)
   {
     Combatant combatant = BattleTestFactory.MakeCombatant(
-      side.Name, faction, health: side.Health, actionPoints: side.ActionPoints, aim: side.Aim);
+      side.Name, faction, health: side.Health, actionPoints: side.ActionPoints, aim: side.Aim, buffs: side.Buffs);
     return BattleActionTestHelper.SpawnUnit(
       session, combatant, side.Position ?? defaultPosition, Optional(side.Weapon), side.Armor);
   }

@@ -1,8 +1,10 @@
+using FunProject.Buffs;
 using FunProject.Core;
 using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using Godot.Collections;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace FunProject.Items;
@@ -46,4 +48,9 @@ public class EquippableItem : HasModSlots, HasNameAndDescription
     => FindCapability<ModSlotsCapability>().Match(
         capability => capability.Slots,
         () => new Array<ModSlot>());
+
+  public IReadOnlyList<BuffData> GrantedBuffs
+    => FindCapability<BuffGrantCapability>().Match(
+        capability => capability.Buffs,
+        () => (IReadOnlyList<BuffData>)[]);
 }

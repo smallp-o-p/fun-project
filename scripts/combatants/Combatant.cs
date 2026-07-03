@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using FunProject.Buffs;
 using FunProject.Items;
 using FunProject.Stats;
 
@@ -14,6 +15,7 @@ public class Combatant : HasStats, HasModSlots
   private readonly StatSheet _stats;
   private readonly Godot.Collections.Array<ModSlot> _modSlots = [];
   public List<EquippableItem> Inventory { get; private set; } = [];
+  public IReadOnlyList<BuffData> InnateBuffs { get; }
 
   public Combatant(CombatantData data, Faction faction)
   {
@@ -31,6 +33,7 @@ public class Combatant : HasStats, HasModSlots
       [typeof(VisionStat)] = data.VisionStat,
       [typeof(AimStat)] = data.AimStat,
     });
+    InnateBuffs = [.. data.InnateBuffs];
 
     for (int i = 0; i < data.ModSlotCount; i++)
     {

@@ -146,14 +146,14 @@ effective = Override ?? (base + ΣAdd) * (1 + ΣPercentAdd) * Π Multiply
 
 Stacking rule: `PercentAdd` entries are **additive** with each other (stack as a sum before multiplying). `Multiply` is reserved for true compounding. If you want "two +10 % bonuses give +20 %", use `PercentAdd(0.1f)` twice. If you want "two 1.1× multipliers give 1.21×", use `Multiply(1.1f)` twice.
 
-### `HasStats.Resolve` / `HasStats.TryResolve`
+### `Resolve` / `TryResolve` (extension methods)
 
-`HasStats` exposes resolution as **default interface methods** on the stat owner itself:
+Resolution is exposed as **extension methods on `HasStats`** (`HasStatsExtensions` in `scripts/stats/`):
 
-- `Resolve<TStat>(IEnumerable<StatMod> sources) : float` — gathers all `StatMod`s whose target type is `TStat`, collects their `StatModifier`s, and folds once over the owner's `BaseValue`. Returns `0f` if the owner has no `TStat`.
-- `TryResolve<TStat>(IEnumerable<StatMod> sources) : Option<float>` — same fold, but returns `None` if the owner has no `TStat` (useful for stats that are optional on a given entity).
+- `owner.Resolve<TStat>(IEnumerable<StatMod> sources) : float` — gathers all `StatMod`s whose target type is `TStat`, collects their `StatModifier`s, and folds once over the owner's `BaseValue`. Returns `0f` if the owner has no `TStat`.
+- `owner.TryResolve<TStat>(IEnumerable<StatMod> sources) : Option<float>` — same fold, but returns `None` if the owner has no `TStat` (useful for stats that are optional on a given entity).
 
-(Default interface methods are only visible through the interface, so internal callers use `((HasStats)owner).Resolve<TStat>(...)`; the `EffectiveStat` wrappers hide that cast.)
+Being extension methods (not default interface methods), they are callable directly on any concrete owner — no `((HasStats)owner)` cast; the `EffectiveStat` wrappers call them directly.
 
 Resolution is keyed by `Type`; there is no stat enum.
 
@@ -178,6 +178,7 @@ Resolves unit-owned stats (Aim, Health, ActionPoints, Vision, Movement, Will, et
 1. Stat contributions from the combatant's own mod slots.
 2. The owning faction's `StatBonuses` (`FactionData.FactionBonuses`, surfaced as `Faction.StatBonuses`).
 3. Stat contributions from the equipped weapon's slots (so a scope targeting `AimStat` buffs the wielder).
+4. `StatMod`s from the unit's active buffs (`BuffData.StatMods`, condition-mirrored by `BuffSystem`).
 
 ```csharp
 int maxHp = Mathf.RoundToInt(unit.EffectiveStat<HealthStat>());
@@ -195,6 +196,7 @@ The following sources are all active participants in stat resolution:
 - Weapon mod slots (`MultiStatMod` resources equipped on `ModSlot`s)
 - `Ammunition.Modifiers` — per-ammo-type stat adjustments
 - `FactionData.FactionBonuses` / `Faction.StatBonuses` — faction-wide stat bonuses
+- Active buffs (`BuffData.StatMods` while the buff's condition holds — see `scripts/buffs/`)
 
 `StatMod` is still single-target, but a single `MultiStatMod` can carry multiple `StatMod` entries, each targeting a different stat.
 
@@ -241,7 +243,7 @@ The following are explicitly out of scope for the current implementation:
 - Runtime lookup is generic and class-based through `HasStats`.
 - `StatModifier` (`Add`, `Multiply`, `CapMin`, `CapMax`, `PercentAdd`, `Override`) is the atomic numeric op — a pure data holder.
 - `HasStats.Fold` (a `static` interface method) combines modifiers deterministically: `Override ?? (base + ΣAdd) * (1 + ΣPercentAdd) * Π Multiply`, then clamp. Percents are additive; `Multiply` is true compounding.
-- `HasStats.Resolve<TStat>` / `TryResolve<TStat>` (default interface methods) gather matching `StatMod`s and fold over the owner's base value.
+- `Resolve<TStat>` / `TryResolve<TStat>` (extension methods on `HasStats`, in `HasStatsExtensions`) gather matching `StatMod`s and fold over the owner's base value.
 - `MultiStatMod` is the sole stat-bearing equippable mod. Single-target effects use a one-element `StatMods` list.
 - Effective stats are read via `Weapon.EffectiveStat<TStat>()` (weapon stats) and `BattleUnitState.EffectiveStat<TStat>()` / `TryEffectiveStat<TStat>()` (unit stats, gathering combatant slots + faction bonuses + equipped-weapon slots).
 - Weapon damage modification is a deliberate exception routed through `DamageBundleMod`, not this system.

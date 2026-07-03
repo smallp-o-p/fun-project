@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Buffs;
 using FunProject.Combatants;
 using FunProject.Core;
 using FunProject.Items;
@@ -30,9 +31,10 @@ internal static class BattleTestFactory
     int movement = 12,
     int vision = 20,
     int aim = 65,
-    int modSlotCount = 0)
+    int modSlotCount = 0,
+    IEnumerable<BuffData> buffs = null)
   {
-    return new Combatant(new CombatantData
+    var data = new CombatantData
     {
       Name = name,
       HealthStat = new HealthStat { BaseValue = health },
@@ -42,7 +44,11 @@ internal static class BattleTestFactory
       VisionStat = new VisionStat { BaseValue = vision },
       AimStat = new AimStat { BaseValue = aim },
       ModSlotCount = modSlotCount,
-    }, faction);
+    };
+    foreach (BuffData buff in buffs ?? [])
+      data.InnateBuffs.Add(buff);
+
+    return new Combatant(data, faction);
   }
 
   public static Faction MakeFaction(string name)
@@ -113,9 +119,9 @@ internal static class BattleTestFactory
     return frame;
   }
 
-  public static Weapon MakeWeapon(string name, int damage = 5, int range = 10, WeaponFrameData frame = null)
+  public static Weapon MakeWeapon(string name, int damage = 5, int range = 10, WeaponFrameData frame = null, params BuffData[] grantedBuffs)
   {
-    return new MeleeWeapon(new WeaponData
+    var data = new WeaponData
     {
       Name = name,
       Description = $"{name} weapon",
@@ -123,7 +129,16 @@ internal static class BattleTestFactory
       DamageStat = new DamageStat { BaseValue = damage },
       RangeStat = new RangeStat { BaseValue = range },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 0 },
-    });
+    };
+    if (grantedBuffs.Length > 0)
+    {
+      var grant = new BuffGrantCapabilityData();
+      foreach (BuffData buff in grantedBuffs)
+        grant.Buffs.Add(buff);
+      data.Capabilities = [grant];
+    }
+
+    return new MeleeWeapon(data);
   }
 
   // A base Weapon whose single packet carries an authored status spec, applied on hit.
@@ -170,6 +185,25 @@ internal static class BattleTestFactory
       ApplyChancePercent = applyChancePercent,
       RequiresHealthDamage = requiresHealthDamage,
     };
+
+  public static BuffData MakeBuff(
+    string name,
+    BuffConditionData condition,
+    StatMod[] statMods = null,
+    DamageBundleMod[] damageMods = null)
+  {
+    var buff = new BuffData
+    {
+      Name = name,
+      Description = $"{name} buff",
+      Condition = condition,
+    };
+    foreach (StatMod statMod in statMods ?? [])
+      buff.StatMods.Add(statMod);
+    foreach (DamageBundleMod damageMod in damageMods ?? [])
+      buff.DamageMods.Add(damageMod);
+    return buff;
+  }
 
   public static WeaponData MakeWeaponData(int damage = 10, int critChance = 5, int range = 1, WeaponFrameData frame = null) =>
     new()

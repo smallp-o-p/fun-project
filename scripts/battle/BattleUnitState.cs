@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using FunProject.Buffs;
 using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
@@ -18,6 +19,7 @@ public sealed class BattleUnitState
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _spottedUnits = [];
   private readonly Dictionary<StatusEffectSpecData, ActiveStatusEffect> _activeStatusEffects = [];
+  private readonly List<Buff> _buffs = [];
 
   internal int Id { get; }
   public Combatant Combatant { get; }
@@ -37,6 +39,10 @@ public sealed class BattleUnitState
   public bool IsDead => !IsAlive;
   public IReadOnlyCollection<ActiveStatusEffect> ActiveStatusEffects => _activeStatusEffects.Values;
   public bool IsImmobilized => _activeStatusEffects.Values.Any(effect => !effect.IsExpired && effect.BlocksAction);
+  public IReadOnlyList<Buff> Buffs => _buffs;
+  public IEnumerable<Buff> ActiveBuffs => _buffs.Where(buff => buff.IsActive);
+  internal IEnumerable<DamageBundleMod> ActiveBuffDamageMods
+    => ActiveBuffs.SelectMany(buff => buff.Data.DamageMods);
 
   internal BattleUnitState(
     int unitId,
@@ -56,6 +62,14 @@ public sealed class BattleUnitState
     // Defensive copy: battle-time inventory mutations must not write through to the
     // shared, authored Combatant template (Data/Runtime ownership boundary).
     _inventory = [.. combatant.Inventory];
+
+    // Dedupe by BuffData reference identity: the same authored buff granted by several
+    // sources (innate + item) must contribute once, mirroring status-effect spec identity.
+    IEnumerable<BuffData> granted = combatant.InnateBuffs
+      .Concat(equippedWeapon.Match(w => w.GrantedBuffs, () => (IReadOnlyList<BuffData>)[]))
+      .Concat(equippedArmor.Match(a => a.Item.GrantedBuffs, () => (IReadOnlyList<BuffData>)[]));
+    foreach (BuffData buffData in granted.Distinct())
+      _buffs.Add(new Buff(buffData));
   }
 
   public void RefreshForNewTurn()
@@ -157,12 +171,20 @@ public sealed class BattleUnitState
   }
 
   public float EffectiveStat<TStat>() where TStat : Stat
-    => ((HasStats)Combatant).Resolve<TStat>(GatherStatContributions());
+    => Combatant.Resolve<TStat>(GatherStatContributions());
 
   public Option<float> TryEffectiveStat<TStat>() where TStat : Stat
-    => ((HasStats)Combatant).TryResolve<TStat>(GatherStatContributions());
+    => Combatant.TryResolve<TStat>(GatherStatContributions());
 
   private IEnumerable<StatMod> GatherStatContributions()
     => Combatant.StatContributions()
-         .Concat(EquippedWeapon.Match(w => w.StatContributions, () => System.Linq.Enumerable.Empty<StatMod>()));
+         .Concat(EquippedWeapon.Match(w => w.StatContributions, () => System.Linq.Enumerable.Empty<StatMod>()))
+         .Concat(ActiveBuffs.SelectMany(buff => buff.Data.StatMods));
+
+  internal void ClampCurrentHealthToMax()
+  {
+    // Floor at 1: buffs adjust stats, they never kill. A buff pushing MaxHealth to 0 or
+    // below must not bypass the death pipeline (HandleUnitDeath) by zeroing health here.
+    CurrentHealth = Math.Min(CurrentHealth, Math.Max(MaxHealth, 1));
+  }
 }

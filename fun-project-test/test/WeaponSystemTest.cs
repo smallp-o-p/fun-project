@@ -116,7 +116,7 @@ public class WeaponSystemTest
   {
     var weapon = new MeleeWeapon(BattleTestFactory.MakeWeaponData());
     StatMod[] sources = [new RangeStatMod { Modifiers = [StatModifier.Add(4)] }];
-    Assert.Equal(5f, ((HasStats)weapon).Resolve<RangeStat>(sources));
+    Assert.Equal(5f, weapon.Resolve<RangeStat>(sources));
   }
 
   [TestCase(TestName = "MultiStatMod add remove and clear manage internal list")]

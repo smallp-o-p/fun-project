@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Godot;
 
 namespace FunProject.Stats;
@@ -14,22 +13,6 @@ public interface HasStats
 {
   Option<TStat> TryGetStat<TStat>() where TStat : Stat;
   TStat GetStat<TStat>() where TStat : Stat;
-
-  /// <summary>
-  /// Effective value of <typeparamref name="TStat"/>: this owner's BaseValue with every
-  /// <see cref="StatMod"/> in <paramref name="sources"/> that targets it folded in.
-  /// Returns 0 when this owner has no <typeparamref name="TStat"/>.
-  /// </summary>
-  float Resolve<TStat>(IEnumerable<StatMod> sources) where TStat : Stat
-    => TryResolve<TStat>(sources).IfNone(0f);
-
-  /// <summary>
-  /// Like <see cref="Resolve{TStat}"/> but None when this owner has no <typeparamref name="TStat"/>.
-  /// </summary>
-  Option<float> TryResolve<TStat>(IEnumerable<StatMod> sources) where TStat : Stat
-    => TryGetStat<TStat>().Map(stat => Fold(
-         stat.BaseValue,
-         sources.Where(mod => mod.TargetType == typeof(TStat)).SelectMany(mod => mod.Modifiers)));
 
   /// <summary>
   /// Deterministic, source-order-independent fold of <see cref="StatModifier"/> deltas onto a base
