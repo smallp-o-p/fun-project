@@ -1,4 +1,3 @@
-using Godot;
 using System;
 using System.Collections.Generic;
 
@@ -17,7 +16,7 @@ public sealed class FindPathForUnit : BattleSessionQuery<BattleBoardState.Valida
 
   internal override Either<BattleQueryFailure, BattleBoardState.ValidatedPoint[]> Execute(BattleSession session)
   {
-    return Succeed(session.Board.FindPath(Unit.Position, Destination, Unit.Id));
+    return Succeed(session.Board.FindPath(Unit.Id, Destination));
   }
 }
 

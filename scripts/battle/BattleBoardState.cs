@@ -112,9 +112,7 @@ public sealed class BattleBoardState
         });
     }
   }
-
-  // Sets a tile's walkability and resyncs the path graph: a tile becoming walkable that has no node yet
-  // is added and wired to its existing neighbors; otherwise only its disabled flag is refreshed.
+  
   public void SetTileWalkable(ValidatedPoint point, bool walkable)
   {
     GetTile(point).IsWalkable = walkable;
@@ -192,25 +190,28 @@ public sealed class BattleBoardState
   {
     return _positionByUnit.TryGetValue(unitId, out ValidatedPoint point) ? Some(point) : None;
   }
-
-  public ValidatedPoint[] FindPath(ValidatedPoint source, ValidatedPoint destination, int movingUnitId)
+  
+  /// <summary>
+  /// Find a path for a unit at tile X to destination
+  /// </summary>
+  /// <param name="movingUnitId"></param>
+  /// <param name="destination"></param>
+  /// <returns>A path of points to destination, or [] if no path can be found.</returns>
+  public ValidatedPoint[] FindPath(int movingUnitId, ValidatedPoint destination)
   {
+    if (!_positionByUnit.TryGetValue(movingUnitId, out ValidatedPoint source))
+      return [];
     if (!CanUsePathEndpoint(source, movingUnitId) || !CanUsePathEndpoint(destination, movingUnitId))
       return [];
 
     long sourceId = CoordinatesToPointId(source);
     long destinationId = CoordinatesToPointId(destination);
 
-    // AStar3D offers no "treat this start point as enabled for one query" option, so when the moving
-    // unit stands on (and thus disables) the source we clear that flag for the duration of the query
-    // and restore it in finally — leaving no residue even if GetIdPath throws. Assumes single-threaded
-    // access to the board (the whole battle runtime is single-threaded).
-    bool restoreSourceDisabled =
-      _occupants.TryGetValue(source, out int sourceOccupant) && sourceOccupant == movingUnitId
-      && _pathGraph.IsPointDisabled(sourceId);
-
-    if (restoreSourceDisabled)
-      _pathGraph.SetPointDisabled(sourceId, false);
+    // The mover occupies (and thus disables) its own source node, and AStar3D offers no "treat
+    // this start point as enabled for one query" option, so we clear that flag for the duration
+    // of the query and restore it in finally — leaving no residue even if GetIdPath throws.
+    // Assumes single-threaded access to the board (the whole battle runtime is single-threaded).
+    _pathGraph.SetPointDisabled(sourceId, false);
 
     try
     {
@@ -218,8 +219,7 @@ public sealed class BattleBoardState
     }
     finally
     {
-      if (restoreSourceDisabled)
-        _pathGraph.SetPointDisabled(sourceId, ShouldDisablePathPoint(source));
+      _pathGraph.SetPointDisabled(sourceId, ShouldDisablePathPoint(source));
     }
   }
 
