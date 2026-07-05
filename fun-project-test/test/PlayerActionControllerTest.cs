@@ -99,7 +99,7 @@ public class PlayerActionControllerTest
 
     Assert.Equal(PlayerActionController.TargetingMode.None, c.Mode);
     // After passing, the unit is no longer available this turn.
-    Assert.False(GetValue(runtime.Query(new CanUnitActNow(hero))));
+    Assert.False(runtime.Query(new CanUnitActNow(hero.State)));
   }
 
   [TestCase(TestName = "Cancel steps back one level")]

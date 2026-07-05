@@ -80,8 +80,8 @@ public sealed class BattleSession
   public Option<BattleOutcome> Outcome { get; private set; }
   // Raw views: the session holds and exposes plain unit state; proofs exist only as return
   // values (TryGetAlive, read-query results), never as session-held collections.
-  public IEnumerable<BattleUnitState> AliveUnits => _units.Where((unit) => unit.IsAlive);
-  public IEnumerable<BattleUnitState> DeadUnits => _units.Where((unit) => unit.IsDead);
+  public IEnumerable<BattleUnitState> AliveUnits => _units.Where(unit => unit.IsAlive);
+  public IEnumerable<BattleUnitState> DeadUnits => _units.Where(unit => unit.IsDead);
 
   // Mints a proof iff the unit instance belongs to THIS session's alive storage (provenance +
   // aliveness in one check). The single door for callers holding a raw BattleUnitState.
@@ -552,12 +552,7 @@ public sealed class BattleSession
     if (Phase != BattlePhase.InProgress)
       throw new InvalidOperationException("Trying to check unit while the battle is not in progress.");
 
-    if (unit.Side != ActiveSide)
-      return false;
-    if (!_scheduler.IsUnitAvailable(unit))
-      return false;
-
-    return unit.CanAct();
+    return unit.Side == ActiveSide && _scheduler.IsUnitAvailable(unit) && unit.CanAct();
   }
 
   internal static int GetGridDistance(Vector3I source, Vector3I destination)
@@ -807,14 +802,16 @@ public sealed class BattleSession
   {
     var nextSide = _scheduler.AdvanceActiveSideToQueueHead();
 
+    // Refresh availability immediately after the active side flips: buff evaluation below
+    // dispatches events, and no observer may see the previous side's units as still available.
+    _scheduler.RefreshActiveFactionAvailability();
+
     // Every side's turn start re-evaluates ALL alive units so conditions that changed
     // during another faction's turn are fresh; must precede the AP refresh (see BuffSystem).
     BuffSystem.EvaluateAll(this);
 
     foreach (var unit in GetFactionAliveUnits(nextSide))
       unit.RefreshForNewTurn();
-
-    _scheduler.RefreshActiveFactionAvailability();
 
     RaiseEvents(
       new ActiveSideChangedBattleEvent(nextSide),

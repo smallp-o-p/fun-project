@@ -45,21 +45,17 @@ public sealed class PlayerActionController
   // Selects the controllable (player-faction) unit on the tile and caches its action options.
   public bool TrySelectUnitAt(Vector3I tile)
   {
-    return _runtime.TryGetTile(tile).Match(
-      Some: point => _runtime.Query(new GetUnitAtTile(point)).Match(
-        Right: occupant => occupant.Match(
-          Some: unit =>
-          {
-            if (unit.Side != _playerFaction)
-              return false;
-            SelectedUnit = Some(unit);
-            ResetTargeting();
-            RefreshOptions();
-            return true;
-          },
-          None: () => false),
-        Left: _ => false),
-      None: () => false);
+    return _runtime.TryGetTile(tile).Bind(point => _runtime.Query(new GetUnitAtTile(point))).Match(
+      Some: unit =>
+      {
+        if (unit.Side != _playerFaction)
+          return false;
+        SelectedUnit = Some(unit);
+        ResetTargeting();
+        RefreshOptions();
+        return true;
+      },
+      None: false);
   }
 
   public void BeginAction(UnitActionOption option)
@@ -157,21 +153,19 @@ public sealed class PlayerActionController
     // Mint the aliveness proof at the query door; a unit that died since selection yields None
     // (empty options), replacing what used to be a query Left for a dead unit.
     _options = SelectedUnit.Bind(_runtime.TryGetAlive).Match(
-      Some: proof => _runtime.Query(new GetAvailableActionsForUnit(proof)).Match(
-        Right: actions => BuildOptions(proof.State, actions),
-        Left: []),
+      Some: proof => BuildOptions(proof.State, _runtime.Query(new GetAvailableActionsForUnit(proof))),
       None: []);
   }
 
   // Presentation-side mapping: one option per domain verb row, availability straight from the
   // row. Targeting handlers stay presentation-owned; the domain never sees them.
   private static IReadOnlyList<UnitActionOption> BuildOptions(
-    BattleUnitState unit, IReadOnlyList<AvailableUnitAction> actions)
+    BattleUnitState unit, IReadOnlyList<UnitAction> actions)
   {
     return actions.Select(action => MakeOption(unit, action)).ToList();
   }
 
-  private static UnitActionOption MakeOption(BattleUnitState unit, AvailableUnitAction action)
+  private static UnitActionOption MakeOption(BattleUnitState unit, UnitAction action)
   {
     return action.Action switch
     {

@@ -23,10 +23,10 @@ public class GetAvailableActionsForUnitTest
     return (runtime, player, enemy);
   }
 
-  private static IReadOnlyList<AvailableUnitAction> ActionsOf(BattleRuntime runtime, AliveUnit unit) =>
-    GetValue(runtime.Query(new GetAvailableActionsForUnit(unit)));
+  private static IReadOnlyList<UnitAction> ActionsOf(BattleRuntime runtime, AliveUnit unit) =>
+    runtime.Query(new GetAvailableActionsForUnit(unit));
 
-  private static AvailableUnitAction Row<TDefinition>(IReadOnlyList<AvailableUnitAction> actions)
+  private static UnitAction Row<TDefinition>(IReadOnlyList<UnitAction> actions)
     where TDefinition : UnitActionDefinition =>
     actions.Single(action => action.Action is TDefinition);
 
@@ -41,7 +41,7 @@ public class GetAvailableActionsForUnitTest
     Assert.False(actions.Any(action => action.Action is ReloadActionDefinition));
   }
 
-  [TestCase(TestName = "Magazine weapon adds a Reload row in catalog order; full mag makes it unavailable with CanReloadCondition")]
+  [TestCase(TestName = "Magazine weapon adds a Reload row in catalog order; full mag makes it unavailable")]
   public void MagazineWeaponAddsReloadRow()
   {
     var (runtime, player, _) = MakeBattle(BattleTestFactory.MakeAmmoWeapon("SMG"));
@@ -57,10 +57,9 @@ public class GetAvailableActionsForUnitTest
     Assert.True(Row<AttackActionDefinition>(actions).IsAvailable);
     var reload = Row<ReloadActionDefinition>(actions);
     Assert.False(reload.IsAvailable);
-    Assert.True(reload.FailedCondition.Match(c => c is CanReloadCondition, () => false));
   }
 
-  [TestCase(TestName = "Empty magazine: Attack unavailable with WeaponIsLoadedCondition, Reload available")]
+  [TestCase(TestName = "Empty magazine: Attack unavailable, Reload available")]
   public void EmptyMagazineFlipsAttackAndReload()
   {
     var (runtime, player, _) = MakeBattle(BattleTestFactory.MakeAmmoWeapon("Pistol", magazine: 1));
@@ -74,7 +73,6 @@ public class GetAvailableActionsForUnitTest
 
     var attack = Row<AttackActionDefinition>(actions);
     Assert.False(attack.IsAvailable);
-    Assert.True(attack.FailedCondition.Match(c => c is WeaponIsLoadedCondition, () => false));
     Assert.True(Row<ReloadActionDefinition>(actions).IsAvailable);
   }
 
@@ -89,18 +87,16 @@ public class GetAvailableActionsForUnitTest
     Assert.True(Row<MoveActionDefinition>(actions).IsAvailable);
   }
 
-  [TestCase(TestName = "Not-active-side unit: every row unavailable, EndTurn failing IsActiveSideCondition")]
+  [TestCase(TestName = "Not-active-side unit: every row unavailable, including EndTurn")]
   public void NotActiveSideAllUnavailable()
   {
     var (runtime, _, enemy) = MakeBattle(BattleTestFactory.MakeWeapon("Rifle"));
     var actions = ActionsOf(runtime, SingleAliveUnit(runtime, enemy)); // enemy is not active at turn 1
 
     Assert.True(actions.All(action => !action.IsAvailable));
-    Assert.True(Row<MoveActionDefinition>(actions).FailedCondition.Match(c => c is UnitCanActNowCondition, () => false));
-    Assert.True(Row<EndTurnActionDefinition>(actions).FailedCondition.Match(c => c is IsActiveSideCondition, () => false));
   }
 
-  [TestCase(TestName = "Boxed-in unit: Move unavailable with HasOpenAdjacentTileCondition")]
+  [TestCase(TestName = "Boxed-in unit: Move unavailable")]
   public void BoxedInMoveUnavailable()
   {
     var player = BattleTestFactory.MakeFaction("Player");
@@ -116,7 +112,6 @@ public class GetAvailableActionsForUnitTest
 
     var move = Row<MoveActionDefinition>(ActionsOf(runtime, hero));
     Assert.False(move.IsAvailable);
-    Assert.True(move.FailedCondition.Match(c => c is HasOpenAdjacentTileCondition, () => false));
   }
 
   [TestCase(TestName = "Out-of-AP unit: only EndTurn is available")]

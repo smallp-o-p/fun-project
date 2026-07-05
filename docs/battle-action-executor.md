@@ -105,7 +105,7 @@ Visual systems should not infer tactical truth from executor internals.
 Recommended rule:
 
 - use `BattleActionResult` for command outcomes
-- use read-side `BattleSessionQuery<TResult>` values for previews
+- use read-side `IBattleSessionQuery<TResult>` values for previews
 - use `BattleEventCommitted` for visual updates after state has committed
 
 Example:
@@ -120,8 +120,8 @@ Godot scene nodes that need actual Godot signals should adapt this C# event at t
 
 The executor does not expose preview evaluation. Controllers and AI should use explicit read-side queries, for example:
 
-- reachable cells for a unit
-- valid throw targets for an item
-- action-point cost for a path
+- reachable tiles for a unit (`GetPossibleMoveTilesForUnit`)
+- a movement path preview (`FindPathForUnit`)
+- a hit-chance preview for an attack (`GetHitChanceForAttack`)
 
 Those should stay read-only and should not bypass the authoritative action path.

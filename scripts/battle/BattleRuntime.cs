@@ -8,8 +8,6 @@ public sealed class BattleRuntime : IDisposable
   private readonly BattleSession _session;
   private readonly BattleActionExecutor _actions;
   private bool _disposed;
-  public List<BattleAction> ActionLog = [];
-  public List<BattleEvent> EventLog = [];
 
   public Option<BattleActionResult> LastActionResult
   {
@@ -36,7 +34,7 @@ public sealed class BattleRuntime : IDisposable
     _actions.OnActionComplete += RaiseActionCompleted;
   }
 
-  public Either<BattleQueryFailure, TResult> Query<TResult>(BattleSessionQuery<TResult> query)
+  public TResult Query<TResult>(IBattleSessionQuery<TResult> query)
   {
     ThrowIfDisposed();
     ArgumentNullException.ThrowIfNull(query);
@@ -64,7 +62,6 @@ public sealed class BattleRuntime : IDisposable
   public IReadOnlyList<BattleActionResult> ExecuteAction(BattleAction action)
   {
     ThrowIfDisposed();
-    ActionLog.Add(action);
     return _actions.Submit(action);
   }
 
@@ -93,7 +90,6 @@ public sealed class BattleRuntime : IDisposable
 
   private void RaiseBattleEventCommitted(BattleEvent battleEvent)
   {
-    EventLog.Add(battleEvent);
     BattleEventCommitted.Invoke(battleEvent);
   }
 

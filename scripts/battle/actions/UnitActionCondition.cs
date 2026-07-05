@@ -2,10 +2,10 @@ using System.Linq;
 
 namespace FunProject.Battle;
 
-// Availability conditions for unit action verbs. Identity is the concrete subclass (no enums):
-// callers receive a failed condition as the object itself and dispatch on its type. IsMet is
-// internal and query-side only (GetAvailableActionsForUnit), so it takes a provably-alive
-// AliveUnit; presentation sees identity, never evaluates.
+/// <summary>
+/// A fancy way to check if a unit can do a certain action. Unit actions should compose these condition objects
+/// to check its availability.
+/// </summary>
 public abstract class UnitActionCondition
 {
   internal abstract bool IsMet(BattleSession session, AliveUnit unit);
@@ -19,14 +19,9 @@ public sealed class UnitCanActNowCondition : UnitActionCondition
     => session.Phase == BattlePhase.InProgress && session.CanUnitActNow(unit.State);
 }
 
-public sealed class HasActionPointsCondition : UnitActionCondition
+public sealed class HasActionPointsCondition(int cost) : UnitActionCondition
 {
-  public int Cost { get; }
-
-  public HasActionPointsCondition(int cost)
-  {
-    Cost = cost;
-  }
+  public int Cost { get; } = cost;
 
   internal override bool IsMet(BattleSession session, AliveUnit unit)
     => unit.State.CurrentActionPoints >= Cost;

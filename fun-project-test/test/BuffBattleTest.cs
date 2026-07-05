@@ -46,6 +46,7 @@ public partial class BuffBattleTest
     }.Start();
     var player = battle.PlayerUnit.State;
     var recorder = new BattleEventRecorder(battle.Session);
+
     HitChanceBreakdown Preview() => GetValue(Query(battle.Session,
       new GetHitChanceForAttack(
         battle.PlayerUnit.AliveIn(battle.Session),

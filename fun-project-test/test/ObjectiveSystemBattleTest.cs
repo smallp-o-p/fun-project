@@ -82,8 +82,8 @@ public class ObjectiveSystemBattleTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    Either<BattleQueryFailure, Operation> result = Query(session, new GetOperationForFaction(a));
+    Option<Operation> result = Query(session, new GetOperationForFaction(a));
 
-    Assert.True(result.IsRight);
+    Assert.True(result.IsSome);
   }
 }

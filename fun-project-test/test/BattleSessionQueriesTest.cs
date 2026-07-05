@@ -15,7 +15,7 @@ public class BattleSessionQueriesTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction), new Vector3I(0, 0, 0));
 
-    BattleBoardState.ValidatedPoint[] path = GetValue(Query(session, new FindPathForUnit(unit.AliveIn(session), session.Board.At(2, 0, 0))));
+    BattleBoardState.ValidatedPoint[] path = Query(session, new FindPathForUnit(unit.AliveIn(session), session.Board.At(2, 0, 0)));
 
     Assert.Equal(3, path.Length);
     Assert.Equal(new Vector3I(0, 0, 0), path[0].Raw);
@@ -41,7 +41,7 @@ public class BattleSessionQueriesTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction), new Vector3I(1, 0, 0));
 
-    Option<BattleUnitState> occupant = GetValue(Query(session, new GetUnitAtTile(session.Board.At(1, 0, 0))));
+    Option<BattleUnitState> occupant = Query(session, new GetUnitAtTile(session.Board.At(1, 0, 0)));
 
     Assert.True(occupant.IsSome);
     Assert.Equal(unit.State, occupant.RequireSome());
@@ -54,7 +54,7 @@ public class BattleSessionQueriesTest
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 1), [faction]);
     SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction), new Vector3I(1, 0, 0));
 
-    Option<BattleUnitState> occupant = GetValue(Query(session, new GetUnitAtTile(session.Board.At(2, 0, 0))));
+    Option<BattleUnitState> occupant = Query(session, new GetUnitAtTile(session.Board.At(2, 0, 0)));
 
     Assert.True(occupant.IsNone);
   }
@@ -67,7 +67,7 @@ public class BattleSessionQueriesTest
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Runner", faction, actionPoints: 2), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = GetValue(Query(session, new GetPossibleMoveTilesForUnit(unit.AliveIn(session))));
+    IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = Query(session, new GetPossibleMoveTilesForUnit(unit.AliveIn(session)));
     Assert.True(tiles.Count == 2);
     var rawTiles = tiles.Select(tile => tile.Raw).ToHashSet();
     Assert.True(rawTiles.Contains(new Vector3I(1, 0, 0)));
@@ -84,7 +84,7 @@ public class BattleSessionQueriesTest
     session.Board.SetTileWalkable(session.Board.At(1, 0, 0), false);
     StartBattle(session);
 
-    IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = GetValue(Query(session, new GetPossibleMoveTilesForUnit(unit.AliveIn(session))));
+    IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = Query(session, new GetPossibleMoveTilesForUnit(unit.AliveIn(session)));
     Assert.True(tiles.Count == 0);
   }
 
@@ -100,7 +100,7 @@ public class BattleSessionQueriesTest
     session.Board.GetTile(session.Board.At(3, 0, 0)).BlocksLineOfSight = true;
     StartBattle(session);
 
-    IReadOnlyCollection<AliveUnit> enemies = GetValue(Query(session, new GetVisibleEnemiesForUnit(observer.AliveIn(session))));
+    IReadOnlyCollection<AliveUnit> enemies = Query(session, new GetVisibleEnemiesForUnit(observer.AliveIn(session)));
 
     Assert.True(enemies.Select(e => e.State).Contains(visibleEnemy));
     Assert.False(enemies.Select(e => e.State).Contains(hiddenEnemy));
@@ -120,8 +120,8 @@ public class BattleSessionQueriesTest
     var result = executor.Submit(BattleAction.ApplyDamage(unitA.State, 10)).RequireSingleResult();
     Assert.True(result.Succeeded);
 
-    var factionADead = GetValue(Query(session, new GetFactionDeadUnits(factionA)));
-    var factionBDead = GetValue(Query(session, new GetFactionDeadUnits(factionB)));
+    var factionADead = Query(session, new GetFactionDeadUnits(factionA));
+    var factionBDead = Query(session, new GetFactionDeadUnits(factionB));
 
     Assert.True(factionADead.Select(d => d.State).Contains(unitA));
     Assert.False(factionBDead.Select(d => d.State).Contains(unitA));

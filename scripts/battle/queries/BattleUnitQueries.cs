@@ -1,83 +1,45 @@
 using FunProject.Combatants;
-using Godot;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace FunProject.Battle;
 
-public sealed class GetUnitAtTile : BattleSessionQuery<Option<BattleUnitState>>
+public sealed class GetUnitAtTile(BattleBoardState.ValidatedPoint tile) : IBattleSessionQuery<Option<BattleUnitState>>
 {
-  public BattleBoardState.ValidatedPoint Tile { get; }
-
-  public GetUnitAtTile(BattleBoardState.ValidatedPoint tile)
+  public Option<BattleUnitState> Execute(BattleSession session)
   {
-    Tile = tile;
-  }
-
-  internal override Either<BattleQueryFailure, Option<BattleUnitState>> Execute(BattleSession session)
-  {
-    return Succeed(session.GetUnitAt(Tile));
+    return session.GetUnitAt(tile);
   }
 }
 
-public sealed class GetFactionAliveUnits : BattleSessionQuery<IReadOnlyCollection<AliveUnit>>
+public sealed class GetFactionAliveUnits(Faction side) : IBattleSessionQuery<IReadOnlyCollection<AliveUnit>>
 {
-  public Faction Side { get; }
-
-  public GetFactionAliveUnits(Faction side)
+  public IReadOnlyCollection<AliveUnit> Execute(BattleSession session)
   {
-    ArgumentNullException.ThrowIfNull(side);
-    Side = side;
-  }
-
-  internal override Either<BattleQueryFailure, IReadOnlyCollection<AliveUnit>> Execute(BattleSession session)
-  {
-    return Succeed(session.AliveUnits.Where(unit => unit.Side == Side).Select(session.MintAlive).ToArray());
+    return session.AliveUnits.Where(unit => unit.Side == side).Select(session.MintAlive).ToArray();
   }
 }
 
-public sealed class GetFactionDeadUnits : BattleSessionQuery<IReadOnlyCollection<DeadUnit>>
+public sealed class GetFactionDeadUnits(Faction side) : IBattleSessionQuery<IReadOnlyCollection<DeadUnit>>
 {
-  public Faction Side { get; }
-
-  public GetFactionDeadUnits(Faction side)
+  public IReadOnlyCollection<DeadUnit> Execute(BattleSession session)
   {
-    ArgumentNullException.ThrowIfNull(side);
-    Side = side;
-  }
-
-  internal override Either<BattleQueryFailure, IReadOnlyCollection<DeadUnit>> Execute(BattleSession session)
-  {
-    return Succeed(session.DeadUnits.Where(unit => unit.Side == Side).Select(session.MintDead).ToArray());
+    return session.DeadUnits.Where(unit => unit.Side == side).Select(session.MintDead).ToArray();
   }
 }
 
-public sealed class CanUnitActNow : BattleSessionQuery<bool>
+public sealed class CanUnitActNow(BattleUnitState unit) : IBattleSessionQuery<bool>
 {
-  public AliveUnit Unit { get; }
-  public CanUnitActNow(AliveUnit unit)
+  public bool Execute(BattleSession session)
   {
-    Unit = unit;
-  }
-
-  internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
-  {
-    return RequireInProgress(session).Bind(_ => Succeed(session.CanUnitActNow(Unit.State)));
+    return session.CanUnitActNow(unit);
   }
 }
 
-public sealed class IsUnitStillAvailableThisTurn : BattleSessionQuery<bool>
+public sealed class IsUnitStillAvailableThisTurn(BattleUnitState unit) : IBattleSessionQuery<bool>
 {
-  public AliveUnit Unit { get; }
-
-  public IsUnitStillAvailableThisTurn(AliveUnit unit)
+  public bool Execute(BattleSession session)
   {
-    Unit = unit;
-  }
-
-  internal override Either<BattleQueryFailure, bool> Execute(BattleSession session)
-  {
-    return RequireInProgress(session).Bind(_ => Succeed(session.IsUnitStillAvailableThisTurn(Unit.State)));
+    return session.IsUnitStillAvailableThisTurn(unit);
   }
 }

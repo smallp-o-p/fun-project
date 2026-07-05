@@ -53,15 +53,15 @@ public class BattleFactoryTest
 
     BattleRuntime runtime = UnwrapStart(BattleFactory.Start(setup));
 
-    var playerUnit = GetValue(runtime.Query(new GetFactionAliveUnits(player))).Single();
-    var enemyUnit = GetValue(runtime.Query(new GetFactionAliveUnits(enemy))).Single();
+    var playerUnit = runtime.Query(new GetFactionAliveUnits(player)).Single();
+    var enemyUnit = runtime.Query(new GetFactionAliveUnits(enemy)).Single();
 
     Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw);
     Assert.Equal(new Vector3I(3, 0, 3), enemyUnit.Position.Raw);
 
     // InProgress + player (FactionOrder[0]) is the active side: it can act, enemy cannot yet.
-    Assert.True(GetValue(runtime.Query(new CanUnitActNow(playerUnit))));
-    Assert.False(GetValue(runtime.Query(new CanUnitActNow(enemyUnit))));
+    Assert.True(runtime.Query(new CanUnitActNow(playerUnit.State)));
+    Assert.False(runtime.Query(new CanUnitActNow(enemyUnit.State)));
   }
 
   [TestCase(TestName = "Start fails when a faction has no objective")]
@@ -211,8 +211,8 @@ public class BattleFactoryTest
 
     BattleRuntime runtime = UnwrapStart(BattleFactory.StartFromMap(setup));
 
-    var alpha = GetValue(runtime.Query(new GetFactionAliveUnits(player))).Single();
-    var bandit = GetValue(runtime.Query(new GetFactionAliveUnits(enemy))).Single();
+    var alpha = runtime.Query(new GetFactionAliveUnits(player)).Single();
+    var bandit = runtime.Query(new GetFactionAliveUnits(enemy)).Single();
     Assert.Equal(new Vector3I(0, 0, 0), alpha.Position.Raw);
     Assert.Equal(new Vector3I(3, 0, 3), bandit.Position.Raw);
   }

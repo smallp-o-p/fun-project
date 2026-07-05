@@ -130,9 +130,7 @@ public sealed partial class BattleScene : Node3D
 
     foreach (Faction faction in _factions)
     {
-      IReadOnlyCollection<AliveUnit> units = _runtime.Query(new GetFactionAliveUnits(faction)).Match(
-        Right: found => found,
-        Left: _ => System.Array.Empty<AliveUnit>());
+      IReadOnlyCollection<AliveUnit> units = _runtime.Query(new GetFactionAliveUnits(faction));
 
       var material = new StandardMaterial3D
       {

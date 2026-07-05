@@ -6,9 +6,9 @@ This document describes the command-pattern shape currently used around `BattleS
 
 - `BattleAction` = command and queued tactical intent
 - `BattleActionExecutor` = trigger mediator, queue, and invoker
-- `BattleSessionQuery<TResult>` = read-side query command
-- `BattleQueryRunner` = read-side query invoker
-- `Either<BattleQueryFailure, TResult>` = explicit read-side success/failure result
+- `IBattleSessionQuery<TResult>` = read-side query command
+- `BattleRuntime.Query` = read-side query invoker
+- `TResult` / `Option<T>` / `Either<BattleQueryFailure, TResult>` = read-side result, shaped by whether the question can fail
 - `BattleSession` = receiver and aggregate root
 
 ## Current Flow
@@ -40,6 +40,7 @@ The queue and replay surface stay focused on explicit battle actions. Composite 
 The executor API is:
 
 - `Submit(BattleAction action)`
+- `RegisterTrigger<TEventKey>(BattleTrigger trigger) where TEventKey : BattleEventTag`
 - `LastResult`
 
 And events:
@@ -58,6 +59,8 @@ The current built-in actions are:
 - `StartBattle`
 - `SpawnUnit`
 - `MoveUnit`
+- `AttackUnit`
+- `ReloadWeapon`
 - `ThrowItem`
 - `ApplyDamage`
 - `PassUnit`
@@ -76,5 +79,7 @@ runtime.Query(new GetPossibleMoveTilesForUnit(unit));
 runtime.Query(new FindPathForUnit(unit, destination));
 runtime.Query(new IsUnitStillAvailableThisTurn(unit));
 ```
+
+A query's result shape is part of its contract: questions guaranteed an answer — usually via `AliveUnit`/`ValidatedPoint` proof inputs — return the bare result, absence-is-normal questions return `Option<T>`, and only genuinely fallible questions return `Either<BattleQueryFailure, TResult>`. Proofs are minted at the runtime boundary via `BattleRuntime.TryGetAlive` / `TryGetTile`.
 
 Commands should remain explicit `BattleAction` values executed through `BattleActionExecutor.Submit`.

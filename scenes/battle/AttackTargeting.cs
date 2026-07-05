@@ -36,8 +36,7 @@ public sealed class AttackTargeting : IActionTargeting
       {
         Vector3I from = attacker.Position.Raw;
         int range = _weapon.EffectiveRange;
-        IReadOnlyCollection<AliveUnit> enemies = _runtime.Query(new GetVisibleEnemiesForUnit(attacker)).Match(
-          Right: e => e, Left: _ => System.Array.Empty<AliveUnit>());
+        IReadOnlyCollection<AliveUnit> enemies = _runtime.Query(new GetVisibleEnemiesForUnit(attacker));
 
         foreach (AliveUnit enemy in enemies)
         {

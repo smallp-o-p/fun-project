@@ -31,9 +31,7 @@ public sealed class MoveTargeting : IActionTargeting
     _lastPath = None;
     IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles =
       _runtime.TryGetAlive(_unit).Match(
-        Some: proof => _runtime.Query(new GetPossibleMoveTilesForUnit(proof)).Match(
-          Right: r => r,
-          Left: _ => System.Array.Empty<BattleBoardState.ValidatedPoint>()),
+        Some: proof => _runtime.Query(new GetPossibleMoveTilesForUnit(proof)),
         None: () => System.Array.Empty<BattleBoardState.ValidatedPoint>());
     foreach (BattleBoardState.ValidatedPoint point in tiles)
       _reachable.Add(point.Raw);

@@ -3,7 +3,7 @@ using FunProject.Weapons;
 using System;
 
 // Presentation-side verb taxonomy. Each verb carries its availability (sourced from the domain
-// AvailableUnitAction row) AND owns the factory for its targeting handler, which produces that
+// UnitAction row) AND owns the factory for its targeting handler, which produces that
 // verb's candidate set. Availability and candidates live on the same class so they cannot drift.
 // Targeted verbs implement NeedsTargeting; instant verbs implement CanActDirectly.
 public abstract class UnitActionOption

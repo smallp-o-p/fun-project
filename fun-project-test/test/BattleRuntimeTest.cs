@@ -6,15 +6,15 @@ using Godot;
 [RequireGodotRuntime]
 public sealed partial class BattleRuntimeTest
 {
-  [TestCase(TestName = "Query returns query runner result")]
-  public void QueryReturnsQueryRunnerResult()
+  [TestCase(TestName = "Query executes query against session")]
+  public void QueryExecutesQueryAgainstSession()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
     var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 0));
     var runtime = new BattleRuntime(session);
 
-    Option<BattleUnitState> result = GetValue(runtime.Query(new GetUnitAtTile(session.Board.At(1, 0, 0))));
+    Option<BattleUnitState> result = runtime.Query(new GetUnitAtTile(session.Board.At(1, 0, 0)));
 
     Assert.Equal(unit.State, result.RequireSome());
   }

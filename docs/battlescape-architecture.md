@@ -8,7 +8,7 @@ This document describes the tactical runtime shape in the repo and the nearby ex
 - `BattleSession` is constructed from battle setup data: a prepared board state and stable faction order.
 - `BattleAction` is the authoritative command layer.
 - `BattleActionExecutor` validates primitive actions produced by queued `BattleAction` values.
-- Read-side battle questions are represented as typed query objects, executed through a single query runner.
+- Read-side battle questions are represented as typed query objects, executed through `BattleRuntime.Query`.
 - Controllers, HUD code, and AI should ask battle-state questions through explicit query types instead of accumulating public query methods on `BattleSession`.
 - Godot scene nodes own presentation, input, and focused-unit UX. They do not own tactical truth.
 - Board coordinates use normal `Godot.Vector3I` semantics:
@@ -37,8 +37,8 @@ flowchart LR
         EventStream["BattleEvent stream"]
         Actions["BattleAction\nqueued intent + primitive commands"]
         ActionExecutor["BattleActionExecutor\naction queue + invocation"]
-        Queries["BattleSessionQuery<TResult>\ntyped read questions"]
-        QueryRunner["BattleQueryRunner\nread-query invocation"]
+        Queries["IBattleSessionQuery&lt;TResult&gt;\ntyped read questions"]
+        RuntimeFacade["BattleRuntime\nfacade: Query entry point,\nproof mint doors"]
     end
 
     subgraph Presentation["Godot Presentation / Input"]
@@ -63,11 +63,11 @@ flowchart LR
     HUD -->|"player request"| SceneController
     BattleScene -->|"selection / hover / click"| SceneController
     SceneController -->|"translate to action"| ActionExecutor
-    SceneController -->|"ask typed query"| QueryRunner
+    SceneController -->|"ask typed query"| RuntimeFacade
 
     ActionExecutor -->|"invoke primitive action"| Actions
     Actions -->|"execute against"| BattleSession
-    QueryRunner -->|"invoke"| Queries
+    RuntimeFacade -->|"Query(query)"| Queries
 
     EventStream -->|"BattleEventCommitted"| EventSignalHandler
     EventSignalHandler -->|"Godot signal"| BattleScene
@@ -103,13 +103,13 @@ flowchart LR
   - trigger response scheduling after committed events
   - last-result tracking
   - exception isolation around command execution
-- `BattleQueryRunner` owns:
-  - the single public entry point for read-side tactical questions
-  - null checks on submitted query objects
-  - invoking typed query objects against the current session
-- concrete `BattleSessionQuery<TResult>` classes own:
+- `BattleRuntime` owns:
+  - the single public entry point for read-side tactical questions (`Query`)
+  - null and disposal guards around query invocation
+  - the proof mint doors for scene code: `TryGetAlive(unit) : Option<AliveUnit>` and `TryGetTile(coordinates) : Option<ValidatedPoint>`
+- concrete `IBattleSessionQuery<TResult>` implementations own:
   - one specific read-side question
-  - the result type and failure semantics for that question
+  - the result shape for that question — bare `TResult`, `Option<T>`, or `Either<BattleQueryFailure, TResult>`
   - any query-specific composition across session, board, visibility, or unit state
 - `BattleSceneController`, `BattleScene`, and HUD own:
   - focused / selected unit UX
@@ -156,7 +156,7 @@ The session owns:
 - rebuilding faction visibility after successful actions
 - ending the battle when no living factions remain
 
-The target public read-side surface is a query runner, not a growing method list:
+The target public read-side surface is typed query objects through `BattleRuntime.Query`, not a growing method list:
 
 ```csharp
 var result = runtime.Query(new SomeBattleQuery(...));
@@ -164,40 +164,28 @@ var result = runtime.Query(new SomeBattleQuery(...));
 
 The session may keep internal helpers for actions and query objects, but controllers and AI should not depend on those helpers directly.
 
-### BattleSessionQuery
+### IBattleSessionQuery
 
 Read-side tactical questions should be modeled as typed query objects.
 
 Current base shape:
 
 ```csharp
-public abstract class BattleSessionQuery<TResult>
+public interface IBattleSessionQuery<out TResult>
 {
-  internal abstract Either<BattleQueryFailure, TResult> Execute(BattleSession session);
+  public TResult Execute(BattleSession session);
 }
 ```
 
-Current runner shape:
+Queries are invoked through `BattleRuntime.Query(...)`, which guards against null/disposed misuse and executes the query against its session; `BattleSession` does not expose a public query surface directly.
 
-```csharp
-public sealed class BattleQueryRunner
-{
-  private readonly BattleSession _session;
+Each query's result shape declares whether the question can fail:
 
-  internal BattleQueryRunner(BattleSession session)
-  {
-    _session = session ?? throw new ArgumentNullException(nameof(session));
-  }
+- **Bare `TResult`** — the default. The question always has an answer: usually because proof-typed inputs (`AliveUnit`, `ValidatedPoint`) carry the needed invariants (`FindPathForUnit`, `GetVisibleEnemiesForUnit`), occasionally because any input has a meaningful answer (`CanUnitActNow` takes a raw `BattleUnitState` — `false` covers dead or off-turn units).
+- **`Option<T>`** — absence is a normal answer, not a failure (`GetUnitAtTile`, `GetOperationForFaction`).
+- **`Either<BattleQueryFailure, TResult>`** — the question itself can be infeasible at runtime (`GetHitChanceForAttack` when the target is out of range or unseen, `GetFactionEndOfBattleSummary` before the battle ends). Callers handle the `Left` before using the `Right` value.
 
-  public Either<BattleQueryFailure, TResult> Execute<TResult>(BattleSessionQuery<TResult> query)
-  {
-    ArgumentNullException.ThrowIfNull(query);
-    return query.Execute(_session);
-  }
-}
-```
-
-The query runner is exposed through `BattleRuntime.Query(...)`; `BattleSession` does not expose a public query surface directly. Results are `Either<BattleQueryFailure, TResult>`. Query callers should handle the `Left` `BattleQueryFailure` before using the `Right` value; missing units, invalid tiles, and invalid battle-state questions are failures, not nullable query values.
+Missing/dead units and off-board tiles are no longer query failures: they are rejected at the proof mint doors before a query is ever built. Scene code holding a raw `BattleUnitState` or coordinate mints proofs through `BattleRuntime.TryGetAlive(unit) : Option<AliveUnit>` and `TryGetTile(coordinates) : Option<ValidatedPoint>`; the `None` path is what used to surface as a query `Left`. Misusing the trusted core — passing a proof into a context it was never valid for, or asking a question the current phase cannot answer (for example `CanUnitActNow` while the battle is not in progress) — is programmer error and is guarded by exceptions that are not meant to be caught, per the trusted-core convention.
 
 Example query types:
 
@@ -209,7 +197,7 @@ Example query types:
 - `IsTileVisibleToFaction`
 - `GetFactionAliveUnits`
 
-Each query should encode one question. Avoid catch-all query classes with enum modes, nullable selector fields, or behavior controlled by unrelated properties. If a query algorithm becomes complex or variable, use a strategy behind that specific query rather than turning the query runner into a dispatch switch.
+Each query should encode one question. Avoid catch-all query classes with enum modes, nullable selector fields, or behavior controlled by unrelated properties. If a query algorithm becomes complex or variable, use a strategy behind that specific query rather than turning `BattleRuntime.Query` into a dispatch switch.
 
 ### BattleBoardState
 
@@ -252,6 +240,8 @@ The current built-in authoritative actions are:
 - `StartBattle`
 - `SpawnUnit`
 - `MoveUnit`
+- `AttackUnit`
+- `ReloadWeapon`
 - `ThrowItem`
 - `ApplyDamage`
 - `PassUnit`
@@ -278,6 +268,7 @@ Submitted action results are returned as `IReadOnlyList<BattleActionResult>`. Th
 Current responsibilities:
 
 - `Submit(...)`
+- `RegisterTrigger<TEventKey>(...)`
 - `OnActionStart` event
 - `OnActionComplete` event
 - `LastResult`
@@ -311,7 +302,7 @@ sequenceDiagram
     actor Player
     participant HUD as Battle HUD
     participant Controller as BattleSceneController
-    participant Queries as BattleQueryRunner
+    participant Queries as BattleRuntime.Query
     participant Exec as BattleActionExecutor
     participant Action as MoveUnit
     participant Session as BattleSession
@@ -322,7 +313,7 @@ sequenceDiagram
     Player->>HUD: Confirm move
     HUD->>Controller: Move request
     Controller->>Queries: Execute FindPathForUnit query
-    Queries->>Session: Read unit state
+    Note over Queries: unit arrives as an AliveUnit proof (minted via BattleRuntime.TryGetAlive)
     Queries->>Board: FindPath
     Queries-->>Controller: Return preview path
     Controller->>Exec: Submit move action with destination steps
@@ -404,8 +395,8 @@ Use these names consistently in future tactical work:
 - `BattleActionResult`
 - `BattleActionExecutor`
 - `BattleTrigger`
-- `BattleSessionQuery<TResult>`
-- `BattleQueryRunner`
+- `IBattleSessionQuery<TResult>`
+- `BattleRuntime`
 - `Either<BattleQueryFailure, TResult>`
 - `BattleQueryFailure`
 - `BattleEventTag`

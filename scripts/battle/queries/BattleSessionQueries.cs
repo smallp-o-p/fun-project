@@ -16,9 +16,9 @@ public sealed record FactionBattleSummary
 }
 
 public sealed class GetFactionEndOfBattleSummary(Faction faction)
-  : BattleSessionQuery<FactionBattleSummary>
+  : IBattleSessionQuery<Either<BattleQueryFailure, FactionBattleSummary>>
 {
-  internal override Either<BattleQueryFailure, FactionBattleSummary> Execute(BattleSession session)
+  public Either<BattleQueryFailure, FactionBattleSummary> Execute(BattleSession session)
   {
     if (session.Phase != BattlePhase.Ended)
       return Left(new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState, "Battle session isn't over."));
