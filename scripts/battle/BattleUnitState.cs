@@ -86,6 +86,15 @@ public sealed class BattleUnitState
     return true;
   }
 
+  // Trusted-core spend: callers have already proven affordability (ValidateActingUnit), so
+  // a failed spend here is a broken invariant — not a rejectable outcome — and throws.
+  internal void SpendActionPoints(int cost)
+  {
+    if (!TrySpendActionPoints(cost))
+      throw new InvalidOperationException(
+        $"Unit {Id} cannot spend {cost} action points (has {CurrentActionPoints}).");
+  }
+
   public void ReceiveDamage(int amount)
   {
     if (amount <= 0)

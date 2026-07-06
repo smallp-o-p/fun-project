@@ -50,11 +50,11 @@ public sealed class WeaponIsLoadedCondition : UnitActionCondition
 }
 
 // Some visible unit is a legal attack target right now. Per-target legality delegates to
-// AttackFeasibility, so this can never drift from what AttackUnit accepts at submit time.
+// AttackContext.Resolve, so this can never drift from what AttackUnit accepts at submit time.
 public sealed class HasAttackableTargetCondition : UnitActionCondition
 {
   internal override bool IsMet(BattleSession session, AliveUnit unit)
-    => unit.State.VisibleUnits.Any(target => AttackFeasibility.Resolve(session, unit.State, target).IsRight);
+    => unit.State.VisibleUnits.Any(target => AttackContext.Resolve(session, unit.State, target).IsRight);
 }
 
 public sealed class CanReloadCondition : UnitActionCondition

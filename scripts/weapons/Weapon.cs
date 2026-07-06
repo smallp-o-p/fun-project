@@ -36,13 +36,27 @@ public class Weapon : EquippableItem, HasStats
   public List<Damage> EmitDamage() => EmitDamage([]);
 
   /// <summary>
-  /// Emit this weapon's damage bundle, folding <paramref name="externalMods"/> (e.g. the
-  /// wielder's active buff mods) after the weapon's own. Override to give a weapon type its
-  /// own emission; the common case (contributing extra bundle mods) should delegate to
-  /// <see cref="EmitDamageWith"/>.
+  /// Derive the frame's packets from base damage, fold this weapon's
+  /// <see cref="DamageContributions"/> followed by <paramref name="externalMods"/> (e.g. the
+  /// wielder's active buff mods), and drop non-positive packets at emission.
   /// </summary>
-  public virtual List<Damage> EmitDamage(IEnumerable<DamageBundleMod> externalMods)
-    => EmitDamageWith(externalMods);
+  public List<Damage> EmitDamage(IEnumerable<DamageBundleMod> externalMods)
+  {
+    int baseDamage = GetDamageStat().BaseValue;
+    var context = new DamageEmissionContext(baseDamage);
+
+    List<Damage> bundle = _frame.Packets
+      .Select(packet => packet.Derive(baseDamage))
+      .ToList();
+
+    foreach (DamageBundleMod mod in DamageContributions.Concat(externalMods))
+    {
+      ArgumentNullException.ThrowIfNull(mod);
+      bundle = mod.Apply(bundle, context);
+    }
+
+    return bundle.Where(damage => damage.Amount > 0).ToList();
+  }
 
   public Option<List<Damage>> TrySpendShot() => TrySpendShot([]);
 
@@ -63,28 +77,6 @@ public class Weapon : EquippableItem, HasStats
   /// <summary>Whether reloading would change anything. Weapons without a magazine never reload.</summary>
   public virtual bool CanReload() => false;
 
-  /// <summary>
-  /// Derive the frame's packets from base damage, fold the weapon's slot bundle mods followed by
-  /// <paramref name="additionalMods"/>, and drop non-positive packets at emission.
-  /// </summary>
-  protected List<Damage> EmitDamageWith(IEnumerable<DamageBundleMod> additionalMods)
-  {
-    int baseDamage = GetDamageStat().BaseValue;
-    var context = new DamageEmissionContext(baseDamage);
-
-    List<Damage> bundle = _frame.Packets
-      .Select(packet => packet.Derive(baseDamage))
-      .ToList();
-
-    foreach (DamageBundleMod mod in BundleModsFromSlots().Concat(additionalMods))
-    {
-      ArgumentNullException.ThrowIfNull(mod);
-      bundle = mod.Apply(bundle, context);
-    }
-
-    return bundle.Where(damage => damage.Amount > 0).ToList();
-  }
-
   public float EffectiveStat<TStat>() where TStat : Stat
     => this.Resolve<TStat>(StatContributions);
 
@@ -94,7 +86,12 @@ public class Weapon : EquippableItem, HasStats
   public virtual IEnumerable<StatMod> StatContributions
     => this.EquippedMods().SelectMany(m => m.StatContributions);
 
-  private IEnumerable<DamageBundleMod> BundleModsFromSlots()
+  /// <summary>
+  /// DamageBundleMods this weapon contributes to every emission, folded before any external
+  /// mods. Base: slot-mounted mods; override to append more (e.g. ammunition), mirroring
+  /// <see cref="StatContributions"/>.
+  /// </summary>
+  protected virtual IEnumerable<DamageBundleMod> DamageContributions
     => this.EquippedMods().OfType<DamageBundleEquippableMod>().SelectMany(m => m.BundleMods);
 
   public DamageStat GetDamageStat() => GetStat<DamageStat>();
@@ -148,8 +145,8 @@ public class FirearmWeapon(FirearmWeaponData data) : AmmunitionedWeapon(data)
   public FirearmArchetype Archetype { get; set; } = data.Archetype;
   public Option<Ammunition> AmmoType { get; set; } = Optional(data.DefaultAmmoData);
 
-  public override List<Damage> EmitDamage(IEnumerable<DamageBundleMod> externalMods)
-    => EmitDamageWith(AmmunitionBundleMods().Concat(externalMods));
+  protected override IEnumerable<DamageBundleMod> DamageContributions
+    => base.DamageContributions.Concat(AmmunitionBundleMods());
 
   public override IEnumerable<StatMod> StatContributions => base.StatContributions.Concat(AmmunitionStatMods());
 

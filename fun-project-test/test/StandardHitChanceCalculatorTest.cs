@@ -22,7 +22,7 @@ public partial class StandardHitChanceCalculatorTest
     var weapon = BattleTestFactory.MakeWeapon("Rifle");
     var attacker = new BattleUnitState(1, BattleTestFactory.MakeCombatant("Alpha", attackerFaction, aim: aim), Some(weapon), None);
 
-    return new AttackContext(attacker, attackerPoint, defenderPoint, board);
+    return new AttackContext(attacker, weapon, attackerPoint, defenderPoint, board);
   }
 
   [TestCase(TestName = "Base chance is the attacker's aim when no cover applies")]

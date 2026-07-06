@@ -512,6 +512,14 @@ public sealed class BattleSession
     return Board.FindOccupantPosition(unit.Id);
   }
 
+  // Total for alive units: an alive session unit is always board-indexed (see UnitProofs).
+  // Callers holding a liveness fact use this instead of handling an impossible None; a
+  // None here means the trusted core is broken, so it throws.
+  internal BattleBoardState.ValidatedPoint RequireUnitPosition(BattleUnitState unit)
+    => GetUnitPosition(unit).Match(
+      point => point,
+      () => throw new InvalidOperationException($"Unit {unit.Id} is not indexed on the board."));
+
   internal Option<BattleUnitState> GetUnitAt(BattleBoardState.ValidatedPoint point)
   {
     return Board.GetOccupant(point).Bind(id =>

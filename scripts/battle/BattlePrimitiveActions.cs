@@ -121,8 +121,7 @@ internal sealed class MoveUnitStep : BattleAction
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit id {UnitId} is no longer at {Source.Raw}.");
     if (!session.Board.CanOccupy(Destination))
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"{Destination} cannot be occupied.");
-    if (!Unit.TrySpendActionPoints(ActionPointCost))
-      return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Move unit step action could not spend {ActionPointCost} action points for unit {UnitId}.");
+    Unit.SpendActionPoints(ActionPointCost);
     session.MoveUnit(Unit, Source, Destination);
 
     return BattleActionResult.Success(this, Unit);
@@ -183,8 +182,7 @@ public abstract class UseItemCapabilityAction : BattleAction
     if (usabilityFailure.IsSome)
       return usabilityFailure.Value();
 
-    if (!ActingUnit.TrySpendActionPoints(ActionPointCost))
-      return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{ActingUnit.Combatant.Name} could not spend {ActionPointCost} action points.");
+    ActingUnit.SpendActionPoints(ActionPointCost);
 
     if (ConsumesOnUse)
     {
@@ -283,43 +281,34 @@ public sealed class AttackUnit : BattleAction
     if (validationFailure.IsSome)
       return validationFailure.Value();
 
-    return AttackFeasibility.Resolve(session, Unit, Target).Match(
-      Left: failure => BattleActionResult.Failure(this, MapFailureReason(failure.Kind), failure.Message),
-      Right: resolved => ResolveAttack(session, resolved));
+    return AttackContext.Resolve(session, Unit, Target).Match(
+      Left: message => BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, message),
+      Right: context => ResolveAttack(session, context));
   }
 
-  private static BattleActionFailureReason MapFailureReason(AttackFeasibilityFailureKind kind) =>
-    kind == AttackFeasibilityFailureKind.PositionUnresolved
-      ? BattleActionFailureReason.UnexpectedError
-      : BattleActionFailureReason.Rejected;
-
-  private BattleActionResult ResolveAttack(BattleSession session, ResolvedAttack resolved)
+  private BattleActionResult ResolveAttack(BattleSession session, AttackContext context)
   {
     // Ammo gate comes before the AP spend: an empty magazine is a legal rejection
     // that must leave the attacker's state fully untouched.
-    return resolved.Weapon.TrySpendShot(Unit.ActiveBuffDamageMods).Match(
-      Some: bundle => CommitAttack(session, resolved, bundle),
+    return context.Weapon.TrySpendShot(Unit.ActiveBuffDamageMods).Match(
+      Some: bundle => CommitAttack(session, context, bundle),
       None: () => BattleActionResult.Failure(this, BattleActionFailureReason.Rejected,
-        $"{resolved.Weapon.ItemName} has no ammunition loaded."));
+        $"{context.Weapon.ItemName} has no ammunition loaded."));
   }
 
-  private BattleActionResult CommitAttack(BattleSession session, ResolvedAttack resolved, List<Damage> bundle)
+  private BattleActionResult CommitAttack(BattleSession session, AttackContext context, List<Damage> bundle)
   {
-    BattleUnitState attacker = Unit;
+    Unit.SpendActionPoints(BattleSession.DefaultAttackActionPointCost);
 
-    if (!attacker.TrySpendActionPoints(BattleSession.DefaultAttackActionPointCost))
-      return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"{attacker.Combatant.Name} could not spend {BattleSession.DefaultAttackActionPointCost} action points.");
-
-    AttackContext context = new(attacker, resolved.AttackerPoint, resolved.TargetPoint, session.Board);
     HitChanceBreakdown breakdown = session.HitChanceCalculator.Calculate(context);
     int roll = session.RollPercent();
     bool isHit = roll < breakdown.FinalChance;
 
-    session.RaiseEvent(new UnitAttackedBattleEvent(attacker, Target, resolved.TargetPoint, resolved.Weapon, breakdown, roll, isHit));
+    session.RaiseEvent(new UnitAttackedBattleEvent(Unit, Target, context.DefenderPosition, context.Weapon, breakdown, roll, isHit));
     if (isHit)
       session.ApplyDamageTo(Target, bundle, Some(Unit));
 
-    return BattleActionResult.Success(this, attacker);
+    return BattleActionResult.Success(this, Unit);
   }
 }
 
@@ -344,10 +333,7 @@ public sealed class ApplyDamage : BattleAction
     if (!Unit.IsAlive)
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected, $"Unit {Unit.Id} is not alive.");
 
-    Option<BattleBoardState.ValidatedPoint> unitPointOption = session.GetUnitPosition(Unit);
-    if (unitPointOption.IsNone)
-      return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError, $"Damage action could not resolve position for unit {Unit.Id}.");
-
+    // Alive ⇒ board-indexed is a session invariant; ApplyDamageTo throws if it is broken.
     session.ApplyDamageTo(Unit, Amount);
 
     return BattleActionResult.Success(this, Unit);
@@ -436,9 +422,7 @@ public sealed class ReloadWeapon : BattleAction
     if (!reloadable.CanReload())
       return BattleActionResult.Failure(this, BattleActionFailureReason.Rejected,
         $"{reloadable.ItemName} is already fully loaded.");
-    if (!Unit.TrySpendActionPoints(BattleSession.DefaultReloadActionPointCost))
-      return BattleActionResult.Failure(this, BattleActionFailureReason.UnexpectedError,
-        $"{Unit.Combatant.Name} could not spend {BattleSession.DefaultReloadActionPointCost} action points.");
+    Unit.SpendActionPoints(BattleSession.DefaultReloadActionPointCost);
 
     reloadable.Reload();
     session.RaiseEvent(new UnitReloadedWeaponBattleEvent(Unit, reloadable));
