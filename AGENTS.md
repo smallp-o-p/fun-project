@@ -52,6 +52,7 @@ The tactical runtime in `scripts/battle/` is engine-agnostic C# and is the singl
 Godot scene scripts live in `scenes/` — currently `GameCamera`, `MovementLine`/`MovementLineBuilder`, `Interactable`/`IInteractable`, and the battle bridge in `scenes/battle/`; the `BattleSceneController`/`BattleScene`/HUD layer is not built yet. `scenes/battle/BattleEventSignalHandler` is the one adapter that binds a `BattleRuntime` and re-emits committed events as Godot signals (wrapping payloads in `BattleEventAdapter`/`BattleActionResultAdapter` `RefCounted` envelopes). Scene code reads state via `BattleRuntime.Query(...)` and never mutates the session directly. Keep this handler limited to signal adaptation — no battle-legality checks, no caching of authoritative state, no selection UX (selection is presentation state and is *not* tracked by `BattleSession`).
 
 ## Conventions
+- Prefer Collection expressions over explicitly instantiating any container types.
 - **LanguageExt** is globally imported (`GlobalUsings.cs`: `using LanguageExt; using static LanguageExt.Prelude;`). Prefer `Option<T>` over nullable returns for optional domain data.
 - `SysColGeneric` is the alias for `System.Collections.Generic` (LanguageExt shadows some collection names).
 - File-scoped namespaces under the `FunProject.*` root (`FunProject.Battle`, `FunProject.Stats`, `FunProject.Items`, …); the assembly root namespace is `funproject`. Two-space indentation. PascalCase types/members, camelCase locals/params, `_camelCase` private fields.
