@@ -65,11 +65,18 @@ public sealed class BattleRuntime : IDisposable
     return _actions.Submit(action);
   }
 
-  public void RegisterTrigger<TEventKey>(BattleTrigger trigger)
+  public void RegisterHook<TEventKey>(BattleHook hook, HookPhase phase, int priority = 0)
     where TEventKey : BattleEventTag
   {
     ThrowIfDisposed();
-    _actions.RegisterTrigger<TEventKey>(trigger);
+    _session.RegisterHook<TEventKey>(hook, phase, priority);
+  }
+
+  public bool UnregisterHook<TEventKey>(BattleHook hook, HookPhase phase)
+    where TEventKey : BattleEventTag
+  {
+    ThrowIfDisposed();
+    return _session.UnregisterHook<TEventKey>(hook, phase);
   }
 
   public void Dispose()

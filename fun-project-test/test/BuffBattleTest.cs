@@ -62,6 +62,9 @@ public partial class BuffBattleTest
     Assert.Equal(75f, player.EffectiveStat<AimStat>());
     Assert.Equal(75, Preview().FinalChance); // spec test 4: the preview sees the aim buff
     Assert.Equal(1, recorder.OfType<UnitBuffActivatedBattleEvent>().Count());
+    // v2 hook order pin: TurnStarted commits BEFORE the buff hook's activation (BuffSystem
+    // fires as a Before hook on TurnStarted), not after.
+    recorder.AssertCommittedBefore<TurnStartedBattleEvent, UnitBuffActivatedBattleEvent>();
   }
 
   [TestCase(TestName = "An AP buff active at the owner's turn start is included in the refreshed action points")]

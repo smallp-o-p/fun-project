@@ -5,7 +5,7 @@ This document describes the command-pattern shape currently used around `BattleS
 ## Pattern Mapping
 
 - `BattleAction` = command and queued tactical intent
-- `BattleActionExecutor` = trigger mediator, queue, and invoker
+- `BattleActionExecutor` = hook-interrupt mediator, queue, and invoker
 - `IBattleSessionQuery<TResult>` = read-side query command
 - `BattleRuntime.Query` = read-side query invoker
 - `TResult` / `Option<T>` / `Either<BattleQueryFailure, TResult>` = read-side result, shaped by whether the question can fail
@@ -21,7 +21,7 @@ BattleSceneController / HUD / AI
   -> each primitive action validates and executes against BattleSession
   -> BattleSession bookkeeping APIs
   -> BattleEvent emission
-  -> executor resolves trigger response actions from committed events before continuing
+  -> hooks fire Before/After for each raised event, inside the primitive's action window; the executor collects any interrupt actions they return before continuing
 ```
 
 The queue and replay surface stay focused on explicit battle actions. Composite actions such as `MoveUnit` may yield internal primitive child actions one at a time. Primitive actions such as `ThrowItem` and `ApplyDamage` apply one authoritative state change. `Submit` queues the provided action, resolves that action and every reaction caused by it, then returns the ordered public result list.
@@ -30,7 +30,7 @@ The queue and replay surface stay focused on explicit battle actions. Composite 
 
 - `BattleAction` owns action-specific application logic.
 - `BattleAction` owns action-specific legality checks.
-- `BattleActionExecutor` owns queue order, trigger response ordering, and exception isolation.
+- `BattleActionExecutor` owns queue order, hook-interrupt ordering, and exception isolation.
 - `BattleSession` owns authoritative battle state.
 - `BattleEvent` reports state changes that already committed.
 - queries read from session state without mutating it.
@@ -40,7 +40,6 @@ The queue and replay surface stay focused on explicit battle actions. Composite 
 The executor API is:
 
 - `Submit(BattleAction action)`
-- `RegisterTrigger<TEventKey>(BattleTrigger trigger) where TEventKey : BattleEventTag`
 - `LastResult`
 
 And events:
@@ -48,7 +47,9 @@ And events:
 - `OnActionStart`
 - `OnActionComplete`
 
-`Submit` returns `IReadOnlyList<BattleActionResult>` from that submission. Composite child actions are not public results: `MoveUnitStep` results produced inside `MoveUnit` are hidden from callers. Trigger response actions still raise events and mutate battle state, but they are resolved before `Submit` returns.
+Hooks register on the session, not the executor — the public door is `BattleRuntime.RegisterHook<TEventKey>(BattleHook hook, HookPhase phase, int priority = 0) where TEventKey : BattleEventTag`, plus `UnregisterHook` for self-unregistering one-shots. The executor opens an action window around each primitive so hook-returned interrupts have somewhere to land; it does not own registration.
+
+`Submit` returns `IReadOnlyList<BattleActionResult>` from that submission. Composite child actions are not public results: `MoveUnitStep` results produced inside `MoveUnit` are hidden from callers. Interrupt actions returned by hooks still raise events and mutate battle state, but they are resolved before `Submit` returns.
 
 Presentation code that needs committed state changes should subscribe to `BattleSession.BattleEventCommitted`. That callback runs after the corresponding state change has happened, so graphical work can query the session and see the committed state.
 

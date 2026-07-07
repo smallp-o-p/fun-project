@@ -2,6 +2,7 @@ using FunProject.Battle;
 using FunProject.Combatants;
 using GdUnit4;
 using Godot;
+using System.Collections.Generic;
 using System.Linq;
 
 [TestSuite]
@@ -77,7 +78,7 @@ public class ObjectiveBattleTest
     var exfil = new FakeObjective { Complete = false };
     session.AddObjective(player, task);
     // When the operation fails, hand the player an exfiltrate objective inline.
-    session.RegisterListener<OperationFailedBattleEvent>(new AddObjectiveOnOperationFailed(player, exfil));
+    session.RegisterHook<OperationFailedBattleEvent>(new AddObjectiveOnOperationFailed(player, exfil), HookPhase.After);
     StartBattle(session);
 
     AdvanceTurn(session); // player's task fails -> exfil added -> operation reactivated (Active)
@@ -142,7 +143,7 @@ public class ObjectiveBattleTest
     Assert.Throws<InvalidOperationException>(() => session.StartBattle());
   }
 
-  private sealed class AddObjectiveOnOperationFailed : BattleEventListener
+  private sealed class AddObjectiveOnOperationFailed : BattleHook
   {
     private readonly Faction _faction;
     private readonly Objective _toAdd;
@@ -154,15 +155,17 @@ public class ObjectiveBattleTest
       _toAdd = toAdd;
     }
 
-    public override void OnEventCommitted(BattleSession session, BattleEvent battleEvent)
+    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
     {
       if (_added)
-        return;
+        return [];
       if (battleEvent is OperationFailedBattleEvent failed && failed.Faction == _faction)
       {
         _added = true;
-        session.AddObjective(_faction, _toAdd);
+        context.Session.AddObjective(_faction, _toAdd);
       }
+
+      return [];
     }
   }
 }

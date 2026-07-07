@@ -4,42 +4,41 @@ using System.Collections.Generic;
 
 namespace FunProject.Tests;
 
-// Collects every event it receives; register against the session with RegisterListener<TEventKey>.
-internal sealed class RecordingBattleEventListener : BattleEventListener
+// Collects every event it receives; register with RegisterHook<TEventKey>.
+internal sealed class RecordingHook : BattleHook
 {
   public List<BattleEvent> Received { get; } = [];
 
-  public override void OnEventCommitted(BattleSession session, BattleEvent battleEvent)
-    => Received.Add(battleEvent);
+  public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
+  {
+    Received.Add(battleEvent);
+    return [];
+  }
 }
 
-// A trigger that logs a message the first time it sees a positioned event on the target tile.
-// Optionally counts every evaluation and/or consumes itself when it fires.
-internal sealed partial class RecordingTrigger : BattleTrigger
+// Logs a message when it sees a positioned event on the target tile; counts every evaluation.
+internal sealed partial class PositionRecordingHook : BattleHook
 {
   private readonly Vector3I _position;
   private readonly List<string> _log;
   private readonly string _message;
-  private readonly bool _consume;
 
   public int EvaluateCallCount { get; private set; }
 
-  public RecordingTrigger(Vector3I position, List<string> log, string message, int priority = 0, bool consume = false)
+  public PositionRecordingHook(Vector3I position, List<string> log, string message)
   {
     _position = position;
     _log = log;
     _message = message;
-    _consume = consume;
-    Priority = priority;
   }
 
-  public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
+  public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
   {
     EvaluateCallCount++;
     if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
-      return BattleTriggerResult.NoReaction();
+      return [];
 
     _log.Add(_message);
-    return _consume ? BattleTriggerResult.ConsumeTrigger() : BattleTriggerResult.NoReaction();
+    return [];
   }
 }

@@ -255,7 +255,7 @@ public sealed class ThrowItem : UseItemCapabilityAction
 
   protected override void RaiseUseEvent(BattleSession session)
   {
-    session.RaiseEvent(new ItemThrownBattleEvent(Unit, TargetCell, Item));
+    session.RaiseEvents(new ItemThrownBattleEvent(Unit, TargetCell, Item));
   }
 }
 
@@ -304,7 +304,7 @@ public sealed class AttackUnit : BattleAction
     int roll = session.RollPercent();
     bool isHit = roll < breakdown.FinalChance;
 
-    session.RaiseEvent(new UnitAttackedBattleEvent(Unit, Target, context.DefenderPosition, context.Weapon, breakdown, roll, isHit));
+    session.RaiseEvents(new UnitAttackedBattleEvent(Unit, Target, context.DefenderPosition, context.Weapon, breakdown, roll, isHit));
     if (isHit)
       session.ApplyDamageTo(Target, bundle, Some(Unit));
 
@@ -425,7 +425,7 @@ public sealed class ReloadWeapon : BattleAction
     Unit.SpendActionPoints(BattleSession.DefaultReloadActionPointCost);
 
     reloadable.Reload();
-    session.RaiseEvent(new UnitReloadedWeaponBattleEvent(Unit, reloadable));
+    session.RaiseEvents(new UnitReloadedWeaponBattleEvent(Unit, reloadable));
     return BattleActionResult.Success(this, Unit);
   }
 }

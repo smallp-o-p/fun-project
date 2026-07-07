@@ -100,7 +100,7 @@ flowchart LR
   - preview validation for supported primitive actions
   - the pending action queue
   - invocation order
-  - trigger response scheduling after committed events
+  - hook-interrupt scheduling from hooks firing during a primitive's action window
   - last-result tracking
   - exception isolation around command execution
 - `BattleRuntime` owns:
@@ -268,10 +268,11 @@ Submitted action results are returned as `IReadOnlyList<BattleActionResult>`. Th
 Current responsibilities:
 
 - `Submit(...)`
-- `RegisterTrigger<TEventKey>(...)`
 - `OnActionStart` event
 - `OnActionComplete` event
 - `LastResult`
+
+Hook registration is not an executor responsibility: hooks register on the session (public door `BattleRuntime.RegisterHook<TEventKey>(hook, phase, priority)`, plus `UnregisterHook`), and the executor's only involvement is opening an action window around each primitive so hook-returned interrupts have somewhere to land.
 
 The executor does not currently:
 
@@ -323,7 +324,7 @@ sequenceDiagram
         Action->>Board: Validate adjacency, occupancy, and path legality
         Action->>Board: Commit the next board step
         Action->>Event: Raise UnitMoved and TileOccupied
-        Exec->>Exec: Resolve trigger responses from committed events
+        Exec->>Exec: Close the action window and collect interrupt actions hooks returned during dispatch
     end
     Exec-->>Controller: Return public IReadOnlyList<BattleActionResult>
     Event-->>View: Animate movement from committed battle event
@@ -337,6 +338,7 @@ sequenceDiagram
 - `StartBattle` rebuilds the active round queue from living factions in that order.
 - `ActiveSide` and `TurnNumber` are owned by the session.
 - `EndFactionTurn` is the explicit faction-turn action.
+- Turn start is the same shape at both invocation sites: refresh the relevant faction's action-point availability, then raise the turn-start events (`TurnStarted`, plus `ActiveSideChanged` on a side flip or `SessionStarted` on battle start), then refresh `RefreshForNewTurn` for the affected units. Buff evaluation is an ordinary `Before` hook on `TurnStartedBattleEvent` (`TurnStartBuffHook`) and on `UnitAddedBattleEvent` at spawn (`UnitSpawnedBuffHook`), so a buff flip lands before that event's own broadcast and — for turn start — before the AP refresh that runs once the dispatch completes and reads (possibly buffed) `MaxActionPoints`. Mid-dispatch observers of `SessionStarted`/`TurnStarted` see pre-refresh action points; this is deliberate, since the refresh always completes before `Submit`/`StartBattle` returns. See `docs/battle-event-trigger-architecture.md` for the full hook model.
 - `PassUnit` ends a unit activation and currently advances the turn automatically if that side has no remaining actable units.
 - Unit death updates alive/dead storage, board occupancy, current-turn availability, and faction queue membership through session bookkeeping.
 
@@ -361,11 +363,11 @@ The current event stream is intentionally small and authoritative. Presentation 
 
 Presentation code should react to these events instead of inferring state changes from executor internals.
 
-Trigger registration keys on `BattleEventTag` types, not an enum. A trigger can register against a concrete event such as `TileOccupiedBattleEvent`, or against a shared marker interface such as `IPositionedBattleEvent` or `IUnitBattleEvent`, in which case it fires for every committed event implementing that tag. Concrete event subclasses, such as `UnitMovedBattleEvent` and `TurnStartedBattleEvent`, carry event-specific payloads.
+Hook registration keys on `BattleEventTag` types, not an enum. A `BattleHook` can register against a concrete event such as `TileOccupiedBattleEvent`, or against a shared marker interface such as `IPositionedBattleEvent` or `IUnitBattleEvent`, in which case it fires for every committed event implementing that tag, in whichever `HookPhase` (`Before`/`After`) it was registered for. Concrete event subclasses, such as `UnitMovedBattleEvent` and `TurnStartedBattleEvent`, carry event-specific payloads.
 
-Event dispatch is queue-drained: an event raised mid-dispatch is deferred until after the current event finishes processing (breadth-first, not inline). A throwing observer clears the queue and surfaces the exception. `BattleActionExecutor.Submit` throws if called during dispatch, because listeners are not allowed to inject executor actions — that is the trigger system's role.
+Event dispatch is queue-drained: an event raised mid-dispatch is deferred until after the current event finishes processing (breadth-first, not inline). A throwing hook clears the queue and surfaces the exception. `BattleActionExecutor.Submit` throws if called while the session is dispatching events — no hook, in either phase, may inject a second execution loop; a hook's only write channel outward is the interrupt actions it returns from `OnEvent`, which the executor applies through the normal action path once the current primitive's action window closes.
 
-In addition to triggers, the session supports `BattleEventListener` registrations (internal `RegisterListener<TEventKey>()`, same `BattleEventKeys` tag routing). Listeners are plain-C# session-internal bookkeeping observers that may mutate state directly and raise follow-up events; `ArmorRegenSystem` is the first listener, ticking armor regen on `TurnEndedBattleEvent` and raising `UnitArmorRegeneratedBattleEvent`. Damage to an armored unit flows through the pure `DamageResolver` (scripts/battle/combat/) inside `BattleSession.ApplyDamageTo`: each bundle packet is split into armor damage (1.5x floored on element match) and health damage (always from the un-multiplied amount); `UnitDamagedBattleEvent` carries the `ArmorDamage`/`HealthDamage` split alongside the pre-mitigation bundle.
+The session's `BattleHookRegistry` is the one hook registry (see `docs/battle-event-trigger-architecture.md` for the full model): every hook is a `BattleHook` (or `BattleHook<TEvent>`) registered against an event-tag type with a `HookPhase` and an int priority, and may mutate state directly and raise follow-up events. `ArmorRegenSystem` is registered `After` on `TurnEndedBattleEvent`, ticking armor regen and raising `UnitArmorRegeneratedBattleEvent`. Damage to an armored unit flows through the pure `DamageResolver` (scripts/battle/combat/) inside `BattleSession.ApplyDamageTo`: each bundle packet is split into armor damage (1.5x floored on element match) and health damage (always from the un-multiplied amount); `UnitDamagedBattleEvent` carries the `ArmorDamage`/`HealthDamage` split alongside the pre-mitigation bundle.
 
 ## Future Extensions
 
@@ -394,7 +396,7 @@ Use these names consistently in future tactical work:
 - `BattleAction`
 - `BattleActionResult`
 - `BattleActionExecutor`
-- `BattleTrigger`
+- `BattleHook` (`BattleHook<TEvent>`, `HookPhase.Before`/`After`)
 - `IBattleSessionQuery<TResult>`
 - `BattleRuntime`
 - `Either<BattleQueryFailure, TResult>`

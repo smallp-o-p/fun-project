@@ -1,6 +1,6 @@
-# Battle Event Trigger Architecture Draft
+# Battle Event Trigger Architecture
 
-This document sketches a possible tactical runtime architecture for event-driven battle reactions. It is a draft proposal, not a description of the current implementation.
+This document describes the tactical runtime architecture for event-driven battle reactions as implemented.
 
 The goal is to support actions that unfold over multiple committed steps while allowing battle systems to observe those steps and request follow-up work. Examples include overwatch fire, proximity mines, visibility changes, falling, morale checks, and other effects that happen between a unit's declared action and that action's final destination.
 
@@ -25,26 +25,26 @@ The initial event vocabulary should stay small:
 - `TurnStarted`
 - `TurnEnded`
 
-These event types describe committed state changes. Consequences are resolved from committed events captured by the action executor immediately after a primitive action succeeds.
+These event types describe committed state changes. Consequences are resolved from events as they are raised, mediated by the session's hook registry.
 
 ## Initial Implementation
 
 The first implementation slice now exists in code:
 
 - `TileOccupiedBattleEvent` is emitted after successful movement steps.
-- `MoveUnitStep` publishes committed `UnitMoved` and `TileOccupied` after a successful move.
-- `ApplyDamage` publishes committed `UnitDamaged` and lethal `UnitKilled`.
-- `EndFactionTurn` publishes committed `TurnEnded` and `TurnStarted` transition events.
-- `BattleTrigger` and the executor's internal trigger registry provide mediated, deterministic trigger evaluation bucketed by `BattleEventTag` type.
+- `MoveUnitStep` publishes `UnitMoved` and `TileOccupied` after a successful move.
+- `ApplyDamage` publishes `UnitDamaged` and lethal `UnitKilled`.
+- `EndFactionTurn` publishes `TurnEnded` and `TurnStarted` transition events.
+- `BattleHook` and the session's internal `BattleHookRegistry` provide mediated, deterministic hook evaluation bucketed by `BattleEventTag` type, firing in a `Before` or `After` phase relative to each event's public broadcast.
 - `BattleAction` and `MoveUnit` give the executor explicit high-level queued work and primitive action commits.
-- `BattleActionExecutor` accepts a submitted `BattleAction`, commits primitive actions until the submitted action and its reactions settle, resolves trigger responses from committed events, and inserts interrupt response actions ahead of paused work.
+- `BattleActionExecutor` accepts a submitted `BattleAction`, commits primitive actions one at a time inside an action window, and inserts any interrupt actions hooks returned during that primitive's event dispatch ahead of paused work once the window closes.
 
 Current limitations:
 
-- Concrete overwatch and proximity mine rules are not implemented yet; tests use simple damage triggers as proof-of-concept trigger responses.
-- Runtime trigger responses require a persistent `BattleActionExecutor` when a composite action needs to pause and resume around reactions.
+- Concrete overwatch and proximity mine rules are not implemented yet; tests use simple damage hooks as proof-of-concept interrupt responses.
+- Runtime interrupt responses require a persistent `BattleActionExecutor` when a composite action needs to pause and resume around them.
 - The old predictive command surfaces have been removed. Queued player/AI intent must be expressed as `BattleAction` values such as `MoveUnit`, and primitive actions are the commit layer.
-- The executor indexes triggers by `BattleEventTag` type (concrete event records and the marker interfaces they implement). It does not yet index by tile, faction, owner, or source item.
+- The session's hook registry indexes hooks by `BattleEventTag` type (concrete event records and the marker interfaces they implement) and `HookPhase`. It does not yet index by tile, faction, owner, or source item.
 
 ## Core Runtime Shape
 
@@ -54,11 +54,12 @@ Controller / AI
   -> BattleActionExecutor.Submit(action)
   -> inspect the action at the head of the queue
   -> ask the head action for its next primitive action
-  -> validate and commit that primitive action
-  -> capture the committed events raised during the commit
-  -> ask registered triggers whether any committed event matters
-  -> enqueue any trigger response actions
-  -> continue until the submitted action and reactions settle
+  -> open an action window for that primitive's Execute
+  -> validate and commit the primitive action; each event it raises fires
+     Before hooks, broadcasts BattleEventCommitted, then fires After hooks
+  -> close the action window and collect any interrupt actions hooks
+     returned, in evaluation order
+  -> continue until the submitted action and its interrupts settle
   -> return the ordered action result list
 ```
 
@@ -67,38 +68,40 @@ The important distinction is between composite actions and primitive actions.
 - A high-level action is intent, such as "move this unit through these destination tiles."
 - A primitive action is an atomic authoritative state change, such as "move this unit from tile A to adjacent tile B."
 
-Longer actions should be modeled as sequences of primitive actions. This gives the runtime a stable checkpoint after each step where visibility, triggers, reactions, and presentation updates can happen.
+Longer actions should be modeled as sequences of primitive actions. This gives the runtime a stable checkpoint after each step where visibility, hooks, interrupts, and presentation updates can happen.
 
-The executor should be understood as an action queue processor. The queue head is the currently executing or about-to-execute action. Trigger responses are also actions. When the head action commits events that match registered triggers, the executor enqueues the trigger response actions so they run before the interrupted head action continues. Those response actions can commit events of their own, which may enqueue more actions.
+The executor should be understood as an action queue processor. The queue head is the currently executing or about-to-execute action. Interrupt actions are also actions. When events raised by the head action's commit match registered hooks and those hooks return interrupt actions, the executor enqueues them once the primitive's action window closes, so they run before the interrupted head action continues. Those interrupt actions can commit events of their own, which may enqueue more actions.
 
-## Committed Event Reaction Planning
+## Event Dispatch and Hook Timing
 
-Battle observers are consulted after a primitive state change commits.
+Battle observers are consulted as each event is raised, not only after the whole primitive settles.
 
-The primitive action is responsible for raising the domain events caused by its authoritative state change. The executor captures those committed events, resolves triggers in a deterministic order, and queues any requested responses.
+The primitive action is responsible for raising the domain events caused by its authoritative state change. As each event is raised, the session's dispatch loop fires that event's `Before` hooks, broadcasts `BattleEventCommitted`, then fires its `After` hooks. When this firing happens inside an executor action window, any interrupt actions the hooks return accumulate into that primitive's interrupt buffer.
 
 For movement, this means:
 
 ```text
 validate MoveUnitStep
   -> commit the unit onto the destination tile
-  -> publish committed UnitMoved and TileOccupied
-  -> executor finds triggers for those committed events
+  -> raise UnitMoved: Before hooks fire -> broadcast -> After hooks fire
+  -> raise TileOccupied: Before hooks fire -> broadcast -> After hooks fire
+  -> executor closes the action window and collects any interrupts those
+     hooks returned
   -> run planned interrupt while the unit is on that tile
   -> continue, interrupt, or cancel the remaining movement
 ```
 
-This matters for overwatch and mines. If a unit steps from `X` to `X + 1`, the reaction should evaluate against the post-step state where the unit occupies `X + 1`. The longer move to `X + N` is still unresolved and can be paused or cancelled.
+This matters for overwatch and mines. If a unit steps from `X` to `X + 1`, the hook should evaluate against the post-step state where the unit occupies `X + 1`. The longer move to `X + N` is still unresolved and can be paused or cancelled.
 
-Rules that prevent a commit, such as "this tile cannot be entered," should remain validation rules. Rules that react to an occurred fact, such as "a watched tile became occupied," should be trigger rules. Trigger response actions run after the triggering primitive action commits, so they act on the committed state that caused the event.
+Rules that prevent a commit, such as "this tile cannot be entered," should remain validation rules. Rules that react to an occurred fact, such as "a watched tile became occupied," should be hook rules — registered `After`, since they want to observe a settled fact. A `Before` hook is for the rarer case where a hook's own mutation should be visible to that same event's broadcast observers (buffs are the current example). Either way, interrupt responses run inside the primitive's dispatch, so overwatch/mine interrupts still act on the committed state that caused the event.
 
-For overwatch, the trigger is discovered from the committed movement event, so the target is physically on the watched tile when the shot executes. For a proximity mine, detonation likewise happens after the unit has entered the triggering tile.
+For overwatch, the hook is discovered from the raised movement event, so the target is physically on the watched tile when the shot executes. For a proximity mine, detonation likewise happens after the unit has entered the triggering tile.
 
 ## Proposed Components
 
 ### BattleAction
 
-`BattleAction` represents work requested by a player, AI, reaction, or system.
+`BattleAction` represents work requested by a player, AI, hook interrupt, or system.
 
 Examples:
 
@@ -119,12 +122,9 @@ Responsibilities:
 - accept caller intent through `Submit`
 - keep an ordered action queue
 - treat the queue head as the active or about-to-execute action
-- insert trigger response actions ahead of a paused action when they must resolve immediately
-- queue follow-up actions in defined positions when they do not interrupt the active action
-- resolve the submitted action chain one primitive commit at a time
-- capture committed events during each primitive commit
-- resolve registered triggers for committed events
-- queue deterministic trigger response actions
+- open an action window around each primitive's execution (`BeginActionExecution`/`EndActionExecution`) so hooks firing during its event dispatch have somewhere to deposit interrupt actions
+- insert interrupt actions ahead of a paused action once the window closes, aggregated across the whole primitive and reversed once
+- discard a window's interrupts entirely if the primitive fails
 - decide whether the active action continues, pauses, cancels, or completes
 - return the ordered public result list from the submission
 
@@ -135,19 +135,22 @@ A useful mental model:
 ```text
 queue: [MoveUnit]
 
-MoveUnit step commits TileOccupied
-  -> overwatch trigger returns ReactionFire
-  -> executor inserts ReactionFire before the remaining MoveUnit work
+MoveUnit step raises TileOccupied
+  -> an After hook (overwatch) returns ReactionFire
+  -> the action window closes; executor inserts ReactionFire before the
+     remaining MoveUnit work
 
 queue while resolving: [ReactionFire, MoveUnit]
 
-ReactionFire may commit UnitDamaged
-  -> damage trigger may insert another response
+ReactionFire may raise UnitDamaged
+  -> a damage hook may insert another interrupt
 ```
 
-The queue can therefore grow while a submission is being resolved. The executor controls where new actions are inserted so nested reactions remain deterministic, and a normal submission leaves the queue empty when it returns.
+The queue can therefore grow while a submission is being resolved. The executor controls where new actions are inserted so nested interrupts remain deterministic, and a normal submission leaves the queue empty when it returns.
 
-The public result list does not include primitive child actions produced by a composite action. A `MoveUnit` that commits multiple `MoveUnitStep` actions hides those step results from callers. The committed `BattleEvent` stream remains the source for per-step movement and trigger details.
+When a single primitive raises more than one event (for example a move raising both `UnitMoved` and `TileOccupied`), hooks fire per event — Before, broadcast, After — in raise order, and their returned interrupt actions accumulate in that order into the primitive's action window. The executor reverses the combined list once before inserting it — never per event — so interrupts still insert in evaluation order (event 1's ahead of event 2's) at the front of the queue.
+
+The public result list does not include primitive child actions produced by a composite action. A `MoveUnit` that commits multiple `MoveUnitStep` actions hides those step results from callers. The committed `BattleEvent` stream remains the source for per-step movement and hook details.
 
 The executor may publish presentation notifications after rule resolution, but it should not be the source of truth for domain events. Primitive actions and the session emit committed `BattleEvent` values as they change authoritative state.
 
@@ -157,7 +160,7 @@ Primitive `BattleAction` types are the commit layer.
 
 Primitive actions own their state changes and event emission because they know exactly what changed. For example, `MoveUnitStep` knows the source tile, destination tile, and moved unit after it changes board occupancy. `ApplyDamage` knows the affected unit, damage amount, and whether the damage reduced health to zero.
 
-The executor should not infer events by diffing session state. It should capture the committed domain events raised while a primitive action executes, then use those events to resolve triggers.
+The executor should not infer events by diffing session state. It opens an action window around a primitive's execution so the session's dispatch loop can attribute the hook firings and interrupt actions that happen during that primitive to it, rather than capturing and diffing committed state itself.
 
 Good primitive actions:
 
@@ -171,9 +174,9 @@ High-level movement should be represented by composite actions such as `MoveUnit
 
 ### BattleEvent
 
-`BattleEvent` describes a committed battle fact. Trigger registration keys on `BattleEventTag` types — the concrete event record type plus any `BattleEventTag` marker interfaces it implements (such as `IPositionedBattleEvent`) — while concrete event subclasses carry only the payload that applies to that event.
+`BattleEvent` describes a committed battle fact. Hook registration keys on `BattleEventTag` types — the concrete event record type plus any `BattleEventTag` marker interfaces it implements (such as `IPositionedBattleEvent`) — while concrete event subclasses carry only the payload that applies to that event.
 
-Events need enough context for triggers to evaluate without guessing:
+Events need enough context for hooks to evaluate without guessing:
 
 ```text
 UnitMovedBattleEvent
@@ -202,64 +205,47 @@ TurnStartedBattleEvent / TurnEndedBattleEvent
   TurnNumber
 ```
 
-Shared interfaces such as `IPositionedBattleEvent` let triggers match common payload concepts without forcing every event into one large optional-field record.
+Shared interfaces such as `IPositionedBattleEvent` let hooks match common payload concepts without forcing every event into one large optional-field record.
 
-### BattleTrigger
+### BattleHook
 
-`BattleTrigger` is registered battle-state behavior that reacts to events.
+`BattleHook` (and the generic `BattleHook<TEvent>`) is the one battle observer/reactor concept — there is no phase-by-subclass hierarchy. A hook is registered against an event-tag type with a `HookPhase` (`Before` or `After`) and an int priority; it fires once per matching event, in that phase, receiving a `HookContext` (`Session`, `Phase`, `SourceAction: Option<BattleAction>` — the executor's in-flight primitive when one is open, else `None`).
+
+```csharp
+public abstract class BattleHook
+{
+  public abstract IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent);
+}
+```
 
 Examples:
 
-- a proximity mine registered against affected tiles
-- an overwatch cone registered against watched tiles
-- a reaction-fire rule registered against visibility or occupation events
-- a hazard registered against burning or electrified tiles
+- a proximity mine registered against affected tiles (`After` — reacts to a settled fact)
+- an overwatch cone registered against watched tiles (`After`)
+- session-internal bookkeeping such as `StatusEffectSystem` / `ArmorRegenSystem` / `ObjectiveSystem` (`After`, mutating state directly)
+- buff evaluation (`Before` — its mutation must land before the turn-start/spawn event it rides broadcasts, and before the AP refresh that follows)
 
-A trigger should be serializable battle state. It should not be a raw runtime delegate that disappears on save/load.
+A hook may mutate `BattleSession` directly, raise follow-up events through `context.Session.RaiseEvent(...)` (queued, so the committed stream stays linear), and/or RETURN interrupt actions from `OnEvent`. Returned interrupts only mean something while an executor action is in flight: the session throws `InvalidOperationException` if a hook returns one outside that window — interrupts only mean something inside an executor action. Most hooks return `[]`.
 
-```text
-BattleTrigger
-  TriggerId
-  Owner
-  WatchedEventTypes
-  WatchedTiles
-  Priority
-  Expiration
-```
+One-shot hooks (mines) call `session.UnregisterHook<TEventKey>(this, phase)` on themselves from inside `OnEvent`; matches are materialized before a firing's iteration, so self-unregistration mid-loop is safe and takes effect on the next dispatch.
 
-Triggers should evaluate committed events and return requested consequences. They should not directly mutate `BattleSession`.
+### Hook Registration
 
-```text
-Trigger evaluation result:
-  - no reaction
-  - enqueue response action after commit
-  - consume this trigger
-```
-
-The normal response for event observers is "after commit." This means an event such as `TileOccupied` is captured after the board state changes, and any response action such as overwatch fire or mine detonation is applied while the tile is actually occupied.
-
-### Trigger Registration
-
-`BattleActionExecutor` owns registered triggers and provides efficient lookup through an internal registry. Registration chooses the event-tag bucket through a type parameter:
+The session owns registered hooks and provides lookup through its internal `BattleHookRegistry`. Registration lives on the session; the public door is `BattleRuntime.RegisterHook`, choosing the event-tag bucket through a type parameter, the firing phase, and a priority given at registration:
 
 ```csharp
-executor.RegisterTrigger<TileOccupiedBattleEvent>(trigger);
-executor.RegisterTrigger<IPositionedBattleEvent>(trigger); // fires for every positioned event
+runtime.RegisterHook<TileOccupiedBattleEvent>(hook, HookPhase.After, priority: 0);
+runtime.RegisterHook<IPositionedBattleEvent>(hook, HookPhase.Before); // fires for every positioned event
 ```
 
-`BattleTrigger` still owns detailed matching through `Matches(...)`, but the registry only calls `Matches(...)` on triggers registered for one of the committed event's tag types.
+This is a deliberate scope change from an executor-owned registry: because hooks are registered on the *session* rather than on any one executor, a hook registered through this door fires for every dispatch on that session — including setup and turn-transition dispatches that no executor action produced — not just events an executor happens to be resolving, and the registration survives disposal of any one `BattleRuntime` wrapping it. `ThrowIfDisposed` still guards the `BattleRuntime.RegisterHook`/`UnregisterHook` doors themselves, so a disposed runtime cannot register or unregister hooks, but hooks already registered keep firing for the session's other executors.
 
-For tile-based events, it should be able to answer:
-
-```text
-Which triggers care about a committed TileOccupied at tile X?
-```
-
-This supports proximity mines and overwatch without broadcasting every event to every possible observer.
+Ordering within one (event, phase) bucket is int priority (lower first), then registration order (a monotonic stamp) — one vocabulary, no bucket enum.
 
 The registry currently indexes by:
 
 - event tag type (the concrete event record type plus the `BattleEventTag` marker interfaces it implements)
+- phase (`Before` / `After`)
 
 Later indices can include:
 
@@ -268,19 +254,30 @@ Later indices can include:
 - source item
 - faction
 
-This supports the current runtime without broadcasting every event to every trigger, while leaving room for spatial indexing if tile-based trigger counts grow.
+This supports the current runtime without broadcasting every event to every hook, while leaving room for spatial indexing if tile-based hook counts grow.
 
-## Listeners vs Triggers
+## Phases
 
-`BattleTrigger` and `BattleEventListener` both observe committed events but serve different roles.
+There is one hook base class (`BattleHook`) and one registration door; `HookPhase` is registration data — a firing-order parameter — not a type hierarchy.
 
-**Triggers** are serializable, designer-authored gameplay reactions. They are evaluated by `BattleActionExecutor` between primitive commits, returning interrupt actions that are inserted into the action queue. They have explicit priority and consumption semantics, and they must not mutate `BattleSession` directly — they only queue follow-up `BattleAction` values.
+**`Before`** fires as an event is about to land — before the public `BattleEventCommitted` broadcast. A Before hook's mutations are visible to every broadcast observer of that event: "the event lands fully formed." Buff evaluation (`TurnStartBuffHook` on `TurnStartedBattleEvent`, `UnitSpawnedBuffHook` on `UnitAddedBattleEvent`) is registered `Before` so a buff flip — and any `MaxActionPoints` change it causes — lands before that event's own broadcast, and, for turn start, before the AP refresh that runs once the whole turn-start dispatch completes.
 
-**`BattleEventListener`s** are plain-C# session-internal bookkeeping observers registered via internal `BattleSession.RegisterListener<TEventKey>()`. They share the same tag-type routing (`BattleEventKeys`) as triggers but run inside the session's own dispatch loop. Listeners may mutate session state directly and raise follow-up events. Dispatch is queue-drained: an event raised mid-dispatch is deferred to run after the current event finishes (breadth-first). A throwing observer clears the queue and the exception surfaces. Listeners must not call `BattleActionExecutor.Submit` — the executor throws if called during dispatch.
+**`After`** fires once the event is history — the old listener window. Session-internal bookkeeping (`StatusEffectSystem`, `ArmorRegenSystem`, `ObjectiveSystem`, `CapabilityEffectSystem`) and gameplay interrupts (future overwatch/mines) both register `After`: bookkeeping because it wants to observe a fact that already happened, interrupts because they should act on settled state.
 
-`ArmorRegenSystem` is the first registered listener. It observes `TurnEndedBattleEvent`, ticks the regen delay and current armor for every living unit on that faction whose armor can regenerate, and raises `UnitArmorRegeneratedBattleEvent` only when armor is actually restored.
+Both phases can mutate the session directly, raise follow-up events, and/or return interrupt actions from `OnEvent` — capability is not gated by phase. Ordering within a (event, phase) bucket is int priority (lower first) then registration order.
 
-The rule of thumb: use a trigger when you want a gameplay *reaction* mediated by the executor (overwatch, mines, traps). Use a listener when you want deterministic session bookkeeping that runs every time an event commits (turn-lifecycle upkeep, stat regeneration, status-effect ticking).
+Interrupts (returned `BattleAction`s) only make sense while an executor action is executing a primitive: the executor opens an action window around each primitive's `Execute` (`BeginActionExecution`/`EndActionExecution`), and every hook that fires during that primitive's dispatch — Before or After, for every event the primitive raises — has its returned interrupts accumulate into that one window, in evaluation order. A hook returning interrupts with no window open (setup/turn-transition dispatches, spawns) is a bug surfaced loudly: the session throws. A failed primitive discards its window's interrupts entirely — a failed action enqueues no responses.
+
+Non-phases — deliberately not part of the hook substrate:
+
+- **Pre-broadcast visibility refresh** stays hardwired inside the session's dispatch loop, before `Before` hooks fire. Its fixed position is the mid-move guarantee overwatch and mines depend on, so it is not a registrable phase.
+- **`OnActionStart`/`OnActionComplete`** stay notification-only executor events for presentation; they carry no write power and are not part of the hook substrate.
+
+Documented upgrade paths, not built: a pre-execute veto phase, reactions to failed or rejected primitives, and cancellation of a paused composite's remaining steps. If cancellation is ever added, it should be one explicit field on the interrupt contract — never a four-way enum.
+
+The rule of thumb: register `After` for a hook that should observe a settled fact (gameplay interrupts like overwatch/mines, or bookkeeping like armor regen and objectives); register `Before` when the hook's mutation must be visible to that same event's own broadcast (buffs, so a `MaxActionPoints` change lands before `TurnStarted`/`UnitAdded` is observed and before the AP refresh that follows).
+
+`ArmorRegenSystem` is registered `After` on `TurnEndedBattleEvent` at priority `-100`. It ticks the regen delay and current armor for every living unit on that faction whose armor can regenerate, and raises `UnitArmorRegeneratedBattleEvent` only when armor is actually restored.
 
 ## Observer Rule
 
@@ -289,7 +286,7 @@ Observers should be event-driven, but mediated.
 Prefer this:
 
 ```text
-event committed -> registry finds matching triggers -> executor queues trigger responses
+event raised -> session's hook registry finds matching hooks for this phase -> executor queues any interrupt actions they returned
 ```
 
 Avoid this as the authoritative rule mechanism:
@@ -297,6 +294,8 @@ Avoid this as the authoritative rule mechanism:
 ```text
 event emitted -> arbitrary C# event subscribers mutate battle state
 ```
+
+The rule is structural rather than a convention to remember: `BattleActionExecutor.Submit` throws if called while the session is dispatching events (`IsDispatchingEvents`), so no hook — of either phase — can smuggle in a second execution loop. The only write channel out of a hook toward the executor is the interrupt actions it returns from `OnEvent`, which the executor validates and applies through the normal action path once the current primitive's action window closes.
 
 The mediated model keeps event-driven behavior while preserving deterministic ordering, save/load friendliness, and debuggability.
 
@@ -306,22 +305,22 @@ Example: a unit moves from tile `X` toward tile `X + N`, and an enemy has overwa
 
 ```text
 1. Player or AI enqueues MoveUnit(unit, destinations: X + 1 -> ... -> X + N), using the unit's current session position as the route source.
-2. Executor starts the move action.
+2. Executor starts the move action and opens an action window for MoveUnitStep(unit, X, X + 1).
 3. Executor validates and commits MoveUnitStep(unit, X, X + 1).
 4. Session updates board occupancy and unit position.
-5. MoveUnitStep raises committed UnitMoved and TileOccupied for X + 1.
-6. Executor refreshes visibility and evaluates triggers for the committed events.
-7. Overwatch trigger verifies that the committed target is valid.
-8. Trigger returns QueueInterruptAfterCommit(ReactionFire(observer, target)).
-9. Executor pauses MoveUnit and inserts ReactionFire at the head of the queue.
+5. MoveUnitStep raises UnitMoved: Before hooks fire, broadcast, After hooks fire.
+6. MoveUnitStep raises TileOccupied for X + 1: Before hooks fire, broadcast, After hooks fire.
+7. Overwatch's After hook on TileOccupied verifies the committed target is valid.
+8. The hook returns [ReactionFire(observer, target)]; the interrupt lands in MoveUnitStep's action window.
+9. The window closes once MoveUnitStep's Execute returns; the executor pauses MoveUnit and inserts ReactionFire at the head of the queue.
 10. ReactionFire runs while the target is on X + 1.
 11. ReactionFire applies damage if the shot hits.
-12. Damage events may enqueue more response actions.
+12. Damage events may trigger more interrupts.
 13. If the moving unit dies, the paused move action is cancelled.
 14. If the moving unit survives, the move action resumes with the next step.
 ```
 
-The target is therefore shot while occupying the trigger tile, not after the whole path has completed.
+The target is therefore shot while occupying the hook's tile, not after the whole path has completed.
 
 ## Proximity Mine Flow
 
@@ -329,18 +328,17 @@ Example: a proximity mine is placed and listens for occupation of nearby tiles.
 
 ```text
 1. Mine is placed.
-2. Session registers ProximityMineTrigger with affected tiles.
+2. Session registers a proximity-mine BattleHook (After) against the affected tiles' event key.
 3. Unit attempts to move onto an affected tile.
-4. MoveUnitStep commits and raises TileOccupied for that tile.
-5. Trigger registry finds the mine trigger for the committed tile.
-6. Mine trigger verifies it is armed and the occupying unit is a valid target.
-7. Trigger returns QueueInterruptAfterCommit(DetonateMine) and ConsumeTrigger.
-8. Executor consumes the trigger.
-9. Executor pauses the movement action and inserts DetonateMine at the head of the queue.
-10. DetonateMine runs before the movement action continues.
-11. DetonateMine publishes committed UnitDamaged or UnitKilled events.
-12. Mine damage may enqueue more response actions.
-13. If the mover survives and movement is still valid, the original action continues.
+4. MoveUnitStep commits and raises TileOccupied for that tile, inside its action window.
+5. The mine's After hook fires for the raised event.
+6. Mine hook verifies it is armed and the occupying unit is a valid target.
+7. The hook calls session.UnregisterHook<TileOccupiedBattleEvent>(this, HookPhase.After) on itself, then returns [DetonateMine].
+8. The interrupt lands in MoveUnitStep's action window; once the window closes the executor pauses movement and inserts DetonateMine at the head of the queue.
+9. DetonateMine runs before the movement action continues.
+10. DetonateMine publishes UnitDamaged or UnitKilled events.
+11. Mine damage may trigger more interrupts.
+12. If the mover survives and movement is still valid, the original action continues.
 ```
 
 The mine itself is registered battle state, not a scene object. Presentation can subscribe to the same committed events to animate the detonation.
@@ -351,9 +349,9 @@ Visibility should be updated at primitive checkpoints, especially after movement
 
 ```text
 MoveUnitStep commits
-  -> committed UnitMoved / TileOccupied events are published and captured
-  -> visibility is refreshed
-  -> triggers that depend on post-step state are resolved
+  -> visibility is refreshed, before that step's events fire any hooks
+  -> UnitMoved / TileOccupied each fire Before hooks, broadcast, After hooks
+  -> hooks that depend on post-step state resolve against the refreshed visibility
   -> newly visible or newly hidden units can emit visibility events later
 ```
 
@@ -363,7 +361,7 @@ The starting event list does not include visibility events yet, but the model ca
 - `UnitLostFromSight`
 - `TileRevealed`
 
-For now, overwatch can use the committed event to discover that a watched tile became occupied, then validate against current per-unit visibility before the reaction shot executes.
+For now, overwatch can use the raised event to discover that a watched tile became occupied, then validate against current per-unit visibility before the reaction shot executes.
 
 ## Action Continuation Rules
 
@@ -386,20 +384,20 @@ The route should not be considered guaranteed after the action starts. It is a p
 
 ## Ordering
 
-The executor should own the order in which triggers resolve. Initial ordering can be simple and explicit:
+The executor owns where interrupt actions are inserted into the queue; hook firing order itself is owned by the session's dispatch loop (priority, then registration order, within Before then After, per event). Initial ordering can be simple and explicit:
 
 1. ask the active action for its next primitive action
-2. validate the primitive action
-3. commit the primitive action
-4. capture committed domain events
-5. refresh derived state such as visibility
-6. resolve triggers that care about those committed events
-7. consume resolved one-shot triggers
-8. insert interrupt responses ahead of the paused action
-9. process the new queue head
-10. emit presentation-facing notifications
+2. open an action window, then validate and commit the primitive action
+3. for each event the primitive raises: refresh derived state such as visibility, fire Before hooks, broadcast, fire After hooks
+4. close the action window and collect the interrupt actions accumulated across all of that primitive's events, in evaluation order
+5. one-shot hooks unregister themselves inside `OnEvent`, not as a separate consume step
+6. insert interrupt responses ahead of the paused action
+7. process the new queue head
+8. emit presentation-facing notifications
 
-If trigger ordering becomes contentious, add numeric `Priority` to trigger definitions. The important point is that ordering is data owned by the runtime, not incidental subscription order.
+When one primitive raises several events, hooks are evaluated per event in raise order, and the resulting interrupt actions are aggregated across all of that primitive's events before being reversed once — never reversed per event — so interrupts still insert in evaluation order (event 1's ahead of event 2's) at the front of the queue.
+
+If hook ordering becomes contentious, tune the numeric priority argument given at registration. The important point is that ordering is data owned by the runtime, not incidental subscription order.
 
 ## Design Patterns
 
@@ -407,16 +405,16 @@ Useful patterns for this model:
 
 - Command: primitive `BattleAction` values commit authoritative state changes.
 - State Machine: each `BattleAction` tracks whether it is pending, running, paused, completed, cancelled, or failed.
-- Mediator: `BattleActionExecutor` coordinates actions, events, triggers, and interruptions.
-- Observer: triggers observe battle events through the registry, not through unmanaged subscriptions.
-- Chain of Responsibility: ordered trigger systems process events and return consequences.
+- Mediator: `BattleActionExecutor` coordinates actions, events, hooks, and interruptions.
+- Observer: hooks observe battle events through the registry, not through unmanaged subscriptions.
+- Chain of Responsibility: ordered Before/After hook phases process events and return consequences.
 
 ## Open Design Questions
 
-- Should visibility refresh remain part of primitive action success, move into the executor, or become a trigger system with very high priority?
+- Should visibility refresh remain part of primitive action success, move into the executor, or become a phase with very high priority?
 - Should all actions be resumable, or only actions such as movement?
 - Should reaction fire spend action points immediately when queued or when the shot commits?
-- Should triggers return primitive actions directly, or only enqueue high-level actions?
+- Should hooks return primitive actions directly, or only enqueue high-level actions?
 - Should `BattleEvent` be split into rule-processing events and presentation events?
 
 ## Current Migration Result
@@ -424,10 +422,10 @@ Useful patterns for this model:
 1. `BattleAction` is the executor-facing action abstraction.
 2. `MoveUnitStep` is the internal primitive movement commit.
 3. Multi-step movement orchestration lives in `MoveUnit`.
-4. The executor stores triggers by `BattleEventTag` type.
-5. Tile triggers can register against `TileOccupiedBattleEvent` (or a shared tag interface such as `IPositionedBattleEvent`).
+4. The session's `BattleHookRegistry` stores hooks by `BattleEventTag` type and `HookPhase`.
+5. Tile-based hooks can register against `TileOccupiedBattleEvent` (or a shared tag interface such as `IPositionedBattleEvent`).
 6. Primitive actions publish committed events as they change state.
-7. The executor resolves triggers from committed events and queues response actions.
-8. Tests cover proof-of-concept trigger responses such as damage after tile occupation.
+7. The session's dispatch loop fires Before/After hooks for every raised event and forwards any interrupt actions into the executor's open action window; the executor queues those response actions once the window closes.
+8. Tests cover proof-of-concept hook responses such as damage after tile occupation.
 
 This keeps the existing command/query/session architecture, but gives battle reactions a controlled place to run between primitive state changes.

@@ -77,9 +77,10 @@ internal static class BattleActionTestHelper
     Assert.True(result.Succeeded);
   }
 
-  // The session-taking submit helpers below run on a throwaway executor: triggers registered on a
-  // scenario's shared executor are never evaluated for these submissions. Trigger-sensitive tests
-  // must use the executor overloads instead.
+  // The session-taking submit helpers below run on a throwaway executor. Hooks are
+  // registered on the SESSION, so hooks a test has registered WILL also be evaluated for these
+  // submissions — the reaction window is per-session, not per-executor. Tests that assert
+  // reaction counts or interrupt results should submit through one executor they control.
   public static void AdvanceTurn(BattleSession session)
   {
     EndFactionTurn(session, session.ActiveSide);

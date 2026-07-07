@@ -178,7 +178,7 @@ Resolves unit-owned stats (Aim, Health, ActionPoints, Vision, Movement, Will, et
 1. Stat contributions from the combatant's own mod slots.
 2. The owning faction's `StatBonuses` (`FactionData.FactionBonuses`, surfaced as `Faction.StatBonuses`).
 3. Stat contributions from the equipped weapon's slots (so a scope targeting `AimStat` buffs the wielder).
-4. `StatMod`s from the unit's active buffs (`BuffData.StatMods`, condition-mirrored by `BuffSystem`).
+4. `StatMod`s from the unit's active buffs (`BuffData.StatMods`, condition-mirrored by `BuffHooks` — `TurnStartBuffHook`/`UnitSpawnedBuffHook`).
 
 ```csharp
 int maxHp = Mathf.RoundToInt(unit.EffectiveStat<HealthStat>());

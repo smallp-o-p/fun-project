@@ -33,22 +33,22 @@ public sealed class BattleSession
   private readonly VisibilityService _visibility = new();
   private readonly Dictionary<Faction, Operation> _operations = [];
   private readonly TurnScheduler _scheduler;
-  private readonly BattleEventListenerRegistry _listenerRegistry = new();
+  private readonly BattleHookRegistry _hooks;
   private readonly Queue<BattleEvent> _eventDispatchQueue = [];
 
   private bool _isDispatchingEvents;
 
-  // Events committed during the executor's current capture window (a single primitive
-  // action's Execute). The executor brackets each Execute with BeginCommittedEventCapture /
-  // EndCommittedEventCapture and reads this buffer to learn exactly which events that Execute
-  // committed — in commit order — without subscribing a closure to the public
-  // BattleEventCommitted broadcast. Reused across primitives (cleared on Begin); never
-  // allocated per step. The flag scopes capture to the window so events committed outside it
-  // (battle setup, turn-end follow-ups) are never recorded, mirroring the old single-Execute
-  // subscribe/unsubscribe exactly.
-  private readonly List<BattleEvent> _committedEventCapture = [];
+  // The executor brackets each primitive's Execute with BeginActionExecution /
+  // EndActionExecution. The window is open iff an action is in flight (_inFlightAction.IsSome).
+  // While open, interrupt actions returned by firing hooks accumulate here (in evaluation
+  // order) and the in-flight action is what HookContext exposes as SourceAction. Buffers are
+  // reused across primitives (cleared on Begin); the executor consumes the returned list
+  // before the next Begin. Hooks returning interrupts while no window is open is a
+  // trusted-core violation (gameplay flows only through the executor) and CollectHookInterrupts
+  // throws.
+  private readonly List<BattleAction> _capturedInterrupts = [];
 
-  private bool _capturingCommittedEvents;
+  private Option<BattleAction> _inFlightAction = None;
 
   // Visible sets depend only on board occupancy: a unit's vision range resolves from
   // stat contributions that are fixed for the battle (combatant + equipped weapon; no
@@ -139,17 +139,17 @@ public sealed class BattleSession
     PlayerFaction.IfSome(EnqueueFactionInGlobalOrder);
 
     _scheduler.InitializeQueueFromGlobalOrder();
-    // Order is load-bearing: status-effect tick -> armor regen -> objective evaluation.
-    // Status + armor are High (upkeep runs first); within High, StatusEffect registers
-    // before ArmorRegen because a DoT tick re-arms the regen delay (must precede regen).
-    // Objectives are Low so they evaluate after all upkeep, against post-tick/post-regen state.
-    RegisterListener<TurnEndedBattleEvent>(new StatusEffectSystem(), ListenerPriority.High);
-    RegisterListener<TurnEndedBattleEvent>(new ArmorRegenSystem(), ListenerPriority.High);
-    RegisterListener<TurnEndedBattleEvent>(new ObjectiveSystem(), ListenerPriority.Low);
-    // Reacts to thrown items, independent of the turn-end listener above: it is keyed on
-    // ItemThrownBattleEvent (a different event bucket), so this does not disturb the
-    // StatusEffect -> ArmorRegen -> Objective turn-end ordering.
-    RegisterListener<ItemThrownBattleEvent>(new CapabilityEffectSystem());
+    _hooks = new BattleHookRegistry(this);
+
+    // Order matters here. We want to evaluate all the effects before evaluating objectives because they may
+    // result in an objective failing/completing.
+    RegisterHook<TurnEndedBattleEvent>(new StatusEffectSystem(), HookPhase.After, priority: -100);
+    RegisterHook<TurnEndedBattleEvent>(new ArmorRegenSystem(), HookPhase.After, priority: -100);
+    RegisterHook<TurnEndedBattleEvent>(new ObjectiveSystem(), HookPhase.After, priority: 100);
+    RegisterHook<ItemThrownBattleEvent>(new CapabilityEffectSystem(), HookPhase.After);
+
+    RegisterHook<TurnStartedBattleEvent>(new TurnStartBuffHook(), HookPhase.Before);
+    RegisterHook<UnitAddedBattleEvent>(new UnitSpawnedBuffHook(), HookPhase.Before);
   }
 
   internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
@@ -216,14 +216,6 @@ public sealed class BattleSession
     TurnNumber = 1;
     _scheduler.SetActiveSideToQueueHead();
     _scheduler.ClearSidesActedThisRound();
-
-    // Buff state must be current before the refresh below reads MaxActionPoints
-    // (turn-start evaluation; see BuffSystem).
-    BuffSystem.EvaluateAll(this);
-
-    foreach (var unit in AliveUnits)
-      unit.RefreshForNewTurn();
-
     _scheduler.RefreshActiveFactionAvailability();
 
     // Force a FULL recompute so the start events perform an authoritative pass. Board
@@ -232,9 +224,14 @@ public sealed class BattleSession
     // only a full pass is guaranteed to pick it up.
     _visibilityFullRefreshPending = true;
 
+    // Turn-start hooks (buffs) fire inside this dispatch, BEFORE the AP refresh below reads
+    // buffed MaxActionPoints. Mid-dispatch observers see pre-refresh action points.
     RaiseEvents(
       new SessionStartedBattleEvent(),
       new TurnStartedBattleEvent(ActiveSide, TurnNumber));
+
+    foreach (var unit in AliveUnits)
+      unit.RefreshForNewTurn();
   }
 
   internal SpawnedBattleUnit AddUnit(
@@ -261,11 +258,7 @@ public sealed class BattleSession
     if (Phase == BattlePhase.InProgress)
       _scheduler.AddSpawnedUnit(unit);
 
-    RaiseEvent(new UnitAddedBattleEvent(unit, position));
-
-    // Spawn-time evaluation so the unit enters play with correct buff state; the
-    // turn-start passes keep it fresh from here.
-    BuffSystem.EvaluateUnit(this, unit);
+    RaiseEvents(new UnitAddedBattleEvent(unit, position));
 
     return new SpawnedBattleUnit(unit);
   }
@@ -295,7 +288,7 @@ public sealed class BattleSession
     });
     unit.ReceiveDamage(resolution.HealthDamage);
 
-    RaiseEvent(new UnitDamagedBattleEvent(unit, cause, bundle, resolution.ArmorDamage, resolution.HealthDamage));
+    RaiseEvents(new UnitDamagedBattleEvent(unit, cause, bundle, resolution.ArmorDamage, resolution.HealthDamage));
     if (unit.IsDead)
     {
       HandleUnitDeath(unit, cause);
@@ -335,7 +328,7 @@ public sealed class BattleSession
       return;
 
     ActiveStatusEffect applied = unit.ApplyStatusEffect(spec);
-    RaiseEvent(new UnitStatusEffectAppliedBattleEvent(unit, spec, applied.RemainingTurns));
+    RaiseEvents(new UnitStatusEffectAppliedBattleEvent(unit, spec, applied.RemainingTurns));
   }
 
   // Applies a pure status effect (no damage) directly to a unit: the entry point used by
@@ -375,7 +368,7 @@ public sealed class BattleSession
       _killsByUnit[killer].Add(unit);
     });
 
-    RaiseEvent(new UnitKilledBattleEvent(unit, unitPoint, killedBy));
+    RaiseEvents(new UnitKilledBattleEvent(unit, unitPoint, killedBy));
 
     HandleFactionLoss(unitSide);
 
@@ -403,7 +396,7 @@ public sealed class BattleSession
     if (!_scheduler.TryConsumeAvailableUnit(unit))
       throw new InvalidOperationException($"Unit {unit.Id} is not available this turn.");
 
-    RaiseEvent(new UnitActivationEndedBattleEvent(unit, unitPoint));
+    RaiseEvents(new UnitActivationEndedBattleEvent(unit, unitPoint));
 
     if (!GetFactionAliveUnits(activeSide).Any(CanUnitActNow))
       EndFactionTurn(activeSide);
@@ -411,7 +404,7 @@ public sealed class BattleSession
 
   private void AdvanceTurn()
   {
-    RaiseEvent(new TurnEndedBattleEvent(
+    RaiseEvents(new TurnEndedBattleEvent(
       ActiveSide,
       TurnNumber));
 
@@ -462,7 +455,7 @@ public sealed class BattleSession
     Outcome = Some(outcome);
     Phase = BattlePhase.Ended;
 
-    RaiseEvent(new SessionEndedBattleEvent(outcome));
+    RaiseEvents(new SessionEndedBattleEvent(outcome));
   }
 
   // Objective/operation-driven outcome decision at turn end: one of the two
@@ -573,13 +566,18 @@ public sealed class BattleSession
   }
 
   internal bool IsDispatchingEvents => _isDispatchingEvents;
-
-  internal void RegisterListener<TEventKey>(
-    BattleEventListener listener,
-    ListenerPriority priority = ListenerPriority.Regular)
+  
+  // TODO: Let's limit the possible priority values or it might get really complicated for no reason.
+  internal void RegisterHook<TEventKey>(BattleHook hook, HookPhase phase, int priority = 0)
     where TEventKey : BattleEventTag
   {
-    _listenerRegistry.Register<TEventKey>(listener, priority);
+    _hooks.Register<TEventKey>(hook, phase, priority);
+  }
+
+  internal bool UnregisterHook<TEventKey>(BattleHook hook, HookPhase phase)
+    where TEventKey : BattleEventTag
+  {
+    return _hooks.Unregister<TEventKey>(hook, phase);
   }
 
   // Records a unit whose own board cell changed (spawned/moved/removed) so the next dispatch
@@ -599,15 +597,9 @@ public sealed class BattleSession
   {
     _visibilityFullRefreshPending = true;
   }
-
-  internal void RaiseEvent(BattleEvent battleEvent)
-  {
-    ArgumentNullException.ThrowIfNull(battleEvent);
-    _eventDispatchQueue.Enqueue(battleEvent);
-    DispatchQueuedEvents();
-  }
-
-  private void RaiseEvents(params BattleEvent[] events)
+  
+  // TODO: It may be nicer if this event raising is entirely handled by BattleSession
+  internal void RaiseEvents(params BattleEvent[] events)
   {
     foreach (var battleEvent in events)
     {
@@ -632,18 +624,14 @@ public sealed class BattleSession
         // Recompute visibility from any occupancy/tile change since the last dispatch and queue
         // first-time spottings, before this event is broadcast (preserves the mid-move guarantee).
         RefreshVisibilityAndQueueSpottings();
+
+        CollectHookInterrupts(_hooks.RunPreHooks(battleEvent, _inFlightAction));
         BattleEventCommitted.Invoke(battleEvent);
-        // Record into the executor's capture window after the public broadcast and before
-        // listeners run — exactly where the executor's old closure (subscribed last) ran.
-        if (_capturingCommittedEvents)
-          _committedEventCapture.Add(battleEvent);
-        foreach (BattleEventListener listener in _listenerRegistry.GetMatchingListeners(battleEvent))
-          listener.OnEventCommitted(this, battleEvent);
+        CollectHookInterrupts(_hooks.RunPostHooks(battleEvent, _inFlightAction));
       }
     }
     catch
     {
-      // A throwing observer aborts the drain; stale events must not dispatch later.
       _eventDispatchQueue.Clear();
       throw;
     }
@@ -651,6 +639,18 @@ public sealed class BattleSession
     {
       _isDispatchingEvents = false;
     }
+  }
+
+  // Interrupt actions only mean something inside an executor action; a hook returning them
+  // during setup/bookkeeping dispatches is a bug surfaced loudly, not dropped.
+  private void CollectHookInterrupts(IReadOnlyList<BattleAction> interrupts)
+  {
+    if (interrupts.Count == 0)
+      return;
+    if (_inFlightAction.IsNone)
+      throw new InvalidOperationException(
+        "A hook returned interrupt actions while no executor action was in flight.");
+    _capturedInterrupts.AddRange(interrupts);
   }
 
   private void RefreshVisibilityAndQueueSpottings()
@@ -677,23 +677,25 @@ public sealed class BattleSession
         _eventDispatchQueue.Enqueue(new UnitSpottedBattleEvent(observer, target));
   }
 
-  // Opens a fresh capture window for the executor: committed events are recorded into the
-  // reused buffer until EndCommittedEventCapture. Replaces the executor's old per-Execute
-  // subscribe on BattleEventCommitted without touching the public broadcast. Clears any prior
-  // contents so the window starts empty.
-  internal void BeginCommittedEventCapture()
+  /// <summary>
+  /// Start executing an action.
+  /// </summary>
+  /// <param name="action"></param>
+  internal void BeginActionExecution(BattleAction action)
   {
-    _committedEventCapture.Clear();
-    _capturingCommittedEvents = true;
+    ArgumentNullException.ThrowIfNull(action);
+    _capturedInterrupts.Clear();
+    _inFlightAction = Some(action);
   }
 
-  // Closes the current capture window and returns the events committed during it, in commit
-  // order. The returned reference is the reused buffer; callers must consume it before the
-  // next BeginCommittedEventCapture clears it.
-  internal IReadOnlyList<BattleEvent> EndCommittedEventCapture()
+  /// <summary>
+  /// Finish BattleAction execution, return any interrupt actions for the executor to run.
+  /// </summary>
+  /// <returns></returns>
+  internal IReadOnlyList<BattleAction> EndActionExecution()
   {
-    _capturingCommittedEvents = false;
-    return _committedEventCapture;
+    _inFlightAction = None;
+    return [.. _capturedInterrupts];
   }
 
   private void EnqueueFactionInGlobalOrder(Faction side)
@@ -723,7 +725,7 @@ public sealed class BattleSession
     }
 
     op!.AddObjective(objective);
-    RaiseEvent(new ObjectiveAddedBattleEvent(faction, objective));
+    RaiseEvents(new ObjectiveAddedBattleEvent(faction, objective));
   }
 
   internal void EvaluateOperationAtTurnEnd(Faction faction)
@@ -745,18 +747,17 @@ public sealed class BattleSession
 
       if (current.IsFailed(this))
       {
-        RaiseEvent(new ObjectiveFailedBattleEvent(faction, current));
         op.FailCurrent();
-        RaiseEvent(new OperationFailedBattleEvent(faction));
+        RaiseEvents(new ObjectiveFailedBattleEvent(faction, current), new OperationFailedBattleEvent(faction));
         break;
       }
 
       if (current.IsComplete(this))
       {
-        RaiseEvent(new ObjectiveCompletedBattleEvent(faction, current));
         op.CompleteCurrent();
+        RaiseEvents(new ObjectiveCompletedBattleEvent(faction, current));
         if (op.Status == OperationStatus.Completed)
-          RaiseEvent(new OperationCompletedBattleEvent(faction));
+          RaiseEvents(new OperationCompletedBattleEvent(faction));
         continue;
       }
 
@@ -802,20 +803,19 @@ public sealed class BattleSession
   {
     var nextSide = _scheduler.AdvanceActiveSideToQueueHead();
 
-    // Refresh availability immediately after the active side flips: buff evaluation below
-    // dispatches events, and no observer may see the previous side's units as still available.
+    // Refresh availability immediately after the active side flips: no observer may see the
+    // previous side's units as still available.
     _scheduler.RefreshActiveFactionAvailability();
 
-    // Every side's turn start re-evaluates ALL alive units so conditions that changed
-    // during another faction's turn are fresh; must precede the AP refresh (see BuffSystem).
-    BuffSystem.EvaluateAll(this);
-
-    foreach (var unit in GetFactionAliveUnits(nextSide))
-      unit.RefreshForNewTurn();
-
+    // Turn-start hooks (buffs) fire inside this dispatch, BEFORE the AP refresh below reads
+    // buffed MaxActionPoints — every side's turn start re-evaluates ALL alive units so
+    // conditions that changed during another faction's turn are fresh.
     RaiseEvents(
       new ActiveSideChangedBattleEvent(nextSide),
       new TurnStartedBattleEvent(nextSide, TurnNumber));
+
+    foreach (var unit in GetFactionAliveUnits(nextSide))
+      unit.RefreshForNewTurn();
   }
 
   internal FactionBattleSummary GetFactionSummary(Faction faction)

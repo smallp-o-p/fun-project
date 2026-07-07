@@ -8,7 +8,6 @@ public sealed class BattleActionExecutor
 {
   private readonly BattleSession _session;
   private readonly LinkedList<BattleAction> _pending = [];
-  private readonly BattleTriggerRegistry _triggerRegistry = new();
 
   public Option<BattleActionResult> LastResult { get; private set; }
 
@@ -21,16 +20,10 @@ public sealed class BattleActionExecutor
     _session = session;
   }
 
-  public void RegisterTrigger<TEventKey>(BattleTrigger trigger)
-    where TEventKey : BattleEventTag
-  {
-    _triggerRegistry.Register<TEventKey>(trigger);
-  }
-
   public IReadOnlyList<BattleActionResult> Submit(BattleAction action)
   {
     if (_session.IsDispatchingEvents)
-      throw new InvalidOperationException("Cannot submit actions while battle events are dispatching; listeners raise follow-up events through the session instead.");
+      throw new InvalidOperationException("Cannot submit actions while battle events are dispatching; hooks raise follow-up events through the session instead.");
     Enqueue(action);
     return Tick();
   }
@@ -86,12 +79,12 @@ public sealed class BattleActionExecutor
 
   private BattleActionResult ExecuteQueuedAction(BattleAction action, BattleAction activeAction)
   {
-    // The session records the events this Execute commits into a reused buffer, so we read
-    // exactly this primitive's committed events — in commit order — without subscribing a
-    // closure to the public BattleEventCommitted broadcast or allocating a List per step.
-    IReadOnlyList<BattleEvent> committedEvents;
+    // The session opens an action window for this primitive's Execute: hooks firing during
+    // the dispatches it causes may return interrupt actions, which accumulate in the window
+    // (in evaluation order) alongside the in-flight action HookContext exposes.
+    IReadOnlyList<BattleAction> interrupts;
     BattleActionResult result;
-    _session.BeginCommittedEventCapture();
+    _session.BeginActionExecution(action);
 
     try
     {
@@ -99,7 +92,7 @@ public sealed class BattleActionExecutor
     }
     finally
     {
-      committedEvents = _session.EndCommittedEventCapture();
+      interrupts = _session.EndActionExecution();
     }
 
     ConsumeResult(action, activeAction, result);
@@ -111,7 +104,7 @@ public sealed class BattleActionExecutor
     if (!activeAction.IsDone())
       _pending.AddFirst(activeAction);
 
-    foreach (var reaction in EvaluateTriggerInterruptActions(action, committedEvents).Reverse())
+    foreach (var reaction in interrupts.Reverse())
       _pending.AddFirst(reaction);
 
     return result;
@@ -138,21 +131,4 @@ public sealed class BattleActionExecutor
       activeAction.ConsumeResult(result);
   }
 
-  private IReadOnlyList<BattleAction> EvaluateTriggerInterruptActions(BattleAction sourceAction, IReadOnlyList<BattleEvent> committedEvents)
-  {
-    List<BattleAction> interruptActions = new()
-    {
-      Capacity = committedEvents.Count
-    };
-
-    foreach (BattleEvent battleEvent in committedEvents)
-    {
-      interruptActions.AddRange(_triggerRegistry.EvaluateInterruptActions(
-        _session,
-        battleEvent,
-        sourceAction));
-    }
-
-    return interruptActions;
-  }
 }

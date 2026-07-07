@@ -13,7 +13,7 @@ public partial class BattleActionExecutorTest
   {
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), health: 10, actionPoints: 5);
     var targetPosition = new Vector3I(1, 0, 0);
-    executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 3, shouldConsume: true));
+    session.RegisterHook<TileOccupiedBattleEvent>(new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(targetPosition, unit.State, 3, oneShot: true), HookPhase.After);
     var resolvedActions = new List<BattleAction>();
     executor.OnActionComplete += result => resolvedActions.Add(result.Action);
 
@@ -40,7 +40,7 @@ public partial class BattleActionExecutorTest
     var mid = new Vector3I(1, 0, 0);
     var end = new Vector3I(2, 0, 0);
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), start, health: 10, actionPoints: 5);
-    executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(mid, unit.State, 3, shouldConsume: true));
+    session.RegisterHook<TileOccupiedBattleEvent>(new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(mid, unit.State, 3, oneShot: true), HookPhase.After);
     var resolvedActions = new List<BattleAction>();
     executor.OnActionComplete += result => resolvedActions.Add(result.Action);
 
@@ -97,8 +97,8 @@ public partial class BattleActionExecutorTest
     Assert.Equal(start, session.GetUnitPosition(enemyUnit.State).RequireSome().Raw);
   }
 
-  [TestCase(TestName = "Committed battle event listeners observe committed session state")]
-  public void CommittedBattleEventListenersObserveCommittedSessionState()
+  [TestCase(TestName = "BattleEventCommitted subscribers observe committed session state")]
+  public void BattleEventCommittedSubscribersObserveCommittedSessionState()
   {
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), new Vector3I(1, 0, 1), actionPoints: 5);
     var destination = new Vector3I(1, 0, 2);
@@ -134,16 +134,16 @@ public partial class BattleActionExecutorTest
     Assert.True(second.IsNone);
   }
 
-  [TestCase(TestName = "Executor evaluates matching triggers deterministically")]
-  public void ExecutorEvaluatesMatchingTriggersDeterministically()
+  [TestCase(TestName = "Executor evaluates matching hooks deterministically")]
+  public void ExecutorEvaluatesMatchingHooksDeterministically()
   {
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(targetPosition, log, "late", priority: 10));
-    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(targetPosition, log, "first"));
-    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(targetPosition, log, "second"));
-    executor.RegisterTrigger<UnitDamagedBattleEvent>(new RecordingTrigger(targetPosition, log, "ignored", priority: -10));
+    session.RegisterHook<UnitMovedBattleEvent>(new PositionRecordingHook(targetPosition, log, "late"), HookPhase.After, priority: 10);
+    session.RegisterHook<UnitMovedBattleEvent>(new PositionRecordingHook(targetPosition, log, "first"), HookPhase.After);
+    session.RegisterHook<UnitMovedBattleEvent>(new PositionRecordingHook(targetPosition, log, "second"), HookPhase.After);
+    session.RegisterHook<UnitDamagedBattleEvent>(new PositionRecordingHook(targetPosition, log, "ignored"), HookPhase.After, priority: -10);
 
     BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [session.Board.At(targetPosition)])).RequireSingleResult();
 
@@ -157,26 +157,26 @@ public partial class BattleActionExecutorTest
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    var ignoredTrigger = new RecordingTrigger(targetPosition, log, "ignored");
-    var matchingTrigger = new RecordingTrigger(targetPosition, log, "matching");
-    executor.RegisterTrigger<UnitDamagedBattleEvent>(ignoredTrigger);
-    executor.RegisterTrigger<UnitMovedBattleEvent>(matchingTrigger);
+    var ignoredHook = new PositionRecordingHook(targetPosition, log, "ignored");
+    var matchingHook = new PositionRecordingHook(targetPosition, log, "matching");
+    session.RegisterHook<UnitDamagedBattleEvent>(ignoredHook, HookPhase.After);
+    session.RegisterHook<UnitMovedBattleEvent>(matchingHook, HookPhase.After);
 
     BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [session.Board.At(targetPosition)])).RequireSingleResult();
 
     Assert.True(result.Succeeded);
-    Assert.Equal(0, ignoredTrigger.EvaluateCallCount);
-    Assert.Equal(1, matchingTrigger.EvaluateCallCount);
+    Assert.Equal(0, ignoredHook.EvaluateCallCount);
+    Assert.Equal(1, matchingHook.EvaluateCallCount);
     Assert.True(log.SequenceEqual(["matching"]));
   }
 
-  [TestCase(TestName = "Executor supports trigger registered to event shape")]
-  public void ExecutorSupportsTriggerRegisteredToEventShape()
+  [TestCase(TestName = "Executor supports hook registered to event shape")]
+  public void ExecutorSupportsHookRegisteredToEventShape()
   {
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    executor.RegisterTrigger<IPositionedBattleEvent>(new RecordingTrigger(targetPosition, log, "matched"));
+    session.RegisterHook<IPositionedBattleEvent>(new PositionRecordingHook(targetPosition, log, "matched"), HookPhase.After);
 
     BattleActionResult result = executor.Submit(BattleAction.MoveUnit(unit.State, [session.Board.At(targetPosition)])).RequireSingleResult();
 
@@ -184,14 +184,14 @@ public partial class BattleActionExecutorTest
     Assert.True(log.SequenceEqual(["matched", "matched"]));
   }
 
-  [TestCase(TestName = "Executor consumes resolved triggers before later actions")]
-  public void ExecutorConsumesResolvedTriggersBeforeLaterActions()
+  [TestCase(TestName = "Executor consumes one-shot hooks before later actions")]
+  public void ExecutorConsumesOneShotHooksBeforeLaterActions()
   {
     var start = new Vector3I(0, 0, 0);
     var targetPosition = new Vector3I(1, 0, 0);
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), start, actionPoints: 5);
     var log = new List<string>();
-    executor.RegisterTrigger<UnitMovedBattleEvent>(new RecordingTrigger(targetPosition, log, "matched", consume: true));
+    session.RegisterHook<UnitMovedBattleEvent>(new OneShotRecordingHook(targetPosition, log, "matched"), HookPhase.After);
 
     BattleActionResult[] results =
     [
@@ -205,16 +205,16 @@ public partial class BattleActionExecutorTest
     Assert.True(log.SequenceEqual(["matched"]));
   }
 
-  [TestCase(TestName = "Executor queues interrupt actions in trigger priority order")]
-  public void ExecutorQueuesInterruptActionsInTriggerPriorityOrder()
+  [TestCase(TestName = "Executor queues interrupt actions in hook priority order")]
+  public void ExecutorQueuesInterruptActionsInHookPriorityOrder()
   {
     var start = new Vector3I(0, 0, 0);
     var targetPosition = new Vector3I(1, 0, 0);
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), start, health: 10, actionPoints: 5);
-    executor.RegisterTrigger<UnitMovedBattleEvent>(
-      new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 2, shouldConsume: true) { Priority = 10 });
-    executor.RegisterTrigger<UnitMovedBattleEvent>(
-      new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 1, shouldConsume: true) { Priority = 0 });
+    session.RegisterHook<UnitMovedBattleEvent>(
+      new DamageOnTileOccupiedHook<UnitMovedBattleEvent>(targetPosition, unit.State, 2, oneShot: true), HookPhase.After, priority: 10);
+    session.RegisterHook<UnitMovedBattleEvent>(
+      new DamageOnTileOccupiedHook<UnitMovedBattleEvent>(targetPosition, unit.State, 1, oneShot: true), HookPhase.After, priority: 0);
 
     IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [session.Board.At(targetPosition)]));
     int[] damageAmounts = results
@@ -228,13 +228,39 @@ public partial class BattleActionExecutorTest
     Assert.True(damageAmounts.SequenceEqual([1, 2]));
   }
 
-  [TestCase(TestName = "Executor queues trigger response after committed tile occupation")]
-  public void ExecutorQueuesTriggerResponseAfterCommittedTileOccupation()
+  [TestCase(TestName = "Executor resolves interrupts across a step's events in commit order")]
+  public void ExecutorResolvesInterruptsAcrossEventsInCommitOrder()
+  {
+    var start = new Vector3I(0, 0, 0);
+    var targetPosition = new Vector3I(1, 0, 0);
+    var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), start, health: 10, actionPoints: 5);
+    // One MoveUnitStep commits UnitMoved then TileOccupied. A hook on each event pins the
+    // aggregate-reverse-once contract: the FIRST event's interrupt resolves first. A per-event
+    // reverse would flip this to [2, 1].
+    session.RegisterHook<UnitMovedBattleEvent>(
+      new DamageOnTileOccupiedHook<UnitMovedBattleEvent>(targetPosition, unit.State, 1, oneShot: true), HookPhase.After);
+    session.RegisterHook<TileOccupiedBattleEvent>(
+      new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(targetPosition, unit.State, 2, oneShot: true), HookPhase.After);
+
+    IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [session.Board.At(targetPosition)]));
+    int[] damageAmounts = results
+      .Select(result => result.Action)
+      .OfType<ApplyDamage>()
+      .Select(damage => damage.Amount)
+      .ToArray();
+
+    Assert.Equal(3, results.Count);
+    Assert.True(results.All(result => result.Succeeded));
+    Assert.True(damageAmounts.SequenceEqual([1, 2]));
+  }
+
+  [TestCase(TestName = "Executor queues reaction response after committed tile occupation")]
+  public void ExecutorQueuesReactionResponseAfterCommittedTileOccupation()
   {
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), health: 10, actionPoints: 5);
     var targetPosition = new Vector3I(1, 0, 0);
-    var trigger = new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 3, shouldConsume: true);
-    executor.RegisterTrigger<TileOccupiedBattleEvent>(trigger);
+    var reaction = new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(targetPosition, unit.State, 3, oneShot: true);
+    session.RegisterHook<TileOccupiedBattleEvent>(reaction, HookPhase.After);
 
     IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [session.Board.At(targetPosition)]));
 
@@ -243,16 +269,16 @@ public partial class BattleActionExecutorTest
     Assert.True(results[0].Action is MoveUnit);
     Assert.True(results[1].Action is ApplyDamage);
     Assert.Equal(targetPosition, session.GetUnitPosition(unit.State).RequireSome().Raw);
-    Assert.Equal(targetPosition, trigger.ObservedTargetPositionDuringEvaluation.RequireSome());
+    Assert.Equal(targetPosition, reaction.ObservedTargetPositionDuringEvaluation.RequireSome());
     Assert.Equal(7, unit.State.CurrentHealth);
   }
 
-  [TestCase(TestName = "Executor rejected source action does not consume trigger or enqueue response")]
-  public void ExecutorRejectedSourceActionDoesNotConsumeTriggerOrEnqueueResponse()
+  [TestCase(TestName = "Executor rejected source action does not consume one-shot hook or enqueue response")]
+  public void ExecutorRejectedSourceActionDoesNotConsumeOneShotHookOrEnqueueResponse()
   {
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), health: 10);
     var targetPosition = new Vector3I(2, 0, 0);
-    executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(targetPosition, unit.State, 3, shouldConsume: true));
+    session.RegisterHook<TileOccupiedBattleEvent>(new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(targetPosition, unit.State, 3, oneShot: true), HookPhase.After);
 
     IReadOnlyList<BattleActionResult> rejectedResults = executor.Submit(BattleAction.MoveUnit(unit.State, [session.Board.At(targetPosition)]));
 
@@ -273,17 +299,17 @@ public partial class BattleActionExecutorTest
     Assert.Equal(7, unit.State.CurrentHealth);
   }
 
-  [TestCase(TestName = "Executor supports multiple consumed trigger instances")]
-  public void ExecutorSupportsMultipleConsumedTriggerInstances()
+  [TestCase(TestName = "Executor supports multiple one-shot hook instances")]
+  public void ExecutorSupportsMultipleOneShotHookInstances()
   {
     var start = new Vector3I(0, 0, 0);
     var firstTrap = new Vector3I(1, 0, 0);
     var secondTrap = new Vector3I(2, 0, 0);
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), start, health: 10, actionPoints: 5);
-    executor.RegisterTrigger<TileOccupiedBattleEvent>(
-      new DamageOnTileOccupiedTrigger(firstTrap, unit.State, 2, shouldConsume: true));
-    executor.RegisterTrigger<TileOccupiedBattleEvent>(
-      new DamageOnTileOccupiedTrigger(secondTrap, unit.State, 3, shouldConsume: true));
+    session.RegisterHook<TileOccupiedBattleEvent>(
+      new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(firstTrap, unit.State, 2, oneShot: true), HookPhase.After);
+    session.RegisterHook<TileOccupiedBattleEvent>(
+      new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(secondTrap, unit.State, 3, oneShot: true), HookPhase.After);
 
     IReadOnlyList<BattleActionResult> results = executor.Submit(BattleAction.MoveUnit(unit.State, [session.Board.At(firstTrap), session.Board.At(secondTrap)]));
 
@@ -342,8 +368,8 @@ public partial class BattleActionExecutorTest
 
     var action = new MoveUnit(unit.State, [session.Board.At(mid), session.Board.At(end)]);
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger<TileOccupiedBattleEvent>(
-      new SpawnUnitOnTileOccupiedTrigger(mid, end, enemyFaction));
+    session.RegisterHook<TileOccupiedBattleEvent>(
+      new SpawnUnitOnTileOccupiedHook(mid, end, enemyFaction), HookPhase.After);
 
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
@@ -356,8 +382,8 @@ public partial class BattleActionExecutorTest
     Assert.True(action.IsDone());
   }
 
-  [TestCase(TestName = "MoveUnit stops when trigger response makes mover unavailable")]
-  public void MoveUnitStopsWhenTriggerResponseMakesMoverUnavailable()
+  [TestCase(TestName = "MoveUnit stops when reaction response makes mover unavailable")]
+  public void MoveUnitStopsWhenReactionResponseMakesMoverUnavailable()
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
@@ -370,8 +396,8 @@ public partial class BattleActionExecutorTest
 
     var action = new MoveUnit(unit.State, [session.Board.At(mid), session.Board.At(end)]);
     var executor = new BattleActionExecutor(session);
-    executor.RegisterTrigger<TileOccupiedBattleEvent>(
-      new PassUnitOnTileOccupiedTrigger(mid, unit.State));
+    session.RegisterHook<TileOccupiedBattleEvent>(
+      new PassUnitOnTileOccupiedHook(mid, unit.State), HookPhase.After);
 
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
@@ -384,8 +410,8 @@ public partial class BattleActionExecutorTest
     Assert.True(action.IsDone());
   }
 
-  [TestCase(TestName = "MoveUnit cancels when trigger response kills mover")]
-  public void MoveUnitCancelsWhenTriggerResponseKillsMover()
+  [TestCase(TestName = "MoveUnit cancels when reaction response kills mover")]
+  public void MoveUnitCancelsWhenReactionResponseKillsMover()
   {
     var start = new Vector3I(0, 0, 0);
     var mid = new Vector3I(1, 0, 0);
@@ -393,7 +419,7 @@ public partial class BattleActionExecutorTest
     var (session, executor, _, unit) = StartSoloBattle(new Vector3I(4, 1, 4), start, health: 3, actionPoints: 5);
 
     var action = new MoveUnit(unit.State, [session.Board.At(mid), session.Board.At(end)]);
-    executor.RegisterTrigger<TileOccupiedBattleEvent>(new DamageOnTileOccupiedTrigger(mid, unit.State, 3, shouldConsume: true));
+    session.RegisterHook<TileOccupiedBattleEvent>(new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(mid, unit.State, 3, oneShot: true), HookPhase.After);
     IReadOnlyList<BattleActionResult> results = executor.Submit(action);
 
     BattleActionResult result = results.RequireSingleResult();
@@ -627,89 +653,104 @@ public partial class BattleActionExecutorTest
     Assert.True(executor.LastResult.IsNone);
   }
 
-  private sealed partial class DamageOnTileOccupiedTrigger : BattleTrigger
+  private sealed partial class DamageOnTileOccupiedHook<TEventKey> : BattleHook
+    where TEventKey : BattleEventTag
   {
     private readonly Vector3I _position;
     private readonly BattleUnitState _targetUnit;
     private readonly int _damage;
-    private readonly bool _shouldConsume;
+    private readonly bool _oneShot;
 
     public Option<Vector3I> ObservedTargetPositionDuringEvaluation { get; private set; }
 
-    public DamageOnTileOccupiedTrigger(
-      Vector3I position,
-      BattleUnitState targetUnit,
-      int damage,
-      bool shouldConsume)
+    public DamageOnTileOccupiedHook(Vector3I position, BattleUnitState targetUnit, int damage, bool oneShot)
     {
       _position = position;
       _targetUnit = targetUnit;
       _damage = damage;
-      _shouldConsume = shouldConsume;
+      _oneShot = oneShot;
     }
 
-    public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
+    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
     {
       if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
-        return BattleTriggerResult.NoReaction();
+        return [];
 
-      ObservedTargetPositionDuringEvaluation = session.GetUnitPosition(_targetUnit)
+      ObservedTargetPositionDuringEvaluation = context.Session.GetUnitPosition(_targetUnit)
         .Match(point => Some(point.Raw), () => None);
 
-      return BattleTriggerResult.QueueInterruptAfterCommit(
-        BattleAction.ApplyDamage(_targetUnit, _damage),
-        _shouldConsume);
+      if (_oneShot)
+        context.Session.UnregisterHook<TEventKey>(this, context.Phase);
+
+      return [BattleAction.ApplyDamage(_targetUnit, _damage)];
     }
   }
 
-  private sealed partial class SpawnUnitOnTileOccupiedTrigger : BattleTrigger
+  private sealed partial class SpawnUnitOnTileOccupiedHook : BattleHook
   {
     private readonly Vector3I _triggerPosition;
     private readonly Vector3I _spawnPosition;
     private readonly Faction _faction;
 
-    public SpawnUnitOnTileOccupiedTrigger(
-      Vector3I triggerPosition,
-      Vector3I spawnPosition,
-      Faction faction)
+    public SpawnUnitOnTileOccupiedHook(Vector3I triggerPosition, Vector3I spawnPosition, Faction faction)
     {
       _triggerPosition = triggerPosition;
       _spawnPosition = spawnPosition;
       _faction = faction;
     }
 
-    public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
+    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
     {
       if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _triggerPosition)
-        return BattleTriggerResult.NoReaction();
+        return [];
 
-      return BattleTriggerResult.QueueInterruptAfterCommit(
-        BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("Blocker", _faction), session.Board.At(_spawnPosition)),
-        shouldConsumeTrigger: true);
+      context.Session.UnregisterHook<TileOccupiedBattleEvent>(this, context.Phase);
+      return [BattleAction.SpawnUnit(BattleTestFactory.MakeCombatant("Blocker", _faction), context.Session.Board.At(_spawnPosition))];
     }
   }
 
-  private sealed partial class PassUnitOnTileOccupiedTrigger : BattleTrigger
+  private sealed partial class PassUnitOnTileOccupiedHook : BattleHook
   {
     private readonly Vector3I _triggerPosition;
     private readonly BattleUnitState _unit;
 
-    public PassUnitOnTileOccupiedTrigger(
-      Vector3I triggerPosition,
-      BattleUnitState unit)
+    public PassUnitOnTileOccupiedHook(Vector3I triggerPosition, BattleUnitState unit)
     {
       _triggerPosition = triggerPosition;
       _unit = unit;
     }
 
-    public override BattleTriggerResult Evaluate(BattleSession session, BattleEvent battleEvent, BattleAction sourceAction)
+    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
     {
       if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _triggerPosition)
-        return BattleTriggerResult.NoReaction();
+        return [];
 
-      return BattleTriggerResult.QueueInterruptAfterCommit(
-        BattleAction.PassUnit(_unit),
-        shouldConsumeTrigger: true);
+      context.Session.UnregisterHook<TileOccupiedBattleEvent>(this, context.Phase);
+      return [BattleAction.PassUnit(_unit)];
+    }
+  }
+
+  private sealed partial class OneShotRecordingHook : BattleHook
+  {
+    private readonly Vector3I _position;
+    private readonly List<string> _log;
+    private readonly string _message;
+
+    public OneShotRecordingHook(Vector3I position, List<string> log, string message)
+    {
+      _position = position;
+      _log = log;
+      _message = message;
+    }
+
+    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
+    {
+      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
+        return [];
+
+      _log.Add(_message);
+      context.Session.UnregisterHook<UnitMovedBattleEvent>(this, context.Phase);
+      return [];
     }
   }
 
