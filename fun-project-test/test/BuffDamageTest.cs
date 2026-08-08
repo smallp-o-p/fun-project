@@ -50,14 +50,14 @@ public partial class BuffDamageTest
     }.Start();
     var enemy = battle.EnemyUnit.State;
 
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit); // buff inactive: base 5
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit, battle.EnemyUnit); // buff inactive: base 5
     Assert.Equal(15, enemy.CurrentHealth);
 
     ApplyDamage(battle.Session, battle.PlayerUnit.State, 11);      // player 9/20: condition holds
     EndFactionTurn(battle.Executor, battle.PlayerFaction);         // enemy turn (buff activates)
     EndFactionTurn(battle.Executor, battle.EnemyFaction);          // player turn again
 
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit); // buff active: 5 + 3
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit, battle.EnemyUnit); // buff active: 5 + 3
     Assert.Equal(7, enemy.CurrentHealth);
   }
 }

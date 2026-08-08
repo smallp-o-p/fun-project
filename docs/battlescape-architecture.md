@@ -36,7 +36,7 @@ flowchart LR
         VisibilityMemory["Explored tile memory\nper faction"]
         EventStream["BattleEvent stream"]
         Actions["BattleAction\nqueued intent + primitive commands"]
-        ActionExecutor["BattleActionExecutor\naction queue + invocation"]
+        ActionExecutor["BattleActionExecutor\nhook registry + action queue\ninterrupt resolution"]
         Queries["IBattleSessionQuery&lt;TResult&gt;\ntyped read questions"]
         RuntimeFacade["BattleRuntime\nfacade: Query entry point,\nproof mint doors"]
     end
@@ -97,16 +97,17 @@ flowchart LR
   - board-local pathfinding queries
 - `BattleAction` owns action-specific application and any composite action sequencing after executor-side validation succeeds.
 - `BattleActionExecutor` owns:
-  - preview validation for supported primitive actions
+  - the hook registry, including the default systems registered in its constructor
+  - hook registration and unregistration (`RegisterHook`/`UnregisterHook`) and disposal (`Dispose` detaches its session subscription)
   - the pending action queue
   - invocation order
-  - hook-interrupt scheduling from hooks firing during a primitive's action window
-  - last-result tracking
-  - exception isolation around command execution
+  - hook-interrupt scheduling from hooks firing during a step's action window
+  - unwinding failed submissions (a throwing step or hook clears all queued work; exceptions propagate to the caller by design — they mark invariant breaks or hook bugs, not gameplay outcomes)
 - `BattleRuntime` owns:
   - the single public entry point for read-side tactical questions (`Query`)
   - null and disposal guards around query invocation
   - the proof mint doors for scene code: `TryGetAlive(unit) : Option<AliveUnit>` and `TryGetTile(coordinates) : Option<ValidatedPoint>`
+  - the session's single executor (constructed after subscribing its `BattleEventCommitted` re-raise, so subscribers observe a cause event before hook-born follow-up events), plus the `RegisterHook`/`UnregisterHook` facade doors delegating to that executor
 - concrete `IBattleSessionQuery<TResult>` implementations own:
   - one specific read-side question
   - the result shape for that question — bare `TResult`, `Option<T>`, or `Either<BattleQueryFailure, TResult>`
@@ -155,6 +156,8 @@ The session owns:
 - refreshing action-point availability for the active side
 - rebuilding faction visibility after successful actions
 - ending the battle when no living factions remain
+
+Beyond that bookkeeping, the session is turn scheduling, state, and event dispatch only: it announces `BattleEvent`s through its dispatch loop (a queued drain with a re-entrancy guard, refreshing visibility before each broadcast) and knows nothing about hooks or the executor. The session announces; the executor reacts.
 
 The target public read-side surface is typed query objects through `BattleRuntime.Query`, not a growing method list:
 
@@ -243,23 +246,19 @@ The current built-in authoritative actions are:
 - `AttackUnit`
 - `ReloadWeapon`
 - `ThrowItem`
+- `UseItem`
 - `ApplyDamage`
 - `PassUnit`
 - `EndFactionTurn`
 
-Actions should execute through an explicit executor:
+Actions execute through the runtime, which owns the session's single executor:
 
 ```csharp
-var executor = new BattleActionExecutor(session);
-var result = executor.Submit(BattleAction.MoveUnit(unit, [destination]));
+var runtime = new BattleRuntime(session);
+var result = runtime.ExecuteAction(BattleAction.MoveUnit(unit, [destination]));
 ```
 
-Submitted action results are returned as `IReadOnlyList<BattleActionResult>`. The list reports public action outcomes, not every primitive child commit from a composite action. Each produced result includes:
-
-- success or failure
-- failure reason
-- optional affected unit
-- optional message
+Submitted action results are returned as a single `BattleActionExecResult`: the submitted action plus every `BattleEvent` committed while resolving it, as a zero-copy `ReadOnlySpan<BattleEvent>` view into the executor's append-only event log (a composite's intermediate steps and hook-returned interrupt actions contribute their events to that view but are not separate results). There is no success flag or failure reason: a submission that returns at all completed; a broken invariant (rejected parameters) throws `InvalidOperationException` instead, and outcomes are read from committed events and session state.
 
 ### BattleActionExecutor
 
@@ -268,11 +267,14 @@ Submitted action results are returned as `IReadOnlyList<BattleActionResult>`. Th
 Current responsibilities:
 
 - `Submit(...)`
-- `OnActionStart` event
-- `OnActionComplete` event
-- `LastResult`
+- `RegisterHook<TEventKey>(hook, priority)` / `UnregisterHook<TEventKey>(hook)`
+- `Dispose()`
 
-Hook registration is not an executor responsibility: hooks register on the session (public door `BattleRuntime.RegisterHook<TEventKey>(hook, phase, priority)`, plus `UnregisterHook`), and the executor's only involvement is opening an action window around each primitive so hook-returned interrupts have somewhere to land.
+That is the whole surface: no lifecycle events, no `LastResult`. Outcomes are observed through the returned result's committed `BattleEvent` stream and through committed session state.
+
+The executor is the session's reaction engine: it owns the `BattleHookRegistry`, registers the default systems in its constructor (status effects, armor regen, and objectives on `TurnEndedBattleEvent`; capability effects on `ItemThrownBattleEvent`; buff evaluation on `TurnStartedBattleEvent` and `UnitAddedBattleEvent`), subscribes to `session.BattleEventCommitted`, and fires the matching hooks once per committed event, after the broadcast. It opens an executor-local action window around each primitive so hook-returned interrupts have somewhere to land; a hook returning interrupts with no window open throws. `BattleRuntime.RegisterHook` remains the public facade door — it delegates to the executor — and the session knows nothing about hooks: it only announces events.
+
+One executor per session is a hard invariant: a second executor attached to the same session would double-register the default systems (statuses would tick twice). Production code uses the executor owned by `BattleRuntime`; test helpers cache one executor per session (see [BattleActionExecutor Design](./battle-action-executor.md)).
 
 The executor does not currently:
 
@@ -288,8 +290,6 @@ Current responsibilities:
 - `Bind(BattleRuntime runtime)`
 - `Unbind()`
 - `PresentationEventCommitted` Godot signal
-- `ActionStarted` Godot signal
-- `ActionCompleted` Godot signal
 
 The handler wraps committed `BattleEvent` values in a single `BattleEventAdapter` `RefCounted` envelope. That keeps signal payloads Godot-compatible while preserving access to the original committed event for C# presentation code. Scene components that need read data should call `BattleRuntime.Query(...)` directly and handle the query result shape from the backend.
 
@@ -324,9 +324,9 @@ sequenceDiagram
         Action->>Board: Validate adjacency, occupancy, and path legality
         Action->>Board: Commit the next board step
         Action->>Event: Raise UnitMoved and TileOccupied
-        Exec->>Exec: Close the action window and collect interrupt actions hooks returned during dispatch
+        Exec->>Exec: Close the executor-local action window and collect interrupts hooks returned during dispatch
     end
-    Exec-->>Controller: Return public IReadOnlyList<BattleActionResult>
+    Exec-->>Controller: Return the submission's BattleActionExecResult (action + committed events)
     Event-->>View: Animate movement from committed battle event
     Event-->>HUD: Refresh AP and prompts from committed battle event
 ```
@@ -338,7 +338,7 @@ sequenceDiagram
 - `StartBattle` rebuilds the active round queue from living factions in that order.
 - `ActiveSide` and `TurnNumber` are owned by the session.
 - `EndFactionTurn` is the explicit faction-turn action.
-- Turn start is the same shape at both invocation sites: refresh the relevant faction's action-point availability, then raise the turn-start events (`TurnStarted`, plus `ActiveSideChanged` on a side flip or `SessionStarted` on battle start), then refresh `RefreshForNewTurn` for the affected units. Buff evaluation is an ordinary `Before` hook on `TurnStartedBattleEvent` (`TurnStartBuffHook`) and on `UnitAddedBattleEvent` at spawn (`UnitSpawnedBuffHook`), so a buff flip lands before that event's own broadcast and — for turn start — before the AP refresh that runs once the dispatch completes and reads (possibly buffed) `MaxActionPoints`. Mid-dispatch observers of `SessionStarted`/`TurnStarted` see pre-refresh action points; this is deliberate, since the refresh always completes before `Submit`/`StartBattle` returns. See `docs/battle-event-trigger-architecture.md` for the full hook model.
+- Turn start is the same shape at both invocation sites: refresh the relevant faction's action-point availability, then raise the turn-start events (`TurnStarted`, plus `ActiveSideChanged` on a side flip or `SessionStarted` on battle start), then refresh `RefreshForNewTurn` for the affected units. Buff evaluation is an ordinary hook on `TurnStartedBattleEvent` (`TurnStartBuffHook`) and on `UnitAddedBattleEvent` at spawn (`UnitSpawnedBuffHook`) — both registered by the executor's constructor and fired after the event's broadcast — so a buff flip lands during the dispatch and, for turn start, before the AP refresh that runs once the dispatch completes and reads (possibly buffed) `MaxActionPoints`. Mid-dispatch observers of `SessionStarted`/`TurnStarted` see pre-refresh action points; this is deliberate, since the refresh always completes before `Submit`/`StartBattle` returns.
 - `PassUnit` ends a unit activation and currently advances the turn automatically if that side has no remaining actable units.
 - Unit death updates alive/dead storage, board occupancy, current-turn availability, and faction queue membership through session bookkeeping.
 
@@ -363,11 +363,11 @@ The current event stream is intentionally small and authoritative. Presentation 
 
 Presentation code should react to these events instead of inferring state changes from executor internals.
 
-Hook registration keys on `BattleEventTag` types, not an enum. A `BattleHook` can register against a concrete event such as `TileOccupiedBattleEvent`, or against a shared marker interface such as `IPositionedBattleEvent` or `IUnitBattleEvent`, in which case it fires for every committed event implementing that tag, in whichever `HookPhase` (`Before`/`After`) it was registered for. Concrete event subclasses, such as `UnitMovedBattleEvent` and `TurnStartedBattleEvent`, carry event-specific payloads.
+Hook registration keys on `BattleEventTag` types, not an enum, and lives on the executor: it registers the default systems in its constructor and exposes `RegisterHook` (the `BattleRuntime.RegisterHook` facade door delegates to it). A `BattleHook` can register against a concrete event such as `TileOccupiedBattleEvent`, or against a shared marker interface such as `IPositionedBattleEvent` or `IUnitBattleEvent`, in which case it fires for every committed event implementing that tag. Concrete event subclasses, such as `UnitMovedBattleEvent` and `TurnStartedBattleEvent`, carry event-specific payloads.
 
-Event dispatch is queue-drained: an event raised mid-dispatch is deferred until after the current event finishes processing (breadth-first, not inline). A throwing hook clears the queue and surfaces the exception. `BattleActionExecutor.Submit` throws if called while the session is dispatching events — no hook, in either phase, may inject a second execution loop; a hook's only write channel outward is the interrupt actions it returns from `OnEvent`, which the executor applies through the normal action path once the current primitive's action window closes.
+Event dispatch is queue-drained: an event raised mid-dispatch is deferred until after the current event finishes processing (breadth-first, not inline). A throwing hook clears the queue and surfaces the exception. `BattleActionExecutor.Submit` throws if called while the session is dispatching events — no hook may inject a second execution loop; a hook's only write channel outward is the interrupt actions it returns from `OnEvent`, which the executor applies through the normal action path once the current primitive's action window closes.
 
-The session's `BattleHookRegistry` is the one hook registry (see `docs/battle-event-trigger-architecture.md` for the full model): every hook is a `BattleHook` (or `BattleHook<TEvent>`) registered against an event-tag type with a `HookPhase` and an int priority, and may mutate state directly and raise follow-up events. `ArmorRegenSystem` is registered `After` on `TurnEndedBattleEvent`, ticking armor regen and raising `UnitArmorRegeneratedBattleEvent`. Damage to an armored unit flows through the pure `DamageResolver` (scripts/battle/combat/) inside `BattleSession.ApplyDamageTo`: each bundle packet is split into armor damage (1.5x floored on element match) and health damage (always from the un-multiplied amount); `UnitDamagedBattleEvent` carries the `ArmorDamage`/`HealthDamage` split alongside the pre-mitigation bundle.
+The executor's `BattleHookRegistry` is the one hook registry: every hook is a `BattleHook` (or `BattleHook<TEvent>`) registered against an event-tag type with an int priority, and may mutate state directly and raise follow-up events. `ArmorRegenSystem` is one of the default systems the executor registers in its constructor, on `TurnEndedBattleEvent`, ticking armor regen and raising `UnitArmorRegeneratedBattleEvent`. Damage to an armored unit flows through the pure `DamageResolver` (scripts/battle/combat/) inside `BattleSession.ApplyDamageTo`: each bundle packet is split into armor damage (1.5x floored on element match) and health damage (always from the un-multiplied amount); `UnitDamagedBattleEvent` carries the `ArmorDamage`/`HealthDamage` split alongside the pre-mitigation bundle.
 
 ## Future Extensions
 
@@ -394,9 +394,9 @@ Use these names consistently in future tactical work:
 
 - `BattleSession`
 - `BattleAction`
-- `BattleActionResult`
+- `BattleActionExecResult`
 - `BattleActionExecutor`
-- `BattleHook` (`BattleHook<TEvent>`, `HookPhase.Before`/`After`)
+- `BattleHook` (`BattleHook<TEvent>`, `HookContext`)
 - `IBattleSessionQuery<TResult>`
 - `BattleRuntime`
 - `Either<BattleQueryFailure, TResult>`

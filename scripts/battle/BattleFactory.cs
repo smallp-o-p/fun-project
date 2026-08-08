@@ -53,8 +53,13 @@ public static class BattleFactory
         spawnPointOption.Value(),
         placement.Loadout.Weapon,
         placement.Loadout.Armor);
-      BattleActionResult result = runtime.ExecuteAction(spawn).Single();
-      if (!result.Succeeded)
+      try
+      {
+        // Rejected parameters surface as the executor's invariant-break throw; the only
+        // expected cause here is occupancy, already pre-validated as far as setup can know.
+        runtime.ExecuteAction(spawn);
+      }
+      catch (InvalidOperationException)
       {
         runtime.Dispose();
         return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
@@ -63,9 +68,7 @@ public static class BattleFactory
       }
     }
 
-    BattleActionResult startResult = runtime.ExecuteAction(BattleAction.StartBattle()).Single();
-    if (!startResult.Succeeded)
-      throw new InvalidOperationException($"StartBattle failed after validation: {startResult.Message}");
+    runtime.ExecuteAction(BattleAction.StartBattle());
 
     return Right<BattleSetupFailure, BattleRuntime>(runtime);
   }

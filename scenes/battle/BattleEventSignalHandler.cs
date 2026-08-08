@@ -11,12 +11,6 @@ public sealed partial class BattleEventSignalHandler : Node
   [Signal]
   public delegate void PresentationEventCommittedEventHandler(BattleEventAdapter battleEvent);
 
-  [Signal]
-  public delegate void ActionStartedEventHandler(string actionId);
-
-  [Signal]
-  public delegate void ActionCompletedEventHandler(BattleActionResultAdapter result);
-
   public void Bind(BattleRuntime runtime)
   {
     ArgumentNullException.ThrowIfNull(runtime);
@@ -24,8 +18,6 @@ public sealed partial class BattleEventSignalHandler : Node
     Unbind();
     _runtime = Some(runtime);
     runtime.BattleEventCommitted += ForwardBattleEvent;
-    runtime.ActionStarted += ForwardActionStarted;
-    runtime.ActionCompleted += ForwardActionCompleted;
   }
 
   public void Unbind()
@@ -33,8 +25,6 @@ public sealed partial class BattleEventSignalHandler : Node
     _runtime.IfSome(runtime =>
     {
       runtime.BattleEventCommitted -= ForwardBattleEvent;
-      runtime.ActionStarted -= ForwardActionStarted;
-      runtime.ActionCompleted -= ForwardActionCompleted;
       _runtime = None;
     });
   }
@@ -53,15 +43,5 @@ public sealed partial class BattleEventSignalHandler : Node
   private void ForwardBattleEvent(BattleEvent battleEvent)
   {
     EmitSignal(SignalName.PresentationEventCommitted, new BattleEventAdapter(battleEvent));
-  }
-
-  private void ForwardActionStarted(BattleAction action)
-  {
-    EmitSignal(SignalName.ActionStarted, action.ActionId);
-  }
-
-  private void ForwardActionCompleted(BattleActionResult result)
-  {
-    EmitSignal(SignalName.ActionCompleted, new BattleActionResultAdapter(result));
   }
 }

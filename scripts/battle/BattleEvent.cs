@@ -218,6 +218,25 @@ public sealed record ItemThrownBattleEvent : BattleEvent, IUnitBattleEvent, IPos
 }
 
 /// <summary>
+/// Raised when a unit uses an item through <c>UseItem</c> (the generic active-item verb).
+/// Carries the acting unit and the item; effect payloads are resolved by hooks reacting to
+/// this event, mirroring how blast effects follow <see cref="ItemThrownBattleEvent"/>.
+/// </summary>
+public sealed record ItemUsedBattleEvent : BattleEvent, IUnitBattleEvent
+{
+  public BattleUnitState Unit { get; }
+  public EquippableItem Item { get; }
+
+  public ItemUsedBattleEvent(BattleUnitState unit, EquippableItem item)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentNullException.ThrowIfNull(item);
+    Unit = unit;
+    Item = item;
+  }
+}
+
+/// <summary>
 /// Raised after a thrown item's capability payload (e.g. a blast's effects) has been
 /// resolved against the affected units. Carries the resolved item and the resolution
 /// point so presentation can play an effect at that tile.

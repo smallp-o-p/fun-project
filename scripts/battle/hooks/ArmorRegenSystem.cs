@@ -6,7 +6,7 @@ using System.Linq;
 namespace FunProject.Battle;
 
 /// <summary>
-/// Turn-end After hook: at the end of a faction's turn, ticks armor regen for that
+/// Turn-end hook: at the end of a faction's turn, ticks armor regen for that
 /// faction's living units. The shield-recharge counters live on each ArmorCapability; this
 /// pass is stateless. Registered at priority -100 but after <see cref="StatusEffectSystem"/>,
 /// so a DoT tick that re-arms the regen delay suppresses this turn's recharge.

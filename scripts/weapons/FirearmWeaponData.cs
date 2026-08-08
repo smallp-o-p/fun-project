@@ -1,6 +1,7 @@
 using Godot;
 
 namespace FunProject.Weapons;
+
 public enum FirearmArchetype
 {
   Pistol,

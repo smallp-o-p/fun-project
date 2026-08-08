@@ -25,7 +25,7 @@ public partial class ArmorRegenTest
   public void RegenWaitsOutDelayThenRestores()
   {
     var (battle, armor) = MakeFixture(armor: 10, regenDelayTurns: 2, regenPerTurn: 3);
-    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit, 5)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit.AliveIn(battle.Session), 5));
     Assert.Equal(5, armor.Capability.Current);
     Assert.Equal(2, armor.Capability.RegenDelayRemaining);
 
@@ -56,7 +56,7 @@ public partial class ArmorRegenTest
   public void EnemyTurnEndDoesNotTickPlayerRegen()
   {
     var (battle, armor) = MakeFixture(regenDelayTurns: 2);
-    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit, 6)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit.AliveIn(battle.Session), 6));
 
     EndFactionTurn(battle.Executor, battle.PlayerFaction);   // delay 2 -> 1
     EndFactionTurn(battle.Executor, battle.EnemyFaction);    // must not tick
@@ -68,10 +68,10 @@ public partial class ArmorRegenTest
   public void DamageMidCountdownReArmsDelay()
   {
     var (battle, armor) = MakeFixture(regenDelayTurns: 2);
-    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit, 3)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit.AliveIn(battle.Session), 3));
     EndFactionTurn(battle.Executor, battle.PlayerFaction);   // delay 2 -> 1
 
-    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit, 1)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit.AliveIn(battle.Session), 1));
 
     Assert.Equal(2, armor.Capability.RegenDelayRemaining);
   }
@@ -80,7 +80,7 @@ public partial class ArmorRegenTest
   public void ArmorWithoutRegenRateNeverRegenerates()
   {
     var (battle, armor) = MakeFixture(armor: 10, regenDelayTurns: 0, regenPerTurn: 0);
-    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit, 6)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit.AliveIn(battle.Session), 6));
 
     var recorder = new BattleEventRecorder(battle.Session);
     EndFactionTurn(battle.Executor, battle.PlayerFaction);
@@ -95,7 +95,7 @@ public partial class ArmorRegenTest
   public void DeadUnitsAreNotTicked()
   {
     var (battle, _) = MakeFixture(armor: 5, regenDelayTurns: 0, regenPerTurn: 5);
-    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit, 50)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit.AliveIn(battle.Session), 50));
     Assert.True(battle.PlayerUnit.State.IsDead);
 
     var recorder = new BattleEventRecorder(battle.Session);
@@ -110,7 +110,7 @@ public partial class ArmorRegenTest
   public void RegenEventLandsAfterTurnEnded()
   {
     var (battle, _) = MakeFixture(armor: 10, regenDelayTurns: 0, regenPerTurn: 3);
-    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit, 6)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit.AliveIn(battle.Session), 6));
 
     var recorder = new BattleEventRecorder(battle.Session);
     EndFactionTurn(battle.Executor, battle.PlayerFaction);
@@ -126,14 +126,14 @@ public partial class ArmorRegenTest
   public void HealthOnlyDamageWithDepletedArmorReArmsDelay()
   {
     var (battle, armor) = MakeFixture(armor: 4, regenDelayTurns: 2, regenPerTurn: 3);
-    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit, 4)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit.AliveIn(battle.Session), 4));
     Assert.Equal(0, armor.Capability.Current);
 
     EndFactionTurn(battle.Executor, battle.PlayerFaction);   // delay 2 -> 1
     Assert.Equal(1, armor.Capability.RegenDelayRemaining);
 
     // Armor is depleted: this damage is health-only, and must still reset the countdown.
-    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit, 2)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit.AliveIn(battle.Session), 2));
 
     Assert.Equal(2, armor.Capability.RegenDelayRemaining);
   }
@@ -142,7 +142,7 @@ public partial class ArmorRegenTest
   public void DotTickSuppressesSameTurnRegen()
   {
     var (battle, armor) = MakeFixture(armor: 10, regenDelayTurns: 1, regenPerTurn: 3);
-    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit, 5)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.ApplyDamage(battle.PlayerUnit.AliveIn(battle.Session), 5));
     Assert.Equal(5, armor.Capability.Current);
 
     EndFactionTurn(battle.Executor, battle.PlayerFaction);   // delay 1 -> 0: next player turn end would regen

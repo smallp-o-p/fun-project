@@ -18,14 +18,14 @@ public class BattleCausalityTest
     }.Start();
     var recorder = new BattleEventRecorder(battle.Session);
 
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
 
     var damagedEvent = recorder.OfType<UnitDamagedBattleEvent>().Single();
     Assert.Equal(battle.PlayerUnit.State, damagedEvent.MaybeCause.RequireSome());
   }
 
-  [TestCase(TestName = "A killing blow carries the attacker on both the damage and kill events")]
-  public void KillingBlowCarriesAttackerOnDamageAndKillEvents()
+  [TestCase(TestName = "A killing blow carries the attacker on the kill event alone")]
+  public void KillingBlowCarriesAttackerOnTheKillEventAlone()
   {
     var battle = new BattleDuelBuilder
     {
@@ -35,10 +35,11 @@ public class BattleCausalityTest
     }.Start();
     var recorder = new BattleEventRecorder(battle.Session);
 
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
 
     Assert.True(battle.EnemyUnit.State.IsDead);
-    Assert.Equal(battle.PlayerUnit.State, recorder.OfType<UnitDamagedBattleEvent>().Single().MaybeCause.RequireSome());
+    // A killing blow commits death only: no damage event accompanies the kill.
+    Assert.False(recorder.OfType<UnitDamagedBattleEvent>().Any());
     var killedEvent = recorder.OfType<UnitKilledBattleEvent>().Single();
     Assert.Equal(battle.EnemyUnit.State, killedEvent.Unit);
     Assert.Equal(battle.PlayerUnit.State, killedEvent.MaybeCause.RequireSome());

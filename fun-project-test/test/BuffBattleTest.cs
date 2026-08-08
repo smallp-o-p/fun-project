@@ -62,8 +62,8 @@ public partial class BuffBattleTest
     Assert.Equal(75f, player.EffectiveStat<AimStat>());
     Assert.Equal(75, Preview().FinalChance); // spec test 4: the preview sees the aim buff
     Assert.Equal(1, recorder.OfType<UnitBuffActivatedBattleEvent>().Count());
-    // v2 hook order pin: TurnStarted commits BEFORE the buff hook's activation (BuffSystem
-    // fires as a Before hook on TurnStarted), not after.
+    // v2 hook order pin: TurnStarted commits BEFORE the buff hook's activation (buff
+    // evaluation is fired by the executor after the TurnStarted broadcast), not after.
     recorder.AssertCommittedBefore<TurnStartedBattleEvent, UnitBuffActivatedBattleEvent>();
   }
 
@@ -114,9 +114,9 @@ public partial class BuffBattleTest
 
     Assert.True(player.State.Buffs[0].IsActive); // activated by the battle-start pass
 
-    var executor = new BattleActionExecutor(session);
+    var executor = ExecutorFor(session);
     var recorder = new BattleEventRecorder(session);
-    Attack(executor, player.State, adjacentEnemy.State); // kills the adjacent enemy
+    Attack(session, executor, player.State, adjacentEnemy.State); // kills the adjacent enemy
     EndFactionTurn(executor, playerFaction);             // enemy turn start -> re-evaluate
 
     Assert.False(player.State.Buffs[0].IsActive);

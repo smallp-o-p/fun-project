@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace FunProject.Tests;
 
-// Collects every event it receives; register with RegisterHook<TEventKey>.
+// Collects every event it receives; register with executor/runtime RegisterHook<TEventKey>.
 internal sealed class RecordingHook : BattleHook
 {
   public List<BattleEvent> Received { get; } = [];

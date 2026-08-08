@@ -8,22 +8,21 @@ using System;
 // Targeted verbs implement NeedsTargeting; instant verbs implement CanActDirectly.
 public abstract class UnitActionOption
 {
-  public BattleUnitState Unit { get; }
+  public AliveUnit Unit { get; }
   public bool IsAvailable { get; }
 
-  protected UnitActionOption(BattleUnitState unit, bool isAvailable)
+  protected UnitActionOption(AliveUnit unit, bool isAvailable)
   {
-    ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;
     IsAvailable = isAvailable;
   }
 }
 
-public sealed class MoveActionOption(BattleUnitState unit, bool isAvailable) : UnitActionOption(unit, isAvailable), NeedsTargeting
+public sealed class MoveActionOption(AliveUnit unit, bool isAvailable) : UnitActionOption(unit, isAvailable), NeedsTargeting
 {
   public IActionTargeting Targeting(BattleRuntime runtime)
   {
-    return new MoveTargeting(runtime, Unit);
+    return new MoveTargeting(runtime, Unit.State);
   }
 }
 
@@ -31,7 +30,7 @@ public sealed class AttackActionOption : UnitActionOption, NeedsTargeting
 {
   public Weapon Weapon { get; }
 
-  public AttackActionOption(BattleUnitState unit, Weapon weapon, bool isAvailable)
+  public AttackActionOption(AliveUnit unit, Weapon weapon, bool isAvailable)
     : base(unit, isAvailable)
   {
     ArgumentNullException.ThrowIfNull(weapon);
@@ -40,11 +39,11 @@ public sealed class AttackActionOption : UnitActionOption, NeedsTargeting
 
   public IActionTargeting Targeting(BattleRuntime runtime)
   {
-    return new AttackTargeting(runtime, Unit, Weapon);
+    return new AttackTargeting(runtime, Unit.State, Weapon);
   }
 }
 
-public sealed class PassActionOption(BattleUnitState unit, bool isAvailable)
+public sealed class PassActionOption(AliveUnit unit, bool isAvailable)
   : UnitActionOption(unit, isAvailable), CanActDirectly
 {
   public BattleAction MakeAction()
@@ -53,20 +52,27 @@ public sealed class PassActionOption(BattleUnitState unit, bool isAvailable)
   }
 }
 
-public sealed class EndTurnActionOption(BattleUnitState unit, bool isAvailable)
+public sealed class EndTurnActionOption(AliveUnit unit, bool isAvailable)
   : UnitActionOption(unit, isAvailable), CanActDirectly
 {
   public BattleAction MakeAction()
   {
-    return new EndFactionTurn(Unit.Combatant.OwningFaction);
+    return new EndFactionTurn(Unit.State.Combatant.OwningFaction);
   }
 }
 
-public sealed class ReloadActionOption(BattleUnitState unit, bool isAvailable)
+public sealed class ReloadActionOption(AliveUnit unit, bool isAvailable)
   : UnitActionOption(unit, isAvailable), CanActDirectly
 {
   public BattleAction MakeAction()
   {
-    return BattleAction.ReloadWeapon(Unit);
+    return BattleAction.ReloadWeapon(Unit, RequireReloadableWeapon());
   }
+
+  private AmmunitionedWeapon RequireReloadableWeapon()
+    => Unit.State.EquippedWeapon.Bind(
+        weapon => weapon is AmmunitionedWeapon ammunitioned ? Some(ammunitioned) : None)
+      .Match(
+        weapon => weapon,
+        () => throw new InvalidOperationException("Reload option requires a magazine weapon."));
 }

@@ -66,7 +66,7 @@ internal sealed class BattleDuelBuilder
     BattleActionTestHelper.StartBattle(session);
 
     return new TwoFactionBattle(
-      session, new BattleActionExecutor(session), playerFaction, enemyFaction, playerUnit, enemyUnit);
+      session, ExecutorFor(session), playerFaction, enemyFaction, playerUnit, enemyUnit);
   }
 
   private static BattleTestUnit SpawnSide(BattleSession session, Faction faction, DuelSide side, Vector3I defaultPosition)

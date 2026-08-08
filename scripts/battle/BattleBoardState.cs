@@ -112,7 +112,7 @@ public sealed class BattleBoardState
         });
     }
   }
-  
+
   public void SetTileWalkable(ValidatedPoint point, bool walkable)
   {
     GetTile(point).IsWalkable = walkable;
@@ -190,7 +190,7 @@ public sealed class BattleBoardState
   {
     return _positionByUnit.TryGetValue(unitId, out ValidatedPoint point) ? Some(point) : None;
   }
-  
+
   /// <summary>
   /// Find a path for a unit at tile X to destination
   /// </summary>

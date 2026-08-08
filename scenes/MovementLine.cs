@@ -3,7 +3,8 @@ using Godot;
 [Tool]
 public partial class MovementLine : MeshInstance3D
 {
-  [Export] public Vector3[] Points { get; set; } =
+  [Export]
+  public Vector3[] Points { get; set; } =
   [
     new(0, 0, 0),
     new(1, 0, 0),

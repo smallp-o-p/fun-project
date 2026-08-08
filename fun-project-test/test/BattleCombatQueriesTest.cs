@@ -65,7 +65,9 @@ public partial class BattleCombatQueriesTest
 
     var raisedEvents = new List<BattleEvent>();
     battle.Session.BattleEventCommitted += raisedEvents.Add;
-    Assert.True(battle.Executor.Submit(BattleAction.AttackUnit(battle.PlayerUnit.State, battle.EnemyUnit.State)).RequireSingleResult().Succeeded);
+    battle.Executor.Submit(BattleAction.AttackUnit(
+      battle.PlayerUnit.AliveIn(battle.Session),
+      battle.EnemyUnit.AliveIn(battle.Session)));
 
     var resolved = raisedEvents.OfType<UnitAttackedBattleEvent>().Single().Breakdown;
     Assert.Equal(previewed.BaseChance, resolved.BaseChance);

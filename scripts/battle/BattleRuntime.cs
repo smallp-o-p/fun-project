@@ -9,29 +9,15 @@ public sealed class BattleRuntime : IDisposable
   private readonly BattleActionExecutor _actions;
   private bool _disposed;
 
-  public Option<BattleActionResult> LastActionResult
-  {
-    get
-    {
-      ThrowIfDisposed();
-      return _actions.LastResult;
-    }
-  }
-
   public event Action<BattleEvent> BattleEventCommitted = delegate { };
-  public event Action<BattleAction> ActionStarted = delegate { };
-  public event Action<BattleActionResult> ActionCompleted = delegate { };
 
   public BattleRuntime(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
     _session = session;
-    _actions = new BattleActionExecutor(session);
-
     _session.BattleEventCommitted += RaiseBattleEventCommitted;
-    _actions.OnActionStart += RaiseActionStarted;
-    _actions.OnActionComplete += RaiseActionCompleted;
+    _actions = new BattleActionExecutor(session);
   }
 
   public TResult Query<TResult>(IBattleSessionQuery<TResult> query)
@@ -59,24 +45,24 @@ public sealed class BattleRuntime : IDisposable
     return _session.Board.ValidatePoint(coordinates);
   }
 
-  public IReadOnlyList<BattleActionResult> ExecuteAction(BattleAction action)
+  public BattleActionExecResult ExecuteAction(BattleAction action)
   {
     ThrowIfDisposed();
     return _actions.Submit(action);
   }
 
-  public void RegisterHook<TEventKey>(BattleHook hook, HookPhase phase, int priority = 0)
+  public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0)
     where TEventKey : BattleEventTag
   {
     ThrowIfDisposed();
-    _session.RegisterHook<TEventKey>(hook, phase, priority);
+    _actions.RegisterHook<TEventKey>(hook, priority);
   }
 
-  public bool UnregisterHook<TEventKey>(BattleHook hook, HookPhase phase)
+  public bool UnregisterHook<TEventKey>(BattleHook hook)
     where TEventKey : BattleEventTag
   {
     ThrowIfDisposed();
-    return _session.UnregisterHook<TEventKey>(hook, phase);
+    return _actions.UnregisterHook<TEventKey>(hook);
   }
 
   public void Dispose()
@@ -85,8 +71,7 @@ public sealed class BattleRuntime : IDisposable
       return;
 
     _session.BattleEventCommitted -= RaiseBattleEventCommitted;
-    _actions.OnActionStart -= RaiseActionStarted;
-    _actions.OnActionComplete -= RaiseActionCompleted;
+    _actions.Dispose();
     _disposed = true;
   }
 
@@ -98,15 +83,5 @@ public sealed class BattleRuntime : IDisposable
   private void RaiseBattleEventCommitted(BattleEvent battleEvent)
   {
     BattleEventCommitted.Invoke(battleEvent);
-  }
-
-  private void RaiseActionStarted(BattleAction action)
-  {
-    ActionStarted.Invoke(action);
-  }
-
-  private void RaiseActionCompleted(BattleActionResult result)
-  {
-    ActionCompleted.Invoke(result);
   }
 }

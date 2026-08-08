@@ -25,7 +25,7 @@ public partial class BlastResolutionTest
     var playerFaction = BattleTestFactory.MakeFaction("Player");
     var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
     var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    var executor = new BattleActionExecutor(session);
+    var executor = ExecutorFor(session);
     var thrower = SpawnUnit(session, BattleTestFactory.MakeCombatant("Thrower", playerFaction, actionPoints: 4), new Vector3I(1, 0, 1));
     var recorder = new BattleEventRecorder(session);
     return new Fixture(session, executor, playerFaction, enemyFaction, thrower, recorder);
@@ -34,8 +34,8 @@ public partial class BlastResolutionTest
   private static void Throw(Fixture fixture, ItemWith<ThrowableCapability> grenade, Vector3I target)
   {
     fixture.Thrower.AddInventoryItem(grenade.Item);
-    var result = fixture.Executor.Submit(BattleAction.ThrowItem(fixture.Thrower.State, grenade, fixture.Session.Board.At(target))).RequireSingleResult();
-    Assert.True(result.Succeeded);
+    fixture.Executor.Submit(BattleAction.ThrowItem(
+      fixture.Thrower.AliveIn(fixture.Session), grenade, fixture.Session.Board.At(target)));
   }
 
   [TestCase(TestName = "Thrown grenade damages an enemy within the blast radius")]

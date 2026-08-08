@@ -1,134 +1,162 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace FunProject.Battle;
 
-public sealed class BattleActionExecutor
+public readonly struct BattleActionExecResult(BattleAction action, List<BattleEvent> log, int start, int count)
+{
+  public BattleAction Action { get; } = action;
+  public ReadOnlySpan<BattleEvent> EventsThatOccurred => CollectionsMarshal.AsSpan(log).Slice(start, count);
+}
+
+/// <summary>
+/// The "Command Executor" in the Command design pattern.
+/// It handles execution of submitted BattleActions and is usually the main driver of mutation in BattleSession.
+/// Also handles BattleHooks and interrupt machinery.
+/// Submit Action --> Get events that occurred
+/// </summary>
+public sealed class BattleActionExecutor : IDisposable
 {
   private readonly BattleSession _session;
-  private readonly LinkedList<BattleAction> _pending = [];
+  private readonly BattleHookRegistry _hooks = new();
 
-  public Option<BattleActionResult> LastResult { get; private set; }
+  /// <summary>
+  /// Actions to execute. Empty until an action is submitted, in which case we execute it, and stack any interrupt
+  /// actions on top, and also execute those.
+  /// </summary>
+  private readonly Stack<BattleAction> _pendingActions = [];
 
-  public event Action<BattleAction> OnActionStart = delegate { };
-  public event Action<BattleActionResult> OnActionComplete = delegate { };
+  /// <summary>
+  /// Constant, growing event log.
+  /// </summary>
+  private readonly List<BattleEvent> _eventLog = [];
+
+  private readonly List<BattleAction> _capturedInterrupts = [];
+  private Option<BattleAction> _inFlightAction = None;
+  private bool _disposed;
 
   public BattleActionExecutor(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     _session = session;
+    _session.BattleEventCommitted += OnEventCommitted;
+
+    // Order matters here. We want to evaluate all the effects before evaluating objectives
+    // because they may result in an objective failing/completing.
+    RegisterHook<TurnEndedBattleEvent>(new StatusEffectSystem(), priority: -100);
+    RegisterHook<TurnEndedBattleEvent>(new ArmorRegenSystem(), priority: -100);
+    RegisterHook<TurnEndedBattleEvent>(new ObjectiveSystem(), priority: 100);
+    RegisterHook<ItemThrownBattleEvent>(new CapabilityEffectSystem());
+
+    RegisterHook<TurnStartedBattleEvent>(new TurnStartBuffHook());
+    RegisterHook<UnitAddedBattleEvent>(new UnitSpawnedBuffHook());
   }
 
-  public IReadOnlyList<BattleActionResult> Submit(BattleAction action)
+  private void OnEventCommitted(BattleEvent battleEvent)
   {
-    if (_session.IsDispatchingEvents)
-      throw new InvalidOperationException("Cannot submit actions while battle events are dispatching; hooks raise follow-up events through the session instead.");
-    Enqueue(action);
-    return Tick();
+    _eventLog.Add(battleEvent);
+
+    var interrupts = _hooks.Fire(battleEvent, new HookContext(_session, _inFlightAction));
+    if (interrupts.Count == 0)
+      return;
+    if (_inFlightAction.IsNone)
+      throw new InvalidOperationException(
+        "A hook returned interrupt actions while no executor action was in flight.");
+    _capturedInterrupts.AddRange(interrupts);
   }
 
-  private void Enqueue(BattleAction action)
+  public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0)
+    where TEventKey : BattleEventTag
   {
-    _pending.AddLast(action);
+    ThrowIfDisposed();
+    _hooks.Register<TEventKey>(hook, priority);
   }
 
-  private IReadOnlyList<BattleActionResult> Tick()
+  public bool UnregisterHook<TEventKey>(BattleHook hook)
+    where TEventKey : BattleEventTag
   {
-    List<BattleActionResult> results = [];
-
-    while (_pending.Count > 0)
-    {
-      BattleAction currentAction = _pending.First!.Value;
-      _pending.RemoveFirst();
-
-      // Capture before NextAction may transition state away from Pending.
-      bool isFirstStart = !currentAction.HasStarted;
-      if (currentAction.NextAction(_session).Case is not BattleAction sub)
-        continue;
-
-      BattleActionResult result;
-      try
-      {
-        // The submitted action is the unit of the start/complete contract;
-        // per-step detail flows through the committed BattleEvent stream.
-        if (isFirstStart)
-          OnActionStart.Invoke(currentAction);
-        result = ExecuteQueuedAction(sub, currentAction);
-      }
-      catch (Exception exception)
-      {
-        result = BattleActionResult.Failure(
-          sub,
-          BattleActionFailureReason.UnexpectedError,
-          exception.Message);
-        ConsumeResult(sub, currentAction, result);
-      }
-
-      ReportResult(result, sub, currentAction)
-        .IfSome(reportedResult =>
-        {
-          LastResult = Some(reportedResult);
-          OnActionComplete.Invoke(reportedResult);
-          results.Add(reportedResult);
-        });
-    }
-
-    return results;
+    ThrowIfDisposed();
+    return _hooks.Unregister<TEventKey>(hook);
   }
 
-  private BattleActionResult ExecuteQueuedAction(BattleAction action, BattleAction activeAction)
+  public BattleActionExecResult Submit(BattleAction action)
   {
-    // The session opens an action window for this primitive's Execute: hooks firing during
-    // the dispatches it causes may return interrupt actions, which accumulate in the window
-    // (in evaluation order) alongside the in-flight action HookContext exposes.
-    IReadOnlyList<BattleAction> interrupts;
-    BattleActionResult result;
-    _session.BeginActionExecution(action);
+    ThrowIfDisposed();
+    return DoAction(action);
+  }
+
+  private BattleActionExecResult DoAction(BattleAction action)
+  {
+    int logStart = _eventLog.Count;
+    _pendingActions.Push(action);
 
     try
     {
-      result = action.Execute(_session);
+      while (_pendingActions.Count > 0)
+      {
+        var currentAction = _pendingActions.Peek();
+
+        _capturedInterrupts.Clear();
+        _inFlightAction = Some(currentAction);
+        var actionState = currentAction.Execute(_session);
+
+        switch (actionState)
+        {
+          case BattleAction.Result.Completed:
+            {
+              _pendingActions.Pop();
+              foreach (var reaction in _capturedInterrupts.AsEnumerable().Reverse())
+                _pendingActions.Push(reaction);
+              break;
+            }
+          case BattleAction.Result.Interrupted:
+            {
+              _pendingActions.Pop();
+              break;
+            }
+          case BattleAction.Result.Incomplete:
+            {
+              foreach (var reaction in _capturedInterrupts.AsEnumerable().Reverse())
+                _pendingActions.Push(reaction);
+              break;
+            }
+          case BattleAction.Result.Rejected:
+            {
+              _pendingActions.Pop();
+              throw new InvalidOperationException("Action's parameters should have been verified.");
+            }
+        }
+      }
+    }
+    catch
+    {
+      // A failed submission is fully unwound: nothing queued stays executable, so a later
+      // Submit starts from a clean slate instead of resuming stale work.
+      _pendingActions.Clear();
+      throw;
     }
     finally
     {
-      interrupts = _session.EndActionExecution();
+      _inFlightAction = None;
+      _capturedInterrupts.Clear();
     }
 
-    ConsumeResult(action, activeAction, result);
-    if (!result.Succeeded)
-    {
-      return result;
-    }
-
-    if (!activeAction.IsDone())
-      _pending.AddFirst(activeAction);
-
-    foreach (var reaction in interrupts.Reverse())
-      _pending.AddFirst(reaction);
-
-    return result;
+    return new BattleActionExecResult(action, _eventLog, logStart, _eventLog.Count - logStart);
   }
 
-  private static Option<BattleActionResult> ReportResult(
-    BattleActionResult result,
-    BattleAction action,
-    BattleAction activeAction)
+  public void Dispose()
   {
-    if (ReferenceEquals(action, activeAction))
-      return Some(result);
+    if (_disposed)
+      return;
 
-    if (!activeAction.IsDone())
-      return None;
-
-    return Some(result with { Action = activeAction });
+    _session.BattleEventCommitted -= OnEventCommitted;
+    _disposed = true;
   }
 
-  private static void ConsumeResult(BattleAction primitiveAction, BattleAction activeAction, BattleActionResult result)
+  private void ThrowIfDisposed()
   {
-    primitiveAction.ConsumeResult(result);
-    if (!ReferenceEquals(primitiveAction, activeAction))
-      activeAction.ConsumeResult(result);
+    ObjectDisposedException.ThrowIf(_disposed, this);
   }
-
 }

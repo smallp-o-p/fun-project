@@ -5,7 +5,7 @@ This document describes the command-pattern shape currently used around `BattleS
 ## Pattern Mapping
 
 - `BattleAction` = command and queued tactical intent
-- `BattleActionExecutor` = hook-interrupt mediator, queue, and invoker
+- `BattleActionExecutor` = hook registry owner, hook-interrupt mediator, queue, and invoker
 - `IBattleSessionQuery<TResult>` = read-side query command
 - `BattleRuntime.Query` = read-side query invoker
 - `TResult` / `Option<T>` / `Either<BattleQueryFailure, TResult>` = read-side result, shaped by whether the question can fail
@@ -21,16 +21,16 @@ BattleSceneController / HUD / AI
   -> each primitive action validates and executes against BattleSession
   -> BattleSession bookkeeping APIs
   -> BattleEvent emission
-  -> hooks fire Before/After for each raised event, inside the primitive's action window; the executor collects any interrupt actions they return before continuing
+  -> hooks fire from the executor's BattleEventCommitted subscription for each raised event (after the broadcast), inside the primitive's action window; the executor collects any interrupt actions they return before continuing
 ```
 
-The queue and replay surface stay focused on explicit battle actions. Composite actions such as `MoveUnit` may yield internal primitive child actions one at a time. Primitive actions such as `ThrowItem` and `ApplyDamage` apply one authoritative state change. `Submit` queues the provided action, resolves that action and every reaction caused by it, then returns the ordered public result list.
+The queue and replay surface stay focused on explicit battle actions. Composite actions such as `MoveUnit` commit one step per `Execute` (returning `Result.Incomplete` until the route drains). Primitive actions such as `ThrowItem` and `ApplyDamage` apply one authoritative state change. `Submit` queues the provided action, resolves that action and every reaction caused by it, then returns one `BattleActionExecResult`: the submitted action plus every `BattleEvent` committed during its resolution.
 
 ## Runtime Split
 
 - `BattleAction` owns action-specific application logic.
 - `BattleAction` owns action-specific legality checks.
-- `BattleActionExecutor` owns queue order, hook-interrupt ordering, and exception isolation.
+- `BattleActionExecutor` owns the hook registry (registering the default systems), queue order, hook-interrupt ordering, and exception isolation.
 - `BattleSession` owns authoritative battle state.
 - `BattleEvent` reports state changes that already committed.
 - queries read from session state without mutating it.
@@ -40,16 +40,14 @@ The queue and replay surface stay focused on explicit battle actions. Composite 
 The executor API is:
 
 - `Submit(BattleAction action)`
-- `LastResult`
+- `RegisterHook<TEventKey>(BattleHook hook, int priority = 0)` and `UnregisterHook<TEventKey>(BattleHook hook)`
+- `Dispose()`
 
-And events:
+That is the whole surface: no lifecycle events, no `LastResult`. Outcomes are observed through the returned result's committed `BattleEvent` stream and through committed session state.
 
-- `OnActionStart`
-- `OnActionComplete`
+Hooks register on the executor, not the session: the executor owns the `BattleHookRegistry` and registers the default systems (status effects, armor regen, objectives, capability effects, buff evaluation) in its constructor, firing hooks from its subscription to `session.BattleEventCommitted` once per committed event, after the broadcast. `BattleRuntime.RegisterHook` is the facade door delegating to it — `BattleSession` knows nothing about hooks; it only announces events. The executor opens an executor-local action window around each primitive so hook-returned interrupts have somewhere to land; a hook returning interrupts while no window is open throws. One executor per session is a hard invariant — a second executor would double-register the default systems (statuses ticking twice).
 
-Hooks register on the session, not the executor — the public door is `BattleRuntime.RegisterHook<TEventKey>(BattleHook hook, HookPhase phase, int priority = 0) where TEventKey : BattleEventTag`, plus `UnregisterHook` for self-unregistering one-shots. The executor opens an action window around each primitive so hook-returned interrupts have somewhere to land; it does not own registration.
-
-`Submit` returns `IReadOnlyList<BattleActionResult>` from that submission. Composite child actions are not public results: `MoveUnitStep` results produced inside `MoveUnit` are hidden from callers. Interrupt actions returned by hooks still raise events and mutate battle state, but they are resolved before `Submit` returns.
+`Submit` returns the submission's `BattleActionExecResult` — `(Action, EventsThatOccurred)`, where `EventsThatOccurred` is a zero-copy `ReadOnlySpan<BattleEvent>` view into the executor's append-only event log. A composite's intermediate steps and hook-returned interrupt actions are not separate results; their committed events all belong to the submission's result. Parameters are trusted: a `Result.Rejected` (or a thrown exception) surfaces as an `InvalidOperationException` from `Submit` — always a caller bug, never a gameplay outcome — and a failed submission is fully unwound (no queued work survives it). Facts an earlier interrupt in the same submission can invalidate (liveness, possession, equipment, charges) are re-checked at `Execute` and drop the action as `Result.Interrupted`.
 
 Presentation code that needs committed state changes should subscribe to `BattleSession.BattleEventCommitted`. That callback runs after the corresponding state change has happened, so graphical work can query the session and see the committed state.
 
@@ -63,11 +61,12 @@ The current built-in actions are:
 - `AttackUnit`
 - `ReloadWeapon`
 - `ThrowItem`
+- `UseItem`
 - `ApplyDamage`
 - `PassUnit`
 - `EndFactionTurn`
 
-`MoveUnit` is composite. Callers provide ordered, board-validated destination steps (`ValidatedPoint`s — in-bounds is proven at the caller's mint door), and the action checks the mutable route facts (adjacency, occupancy) from the unit's current session position before yielding an internal `MoveUnitStep` for each tile. This gives the executor a checkpoint where committed movement events can trigger reactions before the route continues inside the same submission. If one of those internal steps fails, the public result is a failed `MoveUnit`, not a failed `MoveUnitStep`.
+`MoveUnit` is composite. Callers provide ordered, board-validated destination steps (`ValidatedPoint`s — in-bounds is proven at the caller's mint door), and the action checks the mutable route facts (adjacency, occupancy) from the unit's current session position before committing each tile, returning `Result.Incomplete` between tiles. This gives the executor a checkpoint where committed movement events can trigger reactions before the route continues inside the same submission. If a reaction kills the mover, the remainder is interrupted quietly (`Result.Interrupted`); any other failed step is an invariant break that throws out of `Submit`.
 
 ## Read Side
 

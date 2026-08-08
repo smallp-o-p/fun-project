@@ -11,7 +11,7 @@ public class BattleEventTest
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
-    var runtime = new BattleRuntime(session);
+    var runtime = RuntimeFor(session);
     var recorder = new BattleEventRecorder(runtime);
 
     var start = session.Board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome();
@@ -26,9 +26,9 @@ public class BattleEventTest
     BattleActionTestHelper.EnsureEveryFactionHasObjective(session);
     BattleActionTestHelper.StartBattle(runtime);
 
-    runtime.ExecuteAction(BattleAction.MoveUnit(unit.State, [destination])).RequireSingleResult();
-    runtime.ExecuteAction(BattleAction.ThrowItem(unit.State, grenade, target)).RequireSingleResult();
-    runtime.ExecuteAction(BattleAction.ApplyDamage(unit.State, 3)).RequireSingleResult();
+    runtime.ExecuteAction(BattleAction.MoveUnit(unit.AliveIn(session), [destination]));
+    runtime.ExecuteAction(BattleAction.ThrowItem(unit.AliveIn(session), grenade, target));
+    runtime.ExecuteAction(BattleAction.ApplyDamage(unit.AliveIn(session), 3));
 
     var addedEvent = recorder.Single<UnitAddedBattleEvent>();
     Assert.True(ReferenceEquals(unit.State, addedEvent.Unit));

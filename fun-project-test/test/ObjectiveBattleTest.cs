@@ -78,7 +78,7 @@ public class ObjectiveBattleTest
     var exfil = new FakeObjective { Complete = false };
     session.AddObjective(player, task);
     // When the operation fails, hand the player an exfiltrate objective inline.
-    session.RegisterHook<OperationFailedBattleEvent>(new AddObjectiveOnOperationFailed(player, exfil), HookPhase.After);
+    ExecutorFor(session).RegisterHook<OperationFailedBattleEvent>(new AddObjectiveOnOperationFailed(player, exfil));
     StartBattle(session);
 
     AdvanceTurn(session); // player's task fails -> exfil added -> operation reactivated (Active)

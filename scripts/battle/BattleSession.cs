@@ -26,6 +26,7 @@ public sealed class BattleSession
   public const int DefaultMovementStepActionPointCost = 1;
   public const int DefaultAttackActionPointCost = 1;
   public const int DefaultReloadActionPointCost = 1;
+  public const int DefaultUseItemActionPointCost = 1;
 
   private readonly IHitChanceCalculator _hitChanceCalculator;
   private readonly Random _random;
@@ -33,22 +34,10 @@ public sealed class BattleSession
   private readonly VisibilityService _visibility = new();
   private readonly Dictionary<Faction, Operation> _operations = [];
   private readonly TurnScheduler _scheduler;
-  private readonly BattleHookRegistry _hooks;
   private readonly Queue<BattleEvent> _eventDispatchQueue = [];
 
+
   private bool _isDispatchingEvents;
-
-  // The executor brackets each primitive's Execute with BeginActionExecution /
-  // EndActionExecution. The window is open iff an action is in flight (_inFlightAction.IsSome).
-  // While open, interrupt actions returned by firing hooks accumulate here (in evaluation
-  // order) and the in-flight action is what HookContext exposes as SourceAction. Buffers are
-  // reused across primitives (cleared on Begin); the executor consumes the returned list
-  // before the next Begin. Hooks returning interrupts while no window is open is a
-  // trusted-core violation (gameplay flows only through the executor) and CollectHookInterrupts
-  // throws.
-  private readonly List<BattleAction> _capturedInterrupts = [];
-
-  private Option<BattleAction> _inFlightAction = None;
 
   // Visible sets depend only on board occupancy: a unit's vision range resolves from
   // stat contributions that are fixed for the battle (combatant + equipped weapon; no
@@ -139,17 +128,6 @@ public sealed class BattleSession
     PlayerFaction.IfSome(EnqueueFactionInGlobalOrder);
 
     _scheduler.InitializeQueueFromGlobalOrder();
-    _hooks = new BattleHookRegistry(this);
-
-    // Order matters here. We want to evaluate all the effects before evaluating objectives because they may
-    // result in an objective failing/completing.
-    RegisterHook<TurnEndedBattleEvent>(new StatusEffectSystem(), HookPhase.After, priority: -100);
-    RegisterHook<TurnEndedBattleEvent>(new ArmorRegenSystem(), HookPhase.After, priority: -100);
-    RegisterHook<TurnEndedBattleEvent>(new ObjectiveSystem(), HookPhase.After, priority: 100);
-    RegisterHook<ItemThrownBattleEvent>(new CapabilityEffectSystem(), HookPhase.After);
-
-    RegisterHook<TurnStartedBattleEvent>(new TurnStartBuffHook(), HookPhase.Before);
-    RegisterHook<UnitAddedBattleEvent>(new UnitSpawnedBuffHook(), HookPhase.Before);
   }
 
   internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
@@ -288,13 +266,13 @@ public sealed class BattleSession
     });
     unit.ReceiveDamage(resolution.HealthDamage);
 
-    RaiseEvents(new UnitDamagedBattleEvent(unit, cause, bundle, resolution.ArmorDamage, resolution.HealthDamage));
     if (unit.IsDead)
     {
       HandleUnitDeath(unit, cause);
       return;
     }
 
+    RaiseEvents(new UnitDamagedBattleEvent(unit, cause, bundle, resolution.ArmorDamage, resolution.HealthDamage));
     ApplyStatusEffectsFrom(unit, bundle, packetResolutions);
   }
 
@@ -565,21 +543,6 @@ public sealed class BattleSession
     return GetFactionAliveUnits(side).Any();
   }
 
-  internal bool IsDispatchingEvents => _isDispatchingEvents;
-  
-  // TODO: Let's limit the possible priority values or it might get really complicated for no reason.
-  internal void RegisterHook<TEventKey>(BattleHook hook, HookPhase phase, int priority = 0)
-    where TEventKey : BattleEventTag
-  {
-    _hooks.Register<TEventKey>(hook, phase, priority);
-  }
-
-  internal bool UnregisterHook<TEventKey>(BattleHook hook, HookPhase phase)
-    where TEventKey : BattleEventTag
-  {
-    return _hooks.Unregister<TEventKey>(hook, phase);
-  }
-
   // Records a unit whose own board cell changed (spawned/moved/removed) so the next dispatch
   // can scope its visibility recompute to the affected units instead of the whole pool. A
   // pending full refresh (battle start) still takes priority and clears this set.
@@ -597,7 +560,7 @@ public sealed class BattleSession
   {
     _visibilityFullRefreshPending = true;
   }
-  
+
   // TODO: It may be nicer if this event raising is entirely handled by BattleSession
   internal void RaiseEvents(params BattleEvent[] events)
   {
@@ -625,9 +588,7 @@ public sealed class BattleSession
         // first-time spottings, before this event is broadcast (preserves the mid-move guarantee).
         RefreshVisibilityAndQueueSpottings();
 
-        CollectHookInterrupts(_hooks.RunPreHooks(battleEvent, _inFlightAction));
-        BattleEventCommitted.Invoke(battleEvent);
-        CollectHookInterrupts(_hooks.RunPostHooks(battleEvent, _inFlightAction));
+        BattleEventCommitted?.Invoke(battleEvent);
       }
     }
     catch
@@ -639,18 +600,6 @@ public sealed class BattleSession
     {
       _isDispatchingEvents = false;
     }
-  }
-
-  // Interrupt actions only mean something inside an executor action; a hook returning them
-  // during setup/bookkeeping dispatches is a bug surfaced loudly, not dropped.
-  private void CollectHookInterrupts(IReadOnlyList<BattleAction> interrupts)
-  {
-    if (interrupts.Count == 0)
-      return;
-    if (_inFlightAction.IsNone)
-      throw new InvalidOperationException(
-        "A hook returned interrupt actions while no executor action was in flight.");
-    _capturedInterrupts.AddRange(interrupts);
   }
 
   private void RefreshVisibilityAndQueueSpottings()
@@ -675,27 +624,6 @@ public sealed class BattleSession
     foreach (var (observer, target) in spottedDelta)
       if (observer.RecordFirstSpotting(target))
         _eventDispatchQueue.Enqueue(new UnitSpottedBattleEvent(observer, target));
-  }
-
-  /// <summary>
-  /// Start executing an action.
-  /// </summary>
-  /// <param name="action"></param>
-  internal void BeginActionExecution(BattleAction action)
-  {
-    ArgumentNullException.ThrowIfNull(action);
-    _capturedInterrupts.Clear();
-    _inFlightAction = Some(action);
-  }
-
-  /// <summary>
-  /// Finish BattleAction execution, return any interrupt actions for the executor to run.
-  /// </summary>
-  /// <returns></returns>
-  internal IReadOnlyList<BattleAction> EndActionExecution()
-  {
-    _inFlightAction = None;
-    return [.. _capturedInterrupts];
   }
 
   private void EnqueueFactionInGlobalOrder(Faction side)

@@ -17,15 +17,14 @@ public class ReloadWeaponActionTest
     }.Start();
     var unit = battle.PlayerUnit;
 
-    Assert.True(battle.Executor.Submit(BattleAction.AttackUnit(unit.State, battle.EnemyUnit.State)).RequireSingleResult().Succeeded);
+    Attack(battle.Session, battle.Executor, unit.State, battle.EnemyUnit.State);
     Assert.Equal(2, weapon.CurrentAmmo);
 
     var recorder = new BattleEventRecorder(battle.Session);
     int actionPointsBefore = unit.CurrentActionPoints;
 
-    var result = battle.Executor.Submit(BattleAction.ReloadWeapon(unit.State)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.ReloadWeapon(unit.AliveIn(battle.Session), weapon));
 
-    Assert.True(result.Succeeded);
     Assert.Equal(3, weapon.CurrentAmmo);
     Assert.Equal(actionPointsBefore - BattleSession.DefaultReloadActionPointCost, unit.CurrentActionPoints);
     var reloadEvent = recorder.Single<UnitReloadedWeaponBattleEvent>();
@@ -37,42 +36,18 @@ public class ReloadWeaponActionTest
   {
     var faction = BattleTestFactory.MakeFaction("Player");
     var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0), BattleTestFactory.MakeAmmoWeapon("SMG"));
+    var weapon = BattleTestFactory.MakeAmmoWeapon("SMG");
+    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0), weapon);
     StartBattle(session);
 
     int actionPointsBefore = unit.CurrentActionPoints;
-    var result = new BattleActionExecutor(session).Submit(BattleAction.ReloadWeapon(unit.State)).RequireSingleResult();
 
-    Assert.False(result.Succeeded);
-    Assert.Equal(BattleActionFailureReason.Rejected, result.FailureReason);
+    // Parameters are trusted: a reload the caller should have gated surfaces as the
+    // executor's invariant-break throw.
+    Assert.Throws<System.InvalidOperationException>(
+      () => ExecutorFor(session).Submit(BattleAction.ReloadWeapon(unit.AliveIn(session), weapon)));
+
     Assert.Equal(actionPointsBefore, unit.CurrentActionPoints);
-  }
-
-  [TestCase(TestName = "A unit without a magazine weapon cannot reload")]
-  public void NonMagazineWeaponReloadRejected()
-  {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    var armedWithMelee = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0), BattleTestFactory.MakeWeapon("Sword"));
-    var unarmed = SpawnUnit(session, BattleTestFactory.MakeCombatant("Bravo", faction), new Vector3I(1, 0, 0));
-    StartBattle(session);
-
-    var executor = new BattleActionExecutor(session);
-    Assert.Equal(BattleActionFailureReason.Rejected, executor.Submit(BattleAction.ReloadWeapon(armedWithMelee.State)).RequireSingleResult().FailureReason);
-    Assert.Equal(BattleActionFailureReason.Rejected, executor.Submit(BattleAction.ReloadWeapon(unarmed.State)).RequireSingleResult().FailureReason);
-  }
-
-  [TestCase(TestName = "An off-turn unit cannot reload")]
-  public void OffTurnReloadRejected()
-  {
-    var battle = new BattleDuelBuilder
-    {
-      Enemy = new DuelSide("Goon", Weapon: BattleTestFactory.MakeAmmoWeapon("SMG")),
-    }.Start();
-
-    var result = battle.Executor.Submit(BattleAction.ReloadWeapon(battle.EnemyUnit.State)).RequireSingleResult();
-
-    Assert.False(result.Succeeded);
-    Assert.Equal(BattleActionFailureReason.Rejected, result.FailureReason);
+    Assert.Equal(weapon.MagazineSize, weapon.CurrentAmmo);
   }
 }

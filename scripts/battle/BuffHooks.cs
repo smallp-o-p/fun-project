@@ -4,8 +4,8 @@ namespace FunProject.Battle;
 
 /// <summary>
 /// Buff condition-mirror (no durations): re-evaluates every buff's activation condition and
-/// mirrors the result into Buff.IsActive. Both hooks fire in the Before phase, so buff state
-/// lands before TurnStarted/UnitAdded broadcast — and before the AP refresh that follows the
+/// mirrors the result into Buff.IsActive. Both hooks are fired by the executor after the
+/// TurnStarted/UnitAdded broadcast — and before the AP refresh that follows the
 /// turn-start dispatch reads MaxActionPoints. Every flip clamps current health to the
 /// (possibly changed) max — the clamp only ever lowers, floors at 1; buffs cannot kill.
 /// </summary>

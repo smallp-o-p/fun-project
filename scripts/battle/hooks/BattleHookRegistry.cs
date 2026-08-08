@@ -5,74 +5,62 @@ using System.Linq;
 namespace FunProject.Battle;
 
 /// <summary>
-/// The one hook registry, session-owned. Entries are (hook, phase, priority, stamp) keyed by
-/// BattleEventTag type; each firing filters to its phase and sorts by priority (lower first)
-/// then registration order. Matches are materialized before iteration, so a hook
-/// unregistering itself mid-firing (one-shot mines) is safe and takes effect next dispatch.
+/// The one hook registry, executor-owned. Entries are (hook, priority, stamp) keyed by
+/// BattleEventTag type; each firing sorts by priority (lower first) then registration
+/// order. Matches are materialized before iteration, and the registry retires hooks that
+/// signal <see cref="BattleHook.NeedsToUnregister"/> right after their firing (one-shot
+/// mines) — both safe mid-firing, both effective on the next dispatch.
 /// </summary>
 internal sealed class BattleHookRegistry
 {
-  private sealed record RegisteredHook(BattleHook Hook, HookPhase Phase, int Priority, long Stamp);
+  private sealed record RegisteredHook(BattleHook Hook, int Priority, long Stamp);
 
-  private readonly BattleSession _session;
   private readonly EventKeyedRegistry<RegisteredHook> _hooks = new();
   private long _nextStamp;
 
-  internal BattleHookRegistry(BattleSession session)
-  {
-    ArgumentNullException.ThrowIfNull(session);
-    _session = session;
-  }
-
-  internal void Register<TEventKey>(BattleHook hook, HookPhase phase, int priority)
+  internal void Register<TEventKey>(BattleHook hook, int priority)
     where TEventKey : BattleEventTag
   {
     ArgumentNullException.ThrowIfNull(hook);
-    RegisteredHook entry = new(hook, phase, priority, _nextStamp++);
+    RegisteredHook entry = new(hook, priority, _nextStamp++);
     _hooks.Register<TEventKey>(entry);
   }
 
-  internal bool Unregister<TEventKey>(BattleHook hook, HookPhase phase)
+  internal bool Unregister<TEventKey>(BattleHook hook)
     where TEventKey : BattleEventTag
   {
     ArgumentNullException.ThrowIfNull(hook);
-    return _hooks.RemoveFirst<TEventKey>(entry => ReferenceEquals(entry.Hook, hook) && entry.Phase == phase);
+    return _hooks.RemoveFirst<TEventKey>(entry => ReferenceEquals(entry.Hook, hook));
   }
 
   /// <summary>
-  /// Fires the event's hooks for one phase, in priority-then-registration order, and returns
-  /// the interrupt actions they produced (in evaluation order). The session routes non-empty
-  /// results into the executor's action window — or throws when none is open.
+  /// Fires the event's hooks, in priority-then-registration order, retiring one-shot hooks
+  /// that signal <see cref="BattleHook.NeedsToUnregister"/> as soon as their firing
+  /// returns, and returns the interrupt actions they produced (in evaluation order).
+  /// Interrupts are routed into the executor's action window — or throw when none is open.
   /// </summary>
-  private IReadOnlyList<BattleAction> Fire(
-    BattleEvent battleEvent,
-    HookPhase phase,
-    Option<BattleAction> sourceAction)
+  public IReadOnlyList<BattleAction> Fire(BattleEvent battleEvent, HookContext context)
   {
     ArgumentNullException.ThrowIfNull(battleEvent);
 
-    var matches = _hooks
-      .GetMatching(battleEvent)
-      .Where(entry => entry.Phase == phase)
-      .OrderBy(entry => entry.Priority)
-      .ThenBy(entry => entry.Stamp)
-      .ToList();
+    RegisteredHook[] matches =
+    [
+      .. _hooks
+        .GetMatching(battleEvent)
+        .OrderBy(entry => entry.Priority)
+        .ThenBy(entry => entry.Stamp),
+    ];
 
-    if (matches.Count == 0)
-      return [];
-
-    var context = new HookContext(_session, phase, sourceAction);
-    List<BattleAction> interruptActions = [];
+    List<BattleAction> interrupts = [];
     foreach (RegisteredHook registered in matches)
-      interruptActions.AddRange(registered.Hook.OnEvent(context, battleEvent));
+    {
+      interrupts.AddRange(registered.Hook.OnEvent(context, battleEvent));
+      if (registered.Hook.NeedsToUnregister)
+        _hooks.RemoveAll(entry => ReferenceEquals(entry.Hook, registered.Hook));
+    }
 
-    return interruptActions;
+    return interrupts;
   }
-
-  internal IReadOnlyList<BattleAction> RunPreHooks(BattleEvent battleEvent, Option<BattleAction> sourceAction) =>
-    Fire(battleEvent, HookPhase.Before, sourceAction);
-  internal IReadOnlyList<BattleAction> RunPostHooks(BattleEvent battleEvent, Option<BattleAction> sourceAction) =>
-    Fire(battleEvent, HookPhase.After, sourceAction);
 }
 
 /// <summary>
@@ -112,6 +100,13 @@ internal sealed class EventKeyedRegistry<T>
     return true;
   }
 
+  /// <summary>Removes every item satisfying the predicate across all keys — a spent one-shot hook retired by the registry.</summary>
+  internal void RemoveAll(Func<T, bool> match)
+  {
+    foreach (var items in _itemsByEventType.Values)
+      items.RemoveAll(item => match(item));
+  }
+
   /// <summary>
   /// Items matching the event, in key order — the event's concrete type first, then its tag
   /// interfaces in reflection order — and in registration order within each key.
@@ -127,7 +122,7 @@ internal sealed class EventKeyedRegistry<T>
         yield return item;
     }
   }
-  
+
   private Type[] KeysFor(BattleEvent battleEvent)
   {
     Type eventType = battleEvent.GetType();

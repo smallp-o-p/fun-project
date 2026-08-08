@@ -6,7 +6,7 @@ using FunProject.Combatants;
 namespace FunProject.Battle;
 
 /// <summary>
-/// Turn-end After hook: at the end of a faction's turn, ticks status effects on that
+/// Turn-end hook: at the end of a faction's turn, ticks status effects on that
 /// faction's living units. The decrement precedes the damage so a duration-N DoT deals
 /// exactly N ticks and the ticked event reports the post-tick remaining turns. DoT damage
 /// goes through the normal ApplyDamageTo pipeline (armor split, events, death handling,

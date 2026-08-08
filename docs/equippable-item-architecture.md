@@ -54,21 +54,32 @@ Design spec: `docs/superpowers/specs/2026-06-09-item-composition-design.md`.
 
 `item.With<TCap>()` returns `Option<ItemWith<TCap>>` — a proof binding the item
 to its capability. Actions that require a capability take the proof type:
-`ThrowItem` takes `ItemWith<ThrowableCapability>`, so non-throwable items are
-rejected by the compiler, not at runtime. Proofs cannot go stale because
-capability sets are fixed at item construction. This is the same pattern as
-`BattleBoardState.ValidatedPoint`.
+`ThrowItem` takes `ItemWith<ThrowableCapability>` and `UseItem` takes
+`ItemWith<ChargesCapability>`, so items without the capability are rejected by
+the compiler, not at runtime. Proofs cannot go stale because capability sets
+are fixed at item construction. This is the same pattern as
+`BattleBoardState.ValidatedPoint` and `AliveUnit`.
 
-`Execute` still re-validates state-dependent facts (possession, action points,
-range) as `Rejected` results — those can change between action construction
-and execution.
+`Execute` re-checks only the state-dependent facts that can change between
+construction and commit (phase, active side, occupancy, attack feasibility
+via `AttackContext.Resolve`, route legality); possession and throw range are
+the caller's job, same as the rest of the trusted-parameters model.
 
 ## Consumption semantics
 
-For a throwable with `ConsumesOnUse`:
-- With a `ChargesCapability`: spend one charge per throw; remove from
-  inventory when depleted.
-- Without: implicitly single-use — removed from inventory after one throw.
+Consumption is parsed once, at action construction, into a `Consumable` receipt
+(`scripts/battle/Consumable.cs`): `Consumable.From(ItemWith<ThrowableCapability>)`
+returns `None` for a non-consuming throwable, and `Consumable.From(ItemWith<ChargesCapability>)`
+always consumes. `SpendOnce(owner)` is the single home for the consumption rules:
+
+- With a `ChargesCapability`: spend one charge per use; remove from inventory
+  when depleted (a charge that cannot be spent is a broken invariant and throws).
+- Without: implicitly single-use — removed from inventory after one use.
+
+`UseItem` is the generic active-item verb: one charge per use at
+`BattleSession.DefaultUseItemActionPointCost`, raising `ItemUsedBattleEvent`;
+effect payloads belong to hooks reacting to that event (the same split as
+`ItemThrownBattleEvent` → `CapabilityEffectSystem`).
 
 ## Adding a capability
 

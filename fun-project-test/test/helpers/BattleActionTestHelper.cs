@@ -5,29 +5,35 @@ using FunProject.Items.Capabilities;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
+using System.Runtime.CompilerServices;
 
 namespace FunProject.Tests;
 
 internal static class BattleActionTestHelper
 {
+  // ONE executor per session, ever: the executor owns the hook registry and registers the
+  // default systems, so a second live executor would double-fire them (statuses ticking
+  // twice). ConditionalWeakTable keys the executor's lifetime to the session, so sessions
+  // dropped by a test don't leak executors.
+  private static readonly ConditionalWeakTable<BattleSession, BattleActionExecutor> ExecutorsBySession = [];
+
+  internal static BattleActionExecutor ExecutorFor(BattleSession session)
+    => ExecutorsBySession.GetValue(session, static s => new BattleActionExecutor(s));
+
   // The Vector3I overloads below are the test-side mint doors: raw literal coordinates are
   // validated here so tests keep their compact call shape.
   public static BattleTestUnit SpawnUnit(BattleSession session, Combatant combatant, Vector3I position)
   {
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.SpawnUnit(combatant, session.Board.At(position))).RequireSingleResult();
-    Assert.True(result.Succeeded);
-    Assert.True(result.AffectedUnit.IsSome);
-    return new BattleTestUnit(result.AffectedUnit.RequireSome());
+    var executor = ExecutorFor(session);
+    executor.Submit(BattleAction.SpawnUnit(combatant, session.Board.At(position)));
+    return SpawnedUnitAt(session, position);
   }
 
   public static BattleTestUnit SpawnUnit(BattleSession session, Combatant combatant, Vector3I position, Weapon weapon)
   {
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.SpawnUnit(combatant, session.Board.At(position), weapon)).RequireSingleResult();
-    Assert.True(result.Succeeded);
-    Assert.True(result.AffectedUnit.IsSome);
-    return new BattleTestUnit(result.AffectedUnit.RequireSome());
+    var executor = ExecutorFor(session);
+    executor.Submit(BattleAction.SpawnUnit(combatant, session.Board.At(position), weapon));
+    return SpawnedUnitAt(session, position);
   }
 
   public static BattleTestUnit SpawnUnit(
@@ -37,21 +43,22 @@ internal static class BattleActionTestHelper
     Option<Weapon> weapon,
     Option<ItemWith<ArmorCapability>> armor)
   {
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(new SpawnUnit(combatant, session.Board.At(position), weapon, armor)).RequireSingleResult();
-    Assert.True(result.Succeeded);
-    Assert.True(result.AffectedUnit.IsSome);
-    return new BattleTestUnit(result.AffectedUnit.RequireSome());
+    var executor = ExecutorFor(session);
+    executor.Submit(new SpawnUnit(combatant, session.Board.At(position), weapon, armor));
+    return SpawnedUnitAt(session, position);
   }
 
   public static BattleTestUnit SpawnUnit(BattleRuntime runtime, Combatant combatant, Vector3I position)
   {
     var point = runtime.TryGetTile(position).RequireSome();
-    var result = runtime.ExecuteAction(BattleAction.SpawnUnit(combatant, point)).RequireSingleResult();
-    Assert.True(result.Succeeded);
-    Assert.True(result.AffectedUnit.IsSome);
-    return new BattleTestUnit(result.AffectedUnit.RequireSome());
+    runtime.ExecuteAction(BattleAction.SpawnUnit(combatant, point));
+    return new BattleTestUnit(runtime.Query(new GetUnitAtTile(point)).RequireSome());
   }
+
+  // The simple execution model reports outcomes through state and events, so the spawn
+  // helpers read the spawned unit straight back from its tile.
+  private static BattleTestUnit SpawnedUnitAt(BattleSession session, Vector3I position)
+    => new(session.GetUnitAt(session.Board.At(position)).RequireSome());
 
   public static void EnsureEveryFactionHasObjective(BattleSession session)
   {
@@ -66,21 +73,18 @@ internal static class BattleActionTestHelper
   public static void StartBattle(BattleSession session)
   {
     EnsureEveryFactionHasObjective(session);
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.StartBattle()).RequireSingleResult();
-    Assert.True(result.Succeeded);
+    var executor = ExecutorFor(session);
+    executor.Submit(BattleAction.StartBattle());
   }
 
   public static void StartBattle(BattleRuntime runtime)
   {
-    var result = runtime.ExecuteAction(BattleAction.StartBattle()).RequireSingleResult();
-    Assert.True(result.Succeeded);
+    runtime.ExecuteAction(BattleAction.StartBattle());
   }
 
-  // The session-taking submit helpers below run on a throwaway executor. Hooks are
-  // registered on the SESSION, so hooks a test has registered WILL also be evaluated for these
-  // submissions — the reaction window is per-session, not per-executor. Tests that assert
-  // reaction counts or interrupt results should submit through one executor they control.
+  // Session-taking helpers all submit through ExecutorFor(session): the single executor
+  // that owns this session's hooks and default systems, so registered hooks observe these
+  // submissions exactly as they do submissions through any other handle to that executor.
   public static void AdvanceTurn(BattleSession session)
   {
     EndFactionTurn(session, session.ActiveSide);
@@ -88,32 +92,31 @@ internal static class BattleActionTestHelper
 
   public static void EndFactionTurn(BattleSession session, Faction faction)
   {
-    EndFactionTurn(new BattleActionExecutor(session), faction);
+    EndFactionTurn(ExecutorFor(session), faction);
   }
 
   public static void EndFactionTurn(BattleActionExecutor executor, Faction faction)
   {
-    var result = executor.Submit(BattleAction.EndFactionTurn(faction)).RequireSingleResult();
-    Assert.True(result.Succeeded);
+    executor.Submit(BattleAction.EndFactionTurn(faction));
   }
 
   public static void PassUnit(BattleSession session, BattleUnitState unit)
   {
-    var result = new BattleActionExecutor(session).Submit(BattleAction.PassUnit(unit)).RequireSingleResult();
-    Assert.True(result.Succeeded);
+    ExecutorFor(session).Submit(
+      BattleAction.PassUnit(session.TryGetAlive(unit).RequireSome()));
   }
 
   public static void ApplyDamage(BattleSession session, BattleUnitState unit, int amount)
   {
-    var result = new BattleActionExecutor(session).Submit(BattleAction.ApplyDamage(unit, amount)).RequireSingleResult();
-    Assert.True(result.Succeeded);
+    ExecutorFor(session).Submit(
+      BattleAction.ApplyDamage(session.TryGetAlive(unit).RequireSome(), amount));
   }
 
-  public static BattleActionResult Attack(BattleActionExecutor executor, BattleUnitState attacker, BattleUnitState target)
+  public static BattleActionExecResult Attack(BattleSession session, BattleActionExecutor executor, BattleUnitState attacker, BattleUnitState target)
   {
-    var result = executor.Submit(BattleAction.AttackUnit(attacker, target)).RequireSingleResult();
-    Assert.True(result.Succeeded);
-    return result;
+    return executor.Submit(BattleAction.AttackUnit(
+      session.TryGetAlive(attacker).RequireSome(),
+      session.TryGetAlive(target).RequireSome()));
   }
 
   // Single faction, one started unit, and a fresh reusable executor.
@@ -131,6 +134,6 @@ internal static class BattleActionTestHelper
       BattleTestFactory.MakeCombatant(unitName, faction, health: health, actionPoints: actionPoints),
       unitPosition);
     StartBattle(session);
-    return new SoloBattle(session, new BattleActionExecutor(session), faction, unit);
+    return new SoloBattle(session, ExecutorFor(session), faction, unit);
   }
 }

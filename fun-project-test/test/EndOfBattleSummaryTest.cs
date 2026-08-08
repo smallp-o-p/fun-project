@@ -39,8 +39,8 @@ public class EndOfBattleSummaryTest
 
     ApplyDamage(battle.Session, bravo, 999);
     ApplyDamage(battle.Session, charlie, 1);
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
-    Attack(battle.Executor, battle.PlayerUnit, bandit2);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit, bandit2);
     EndFactionTurn(battle.Session, battle.PlayerFaction);
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
 
@@ -69,7 +69,7 @@ public class EndOfBattleSummaryTest
 
     ApplyDamage(battle.Session, battle.EnemyUnit, 1);
     EndFactionTurn(battle.Session, battle.PlayerFaction);
-    Attack(battle.Executor, battle.EnemyUnit, battle.PlayerUnit);
+    Attack(battle.Session, battle.Executor, battle.EnemyUnit, battle.PlayerUnit);
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
 
     var playerSummary = GetValue(Query(battle.Session, new GetFactionEndOfBattleSummary(battle.PlayerFaction)));

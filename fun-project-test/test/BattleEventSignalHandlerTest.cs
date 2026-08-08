@@ -18,11 +18,10 @@ public sealed partial class BattleEventSignalHandlerTest
     fixture.Adapter.PresentationEventCommitted += events.Add;
     fixture.Adapter.Bind(fixture.Runtime);
 
-    BattleActionResult result = fixture.Runtime.ExecuteAction(BattleAction.SpawnUnit(
+    fixture.Runtime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", fixture.Faction),
-      fixture.Session.Board.At(1, 0, 1))).RequireSingleResult();
+      fixture.Session.Board.At(1, 0, 1)));
 
-    Assert.True(result.Succeeded);
     BattleEvent committedEvent = committedEvents.Single();
     BattleEventAdapter presentationEvent = events.Single();
     Assert.True(ReferenceEquals(committedEvent, presentationEvent.BattleEvent));
@@ -33,29 +32,6 @@ public sealed partial class BattleEventSignalHandlerTest
     Assert.Equal("Alpha", addedEvent.Unit.Combatant.Name);
     Assert.Equal("Player", addedEvent.Unit.Side.Name);
     Assert.Equal(new Vector3I(1, 0, 1), addedEvent.Position.Raw);
-  }
-
-  [TestCase(TestName = "Adapter emits action lifecycle signals")]
-  public void AdapterEmitsActionLifecycleSignals()
-  {
-    using var fixture = new SignalHandlerFixture(new Vector3I(3, 1, 3));
-    var startedActions = new List<string>();
-    var completedResults = new List<BattleActionResultAdapter>();
-
-    fixture.Adapter.ActionStarted += startedActions.Add;
-    fixture.Adapter.ActionCompleted += completedResults.Add;
-    fixture.Adapter.Bind(fixture.Runtime);
-
-    fixture.Runtime.ExecuteAction(BattleAction.SpawnUnit(
-      BattleTestFactory.MakeCombatant("Alpha", fixture.Faction),
-      fixture.Session.Board.At(1, 0, 1))).RequireSingleResult();
-
-    Assert.Equal(1, startedActions.Count);
-    Assert.Equal("spawn_unit", startedActions[0]);
-    BattleActionResultAdapter result = completedResults.Single();
-    Assert.Equal("spawn_unit", result.ActionId);
-    Assert.True(result.Succeeded);
-    Assert.Equal("Alpha", result.AffectedUnit.RequireSome().Combatant.Name);
   }
 
   [TestCase(TestName = "Unbind stops forwarding runtime events")]
@@ -70,7 +46,7 @@ public sealed partial class BattleEventSignalHandlerTest
     fixture.Adapter.Unbind();
     fixture.Runtime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", fixture.Faction),
-      fixture.Session.Board.At(1, 0, 1))).RequireSingleResult();
+      fixture.Session.Board.At(1, 0, 1)));
 
     Assert.False(fixture.Adapter.IsBound);
     Assert.Equal(0, events.Count);
@@ -81,7 +57,7 @@ public sealed partial class BattleEventSignalHandlerTest
   {
     using var fixture = new SignalHandlerFixture(new Vector3I(3, 1, 3));
     var secondSession = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [fixture.Faction]);
-    var secondRuntime = new BattleRuntime(secondSession);
+    var secondRuntime = RuntimeFor(secondSession);
     var events = new List<BattleEventAdapter>();
 
     fixture.Adapter.PresentationEventCommitted += events.Add;
@@ -90,10 +66,10 @@ public sealed partial class BattleEventSignalHandlerTest
     fixture.Adapter.Bind(secondRuntime);
     fixture.Runtime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Ignored", fixture.Faction),
-      fixture.Session.Board.At(0, 0, 0))).RequireSingleResult();
+      fixture.Session.Board.At(0, 0, 0)));
     secondRuntime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", fixture.Faction),
-      secondSession.Board.At(1, 0, 1))).RequireSingleResult();
+      secondSession.Board.At(1, 0, 1)));
 
     var addedEvent = (UnitAddedBattleEvent)events.Single().BattleEvent;
     Assert.Equal("Alpha", addedEvent.Unit.Combatant.Name);
@@ -110,7 +86,7 @@ public sealed partial class BattleEventSignalHandlerTest
     fixture.Adapter.Free();
     fixture.Runtime.ExecuteAction(BattleAction.SpawnUnit(
       BattleTestFactory.MakeCombatant("Alpha", fixture.Faction),
-      fixture.Session.Board.At(1, 0, 1))).RequireSingleResult();
+      fixture.Session.Board.At(1, 0, 1)));
 
     Assert.Equal(0, events.Count);
   }
@@ -130,7 +106,7 @@ public sealed partial class BattleEventSignalHandlerTest
     EnsureEveryFactionHasObjective(fixture.Session);
     StartBattle(fixture.Runtime);
 
-    fixture.Runtime.ExecuteAction(BattleAction.ApplyDamage(unit.State, 3)).RequireSingleResult();
+    fixture.Runtime.ExecuteAction(BattleAction.ApplyDamage(unit.AliveIn(fixture.Session), 3));
 
     var killedEvent = events
       .Select(presentationEvent => presentationEvent.BattleEvent)
@@ -151,7 +127,7 @@ public sealed partial class BattleEventSignalHandlerTest
     {
       Faction = BattleTestFactory.MakeFaction("Player");
       Session = BattleTestFactory.MakeSession(dimensions, [Faction]);
-      Runtime = new BattleRuntime(Session);
+      Runtime = RuntimeFor(Session);
       Adapter = new BattleEventSignalHandler();
     }
 

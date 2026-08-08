@@ -116,9 +116,8 @@ public class BattleSessionQueriesTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", factionB, health: 10), new Vector3I(1, 0, 0));
     StartBattle(session);
 
-    var executor = new BattleActionExecutor(session);
-    var result = executor.Submit(BattleAction.ApplyDamage(unitA.State, 10)).RequireSingleResult();
-    Assert.True(result.Succeeded);
+    var executor = ExecutorFor(session);
+    executor.Submit(BattleAction.ApplyDamage(unitA.AliveIn(session), 10));
 
     var factionADead = Query(session, new GetFactionDeadUnits(factionA));
     var factionBDead = Query(session, new GetFactionDeadUnits(factionB));

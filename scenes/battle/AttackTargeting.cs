@@ -69,5 +69,13 @@ public sealed class AttackTargeting : IActionTargeting
 
   public bool CanCommit(Vector3I target) => _targetsByTile.ContainsKey(target);
 
-  public BattleAction Build(Vector3I target) => BattleAction.AttackUnit(_unit, _targetsByTile[target]);
+  public BattleAction Build(Vector3I target)
+  {
+    // Fresh proofs at the write boundary: the unit may have moved or died since Begin().
+    return _runtime.TryGetAlive(_unit).Match(
+      attacker => _runtime.TryGetAlive(_targetsByTile[target]).Match(
+        enemy => BattleAction.AttackUnit(attacker, enemy),
+        () => throw new InvalidOperationException("Target is no longer alive.")),
+      () => throw new InvalidOperationException("Attacking unit is no longer alive."));
+  }
 }

@@ -61,7 +61,6 @@ public class ActionTargetingTest
     Assert.True(attack.CanCommit(new Vector3I(3, 0, 0)));
     Assert.False(attack.CanCommit(new Vector3I(1, 0, 0)));     // empty tile is not a candidate
 
-    var results = runtime.ExecuteAction(attack.Build(new Vector3I(3, 0, 0)));
-    Assert.True(results.Single().Succeeded);
+    runtime.ExecuteAction(attack.Build(new Vector3I(3, 0, 0)));
   }
 }

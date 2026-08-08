@@ -100,10 +100,10 @@ public sealed class PlayerActionController
     return true;
   }
 
-  public IReadOnlyList<BattleActionResult> Confirm()
+  public Option<BattleActionExecResult> Confirm()
   {
     if (Mode != TargetingMode.ActionPending)
-      return [];
+      return None;
 
     IActionTargeting handler = RequireHandler();
     Vector3I target = _pendingTarget.Match(t => t, () => throw new InvalidOperationException("No pending target."));
@@ -140,12 +140,12 @@ public sealed class PlayerActionController
     Mode = TargetingMode.ActionTargeting;
   }
 
-  private IReadOnlyList<BattleActionResult> Submit(BattleAction action)
+  private BattleActionExecResult Submit(BattleAction action)
   {
-    IReadOnlyList<BattleActionResult> results = _runtime.ExecuteAction(action);
+    var result = _runtime.ExecuteAction(action);
     ResetTargeting();
     RefreshOptions();
-    return results;
+    return result;
   }
 
   private void RefreshOptions()
@@ -153,24 +153,24 @@ public sealed class PlayerActionController
     // Mint the aliveness proof at the query door; a unit that died since selection yields None
     // (empty options), replacing what used to be a query Left for a dead unit.
     _options = SelectedUnit.Bind(_runtime.TryGetAlive).Match(
-      Some: proof => BuildOptions(proof.State, _runtime.Query(new GetAvailableActionsForUnit(proof))),
+      Some: proof => BuildOptions(proof, _runtime.Query(new GetAvailableActionsForUnit(proof))),
       None: []);
   }
 
   // Presentation-side mapping: one option per domain verb row, availability straight from the
   // row. Targeting handlers stay presentation-owned; the domain never sees them.
   private static IReadOnlyList<UnitActionOption> BuildOptions(
-    BattleUnitState unit, IReadOnlyList<UnitAction> actions)
+    AliveUnit unit, IReadOnlyList<UnitAction> actions)
   {
     return actions.Select(action => MakeOption(unit, action)).ToList();
   }
 
-  private static UnitActionOption MakeOption(BattleUnitState unit, UnitAction action)
+  private static UnitActionOption MakeOption(AliveUnit unit, UnitAction action)
   {
     return action.Action switch
     {
       MoveActionDefinition => new MoveActionOption(unit, action.IsAvailable),
-      AttackActionDefinition => new AttackActionOption(unit, RequireWeapon(unit), action.IsAvailable),
+      AttackActionDefinition => new AttackActionOption(unit, RequireWeapon(unit.State), action.IsAvailable),
       ReloadActionDefinition => new ReloadActionOption(unit, action.IsAvailable),
       PassActionDefinition => new PassActionOption(unit, action.IsAvailable),
       EndTurnActionDefinition => new EndTurnActionOption(unit, action.IsAvailable),

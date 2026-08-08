@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace FunProject.Battle;
 
 /// <summary>
-/// After hook: when an item is thrown, resolves its blast/effect payload. If the thrown
+/// Hook: when an item is thrown, resolves its blast/effect payload. If the thrown
 /// item carries a <see cref="BlastCapability"/>, every effect is applied to the units within
 /// the blast radius via <see cref="CapabilityEffectResolver"/>, then a
 /// <see cref="CapabilityResolvedBattleEvent"/> is raised. A throwable with no blast simply

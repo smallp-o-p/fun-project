@@ -82,9 +82,8 @@ public class PlayerActionControllerTest
     ActionPreview preview = GetValue(c.PreviewAt(new Vector3I(3, 0, 0)));
     Assert.True(preview is AttackPreview);
     Assert.True(c.SetPending(new Vector3I(3, 0, 0)));
-    var results = c.Confirm();
+    c.Confirm();
 
-    Assert.True(results.Single().Succeeded);
     Assert.Equal(PlayerActionController.TargetingMode.None, c.Mode);
   }
 

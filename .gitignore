@@ -21,3 +21,7 @@ graphify-out/
 .openxcom-research/
 Godot-MCP/
 .idea/
+.worktrees/
+.pi/
+.pi-subagents/
+*.DotSettings.user

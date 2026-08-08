@@ -56,7 +56,10 @@ public sealed class MoveTargeting : IActionTargeting
     BattleBoardState.ValidatedPoint[] path = _lastPath.Match(
       Some: cached => cached.Target == target ? cached.Path : QueryPath(target),
       None: () => QueryPath(target));
-    return BattleAction.MoveUnit(_unit, path.Skip(1));
+    // Fresh proof at the write boundary: the mover may have died since Begin().
+    return _runtime.TryGetAlive(_unit).Match(
+      mover => BattleAction.MoveUnit(mover, path.Skip(1)),
+      () => throw new InvalidOperationException("Moving unit is no longer alive."));
   }
 
   private Either<BattleQueryFailure, BattleBoardState.ValidatedPoint[]> ResolvePath(Vector3I target) =>

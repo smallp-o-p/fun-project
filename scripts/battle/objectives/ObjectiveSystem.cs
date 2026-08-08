@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace FunProject.Battle;
 
 /// <summary>
-/// Turn-end After hook: evaluates every faction's operation/objective status. Unlike the
+/// Turn-end hook: evaluates every faction's operation/objective status. Unlike the
 /// status-effect and armor-regen passes (which are scoped to the faction whose turn just
 /// ended), operation evaluation is global — an operation can become complete/failed because
 /// of another faction's turn (e.g. a reaction kill during the enemy turn completing the

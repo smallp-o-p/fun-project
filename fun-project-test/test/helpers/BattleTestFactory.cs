@@ -266,6 +266,17 @@ internal static class BattleTestFactory
     return item.With<ThrowableCapability>().RequireSome();
   }
 
+  public static ItemWith<ChargesCapability> MakeUsableItem(string name, int maxCharges = 1)
+  {
+    var item = new EquippableItem(new EquippableItemData
+    {
+      Name = name,
+      Description = $"{name} usable item",
+      Capabilities = [new ChargesCapabilityData { MaxCharges = maxCharges }],
+    });
+    return item.With<ChargesCapability>().RequireSome();
+  }
+
   public static BattleSession MakeSession(
     Vector3I dimensions,
     IEnumerable<Faction> globalFactionOrder,
@@ -285,6 +296,12 @@ internal static class BattleTestFactory
   {
     return new BattleSession(board, globalFactionOrder, hitChanceCalculator, randomSeed, playerFaction);
   }
+
+  // Runtime owning the session's ONLY executor (public ctor). Never mix with the
+  // ExecutorFor session helpers on the same session — a second executor would
+  // double-register the default systems (statuses ticking twice).
+  public static BattleRuntime RuntimeFor(BattleSession session)
+    => new(session);
 
   public static BattleMapTileData FloorTile() => new() { Walkable = true };
 

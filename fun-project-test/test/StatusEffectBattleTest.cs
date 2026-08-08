@@ -22,7 +22,7 @@ public partial class StatusEffectBattleTest
     var target = battle.EnemyUnit.State;
     var recorder = new BattleEventRecorder(battle.Session);
 
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
 
     var active = target.ActiveStatusEffects.Single();
     Assert.Equal(burn, active.Spec);
@@ -48,12 +48,12 @@ public partial class StatusEffectBattleTest
     }.Start();
     var target = battle.EnemyUnit.State;
 
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
     Assert.False(target.IsImmobilized);
 
     // Wear armor down to 1 (Kinetic ApplyDamage vs Thermal armor stays 1x): next hit spills 2.
-    battle.Executor.Submit(BattleAction.ApplyDamage(target, 6)).RequireSingleResult();
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
+    ApplyDamage(battle.Session, target, 6);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
 
     Assert.True(target.IsImmobilized);
   }
@@ -77,7 +77,7 @@ public partial class StatusEffectBattleTest
     }.Start();
     var target = battle.EnemyUnit.State;
 
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
 
     Assert.Equal(shouldApply, target.ActiveStatusEffects.Any());
   }
@@ -95,8 +95,8 @@ public partial class StatusEffectBattleTest
     var target = battle.EnemyUnit.State;
     var recorder = new BattleEventRecorder(battle.Session);
 
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
 
     Assert.Equal(1, target.ActiveStatusEffects.Count);
     Assert.Equal(2, recorder.OfType<UnitStatusEffectAppliedBattleEvent>().Count());
@@ -115,35 +115,11 @@ public partial class StatusEffectBattleTest
     var target = battle.EnemyUnit.State;
     var recorder = new BattleEventRecorder(battle.Session);
 
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
 
     Assert.True(target.IsDead);
     Assert.False(recorder.OfType<UnitStatusEffectAppliedBattleEvent>().Any());
     Assert.Equal(0, target.ActiveStatusEffects.Count);
-  }
-
-  [TestCase(TestName = "An immobilized unit cannot act")]
-  public void ImmobilizedUnitCannotAct()
-  {
-    var battle = new BattleDuelBuilder
-    {
-      HitChanceCalculator = new AlwaysHitCalculator(),
-      Player = new DuelSide("Alpha", Weapon: BattleTestFactory.MakeWeapon("Rifle")),
-      Enemy = new DuelSide("Hostile", Weapon: BattleTestFactory.MakeWeapon("Enemy Rifle")),
-    }.Start();
-    var attacker = battle.PlayerUnit.State;
-    var target = battle.EnemyUnit.State;
-    attacker.ApplyStatusEffect(BattleTestFactory.MakeStun());
-
-    var result = battle.Executor.Submit(BattleAction.AttackUnit(attacker, target)).RequireSingleResult();
-
-    Assert.False(result.Succeeded);
-    Assert.Equal(target.MaxHealth, target.CurrentHealth);
-    Assert.Equal(attacker.MaxActionPoints, attacker.CurrentActionPoints);
-    Assert.False(battle.Session.CanUnitActNow(attacker));
-
-    var passResult = battle.Executor.Submit(BattleAction.PassUnit(attacker)).RequireSingleResult();
-    Assert.False(passResult.Succeeded);
   }
 
   [TestCase(TestName = "Faction turn auto-ends when remaining units are immobilized")]
@@ -159,9 +135,8 @@ public partial class StatusEffectBattleTest
     var second = SpawnUnit(battle.Session, BattleTestFactory.MakeCombatant("Bravo", battle.PlayerFaction), new Vector3I(1, 0, 1)).State;
     second.ApplyStatusEffect(BattleTestFactory.MakeStun());
 
-    var result = battle.Executor.Submit(BattleAction.PassUnit(attacker)).RequireSingleResult();
+    battle.Executor.Submit(BattleAction.PassUnit(battle.PlayerUnit.AliveIn(battle.Session)));
 
-    Assert.True(result.Succeeded);
     Assert.Equal(battle.EnemyFaction, battle.Session.ActiveSide);
   }
 
@@ -176,7 +151,7 @@ public partial class StatusEffectBattleTest
       Enemy = new DuelSide("Hostile", Health: 20, Weapon: BattleTestFactory.MakeWeapon("Enemy Rifle")),
     }.Start();
     var target = battle.EnemyUnit.State;
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
     Assert.Equal(17, target.CurrentHealth);
 
     EndFactionTurn(battle.Executor, battle.PlayerFaction);   // attacker's turn end: no tick on the enemy unit
@@ -221,7 +196,7 @@ public partial class StatusEffectBattleTest
         Armor: BattleTestFactory.MakeArmor("Thermal Plating", armor: 10, element: Element.Thermal)),
     }.Start();
     var target = battle.EnemyUnit.State;
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);   // 3 Kinetic absorbed at 1x: armor 10 -> 7
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);   // 3 Kinetic absorbed at 1x: armor 10 -> 7
     var armor = target.EquippedArmor.RequireSome().Capability;
     Assert.Equal(7, armor.Current);
     Assert.Equal(target.MaxHealth, target.CurrentHealth);
@@ -247,7 +222,7 @@ public partial class StatusEffectBattleTest
         Armor: BattleTestFactory.MakeArmor("Recharger", armor: 10, element: Element.Kinetic, regenDelayTurns: 1, regenPerTurn: 3)),
     }.Start();
     var target = battle.EnemyUnit.State;
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);   // 3 Thermal vs Kinetic armor at 1x: armor 10 -> 7, delay armed
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);   // 3 Thermal vs Kinetic armor at 1x: armor 10 -> 7, delay armed
     var armor = target.EquippedArmor.RequireSome().Capability;
     Assert.Equal(7, armor.Current);
 
@@ -279,7 +254,7 @@ public partial class StatusEffectBattleTest
       Enemy = new DuelSide("Hostile", Health: 4, Weapon: BattleTestFactory.MakeWeapon("Enemy Rifle")),
     }.Start();
     var target = battle.EnemyUnit.State;
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);   // 4 -> 1 health, burning
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);   // 4 -> 1 health, burning
     Assert.True(target.IsAlive);
 
     EndFactionTurn(battle.Executor, battle.PlayerFaction);
@@ -302,15 +277,12 @@ public partial class StatusEffectBattleTest
       Player = new DuelSide("Alpha", Weapon: BattleTestFactory.MakeStatusWeapon(stun)),
       Enemy = new DuelSide("Hostile", Weapon: BattleTestFactory.MakeWeapon("Enemy Rifle")),
     }.Start();
-    var attacker = battle.PlayerUnit.State;
     var target = battle.EnemyUnit.State;
-    Attack(battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
+    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
     Assert.True(target.IsImmobilized);
 
     EndFactionTurn(battle.Executor, battle.PlayerFaction);          // enemy turn: stunned target cannot act
     Assert.False(battle.Session.CanUnitActNow(target));
-    var attackBack = battle.Executor.Submit(BattleAction.AttackUnit(target, attacker)).RequireSingleResult();
-    Assert.False(attackBack.Succeeded);
 
     var recorder = new BattleEventRecorder(battle.Session);
     EndFactionTurn(battle.Executor, battle.EnemyFaction);           // stun ticks 1 -> 0 and expires
