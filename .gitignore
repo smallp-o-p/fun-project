@@ -25,3 +25,4 @@ Godot-MCP/
 .pi/
 .pi-subagents/
 *.DotSettings.user
+.superpowers/

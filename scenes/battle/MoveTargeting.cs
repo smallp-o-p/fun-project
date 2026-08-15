@@ -23,6 +23,8 @@ public sealed class MoveTargeting : IActionTargeting
     _unit = unit;
   }
 
+  public ConfirmMode Confirm => ConfirmMode.Confirm;
+
   public IReadOnlyCollection<Vector3I> Candidates => _reachable;
 
   public IReadOnlyCollection<Vector3I> Begin()

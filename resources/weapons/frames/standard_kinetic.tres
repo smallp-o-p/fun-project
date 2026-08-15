@@ -1,15 +1,13 @@
-[gd_resource type="Resource" script_class="WeaponFrameData" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="WeaponFrameData" format=3 uid="uid://but3ivq5h35lq"]
 
-[ext_resource type="Script" path="res://scripts/weapons/damage/WeaponFrameData.cs" id="1_frame"]
-[ext_resource type="Script" path="res://scripts/weapons/damage/DamagePacketData.cs" id="2_packet"]
+[ext_resource type="Script" uid="uid://bcdy1rpcvgr0y" path="res://scripts/weapons/damage/WeaponFrameData.cs" id="1_frame"]
+[ext_resource type="Script" uid="uid://ct6shc03x8ial" path="res://scripts/weapons/damage/DamagePacketData.cs" id="2_packet"]
 
 [sub_resource type="Resource" id="Resource_packet1"]
 script = ExtResource("2_packet")
-Element = 0
-Multiplier = 1.0
 
 [resource]
 script = ExtResource("1_frame")
-Packets = Array[Object]([SubResource("Resource_packet1")])
+Packets = Array[ExtResource("2_packet")]([SubResource("Resource_packet1")])
 Name = "Standard Kinetic Frame"
 Description = "The full charge delivered as a single kinetic slug."

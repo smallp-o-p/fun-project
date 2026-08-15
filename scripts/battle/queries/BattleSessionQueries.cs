@@ -26,3 +26,16 @@ public sealed class GetFactionEndOfBattleSummary(Faction faction)
     return Right(session.GetFactionSummary(faction));
   }
 }
+
+// The side whose turn it currently is. Total: any session state has an active side
+// (during Setup it is the first faction of the order).
+public sealed class GetActiveSideQuery : IBattleSessionQuery<Faction>
+{
+  public Faction Execute(BattleSession session) => session.ActiveSide;
+}
+
+// The battle's lifecycle phase. Total by construction.
+public sealed class GetBattlePhaseQuery : IBattleSessionQuery<BattlePhase>
+{
+  public BattlePhase Execute(BattleSession session) => session.Phase;
+}

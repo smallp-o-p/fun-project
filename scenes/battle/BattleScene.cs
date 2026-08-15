@@ -1,21 +1,28 @@
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Stats;
+using FunProject.Weapons;
 using Godot;
 using System.Collections.Generic;
+using System.Linq;
 
 // Minimal scaffolding host: boots a small BattleRuntime via BattleFactory, builds the scene tree in
-// code (camera, light, ground, unit meshes, HUD), binds the event signal handler, and repaints unit
-// meshes when UnitMoved events commit. Deliberately throwaway — to be superseded by the real
-// BattleScene/HUD later.
+// code (camera, light, ground, unit meshes, HUD), and connects the presentation FSM to input and
+// event playback. Deliberately throwaway — to be superseded by the real BattleScene/HUD later.
 public sealed partial class BattleScene : Node3D
 {
   private static readonly Vector3I BoardDimensions = new(8, 1, 8);
 
   private BattleRuntime _runtime = null!;
+  private BattleUiController _ui = null!;
+  private EventPlaybackDirector _director = null!;
+  private MovementLine _movementLine = null!;
+  private ReachableTileHighlighter _highlighter = null!;
+  private Container _verbButtons = null!;
+  private Label _hitChanceLabel = null!;
+  private Label _bannerLabel = null!;
   private Faction _playerFaction = null!;
   private readonly List<Faction> _factions = [];
-  private readonly Dictionary<BattleUnitState, Node3D> _unitMeshes = [];
 
   public override void _Ready()
   {
@@ -23,30 +30,44 @@ public sealed partial class BattleScene : Node3D
 
     BuildEnvironment();
     Camera3D camera = BuildCamera();
+
+    var director = new EventPlaybackDirector { Name = "EventPlaybackDirector" };
+    AddChild(director);
+    director.Bind(_runtime);
+    _director = director;
+
     SpawnUnitMeshes();
 
-    var signals = new BattleEventSignalHandler { Name = "BattleEventSignalHandler" };
-    AddChild(signals);
-    signals.PresentationEventCommitted += OnPresentationEvent;
-    signals.Bind(_runtime);
+    _movementLine = new MovementLine { Name = "MovementLine" };
+    AddChild(_movementLine);
+    _movementLine.Visible = false; // MovementLine._Ready rebuilds + shows a default line; hide it after AddChild
+    _highlighter = new ReachableTileHighlighter { Name = "ReachableTileHighlighter" };
+    AddChild(_highlighter);
 
-    var movementLine = new MovementLine { Name = "MovementLine" };
-    AddChild(movementLine);
-    movementLine.Visible = false; // MovementLine._Ready rebuilds + shows a default line; hide it after AddChild
-    var highlighter = new ReachableTileHighlighter { Name = "ReachableTileHighlighter" };
-    AddChild(highlighter);
+    _ui = new BattleUiController(_runtime, _playerFaction, () => _director.Busy);
 
-    var controller = new PlayerActionController(_runtime, _playerFaction);
     var input = new BattleInputController { Name = "BattleInputController" };
     AddChild(input);
-    (Container verbButtons, Label hitChanceLabel, Button confirm, Button cancel) = BuildHud(input);
-    input.Initialize(controller, camera, movementLine, highlighter, verbButtons, hitChanceLabel);
-    confirm.Pressed += input.OnConfirmPressed;
-    cancel.Pressed += input.OnCancelPressed;
+    input.Initialize(_ui, camera);
+    BuildHud();
+
+    _ui.StateChanged += RefreshHud;
+    _ui.ReadoutsChanged += RefreshHud;
+    _ui.StateChanged += () =>
+    {
+      if (_ui.State == UiState.BattleOver)
+        ShowBattleOverBanner();
+    };
+    _director.PlaybackIdle += RefreshHud;
+    _director.PlaybackIdle += OnPlaybackIdle;
+    input.PreviewUpdated += RenderHudPreviewOnly;
+
+    RefreshHud();
   }
 
   public override void _ExitTree()
   {
+    _ui?.Dispose();
     _runtime?.Dispose();
   }
 
@@ -59,9 +80,13 @@ public sealed partial class BattleScene : Node3D
     _factions.Add(enemy);
 
     var board = new BattleBoardState(BoardDimensions);
+    FirearmWeaponData pistolData = ResourceLoader.Load<FirearmWeaponData>(
+      "res://resources/weapons/service_pistol.tres")
+      ?? throw new System.InvalidOperationException("Could not load the service pistol resource.");
+    Weapon heroWeapon = new FirearmWeapon(pistolData);
     var placements = new List<UnitPlacement>
     {
-      new(new UnitLoadout(MakeCombatant("Hero", player)), new Vector3I(1, 0, 1)),
+      new(new UnitLoadout(MakeCombatant("Hero", player), Some(heroWeapon)), new Vector3I(1, 0, 1)),
       new(new UnitLoadout(MakeCombatant("Goon", enemy)), new Vector3I(6, 0, 6)),
     };
     var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
@@ -148,18 +173,12 @@ public sealed partial class BattleScene : Node3D
           Position = BoardCoordinates.TileToWorldCenter(tile) + new Vector3(0f, 0.5f, 0f),
         };
         AddChild(mesh);
-        _unitMeshes[unit.State] = mesh;
+        _director.RegisterUnitMesh(unit.State, mesh);
       }
     }
   }
 
-  private void OnPresentationEvent(BattleEventAdapter adapter)
-  {
-    if (adapter.BattleEvent is UnitMovedBattleEvent moved && _unitMeshes.TryGetValue(moved.Unit, out Node3D? mesh))
-      mesh.Position = BoardCoordinates.TileToWorldCenter(moved.Position.Raw) + new Vector3(0f, 0.5f, 0f);
-  }
-
-  private (Container VerbButtons, Label HitChance, Button Confirm, Button Cancel) BuildHud(BattleInputController input)
+  private void BuildHud()
   {
     var layer = new CanvasLayer { Name = "Hud" };
     AddChild(layer);
@@ -167,17 +186,138 @@ public sealed partial class BattleScene : Node3D
     var box = new VBoxContainer { Position = new Vector2(20f, 20f) };
     layer.AddChild(box);
 
-    var verbButtons = new VBoxContainer { Name = "VerbButtons" };
-    box.AddChild(verbButtons);
+    _verbButtons = new VBoxContainer { Name = "VerbButtons" };
+    box.AddChild(_verbButtons);
 
     var confirm = new Button { Text = "Confirm" };
     box.AddChild(confirm);
+    confirm.Pressed += () => _ui.Confirm();
+
     var cancel = new Button { Text = "Cancel" };
     box.AddChild(cancel);
+    cancel.Pressed += () => _ui.Cancel();
 
-    var hitChance = new Label { Name = "HitChance", Visible = false };
-    box.AddChild(hitChance);
+    _hitChanceLabel = new Label { Name = "HitChance", Visible = false };
+    box.AddChild(_hitChanceLabel);
 
-    return (verbButtons, hitChance, confirm, cancel);
+    _bannerLabel = new Label
+    {
+      Name = "BattleOverBanner",
+      Visible = false,
+      Position = new Vector2(300f, 200f),
+      Size = new Vector2(400f, 60f),
+      HorizontalAlignment = HorizontalAlignment.Center,
+      VerticalAlignment = VerticalAlignment.Center,
+    };
+    layer.AddChild(_bannerLabel);
+  }
+
+  private void RefreshHud()
+  {
+    foreach (Node child in _verbButtons.GetChildren())
+      child.QueueFree();
+
+    foreach (UnitActionOption option in _ui.ActionOptions)
+    {
+      var button = new Button
+      {
+        Text = LabelFor(option),
+        Disabled = !option.IsAvailable,
+      };
+      UnitActionOption captured = option;
+      button.Pressed += () => _ui.BeginAction(captured);
+      _verbButtons.AddChild(button);
+    }
+
+    bool targeting = _ui.State is UiState.Targeting or UiState.TargetingLocked;
+    if (targeting)
+      _highlighter.Show(_ui.CandidateCells);
+    else
+      _highlighter.Clear();
+
+    if (targeting)
+      _ui.LastPreview.Match(RenderPreview, HidePreview);
+    else
+      HidePreview();
+  }
+
+  private void RenderHudPreviewOnly()
+  {
+    if (_ui.State is not (UiState.Targeting or UiState.TargetingLocked))
+    {
+      HidePreview();
+      return;
+    }
+
+    _ui.LastPreview.Match(RenderPreview, HidePreview);
+  }
+
+  private void ShowBattleOverBanner()
+  {
+    _bannerLabel.Text = _runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
+      Right: summary => summary.Outcome == BattleOutcome.Victory ? "VICTORY" : "DEFEAT",
+      Left: _ => "BATTLE OVER");
+    _bannerLabel.Visible = true;
+  }
+
+  private void OnPlaybackIdle()
+  {
+    RefreshHud();
+    if (_runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
+      return;
+
+    Faction activeSide = _runtime.Query(new GetActiveSideQuery());
+    if (ReferenceEquals(activeSide, _playerFaction))
+      return;
+
+    // THROWAWAY: automatically end enemy turns until a real enemy controller exists.
+    _runtime.ExecuteAction(BattleAction.EndFactionTurn(activeSide));
+  }
+
+  private static string LabelFor(UnitActionOption option) => option switch
+  {
+    MoveActionOption => "Move",
+    AttackActionOption => "Attack",
+    PassActionOption => "Pass",
+    EndTurnActionOption => "End Turn",
+    ReloadActionOption => "Reload",
+    _ => option.GetType().Name,
+  };
+
+  private void RenderPreview(ActionPreview preview)
+  {
+    switch (preview)
+    {
+      case PathPreview p:
+        _hitChanceLabel.Visible = false;
+        DrawLine(p.Path);
+        break;
+      case AttackPreview a:
+        _movementLine.Visible = false;
+        _hitChanceLabel.Text = $"{a.HitChance.FinalChance}%";
+        _hitChanceLabel.Visible = true;
+        break;
+    }
+  }
+
+  private void HidePreview()
+  {
+    _movementLine.Visible = false;
+    _hitChanceLabel.Visible = false;
+  }
+
+  private void DrawLine(IReadOnlyList<Vector3I> path)
+  {
+    if (path.Count < 2)
+    {
+      _movementLine.Visible = false;
+      return;
+    }
+
+    _movementLine.Points = path
+      .Select(tile => BoardCoordinates.TileToWorldCenter(tile) + new Vector3(0f, 0.05f, 0f))
+      .ToArray();
+    _movementLine.Rebuild();
+    _movementLine.Visible = true;
   }
 }

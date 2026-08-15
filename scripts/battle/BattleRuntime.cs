@@ -10,6 +10,8 @@ public sealed class BattleRuntime : IDisposable
   private bool _disposed;
 
   public event Action<BattleEvent> BattleEventCommitted = delegate { };
+  public event Action<BattleAction> ActionStarted = delegate { };
+  public event Action<BattleActionExecResult> ActionCompleted = delegate { };
 
   public BattleRuntime(BattleSession session)
   {
@@ -48,7 +50,10 @@ public sealed class BattleRuntime : IDisposable
   public BattleActionExecResult ExecuteAction(BattleAction action)
   {
     ThrowIfDisposed();
-    return _actions.Submit(action);
+    ActionStarted.Invoke(action);
+    BattleActionExecResult result = _actions.Submit(action);
+    ActionCompleted.Invoke(result);
+    return result;
   }
 
   public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0)

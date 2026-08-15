@@ -25,6 +25,8 @@ public sealed class AttackTargeting : IActionTargeting
     _weapon = weapon;
   }
 
+  public ConfirmMode Confirm => ConfirmMode.Immediate;
+
   public IReadOnlyCollection<Vector3I> Candidates => _targetsByTile.Keys;
 
   public IReadOnlyCollection<Vector3I> Begin()

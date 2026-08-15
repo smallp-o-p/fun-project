@@ -1,37 +1,42 @@
-[gd_resource type="Resource" script_class="FirearmWeaponData" load_steps=12 format=3 uid="uid://xilu3cj030eu"]
+[gd_resource type="Resource" script_class="FirearmWeaponData" format=3 uid="uid://c8fmm66ofct66"]
 
 [ext_resource type="Script" uid="uid://dnk85ukx4hsk8" path="res://scripts/stats/concrete_stats/AmmunitionStat.cs" id="1_ammo"]
 [ext_resource type="Script" uid="uid://cogsdmnfr7ro4" path="res://scripts/stats/concrete_stats/CriticalChanceStat.cs" id="1_crit"]
 [ext_resource type="Script" uid="uid://dojdd5hgirkn2" path="res://scripts/stats/concrete_stats/DamageStat.cs" id="1_damage"]
 [ext_resource type="Script" uid="uid://cei4l4eg05jg1" path="res://scripts/weapons/FirearmWeaponData.cs" id="1_fvdq8"]
 [ext_resource type="Script" uid="uid://pkqahop342cp" path="res://scripts/stats/concrete_stats/RangeStat.cs" id="1_range"]
-[ext_resource type="Resource" uid="uid://djtse040feqhb" path="res://resources/weapons/ammo/standard.tres" id="2_bg1dx"]
-[ext_resource type="Resource" path="res://resources/weapons/frames/standard_kinetic.tres" id="3_frame"]
+[ext_resource type="Script" uid="uid://bhrmb8ckntsto" path="res://scripts/items/capabilities/ItemCapabilityData.cs" id="2_4vjy0"]
+[ext_resource type="Resource" uid="uid://but3ivq5h35lq" path="res://resources/weapons/frames/standard_kinetic.tres" id="3_frame"]
+[ext_resource type="Resource" uid="uid://b3822r26xoua8" path="res://resources/weapons/ammo/standard_rounds.tres" id="5_4vjy0"]
 
-[sub_resource type="Resource" id="Resource_vj6ow"]
+[sub_resource type="Resource" id="Resource_75boo"]
 script = ExtResource("1_ammo")
 BaseValue = 4
+metadata/_custom_type_script = "uid://dnk85ukx4hsk8"
 
-[sub_resource type="Resource" id="Resource_q7nbd"]
+[sub_resource type="Resource" id="Resource_ofjgw"]
 script = ExtResource("1_crit")
-BaseValue = 25
+BaseValue = 15
+metadata/_custom_type_script = "uid://cogsdmnfr7ro4"
 
-[sub_resource type="Resource" id="Resource_eu4gj"]
+[sub_resource type="Resource" id="Resource_32rhf"]
 script = ExtResource("1_damage")
 BaseValue = 4
+metadata/_custom_type_script = "uid://dojdd5hgirkn2"
 
-[sub_resource type="Resource" id="Resource_4vjy0"]
+[sub_resource type="Resource" id="Resource_njiaa"]
 script = ExtResource("1_range")
 BaseValue = 4
+metadata/_custom_type_script = "uid://pkqahop342cp"
 
 [resource]
 script = ExtResource("1_fvdq8")
-AmmunitionStat = SubResource("Resource_vj6ow")
-DefaultAmmoData = ExtResource("2_bg1dx")
+AmmunitionStat = SubResource("Resource_75boo")
+DefaultAmmoData = ExtResource("5_4vjy0")
 Frame = ExtResource("3_frame")
-DamageStat = SubResource("Resource_eu4gj")
-RangeStat = SubResource("Resource_4vjy0")
-CriticalChanceStat = SubResource("Resource_q7nbd")
+DamageStat = SubResource("Resource_32rhf")
+RangeStat = SubResource("Resource_njiaa")
+CriticalChanceStat = SubResource("Resource_ofjgw")
 Name = "Service Pistol"
-Description = "Standard Issue service pistol offered to every Enforcer. Handy in a pinch, but don't expect to stop anything big. "
-metadata/_custom_type_script = "uid://cei4l4eg05jg1"
+Description = "Standard-issue service pistol"
+metadata/_custom_type_script = "uid://d7wswcxh2fxc"
