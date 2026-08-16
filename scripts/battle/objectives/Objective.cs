@@ -1,16 +1,20 @@
 using FunProject.Combatants;
 using System;
+using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
-// Runtime objective instance: owns its behavior and parameters in code, and
-// references authored display data (name/description). Owner is assigned when the
-// objective is enqueued into a faction's Operation.
+// Runtime objective instance: behavior + parameters in code (constructor takes its authored
+// ObjectiveData subclass), display text + outcome directives on the data. Objectives are
+// faction-agnostic predicates; the router supplies the evaluating faction to Check. State flips
+// (Ongoing -> Passed/Failed) only through the session's Record doors, driven by ObjectiveSystem
+// when an observed event makes Check return a flip; an objective is evaluated from the NEXT
+// event after it was added.
 public abstract class Objective
 {
   public ObjectiveData Data { get; }
 
-  public Faction Owner { get; internal set; } = null!;
+  public ObjectiveResult State { get; internal set; } = ObjectiveResult.Ongoing;
 
   protected Objective(ObjectiveData data)
   {
@@ -18,9 +22,10 @@ public abstract class Objective
     Data = data;
   }
 
-  public abstract bool IsComplete(BattleSession session);
+  // Event-key types this objective observes: concrete event records and/or tag interfaces
+  // (e.g. typeof(UnitKilledBattleEvent), typeof(IUnitBattleEvent)).
+  public abstract IReadOnlyCollection<Type> ObservedEventKeys { get; }
 
-  // Default failure rule shared by all current objectives: the owning faction has
-  // no living units left. Override only if an objective needs a different rule.
-  public virtual bool IsFailed(BattleSession session) => !session.HasLivingUnits(Owner);
+  // Pure query over the session plus the just-committed event: Ongoing, or the flip.
+  public abstract ObjectiveResult Check(Faction owner, BattleEvent battleEvent, BattleSession session);
 }

@@ -35,10 +35,10 @@ public class BattleFactoryTest
       new(new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)), new Vector3I(0, 0, 0)),
       new(new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)), new Vector3I(3, 0, 3)),
     };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
+    var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
-      [player] = new Objective[] { new FakeObjective() },
-      [enemy] = new Objective[] { new FakeObjective() },
+      [player] = new ObjectiveData[] { new FakeObjectiveData() },
+      [enemy] = new ObjectiveData[] { new FakeObjectiveData() },
     };
     var setup = new BattleSetup(board, new[] { player, enemy }, placements, objectives);
     return (setup, player, enemy);
@@ -70,9 +70,9 @@ public class BattleFactoryTest
     var (setup, player, _) = MinimalSetup();
     var noEnemyObjective = setup with
     {
-      Objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
+      Objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
       {
-        [player] = new Objective[] { new FakeObjective() },
+        [player] = new ObjectiveData[] { new FakeObjectiveData() },
       },
     };
 
@@ -114,11 +114,11 @@ public class BattleFactoryTest
     var stranger = BattleTestFactory.MakeFaction("Stranger");
     var withStrangerObjective = setup with
     {
-      Objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
+      Objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
       {
-        [player] = new Objective[] { new FakeObjective() },
-        [enemy] = new Objective[] { new FakeObjective() },
-        [stranger] = new Objective[] { new FakeObjective() },
+        [player] = new ObjectiveData[] { new FakeObjectiveData() },
+        [enemy] = new ObjectiveData[] { new FakeObjectiveData() },
+        [stranger] = new ObjectiveData[] { new FakeObjectiveData() },
       },
     };
 
@@ -202,10 +202,10 @@ public class BattleFactoryTest
       [0] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)) },
       [1] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)) },
     };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
+    var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
-      [player] = new Objective[] { new FakeObjective() },
-      [enemy] = new Objective[] { new FakeObjective() },
+      [player] = new ObjectiveData[] { new FakeObjectiveData() },
+      [enemy] = new ObjectiveData[] { new FakeObjectiveData() },
     };
     var setup = new MapBattleSetup(TwoSlotMap(), new[] { player, enemy }, rosters, objectives);
 
@@ -232,10 +232,10 @@ public class BattleFactoryTest
       },
       [1] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)) },
     };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
+    var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
-      [player] = new Objective[] { new FakeObjective() },
-      [enemy] = new Objective[] { new FakeObjective() },
+      [player] = new ObjectiveData[] { new FakeObjectiveData() },
+      [enemy] = new ObjectiveData[] { new FakeObjectiveData() },
     };
     var setup = new MapBattleSetup(TwoSlotMap(), new[] { player, enemy }, rosters, objectives);
 
@@ -252,10 +252,10 @@ public class BattleFactoryTest
       [0] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)) },
       [5] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)) }, // out of range
     };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
+    var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
-      [player] = new Objective[] { new FakeObjective() },
-      [enemy] = new Objective[] { new FakeObjective() },
+      [player] = new ObjectiveData[] { new FakeObjectiveData() },
+      [enemy] = new ObjectiveData[] { new FakeObjectiveData() },
     };
     var setup = new MapBattleSetup(TwoSlotMap(), new[] { player, enemy }, rosters, objectives);
 
@@ -273,10 +273,10 @@ public class BattleFactoryTest
       [0] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Wrong", enemy)) },
       [1] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)) },
     };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
+    var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
-      [player] = new Objective[] { new FakeObjective() },
-      [enemy] = new Objective[] { new FakeObjective() },
+      [player] = new ObjectiveData[] { new FakeObjectiveData() },
+      [enemy] = new ObjectiveData[] { new FakeObjectiveData() },
     };
     var setup = new MapBattleSetup(TwoSlotMap(), new[] { player, enemy }, rosters, objectives);
 
@@ -298,10 +298,10 @@ public class BattleFactoryTest
       [0] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)) },
       [1] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)) },
     };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
+    var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
-      [player] = new Objective[] { new FakeObjective() },
-      [enemy] = new Objective[] { new FakeObjective() },
+      [player] = new ObjectiveData[] { new FakeObjectiveData() },
+      [enemy] = new ObjectiveData[] { new FakeObjectiveData() },
     };
     var setup = new MapBattleSetup(map, new[] { player, enemy }, rosters, objectives);
 

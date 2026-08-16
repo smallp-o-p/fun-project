@@ -1,11 +1,14 @@
 using FunProject.Combatants;
+using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
-public sealed class GetOperationForFaction(Faction side) : IBattleSessionQuery<Option<Operation>>
+// All of a faction's objectives, flipped ones included (history), in add order.
+// None when the faction was never given any.
+public sealed class GetObjectivesForFaction(Faction side) : IBattleSessionQuery<Option<IReadOnlyList<Objective>>>
 {
-  public Option<Operation> Execute(BattleSession session)
+  public Option<IReadOnlyList<Objective>> Execute(BattleSession session)
   {
-    return session.GetOperation(side);
+    return session.GetObjectives(side) is { Count: > 0 } list ? Some(list) : None;
   }
 }

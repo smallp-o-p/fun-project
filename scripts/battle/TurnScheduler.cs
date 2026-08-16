@@ -34,8 +34,7 @@ internal sealed class TurnScheduler
   public IReadOnlyCollection<Faction> TurnQueue => _turnQueue;
   public int RoundQueueCount => _turnQueue.Count;
 
-  // Registers a faction in the global turn order. Returns true iff it was newly added,
-  // letting the session create the matching Operation only on first registration.
+  // Registers a faction in the global turn order. Returns true iff it was newly added.
   public bool RegisterFaction(Faction side)
   {
     if (_globalFactionOrder.Contains(side))

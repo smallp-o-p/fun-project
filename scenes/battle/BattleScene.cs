@@ -89,10 +89,16 @@ public sealed partial class BattleScene : Node3D
       new(new UnitLoadout(MakeCombatant("Hero", player), Some(heroWeapon)), new Vector3I(1, 0, 1)),
       new(new UnitLoadout(MakeCombatant("Goon", enemy)), new Vector3I(6, 0, 6)),
     };
-    var objectives = new Dictionary<Faction, IReadOnlyList<Objective>>
+    var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
-      [player] = [new EliminateAllOpposingForcesObjective(new ObjectiveData())],
-      [enemy] = [new EliminateAllOpposingForcesObjective(new ObjectiveData())],
+      [player] =
+      [
+        new EliminateAllOpposingForcesObjectiveData
+        {
+          OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+        },
+      ],
+      [enemy] = [new EliminateAllOpposingForcesObjectiveData()],
     };
 
     return BattleFactory.Start(new BattleSetup(board, [player, enemy], placements, objectives))

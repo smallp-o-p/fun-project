@@ -1,13 +1,24 @@
+using FunProject.Combatants;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace FunProject.Battle;
 
 public sealed class EliminateAllOpposingForcesObjective : Objective
 {
-  public EliminateAllOpposingForcesObjective(ObjectiveData data) : base(data)
+  public EliminateAllOpposingForcesObjective(EliminateAllOpposingForcesObjectiveData data) : base(data)
   {
   }
 
-  public override bool IsComplete(BattleSession session) =>
-    session.GlobalFactionTurnOrder.All(side => side == Owner || !session.HasLivingUnits(side));
+  public override IReadOnlyCollection<Type> ObservedEventKeys { get; } = [typeof(UnitKilledBattleEvent)];
+
+  public override ObjectiveResult Check(Faction owner, BattleEvent battleEvent, BattleSession session)
+  {
+    if (session.GlobalFactionTurnOrder.All(side => side == owner || !session.HasLivingUnits(side)))
+      return ObjectiveResult.Passed;
+    if (!session.HasLivingUnits(owner))
+      return ObjectiveResult.Failed;
+    return ObjectiveResult.Ongoing;
+  }
 }

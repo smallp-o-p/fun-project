@@ -22,7 +22,7 @@ public sealed record BattleSetup(
   BattleBoardState Board,
   IReadOnlyList<Faction> FactionOrder,
   IReadOnlyList<UnitPlacement> Placements,
-  IReadOnlyDictionary<Faction, IReadOnlyList<Objective>> Objectives,
+  IReadOnlyDictionary<Faction, IReadOnlyList<ObjectiveData>> Objectives,
   int? Seed = null,
   Option<Faction> PlayerFaction = default,
   IHitChanceCalculator? HitChance = null);
@@ -33,7 +33,7 @@ public sealed record MapBattleSetup(
   BattleMapData Map,
   IReadOnlyList<Faction> FactionOrder,
   IReadOnlyDictionary<int, IReadOnlyList<UnitLoadout>> RostersBySlot,
-  IReadOnlyDictionary<Faction, IReadOnlyList<Objective>> Objectives,
+  IReadOnlyDictionary<Faction, IReadOnlyList<ObjectiveData>> Objectives,
   int? Seed = null,
   Option<Faction> PlayerFaction = default,
   IHitChanceCalculator? HitChance = null);

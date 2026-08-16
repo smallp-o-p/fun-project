@@ -40,8 +40,8 @@ public class BattleOutcomeTest
     Assert.Equal(BattleOutcome.Defeat, ended.Outcome);
   }
 
-  [TestCase(TestName = "Player becoming the sole surviving side resolves to Victory at the end of the turn")]
-  public void PlayerSoleSurvivorResolvesToVictoryAtTurnEnd()
+  [TestCase(TestName = "Player becoming the sole surviving side resolves to Victory the instant the last enemy dies")]
+  public void PlayerSoleSurvivorResolvesToVictoryInstantly()
   {
     var battle = new BattleDuelBuilder
     {
@@ -53,10 +53,6 @@ public class BattleOutcomeTest
     var recorder = new BattleEventRecorder(battle.Session);
 
     ApplyDamage(battle.Session, battle.EnemyUnit, 999);
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
-    Assert.True(battle.Session.Outcome.IsNone);
-
-    AdvanceTurn(battle.Session);
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());

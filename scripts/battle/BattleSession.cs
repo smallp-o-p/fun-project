@@ -32,7 +32,7 @@ public sealed class BattleSession
   private readonly Random _random;
   private readonly List<BattleUnitState> _units = [];
   private readonly VisibilityService _visibility = new();
-  private readonly Dictionary<Faction, Operation> _operations = [];
+  private readonly Dictionary<Faction, List<Objective>> _objectives = [];
   private readonly TurnScheduler _scheduler;
   private readonly Queue<BattleEvent> _eventDispatchQueue = [];
 
@@ -185,7 +185,7 @@ public sealed class BattleSession
 
     foreach (var side in _scheduler.GlobalFactionTurnOrder)
     {
-      if (_operations[side].PendingObjectives.Count == 0)
+      if (GetObjectives(side).Count == 0)
         throw new InvalidOperationException(
           $"Faction {side.Name} has no objective; assign every faction at least one objective before starting the battle.");
     }
@@ -207,6 +207,11 @@ public sealed class BattleSession
     RaiseEvents(
       new SessionStartedBattleEvent(),
       new TurnStartedBattleEvent(ActiveSide, TurnNumber));
+
+    // A turn-start objective flip (e.g. SurviveUntilTurn with TargetTurn 1) can end the
+    // battle inside that dispatch; skip the AP refresh for a dead battle.
+    if (Phase == BattlePhase.Ended)
+      return;
 
     foreach (var unit in AliveUnits)
       unit.RefreshForNewTurn();
@@ -391,13 +396,12 @@ public sealed class BattleSession
     if (Phase == BattlePhase.Ended)
       return;
 
-    // End-of-turn outcome. This runs after RaiseEvent above has fully drained the
-    // dispatch queue, so the turn-end listeners (status -> armor -> ObjectiveSystem)
-    // have updated operation statuses AND any reaction listeners (e.g. a fail ->
-    // add-and-reactivate handler) have already run before we read the status.
-    // Resolve before any turn-queue mutation.
-    if (TryEndBattleIfDecided())
+    // With no player faction there is no backstop: if every faction is wiped, Draw.
+    if (!_scheduler.GlobalFactionTurnOrder.Any(HasLivingUnits))
+    {
+      EndBattle(BattleOutcome.Draw);
       return;
+    }
 
     _scheduler.MarkActiveSideActed();
 
@@ -423,7 +427,7 @@ public sealed class BattleSession
     AdvanceTurn();
   }
 
-  private void EndBattle(BattleOutcome outcome)
+  internal void EndBattle(BattleOutcome outcome)
   {
     if (Phase == BattlePhase.Ended)
       return;
@@ -434,47 +438,6 @@ public sealed class BattleSession
     Phase = BattlePhase.Ended;
 
     RaiseEvents(new SessionEndedBattleEvent(outcome));
-  }
-
-  // Objective/operation-driven outcome decision at turn end: one of the two
-  // intentional places the battle can terminate. The other is the immediate-defeat
-  // branch in HandleUnitDeath, which ends the battle the moment the player faction is
-  // wiped (deliberate shipped behavior: a player wipe ends immediately rather than
-  // waiting for turn end). This method only runs the turn-end operation outcome rules.
-  // Returns true iff it ended the battle.
-  private bool TryEndBattleIfDecided()
-  {
-    if (Phase != BattlePhase.InProgress)
-      return false;
-
-    return PlayerFaction.Match(
-      Some: player =>
-      {
-        Operation op = _operations[player];
-        if (op.Status == OperationStatus.Failed)
-        {
-          EndBattle(BattleOutcome.Defeat);
-          return true;
-        }
-
-        if (op.Status == OperationStatus.Completed)
-        {
-          EndBattle(BattleOutcome.Victory);
-          return true;
-        }
-
-        return false;
-      },
-      None: () =>
-      {
-        if (!_scheduler.GlobalFactionTurnOrder.Any(HasLivingUnits))
-        {
-          EndBattle(BattleOutcome.Draw);
-          return true;
-        }
-
-        return false;
-      });
   }
 
   internal Option<BattleBoardState.ValidatedPoint> GetUnitPosition(BattleUnitState unit)
@@ -628,8 +591,7 @@ public sealed class BattleSession
 
   private void EnqueueFactionInGlobalOrder(Faction side)
   {
-    if (_scheduler.RegisterFaction(side))
-      _operations[side] = new Operation(side);
+    _scheduler.RegisterFaction(side);
   }
 
   private void HandleFactionLoss(Faction side)
@@ -645,73 +607,44 @@ public sealed class BattleSession
     ArgumentNullException.ThrowIfNull(faction);
     ArgumentNullException.ThrowIfNull(objective);
 
-    if (!_operations.TryGetValue(faction, out Operation? op))
+    if (!_objectives.TryGetValue(faction, out var list))
     {
-      op = new Operation(faction);
-      _operations[faction] = op;
+      _objectives[faction] = list = [];
       _scheduler.RegisterFaction(faction);
     }
 
-    op!.AddObjective(objective);
+    list.Add(objective);
     RaiseEvents(new ObjectiveAddedBattleEvent(faction, objective));
   }
 
-  internal void EvaluateOperationAtTurnEnd(Faction faction)
+  // Objective-system doors: flip state + raise the flip event. Trusted core — called only
+  // by ObjectiveSystem for an Ongoing objective it owns the routing of.
+  internal void RecordObjectiveCompleted(Faction faction, Objective objective)
   {
     ArgumentNullException.ThrowIfNull(faction);
-    if (Phase != BattlePhase.InProgress)
-      return;
-    if (!_operations.TryGetValue(faction, out Operation? found))
-      return;
+    ArgumentNullException.ThrowIfNull(objective);
+    if (objective.State != ObjectiveResult.Ongoing)
+      throw new InvalidOperationException($"Objective {objective.Data.Name} is already {objective.State}.");
 
-    Operation op = found!;
-    while (op.Status == OperationStatus.Active)
-    {
-      Option<Objective> currentOption = op.Current;
-      if (currentOption.IsNone)
-        break;
-      Objective current =
-        currentOption.Match(c => c, () => throw new InvalidOperationException("Current objective vanished."));
-
-      if (current.IsFailed(this))
-      {
-        op.FailCurrent();
-        RaiseEvents(new ObjectiveFailedBattleEvent(faction, current), new OperationFailedBattleEvent(faction));
-        break;
-      }
-
-      if (current.IsComplete(this))
-      {
-        op.CompleteCurrent();
-        RaiseEvents(new ObjectiveCompletedBattleEvent(faction, current));
-        if (op.Status == OperationStatus.Completed)
-          RaiseEvents(new OperationCompletedBattleEvent(faction));
-        continue;
-      }
-
-      break;
-    }
+    objective.State = ObjectiveResult.Passed;
+    RaiseEvents(new ObjectiveCompletedBattleEvent(faction, objective));
   }
 
-  // Evaluate EVERY faction's operation at a turn end, in the deterministic
-  // GlobalFactionTurnOrder, not just the faction whose turn just ended. An operation can
-  // become complete/failed because of ANOTHER faction's turn (e.g. an overwatch/mine
-  // reaction killing the last enemy during the enemy's turn completes the player's
-  // eliminate-all objective), so per-faction evaluation would resolve it a full round late
-  // (or never, if the owner cannot take another turn). EvaluateOperationAtTurnEnd guards
-  // Phase == InProgress, only advances an Active operation, and is idempotent for an
-  // already-resolved one, so evaluating all factions every turn end is safe and any
-  // re-evaluation is a no-op.
-  internal void EvaluateAllOperationsAtTurnEnd()
-  {
-    foreach (Faction faction in _scheduler.GlobalFactionTurnOrder)
-      EvaluateOperationAtTurnEnd(faction);
-  }
-
-  internal Option<Operation> GetOperation(Faction faction)
+  internal void RecordObjectiveFailed(Faction faction, Objective objective)
   {
     ArgumentNullException.ThrowIfNull(faction);
-    return _operations.TryGetValue(faction, out Operation? op) ? Some(op!) : None;
+    ArgumentNullException.ThrowIfNull(objective);
+    if (objective.State != ObjectiveResult.Ongoing)
+      throw new InvalidOperationException($"Objective {objective.Data.Name} is already {objective.State}.");
+
+    objective.State = ObjectiveResult.Failed;
+    RaiseEvents(new ObjectiveFailedBattleEvent(faction, objective));
+  }
+
+  internal IReadOnlyList<Objective> GetObjectives(Faction faction)
+  {
+    ArgumentNullException.ThrowIfNull(faction);
+    return _objectives.TryGetValue(faction, out var list) ? list : [];
   }
 
   private void StartNextRound()
@@ -722,7 +655,7 @@ public sealed class BattleSession
 
     if (_scheduler.RoundQueueCount == 0)
       throw new InvalidOperationException(
-        "StartNextRound reached with no living factions; TryEndBattleIfDecided ends the battle at the prior turn end.");
+        "StartNextRound reached with no living factions; AdvanceTurn should end the battle at the prior turn end.");
 
     BeginNextQueuedSideTurn();
   }
@@ -741,6 +674,11 @@ public sealed class BattleSession
     RaiseEvents(
       new ActiveSideChangedBattleEvent(nextSide),
       new TurnStartedBattleEvent(nextSide, TurnNumber));
+
+    // A turn-start objective flip (e.g. SurviveUntilTurn reaching its target) can end the
+    // battle inside that dispatch; skip the AP refresh for a dead battle.
+    if (Phase == BattlePhase.Ended)
+      return;
 
     foreach (var unit in GetFactionAliveUnits(nextSide))
       unit.RefreshForNewTurn();

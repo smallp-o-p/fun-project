@@ -75,6 +75,20 @@ public partial class BattleHookTest
     Assert.True(unitEventsListener.Received.OfType<UnitAddedBattleEvent>().Any());
   }
 
+  [TestCase(TestName = "A hook registered under concrete and interface keys fires once for one event")]
+  public void OneHookRegisteredUnderMultipleMatchingKeysFiresOnce()
+  {
+    var (session, executor, faction) = MakeSessionWithUnit();
+    var unit = session.GetFactionAliveUnits(faction).First();
+    var hook = new RecordingHook();
+    executor.RegisterHook<UnitKilledBattleEvent>(hook);
+    executor.RegisterHook<IUnitBattleEvent>(hook);
+
+    ApplyDamage(session, unit, 999);
+
+    Assert.Equal(1, hook.Received.Count);
+  }
+
   [TestCase(TestName = "Event raised by a hook dispatches after the current event and reaches other hooks")]
   public void HookRaisedEventDispatchesAfterCurrentEvent()
   {

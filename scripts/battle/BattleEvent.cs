@@ -437,25 +437,3 @@ public sealed record ObjectiveFailedBattleEvent : BattleEvent
     Objective = objective;
   }
 }
-
-public sealed record OperationCompletedBattleEvent : BattleEvent
-{
-  public Faction Faction { get; }
-
-  public OperationCompletedBattleEvent(Faction faction)
-  {
-    ArgumentNullException.ThrowIfNull(faction);
-    Faction = faction;
-  }
-}
-
-public sealed record OperationFailedBattleEvent : BattleEvent
-{
-  public Faction Faction { get; }
-
-  public OperationFailedBattleEvent(Faction faction)
-  {
-    ArgumentNullException.ThrowIfNull(faction);
-    Faction = faction;
-  }
-}

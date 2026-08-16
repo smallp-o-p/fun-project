@@ -194,7 +194,7 @@ public sealed partial class BattleUiControllerTest
       fixture.Runtime.Query(new GetUnitAtTile(board)).RequireSome());
   }
 
-  [TestCase(TestName = "Attack is click-to-fire and exits targeting on commit")]
+  [TestCase(TestName = "Attack is click-to-fire and enters BattleOver when it ends the battle")]
   public void AttackIsClickToFire()
   {
     using var fixture = new UiFixture();
@@ -205,7 +205,7 @@ public sealed partial class BattleUiControllerTest
 
     Assert.True(fixture.Ui.ClickTile(new Vector3I(4, 0, 4))); // enemy tile: fires immediately
 
-    Assert.Equal(UiState.UnitSelected, fixture.Ui.State);
+    Assert.Equal(UiState.BattleOver, fixture.Ui.State);
     Assert.True(fixture.Runtime.TryGetAlive(fixture.EnemyUnit.State).IsNone); // dead
   }
 

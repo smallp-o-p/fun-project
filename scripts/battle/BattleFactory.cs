@@ -27,10 +27,10 @@ public static class BattleFactory
 
     var session = new BattleSession(setup.Board, setup.FactionOrder, setup.HitChance, setup.Seed, setup.PlayerFaction);
 
-    foreach (KeyValuePair<Faction, IReadOnlyList<Objective>> entry in setup.Objectives)
+    foreach (KeyValuePair<Faction, IReadOnlyList<ObjectiveData>> entry in setup.Objectives)
     {
-      foreach (Objective objective in entry.Value)
-        session.AddObjective(entry.Key, objective);
+      foreach (ObjectiveData data in entry.Value)
+        session.AddObjective(entry.Key, data.Instantiate());
     }
 
     var runtime = new BattleRuntime(session);
@@ -173,7 +173,7 @@ public static class BattleFactory
   {
     foreach (Faction faction in setup.FactionOrder)
     {
-      if (!setup.Objectives.TryGetValue(faction, out IReadOnlyList<Objective>? objectives) || objectives.Count == 0)
+      if (!setup.Objectives.TryGetValue(faction, out IReadOnlyList<ObjectiveData>? objectives) || objectives.Count == 0)
         return new BattleSetupFailure(BattleSetupFailureReason.MissingObjective, $"Faction {faction.Name} has no objective.");
     }
 

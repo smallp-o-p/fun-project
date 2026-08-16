@@ -331,7 +331,7 @@ internal static class BattleTestFactory
       .ToList();
     var objectives = factionOrder.ToDictionary(
       faction => faction,
-      faction => (IReadOnlyList<Objective>)new Objective[] { new FakeObjective() });
+      faction => (IReadOnlyList<ObjectiveData>)new ObjectiveData[] { new FakeObjectiveData() });
 
     return BattleFactory.Start(new BattleSetup(board, factionOrder, unitPlacements, objectives)).Match(
       Right: runtime => runtime,

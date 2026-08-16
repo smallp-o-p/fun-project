@@ -48,7 +48,8 @@ internal sealed class BattleHookRegistry
       .. _hooks
         .GetMatching(battleEvent)
         .OrderBy(entry => entry.Priority)
-        .ThenBy(entry => entry.Stamp),
+        .ThenBy(entry => entry.Stamp)
+        .DistinctBy(entry => entry.Hook, System.Collections.Generic.ReferenceEqualityComparer.Instance),
     ];
 
     List<BattleAction> interrupts = [];
@@ -77,8 +78,8 @@ internal sealed class EventKeyedRegistry<T>
     where TEventKey : BattleEventTag
   {
     ArgumentNullException.ThrowIfNull(item);
-    Type eventKey = typeof(TEventKey);
 
+    Type eventKey = typeof(TEventKey);
     if (!_itemsByEventType.TryGetValue(eventKey, out var items))
       _itemsByEventType[eventKey] = items = [];
 

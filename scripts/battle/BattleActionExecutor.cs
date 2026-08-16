@@ -43,15 +43,17 @@ public sealed class BattleActionExecutor : IDisposable
     _session = session;
     _session.BattleEventCommitted += OnEventCommitted;
 
-    // Order matters here. We want to evaluate all the effects before evaluating objectives
-    // because they may result in an objective failing/completing.
+    // Order matters here. Status effects tick before armor regen at turn end.
     RegisterHook<TurnEndedBattleEvent>(new StatusEffectSystem(), priority: -100);
     RegisterHook<TurnEndedBattleEvent>(new ArmorRegenSystem(), priority: -100);
-    RegisterHook<TurnEndedBattleEvent>(new ObjectiveSystem(), priority: 100);
     RegisterHook<ItemThrownBattleEvent>(new CapabilityEffectSystem());
 
     RegisterHook<TurnStartedBattleEvent>(new TurnStartBuffHook());
     RegisterHook<UnitAddedBattleEvent>(new UnitSpawnedBuffHook());
+
+    // Objectives are an ordinary default system, receiving every event through the
+    // BattleEventTag catch-all key and filtering their declared observed keys internally.
+    RegisterHook<BattleEventTag>(new ObjectiveSystem(_session), priority: 100);
   }
 
   private void OnEventCommitted(BattleEvent battleEvent)
@@ -94,7 +96,10 @@ public sealed class BattleActionExecutor : IDisposable
 
     try
     {
-      while (_pendingActions.Count > 0)
+      // A mid-dispatch battle end (objective directive, player-wipe backstop) drops all
+      // remaining work: queued interrupts and un-executed composite steps must never run
+      // against an ended session (their primitives require InProgress).
+      while (_pendingActions.Count > 0 && _session.Phase != BattlePhase.Ended)
       {
         var currentAction = _pendingActions.Peek();
 
@@ -129,6 +134,9 @@ public sealed class BattleActionExecutor : IDisposable
             }
         }
       }
+
+      if (_session.Phase == BattlePhase.Ended)
+        _pendingActions.Clear();
     }
     catch
     {

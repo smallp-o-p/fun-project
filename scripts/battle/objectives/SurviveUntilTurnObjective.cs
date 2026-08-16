@@ -1,13 +1,20 @@
+using FunProject.Combatants;
+using System;
+using System.Collections.Generic;
+
 namespace FunProject.Battle;
 
 public sealed class SurviveUntilTurnObjective : Objective
 {
   private readonly int _targetTurn;
 
-  public SurviveUntilTurnObjective(ObjectiveData data, int targetTurn) : base(data)
+  public SurviveUntilTurnObjective(SurviveUntilTurnObjectiveData data) : base(data)
   {
-    _targetTurn = targetTurn;
+    _targetTurn = data.TargetTurn;
   }
 
-  public override bool IsComplete(BattleSession session) => session.TurnNumber >= _targetTurn;
+  public override IReadOnlyCollection<Type> ObservedEventKeys { get; } = [typeof(TurnStartedBattleEvent)];
+
+  public override ObjectiveResult Check(Faction _, BattleEvent battleEvent, BattleSession session) =>
+    session.TurnNumber >= _targetTurn ? ObjectiveResult.Passed : ObjectiveResult.Ongoing;
 }

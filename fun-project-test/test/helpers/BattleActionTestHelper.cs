@@ -60,14 +60,22 @@ internal static class BattleActionTestHelper
   private static BattleTestUnit SpawnedUnitAt(BattleSession session, Vector3I position)
     => new(session.GetUnitAt(session.Board.At(position)).RequireSome());
 
+  // Auto-fill only what is missing. The player faction's auto-objective carries the
+  // Victory directive (matches BattleScene's authored setup); everyone else is silent —
+  // non-player battles then keep running (or Draw at total annihilation) exactly as the
+  // no-player BattleOutcomeTest cases pin.
   public static void EnsureEveryFactionHasObjective(BattleSession session)
   {
     foreach (var faction in session.GlobalFactionTurnOrder)
-      session.GetOperation(faction).IfSome(op =>
-      {
-        if (op.PendingObjectives.Count == 0)
-          op.AddObjective(new EliminateAllOpposingForcesObjective(new ObjectiveData()));
-      });
+    {
+      if (session.GetObjectives(faction).Count > 0)
+        continue;
+
+      var data = new EliminateAllOpposingForcesObjectiveData();
+      if (session.PlayerFaction == Some(faction))
+        data.OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory };
+      session.AddObjective(faction, data.Instantiate());
+    }
   }
 
   public static void StartBattle(BattleSession session)

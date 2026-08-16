@@ -14,7 +14,7 @@ The executor exists to answer two questions cleanly:
 It is responsible for:
 
 - owning the pending action queue
-- owning the hook registry and registering the default systems (status effects, armor regen, objectives, capability effects, buff evaluation)
+- owning the hook registry and registering the default systems (status effects, armor regen, capability effects, buff evaluation, and `ObjectiveSystem` — all registered directly in its constructor; `ObjectiveSystem` is registered once under the `BattleEventTag` catch-all at priority +100, receives every event, and filters objectives by their declared observed keys internally. It has no self-registration or executor back-reference. An objective flips mid-dispatch when a committed event makes its `Check` return Passed or Failed; the authored directive then responds to that flip)
 - accepting a submitted `BattleAction` intent and resolving the resulting action chain
 - executing one step of the queued action head at a time (a step that returns `Result.Incomplete` keeps its action at the queue head)
 - opening an executor-local action window around each step's execution so hooks firing during its event dispatch can return interrupt actions, collecting those interrupts once the step commits (discarding them if it fails), and throwing when a hook returns interrupts with no window open — the guard lives in the executor
@@ -53,11 +53,11 @@ The current executor API is:
 
 There are no executor-level lifecycle events and no `LastResult`: outcomes are observed through the returned `BattleActionExecResult` (carrying the committed `BattleEvent` stream) and through committed session state.
 
-The hook registry lives on the executor: its constructor registers the default systems (status effects, armor regen, objectives, capability effects, buff evaluation), and the `RegisterHook`/`UnregisterHook` methods above are the registration surface. `BattleRuntime.RegisterHook` is the facade door delegating to the executor — the session no longer knows hooks exist; it only announces events. Disposing the executor detaches its `BattleEventCommitted` subscription from the session.
+The hook registry lives on the executor: its constructor registers the default systems — status effects, armor regen, capability effects, buff evaluation, and `ObjectiveSystem` — directly. `ObjectiveSystem` is registered once under the `BattleEventTag` catch-all at priority +100, receives every event, and filters objectives by their declared observed keys internally; it has no self-registration or executor back-reference. An objective flips mid-dispatch when a committed event makes its `Check` return Passed or Failed, and the authored directive then interprets the flip. The `RegisterHook`/`UnregisterHook` methods above are the registration surface. `BattleRuntime.RegisterHook` is the facade door delegating to the executor — the session no longer knows hooks exist; it only announces events. Disposing the executor detaches its `BattleEventCommitted` subscription from the session.
 
 ## One Executor Per Session
 
-A session must have exactly one executor for its lifetime. The executor owns the hook registry and registers the default systems in its constructor, so a second executor attached to the same session would double-register them: statuses would tick twice per turn end, armor regen and objectives would run twice, and so on. Nothing at the language level prevents a second executor — the invariant is held by ownership: production code never constructs a second one (`BattleRuntime` owns the session's single executor, and its public constructor subscribes its `BattleEventCommitted` re-raise before constructing that executor, so scene subscribers observe a cause event before any hook-born follow-up events), and test code goes through the shared helpers: `BattleActionTestHelper.ExecutorFor` caches one executor per session, and `BattleTestFactory.RuntimeFor` wraps the public runtime constructor — `RuntimeFor` returns a fresh runtime each call, so a test session gets exactly one runtime and keeps it.
+A session must have exactly one executor for its lifetime. The executor owns the hook registry and registers the default systems in its constructor, so a second executor attached to the same session would double-register them: statuses would tick twice per turn end, armor regen would run twice, and objective routing would run twice. Nothing at the language level prevents a second executor — the invariant is held by ownership: production code never constructs a second one (`BattleRuntime` owns the session's single executor, and its public constructor subscribes its `BattleEventCommitted` re-raise before constructing that executor, so scene subscribers observe a cause event before any hook-born follow-up events), and test code goes through the shared helpers: `BattleActionTestHelper.ExecutorFor` caches one executor per session, and `BattleTestFactory.RuntimeFor` wraps the public runtime constructor — `RuntimeFor` returns a fresh runtime each call, so a test session gets exactly one runtime and keeps it.
 
 ## Execution Flow
 
@@ -73,12 +73,13 @@ The current happy-path flow is:
 8. the executor closes the action window once the step's execution path returns, whether it completed, failed, or threw
 9. a failed step's collected interrupts are discarded; nothing is enqueued (and a `Result.Rejected` throws out of `Submit`)
 10. on success, the executor aggregates the window's interrupt actions and reverses that combined list once (never per event), then inserts the result ahead of paused work — so an earlier-raised event's interrupts still run before a later event's
-11. the executor continues until the submitted action and its interrupts settle
-12. `Submit` returns exactly one `BattleActionExecResult`: the submitted action and every event committed during its resolution
+11. if the battle ended during the step's dispatch, the executor clears remaining queued work instead: unexecuted composite steps and queued interrupts are dropped
+12. otherwise, the executor continues until the submitted action and its interrupts settle
+13. `Submit` returns exactly one `BattleActionExecResult`: the submitted action and every event committed during its resolution
 
 Actions should be executed through an explicit `BattleActionExecutor` by calling `Submit`. A normal submission leaves the queue empty when it returns; the queue is non-empty only while the executor is actively resolving submitted work.
 
-Composite actions execute across several steps (for example, `MoveUnit` commits one tile per `Execute`, returning `Result.Incomplete` until the route drains). Those intermediate steps are commit checkpoints for validation, event emission, and hook evaluation; they are not separate public results. Interrupt actions returned by hooks still mutate state and raise committed `BattleEvent`s as they are resolved inside the same submission, and their events are part of the submission's result. `Submit` does not expose `Tick`; it queues the provided action, resolves the action and its interrupts immediately, and returns.
+Composite actions execute across several steps (for example, `MoveUnit` commits one tile per `Execute`, returning `Result.Incomplete` until the route drains). Those intermediate steps are commit checkpoints for validation, event emission, and hook evaluation; they are not separate public results. Interrupt actions returned by hooks still mutate state and raise committed `BattleEvent`s as they are resolved inside the same submission, and their events are part of the submission's result. If a step's dispatch ends the battle, remaining composite steps and any queued interrupts are discarded rather than run against an ended session. `Submit` does not expose `Tick`; it queues the provided action, resolves the action and its interrupts immediately, and returns.
 
 ## Supported Validation Rules
 
