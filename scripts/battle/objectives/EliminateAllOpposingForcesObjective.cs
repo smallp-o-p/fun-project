@@ -1,7 +1,6 @@
 using FunProject.Combatants;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -15,7 +14,7 @@ public sealed class EliminateAllOpposingForcesObjective : Objective
 
   public override ObjectiveResult Check(Faction owner, BattleEvent battleEvent, BattleSession session)
   {
-    if (session.GlobalFactionTurnOrder.All(side => side == owner || !session.HasLivingUnits(side)))
+    if (session.GlobalFactionTurnOrder.AsValueEnumerable().All(side => side == owner || !session.HasLivingUnits(side)))
       return ObjectiveResult.Passed;
     if (!session.HasLivingUnits(owner))
       return ObjectiveResult.Failed;

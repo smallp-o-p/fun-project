@@ -92,6 +92,7 @@ Godot scene scripts live in `scenes/` — currently `GameCamera`, `MovementLine`
 ## Conventions
 - Prefer Collection expressions over explicitly instantiating any container types.
 - **LanguageExt** is globally imported (`GlobalUsings.cs`: `using LanguageExt; using static LanguageExt.Prelude;`). Prefer `Option<T>` over nullable returns for optional domain data.
+- Don't use `System.Linq`. All code uses the ZLinq package and thus all LINQ chains must start with `.AsValueEnumerable()`.
 - `SysColGeneric` is the alias for `System.Collections.Generic` (LanguageExt shadows some collection names).
 - File-scoped namespaces under the `FunProject.*` root (`FunProject.Battle`, `FunProject.Stats`, `FunProject.Items`, …); the assembly root namespace is `funproject`. Two-space indentation. PascalCase types/members, camelCase locals/params, `_camelCase` private fields.
 - After any code change, run `dotnet format` on the changed code.

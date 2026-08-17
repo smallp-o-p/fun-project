@@ -2,7 +2,6 @@ using FunProject.Battle;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -24,7 +23,7 @@ public partial class BattleCombatQueriesTest
         battle.PlayerUnit.AliveIn(battle.Session), battle.EnemyUnit.AliveIn(battle.Session))));
 
     Assert.Equal(65, breakdown.BaseChance);
-    Assert.Equal(-40, breakdown.Modifiers.Single().Amount);
+    Assert.Equal(-40, breakdown.Modifiers.AsValueEnumerable().Single().Amount);
     Assert.Equal(25, breakdown.FinalChance);
   }
 
@@ -69,7 +68,7 @@ public partial class BattleCombatQueriesTest
       battle.PlayerUnit.AliveIn(battle.Session),
       battle.EnemyUnit.AliveIn(battle.Session)));
 
-    var resolved = raisedEvents.OfType<UnitAttackedBattleEvent>().Single().Breakdown;
+    var resolved = raisedEvents.AsValueEnumerable().OfType<UnitAttackedBattleEvent>().Single().Breakdown;
     Assert.Equal(previewed.BaseChance, resolved.BaseChance);
     Assert.Equal(previewed.FinalChance, resolved.FinalChance);
     Assert.Equal(previewed.Modifiers.Count, resolved.Modifiers.Count);

@@ -3,7 +3,6 @@ using FunProject.Combatants;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -30,7 +29,7 @@ public class ObjectiveBattleTest
     Assert.Equal(BattlePhase.Ended, session.Phase);
     Assert.Equal(BattleOutcome.Victory, session.Outcome.RequireSome());
     // Stream order: kill, then the flip, then the session end.
-    var events = recorder.All.ToList();
+    var events = recorder.All.AsValueEnumerable().ToList();
     Assert.True(events.FindIndex(e => e is UnitKilledBattleEvent)
       < events.FindIndex(e => e is ObjectiveCompletedBattleEvent));
     Assert.True(events.FindIndex(e => e is ObjectiveCompletedBattleEvent)
@@ -230,8 +229,8 @@ public class ObjectiveBattleTest
       [session.Board.At(1, 0, 0)]));
 
     Assert.Equal(BattlePhase.InProgress, session.Phase);
-    Assert.Equal(1, recorder.OfType<ObjectiveCompletedBattleEvent>().Count());
-    Assert.Equal(0, recorder.OfType<SessionEndedBattleEvent>().Count());
+    Assert.Equal(1, recorder.OfType<ObjectiveCompletedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(0, recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Count());
   }
 
   [TestCase(TestName = "A mid-submission objective win drops remaining composite move steps")]
@@ -286,8 +285,8 @@ public class ObjectiveBattleTest
 
     Assert.Equal(BattlePhase.Ended, session.Phase); // resolved NOW, not at turn end
     Assert.Equal(BattleOutcome.Victory, session.Outcome.RequireSome());
-    Assert.Equal(1, recorder.OfType<ObjectiveCompletedBattleEvent>().Count(e => e.Faction == player));
-    Assert.Equal(BattleOutcome.Victory, recorder.OfType<SessionEndedBattleEvent>().Single().Outcome);
+    Assert.Equal(1, recorder.OfType<ObjectiveCompletedBattleEvent>().AsValueEnumerable().Count(e => e.Faction == player));
+    Assert.Equal(BattleOutcome.Victory, recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Single().Outcome);
   }
 
   [TestCase(TestName = "A wiped player loses instantly even with silent directives")]
@@ -327,8 +326,8 @@ public class ObjectiveBattleTest
 
     Assert.Equal(BattlePhase.Ended, session.Phase);
     Assert.Equal(BattleOutcome.Defeat, session.Outcome.RequireSome());
-    Assert.Equal(BattleOutcome.Defeat, recorder.OfType<SessionEndedBattleEvent>().Single().Outcome);
-    Assert.Equal(0, recorder.OfType<ObjectiveFailedBattleEvent>().Count());
+    Assert.Equal(BattleOutcome.Defeat, recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Single().Outcome);
+    Assert.Equal(0, recorder.OfType<ObjectiveFailedBattleEvent>().AsValueEnumerable().Count());
   }
 
   private sealed class QueueInterruptOnKill(BattleAction interrupt) : BattleHook

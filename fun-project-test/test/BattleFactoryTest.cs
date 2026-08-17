@@ -4,7 +4,6 @@ using GdUnit4;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -53,8 +52,8 @@ public class BattleFactoryTest
 
     BattleRuntime runtime = UnwrapStart(BattleFactory.Start(setup));
 
-    var playerUnit = runtime.Query(new GetFactionAliveUnits(player)).Single();
-    var enemyUnit = runtime.Query(new GetFactionAliveUnits(enemy)).Single();
+    var playerUnit = runtime.Query(new GetFactionAliveUnits(player)).AsValueEnumerable().Single();
+    var enemyUnit = runtime.Query(new GetFactionAliveUnits(enemy)).AsValueEnumerable().Single();
 
     Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw);
     Assert.Equal(new Vector3I(3, 0, 3), enemyUnit.Position.Raw);
@@ -211,8 +210,8 @@ public class BattleFactoryTest
 
     BattleRuntime runtime = UnwrapStart(BattleFactory.StartFromMap(setup));
 
-    var alpha = runtime.Query(new GetFactionAliveUnits(player)).Single();
-    var bandit = runtime.Query(new GetFactionAliveUnits(enemy)).Single();
+    var alpha = runtime.Query(new GetFactionAliveUnits(player)).AsValueEnumerable().Single();
+    var bandit = runtime.Query(new GetFactionAliveUnits(enemy)).AsValueEnumerable().Single();
     Assert.Equal(new Vector3I(0, 0, 0), alpha.Position.Raw);
     Assert.Equal(new Vector3I(3, 0, 3), bandit.Position.Raw);
   }

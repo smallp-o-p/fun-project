@@ -422,9 +422,9 @@ public class BattleVisibilityTest
       ;
 
     // Exactly one spotted event: observer newly sees enemy B.
-    Assert.Equal(1, spottedEvents.Count(e => ReferenceEquals(e.Unit, observer.State) && ReferenceEquals(e.Target, enemyB.State)));
+    Assert.Equal(1, spottedEvents.AsValueEnumerable().Count(e => ReferenceEquals(e.Unit, observer.State) && ReferenceEquals(e.Target, enemyB.State)));
     // No spotted event for enemy A (it was already visible, then dropped — never newly spotted).
-    Assert.Equal(0, spottedEvents.Count(e => ReferenceEquals(e.Target, enemyA.State)));
+    Assert.Equal(0, spottedEvents.AsValueEnumerable().Count(e => ReferenceEquals(e.Target, enemyA.State)));
   }
 
   // A unit that leaves and re-enters an observer's line of sight is spotted only ONCE: the observer

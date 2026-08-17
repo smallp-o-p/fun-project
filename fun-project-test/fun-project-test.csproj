@@ -25,6 +25,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Remove="System.Linq" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\fun-project.csproj" />
   </ItemGroup>
 

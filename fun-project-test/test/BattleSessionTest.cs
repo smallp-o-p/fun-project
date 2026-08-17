@@ -6,7 +6,6 @@ using GdUnit4;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -76,11 +75,11 @@ public class BattleSessionTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("B1", factionB), new Vector3I(2, 0, 0));
 
     Assert.Equal(2, session.GlobalFactionTurnOrder.Count);
-    Assert.Equal(factionA, session.GlobalFactionTurnOrder.First());
-    Assert.Equal(factionB, session.GlobalFactionTurnOrder.Last());
+    Assert.Equal(factionA, session.GlobalFactionTurnOrder.AsValueEnumerable().First());
+    Assert.Equal(factionB, session.GlobalFactionTurnOrder.AsValueEnumerable().Last());
     Assert.Equal(2, session.TurnQueue.Count);
-    Assert.Equal(factionA, session.TurnQueue.First());
-    Assert.Equal(factionB, session.TurnQueue.Last());
+    Assert.Equal(factionA, session.TurnQueue.AsValueEnumerable().First());
+    Assert.Equal(factionB, session.TurnQueue.AsValueEnumerable().Last());
   }
 
   [TestCase(TestName = "Constructor seeds global faction order")]
@@ -93,11 +92,11 @@ public class BattleSessionTest
       [factionB, factionA, factionB]);
 
     Assert.Equal(2, session.GlobalFactionTurnOrder.Count);
-    Assert.Equal(factionB, session.GlobalFactionTurnOrder.First());
-    Assert.Equal(factionA, session.GlobalFactionTurnOrder.Last());
+    Assert.Equal(factionB, session.GlobalFactionTurnOrder.AsValueEnumerable().First());
+    Assert.Equal(factionA, session.GlobalFactionTurnOrder.AsValueEnumerable().Last());
     Assert.Equal(factionB, session.ActiveSide);
-    Assert.Equal(factionB, session.TurnQueue.First());
-    Assert.Equal(0, session.AliveUnits.Count());
+    Assert.Equal(factionB, session.TurnQueue.AsValueEnumerable().First());
+    Assert.Equal(0, session.AliveUnits.AsValueEnumerable().Count());
     Assert.False(session.Board.IsOccupied(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()));
   }
 
@@ -217,7 +216,7 @@ public class BattleSessionTest
     StartBattle(session);
 
     ApplyDamage(session, unitC.State, 10);
-    Assert.False(session.TurnQueue.Contains(factionC));
+    Assert.False(session.TurnQueue.AsValueEnumerable().Contains(factionC));
 
     AdvanceTurn(session);
     Assert.Equal(1, session.TurnNumber);
@@ -243,7 +242,7 @@ public class BattleSessionTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("C1", factionC), new Vector3I(2, 0, 0));
 
     Assert.Equal(1, session.TurnNumber);
-    Assert.True(session.TurnQueue.Contains(factionC));
+    Assert.True(session.TurnQueue.AsValueEnumerable().Contains(factionC));
 
     AdvanceTurn(session);
     Assert.Equal(1, session.TurnNumber);
@@ -295,9 +294,9 @@ public class BattleSessionTest
     SpawnUnit(session, BattleTestFactory.MakeCombatant("C1", factionC), new Vector3I(2, 0, 0));
 
     Assert.Equal(factionA, session.ActiveSide);
-    Assert.True(session.TurnQueue.Contains(factionA));
-    Assert.True(session.TurnQueue.Contains(factionB));
-    Assert.True(session.TurnQueue.Contains(factionC));
+    Assert.True(session.TurnQueue.AsValueEnumerable().Contains(factionA));
+    Assert.True(session.TurnQueue.AsValueEnumerable().Contains(factionB));
+    Assert.True(session.TurnQueue.AsValueEnumerable().Contains(factionC));
   }
 
   [TestCase(TestName = "Move updates unit position occupancy and action points")]
@@ -326,7 +325,7 @@ public class BattleSessionTest
     StartBattle(session);
 
     BattleBoardState.ValidatedPoint[] validatedPath = Query(session, new FindPathForUnit(unit.AliveIn(session), session.Board.At(2, 0, 0)));
-    BattleBoardState.ValidatedPoint[] path = validatedPath.Skip(1).ToArray();
+    BattleBoardState.ValidatedPoint[] path = validatedPath.AsValueEnumerable().Skip(1).ToArray();
     Assert.Equal(3, validatedPath.Length);
     Assert.Equal(2, path.Length);
 
@@ -396,7 +395,7 @@ public class BattleSessionTest
     StartBattle(session);
 
     BattleBoardState.ValidatedPoint[] validatedPath = Query(session, new FindPathForUnit(unit.AliveIn(session), session.Board.At(2, 0, 0)));
-    BattleBoardState.ValidatedPoint[] path = validatedPath.Skip(1).ToArray();
+    BattleBoardState.ValidatedPoint[] path = validatedPath.AsValueEnumerable().Skip(1).ToArray();
     Assert.Equal(3, validatedPath.Length);
     Assert.Equal(2, path.Length);
 
@@ -442,12 +441,12 @@ public class BattleSessionTest
 
     Assert.False(session.Board.IsOccupied(session.Board.At(0, 0, 0)));
     Assert.Equal(factionA, session.ActiveSide);
-    Assert.False(session.AliveUnits.Contains(unitA.State));
-    Assert.True(session.DeadUnits.Contains(unitA.State));
-    Assert.False(Query(session, new GetFactionAliveUnits(factionA)).Select(u => u.State).Contains(unitA));
-    Assert.True(Query(session, new GetFactionDeadUnits(factionA)).Select(d => d.State).Contains(unitA));
-    Assert.True(session.TurnQueue.Contains(factionA));
-    Assert.True(session.TurnQueue.Contains(factionB));
+    Assert.False(session.AliveUnits.AsValueEnumerable().Contains(unitA.State));
+    Assert.True(session.DeadUnits.AsValueEnumerable().Contains(unitA.State));
+    Assert.False(Query(session, new GetFactionAliveUnits(factionA)).AsValueEnumerable().Select(u => u.State).Contains(unitA));
+    Assert.True(Query(session, new GetFactionDeadUnits(factionA)).AsValueEnumerable().Select(d => d.State).Contains(unitA));
+    Assert.True(session.TurnQueue.AsValueEnumerable().Contains(factionA));
+    Assert.True(session.TurnQueue.AsValueEnumerable().Contains(factionB));
 
     AdvanceTurn(session);
     Assert.Equal(factionB, session.ActiveSide);
@@ -469,7 +468,7 @@ public class BattleSessionTest
     Assert.Equal(factionA, session.ActiveSide);
     Assert.True(Query(session, new CanUnitActNow(unitA2)));
     Assert.False(session.Board.IsOccupied(session.Board.At(0, 0, 0)));
-    Assert.True(session.DeadUnits.Contains(unitA1.State));
+    Assert.True(session.DeadUnits.AsValueEnumerable().Contains(unitA1.State));
   }
 
   [TestCase(TestName = "Unit can throw a grenade in battle session")]
@@ -510,9 +509,9 @@ public class BattleSessionTest
 
     Assert.Throws<InvalidOperationException>(() =>
       session.AddUnit(BattleTestFactory.MakeCombatant("Bravo", faction), occupiedPoint, None, None));
-    Assert.Equal(1, session.AliveUnits.Count());
-    Assert.True(session.AliveUnits.Contains(occupiedUnit));
-    Assert.False(session.AliveUnits.Any(unit => unit.Combatant.Name == "Bravo"));
+    Assert.Equal(1, session.AliveUnits.AsValueEnumerable().Count());
+    Assert.True(session.AliveUnits.AsValueEnumerable().Contains(occupiedUnit));
+    Assert.False(session.AliveUnits.AsValueEnumerable().Any(unit => unit.Combatant.Name == "Bravo"));
   }
 
   [TestCase(TestName = "EndUnitActivation throws when the unit is already unavailable")]

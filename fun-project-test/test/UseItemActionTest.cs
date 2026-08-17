@@ -55,6 +55,6 @@ public class UseItemActionTest
 
     Assert.Equal(0, usable.Capability.Current);
     Assert.Equal(apAfterFirstUse, unit.CurrentActionPoints);
-    Assert.False(recorder.OfType<ItemUsedBattleEvent>().Any());
+    Assert.False(recorder.OfType<ItemUsedBattleEvent>().AsValueEnumerable().Any());
   }
 }

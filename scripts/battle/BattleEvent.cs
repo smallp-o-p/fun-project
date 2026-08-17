@@ -5,7 +5,6 @@ using FunProject.Items.Effects;
 using FunProject.Weapons;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -162,7 +161,7 @@ public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent, ICa
     ArgumentOutOfRangeException.ThrowIfNegative(healthDamage);
     Unit = unit;
     Bundle = bundle;
-    TotalAmount = bundle.Sum(damage => damage.Amount);
+    TotalAmount = bundle.AsValueEnumerable().Sum(damage => damage.Amount);
     ArmorDamage = armorDamage;
     HealthDamage = healthDamage;
     MaybeCause = cause;

@@ -2,7 +2,6 @@ using FunProject.Battle;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -23,7 +22,7 @@ public class ObjectiveSystemBattleTest
 
     ApplyDamage(session, bUnit, 999);
 
-    Assert.Equal(1, session.GetObjectives(a).Count(o => o.State == ObjectiveResult.Passed));
+    Assert.Equal(1, session.GetObjectives(a).AsValueEnumerable().Count(o => o.State == ObjectiveResult.Passed));
   }
 
   [TestCase(TestName = "Objectives present before executor construction are read from session state")]
@@ -42,7 +41,7 @@ public class ObjectiveSystemBattleTest
 
     ApplyDamage(session, bUnit, 999);
 
-    Assert.Equal(1, session.GetObjectives(a).Count(o => o.State == ObjectiveResult.Passed));
+    Assert.Equal(1, session.GetObjectives(a).AsValueEnumerable().Count(o => o.State == ObjectiveResult.Passed));
   }
 
   [TestCase(TestName = "AddObjective raises an ObjectiveAdded event")]
@@ -55,7 +54,7 @@ public class ObjectiveSystemBattleTest
 
     session.AddObjective(a, new FakeObjective());
 
-    Assert.Equal(1, recorder.OfType<ObjectiveAddedBattleEvent>().Count());
+    Assert.Equal(1, recorder.OfType<ObjectiveAddedBattleEvent>().AsValueEnumerable().Count());
   }
 
   [TestCase(TestName = "An objective is only checked against events it observes")]

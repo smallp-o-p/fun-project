@@ -6,7 +6,6 @@ using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
 using GdUnit4;
 using Godot;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -49,8 +48,8 @@ public partial class BlastResolutionTest
     Throw(fixture, grenade, new Vector3I(3, 0, 1));
 
     Assert.Equal(12, enemy.State.CurrentHealth);
-    Assert.True(fixture.Recorder.OfType<UnitDamagedBattleEvent>().Any(e => ReferenceEquals(e.Unit, enemy.State)));
-    Assert.True(fixture.Recorder.OfType<CapabilityResolvedBattleEvent>().Any());
+    Assert.True(fixture.Recorder.OfType<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, enemy.State)));
+    Assert.True(fixture.Recorder.OfType<CapabilityResolvedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "A unit outside the blast radius is unaffected")]
@@ -66,7 +65,7 @@ public partial class BlastResolutionTest
 
     Assert.Equal(12, nearEnemy.State.CurrentHealth);
     Assert.Equal(20, farEnemy.State.CurrentHealth);
-    Assert.False(fixture.Recorder.OfType<UnitDamagedBattleEvent>().Any(e => ReferenceEquals(e.Unit, farEnemy.State)));
+    Assert.False(fixture.Recorder.OfType<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, farEnemy.State)));
   }
 
   [TestCase(TestName = "Friendly-fire: an allied unit within the blast radius is also damaged")]
@@ -83,7 +82,7 @@ public partial class BlastResolutionTest
     // Target (4,0,1): the enemy (distance 0) and the allied unit (distance 1) are both in radius.
     Assert.Equal(12, enemy.State.CurrentHealth);
     Assert.Equal(12, ally.State.CurrentHealth);
-    Assert.True(fixture.Recorder.OfType<UnitDamagedBattleEvent>().Any(e => ReferenceEquals(e.Unit, ally.State)));
+    Assert.True(fixture.Recorder.OfType<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, ally.State)));
   }
 
   [TestCase(TestName = "A status effect in the blast applies to an in-radius unit")]
@@ -101,6 +100,6 @@ public partial class BlastResolutionTest
     Throw(fixture, grenade, new Vector3I(3, 0, 1));
 
     Assert.True(enemy.State.IsImmobilized);
-    Assert.True(fixture.Recorder.OfType<UnitStatusEffectAppliedBattleEvent>().Any(e => ReferenceEquals(e.Unit, enemy.State)));
+    Assert.True(fixture.Recorder.OfType<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, enemy.State)));
   }
 }

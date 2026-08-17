@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -18,6 +17,6 @@ public sealed record HitChanceBreakdown
 
     BaseChance = baseChance;
     Modifiers = [.. modifiers];
-    FinalChance = Math.Clamp(baseChance + Modifiers.Sum(modifier => modifier.Amount), 0, 100);
+    FinalChance = Math.Clamp(baseChance + Modifiers.AsValueEnumerable().Sum(modifier => modifier.Amount), 0, 100);
   }
 }

@@ -3,7 +3,6 @@ using FunProject.Combatants;
 using GdUnit4;
 using Godot;
 using System;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -141,7 +140,7 @@ public sealed partial class BattleUiControllerTest
   {
     using var fixture = new UiFixture();
     fixture.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    MoveActionOption move = fixture.Ui.ActionOptions.OfType<MoveActionOption>().Single();
+    MoveActionOption move = fixture.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single();
 
     fixture.Ui.BeginAction(move);
 
@@ -158,7 +157,7 @@ public sealed partial class BattleUiControllerTest
   {
     using var fixture = new UiFixture();
     fixture.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.OfType<MoveActionOption>().Single());
+    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
 
     Assert.True(fixture.Ui.ClickTile(new Vector3I(4, 0, 2))); // Confirm mode: locks
     Assert.Equal(UiState.TargetingLocked, fixture.Ui.State);
@@ -179,7 +178,7 @@ public sealed partial class BattleUiControllerTest
   {
     using var fixture = new UiFixture();
     fixture.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.OfType<MoveActionOption>().Single());
+    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
     fixture.Ui.ClickTile(new Vector3I(4, 0, 2));
 
     Assert.False(fixture.Ui.ClickTile(new Vector3I(3, 0, 1))); // different valid tile: re-target
@@ -199,7 +198,7 @@ public sealed partial class BattleUiControllerTest
   {
     using var fixture = new UiFixture();
     fixture.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    AttackActionOption attack = fixture.Ui.ActionOptions.OfType<AttackActionOption>().Single();
+    AttackActionOption attack = fixture.Ui.ActionOptions.AsValueEnumerable().OfType<AttackActionOption>().Single();
     fixture.Ui.BeginAction(attack);
     Assert.Equal(UiState.Targeting, fixture.Ui.State);
 
@@ -214,7 +213,7 @@ public sealed partial class BattleUiControllerTest
   {
     using var fixture = new UiFixture();
     fixture.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.OfType<MoveActionOption>().Single());
+    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
     fixture.Ui.ClickTile(new Vector3I(4, 0, 2));
     Assert.Equal(UiState.TargetingLocked, fixture.Ui.State);
 
@@ -231,7 +230,7 @@ public sealed partial class BattleUiControllerTest
   {
     using var fixture = new UiFixture();
     fixture.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    EndTurnActionOption endTurn = fixture.Ui.ActionOptions.OfType<EndTurnActionOption>().Single();
+    EndTurnActionOption endTurn = fixture.Ui.ActionOptions.AsValueEnumerable().OfType<EndTurnActionOption>().Single();
 
     fixture.Ui.BeginAction(endTurn);
 
@@ -246,7 +245,7 @@ public sealed partial class BattleUiControllerTest
     fixture.Ui.TrySelectAt(new Vector3I(4, 0, 1));
     Assert.True(fixture.Ui.PreviewAt(new Vector3I(4, 0, 2)).IsLeft); // not targeting: Left
 
-    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.OfType<MoveActionOption>().Single());
+    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
     Assert.True(fixture.Ui.PreviewAt(new Vector3I(4, 0, 2)).IsRight);
     Assert.True(fixture.Ui.LastPreview.IsSome);
   }
@@ -256,7 +255,7 @@ public sealed partial class BattleUiControllerTest
   {
     using var fixture = new UiFixture();
     fixture.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.OfType<MoveActionOption>().Single());
+    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
     fixture.Ui.ClickTile(new Vector3I(4, 0, 2));
 
     fixture.Busy = true;
@@ -319,7 +318,7 @@ public sealed partial class BattleUiControllerTest
     Assert.True(readoutsChanged >= 2);      // both selections mutated readouts
     Assert.Equal(fixture.SupportUnit.State, fixture.Ui.SelectedUnit.RequireSome());
     // The cached options now belong to the NEW unit:
-    Assert.True(fixture.Ui.ActionOptions.All(o => ReferenceEquals(o.Unit.State, fixture.SupportUnit.State)));
+    Assert.True(fixture.Ui.ActionOptions.AsValueEnumerable().All(o => ReferenceEquals(o.Unit.State, fixture.SupportUnit.State)));
   }
 
   [TestCase(TestName = "Invalid hover clears the stale preview; gated previews are refused")]
@@ -327,7 +326,7 @@ public sealed partial class BattleUiControllerTest
   {
     using var fixture = new UiFixture();
     fixture.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.OfType<MoveActionOption>().Single());
+    fixture.Ui.BeginAction(fixture.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
 
     Assert.True(fixture.Ui.PreviewAt(new Vector3I(4, 0, 2)).IsRight);
     Assert.True(fixture.Ui.LastPreview.IsSome);

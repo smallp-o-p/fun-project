@@ -3,7 +3,6 @@ using FunProject.Core;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using GdUnit4;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -49,7 +48,7 @@ public partial class ArmorRegenTest
     var recorder = new BattleEventRecorder(battle.Session);
     EndFactionTurn(battle.Executor, battle.EnemyFaction);
     EndFactionTurn(battle.Executor, battle.PlayerFaction);   // at max: no regen event
-    Assert.False(recorder.OfType<UnitArmorRegeneratedBattleEvent>().Any());
+    Assert.False(recorder.OfType<UnitArmorRegeneratedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "Enemy turn end does not tick the player's regen")]
@@ -88,7 +87,7 @@ public partial class ArmorRegenTest
     EndFactionTurn(battle.Executor, battle.PlayerFaction);
 
     Assert.Equal(4, armor.Capability.Current);
-    Assert.False(recorder.OfType<UnitArmorRegeneratedBattleEvent>().Any());
+    Assert.False(recorder.OfType<UnitArmorRegeneratedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "Dead units are not ticked")]
@@ -103,7 +102,7 @@ public partial class ArmorRegenTest
     // ending the player's own turn is also the tick that would regen this unit.
     EndFactionTurn(battle.Executor, battle.PlayerFaction);
 
-    Assert.False(recorder.OfType<UnitArmorRegeneratedBattleEvent>().Any());
+    Assert.False(recorder.OfType<UnitArmorRegeneratedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "Regen event lands between turn-ended and the next turn-started")]
@@ -158,7 +157,7 @@ public partial class ArmorRegenTest
     // BEFORE the regen pass runs, so this turn end must not regenerate.
     EndFactionTurn(battle.Executor, battle.PlayerFaction);
 
-    Assert.False(recorder.OfType<UnitArmorRegeneratedBattleEvent>().Any());
+    Assert.False(recorder.OfType<UnitArmorRegeneratedBattleEvent>().AsValueEnumerable().Any());
     Assert.Equal(3, armor.Capability.Current);               // 5 - 2 tick, absorbed by armor
     Assert.Equal(0, armor.Capability.RegenDelayRemaining);   // re-armed to 1, then counted down by the same regen pass
   }

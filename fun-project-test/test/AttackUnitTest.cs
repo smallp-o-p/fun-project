@@ -5,7 +5,6 @@ using GdUnit4;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -52,7 +51,7 @@ public partial class AttackUnitTest
     Assert.Equal(target.State.MaxHealth, target.State.CurrentHealth);
     Assert.Equal(attacker.State.MaxActionPoints - 1, attacker.CurrentActionPoints);
     Assert.False(recorder.Single<UnitAttackedBattleEvent>().IsHit);
-    Assert.False(recorder.OfType<UnitDamagedBattleEvent>().Any());
+    Assert.False(recorder.OfType<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "Applicable cover lowers the resolved hit chance")]
@@ -72,7 +71,7 @@ public partial class AttackUnitTest
     var attackEvent = recorder.Single<UnitAttackedBattleEvent>();
     Assert.Equal(0, attackEvent.Breakdown.FinalChance);
     Assert.False(attackEvent.IsHit);
-    Assert.Equal(StandardHitChanceCalculator.CoverModifierLabel, attackEvent.Breakdown.Modifiers.Single().Label);
+    Assert.Equal(StandardHitChanceCalculator.CoverModifierLabel, attackEvent.Breakdown.Modifiers.AsValueEnumerable().Single().Label);
   }
 
   [TestCase(TestName = "Injected calculator replaces the hit chance algorithm")]
@@ -168,14 +167,14 @@ public partial class AttackUnitTest
     battle.Executor.Submit(BattleAction.MoveUnit(mover.AliveIn(battle.Session), [battle.Session.Board.At(from + new Vector3I(0, 0, 1))]));
 
     Assert.True(mover.State.IsDead);
-    Assert.Equal(1, recorder.OfType<UnitAttackedBattleEvent>().Count());
+    Assert.Equal(1, recorder.OfType<UnitAttackedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(1, weapon.CurrentAmmo);
   }
 
   [TestCase(TestName = "Same seed produces the same attack outcome sequence")]
   public void SameSeedProducesTheSameAttackOutcomeSequence()
   {
-    Assert.True(RunSeededAttackOutcomes(1234).SequenceEqual(RunSeededAttackOutcomes(1234)));
+    Assert.True(RunSeededAttackOutcomes(1234).AsValueEnumerable().SequenceEqual(RunSeededAttackOutcomes(1234)));
   }
 
   [TestCase(TestName = "Damage event carries the weapon's emitted bundle")]
@@ -196,7 +195,7 @@ public partial class AttackUnitTest
     var damagedEvent = recorder.Single<UnitDamagedBattleEvent>();
     Assert.Equal(6, damagedEvent.TotalAmount); // 4 Thermal + 2 Electrical
     Assert.Equal(target.State.MaxHealth - 6, target.State.CurrentHealth);
-    Assert.True(damagedEvent.Bundle.SequenceEqual(
+    Assert.True(damagedEvent.Bundle.AsValueEnumerable().SequenceEqual(
       new[] { new Damage(4, Element.Thermal), new Damage(2, Element.Electrical) }));
   }
 
@@ -210,7 +209,7 @@ public partial class AttackUnitTest
 
     var damagedEvent = recorder.Single<UnitDamagedBattleEvent>();
     Assert.Equal(3, damagedEvent.TotalAmount);
-    Assert.True(damagedEvent.Bundle.SequenceEqual(new[] { new Damage(3, Element.Kinetic) }));
+    Assert.True(damagedEvent.Bundle.AsValueEnumerable().SequenceEqual(new[] { new Damage(3, Element.Kinetic) }));
   }
 
   [TestCase(TestName = "An empty magazine interrupts the attack without spending AP or raising events")]
@@ -234,7 +233,7 @@ public partial class AttackUnitTest
     battle.Executor.Submit(BattleAction.AttackUnit(attacker.AliveIn(battle.Session), target.AliveIn(battle.Session)));
 
     Assert.Equal(actionPointsBefore, attacker.CurrentActionPoints);
-    Assert.False(recorder.OfType<UnitAttackedBattleEvent>().Any());
+    Assert.False(recorder.OfType<UnitAttackedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "A missed shot still spends ammunition")]
@@ -266,7 +265,7 @@ public partial class AttackUnitTest
     for (int i = 0; i < 5; i++)
       Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
 
-    return recorder.OfType<UnitAttackedBattleEvent>().Select(attackEvent => attackEvent.IsHit).ToList();
+    return recorder.OfType<UnitAttackedBattleEvent>().AsValueEnumerable().Select(attackEvent => attackEvent.IsHit).ToList();
   }
 
   private sealed class BuildInterruptsHook(Func<HookContext, IReadOnlyList<BattleAction>> build) : BattleHook<UnitMovedBattleEvent>

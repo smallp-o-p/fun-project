@@ -1,6 +1,5 @@
 using FunProject.Combatants;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -42,7 +41,7 @@ public sealed class GetVisibleEnemiesForUnit(AliveUnit observer) : IBattleSessio
   public IReadOnlyCollection<AliveUnit> Execute(BattleSession session)
   {
     return observer.State.VisibleUnits
-      .Where(unit => unit.Side != observer.State.Side && unit.IsAlive)
+      .AsValueEnumerable().Where(unit => unit.Side != observer.State.Side && unit.IsAlive)
       .Select(session.MintAlive)
       .ToArray();
   }
@@ -65,7 +64,7 @@ public sealed class GetVisibleUnitsForFaction(Faction faction) : IBattleSessionQ
     // plus any other unit seen by some observer. Filtering AliveUnits also drops any stale
     // dead reference exactly as the prior AliveUnits.Where did.
     return session.AliveUnits
-      .Where(unit => unit.Side == faction || visibleToObservers.Contains(unit))
+      .AsValueEnumerable().Where(unit => unit.Side == faction || visibleToObservers.Contains(unit))
       .Select(session.MintAlive)
       .ToArray();
   }

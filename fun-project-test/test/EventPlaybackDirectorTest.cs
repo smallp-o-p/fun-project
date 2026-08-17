@@ -3,7 +3,6 @@ using GdUnit4;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -134,7 +133,7 @@ public sealed partial class EventPlaybackDirectorTest
     public void MoveAlong(params Vector3I[] path)
     {
       AliveUnit mover = Runtime.TryGetAlive(Unit.State).RequireSome();
-      Runtime.ExecuteAction(BattleAction.MoveUnit(mover, path.Select(tile =>
+      Runtime.ExecuteAction(BattleAction.MoveUnit(mover, path.AsValueEnumerable().Select(tile =>
         Runtime.TryGetTile(tile).RequireSome()).ToList()));
     }
 
@@ -174,7 +173,7 @@ public sealed partial class EventPlaybackDirectorTest
 
     protected override void PlayMoveStep(IReadOnlyList<UnitMovedBattleEvent> run, Action done)
     {
-      MoveRuns.Add(run.Select(step => step.Position.Raw).ToList());
+      MoveRuns.Add(run.AsValueEnumerable().Select(step => step.Position.Raw).ToList());
       done();
     }
   }

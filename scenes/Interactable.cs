@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Godot;
 
 public abstract partial class Interactable : Area3D, IInteractable
@@ -91,6 +90,6 @@ public abstract partial class Interactable : Area3D, IInteractable
 
   private bool HasCollisionShape()
   {
-    return GetChildren().Any(node => node is CollisionShape3D || node is CollisionPolygon3D);
+    return GetChildren().AsValueEnumerable().Any(node => node is CollisionShape3D || node is CollisionPolygon3D);
   }
 }

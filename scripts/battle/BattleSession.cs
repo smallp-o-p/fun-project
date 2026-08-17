@@ -8,7 +8,6 @@ using Godot;
 using LanguageExt.UnsafeValueAccess;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -69,8 +68,8 @@ public sealed class BattleSession
   public Option<BattleOutcome> Outcome { get; private set; }
   // Raw views: the session holds and exposes plain unit state; proofs exist only as return
   // values (TryGetAlive, read-query results), never as session-held collections.
-  public IEnumerable<BattleUnitState> AliveUnits => _units.Where(unit => unit.IsAlive);
-  public IEnumerable<BattleUnitState> DeadUnits => _units.Where(unit => unit.IsDead);
+  public IEnumerable<BattleUnitState> AliveUnits => _units.AsValueEnumerable().Where(unit => unit.IsAlive).ToArray();
+  public IEnumerable<BattleUnitState> DeadUnits => _units.AsValueEnumerable().Where(unit => unit.IsDead).ToArray();
 
   // Mints a proof iff the unit instance belongs to THIS session's alive storage (provenance +
   // aliveness in one check). The single door for callers holding a raw BattleUnitState.
@@ -133,13 +132,13 @@ public sealed class BattleSession
   internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
   {
     ArgumentNullException.ThrowIfNull(side);
-    return AliveUnits.Where(unit => unit.Side == side);
+    return AliveUnits.AsValueEnumerable().Where(unit => unit.Side == side).ToArray();
   }
 
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetFactionVisibleTiles(Faction side)
   {
     ArgumentNullException.ThrowIfNull(side);
-    return GetFactionAliveUnits(side)
+    return GetFactionAliveUnits(side).AsValueEnumerable()
       .SelectMany(unit => unit.VisibleTiles)
       .ToHashSet();
   }
@@ -159,13 +158,13 @@ public sealed class BattleSession
       return true;
 
     return GetFactionAliveUnits(side)
-      .Any(unit => unit.VisibleUnits.Contains(target));
+      .AsValueEnumerable().Any(unit => unit.VisibleUnits.Contains(target));
   }
 
   internal bool IsTileVisibleToFaction(Faction side, BattleBoardState.ValidatedPoint tile)
   {
     ArgumentNullException.ThrowIfNull(side);
-    return GetFactionAliveUnits(side).Any(unit => unit.VisibleTiles.Contains(tile));
+    return GetFactionAliveUnits(side).AsValueEnumerable().Any(unit => unit.VisibleTiles.Contains(tile));
   }
 
   internal bool IsUnitStillAvailableThisTurn(BattleUnitState unit)
@@ -286,7 +285,7 @@ public sealed class BattleSession
     IReadOnlyList<Damage> bundle,
     IReadOnlyList<DamageResolution> packetResolutions)
   {
-    foreach ((Damage damage, DamageResolution resolution) in bundle.Zip(packetResolutions))
+    foreach ((Damage damage, DamageResolution resolution) in bundle.AsValueEnumerable().Zip(packetResolutions))
     {
       if (damage.Amount <= 0)
         continue;
@@ -381,7 +380,7 @@ public sealed class BattleSession
 
     RaiseEvents(new UnitActivationEndedBattleEvent(unit, unitPoint));
 
-    if (!GetFactionAliveUnits(activeSide).Any(CanUnitActNow))
+    if (!GetFactionAliveUnits(activeSide).AsValueEnumerable().Any(CanUnitActNow))
       EndFactionTurn(activeSide);
   }
 
@@ -397,7 +396,7 @@ public sealed class BattleSession
       return;
 
     // With no player faction there is no backstop: if every faction is wiped, Draw.
-    if (!_scheduler.GlobalFactionTurnOrder.Any(HasLivingUnits))
+    if (!_scheduler.GlobalFactionTurnOrder.AsValueEnumerable().Any(HasLivingUnits))
     {
       EndBattle(BattleOutcome.Draw);
       return;
@@ -503,7 +502,7 @@ public sealed class BattleSession
 
   internal bool HasLivingUnits(Faction side)
   {
-    return GetFactionAliveUnits(side).Any();
+    return GetFactionAliveUnits(side).AsValueEnumerable().Any();
   }
 
   // Records a unit whose own board cell changed (spawned/moved/removed) so the next dispatch
@@ -691,15 +690,16 @@ public sealed class BattleSession
       Faction = faction,
       Outcome = Outcome.Value(),
       CombatantsDead = (SysColGeneric.HashSet<Combatant>)
-        [.. DeadUnits.Where(unit => unit.Side == faction).Select(unit => unit.Combatant)],
+        [.. DeadUnits.AsValueEnumerable().Where(unit => unit.Side == faction).Select(unit => unit.Combatant).ToArray()],
       CombatantsWounded = (SysColGeneric.HashSet<Combatant>)
       [
-        ..AliveUnits.Where(unit => unit.Side == faction).Where(unit => unit.MaxHealth > unit.CurrentHealth)
-          .Select(unit => unit.Combatant)
+        ..AliveUnits.AsValueEnumerable().Where(unit => unit.Side == faction).Where(unit => unit.MaxHealth > unit.CurrentHealth)
+          .Select(unit => unit.Combatant).ToArray()
       ],
-      DefeatedPerCombatant = _killsByUnit.Where(unitKilled => unitKilled.Key.Side == faction)
+      DefeatedPerCombatant = _killsByUnit.AsValueEnumerable().Where(unitKilled => unitKilled.Key.Side == faction)
         .Select(unitKilled =>
-          (unitKilled.Key.Combatant, unitKilled.Value.Select(killed => killed.Combatant).ToList())).ToDictionary(),
+          (unitKilled.Key.Combatant, unitKilled.Value.AsValueEnumerable().Select(killed => killed.Combatant).ToList()))
+        .ToDictionary(entry => entry.Item1, entry => entry.Item2),
       TurnCount = TurnNumber
     };
   }

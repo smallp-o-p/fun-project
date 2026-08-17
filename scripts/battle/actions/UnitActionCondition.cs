@@ -1,4 +1,3 @@
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -49,7 +48,7 @@ public sealed class WeaponIsLoadedCondition : UnitActionCondition
 public sealed class HasAttackableTargetCondition : UnitActionCondition
 {
   internal override bool IsMet(BattleSession session, AliveUnit unit)
-    => unit.State.VisibleUnits.Any(target => AttackContext.Resolve(session, unit.State, target).IsRight);
+    => unit.State.VisibleUnits.AsValueEnumerable().Any(target => AttackContext.Resolve(session, unit.State, target).IsRight);
 }
 
 public sealed class CanReloadCondition : UnitActionCondition

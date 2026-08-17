@@ -1,7 +1,6 @@
 using FunProject.Battle;
 using GdUnit4;
 using Godot;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -52,7 +51,7 @@ public class EndOfBattleSummaryTest
     Assert.True(summary.CombatantsDead.SetEquals([bravo.Combatant]), "Dead should hold only the fallen player combatant, not enemy dead.");
     Assert.True(summary.CombatantsWounded.SetEquals([charlie.Combatant]), "Wounded should hold only the hurt-but-alive player combatant.");
     Assert.Equal(1, summary.DefeatedPerCombatant.Count);
-    Assert.True(summary.DefeatedPerCombatant[battle.PlayerUnit.Combatant].SequenceEqual([battle.EnemyUnit.Combatant, bandit2.Combatant]));
+    Assert.True(summary.DefeatedPerCombatant[battle.PlayerUnit.Combatant].AsValueEnumerable().SequenceEqual([battle.EnemyUnit.Combatant, bandit2.Combatant]));
   }
 
   [TestCase(TestName = "A defeat summary excludes enemy wounded and the enemy summary attributes its kill")]
@@ -82,6 +81,6 @@ public class EndOfBattleSummaryTest
     Assert.Equal(0, enemySummary.CombatantsDead.Count);
     Assert.True(enemySummary.CombatantsWounded.SetEquals([battle.EnemyUnit.Combatant]));
     Assert.Equal(1, enemySummary.DefeatedPerCombatant.Count);
-    Assert.True(enemySummary.DefeatedPerCombatant[battle.EnemyUnit.Combatant].SequenceEqual([battle.PlayerUnit.Combatant]));
+    Assert.True(enemySummary.DefeatedPerCombatant[battle.EnemyUnit.Combatant].AsValueEnumerable().SequenceEqual([battle.PlayerUnit.Combatant]));
   }
 }

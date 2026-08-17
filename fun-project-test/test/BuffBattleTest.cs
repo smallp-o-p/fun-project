@@ -3,7 +3,6 @@ using FunProject.Buffs;
 using FunProject.Stats;
 using GdUnit4;
 using Godot;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -61,7 +60,7 @@ public partial class BuffBattleTest
     Assert.True(player.Buffs[0].IsActive); // fresh during the ENEMY turn (every-turn-start eval)
     Assert.Equal(75f, player.EffectiveStat<AimStat>());
     Assert.Equal(75, Preview().FinalChance); // spec test 4: the preview sees the aim buff
-    Assert.Equal(1, recorder.OfType<UnitBuffActivatedBattleEvent>().Count());
+    Assert.Equal(1, recorder.OfType<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count());
     // v2 hook order pin: TurnStarted commits BEFORE the buff hook's activation (buff
     // evaluation is fired by the executor after the TurnStarted broadcast), not after.
     recorder.AssertCommittedBefore<TurnStartedBattleEvent, UnitBuffActivatedBattleEvent>();

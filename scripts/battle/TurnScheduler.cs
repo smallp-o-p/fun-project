@@ -1,7 +1,6 @@
 using FunProject.Combatants;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -165,11 +164,11 @@ internal sealed class TurnScheduler
 
   private void RemoveEliminatedSidesFromQueue()
   {
-    _turnQueue = new Queue<Faction>(_turnQueue.Where(_hasLivingUnits));
+    _turnQueue = new Queue<Faction>(_turnQueue.AsValueEnumerable().Where(_hasLivingUnits).ToArray());
   }
 
   private void RemoveSideFromQueue(Faction side)
   {
-    _turnQueue = new Queue<Faction>(_turnQueue.Where(faction => faction != side));
+    _turnQueue = new Queue<Faction>(_turnQueue.AsValueEnumerable().Where(faction => faction != side).ToArray());
   }
 }

@@ -2,7 +2,6 @@ using FunProject.Battle;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 // Tile-path targeting: reachable tiles from GetPossibleMoveTilesForUnit; path preview/commit from
 // FindPathForUnit (source-inclusive, so the committed MoveUnit drops index 0). The handler owns the
@@ -45,7 +44,7 @@ public sealed class MoveTargeting : IActionTargeting
       Right: path =>
       {
         _lastPath = Some((target, path));
-        return Right<BattleQueryFailure, ActionPreview>(new PathPreview(path.Select(point => point.Raw).ToArray()));
+        return Right<BattleQueryFailure, ActionPreview>(new PathPreview(path.AsValueEnumerable().Select(point => point.Raw).ToArray()));
       },
       Left: Left<BattleQueryFailure, ActionPreview>);
 
@@ -60,7 +59,7 @@ public sealed class MoveTargeting : IActionTargeting
       None: () => QueryPath(target));
     // Fresh proof at the write boundary: the mover may have died since Begin().
     return _runtime.TryGetAlive(_unit).Match(
-      mover => BattleAction.MoveUnit(mover, path.Skip(1)),
+      mover => BattleAction.MoveUnit(mover, path.AsValueEnumerable().Skip(1).ToArray()),
       () => throw new InvalidOperationException("Moving unit is no longer alive."));
   }
 

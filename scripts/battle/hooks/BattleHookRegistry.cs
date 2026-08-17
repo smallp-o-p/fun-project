@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -47,7 +46,7 @@ internal sealed class BattleHookRegistry
     [
       .. _hooks
         .GetMatching(battleEvent)
-        .OrderBy(entry => entry.Priority)
+        .AsValueEnumerable().OrderBy(entry => entry.Priority)
         .ThenBy(entry => entry.Stamp)
         .DistinctBy(entry => entry.Hook, System.Collections.Generic.ReferenceEqualityComparer.Instance),
     ];
@@ -135,7 +134,7 @@ internal sealed class EventKeyedRegistry<T>
       eventType,
       .. eventType
         .GetInterfaces()
-        .Where(interfaceType => typeof(BattleEventTag).IsAssignableFrom(interfaceType)),
+        .AsValueEnumerable().Where(interfaceType => typeof(BattleEventTag).IsAssignableFrom(interfaceType)),
     ];
     _keyCache[eventType] = keys;
     return keys;

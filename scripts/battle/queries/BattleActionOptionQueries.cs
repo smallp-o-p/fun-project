@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -15,10 +14,10 @@ public sealed class GetAvailableActionsForUnit(AliveUnit unit) : IBattleSessionQ
   public IReadOnlyList<UnitAction> Execute(BattleSession session)
   {
     return UnitActionCatalog.All
-      .Where(definition => definition.ExistsFor(unit.State))
+      .AsValueEnumerable().Where(definition => definition.ExistsFor(unit.State))
       .Select(definition => new UnitAction(
         definition,
-        definition.Conditions.All(condition => condition.IsMet(session, unit))))
+        definition.Conditions.AsValueEnumerable().All(condition => condition.IsMet(session, unit))))
       .ToList();
   }
 }

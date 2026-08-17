@@ -1,6 +1,5 @@
 using FunProject.Combatants;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -16,7 +15,7 @@ public sealed class GetFactionAliveUnits(Faction side) : IBattleSessionQuery<IRe
 {
   public IReadOnlyCollection<AliveUnit> Execute(BattleSession session)
   {
-    return session.AliveUnits.Where(unit => unit.Side == side).Select(session.MintAlive).ToArray();
+    return session.AliveUnits.AsValueEnumerable().Where(unit => unit.Side == side).Select(session.MintAlive).ToArray();
   }
 }
 
@@ -24,7 +23,7 @@ public sealed class GetFactionDeadUnits(Faction side) : IBattleSessionQuery<IRea
 {
   public IReadOnlyCollection<DeadUnit> Execute(BattleSession session)
   {
-    return session.DeadUnits.Where(unit => unit.Side == side).Select(session.MintDead).ToArray();
+    return session.DeadUnits.AsValueEnumerable().Where(unit => unit.Side == side).Select(session.MintDead).ToArray();
   }
 }
 

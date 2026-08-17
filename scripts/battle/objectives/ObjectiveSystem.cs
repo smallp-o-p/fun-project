@@ -1,7 +1,6 @@
 using FunProject.Combatants;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -78,7 +77,7 @@ public sealed class ObjectiveSystem : BattleHook
     foreach (Faction faction in _session.GlobalFactionTurnOrder)
       foreach (Objective objective in _session.GetObjectives(faction))
         if (objective.State == ObjectiveResult.Ongoing
-            && objective.ObservedEventKeys.Any(eventKeys.Contains))
+            && objective.ObservedEventKeys.AsValueEnumerable().Any(eventType => eventKeys.AsValueEnumerable().Contains(eventType)))
           candidates.Add((faction, objective));
 
     return [.. candidates];
@@ -97,7 +96,7 @@ public sealed class ObjectiveSystem : BattleHook
       eventType,
       .. eventType
         .GetInterfaces()
-        .Where(interfaceType => typeof(BattleEventTag).IsAssignableFrom(interfaceType)),
+        .AsValueEnumerable().Where(interfaceType => typeof(BattleEventTag).IsAssignableFrom(interfaceType)),
     ];
     _eventKeyCache[eventType] = keys;
     return keys;

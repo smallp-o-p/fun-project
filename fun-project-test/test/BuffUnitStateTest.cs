@@ -2,7 +2,6 @@ using FunProject.Buffs;
 using FunProject.Stats;
 using GdUnit4;
 using Godot;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -29,7 +28,7 @@ public partial class BuffUnitStateTest
       MakeWeapon("Charm Blade", grantedBuffs: [shared]));
 
     Assert.Equal(2, unit.State.Buffs.Count);
-    Assert.Equal(1, unit.State.Buffs.Count(buff => buff.Data == shared));
+    Assert.Equal(1, unit.State.Buffs.AsValueEnumerable().Count(buff => buff.Data == shared));
   }
 
   [TestCase(TestName = "Active buff StatMods flow into EffectiveStat; inactive contribute nothing")]
@@ -43,13 +42,13 @@ public partial class BuffUnitStateTest
       new Vector3I(4, 0, 4));
 
     Assert.Equal(65f, buffed.State.EffectiveStat<AimStat>());
-    Assert.False(buffed.State.ActiveBuffDamageMods.Any());
+    Assert.False(buffed.State.ActiveBuffDamageMods.AsValueEnumerable().Any());
 
     ApplyDamage(session, buffed.State, 11); // 9/20: condition holds
     Assert.True(buffed.State.Buffs[0].Evaluate(session, buffed.State));
 
     Assert.Equal(75f, buffed.State.EffectiveStat<AimStat>());
-    Assert.Equal(1, buffed.State.ActiveBuffs.Count());
+    Assert.Equal(1, buffed.State.ActiveBuffs.AsValueEnumerable().Count());
   }
 
   [TestCase(TestName = "ClampCurrentHealthToMax lowers current health to a reduced max and never raises it")]

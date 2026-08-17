@@ -1,7 +1,6 @@
 using FunProject.Battle;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Tests;
 
@@ -25,11 +24,11 @@ internal sealed class BattleEventRecorder
 
   public IReadOnlyList<BattleEvent> All => _events;
 
-  public IEnumerable<TEvent> OfType<TEvent>() where TEvent : BattleEvent => _events.OfType<TEvent>();
+  public IEnumerable<TEvent> OfType<TEvent>() where TEvent : BattleEvent => _events.AsValueEnumerable().OfType<TEvent>().ToArray();
 
   public TEvent Single<TEvent>() where TEvent : BattleEvent
   {
-    List<TEvent> matches = _events.OfType<TEvent>().ToList();
+    List<TEvent> matches = _events.AsValueEnumerable().OfType<TEvent>().ToList();
     if (matches.Count != 1)
       throw new InvalidOperationException(
         $"Expected exactly one {typeof(TEvent).Name} but found {matches.Count}.");

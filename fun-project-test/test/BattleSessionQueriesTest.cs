@@ -2,7 +2,6 @@ using FunProject.Battle;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -69,10 +68,10 @@ public class BattleSessionQueriesTest
 
     IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = Query(session, new GetPossibleMoveTilesForUnit(unit.AliveIn(session)));
     Assert.True(tiles.Count == 2);
-    var rawTiles = tiles.Select(tile => tile.Raw).ToHashSet();
+    var rawTiles = tiles.AsValueEnumerable().Select(tile => tile.Raw).ToHashSet();
     Assert.True(rawTiles.Contains(new Vector3I(1, 0, 0)));
     Assert.True(rawTiles.Contains(new Vector3I(2, 0, 0)));
-    Assert.False(tiles.Any(tile => tile.Raw == session.GetUnitPosition(unit.State).RequireSome().Raw));
+    Assert.False(tiles.AsValueEnumerable().Any(tile => tile.Raw == session.GetUnitPosition(unit.State).RequireSome().Raw));
   }
 
   [TestCase(TestName = "GetPossibleMoveTilesForUnit does not include unreachable tiles inside movement range")]
@@ -102,8 +101,8 @@ public class BattleSessionQueriesTest
 
     IReadOnlyCollection<AliveUnit> enemies = Query(session, new GetVisibleEnemiesForUnit(observer.AliveIn(session)));
 
-    Assert.True(enemies.Select(e => e.State).Contains(visibleEnemy));
-    Assert.False(enemies.Select(e => e.State).Contains(hiddenEnemy));
+    Assert.True(enemies.AsValueEnumerable().Select(e => e.State).Contains(visibleEnemy));
+    Assert.False(enemies.AsValueEnumerable().Select(e => e.State).Contains(hiddenEnemy));
   }
 
   [TestCase(TestName = "GetFactionDeadUnits filters by faction")]
@@ -122,9 +121,9 @@ public class BattleSessionQueriesTest
     var factionADead = Query(session, new GetFactionDeadUnits(factionA));
     var factionBDead = Query(session, new GetFactionDeadUnits(factionB));
 
-    Assert.True(factionADead.Select(d => d.State).Contains(unitA));
-    Assert.False(factionBDead.Select(d => d.State).Contains(unitA));
-    Assert.True(!factionBDead.Any());
+    Assert.True(factionADead.AsValueEnumerable().Select(d => d.State).Contains(unitA));
+    Assert.False(factionBDead.AsValueEnumerable().Select(d => d.State).Contains(unitA));
+    Assert.True(!factionBDead.AsValueEnumerable().Any());
   }
 
 }

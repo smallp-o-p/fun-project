@@ -3,14 +3,13 @@ using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Weapons;
 using System;
-using System.Linq;
 namespace FunProject.Battle;
 
 public sealed class StartBattle : BattleAction
 {
   public override Result Execute(BattleSession session)
   {
-    if (session.Phase != BattlePhase.Setup || !session.AliveUnits.Any())
+    if (session.Phase != BattlePhase.Setup || !session.AliveUnits.AsValueEnumerable().Any())
       return Result.Rejected;
 
     session.StartBattle();

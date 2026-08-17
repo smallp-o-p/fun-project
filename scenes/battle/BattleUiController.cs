@@ -4,7 +4,6 @@ using FunProject.Weapons;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 // Presentation-side UI state machine (pure C#, no Godot beyond Vector3I). Owns selection, the
 // verb options cache, and the targeting sub-states. Two transition sources, and only two:
@@ -272,7 +271,7 @@ public sealed class BattleUiController : IDisposable
 
   private static IReadOnlyList<UnitActionOption> BuildOptions(
     AliveUnit unit, IReadOnlyList<UnitAction> actions) =>
-    actions.Select(action => MakeOption(unit, action)).ToList();
+    actions.AsValueEnumerable().Select(action => MakeOption(unit, action)).ToList();
 
   private static UnitActionOption MakeOption(AliveUnit unit, UnitAction action) => action.Action switch
   {

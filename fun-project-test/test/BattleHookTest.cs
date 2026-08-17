@@ -4,7 +4,6 @@ using GdUnit4;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -58,7 +57,7 @@ public partial class BattleHookTest
     StartBattle(session);
 
     Assert.Equal(1, turnStartedListener.Received.Count);
-    Assert.True(turnStartedListener.Received.Single() is TurnStartedBattleEvent);
+    Assert.True(turnStartedListener.Received.AsValueEnumerable().Single() is TurnStartedBattleEvent);
     Assert.Equal(0, damagedListener.Received.Count);
   }
 
@@ -72,14 +71,14 @@ public partial class BattleHookTest
 
     SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
 
-    Assert.True(unitEventsListener.Received.OfType<UnitAddedBattleEvent>().Any());
+    Assert.True(unitEventsListener.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
   }
 
   [TestCase(TestName = "A hook registered under concrete and interface keys fires once for one event")]
   public void OneHookRegisteredUnderMultipleMatchingKeysFiresOnce()
   {
     var (session, executor, faction) = MakeSessionWithUnit();
-    var unit = session.GetFactionAliveUnits(faction).First();
+    var unit = session.GetFactionAliveUnits(faction).AsValueEnumerable().First();
     var hook = new RecordingHook();
     executor.RegisterHook<UnitKilledBattleEvent>(hook);
     executor.RegisterHook<IUnitBattleEvent>(hook);
@@ -133,10 +132,10 @@ public partial class BattleHookTest
     // session clears its dispatch queue on the way out.
     Assert.Throws<InvalidOperationException>(
       () => executor.Submit(BattleAction.EndFactionTurn(faction)));
-    Assert.False(recorder.OfType<ProbeBattleEvent>().Any());
+    Assert.False(recorder.OfType<ProbeBattleEvent>().AsValueEnumerable().Any());
 
     executor.Submit(BattleAction.EndFactionTurn(faction));
-    Assert.False(recorder.OfType<ProbeBattleEvent>().Any());
+    Assert.False(recorder.OfType<ProbeBattleEvent>().AsValueEnumerable().Any());
   }
 
   private sealed partial class MarkingHook : BattleHook
@@ -200,10 +199,10 @@ public partial class BattleHookTest
     var (session, executor, faction) = MakeSessionWithUnit();
     StartBattle(session);
     var hook = new InterruptingHook(context => BattleAction.PassUnit(
-      context.Session.TryGetAlive(context.Session.GetFactionAliveUnits(faction).First()).RequireSome()));
+      context.Session.TryGetAlive(context.Session.GetFactionAliveUnits(faction).AsValueEnumerable().First()).RequireSome()));
     executor.RegisterHook<UnitMovedBattleEvent>(hook);
 
-    var unit = session.GetFactionAliveUnits(faction).First();
+    var unit = session.GetFactionAliveUnits(faction).AsValueEnumerable().First();
     executor.Submit(BattleAction.MoveUnit(session.TryGetAlive(unit).RequireSome(), [session.Board.At(1, 0, 2)]))
       ;
 
@@ -236,7 +235,7 @@ public partial class BattleHookTest
     executor.RegisterHook<UnitMovedBattleEvent>(hook);
     executor.RegisterHook<TurnStartedBattleEvent>(hook);
 
-    var unit = session.GetFactionAliveUnits(faction).First();
+    var unit = session.GetFactionAliveUnits(faction).AsValueEnumerable().First();
     executor.Submit(BattleAction.MoveUnit(session.TryGetAlive(unit).RequireSome(), [session.Board.At(1, 0, 0)]));
 
     AdvanceTurn(session);

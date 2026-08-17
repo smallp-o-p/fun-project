@@ -13,7 +13,7 @@ internal static class BattleQueryTestHelper
   }
 
   public static AliveUnit SingleAliveUnit(BattleRuntime runtime, Faction faction) =>
-    runtime.Query(new GetFactionAliveUnits(faction)).Single();
+    runtime.Query(new GetFactionAliveUnits(faction)).AsValueEnumerable().Single();
 
   public static TResult GetValue<TResult>(Either<BattleQueryFailure, TResult> result)
   {

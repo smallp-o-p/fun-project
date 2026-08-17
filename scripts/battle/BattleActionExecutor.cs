@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace FunProject.Battle;
@@ -112,7 +111,7 @@ public sealed class BattleActionExecutor : IDisposable
           case BattleAction.Result.Completed:
             {
               _pendingActions.Pop();
-              foreach (var reaction in _capturedInterrupts.AsEnumerable().Reverse())
+              foreach (var reaction in _capturedInterrupts.AsValueEnumerable().Reverse())
                 _pendingActions.Push(reaction);
               break;
             }
@@ -123,7 +122,7 @@ public sealed class BattleActionExecutor : IDisposable
             }
           case BattleAction.Result.Incomplete:
             {
-              foreach (var reaction in _capturedInterrupts.AsEnumerable().Reverse())
+              foreach (var reaction in _capturedInterrupts.AsValueEnumerable().Reverse())
                 _pendingActions.Push(reaction);
               break;
             }

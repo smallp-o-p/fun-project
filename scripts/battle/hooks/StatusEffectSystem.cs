@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using FunProject.Combatants;
 
 namespace FunProject.Battle;
@@ -21,7 +20,7 @@ public sealed class StatusEffectSystem : BattleHook<TurnEndedBattleEvent>
     Faction faction = turnEnded.Faction;
     foreach (BattleUnitState unit in context.Session.GetFactionAliveUnits(faction).ToImmutableList()) // snapshot: a lethal tick removes the unit from AliveUnits mid-iteration
     {
-      foreach (ActiveStatusEffect active in unit.ActiveStatusEffects.ToList())
+      foreach (ActiveStatusEffect active in unit.ActiveStatusEffects.AsValueEnumerable().ToList())
       {
         active.TickDown();
         context.Session.RaiseEvents(new UnitStatusEffectTickedBattleEvent(unit, active.Spec, active.RemainingTurns));

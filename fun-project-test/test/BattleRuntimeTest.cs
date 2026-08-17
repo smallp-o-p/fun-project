@@ -48,7 +48,7 @@ public sealed partial class BattleRuntimeTest
       BattleTestFactory.MakeCombatant("Alpha", faction),
       session.Board.At(1, 0, 1)));
 
-    Assert.True(recorder.OfType<UnitAddedBattleEvent>().Any());
+    Assert.True(recorder.OfType<UnitAddedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "RegisterHook affects runtime action execution")]

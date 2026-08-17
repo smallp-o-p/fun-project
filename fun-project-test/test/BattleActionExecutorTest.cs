@@ -4,7 +4,6 @@ using GdUnit4;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -71,7 +70,7 @@ public partial class BattleActionExecutorTest
 
     Assert.True(unit.State.IsDead);
     Assert.Equal(2, usable.Capability.Current);
-    Assert.False(recorder.OfType<ItemUsedBattleEvent>().Any());
+    Assert.False(recorder.OfType<ItemUsedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "A failed submission is unwound; the next Submit does not resume stale work")]
@@ -124,10 +123,10 @@ public partial class BattleActionExecutorTest
 
     executor.Submit(BattleAction.MoveUnit(unit.AliveIn(session), [session.Board.At(1, 0, 2)], 2));
 
-    Assert.True(recorder.OfType<UnitMovedBattleEvent>().Any(battleEvent =>
+    Assert.True(recorder.OfType<UnitMovedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
       battleEvent.Position.Raw == new Vector3I(1, 0, 2) &&
       battleEvent.SourcePosition.Raw == new Vector3I(1, 0, 1)));
-    Assert.True(recorder.OfType<TileOccupiedBattleEvent>().Any(battleEvent =>
+    Assert.True(recorder.OfType<TileOccupiedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
       battleEvent.Position.Raw == new Vector3I(1, 0, 2)));
   }
 
@@ -163,7 +162,7 @@ public partial class BattleActionExecutorTest
 
     executor.Submit(BattleAction.MoveUnit(unit.AliveIn(session), [session.Board.At(targetPosition)]));
 
-    Assert.True(log.SequenceEqual(["first", "second", "late"]));
+    Assert.True(log.AsValueEnumerable().SequenceEqual(["first", "second", "late"]));
   }
 
   [TestCase(TestName = "Executor only evaluates registered event key bucket")]
@@ -181,7 +180,7 @@ public partial class BattleActionExecutorTest
 
     Assert.Equal(0, ignoredHook.EvaluateCallCount);
     Assert.Equal(1, matchingHook.EvaluateCallCount);
-    Assert.True(log.SequenceEqual(["matching"]));
+    Assert.True(log.AsValueEnumerable().SequenceEqual(["matching"]));
   }
 
   [TestCase(TestName = "Executor supports hook registered to event shape")]
@@ -194,7 +193,7 @@ public partial class BattleActionExecutorTest
 
     executor.Submit(BattleAction.MoveUnit(unit.AliveIn(session), [session.Board.At(targetPosition)]));
 
-    Assert.True(log.SequenceEqual(["matched", "matched"]));
+    Assert.True(log.AsValueEnumerable().SequenceEqual(["matched", "matched"]));
   }
 
   [TestCase(TestName = "Executor consumes one-shot hooks before later actions")]
@@ -214,7 +213,7 @@ public partial class BattleActionExecutorTest
     ];
 
     Assert.Equal(3, results.Length);
-    Assert.True(log.SequenceEqual(["matched"]));
+    Assert.True(log.AsValueEnumerable().SequenceEqual(["matched"]));
   }
 
   [TestCase(TestName = "Executor resolves interrupt actions in hook priority order")]
@@ -232,7 +231,7 @@ public partial class BattleActionExecutorTest
     executor.Submit(BattleAction.MoveUnit(unit.AliveIn(session), [session.Board.At(targetPosition)]));
 
     int[] damageAmounts = recorder.OfType<UnitDamagedBattleEvent>()
-      .Select(damaged => damaged.TotalAmount)
+      .AsValueEnumerable().Select(damaged => damaged.TotalAmount)
       .ToArray();
 
     Assert.True(damageAmounts.SequenceEqual([1, 2]));
@@ -256,7 +255,7 @@ public partial class BattleActionExecutorTest
     executor.Submit(BattleAction.MoveUnit(unit.AliveIn(session), [session.Board.At(targetPosition)]));
 
     int[] damageAmounts = recorder.OfType<UnitDamagedBattleEvent>()
-      .Select(damaged => damaged.TotalAmount)
+      .AsValueEnumerable().Select(damaged => damaged.TotalAmount)
       .ToArray();
 
     Assert.True(damageAmounts.SequenceEqual([1, 2]));
@@ -418,10 +417,10 @@ public partial class BattleActionExecutorTest
     var executor = ExecutorFor(session);
     executor.Submit(BattleAction.EndFactionTurn(factionA));
 
-    Assert.True(recorder.OfType<TurnEndedBattleEvent>().Any(battleEvent =>
+    Assert.True(recorder.OfType<TurnEndedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
       battleEvent.Faction == factionA &&
       battleEvent.TurnNumber == 1));
-    Assert.True(recorder.OfType<TurnStartedBattleEvent>().Any(battleEvent =>
+    Assert.True(recorder.OfType<TurnStartedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
       battleEvent.Faction == factionB &&
       battleEvent.TurnNumber == 1));
   }

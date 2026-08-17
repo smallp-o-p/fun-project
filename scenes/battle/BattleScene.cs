@@ -4,7 +4,6 @@ using FunProject.Stats;
 using FunProject.Weapons;
 using Godot;
 using System.Collections.Generic;
-using System.Linq;
 
 // Minimal scaffolding host: boots a small BattleRuntime via BattleFactory, builds the scene tree in
 // code (camera, light, ground, unit meshes, HUD), and connects the presentation FSM to input and
@@ -320,7 +319,7 @@ public sealed partial class BattleScene : Node3D
       return;
     }
 
-    _movementLine.Points = path
+    _movementLine.Points = path.AsValueEnumerable()
       .Select(tile => BoardCoordinates.TileToWorldCenter(tile) + new Vector3(0f, 0.05f, 0f))
       .ToArray();
     _movementLine.Rebuild();

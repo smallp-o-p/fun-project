@@ -2,7 +2,6 @@ using FunProject.Battle;
 using FunProject.Core;
 using GdUnit4;
 using Godot;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -82,8 +81,8 @@ public partial class ArmorBattleTest
     Assert.Equal(0, unit.State.CurrentHealth);
     Assert.True(unit.State.IsDead);
     // A killing blow commits death only: no damage event accompanies the kill.
-    Assert.False(recorder.OfType<UnitDamagedBattleEvent>().Any());
-    Assert.True(recorder.OfType<UnitKilledBattleEvent>().Any());
+    Assert.False(recorder.OfType<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
+    Assert.True(recorder.OfType<UnitKilledBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "Attack strips element-matched armor at 1.5x")]

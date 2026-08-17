@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Godot;
 using FunProject.Items;
 using FunProject.Stats;
@@ -45,17 +44,17 @@ public class Weapon : EquippableItem, HasStats
     int baseDamage = GetDamageStat().BaseValue;
     var context = new DamageEmissionContext(baseDamage);
 
-    List<Damage> bundle = _frame.Packets
+    List<Damage> bundle = _frame.Packets.AsValueEnumerable()
       .Select(packet => packet.Derive(baseDamage))
       .ToList();
 
-    foreach (DamageBundleMod mod in DamageContributions.Concat(externalMods))
+    foreach (DamageBundleMod mod in DamageContributions.AsValueEnumerable().Concat(externalMods))
     {
       ArgumentNullException.ThrowIfNull(mod);
       bundle = mod.Apply(bundle, context);
     }
 
-    return bundle.Where(damage => damage.Amount > 0).ToList();
+    return bundle.AsValueEnumerable().Where(damage => damage.Amount > 0).ToList();
   }
 
   public Option<List<Damage>> TrySpendShot() => TrySpendShot([]);
@@ -84,7 +83,7 @@ public class Weapon : EquippableItem, HasStats
 
   /// <summary>StatMods this weapon contributes to resolution; override to add more (e.g. ammunition).</summary>
   public virtual IEnumerable<StatMod> StatContributions
-    => this.EquippedMods().SelectMany(m => m.StatContributions);
+    => this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).ToArray();
 
   /// <summary>
   /// DamageBundleMods this weapon contributes to every emission, folded before any external
@@ -92,7 +91,7 @@ public class Weapon : EquippableItem, HasStats
   /// <see cref="StatContributions"/>.
   /// </summary>
   protected virtual IEnumerable<DamageBundleMod> DamageContributions
-    => this.EquippedMods().OfType<DamageBundleEquippableMod>().SelectMany(m => m.BundleMods);
+    => this.EquippedMods().AsValueEnumerable().OfType<DamageBundleEquippableMod>().SelectMany(m => m.BundleMods).ToArray();
 
   public DamageStat GetDamageStat() => GetStat<DamageStat>();
   public RangeStat GetRangeStat() => GetStat<RangeStat>();
@@ -146,9 +145,9 @@ public class FirearmWeapon(FirearmWeaponData data) : AmmunitionedWeapon(data)
   public Option<Ammunition> AmmoType { get; set; } = Optional(data.DefaultAmmoData);
 
   protected override IEnumerable<DamageBundleMod> DamageContributions
-    => base.DamageContributions.Concat(AmmunitionBundleMods());
+    => base.DamageContributions.AsValueEnumerable().Concat(AmmunitionBundleMods()).ToArray();
 
-  public override IEnumerable<StatMod> StatContributions => base.StatContributions.Concat(AmmunitionStatMods());
+  public override IEnumerable<StatMod> StatContributions => base.StatContributions.AsValueEnumerable().Concat(AmmunitionStatMods()).ToArray();
 
   private IEnumerable<DamageBundleMod> AmmunitionBundleMods()
     => AmmoType.Match(ammo => (IEnumerable<DamageBundleMod>)ammo.DamageMods, () => []);

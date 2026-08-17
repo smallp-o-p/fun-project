@@ -4,7 +4,6 @@ using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -21,8 +20,8 @@ public partial class BuffDamageTest
   {
     var weapon = MakeWeapon("Blade", damage: 5);
 
-    Assert.Equal(5, weapon.EmitDamage().Sum(damage => damage.Amount));
-    Assert.Equal(8, weapon.EmitDamage([AddThreeToAllPackets()]).Sum(damage => damage.Amount));
+    Assert.Equal(5, weapon.EmitDamage().AsValueEnumerable().Sum(damage => damage.Amount));
+    Assert.Equal(8, weapon.EmitDamage([AddThreeToAllPackets()]).AsValueEnumerable().Sum(damage => damage.Amount));
   }
 
   [TestCase(TestName = "TrySpendShot threads external mods through the ammunitioned path")]
@@ -31,7 +30,7 @@ public partial class BuffDamageTest
     var weapon = MakeAmmoWeapon("Rifle", magazine: 6, damage: 5);
 
     var bundle = weapon.TrySpendShot([AddThreeToAllPackets()]).RequireSome();
-    Assert.Equal(8, bundle.Sum(damage => damage.Amount));
+    Assert.Equal(8, bundle.AsValueEnumerable().Sum(damage => damage.Amount));
     Assert.Equal(5, weapon.CurrentAmmo); // the shot was still spent
   }
 

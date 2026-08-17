@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Godot;
 
 namespace FunProject.Weapons;
@@ -20,7 +19,7 @@ public partial class DamageBundleMod : Resource
       result = modifier.Apply(result);
     }
 
-    List<Damage> emitted = result.ToList();
+    List<Damage> emitted = result.AsValueEnumerable().ToList();
     foreach (DamagePacketData packet in AddedPackets)
     {
       ArgumentNullException.ThrowIfNull(packet);

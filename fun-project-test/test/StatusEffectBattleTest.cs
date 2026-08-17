@@ -3,7 +3,6 @@ using FunProject.Core;
 using GdUnit4;
 using Godot;
 using System;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -24,7 +23,7 @@ public partial class StatusEffectBattleTest
 
     Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
 
-    var active = target.ActiveStatusEffects.Single();
+    var active = target.ActiveStatusEffects.AsValueEnumerable().Single();
     Assert.Equal(burn, active.Spec);
     Assert.Equal(2, active.RemainingTurns);
     var appliedEvent = recorder.Single<UnitStatusEffectAppliedBattleEvent>();
@@ -79,7 +78,7 @@ public partial class StatusEffectBattleTest
 
     Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
 
-    Assert.Equal(shouldApply, target.ActiveStatusEffects.Any());
+    Assert.Equal(shouldApply, target.ActiveStatusEffects.AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "Re-applying a status keeps a single instance")]
@@ -99,7 +98,7 @@ public partial class StatusEffectBattleTest
     Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
 
     Assert.Equal(1, target.ActiveStatusEffects.Count);
-    Assert.Equal(2, recorder.OfType<UnitStatusEffectAppliedBattleEvent>().Count());
+    Assert.Equal(2, recorder.OfType<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Count());
   }
 
   [TestCase(TestName = "A killing blow does not apply statuses")]
@@ -118,7 +117,7 @@ public partial class StatusEffectBattleTest
     Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
 
     Assert.True(target.IsDead);
-    Assert.False(recorder.OfType<UnitStatusEffectAppliedBattleEvent>().Any());
+    Assert.False(recorder.OfType<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Any());
     Assert.Equal(0, target.ActiveStatusEffects.Count);
   }
 
@@ -171,7 +170,7 @@ public partial class StatusEffectBattleTest
     EndFactionTurn(battle.Executor, battle.EnemyFaction);    // tick: 2 damage, 1 -> 0, expires
 
     Assert.Equal(13, target.CurrentHealth);
-    Assert.True(recorder.OfType<UnitStatusEffectExpiredBattleEvent>().Any());
+    Assert.True(recorder.OfType<UnitStatusEffectExpiredBattleEvent>().AsValueEnumerable().Any());
     Assert.Equal(0, target.ActiveStatusEffects.Count);
 
     EndFactionTurn(battle.Executor, battle.PlayerFaction);
@@ -179,7 +178,7 @@ public partial class StatusEffectBattleTest
     EndFactionTurn(battle.Executor, battle.EnemyFaction);    // nothing left to tick
 
     Assert.Equal(13, target.CurrentHealth);
-    Assert.False(recorder.OfType<UnitStatusEffectTickedBattleEvent>().Any());
+    Assert.False(recorder.OfType<UnitStatusEffectTickedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "DoT ticks resolve through armor with elemental matching")]
@@ -235,12 +234,12 @@ public partial class StatusEffectBattleTest
     EndFactionTurn(battle.Executor, battle.PlayerFaction);
     EndFactionTurn(battle.Executor, battle.EnemyFaction);           // tick: armor 5 -> 3, burn expires; regen still suppressed
     Assert.Equal(3, armor.Current);
-    Assert.False(recorder.OfType<UnitArmorRegeneratedBattleEvent>().Any());
+    Assert.False(recorder.OfType<UnitArmorRegeneratedBattleEvent>().AsValueEnumerable().Any());
 
     EndFactionTurn(battle.Executor, battle.PlayerFaction);
     EndFactionTurn(battle.Executor, battle.EnemyFaction);           // burn gone: delay already counted down, regen restores 3
     Assert.Equal(6, armor.Current);
-    Assert.True(recorder.OfType<UnitArmorRegeneratedBattleEvent>().Any());
+    Assert.True(recorder.OfType<UnitArmorRegeneratedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "A lethal tick kills the unit and the turn advances cleanly")]
@@ -262,7 +261,7 @@ public partial class StatusEffectBattleTest
     EndFactionTurn(battle.Executor, battle.EnemyFaction);           // tick 2 kills at the enemy's own turn end
 
     Assert.True(target.IsDead);
-    Assert.True(recorder.OfType<UnitKilledBattleEvent>().Any());
+    Assert.True(recorder.OfType<UnitKilledBattleEvent>().AsValueEnumerable().Any());
     Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
     Assert.Equal(battle.PlayerFaction, battle.Session.ActiveSide);
   }
@@ -288,7 +287,7 @@ public partial class StatusEffectBattleTest
     EndFactionTurn(battle.Executor, battle.EnemyFaction);           // stun ticks 1 -> 0 and expires
 
     Assert.False(target.IsImmobilized);
-    Assert.True(recorder.OfType<UnitStatusEffectExpiredBattleEvent>().Any());
+    Assert.True(recorder.OfType<UnitStatusEffectExpiredBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "A lethal tick stops the unit's remaining statuses")]
@@ -312,12 +311,12 @@ public partial class StatusEffectBattleTest
     EndFactionTurn(battle.Executor, battle.EnemyFaction);           // first tick kills; the second status never ticks
 
     Assert.True(target.IsDead);
-    Assert.Equal(1, recorder.OfType<UnitStatusEffectTickedBattleEvent>().Count());
-    Assert.True(recorder.OfType<UnitKilledBattleEvent>().Any());
-    Assert.False(recorder.OfType<UnitStatusEffectExpiredBattleEvent>().Any());
+    Assert.Equal(1, recorder.OfType<UnitStatusEffectTickedBattleEvent>().AsValueEnumerable().Count());
+    Assert.True(recorder.OfType<UnitKilledBattleEvent>().AsValueEnumerable().Any());
+    Assert.False(recorder.OfType<UnitStatusEffectExpiredBattleEvent>().AsValueEnumerable().Any());
     Assert.Equal(2, target.ActiveStatusEffects.Count);
-    Assert.Equal(1, target.ActiveStatusEffects.Count(effect => effect.RemainingTurns == 1));
-    Assert.Equal(1, target.ActiveStatusEffects.Count(effect => effect.RemainingTurns == 2));
+    Assert.Equal(1, target.ActiveStatusEffects.AsValueEnumerable().Count(effect => effect.RemainingTurns == 1));
+    Assert.Equal(1, target.ActiveStatusEffects.AsValueEnumerable().Count(effect => effect.RemainingTurns == 2));
     Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
     Assert.Equal(battle.PlayerFaction, battle.Session.ActiveSide);
   }
@@ -342,9 +341,9 @@ public partial class StatusEffectBattleTest
     EndFactionTurn(battle.Executor, battle.EnemyFaction);           // both tick: 2 + 1 damage
 
     Assert.Equal(17, target.CurrentHealth);
-    Assert.Equal(2, recorder.OfType<UnitStatusEffectTickedBattleEvent>().Count());
+    Assert.Equal(2, recorder.OfType<UnitStatusEffectTickedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(2, target.ActiveStatusEffects.Count);
-    Assert.Equal(1, target.ActiveStatusEffects.Count(effect => effect.RemainingTurns == 1));
-    Assert.Equal(1, target.ActiveStatusEffects.Count(effect => effect.RemainingTurns == 2));
+    Assert.Equal(1, target.ActiveStatusEffects.AsValueEnumerable().Count(effect => effect.RemainingTurns == 1));
+    Assert.Equal(1, target.ActiveStatusEffects.AsValueEnumerable().Count(effect => effect.RemainingTurns == 2));
   }
 }

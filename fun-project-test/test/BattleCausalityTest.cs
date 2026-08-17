@@ -1,7 +1,6 @@
 using FunProject.Battle;
 using GdUnit4;
 using Godot;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -20,7 +19,7 @@ public class BattleCausalityTest
 
     Attack(battle.Session, battle.Executor, battle.PlayerUnit, battle.EnemyUnit);
 
-    var damagedEvent = recorder.OfType<UnitDamagedBattleEvent>().Single();
+    var damagedEvent = recorder.OfType<UnitDamagedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(battle.PlayerUnit.State, damagedEvent.MaybeCause.RequireSome());
   }
 
@@ -39,8 +38,8 @@ public class BattleCausalityTest
 
     Assert.True(battle.EnemyUnit.State.IsDead);
     // A killing blow commits death only: no damage event accompanies the kill.
-    Assert.False(recorder.OfType<UnitDamagedBattleEvent>().Any());
-    var killedEvent = recorder.OfType<UnitKilledBattleEvent>().Single();
+    Assert.False(recorder.OfType<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
+    var killedEvent = recorder.OfType<UnitKilledBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(battle.EnemyUnit.State, killedEvent.Unit);
     Assert.Equal(battle.PlayerUnit.State, killedEvent.MaybeCause.RequireSome());
   }
@@ -58,7 +57,7 @@ public class BattleCausalityTest
     ApplyDamage(session, unit, 3);
     ApplyDamage(session, unit, 999);
 
-    Assert.True(recorder.OfType<UnitDamagedBattleEvent>().All(damagedEvent => damagedEvent.MaybeCause.IsNone));
-    Assert.True(recorder.OfType<UnitKilledBattleEvent>().Single().MaybeCause.IsNone);
+    Assert.True(recorder.OfType<UnitDamagedBattleEvent>().AsValueEnumerable().All(damagedEvent => damagedEvent.MaybeCause.IsNone));
+    Assert.True(recorder.OfType<UnitKilledBattleEvent>().AsValueEnumerable().Single().MaybeCause.IsNone);
   }
 }

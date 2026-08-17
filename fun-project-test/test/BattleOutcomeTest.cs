@@ -3,7 +3,6 @@ using FunProject.Core;
 using FunProject.Items.Effects;
 using GdUnit4;
 using Godot;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -36,7 +35,7 @@ public class BattleOutcomeTest
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
-    var ended = recorder.OfType<SessionEndedBattleEvent>().Single();
+    var ended = recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Defeat, ended.Outcome);
   }
 
@@ -56,7 +55,7 @@ public class BattleOutcomeTest
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
-    var ended = recorder.OfType<SessionEndedBattleEvent>().Single();
+    var ended = recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Victory, ended.Outcome);
   }
 
@@ -76,7 +75,7 @@ public class BattleOutcomeTest
 
     Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
     Assert.True(battle.Session.Outcome.IsNone);
-    Assert.False(recorder.OfType<SessionEndedBattleEvent>().Any());
+    Assert.False(recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Any());
 
     // A lone survivor keeps taking turns across the round boundary — the path
     // adjacent to StartNextRound's impossible-state guard — without ending.
@@ -85,7 +84,7 @@ public class BattleOutcomeTest
     Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
     Assert.Equal(3, battle.Session.TurnNumber);
     Assert.True(battle.Session.Outcome.IsNone);
-    Assert.False(recorder.OfType<SessionEndedBattleEvent>().Any());
+    Assert.False(recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "Without a player faction total annihilation resolves to Draw at the end of the turn")]
@@ -107,7 +106,7 @@ public class BattleOutcomeTest
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Draw, battle.Session.Outcome.RequireSome());
-    var ended = recorder.OfType<SessionEndedBattleEvent>().Single();
+    var ended = recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Draw, ended.Outcome);
   }
 
@@ -135,7 +134,7 @@ public class BattleOutcomeTest
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
-    var ended = recorder.OfType<SessionEndedBattleEvent>().Single();
+    var ended = recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Defeat, ended.Outcome);
   }
 }

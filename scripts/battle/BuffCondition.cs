@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using FunProject.Buffs;
 
 namespace FunProject.Battle;
@@ -47,7 +46,7 @@ public sealed class AdjacentEnemyCondition : BuffCondition
   internal override bool IsMet(BattleSession session, BattleUnitState unit)
     => session.GetUnitPosition(unit).Match(
          position => session.AliveUnits
-           .Where(other => other.Side != unit.Side)
+           .AsValueEnumerable().Where(other => other.Side != unit.Side)
            .Any(other => session.GetUnitPosition(other).Match(
              otherPosition => BattleBoardState.AreAdjacent(position, otherPosition),
              () => false)),

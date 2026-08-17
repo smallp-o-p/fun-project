@@ -5,7 +5,6 @@ using GdUnit4;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -28,7 +27,7 @@ public class GetAvailableActionsForUnitTest
 
   private static UnitAction Row<TDefinition>(IReadOnlyList<UnitAction> actions)
     where TDefinition : UnitActionDefinition =>
-    actions.Single(action => action.Action is TDefinition);
+    actions.AsValueEnumerable().Single(action => action.Action is TDefinition);
 
   [TestCase(TestName = "Armed melee unit: Move, Attack, Pass, EndTurn rows, all available, no Reload row")]
   public void ArmedMeleeUnitAllVerbsAvailable()
@@ -37,8 +36,8 @@ public class GetAvailableActionsForUnitTest
     var actions = ActionsOf(runtime, SingleAliveUnit(runtime, player));
 
     Assert.Equal(4, actions.Count);
-    Assert.True(actions.All(action => action.IsAvailable));
-    Assert.False(actions.Any(action => action.Action is ReloadActionDefinition));
+    Assert.True(actions.AsValueEnumerable().All(action => action.IsAvailable));
+    Assert.False(actions.AsValueEnumerable().Any(action => action.Action is ReloadActionDefinition));
   }
 
   [TestCase(TestName = "Magazine weapon adds a Reload row in catalog order; full mag makes it unavailable")]
@@ -82,8 +81,8 @@ public class GetAvailableActionsForUnitTest
     var (runtime, player, _) = MakeBattle(None);
     var actions = ActionsOf(runtime, SingleAliveUnit(runtime, player));
 
-    Assert.False(actions.Any(action => action.Action is AttackActionDefinition));
-    Assert.False(actions.Any(action => action.Action is ReloadActionDefinition));
+    Assert.False(actions.AsValueEnumerable().Any(action => action.Action is AttackActionDefinition));
+    Assert.False(actions.AsValueEnumerable().Any(action => action.Action is ReloadActionDefinition));
     Assert.True(Row<MoveActionDefinition>(actions).IsAvailable);
   }
 
@@ -93,7 +92,7 @@ public class GetAvailableActionsForUnitTest
     var (runtime, _, enemy) = MakeBattle(BattleTestFactory.MakeWeapon("Rifle"));
     var actions = ActionsOf(runtime, SingleAliveUnit(runtime, enemy)); // enemy is not active at turn 1
 
-    Assert.True(actions.All(action => !action.IsAvailable));
+    Assert.True(actions.AsValueEnumerable().All(action => !action.IsAvailable));
   }
 
   [TestCase(TestName = "Boxed-in unit: Move unavailable")]

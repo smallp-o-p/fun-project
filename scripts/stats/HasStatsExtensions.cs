@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Stats;
 
@@ -19,5 +18,5 @@ public static class HasStatsExtensions
   public static Option<float> TryResolve<TStat>(this HasStats owner, IEnumerable<StatMod> sources) where TStat : Stat
     => owner.TryGetStat<TStat>().Map(stat => HasStats.Fold(
          stat.BaseValue,
-         sources.Where(mod => mod.TargetType == typeof(TStat)).SelectMany(mod => mod.Modifiers)));
+         sources.AsValueEnumerable().Where(mod => mod.TargetType == typeof(TStat)).SelectMany(mod => mod.Modifiers).ToArray()));
 }

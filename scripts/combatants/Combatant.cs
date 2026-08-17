@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using FunProject.Buffs;
 using FunProject.Items;
 using FunProject.Stats;
@@ -48,7 +47,7 @@ public class Combatant : HasStats, HasModSlots
   public Godot.Collections.Array<ModSlot> GetModSlots() => _modSlots;
 
   public IEnumerable<StatMod> StatContributions()
-    => this.EquippedMods().SelectMany(m => m.StatContributions).Concat(OwningFaction.StatBonuses);
+    => this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).Concat(OwningFaction.StatBonuses).ToArray();
 
   public void EquipItem(EquippableItem item)
   {

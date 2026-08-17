@@ -1,7 +1,6 @@
 using FunProject.Battle;
 using GdUnit4;
 using Godot;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -42,7 +41,7 @@ public partial class BattleBoardStateTest
     Assert.Equal(new Vector3I(0, 0, 1), path[0].Raw);
     Assert.Equal(new Vector3I(2, 0, 1), path[^1].Raw);
     Assert.Equal(5, path.Length);
-    Assert.False(path.Any(point => point.Raw == new Vector3I(1, 0, 1)));
+    Assert.False(path.AsValueEnumerable().Any(point => point.Raw == new Vector3I(1, 0, 1)));
   }
 
   [TestCase(TestName = "FindPath returns an empty path when no traversable route exists")]
@@ -81,7 +80,7 @@ public partial class BattleBoardStateTest
     BattleBoardState.ValidatedPoint[] pathFromOccupiedSource = board.FindPath(7, board.At(2, 0, 1));
 
     Assert.Equal(5, pathAroundOccupant.Length);
-    Assert.False(pathAroundOccupant.Any(point => point.Raw == new Vector3I(1, 0, 1)));
+    Assert.False(pathAroundOccupant.AsValueEnumerable().Any(point => point.Raw == new Vector3I(1, 0, 1)));
     Assert.Equal(2, pathFromOccupiedSource.Length);
     Assert.Equal(new Vector3I(1, 0, 1), pathFromOccupiedSource[0].Raw);
     Assert.Equal(new Vector3I(2, 0, 1), pathFromOccupiedSource[^1].Raw);

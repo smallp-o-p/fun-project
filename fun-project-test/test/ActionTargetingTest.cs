@@ -4,7 +4,6 @@ using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -32,7 +31,7 @@ public class ActionTargetingTest
     var move = new MoveTargeting(runtime, hero.State);
 
     IReadOnlyCollection<Vector3I> reachable = move.Begin();
-    Assert.True(reachable.Contains(new Vector3I(2, 0, 1)));
+    Assert.True(reachable.AsValueEnumerable().Contains(new Vector3I(2, 0, 1)));
 
     ActionPreview preview = GetValue(move.Preview(new Vector3I(2, 0, 1)));
     Assert.True(preview is PathPreview);
@@ -53,7 +52,7 @@ public class ActionTargetingTest
     var attack = new AttackTargeting(runtime, hero.State, rifle);
 
     IReadOnlyCollection<Vector3I> candidates = attack.Begin();
-    Assert.True(candidates.Contains(new Vector3I(3, 0, 0)));   // the enemy's tile, in range + visible
+    Assert.True(candidates.AsValueEnumerable().Contains(new Vector3I(3, 0, 0)));   // the enemy's tile, in range + visible
 
     ActionPreview preview = GetValue(attack.Preview(new Vector3I(3, 0, 0)));
     Assert.True(preview is AttackPreview);

@@ -9,7 +9,6 @@ using FunProject.Stats;
 using FunProject.Weapons;
 using Godot;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Tests;
 
@@ -325,11 +324,11 @@ internal static class BattleTestFactory
   // live runtime. Accepts a prebuilt board so callers can pre-mutate walkability/cover.
   public static BattleRuntime StartRuntime(BattleBoardState board, params StartPlacement[] placements)
   {
-    List<Faction> factionOrder = placements.Select(placement => placement.Faction).Distinct().ToList();
+    List<Faction> factionOrder = placements.AsValueEnumerable().Select(placement => placement.Faction).Distinct().ToList();
     List<UnitPlacement> unitPlacements = placements
-      .Select(placement => new UnitPlacement(new UnitLoadout(placement.Combatant, placement.Weapon), placement.Position))
+      .AsValueEnumerable().Select(placement => new UnitPlacement(new UnitLoadout(placement.Combatant, placement.Weapon), placement.Position))
       .ToList();
-    var objectives = factionOrder.ToDictionary(
+    var objectives = factionOrder.AsValueEnumerable().ToDictionary(
       faction => faction,
       faction => (IReadOnlyList<ObjectiveData>)new ObjectiveData[] { new FakeObjectiveData() });
 

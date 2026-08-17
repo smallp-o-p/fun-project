@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Godot;
 using FunProject.Buffs;
 using FunProject.Combatants;
@@ -38,11 +37,11 @@ public sealed class BattleUnitState
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
   public IReadOnlyCollection<ActiveStatusEffect> ActiveStatusEffects => _activeStatusEffects.Values;
-  public bool IsImmobilized => _activeStatusEffects.Values.Any(effect => !effect.IsExpired && effect.BlocksAction);
+  public bool IsImmobilized => _activeStatusEffects.Values.AsValueEnumerable().Any(effect => !effect.IsExpired && effect.BlocksAction);
   public IReadOnlyList<Buff> Buffs => _buffs;
-  public IEnumerable<Buff> ActiveBuffs => _buffs.Where(buff => buff.IsActive);
+  public IEnumerable<Buff> ActiveBuffs => _buffs.AsValueEnumerable().Where(buff => buff.IsActive).ToArray();
   internal IEnumerable<DamageBundleMod> ActiveBuffDamageMods
-    => ActiveBuffs.SelectMany(buff => buff.Data.DamageMods);
+    => ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.Data.DamageMods).ToArray();
 
   internal BattleUnitState(
     int unitId,
@@ -66,9 +65,10 @@ public sealed class BattleUnitState
     // Dedupe by BuffData reference identity: the same authored buff granted by several
     // sources (innate + item) must contribute once, mirroring status-effect spec identity.
     IEnumerable<BuffData> granted = combatant.InnateBuffs
-      .Concat(equippedWeapon.Match(w => w.GrantedBuffs, () => (IReadOnlyList<BuffData>)[]))
-      .Concat(equippedArmor.Match(a => a.Item.GrantedBuffs, () => (IReadOnlyList<BuffData>)[]));
-    foreach (BuffData buffData in granted.Distinct())
+      .AsValueEnumerable().Concat(equippedWeapon.Match(w => w.GrantedBuffs, () => (IReadOnlyList<BuffData>)[]))
+      .Concat(equippedArmor.Match(a => a.Item.GrantedBuffs, () => (IReadOnlyList<BuffData>)[]))
+      .ToArray();
+    foreach (BuffData buffData in granted.AsValueEnumerable().Distinct())
       _buffs.Add(new Buff(buffData));
   }
 
@@ -187,8 +187,10 @@ public sealed class BattleUnitState
 
   private IEnumerable<StatMod> GatherStatContributions()
     => Combatant.StatContributions()
-         .Concat(EquippedWeapon.Match(w => w.StatContributions, () => System.Linq.Enumerable.Empty<StatMod>()))
-         .Concat(ActiveBuffs.SelectMany(buff => buff.Data.StatMods));
+         .AsValueEnumerable()
+         .Concat(EquippedWeapon.Match<IEnumerable<StatMod>>(w => w.StatContributions, () => System.Array.Empty<StatMod>()))
+         .Concat(ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.Data.StatMods).ToArray())
+         .ToArray();
 
   internal void ClampCurrentHealthToMax()
   {

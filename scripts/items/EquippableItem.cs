@@ -5,7 +5,6 @@ using FunProject.Stats;
 using Godot.Collections;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Items;
 
@@ -24,7 +23,7 @@ public class EquippableItem : HasModSlots, HasNameAndDescription
     foreach (ItemCapabilityData capabilityData in data.Capabilities)
     {
       ItemCapability capability = capabilityData.CreateRuntime();
-      if (_capabilities.Any(existing => existing.GetType().IsAssignableTo(capability.GetType())
+      if (_capabilities.AsValueEnumerable().Any(existing => existing.GetType().IsAssignableTo(capability.GetType())
                                      || capability.GetType().IsAssignableTo(existing.GetType())))
         throw new InvalidOperationException($"Item '{ItemName}' has more than one {capability.GetType().Name}.");
       _capabilities.Add(capability);
@@ -36,7 +35,7 @@ public class EquippableItem : HasModSlots, HasNameAndDescription
 
   public Option<TCap> FindCapability<TCap>() where TCap : ItemCapability
   {
-    foreach (var capability in _capabilities.OfType<TCap>())
+    foreach (var capability in _capabilities.AsValueEnumerable().OfType<TCap>())
       return capability;
     return None;
   }

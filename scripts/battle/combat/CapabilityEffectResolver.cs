@@ -2,7 +2,6 @@ using FunProject.Items.Effects;
 using FunProject.Weapons;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FunProject.Battle;
 
@@ -30,7 +29,7 @@ public static class CapabilityEffectResolver
     // BEFORE applying anything; radius 0 = only the origin tile's occupant. Friendly-fire
     // is intentional, so no side filtering.
     List<BattleUnitState> affected = session.AliveUnits
-      .Where(unit => session.GetUnitPosition(unit).Match(
+      .AsValueEnumerable().Where(unit => session.GetUnitPosition(unit).Match(
         Some: point => BattleSession.GetGridDistance(point.Raw, origin.Raw) <= radius,
         None: () => false))
       .ToList();

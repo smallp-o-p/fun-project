@@ -4,7 +4,6 @@ using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
 using System;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -106,7 +105,7 @@ public class DamagePipelineTest
 
     Assert.True(slot.HasMod);
     Assert.Equal(1, mod.BundleMods.Count);
-    Assert.False(mod.StatContributions.Any());
+    Assert.False(mod.StatContributions.AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "EmitDamage derives the frame's packets from base damage")]

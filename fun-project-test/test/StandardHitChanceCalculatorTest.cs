@@ -1,7 +1,6 @@
 using FunProject.Battle;
 using GdUnit4;
 using Godot;
-using System.Linq;
 
 [TestSuite]
 [RequireGodotRuntime]
