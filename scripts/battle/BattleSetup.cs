@@ -2,7 +2,6 @@ using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Weapons;
-using Godot;
 using System.Collections.Generic;
 
 namespace FunProject.Battle;

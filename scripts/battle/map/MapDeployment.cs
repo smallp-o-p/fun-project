@@ -1,5 +1,4 @@
 using FunProject.Combatants;
-using Godot;
 using System.Collections.Generic;
 
 namespace FunProject.Battle;
@@ -29,7 +28,8 @@ public static class MapDeployment
       for (int i = 0; i < combatants.Count; i++)
       {
         Vector3I cell = cells[i];
-        if (!IsInBounds(cell, map.Dimensions))
+        var mapDimensions = new Vector3I(map.Dimensions.X, map.Dimensions.Y, map.Dimensions.Z);
+        if (!IsInBounds(cell, mapDimensions))
           return Left<string, IReadOnlyList<(Combatant Combatant, Vector3I Position)>>(
             $"Spawn cell {cell} for slot {slot} is out of bounds for dimensions {map.Dimensions}.");
 
@@ -46,10 +46,12 @@ public static class MapDeployment
   private static List<Vector3I> SpawnCellsForSlot(BattleMapData map, int slot)
   {
     var cells = new List<Vector3I>();
-    foreach (KeyValuePair<Vector3I, BattleMapTileData> entry in map.Tiles)
+    // Godot.Vector3I keys (the authored map's coordinate type) are converted to the runtime
+    // Vector3I as they are read off the map.
+    foreach (var entry in map.Tiles)
     {
       if (entry.Value is not null && entry.Value.SpawnFactionSlot == slot)
-        cells.Add(entry.Key);
+        cells.Add(new Vector3I(entry.Key.X, entry.Key.Y, entry.Key.Z));
     }
 
     cells.Sort(CompareCells);

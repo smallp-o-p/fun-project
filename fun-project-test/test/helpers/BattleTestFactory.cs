@@ -308,15 +308,21 @@ internal static class BattleTestFactory
 
   public static BattleMapTileData SpawnTile(int slot) => new() { SpawnFactionSlot = slot };
 
+  // Takes runtime Vector3I coordinates (X = width, Y = levels/height, Z = depth) and converts
+  // them to Godot.Vector3I dictionary keys when building the authored map.
   public static BattleMapData MakeMapData(
     Vector3I dimensions,
     params (Vector3I Cell, BattleMapTileData Tile)[] tiles)
   {
-    var dict = new Godot.Collections.Dictionary<Vector3I, BattleMapTileData>();
+    var dict = new Godot.Collections.Dictionary<Godot.Vector3I, BattleMapTileData>();
     foreach ((Vector3I cell, BattleMapTileData tile) in tiles)
-      dict[cell] = tile;
+      dict[new Godot.Vector3I(cell.X, cell.Y, cell.Z)] = tile;
 
-    return new BattleMapData { Dimensions = dimensions, Tiles = dict };
+    return new BattleMapData
+    {
+      Dimensions = new Godot.Vector3I(dimensions.X, dimensions.Y, dimensions.Z),
+      Tiles = dict,
+    };
   }
 
   // Production-path bring-up: builds a BattleSetup (one FakeObjective per distinct faction, in

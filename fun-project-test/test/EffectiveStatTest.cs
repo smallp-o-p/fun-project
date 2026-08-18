@@ -60,7 +60,7 @@ public class EffectiveStatTest
   {
     var playerFaction = BattleTestFactory.MakeFaction("Player");
     var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var board = new BattleBoardState(new Godot.Vector3I(12, 1, 12));
+    var board = new BattleBoardState(new Vector3I(12, 1, 12));
     var session = BattleTestFactory.MakeSession(board, [playerFaction, enemyFaction]);
 
     // Base range 3 is too short to reach tile (0,0,8); the +10 slot mod lifts effective range to 13.
@@ -69,8 +69,8 @@ public class EffectiveStatTest
     weapon.GetModSlots()[0].Equip(new MultiStatMod { StatMods = [new RangeStatMod { Modifiers = [StatModifier.Add(10)] }] });
 
     // distance 8 > base range 3, but effective range 3+10=13 => in range after edits
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction), new Godot.Vector3I(0, 0, 0), weapon);
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Godot.Vector3I(0, 0, 8));
+    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction), new Vector3I(0, 0, 0), weapon);
+    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(0, 0, 8));
     StartBattle(session);
 
     var result = BattleQueryTestHelper.Query(session, new GetHitChanceForAttack(attacker.AliveIn(session), target.AliveIn(session)));
@@ -85,9 +85,9 @@ public class EffectiveStatTest
     var combatant = BattleTestFactory.MakeCombatant("Alpha", faction, aim: 65, modSlotCount: 1);
     combatant.GetModSlots()[0].Equip(new MultiStatMod { StatMods = [new AimStatMod { Modifiers = [StatModifier.Add(15)] }] });
 
-    var board = new FunProject.Battle.BattleBoardState(new Godot.Vector3I(8, 1, 8));
-    var attackerPoint = board.ValidatePoint(new Godot.Vector3I(4, 0, 1)).RequireSome();
-    var defenderPoint = board.ValidatePoint(new Godot.Vector3I(4, 0, 4)).RequireSome();
+    var board = new FunProject.Battle.BattleBoardState(new Vector3I(8, 1, 8));
+    var attackerPoint = board.ValidatePoint(new Vector3I(4, 0, 1)).RequireSome();
+    var defenderPoint = board.ValidatePoint(new Vector3I(4, 0, 4)).RequireSome();
     var weapon = BattleTestFactory.MakeWeapon("Rifle");
     var attacker = new FunProject.Battle.BattleUnitState(1, combatant, Some(weapon), None);
     var context = new FunProject.Battle.AttackContext(attacker, weapon, attackerPoint, defenderPoint, board);

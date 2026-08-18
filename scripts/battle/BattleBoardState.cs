@@ -64,7 +64,8 @@ public sealed class BattleBoardState
   {
   }
 
-  public BattleBoardState(BattleMapData map) : this(map.Dimensions, map)
+  public BattleBoardState(BattleMapData map)
+    : this(new Vector3I(map.Dimensions.X, map.Dimensions.Y, map.Dimensions.Z), map)
   {
   }
 
@@ -97,7 +98,7 @@ public sealed class BattleBoardState
       if (data is null)
         continue;
 
-      ValidatePoint(entry.Key).Match(
+      ValidatePoint(new Vector3I(entry.Key.X, entry.Key.Y, entry.Key.Z)).Match(
         point =>
         {
           BattleTileState tile = GetTile(point);
@@ -256,7 +257,7 @@ public sealed class BattleBoardState
   public static int GetGridDistance(Vector3I source, Vector3I destination)
   {
     var delta = source - destination;
-    return Mathf.Abs(delta.X) + Mathf.Abs(delta.Y) + Mathf.Abs(delta.Z);
+    return Math.Abs(delta.X) + Math.Abs(delta.Y) + Math.Abs(delta.Z);
   }
 
   public static bool AreAdjacent(ValidatedPoint source, ValidatedPoint destination)

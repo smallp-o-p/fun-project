@@ -11,7 +11,7 @@ This document describes the tactical runtime shape in the repo and the nearby ex
 - Read-side battle questions are represented as typed query objects, executed through `BattleRuntime.Query`.
 - Controllers, HUD code, and AI should ask battle-state questions through explicit query types instead of accumulating public query methods on `BattleSession`.
 - Godot scene nodes own presentation, input, and focused-unit UX. They do not own tactical truth.
-- Board coordinates use normal `Godot.Vector3I` semantics:
+- Board coordinates are the engine-agnostic `FunProject.Core.Vector3I` (axis-compatible with Godot's `Vector3I`, which remains the type of the authored `BattleMapData` surface):
   - `X` = width
   - `Y` = levels / height
   - `Z` = length / depth

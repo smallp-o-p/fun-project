@@ -41,7 +41,7 @@ public sealed class BattleRuntime : IDisposable
 
   // The tile mint door for scene code holding a raw coordinate (Some iff the tile is on this
   // session's board). In-bounds is a stable fact, so this proof cannot go stale.
-  public Option<BattleBoardState.ValidatedPoint> TryGetTile(Godot.Vector3I coordinates)
+  public Option<BattleBoardState.ValidatedPoint> TryGetTile(Vector3I coordinates)
   {
     ThrowIfDisposed();
     return _session.Board.ValidatePoint(coordinates);

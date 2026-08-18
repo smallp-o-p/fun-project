@@ -108,7 +108,7 @@ The tile system should evolve toward these responsibilities:
 
 ## Coordinate Conventions
 
-Board coordinates should continue using `Godot.Vector3I` semantics:
+Board coordinates are the engine-agnostic `FunProject.Core.Vector3I` (axis-compatible with Godot's `Vector3I`):
 
 - `X` = width
 - `Y` = levels / height

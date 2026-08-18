@@ -1,5 +1,3 @@
-using Godot;
-
 namespace FunProject.Battle;
 
 public static class CoverRules

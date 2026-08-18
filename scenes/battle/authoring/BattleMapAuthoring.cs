@@ -48,11 +48,11 @@ public partial class BattleMapAuthoring : GridMap
     AssociatedData = GD.Load<Resource>(TargetPath);
   }
 
-  private List<(Vector3I Coordinates, BattleMapTileData Brush)> ReadPaintedCells()
+  private List<(Godot.Vector3I Coordinates, BattleMapTileData Brush)> ReadPaintedCells()
   {
-    var painted = new List<(Vector3I Coordinates, BattleMapTileData Brush)>();
+    var painted = new List<(Godot.Vector3I Coordinates, BattleMapTileData Brush)>();
 
-    foreach (Vector3I cell in GetUsedCells())
+    foreach (Godot.Vector3I cell in GetUsedCells())
     {
       int itemId = GetCellItem(cell);
       if (itemId == InvalidCellItem)
@@ -83,7 +83,7 @@ public partial class BattleMapAuthoring : GridMap
   // origin and keys each cell to its brush (the same brush instance is reused across cells of
   // the same type). Static and free of GridMap/scene state, so it stays unit-testable without a
   // live GridMap.
-  public static BattleMapData BuildMap(IReadOnlyList<(Vector3I Coordinates, BattleMapTileData Brush)> cells)
+  public static BattleMapData BuildMap(IReadOnlyList<(Godot.Vector3I Coordinates, BattleMapTileData Brush)> cells)
   {
     if (cells is null || cells.Count == 0)
       throw new InvalidOperationException("Cannot bake a BattleMapData from zero painted cells.");
@@ -92,7 +92,7 @@ public partial class BattleMapAuthoring : GridMap
     int maxX = int.MinValue, maxZ = int.MinValue, maxLevel = int.MinValue;
     foreach (var cell in cells)
     {
-      Vector3I c = cell.Coordinates;
+      Godot.Vector3I c = cell.Coordinates;
       minX = Math.Min(minX, c.X);
       maxX = Math.Max(maxX, c.X);
       minZ = Math.Min(minZ, c.Z);
@@ -100,12 +100,12 @@ public partial class BattleMapAuthoring : GridMap
       maxLevel = Math.Max(maxLevel, c.Y);
     }
 
-    var dimensions = new Vector3I(maxX - minX + 1, maxLevel + 1, maxZ - minZ + 1);
-    var tiles = new Godot.Collections.Dictionary<Vector3I, BattleMapTileData>();
+    var dimensions = new Godot.Vector3I(maxX - minX + 1, maxLevel + 1, maxZ - minZ + 1);
+    var tiles = new Godot.Collections.Dictionary<Godot.Vector3I, BattleMapTileData>();
 
     foreach (var cell in cells)
     {
-      var normalized = new Vector3I(cell.Coordinates.X - minX, cell.Coordinates.Y, cell.Coordinates.Z - minZ);
+      var normalized = new Godot.Vector3I(cell.Coordinates.X - minX, cell.Coordinates.Y, cell.Coordinates.Z - minZ);
       tiles[normalized] = cell.Brush;
     }
 
