@@ -177,24 +177,24 @@ public sealed class BattleBoardState
   }
 
   /// <summary>
-  /// Find a shortest path for a unit to destination via breadth-first search (all steps cost
+  /// Find a shortest path from source to destination via breadth-first search (all steps cost
   /// the same — the board has no terrain costs yet; if weighted movement ever arrives, replace
-  /// this with a best-first search, keeping the neighbor rule below). The fixed
+  /// this with a best-first search, keeping the neighbor rule below). Every tile the search
+  /// enters — the destination included — must be occupiable (walkable and unoccupied); the
+  /// source is seeded without testing, so an occupied source still paths out of it. The fixed
   /// <see cref="OrthogonalDirections"/> order makes the choice among equal-length paths
   /// deterministic.
   /// </summary>
-  /// <param name="movingUnitId"></param>
+  /// <param name="source"></param>
   /// <param name="destination"></param>
-  /// <returns>A path of points from the unit's tile to destination, or [] if no path can be found.</returns>
-  public ValidatedPoint[] FindPath(int movingUnitId, ValidatedPoint destination)
+  /// <returns>A path of points from source to destination, or [] if no path can be found.</returns>
+  public ValidatedPoint[] FindPath(ValidatedPoint source, ValidatedPoint destination)
   {
-    if (!_positionByUnit.TryGetValue(movingUnitId, out ValidatedPoint source))
-      return [];
-    if (!CanUsePathEndpoint(source, movingUnitId) || !CanUsePathEndpoint(destination, movingUnitId))
+    if (source == destination)
+      return [source];
+    if (!CanOccupy(destination))
       return [];
 
-    // The search starts at the mover's tile and only ever tests tiles it enters, so the
-    // mover occupying its own source needs no special casing.
     Dictionary<ValidatedPoint, ValidatedPoint> parentByNode = [];
     Queue<ValidatedPoint> frontier = new();
     parentByNode[source] = source;
@@ -215,7 +215,7 @@ public sealed class BattleBoardState
         var neighbor = new ValidatedPoint(neighborCoordinates);
         if (parentByNode.ContainsKey(neighbor))
           continue;
-        if (!CanUsePathEndpoint(neighbor, movingUnitId))
+        if (!CanOccupy(neighbor))
           continue;
 
         parentByNode[neighbor] = current;
@@ -291,16 +291,6 @@ public sealed class BattleBoardState
           yield return new ValidatedPoint(new Vector3I(x, y, z));
       }
     }
-  }
-
-  private bool CanUsePathEndpoint(ValidatedPoint point, int movingUnitId)
-  {
-    if (!GetTile(point).IsWalkable)
-      return false;
-    if (!_occupants.TryGetValue(point, out int occupant))
-      return true;
-
-    return occupant == movingUnitId;
   }
 
   public BattleTileState GetTile(ValidatedPoint point)

@@ -7,7 +7,7 @@ public sealed class FindPathForUnit(AliveUnit unit, BattleBoardState.ValidatedPo
 {
   public BattleBoardState.ValidatedPoint[] Execute(BattleSession session)
   {
-    return session.Board.FindPath(unit.Id, destination);
+    return session.Board.FindPath(unit.Position, destination);
   }
 }
 

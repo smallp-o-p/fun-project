@@ -34,9 +34,8 @@ public partial class BattleBoardStateTest
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
     board.SetTileWalkable(board.At(1, 0, 1), false);
-    Assert.True(board.TryPlaceOccupant(board.At(0, 0, 1), 1));
 
-    BattleBoardState.ValidatedPoint[] path = board.FindPath(1, board.At(2, 0, 1));
+    BattleBoardState.ValidatedPoint[] path = board.FindPath(board.At(0, 0, 1), board.At(2, 0, 1));
 
     Assert.Equal(new Vector3I(0, 0, 1), path[0].Raw);
     Assert.Equal(new Vector3I(2, 0, 1), path[^1].Raw);
@@ -51,19 +50,19 @@ public partial class BattleBoardStateTest
     board.SetTileWalkable(board.At(1, 0, 0), false);
     board.SetTileWalkable(board.At(1, 0, 1), false);
     board.SetTileWalkable(board.At(1, 0, 2), false);
-    Assert.True(board.TryPlaceOccupant(board.At(0, 0, 1), 1));
 
-    BattleBoardState.ValidatedPoint[] path = board.FindPath(1, board.At(2, 0, 1));
+    BattleBoardState.ValidatedPoint[] path = board.FindPath(board.At(0, 0, 1), board.At(2, 0, 1));
 
     Assert.Equal(0, path.Length);
   }
 
-  [TestCase(TestName = "FindPath returns an empty path for a unit not placed on the board")]
-  public void FindPathReturnsAnEmptyPathForAUnitNotPlacedOnTheBoard()
+  [TestCase(TestName = "FindPath returns an empty path when the destination is occupied")]
+  public void FindPathReturnsAnEmptyPathWhenTheDestinationIsOccupied()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
+    Assert.True(board.TryPlaceOccupant(board.At(2, 0, 1), 7));
 
-    BattleBoardState.ValidatedPoint[] path = board.FindPath(42, board.At(2, 0, 1));
+    BattleBoardState.ValidatedPoint[] path = board.FindPath(board.At(0, 0, 1), board.At(2, 0, 1));
 
     Assert.Equal(0, path.Length);
   }
@@ -75,9 +74,8 @@ public partial class BattleBoardStateTest
     // search visits the +X neighbor before the +Z neighbor, so the path runs X-first. This
     // pins the deterministic tie-break that the fixed OrthogonalDirections order provides.
     BattleBoardState board = new(new Vector3I(3, 1, 3));
-    Assert.True(board.TryPlaceOccupant(board.At(0, 0, 0), 1));
 
-    BattleBoardState.ValidatedPoint[] path = board.FindPath(1, board.At(1, 0, 1));
+    BattleBoardState.ValidatedPoint[] path = board.FindPath(board.At(0, 0, 0), board.At(1, 0, 1));
 
     Assert.Equal(3, path.Length);
     Assert.Equal(new Vector3I(1, 0, 0), path[1].Raw);
@@ -91,8 +89,8 @@ public partial class BattleBoardStateTest
     Assert.True(board.TryPlaceOccupant(board.At(1, 0, 1), 7));
     Assert.True(board.TryPlaceOccupant(board.At(0, 0, 1), 2));
 
-    BattleBoardState.ValidatedPoint[] pathAroundOccupant = board.FindPath(2, board.At(2, 0, 1));
-    BattleBoardState.ValidatedPoint[] pathFromOccupiedSource = board.FindPath(7, board.At(2, 0, 1));
+    BattleBoardState.ValidatedPoint[] pathAroundOccupant = board.FindPath(board.At(0, 0, 1), board.At(2, 0, 1));
+    BattleBoardState.ValidatedPoint[] pathFromOccupiedSource = board.FindPath(board.At(1, 0, 1), board.At(2, 0, 1));
 
     Assert.Equal(5, pathAroundOccupant.Length);
     Assert.False(pathAroundOccupant.AsValueEnumerable().Any(point => point.Raw == new Vector3I(1, 0, 1)));
@@ -102,7 +100,7 @@ public partial class BattleBoardStateTest
 
     Assert.True(board.TryClearOccupant(board.At(1, 0, 1), 7));
 
-    BattleBoardState.ValidatedPoint[] pathAfterClearingOccupant = board.FindPath(2, board.At(2, 0, 1));
+    BattleBoardState.ValidatedPoint[] pathAfterClearingOccupant = board.FindPath(board.At(0, 0, 1), board.At(2, 0, 1));
     Assert.Equal(3, pathAfterClearingOccupant.Length);
   }
 
