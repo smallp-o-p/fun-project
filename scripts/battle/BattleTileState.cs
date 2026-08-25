@@ -3,7 +3,7 @@ namespace FunProject.Battle;
 public sealed class BattleTileState
 {
   // Walkability is authored at board construction and otherwise mutated only through
-  // BattleBoardState.SetTileWalkable, which keeps the path graph in sync.
+  // BattleBoardState.SetTileWalkable.
   public bool IsWalkable { get; internal set; } = true;
 
   public bool BlocksLineOfSight { get; set; }

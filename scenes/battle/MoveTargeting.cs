@@ -6,7 +6,7 @@ using System.Collections.Generic;
 // Tile-path targeting: reachable tiles from GetPossibleMoveTilesForUnit; path preview/commit from
 // FindPathForUnit (source-inclusive, so the committed MoveUnit drops index 0). The handler owns the
 // reachable set as the single source the controller renders from, and caches the last previewed
-// (target, path) so commit reuses the hover preview's path instead of re-querying AStar.
+// (target, path) so commit reuses the hover preview's path instead of re-querying the path search.
 public sealed class MoveTargeting : IActionTargeting
 {
   private readonly BattleRuntime _runtime;

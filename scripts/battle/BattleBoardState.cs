@@ -50,11 +50,6 @@ public sealed class BattleBoardState
   }
 
   private readonly BattleTileState[,,] _tiles;
-  private readonly AStar3D _pathGraph = new();
-  // Managed adjacency for every existing path-graph point, kept in sync as points/edges are added.
-  // The key set is exactly the set of AStar points (sparse: void cells have no entry), so GetReachableTiles
-  // can walk connectivity without per-node Godot interop allocations.
-  private readonly Dictionary<long, List<long>> _neighborsById = [];
   private readonly Dictionary<ValidatedPoint, int> _occupants = [];
   private readonly Dictionary<int, ValidatedPoint> _positionByUnit = [];
 
@@ -82,9 +77,6 @@ public sealed class BattleBoardState
 
     if (map is not null)
       ApplyMapData(map);
-
-    // Build the path graph once, after final walkability is known, so void cells never allocate a node.
-    BuildPathGraph();
   }
 
   private void ApplyMapData(BattleMapData map)
@@ -117,10 +109,6 @@ public sealed class BattleBoardState
   public void SetTileWalkable(ValidatedPoint point, bool walkable)
   {
     GetTile(point).IsWalkable = walkable;
-    if (walkable)
-      EnsurePathGraphPoint(point);
-
-    UpdatePathPointState(point);
   }
 
   private bool IsInBounds(Vector3I coordinates)
@@ -155,7 +143,6 @@ public sealed class BattleBoardState
 
     _occupants[point] = unitId;
     _positionByUnit[unitId] = point;
-    UpdatePathPointState(point);
     return true;
   }
 
@@ -171,8 +158,6 @@ public sealed class BattleBoardState
     _occupants.Remove(source);
     _occupants[destination] = unitId;
     _positionByUnit[unitId] = destination;
-    UpdatePathPointState(source);
-    UpdatePathPointState(destination);
     return true;
   }
 
@@ -183,7 +168,6 @@ public sealed class BattleBoardState
 
     _occupants.Remove(point);
     _positionByUnit.Remove(unitId);
-    UpdatePathPointState(point);
     return true;
   }
 
@@ -193,11 +177,15 @@ public sealed class BattleBoardState
   }
 
   /// <summary>
-  /// Find a path for a unit at tile X to destination
+  /// Find a shortest path for a unit to destination via breadth-first search (all steps cost
+  /// the same — the board has no terrain costs yet; if weighted movement ever arrives, replace
+  /// this with a best-first search, keeping the neighbor rule below). The fixed
+  /// <see cref="OrthogonalDirections"/> order makes the choice among equal-length paths
+  /// deterministic.
   /// </summary>
   /// <param name="movingUnitId"></param>
   /// <param name="destination"></param>
-  /// <returns>A path of points to destination, or [] if no path can be found.</returns>
+  /// <returns>A path of points from the unit's tile to destination, or [] if no path can be found.</returns>
   public ValidatedPoint[] FindPath(int movingUnitId, ValidatedPoint destination)
   {
     if (!_positionByUnit.TryGetValue(movingUnitId, out ValidatedPoint source))
@@ -205,23 +193,50 @@ public sealed class BattleBoardState
     if (!CanUsePathEndpoint(source, movingUnitId) || !CanUsePathEndpoint(destination, movingUnitId))
       return [];
 
-    long sourceId = CoordinatesToPointId(source);
-    long destinationId = CoordinatesToPointId(destination);
+    // The search starts at the mover's tile and only ever tests tiles it enters, so the
+    // mover occupying its own source needs no special casing.
+    Dictionary<ValidatedPoint, ValidatedPoint> parentByNode = [];
+    Queue<ValidatedPoint> frontier = new();
+    parentByNode[source] = source;
+    frontier.Enqueue(source);
 
-    // The mover occupies (and thus disables) its own source node, and AStar3D offers no "treat
-    // this start point as enabled for one query" option, so we clear that flag for the duration
-    // of the query and restore it in finally — leaving no residue even if GetIdPath throws.
-    // Assumes single-threaded access to the board (the whole battle runtime is single-threaded).
-    _pathGraph.SetPointDisabled(sourceId, false);
+    while (frontier.Count > 0)
+    {
+      ValidatedPoint current = frontier.Dequeue();
+      if (current == destination)
+        return ReconstructPath(parentByNode, source, destination);
 
-    try
-    {
-      return System.Array.ConvertAll(_pathGraph.GetIdPath(sourceId, destinationId), PointIdToCoordinates);
+      foreach (Vector3I direction in OrthogonalDirections)
+      {
+        Vector3I neighborCoordinates = current.Raw + direction;
+        if (!IsInBounds(neighborCoordinates))
+          continue;
+
+        var neighbor = new ValidatedPoint(neighborCoordinates);
+        if (parentByNode.ContainsKey(neighbor))
+          continue;
+        if (!CanUsePathEndpoint(neighbor, movingUnitId))
+          continue;
+
+        parentByNode[neighbor] = current;
+        frontier.Enqueue(neighbor);
+      }
     }
-    finally
-    {
-      _pathGraph.SetPointDisabled(sourceId, ShouldDisablePathPoint(source));
-    }
+
+    return [];
+  }
+
+  private static ValidatedPoint[] ReconstructPath(
+    Dictionary<ValidatedPoint, ValidatedPoint> parentByNode,
+    ValidatedPoint source,
+    ValidatedPoint destination)
+  {
+    List<ValidatedPoint> reversed = [];
+    for (ValidatedPoint current = destination; current != source; current = parentByNode[current])
+      reversed.Add(current);
+    reversed.Add(source);
+
+    return reversed.AsValueEnumerable().Reverse().ToArray();
   }
 
   public bool CanOccupy(ValidatedPoint point)
@@ -229,16 +244,17 @@ public sealed class BattleBoardState
     return GetTile(point).IsWalkable && !_occupants.ContainsKey(point);
   }
 
-  // The board's single definition of orthogonal adjacency; the path graph and every
-  // adjacency question must share it so movement rules cannot drift.
+  // The board's single definition of orthogonal adjacency; the path search and every
+  // adjacency question must share it so movement rules cannot drift. The order is load-bearing:
+  // searches visit neighbors in this order, which fixes the tie-break among equal-cost paths.
   private static readonly Vector3I[] OrthogonalDirections =
   [
     new(-1, 0, 0), new(1, 0, 0), new(0, 0, -1), new(0, 0, 1), new(0, -1, 0), new(0, 1, 0),
   ];
 
   /// <summary>
-  /// True when any adjacent tile (the same neighborhood the path graph connects) can be
-  /// occupied right now — the cheap no-BFS proxy for "some move exists".
+  /// True when any adjacent tile (the same neighborhood the path search walks) can be
+  /// occupied right now — the cheap no-search proxy for "some move exists".
   /// </summary>
   public bool HasOccupiableNeighbor(ValidatedPoint point)
   {
@@ -277,26 +293,6 @@ public sealed class BattleBoardState
     }
   }
 
-  private void BuildPathGraph()
-  {
-    // Sparse: only walkable cells become nodes. Void/hole cells get no node or edges, mirroring
-    // the previous "non-walkable point is permanently disabled" behavior at a fraction of the cost.
-    int walkableCount = 0;
-    foreach (ValidatedPoint point in EnumerateBoardPoints())
-    {
-      if (GetTile(point).IsWalkable)
-        walkableCount++;
-    }
-
-    _pathGraph.ReserveSpace(Math.Max(1, walkableCount));
-
-    foreach (ValidatedPoint point in EnumerateBoardPoints())
-    {
-      if (GetTile(point).IsWalkable)
-        AddPathGraphPoint(point);
-    }
-  }
-
   private bool CanUsePathEndpoint(ValidatedPoint point, int movingUnitId)
   {
     if (!GetTile(point).IsWalkable)
@@ -305,15 +301,6 @@ public sealed class BattleBoardState
       return true;
 
     return occupant == movingUnitId;
-  }
-
-  private long CoordinatesToPointId(ValidatedPoint point) => CoordinatesToPointId(point.Raw);
-
-  private long CoordinatesToPointId(Vector3I coordinates)
-  {
-    return coordinates.X
-      + ((long)Dimensions.X * coordinates.Z)
-      + ((long)Dimensions.X * Dimensions.Z * coordinates.Y);
   }
 
   public BattleTileState GetTile(ValidatedPoint point)
@@ -327,109 +314,39 @@ public sealed class BattleBoardState
     return _tiles[x, y, z];
   }
 
-  private void UpdatePathPointState(ValidatedPoint point)
-  {
-    long pointId = CoordinatesToPointId(point);
-    if (!_pathGraph.HasPoint(pointId))
-      return;
-
-    _pathGraph.SetPointDisabled(pointId, ShouldDisablePathPoint(point));
-  }
-
-  private void EnsurePathGraphPoint(ValidatedPoint point)
-  {
-    if (!_pathGraph.HasPoint(CoordinatesToPointId(point)))
-      AddPathGraphPoint(point);
-  }
-
-  private void AddPathGraphPoint(ValidatedPoint point)
-  {
-    Vector3I coordinates = point.Raw;
-    long pointId = CoordinatesToPointId(point);
-    _pathGraph.AddPoint(pointId, ToPathGraphPosition(coordinates));
-    _neighborsById[pointId] = [];
-
-    // Connect to every in-bounds neighbor that already has a node. During construction only the
-    // backward neighbors exist yet; for a point added later (SetTileWalkable) any of the six may.
-    foreach (Vector3I direction in OrthogonalDirections)
-      ConnectPathGraphPointToExistingNeighbor(pointId, coordinates + direction);
-
-    UpdatePathPointState(point);
-  }
-
-  private static Vector3 ToPathGraphPosition(Vector3I coordinates)
-  {
-    return new Vector3(
-      coordinates.X + 0.5f,
-      coordinates.Y + 0.5f,
-      coordinates.Z + 0.5f);
-  }
-
-  private void ConnectPathGraphPointToExistingNeighbor(long pointId, Vector3I neighborCoordinates)
-  {
-    if (!IsInBounds(neighborCoordinates))
-      return;
-
-    long neighborId = CoordinatesToPointId(neighborCoordinates);
-    if (!_neighborsById.TryGetValue(neighborId, out List<long>? neighborList))
-      return;
-
-    _pathGraph.ConnectPoints(pointId, neighborId);
-    _neighborsById[pointId].Add(neighborId);
-    neighborList.Add(pointId);
-  }
-
-  private bool ShouldDisablePathPoint(ValidatedPoint point)
-  {
-    return !GetTile(point).IsWalkable || _occupants.ContainsKey(point);
-  }
-
   public IReadOnlyCollection<ValidatedPoint> GetReachableTiles(ValidatedPoint origin, int maxSteps)
   {
-    // Walks the cached path graph so connectivity and blocking stay defined in one place.
-    // The origin is enqueued unconditionally: its own disabled state (the mover standing
-    // on it) must not block the search, mirroring FindPath's source handling.
+    // Bounded-depth flood over occupiable tiles, using the same neighbor rule FindPath searches.
+    // The origin seeds the search unconditionally — its own occupation (the mover standing on
+    // it) must not block the search — but is not itself part of the result.
     List<ValidatedPoint> reachable = [];
-    SysColGeneric.HashSet<long> visited = [CoordinatesToPointId(origin)];
-    Queue<(long id, int steps)> frontier = new();
-    frontier.Enqueue((CoordinatesToPointId(origin), 0));
+    SysColGeneric.HashSet<ValidatedPoint> visited = [origin];
+    Queue<(ValidatedPoint Point, int Steps)> frontier = new();
+    frontier.Enqueue((origin, 0));
 
     while (frontier.Count > 0)
     {
-      var (currentId, steps) = frontier.Dequeue();
+      var (current, steps) = frontier.Dequeue();
       if (steps >= maxSteps)
         continue;
-      if (!_neighborsById.TryGetValue(currentId, out List<long>? neighbors))
-        continue;
 
-      foreach (long neighborId in neighbors)
+      foreach (Vector3I direction in OrthogonalDirections)
       {
-        if (!visited.Add(neighborId))
-          continue;
-        if (_pathGraph.IsPointDisabled(neighborId))
+        Vector3I neighborCoordinates = current.Raw + direction;
+        if (!IsInBounds(neighborCoordinates))
           continue;
 
-        reachable.Add(PointIdToCoordinates(neighborId));
-        frontier.Enqueue((neighborId, steps + 1));
+        var neighbor = new ValidatedPoint(neighborCoordinates);
+        if (!visited.Add(neighbor))
+          continue;
+        if (!CanOccupy(neighbor))
+          continue;
+
+        reachable.Add(neighbor);
+        frontier.Enqueue((neighbor, steps + 1));
       }
     }
 
     return reachable;
-  }
-
-  private ValidatedPoint PointIdToCoordinates(long pointId)
-  {
-    long layerSize = (long)Dimensions.X * Dimensions.Z;
-    if (pointId < 0)
-      throw new ArgumentOutOfRangeException(nameof(pointId), "Point id must be non-negative.");
-
-    long y = pointId / layerSize;
-    long remainder = pointId % layerSize;
-    long z = remainder / Dimensions.X;
-    long x = remainder % Dimensions.X;
-    if (x >= Dimensions.X || y >= Dimensions.Y || z >= Dimensions.Z)
-      throw new ArgumentOutOfRangeException(nameof(pointId), "Point id must map to a valid board coordinate.");
-
-    return new ValidatedPoint(new Vector3I((int)x, (int)y, (int)z));
   }
 }

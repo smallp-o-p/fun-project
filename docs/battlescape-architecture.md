@@ -212,7 +212,7 @@ Each query should encode one question. Avoid catch-all query classes with enum m
 - `FindPath(...)`
 - `AreAdjacent(...)`
 
-Pathfinding is currently integrated directly into the board through Godot `AStar3D`. Query objects should be the controller-facing surface for unit-specific path questions, for example `FindPathForUnit` and `GetPossibleMoveTilesForUnit`. If path rules become substantially more unit-specific later, this can be extracted behind a movement-query strategy without changing the controller-facing query contract.
+Pathfinding is currently integrated directly into the board as a pure-C# breadth-first search over the tile grid (uniform step costs; swap in a best-first search if weighted movement ever arrives). Query objects should be the controller-facing surface for unit-specific path questions, for example `FindPathForUnit` and `GetPossibleMoveTilesForUnit`. If path rules become substantially more unit-specific later, this can be extracted behind a movement-query strategy without changing the controller-facing query contract.
 
 ### BattleSession Visibility
 

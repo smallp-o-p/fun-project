@@ -68,8 +68,23 @@ public partial class BattleBoardStateTest
     Assert.Equal(0, path.Length);
   }
 
-  [TestCase(TestName = "FindPath stays in sync with occupant changes on the cached graph")]
-  public void FindPathStaysInSyncWithOccupantChangesOnTheCachedGraph()
+  [TestCase(TestName = "FindPath breaks equal-length ties by the fixed direction order")]
+  public void FindPathBreaksEqualLengthTiesByTheFixedDirectionOrder()
+  {
+    // From (0,0,0) to (1,0,1) two shortest routes exist — via (1,0,0) or via (0,0,1). The
+    // search visits the +X neighbor before the +Z neighbor, so the path runs X-first. This
+    // pins the deterministic tie-break that the fixed OrthogonalDirections order provides.
+    BattleBoardState board = new(new Vector3I(3, 1, 3));
+    Assert.True(board.TryPlaceOccupant(board.At(0, 0, 0), 1));
+
+    BattleBoardState.ValidatedPoint[] path = board.FindPath(1, board.At(1, 0, 1));
+
+    Assert.Equal(3, path.Length);
+    Assert.Equal(new Vector3I(1, 0, 0), path[1].Raw);
+  }
+
+  [TestCase(TestName = "FindPath stays in sync with occupant changes")]
+  public void FindPathStaysInSyncWithOccupantChanges()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
 
