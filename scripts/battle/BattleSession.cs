@@ -29,6 +29,7 @@ public sealed class BattleSession
   private readonly IHitChanceCalculator _hitChanceCalculator;
   private readonly Random _random;
   private readonly List<BattleUnitState> _units = [];
+  private readonly SysColGeneric.List<BattleObjectState> _objects = [];
   private readonly VisibilityService _visibility = new();
   private readonly Dictionary<Faction, List<Objective>> _objectives = [];
   private readonly TurnScheduler _scheduler;
@@ -69,6 +70,8 @@ public sealed class BattleSession
   // values (TryGetAlive, read-query results), never as session-held collections.
   public IEnumerable<BattleUnitState> AliveUnits => _units.AsValueEnumerable().Where(unit => unit.IsAlive).ToArray();
   public IEnumerable<BattleUnitState> DeadUnits => _units.AsValueEnumerable().Where(unit => unit.IsDead).ToArray();
+  // Raw view, snapshot like AliveUnits: plain object state; proofs only as return values.
+  public IEnumerable<BattleObjectState> Objects => _objects.AsValueEnumerable().ToArray();
 
   // Mints a proof iff the unit instance belongs to THIS session's alive storage (provenance +
   // aliveness in one check). The single door for callers holding a raw BattleUnitState.
@@ -76,6 +79,14 @@ public sealed class BattleSession
   {
     ArgumentNullException.ThrowIfNull(unit);
     return _units.Contains(unit) && unit.IsAlive ? Some(MintAlive(unit)) : None;
+  }
+
+  public Option<LiveObject> TryGetAliveObject(BattleObjectState obj)
+  {
+    ArgumentNullException.ThrowIfNull(obj);
+    return _objects.Contains(obj) && obj.Status.IsNone
+      ? Some(MintAliveObject(obj))
+      : None;
   }
 
   // Single mint point: snapshots the unit's board position into the one-shot proof. An alive
@@ -87,6 +98,11 @@ public sealed class BattleSession
       Some: position => new AliveUnit(unit, position),
       None: () => throw new InvalidOperationException($"Unit {unit.Id} is alive but not board-indexed."));
   }
+
+  internal LiveObject MintAliveObject(BattleObjectState obj)
+    => Board.FindObjectPosition(obj.Id).Match(
+      Some: position => new LiveObject(obj, position),
+      None: () => throw new InvalidOperationException($"Object {obj.Id} is placed but not board-indexed."));
 
   internal DeadUnit MintDead(BattleUnitState unit)
   {
@@ -242,6 +258,17 @@ public sealed class BattleSession
     RaiseEvents(new UnitAddedBattleEvent(unit, position));
 
     return new SpawnedBattleUnit(unit);
+  }
+
+  // Trusted core: the factory pre-validates occupancy; a miss here is a caller bug.
+  internal void AddObject(BattleSpecialObjectData data, BattleBoardState.ValidatedPoint position)
+  {
+    ArgumentNullException.ThrowIfNull(data);
+    var state = new BattleObjectState(-_objects.Count - 1, data, position.Raw);
+    if (!Board.TryPlaceObjectOccupant(position, state.Id))
+      throw new InvalidOperationException($"Object cell {position.Raw} is not occupiable.");
+    _objects.Add(state);
+    RaiseEvents(new ObjectPlacedBattleEvent(state, position));
   }
 
   internal void ApplyDamageTo(BattleUnitState unit, int amount)
@@ -456,6 +483,32 @@ public sealed class BattleSession
   {
     return Board.GetOccupant(point).Bind(id =>
       id < _units.Count && _units[id].IsAlive ? Some(_units[id]) : None);
+  }
+
+  internal void MarkObjectInteracted(BattleObjectState obj)
+  {
+    if (obj.Status.IsSome)
+      throw new InvalidOperationException($"Object {obj.Id} is not live on the board.");
+    BattleBoardState.ValidatedPoint position = Board.FindObjectPosition(obj.Id).Match(
+      Some: point => point,
+      None: () => throw new InvalidOperationException($"Object {obj.Id} is placed but not board-indexed."));
+    if (!Board.TryClearObjectOccupant(position, obj.Id))
+      throw new InvalidOperationException($"Could not clear occupancy for object {obj.Id}.");
+    obj.Status = Some(ObjectStatus.Interacted);
+  }
+
+  internal (BattleObjectState Object, BattleBoardState.ValidatedPoint Position) MarkObjectExpired(
+    BattleObjectState obj)
+  {
+    if (obj.Status.IsSome)
+      throw new InvalidOperationException($"Object {obj.Id} is not live on the board.");
+    BattleBoardState.ValidatedPoint position = Board.FindObjectPosition(obj.Id).Match(
+      Some: point => point,
+      None: () => throw new InvalidOperationException($"Object {obj.Id} is placed but not board-indexed."));
+    if (!Board.TryClearObjectOccupant(position, obj.Id))
+      throw new InvalidOperationException($"Could not clear occupancy for object {obj.Id}.");
+    obj.Status = Some(ObjectStatus.Expired);
+    return (obj, position);
   }
 
   internal void MoveUnit(BattleUnitState unit, BattleBoardState.ValidatedPoint source,

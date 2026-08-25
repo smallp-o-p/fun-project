@@ -42,3 +42,8 @@ public sealed class IsUnitStillAvailableThisTurn(BattleUnitState unit) : IBattle
     return session.IsUnitStillAvailableThisTurn(unit);
   }
 }
+
+public sealed class GetPlayerFactionQuery : IBattleSessionQuery<Option<Faction>>
+{
+  public Option<Faction> Execute(BattleSession session) => session.PlayerFaction;
+}

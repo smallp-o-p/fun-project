@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Ammunition" format=3 uid="uid://b3822r26xoua8"]
+
+[ext_resource type="Script" uid="uid://c4kt22tkplbvx" path="res://scripts/weapons/damage/mods/DamageBundleMod.cs" id="1_03plt"]
+[ext_resource type="Script" uid="uid://cl5bjj507pl44" path="res://scripts/stats/StatMod.cs" id="2_cmxwv"]
+[ext_resource type="Script" uid="uid://dblwp0i2w2h3x" path="res://scripts/weapons/Ammunition.cs" id="3_m175d"]
+
+[resource]
+script = ExtResource("3_m175d")
+Name = "Standard Rounds"
+Description = "Basic rounds. Make sure it's not pointed towards yourself."
+metadata/_custom_type_script = "uid://dblwp0i2w2h3x"

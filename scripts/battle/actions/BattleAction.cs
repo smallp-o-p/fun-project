@@ -39,6 +39,11 @@ public abstract class BattleAction
     return new SpawnUnit(combatant, position, equippedWeapon);
   }
 
+  public static PlaceObject PlaceObject(BattleSpecialObjectData data, BattleBoardState.ValidatedPoint position)
+  {
+    return new PlaceObject(data, position);
+  }
+
   public static MoveUnit MoveUnit(
     AliveUnit unit,
     IEnumerable<BattleBoardState.ValidatedPoint> destinations,
@@ -46,6 +51,11 @@ public abstract class BattleAction
   )
   {
     return new MoveUnit(unit, destinations, actionPointCostPerStep);
+  }
+
+  public static InteractWithObject InteractWithObject(AliveUnit unit, LiveObject obj)
+  {
+    return new InteractWithObject(unit, obj);
   }
 
   public static AttackUnit AttackUnit(AliveUnit attacker, AliveUnit target)

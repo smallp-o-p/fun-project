@@ -1,4 +1,7 @@
 using FunProject.Combatants;
+using FunProject.Items;
+using FunProject.Items.Capabilities;
+using FunProject.Weapons;
 using LanguageExt.UnsafeValueAccess;
 using System;
 using System.Collections.Generic;
@@ -9,6 +12,117 @@ namespace FunProject.Battle;
 // BattleRuntime. Lives in the assembly so it can drive the internal session/action primitives.
 public static class BattleFactory
 {
+  public static Either<BattleSetupFailure, BattleRuntime> Start(
+    BattleTypeData type,
+    int? seed = null,
+    Option<IReadOnlyList<UnitLoadout>> playerRosterOverride = default)
+  {
+    ArgumentNullException.ThrowIfNull(type);
+    if (type.MapPool.Count == 0)
+      return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
+        BattleSetupFailureReason.EmptyMapPool, $"{type.Name} has an empty map pool."));
+    if (type.PlayerFactionIndex < 0 || type.PlayerFactionIndex >= type.Factions.Count)
+      return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
+        BattleSetupFailureReason.UnknownFaction,
+        $"PlayerFactionIndex {type.PlayerFactionIndex} is out of range for {type.Factions.Count} factions."));
+
+    int resolvedSeed = seed ?? Random.Shared.Next();
+    BattleMapData map = type.MapPool[new Random(resolvedSeed).Next(type.MapPool.Count)];
+
+    List<Faction> factionOrder = [];
+    Dictionary<Faction, IReadOnlyList<ObjectiveData>> objectives = [];
+    foreach (FactionDeploymentData deployment in type.Factions)
+    {
+      Faction faction = new(deployment.Faction);
+      factionOrder.Add(faction);
+      objectives[faction] = [.. deployment.Objectives];
+    }
+
+    Faction playerFaction = factionOrder[type.PlayerFactionIndex];
+
+    Dictionary<int, IReadOnlyList<Combatant>> rostersBySlot = [];
+    Dictionary<Combatant, UnitLoadout> loadoutByCombatant = [];
+    for (int slot = 0; slot < type.Factions.Count; slot++)
+    {
+      Faction slotFaction = factionOrder[slot];
+      List<UnitLoadout> loadouts = [];
+      bool useOverride = slot == type.PlayerFactionIndex && playerRosterOverride.IsSome;
+      if (useOverride)
+      {
+        IReadOnlyList<UnitLoadout> overrideLoadouts = playerRosterOverride.Match(
+          Some: playerLoadouts => playerLoadouts,
+          None: () => throw new InvalidOperationException("Player roster override disappeared after IsSome check."));
+        foreach (UnitLoadout loadout in overrideLoadouts)
+        {
+          loadout.Combatant.OwningFaction = slotFaction;
+          loadouts.Add(loadout);
+        }
+      }
+      else
+      {
+        foreach (RosterEntryData entry in type.Factions[slot].Roster)
+        {
+          for (int count = 0; count < Math.Max(1, entry.Quantity); count++)
+          {
+            Combatant combatant = new(entry.Combatant, slotFaction);
+            Option<Weapon> weapon = entry.Weapon is null ? None : Some(new Weapon(entry.Weapon));
+            Option<ItemWith<ArmorCapability>> armor = entry.Armor is null
+              ? None
+              : new EquippableItem(entry.Armor).With<ArmorCapability>();
+            loadouts.Add(new UnitLoadout(combatant, weapon, armor));
+          }
+        }
+      }
+
+      List<Combatant> combatants = [];
+      foreach (UnitLoadout loadout in loadouts)
+      {
+        combatants.Add(loadout.Combatant);
+        loadoutByCombatant[loadout.Combatant] = loadout;
+      }
+
+      rostersBySlot[slot] = combatants;
+    }
+
+    return MapDeployment.AssignSpawns(map, rostersBySlot).Match(
+      Left: message => Left<BattleSetupFailure, BattleRuntime>(
+        new BattleSetupFailure(BattleSetupFailureReason.SpawnSlotShortfall, message)),
+      Right: spawns =>
+      {
+        List<UnitPlacement> unitPlacements = [];
+        foreach ((Combatant Combatant, Vector3I Position) spawn in spawns)
+          unitPlacements.Add(new UnitPlacement(loadoutByCombatant[spawn.Combatant], spawn.Position));
+
+        List<ObjectPlacement> objectPlacements = [];
+        foreach (ObjectPlacementData authored in type.Objects)
+        {
+          // Authored positions are Godot.Vector3I on the exported surface; convert to the
+          // runtime Vector3I as they are read off the resource (same boundary as MapDeployment).
+          foreach (var position in authored.Positions)
+            objectPlacements.Add(new ObjectPlacement(authored.SpecialObject, new Vector3I(position.X, position.Y, position.Z)));
+        }
+
+        BattleSetup setup = new(
+          Board: new BattleBoardState(map),
+          FactionOrder: factionOrder,
+          Placements: unitPlacements,
+          Objectives: objectives,
+          Seed: resolvedSeed,
+          PlayerFaction: Some(playerFaction),
+          Objects: objectPlacements);
+
+        return Start(setup).Match(
+          Right: runtime =>
+          {
+            foreach (BattleTypeSystemData declared in type.Systems)
+              declared.Register(runtime);
+
+            return Right<BattleSetupFailure, BattleRuntime>(runtime);
+          },
+          Left: failure => Left<BattleSetupFailure, BattleRuntime>(failure));
+      });
+  }
+
   public static Either<BattleSetupFailure, BattleRuntime> Start(BattleSetup setup)
   {
     ArgumentNullException.ThrowIfNull(setup);
@@ -66,6 +180,39 @@ public static class BattleFactory
       }
     }
 
+    var objectCells = new SysColGeneric.HashSet<Vector3I>();
+    foreach (ObjectPlacement placement in setup.Objects ?? [])
+    {
+      if (!objectCells.Add(placement.Position))
+      {
+        runtime.Dispose();
+        return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
+          BattleSetupFailureReason.DuplicateObjectCell,
+          $"Two objects share cell {placement.Position}."));
+      }
+
+      Option<BattleBoardState.ValidatedPoint> objectPoint = setup.Board.ValidatePoint(placement.Position);
+      if (objectPoint.IsNone)
+      {
+        runtime.Dispose();
+        return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
+          BattleSetupFailureReason.ObjectCellUnavailable,
+          $"Object cell {placement.Position} for {placement.Data.Name} is out of bounds."));
+      }
+
+      try
+      {
+        runtime.ExecuteAction(BattleAction.PlaceObject(placement.Data, objectPoint.Value()));
+      }
+      catch (InvalidOperationException)
+      {
+        runtime.Dispose();
+        return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
+          BattleSetupFailureReason.ObjectCellUnavailable,
+          $"Object cell {placement.Position} for {placement.Data.Name} is not occupiable."));
+      }
+    }
+
     runtime.ExecuteAction(BattleAction.StartBattle());
 
     return Right<BattleSetupFailure, BattleRuntime>(runtime);
@@ -117,7 +264,8 @@ public static class BattleFactory
           setup.Objectives,
           setup.Seed,
           setup.PlayerFaction,
-          setup.HitChance);
+          setup.HitChance,
+          null);
         return Start(coreSetup);
       });
   }

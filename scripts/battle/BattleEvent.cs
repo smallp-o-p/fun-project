@@ -95,6 +95,51 @@ public sealed record UnitAddedBattleEvent : BattleEvent, IUnitBattleEvent, IPosi
   }
 }
 
+/// <summary>Raised when a special board object is placed onto a tile.</summary>
+public sealed record ObjectPlacedBattleEvent : BattleEvent, IPositionedBattleEvent
+{
+  public BattleObjectState Object { get; }
+  public BattleBoardState.ValidatedPoint Position { get; }
+
+  public ObjectPlacedBattleEvent(BattleObjectState @object, BattleBoardState.ValidatedPoint position)
+  {
+    ArgumentNullException.ThrowIfNull(@object);
+    Object = @object;
+    Position = position;
+  }
+}
+
+/// <summary>Raised when a unit successfully interacts with a placed object.</summary>
+public sealed record ObjectInteractedBattleEvent : BattleEvent, IPositionedBattleEvent
+{
+  public BattleUnitState Actor { get; }
+  public BattleObjectState Object { get; }
+  public BattleBoardState.ValidatedPoint Position { get; }
+
+  public ObjectInteractedBattleEvent(BattleUnitState actor, BattleObjectState @object, BattleBoardState.ValidatedPoint position)
+  {
+    ArgumentNullException.ThrowIfNull(actor);
+    ArgumentNullException.ThrowIfNull(@object);
+    Actor = actor;
+    Object = @object;
+    Position = position;
+  }
+}
+
+/// <summary>Raised after an object's expiry trigger resolves its payload.</summary>
+public sealed record ObjectExpiredBattleEvent : BattleEvent, IPositionedBattleEvent
+{
+  public BattleObjectState Object { get; }
+  public BattleBoardState.ValidatedPoint Position { get; }
+
+  public ObjectExpiredBattleEvent(BattleObjectState @object, BattleBoardState.ValidatedPoint position)
+  {
+    ArgumentNullException.ThrowIfNull(@object);
+    Object = @object;
+    Position = position;
+  }
+}
+
 public sealed record UnitActivationEndedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }

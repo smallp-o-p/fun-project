@@ -39,6 +39,13 @@ public sealed class BattleRuntime : IDisposable
     return _session.TryGetAlive(unit);
   }
 
+  public Option<LiveObject> TryGetAliveObject(BattleObjectState obj)
+  {
+    ThrowIfDisposed();
+    ArgumentNullException.ThrowIfNull(obj);
+    return _session.TryGetAliveObject(obj);
+  }
+
   // The tile mint door for scene code holding a raw coordinate (Some iff the tile is on this
   // session's board). In-bounds is a stable fact, so this proof cannot go stale.
   public Option<BattleBoardState.ValidatedPoint> TryGetTile(Vector3I coordinates)

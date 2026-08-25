@@ -265,6 +265,44 @@ public class BattleVisibilityTest
     Assert.True(Query(session, new HasFactionExploredTile(playerFaction, tile)));
   }
 
+  [TestCase(TestName = "Visible objects follow explored-tile memory for each faction")]
+  public void VisibleObjectsFollowExploredTileMemory()
+  {
+    var playerFaction = BattleTestFactory.MakeFaction("Player");
+    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
+    var session = BattleTestFactory.MakeSession(new Vector3I(6, 1, 6), [playerFaction, enemyFaction]);
+    var player = SpawnUnit(session, BattleTestFactory.MakeCombatant("Scout", playerFaction, vision: 2), new Vector3I(0, 0, 0));
+    SpawnUnit(session, BattleTestFactory.MakeCombatant("Enemy", enemyFaction, vision: 1), new Vector3I(5, 0, 5));
+    BattleActionExecutor executor = ExecutorFor(session);
+
+    BattleBoardState.ValidatedPoint nearPoint = session.Board.At(new Vector3I(1, 0, 0));
+    BattleBoardState.ValidatedPoint farPoint = session.Board.At(new Vector3I(4, 0, 4));
+    var nearData = new BattleSpecialObjectData { Name = "Near Bomb" };
+    nearData.Capabilities.Add(new InteractiveCapabilityData { ActionPointCost = 1 });
+    var farData = new BattleSpecialObjectData { Name = "Far Bomb" };
+    farData.Capabilities.Add(new InteractiveCapabilityData { ActionPointCost = 1 });
+
+    executor.Submit(BattleAction.PlaceObject(nearData, nearPoint));
+    executor.Submit(BattleAction.PlaceObject(farData, farPoint));
+    BattleObjectState[] objects = [.. session.Objects];
+    BattleObjectState nearObject = objects[0];
+
+    StartBattle(session);
+
+    var playerVisible = Query(session, new GetFactionVisibleObjectsQuery(playerFaction));
+    Assert.Equal(1, playerVisible.Count);
+    Assert.Equal(nearObject, playerVisible[0]);
+    Assert.Equal(0, Query(session, new GetFactionVisibleObjectsQuery(enemyFaction)).Count);
+
+    executor.Submit(BattleAction.InteractWithObject(
+      player.AliveIn(session),
+      session.TryGetAliveObject(nearObject).RequireSome()));
+
+    playerVisible = Query(session, new GetFactionVisibleObjectsQuery(playerFaction));
+    Assert.Equal(1, playerVisible.Count);
+    Assert.Equal(Some(ObjectStatus.Interacted), playerVisible[0].Status);
+  }
+
   [TestCase(TestName = "Enemy units drop from faction visibility when sight is broken")]
   public void EnemyUnitsDropFromFactionVisibilityWhenSightIsBroken()
   {

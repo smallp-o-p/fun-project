@@ -57,6 +57,46 @@ public sealed class SpawnUnit : BattleAction
   }
 }
 
+/// <summary>Places a special board object onto the board during setup.</summary>
+public sealed class PlaceObject(BattleSpecialObjectData data, BattleBoardState.ValidatedPoint position) : BattleAction
+{
+  public override Result Execute(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(data);
+    if (session.Phase != BattlePhase.Setup || !session.Board.CanOccupy(position))
+      return Result.Rejected;
+
+    session.AddObject(data, position);
+    return Result.Completed;
+  }
+}
+
+/// <summary>Interacts with a live board object, spending AP before mutating it. Adjacency
+/// and other reach rules are deliberately NOT enforced here — they belong to a higher-level
+/// action wrapping this primitive.</summary>
+public sealed class InteractWithObject(AliveUnit unit, LiveObject obj) : BattleAction
+{
+  public override Result Execute(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(session);
+
+    if (session.TryGetAlive(unit.State).IsNone || session.TryGetAliveObject(obj.State).IsNone)
+      return Result.Interrupted;
+
+    return obj.State.FindCapability<InteractiveCapability>().Match(
+      Some: interactive =>
+      {
+        if (!unit.State.TrySpendActionPoints(interactive.ActionPointCost))
+          return Result.Rejected;
+
+        session.MarkObjectInteracted(obj.State);
+        session.RaiseEvents(new ObjectInteractedBattleEvent(unit.State, obj.State, obj.Position));
+        return Result.Completed;
+      },
+      None: () => Result.Rejected);
+  }
+}
+
 // Target feasibility (weapon/self/ally/liveness/visibility/range) resolves once through
 // AttackContext.Resolve — the gate shared with GetHitChanceForAttack and
 // HasAttackableTargetCondition — so the write side can never drift from the preview.

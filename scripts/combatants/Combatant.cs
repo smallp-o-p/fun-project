@@ -10,7 +10,7 @@ public class Combatant : HasStats, HasModSlots
 {
   public int MaxInventorySize = 5;
   public string Name { get; }
-  public Faction OwningFaction { get; }
+  public Faction OwningFaction { get; internal set; }
   private readonly StatSheet _stats;
   private readonly Godot.Collections.Array<ModSlot> _modSlots = [];
   public List<EquippableItem> Inventory { get; private set; } = [];

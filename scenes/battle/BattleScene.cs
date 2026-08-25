@@ -1,7 +1,5 @@
 using FunProject.Battle;
 using FunProject.Combatants;
-using FunProject.Stats;
-using FunProject.Weapons;
 using Godot;
 using System.Collections.Generic;
 
@@ -72,52 +70,22 @@ public sealed partial class BattleScene : Node3D
 
   private BattleRuntime BuildRuntime()
   {
-    var player = new Faction(new FactionData { Name = "Player", Description = "Player" });
-    var enemy = new Faction(new FactionData { Name = "Enemy", Description = "Enemy" });
-    _playerFaction = player;
-    _factions.Add(player);
-    _factions.Add(enemy);
+    BattleTypeData type = ResourceLoader.Load<BattleTypeData>("res://resources/battle_types/bomb_defusal.tres")
+      ?? throw new System.InvalidOperationException("Could not load the bomb defusal battle type.");
+    BattleRuntime runtime = BattleFactory.Start(type).Match(
+      Right: started => started,
+      Left: failure => throw new System.InvalidOperationException($"Battle setup failed: {failure.Message}"));
 
-    var board = new BattleBoardState(BoardDimensions);
-    FirearmWeaponData pistolData = ResourceLoader.Load<FirearmWeaponData>(
-      "res://resources/weapons/service_pistol.tres")
-      ?? throw new System.InvalidOperationException("Could not load the service pistol resource.");
-    Weapon heroWeapon = new FirearmWeapon(pistolData);
-    var placements = new List<UnitPlacement>
-    {
-      new(new UnitLoadout(MakeCombatant("Hero", player), Some(heroWeapon)), new Vector3I(1, 0, 1)),
-      new(new UnitLoadout(MakeCombatant("Goon", enemy)), new Vector3I(6, 0, 6)),
-    };
-    var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
-    {
-      [player] =
-      [
-        new EliminateAllOpposingForcesObjectiveData
-        {
-          OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
-        },
-      ],
-      [enemy] = [new EliminateAllOpposingForcesObjectiveData()],
-    };
+    _playerFaction = runtime.Query(new GetPlayerFactionQuery()).Match(
+      Some: faction => faction,
+      None: () => throw new System.InvalidOperationException("Started battle is missing a player faction."));
 
-    return BattleFactory.Start(new BattleSetup(board, [player, enemy], placements, objectives))
-      .Match(
-        Right: runtime => runtime,
-        Left: failure => throw new System.InvalidOperationException($"Battle setup failed: {failure.Message}"));
+    _factions.Clear();
+    foreach (Faction faction in runtime.Query(new GetGlobalFactionTurnOrderQuery()))
+      _factions.Add(faction);
+
+    return runtime;
   }
-
-  private static Combatant MakeCombatant(string name, Faction faction) =>
-    new(new CombatantData
-    {
-      Name = name,
-      HealthStat = new HealthStat { BaseValue = 20 },
-      ActionPointsStat = new ActionPointsStat { BaseValue = 6 },
-      WillStat = new WillStat { BaseValue = 50 },
-      MovementStat = new MovementStat { BaseValue = 12 },
-      VisionStat = new VisionStat { BaseValue = 20 },
-      AimStat = new AimStat { BaseValue = 65 },
-      ModSlotCount = 0,
-    }, faction);
 
   private void BuildEnvironment()
   {

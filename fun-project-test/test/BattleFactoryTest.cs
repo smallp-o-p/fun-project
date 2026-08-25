@@ -306,4 +306,220 @@ public class BattleFactoryTest
 
     Assert.Equal(BattleSetupFailureReason.SpawnCellUnavailable, ExpectFailure(BattleFactory.StartFromMap(setup)).Reason);
   }
+
+
+  // --- battle type entry ---------------------------------------------------
+
+  private static BattleTypeData MakeBattleType()
+  {
+    var playerFaction = new FactionData { Name = "Player" };
+    var enemyFaction = new FactionData { Name = "Aliens" };
+    var trooper = new CombatantData
+    {
+      Name = "Trooper",
+      HealthStat = new FunProject.Stats.HealthStat { BaseValue = 20 },
+      ActionPointsStat = new FunProject.Stats.ActionPointsStat { BaseValue = 6 },
+      WillStat = new FunProject.Stats.WillStat { BaseValue = 50 },
+      MovementStat = new FunProject.Stats.MovementStat { BaseValue = 12 },
+      VisionStat = new FunProject.Stats.VisionStat { BaseValue = 20 },
+      AimStat = new FunProject.Stats.AimStat { BaseValue = 65 },
+    };
+
+    var type = new BattleTypeData { Name = "Bomb Defusal" };
+    type.MapPool.Add(BattleTestFactory.MakeMapData(
+      new Vector3I(4, 1, 4),
+      (new Vector3I(0, 0, 0), BattleTestFactory.SpawnTile(0)),
+      (new Vector3I(1, 0, 0), BattleTestFactory.SpawnTile(0)),
+      (new Vector3I(2, 0, 3), BattleTestFactory.SpawnTile(1)),
+      (new Vector3I(3, 0, 3), BattleTestFactory.FloorTile())));
+    type.MapPool.Add(BattleTestFactory.MakeMapData(
+      new Vector3I(4, 1, 4),
+      (new Vector3I(0, 0, 0), BattleTestFactory.SpawnTile(0)),
+      (new Vector3I(1, 0, 0), BattleTestFactory.SpawnTile(0)),
+      (new Vector3I(0, 0, 1), BattleTestFactory.SpawnTile(1))));
+
+    var playerDeployment = new FactionDeploymentData { Faction = playerFaction };
+    playerDeployment.Roster.Add(new RosterEntryData { Combatant = trooper, Quantity = 2 });
+    playerDeployment.Objectives.Add(new DefuseAllBombsObjectiveData
+    {
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    });
+    var enemyDeployment = new FactionDeploymentData { Faction = enemyFaction };
+    enemyDeployment.Roster.Add(new RosterEntryData { Combatant = trooper, Quantity = 1 });
+    enemyDeployment.Objectives.Add(new FakeObjectiveData());
+
+    type.Factions.Add(playerDeployment);
+    type.Factions.Add(enemyDeployment);
+    type.Systems.Add(new ObjectExpirySystemData());
+    return type;
+  }
+
+  [TestCase(TestName = "Type start spawns rosters, places objects, registers declared systems")]
+  public void RequestHappyPath()
+  {
+    BattleTypeData type = MakeBattleType();
+    var bombData = new BattleSpecialObjectData { Name = "Bomb" };
+    bombData.Capabilities.Add(new InteractiveCapabilityData());
+    bombData.Capabilities.Add(new TimedEffectCapabilityData { FireAfterTurns = 3 });
+    var placement = new ObjectPlacementData { SpecialObject = bombData };
+    placement.Positions.Add(new Godot.Vector3I(3, 0, 3));
+    type.Objects.Add(placement);
+
+    BattleRuntime runtime = UnwrapStart(BattleFactory.Start(type, seed: 7));
+
+    int units = 0;
+    for (int x = 0; x < 4; x++)
+      for (int z = 0; z < 4; z++)
+        if (runtime.Query(new GetUnitAtTile(
+              runtime.TryGetTile(new Vector3I(x, 0, z)).RequireSome())).IsSome)
+          units++;
+    Assert.Equal(3, units);
+
+    var objects = runtime.Query(new GetBattleSpecialObjectsQuery());
+    Assert.Equal(1, objects.Count);
+    Assert.True(objects[0].Status.IsNone);
+
+    for (int turn = 0; turn < 6 && runtime.Query(new GetBattlePhaseQuery()) == BattlePhase.InProgress; turn++)
+      runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    Assert.Equal(Some(ObjectStatus.Expired), runtime.Query(new GetBattleSpecialObjectsQuery())[0].Status);
+  }
+
+  [TestCase(TestName = "Same seed produces the identical battle layout")]
+  public void SeedDeterminism()
+  {
+    BattleTypeData type = MakeBattleType();
+    string first = LayoutFingerprint(UnwrapStart(BattleFactory.Start(type, seed: 7)));
+    string second = LayoutFingerprint(UnwrapStart(BattleFactory.Start(type, seed: 7)));
+    Assert.Equal(first, second);
+  }
+
+  private static string LayoutFingerprint(BattleRuntime runtime)
+  {
+    var cells = new List<string>();
+    for (int x = 0; x < 4; x++)
+      for (int z = 0; z < 4; z++)
+        if (runtime.Query(new GetUnitAtTile(
+              runtime.TryGetTile(new Vector3I(x, 0, z)).RequireSome())).IsSome)
+          cells.Add($"{x},{z}");
+    return string.Join("|", cells);
+  }
+
+  private static BattleTypeData MakeDuelBattleType()
+  {
+    var playerFaction = new FactionData { Name = "Player" };
+    var enemyFaction = new FactionData { Name = "Enemy" };
+    var shooter = new CombatantData
+    {
+      Name = "Shooter",
+      HealthStat = new FunProject.Stats.HealthStat { BaseValue = 20 },
+      ActionPointsStat = new FunProject.Stats.ActionPointsStat { BaseValue = 6 },
+      WillStat = new FunProject.Stats.WillStat { BaseValue = 50 },
+      MovementStat = new FunProject.Stats.MovementStat { BaseValue = 12 },
+      VisionStat = new FunProject.Stats.VisionStat { BaseValue = 20 },
+      AimStat = new FunProject.Stats.AimStat { BaseValue = 65 },
+    };
+
+    var type = new BattleTypeData { Name = "Duel" };
+    type.MapPool.Add(BattleTestFactory.MakeMapData(
+      new Vector3I(2, 1, 1),
+      (new Vector3I(0, 0, 0), BattleTestFactory.SpawnTile(0)),
+      (new Vector3I(1, 0, 0), BattleTestFactory.SpawnTile(1))));
+
+    var playerDeployment = new FactionDeploymentData { Faction = playerFaction };
+    playerDeployment.Roster.Add(new RosterEntryData
+    {
+      Combatant = shooter,
+      Weapon = BattleTestFactory.MakeWeaponData(damage: 5, range: 10),
+    });
+    playerDeployment.Objectives.Add(new FakeObjectiveData());
+
+    var enemyDeployment = new FactionDeploymentData { Faction = enemyFaction };
+    enemyDeployment.Roster.Add(new RosterEntryData
+    {
+      Combatant = shooter,
+      Weapon = BattleTestFactory.MakeWeaponData(damage: 5, range: 10),
+    });
+    enemyDeployment.Objectives.Add(new FakeObjectiveData());
+
+    type.Factions.Add(playerDeployment);
+    type.Factions.Add(enemyDeployment);
+    return type;
+  }
+
+  private static bool FirstAttackHits(BattleRuntime runtime)
+  {
+    BattleBoardState.ValidatedPoint attackerTile = runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome();
+    BattleBoardState.ValidatedPoint targetTile = runtime.TryGetTile(new Vector3I(1, 0, 0)).RequireSome();
+    BattleUnitState attacker = runtime.Query(new GetUnitAtTile(attackerTile)).RequireSome();
+    BattleUnitState target = runtime.Query(new GetUnitAtTile(targetTile)).RequireSome();
+
+    BattleActionExecResult result = runtime.ExecuteAction(BattleAction.AttackUnit(
+      runtime.TryGetAlive(attacker).RequireSome(),
+      runtime.TryGetAlive(target).RequireSome()));
+
+    foreach (BattleEvent battleEvent in result.EventsThatOccurred)
+    {
+      if (battleEvent is UnitAttackedBattleEvent attacked)
+        return attacked.IsHit;
+    }
+
+    throw new Exception("Expected attack event from duel attack.");
+  }
+
+  [TestCase(TestName = "Player roster override is adopted into the started player faction")]
+  public void PlayerRosterOverride()
+  {
+    BattleTypeData type = MakeBattleType();
+    var foreignFaction = new Faction(new FactionData { Name = "Override" });
+    var loadouts = new List<UnitLoadout>
+    {
+      new(BattleTestFactory.MakeCombatant("Vet", foreignFaction)),
+    };
+
+    using BattleRuntime runtime = UnwrapStart(BattleFactory.Start(
+      type, seed: 42, playerRosterOverride: Some((IReadOnlyList<UnitLoadout>)loadouts)));
+    Faction playerFaction = runtime.Query(new GetPlayerFactionQuery()).RequireSome();
+
+    int playerUnits = 0;
+    for (int x = 0; x < 4; x++)
+    {
+      for (int z = 0; z < 4; z++)
+      {
+        Option<BattleUnitState> unit = runtime.Query(new GetUnitAtTile(
+          runtime.TryGetTile(new Vector3I(x, 0, z)).RequireSome()));
+        if (unit.Match(Some: placed => placed.Side == playerFaction, None: () => false))
+          playerUnits++;
+      }
+    }
+
+    Assert.Equal(1, playerUnits);
+  }
+
+  [TestCase(TestName = "Seed flows into the battle session RNG")]
+  public void RequestSeedDrivesBattleRng()
+  {
+    BattleTypeData type = MakeDuelBattleType();
+
+    using BattleRuntime first = UnwrapStart(BattleFactory.Start(type, seed: 7));
+    using BattleRuntime second = UnwrapStart(BattleFactory.Start(type, seed: 7));
+
+    Assert.Equal(FirstAttackHits(first), FirstAttackHits(second));
+  }
+
+  [TestCase(TestName = "Empty map pool is a typed failure")]
+  public void EmptyMapPoolFails()
+  {
+    var type = new BattleTypeData { Name = "Broken" };
+    Assert.Equal(BattleSetupFailureReason.EmptyMapPool,
+      ExpectFailure(BattleFactory.Start(type)).Reason);
+  }
+
+  [TestCase(TestName = "Out-of-range player faction index is a typed failure")]
+  public void BadPlayerFactionIndex()
+  {
+    BattleTypeData type = MakeBattleType();
+    type.PlayerFactionIndex = 5;
+    Assert.Equal(BattleSetupFailureReason.UnknownFaction,
+      ExpectFailure(BattleFactory.Start(type, seed: 42)).Reason);
+  }
 }

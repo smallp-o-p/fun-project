@@ -15,7 +15,8 @@ namespace FunProject.Battle;
 /// visible from the next event, not retroactively in the event that queued them. On a flip
 /// the outcome is recorded FIRST (state + events, so observers see the flip before anything
 /// it causes), then the directive runs: end the battle, queue instance-bound follow-ups, or
-/// nothing (null). Never returns interrupts; once the battle has ended it stops flipping.
+/// nothing (null). Never returns interrupts; if the battle has already ended, directives rely
+/// on <see cref="BattleSession.EndBattle"/> being idempotent so late flips can still be recorded.
 /// </summary>
 public sealed class ObjectiveSystem : BattleHook
 {
@@ -35,9 +36,6 @@ public sealed class ObjectiveSystem : BattleHook
         && context.Session.PlayerFaction.Match(
           Some: player => killed.Unit.Side == player && !context.Session.HasLivingUnits(player),
           None: () => false))
-      return [];
-
-    if (_session.Phase == BattlePhase.Ended)
       return [];
 
     foreach (var (owner, objective) in InterestedIn(battleEvent))

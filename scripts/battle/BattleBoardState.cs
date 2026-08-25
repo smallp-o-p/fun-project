@@ -51,7 +51,9 @@ public sealed class BattleBoardState
 
   private readonly BattleTileState[,,] _tiles;
   private readonly Dictionary<ValidatedPoint, int> _occupants = [];
+  private readonly Dictionary<ValidatedPoint, int> _objectOccupants = [];
   private readonly Dictionary<int, ValidatedPoint> _positionByUnit = [];
+  private readonly Dictionary<int, ValidatedPoint> _positionByObject = [];
 
   public Vector3I Dimensions { get; }
 
@@ -138,7 +140,7 @@ public sealed class BattleBoardState
 
   public bool TryPlaceOccupant(ValidatedPoint point, int unitId)
   {
-    if (!GetTile(point).IsWalkable || _occupants.ContainsKey(point))
+    if (!GetTile(point).IsWalkable || _occupants.ContainsKey(point) || _objectOccupants.ContainsKey(point))
       return false;
 
     _occupants[point] = unitId;
@@ -152,7 +154,7 @@ public sealed class BattleBoardState
       return false;
     if (source.Equals(destination))
       return true;
-    if (_occupants.ContainsKey(destination))
+    if (_occupants.ContainsKey(destination) || _objectOccupants.ContainsKey(destination))
       return false;
 
     _occupants.Remove(source);
@@ -174,6 +176,11 @@ public sealed class BattleBoardState
   public Option<ValidatedPoint> FindOccupantPosition(int unitId)
   {
     return _positionByUnit.TryGetValue(unitId, out ValidatedPoint point) ? Some(point) : None;
+  }
+
+  public Option<ValidatedPoint> FindObjectPosition(int objectId)
+  {
+    return _positionByObject.TryGetValue(objectId, out ValidatedPoint point) ? Some(point) : None;
   }
 
   /// <summary>
@@ -241,7 +248,7 @@ public sealed class BattleBoardState
 
   public bool CanOccupy(ValidatedPoint point)
   {
-    return GetTile(point).IsWalkable && !_occupants.ContainsKey(point);
+    return GetTile(point).IsWalkable && !_occupants.ContainsKey(point) && !_objectOccupants.ContainsKey(point);
   }
 
   // The board's single definition of orthogonal adjacency; the path search and every
@@ -302,6 +309,29 @@ public sealed class BattleBoardState
   internal BattleTileState GetTileUnchecked(int x, int y, int z)
   {
     return _tiles[x, y, z];
+  }
+
+  public bool IsBlockedByObject(ValidatedPoint point)
+    => _objectOccupants.ContainsKey(point);
+
+  public bool TryPlaceObjectOccupant(ValidatedPoint point, int objectId)
+  {
+    if (!GetTile(point).IsWalkable || _occupants.ContainsKey(point) || _objectOccupants.ContainsKey(point))
+      return false;
+
+    _objectOccupants[point] = objectId;
+    _positionByObject[objectId] = point;
+    return true;
+  }
+
+  public bool TryClearObjectOccupant(ValidatedPoint point, int objectId)
+  {
+    if (!_objectOccupants.TryGetValue(point, out int occupant) || occupant != objectId)
+      return false;
+
+    _objectOccupants.Remove(point);
+    _positionByObject.Remove(objectId);
+    return true;
   }
 
   public IReadOnlyCollection<ValidatedPoint> GetReachableTiles(ValidatedPoint origin, int maxSteps)
