@@ -1,0 +1,70 @@
+[gd_scene format=3 uid="uid://bb075r51rxteo"]
+
+[ext_resource type="PackedScene" uid="uid://jdkumfovnam8" path="res://scenes/geoscape/GeoscapeScene.tscn" id="1"]
+[ext_resource type="Resource" uid="uid://dmvbgh32f1l1n" path="res://resources/geoscape/TestMap.tres" id="2"]
+[ext_resource type="Script" uid="uid://bs8rgghlkfg2k" path="res://scenes/geoscape/RegionButton.cs" id="3_regionbtn"]
+
+[node name="DebugGeoscape" unique_id=958707659 instance=ExtResource("1")]
+Map = ExtResource("2")
+
+[node name="Northmark" type="Button" parent="Map" parent_id_path=PackedInt32Array(1111572209) index="0" unique_id=1736169534]
+script = ExtResource("3_regionbtn")
+
+[node name="Fill" type="Polygon2D" parent="Map/Northmark" index="0" unique_id=1132142056]
+color = Color(0.35, 0.45, 0.65, 1)
+polygon = PackedVector2Array(200, 80, 700, 60, 820, 220, 560, 320, 238.3772, 299.53983)
+
+[node name="Outline" type="Line2D" parent="Map/Northmark" index="1" unique_id=1802017455]
+points = PackedVector2Array(200, 80, 700, 60, 820, 220, 560, 320, 240, 300, 200, 80)
+width = 2.0
+default_color = Color(0, 0, 0, 1)
+
+[node name="Velden" type="Button" parent="Map" parent_id_path=PackedInt32Array(1111572209) index="1" unique_id=1370932033]
+script = ExtResource("3_regionbtn")
+
+[node name="Fill" type="Polygon2D" parent="Map/Velden" index="0" unique_id=2054779897]
+color = Color(0.3, 0.55, 0.3, 1)
+polygon = PackedVector2Array(240, 300, 560, 320, 700, 480, 520, 620, 220, 560)
+
+[node name="Outline" type="Line2D" parent="Map/Velden" index="1" unique_id=570545062]
+points = PackedVector2Array(240, 300, 560, 320, 700, 480, 520, 620, 220, 560, 240, 300)
+width = 2.0
+default_color = Color(0, 0, 0, 1)
+
+[node name="Eastreach" type="Button" parent="Map" parent_id_path=PackedInt32Array(1111572209) index="2" unique_id=202013912]
+script = ExtResource("3_regionbtn")
+
+[node name="Fill" type="Polygon2D" parent="Map/Eastreach" index="0" unique_id=1177671081]
+color = Color(0.75, 0.65, 0.35, 1)
+polygon = PackedVector2Array(820, 220, 560, 320, 700, 480, 980, 520, 1120, 300, 1080, 180)
+
+[node name="Outline" type="Line2D" parent="Map/Eastreach" index="1" unique_id=1931205590]
+points = PackedVector2Array(820, 220, 560, 320, 700, 480, 980, 520, 1120, 300, 1080, 180, 820, 220)
+width = 2.0
+default_color = Color(0, 0, 0, 1)
+
+[node name="Sorrow Isles" type="Button" parent="Map" parent_id_path=PackedInt32Array(1111572209) index="3" unique_id=141756287]
+script = ExtResource("3_regionbtn")
+
+[node name="Fill" type="Polygon2D" parent="Map/Sorrow Isles" index="0" unique_id=1753986740]
+color = Color(0.3, 0.55, 0.55, 1)
+polygon = PackedVector2Array(300, 700, 520, 660, 600, 780, 380, 840)
+
+[node name="Outline" type="Line2D" parent="Map/Sorrow Isles" index="1" unique_id=91199189]
+points = PackedVector2Array(300, 700, 520, 660, 600, 780, 380, 840, 300, 700)
+width = 2.0
+default_color = Color(0, 0, 0, 1)
+
+[node name="Cinder Wastes" type="Button" parent="Map" parent_id_path=PackedInt32Array(1111572209) index="4" unique_id=1165056032]
+script = ExtResource("3_regionbtn")
+
+[node name="Fill" type="Polygon2D" parent="Map/Cinder Wastes" index="0" unique_id=607820880]
+color = Color(0.7, 0.4, 0.3, 1)
+polygon = PackedVector2Array(1120, 300, 1380, 380, 1420, 650, 1050, 700, 980, 520)
+
+[node name="Outline" type="Line2D" parent="Map/Cinder Wastes" index="1" unique_id=627324102]
+points = PackedVector2Array(1120, 300, 1380, 380, 1420, 650, 1050, 700, 980, 520, 1120, 300)
+width = 2.0
+default_color = Color(0, 0, 0, 1)
+
+[node name="ResolutionDialog" parent="ResolutionLayer" index="0" unique_id=752477989]

@@ -1,0 +1,78 @@
+[gd_resource type="Resource" script_class="GeoscapeMapData" format=3 uid="uid://dmvbgh32f1l1n"]
+
+[ext_resource type="Script" uid="uid://dl7vjr78sskdu" path="res://scripts/strategic/GeoscapeMapData.cs" id="1"]
+[ext_resource type="Script" uid="uid://e5sdmq8l4a3a" path="res://scripts/strategic/RegionData.cs" id="2"]
+[ext_resource type="Script" uid="uid://wteelogkx2oj" path="res://scripts/strategic/GeoscapeEventDefinition.cs" id="3"]
+[ext_resource type="Script" uid="uid://cvsrysjc061la" path="res://scripts/strategic/ScheduledEventData.cs" id="4"]
+
+[sub_resource type="Resource" id="Region_northmark"]
+script = ExtResource("2")
+FlavorText = "Cold and proud."
+Name = "Northmark"
+Description = "A cold northern peninsula."
+
+[sub_resource type="Resource" id="Region_velden"]
+script = ExtResource("2")
+FlavorText = "Old farms, older grudges."
+Name = "Velden"
+Description = "The central heartland."
+
+[sub_resource type="Resource" id="Region_eastreach"]
+script = ExtResource("2")
+FlavorText = "Trade roads and watchtowers."
+Name = "Eastreach"
+Description = "The eastern marches."
+
+[sub_resource type="Resource" id="Region_sorrow"]
+script = ExtResource("2")
+FlavorText = "Named for the fleets lost there."
+Name = "Sorrow Isles"
+Description = "A scattered southern archipelago."
+
+[sub_resource type="Resource" id="Region_cinder"]
+script = ExtResource("2")
+FlavorText = "Glass plains and silence."
+Name = "Cinder Wastes"
+Description = "The burnt far east."
+
+[sub_resource type="Resource" id="Event_tactical"]
+script = ExtResource("3")
+Kind = 0
+Title = "Signal in the Snow"
+Description = "A downed alien craft is broadcasting from the Northmark tundra. Whatever answers it will not stay quiet for long."
+TargetRegionName = "Northmark"
+
+[sub_resource type="Resource" id="Schedule_tactical"]
+script = ExtResource("4")
+AtTick = 120
+Event = SubResource("Event_tactical")
+
+[sub_resource type="Resource" id="Event_plot"]
+script = ExtResource("3")
+Title = "Council Broadcast"
+Description = "An unscheduled transmission cuts across every channel in the region. The Council insists it is a test. It is not."
+
+[sub_resource type="Resource" id="Schedule_plot"]
+script = ExtResource("4")
+AtTick = 360
+Event = SubResource("Event_plot")
+
+[sub_resource type="Resource" id="Event_minigame"]
+script = ExtResource("3")
+Kind = 2
+Title = "Wreck Salvage"
+Description = "Scavengers are stripping a wreck in the Sorrow Isles. Get there first."
+ExpiresAfterTicks = 72
+TargetRegionName = "Sorrow Isles"
+
+[sub_resource type="Resource" id="Schedule_minigame"]
+script = ExtResource("4")
+AtTick = 480
+Event = SubResource("Event_minigame")
+
+[resource]
+script = ExtResource("1")
+Regions = [SubResource("Region_northmark"), SubResource("Region_velden"), SubResource("Region_eastreach"), SubResource("Region_sorrow"), SubResource("Region_cinder")]
+Timeline = [SubResource("Schedule_tactical"), SubResource("Schedule_plot"), SubResource("Schedule_minigame")]
+Name = "Test Geoscape"
+Description = "Debug map for the geoscape scene."

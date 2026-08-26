@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://useilo010t6y"]
+
+[ext_resource type="Script" uid="uid://utsd13okho7v" path="res://scenes/geoscape/GeoscapeHud.cs" id="1_7h8wm"]
+
+[node name="GeoscapeHud" type="CanvasLayer" unique_id=1886936763]
+script = ExtResource("1_7h8wm")
+
+[node name="TopBar" type="HBoxContainer" parent="." unique_id=931898494]
+unique_name_in_owner = true
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 31.0
+grow_horizontal = 2
+size_flags_horizontal = 3
+
+[node name="ClockLabel" type="Label" parent="TopBar" unique_id=1127459339]
+unique_name_in_owner = true
+layout_mode = 2
+text = "..."
+
+[node name="VSeparator" type="VSeparator" parent="TopBar" unique_id=2125174445]
+layout_mode = 2
+
+[node name="TimeButtons" type="HBoxContainer" parent="TopBar" unique_id=650970638]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="PauseButton" type="Button" parent="TopBar/TimeButtons" unique_id=409197300]
+unique_name_in_owner = true
+layout_mode = 2
+toggle_mode = true
+button_pressed = true
+text = "Pause"
+
+[node name="SpeedButton" type="Button" parent="TopBar/TimeButtons" unique_id=178041197]
+unique_name_in_owner = true
+layout_mode = 2
+text = "1x"
+
+[node name="Alerts" type="VBoxContainer" parent="." unique_id=771948312]
+unique_name_in_owner = true
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_top = 60.0

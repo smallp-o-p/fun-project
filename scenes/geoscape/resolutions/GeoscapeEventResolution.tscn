@@ -1,0 +1,75 @@
+[gd_scene format=3 uid="uid://oo7kshnr865k"]
+
+[ext_resource type="Script" uid="uid://bq8e6okud6r7" path="res://scenes/geoscape/resolutions/GeoscapeEventResolution.cs" id="1_s6fx8"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_k0foj"]
+
+[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_k0foj"]
+size = Vector2(128, 128)
+
+[node name="GeoscapeEventResolution" type="Control" unique_id=752477989]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_s6fx8")
+
+[node name="Dim" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.5)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="CenterContainer" unique_id=1630687601]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/PanelContainer" unique_id=1894186571]
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="Title" type="Label" parent="CenterContainer/PanelContainer/VBoxContainer" unique_id=901292771]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Title"
+horizontal_alignment = 1
+
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/PanelContainer/VBoxContainer" unique_id=1189477609]
+layout_mode = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 4
+theme_override_constants/margin_bottom = 4
+
+[node name="PanelContainer" type="PanelContainer" parent="CenterContainer/PanelContainer/VBoxContainer/MarginContainer" unique_id=820640759]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_k0foj")
+
+[node name="Img" type="TextureRect" parent="CenterContainer/PanelContainer/VBoxContainer/MarginContainer/PanelContainer" unique_id=1584576596]
+unique_name_in_owner = true
+layout_mode = 2
+texture = SubResource("PlaceholderTexture2D_k0foj")
+stretch_mode = 3
+
+[node name="Description" type="Label" parent="CenterContainer/PanelContainer/VBoxContainer" unique_id=833110878]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(256, 0)
+layout_mode = 2
+text = "Description"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Buttons" type="HBoxContainer" parent="CenterContainer/PanelContainer/VBoxContainer" unique_id=1736793205]
+unique_name_in_owner = true
+layout_mode = 2
+alignment = 1
