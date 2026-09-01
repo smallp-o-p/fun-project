@@ -6,14 +6,18 @@ using FunProject.Stats;
 
 namespace FunProject.Combatants;
 
+/// <summary>
+/// Saved state for a unit.
+/// </summary>
 public class Combatant : HasStats, HasModSlots
 {
-  public int MaxInventorySize = 5;
   public string Name { get; }
   public Faction OwningFaction { get; internal set; }
   private readonly StatSheet _stats;
   private readonly Godot.Collections.Array<ModSlot> _modSlots = [];
-  public List<EquippableItem> Inventory { get; private set; } = [];
+  private readonly Dictionary<int, EquippableItem> _inventory = [];
+  public IReadOnlyDictionary<int, EquippableItem> Inventory => _inventory;
+  public int MaxInventorySize { get; }
   public IReadOnlyList<BuffData> InnateBuffs { get; }
 
   public Combatant(CombatantData data, Faction faction, Option<string> name = default)
@@ -38,6 +42,7 @@ public class Combatant : HasStats, HasModSlots
     {
       _modSlots.Add(new ModSlot());
     }
+    MaxInventorySize = data.InventorySize;
   }
 
   public Option<TStat> TryGetStat<TStat>() where TStat : Stat => _stats.TryGetStat<TStat>();
@@ -49,11 +54,13 @@ public class Combatant : HasStats, HasModSlots
   public IEnumerable<StatMod> StatContributions()
     => this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).Concat(OwningFaction.StatBonuses).ToArray();
 
-  public void EquipItem(EquippableItem item)
+  public void EquipItem(EquippableItem item, int slot)
   {
-    if (Inventory.Count < MaxInventorySize)
-    {
-      Inventory.Add(item);
-    }
+    ArgumentNullException.ThrowIfNull(item);
+    if (slot < 0 || slot >= MaxInventorySize)
+      throw new InvalidOperationException(
+        $"EquipItem slot {slot} is out of range for an inventory of size {MaxInventorySize}.");
+
+    _inventory[slot] = item;
   }
 }

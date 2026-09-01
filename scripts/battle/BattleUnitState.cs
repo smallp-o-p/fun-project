@@ -58,9 +58,13 @@ public sealed class BattleUnitState
     EquippedArmor = equippedArmor;
     CurrentHealth = MaxHealth;
     CurrentActionPoints = MaxActionPoints;
-    // Defensive copy: battle-time inventory mutations must not write through to the
-    // shared, authored Combatant template (Data/Runtime ownership boundary).
-    _inventory = [.. combatant.Inventory];
+    // Ascending slot order: the battle inventory is positional, and Dictionary enumeration
+    // order is an implementation detail — sparse keys must not shuffle it.
+    var inventory = new List<EquippableItem>(combatant.MaxInventorySize);
+    for (int slot = 0; slot < combatant.MaxInventorySize; slot++)
+      if (combatant.Inventory.TryGetValue(slot, out EquippableItem? item))
+        inventory.Add(item);
+    _inventory = inventory;
 
     // Dedupe by BuffData reference identity: the same authored buff granted by several
     // sources (innate + item) must contribute once, mirroring status-effect spec identity.
