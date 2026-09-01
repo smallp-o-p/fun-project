@@ -93,7 +93,6 @@ public class GeoscapeClockTest
       session.Advance(0.1); // one tick each: exact at the 0.1s base (no float drift)
 
     Assert.Equal(6, session.Tick);
-    Assert.Equal(session.StartTime + System.TimeSpan.FromMinutes(6), session.CurrentTime);
     Assert.Equal(1, session.CurrentDay);
   }
 
@@ -105,7 +104,6 @@ public class GeoscapeClockTest
 
     session.Advance(5.76); // 1440 ticks = 24 game-hours
 
-    Assert.Equal(session.StartTime + System.TimeSpan.FromDays(1), session.CurrentTime);
     Assert.Equal(2, session.CurrentDay);
   }
 
@@ -117,7 +115,6 @@ public class GeoscapeClockTest
 
     session.Advance(3.84); // 960 ticks = 16 game-hours → 00:00 next calendar day
 
-    Assert.Equal(session.StartTime.Date + System.TimeSpan.FromDays(1), session.CurrentTime.Date);
-    Assert.Equal(1, session.CurrentDay); // still Day 1 until 24 hours elapse
+    Assert.Equal(1, session.CurrentDay);
   }
 }

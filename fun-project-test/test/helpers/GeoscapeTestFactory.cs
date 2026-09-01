@@ -15,12 +15,10 @@ internal static class GeoscapeTestFactory
 
   public static GeoscapeSession MakeSession(
     RegionData[]? regions = null,
-    ScheduledEventData[]? timeline = null,
-    string startTimeIso = "2087-03-01T08:00:00")
+    ScheduledEventData[]? timeline = null)
   {
     return new GeoscapeSession(new GeoscapeMapData
     {
-      StartTimeIso = startTimeIso,
       Regions = regions ?? [],
       Timeline = timeline ?? [],
     });

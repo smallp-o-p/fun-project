@@ -10,17 +10,14 @@ public sealed class GeoscapeSession
   // One tick advances the in-game clock by one minute.
   public const int TickGameSeconds = 60;
 
-  // Real seconds per tick, bound to the enum by name: Normal is the base (1x), the rest are
-  // 5x, 12.5x, and 25x of it. Paused never reaches this in Advance (it returns early), so it
-  // has no arm. Rates bound by name, not array position: a positional table desyncs on any
-  // renumbering (Paused becoming -1 once made Normal divide by the paused rate of 0.0, and
-  // one Advance looped ~2.1 billion ticks).
+  private const double BaseSecondsPerTick = 0.1;
   private static double SecondsPerTick(TimeSpeed speed) => speed switch
   {
-    TimeSpeed.Normal => 0.1,
-    TimeSpeed.Fast => 0.02,
-    TimeSpeed.VeryFast => 0.008,
-    TimeSpeed.VeryVeryFast => 0.004,
+    TimeSpeed.Paused => 0.0,
+    TimeSpeed.Normal => BaseSecondsPerTick,
+    TimeSpeed.Fast => BaseSecondsPerTick / 5.0,
+    TimeSpeed.VeryFast => BaseSecondsPerTick / 12.5,
+    TimeSpeed.VeryVeryFast => BaseSecondsPerTick / 25.0,
     _ => throw new InvalidOperationException($"Unknown time speed '{speed}'."),
   };
 
@@ -47,11 +44,6 @@ public sealed class GeoscapeSession
 
     MapSize = mapData.Size;
 
-    StartTime = DateTime.Parse(
-      mapData.StartTimeIso,
-      CultureInfo.InvariantCulture,
-      DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
-
     foreach (RegionData region in mapData.Regions)
     {
       if (!_indexByName.TryAdd(region.Name, _regions.Count))
@@ -74,13 +66,13 @@ public sealed class GeoscapeSession
 
   public TimeSpeed Speed { get; private set; } = TimeSpeed.Paused;
 
-  public DateTime StartTime { get; }
-
-  public DateTime CurrentTime => StartTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
+  private readonly DateTime _startTime = DateTime.UnixEpoch;
+  
+  public DateTime CurrentTime => _startTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
 
   // Days of game time elapsed since the start, 1-based: Day 1 spans the first 24 game-hours,
   // so an 08:00 start rolls to Day 2 at the next 08:00 — not at midnight.
-  public int CurrentDay => (int)((CurrentTime - StartTime).TotalDays) + 1;
+  public int CurrentDay => (int)((CurrentTime - _startTime).TotalDays) + 1;
 
   public IReadOnlyList<RegionData> Regions => _regions;
 
