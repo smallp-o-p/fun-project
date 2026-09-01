@@ -1,7 +1,7 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dm5w72otw20q2"]
 
 [ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitLabel.tscn" id="1_pisvb"]
-[ext_resource type="Script" path="res://scenes/geoscape/units/UnitRoster.cs" id="2_script"]
+[ext_resource type="Script" uid="uid://cs2b2vwhkbjeb" path="res://scenes/geoscape/units/UnitRoster.cs" id="2_script"]
 
 [node name="UnitRoster" type="PanelContainer" unique_id=161475801]
 anchors_preset = 15
@@ -27,21 +27,22 @@ custom_minimum_size = Vector2(0, 96)
 layout_mode = 2
 theme_override_constants/margin_bottom = 16
 
-[node name="HBox" type="HBoxContainer" parent="MarginContainer/VBoxContainer/Header"]
+[node name="HBox" type="HBoxContainer" parent="MarginContainer/VBoxContainer/Header" unique_id=1299085671]
 layout_mode = 2
 
-[node name="Title" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Header/HBox"]
+[node name="Title" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Header/HBox" unique_id=1828378539]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/normal_font_size = 64
 text = "Units"
+scroll_active = false
 vertical_alignment = 2
 
-[node name="BackButton" type="Button" parent="MarginContainer/VBoxContainer/Header/HBox"]
+[node name="BackButton" type="Button" parent="MarginContainer/VBoxContainer/Header/HBox" unique_id=1077662828]
 unique_name_in_owner = true
-layout_mode = 2
 custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
 text = "Back"
 
 [node name="TableHeader" type="HBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=1298819191]

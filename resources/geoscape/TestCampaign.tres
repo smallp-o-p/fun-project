@@ -1,10 +1,10 @@
-[gd_resource type="Resource" script_class="CampaignStartData" format=3]
+[gd_resource type="Resource" script_class="CampaignStartData" format=3 uid="uid://bijygom520bfo"]
 
-[ext_resource type="Script" path="res://scripts/gamestate/CampaignStartData.cs" id="1_start"]
-[ext_resource type="Script" path="res://scripts/gamestate/RosterEntryData.cs" id="2_entry"]
-[ext_resource type="Resource" path="res://resources/geoscape/TestMap.tres" id="3_map"]
+[ext_resource type="Script" uid="uid://d34a7ypj2m7h2" path="res://scripts/gamestate/CampaignStartData.cs" id="1_start"]
+[ext_resource type="Script" uid="uid://cch10oeqcit2a" path="res://scripts/gamestate/RosterEntryData.cs" id="2_entry"]
+[ext_resource type="Resource" uid="uid://dmvbgh32f1l1n" path="res://resources/geoscape/TestMap.tres" id="3_map"]
 [ext_resource type="Resource" path="res://resources/factions/player.tres" id="4_faction"]
-[ext_resource type="Resource" path="res://resources/combatants/soldier.tres" id="5_soldier"]
+[ext_resource type="Resource" uid="uid://dg2tr6x5fu31x" path="res://resources/combatants/soldier.tres" id="5_soldier"]
 
 [sub_resource type="Resource" id="Resource_entry1"]
 script = ExtResource("2_entry")
@@ -28,8 +28,8 @@ DisplayName = "Cpl. Dmitri Volkov"
 
 [resource]
 script = ExtResource("1_start")
-Name = "Test Campaign"
-Description = "Debug campaign for the geoscape."
 Map = ExtResource("3_map")
 PlayerFaction = ExtResource("4_faction")
 StartingRoster = [SubResource("Resource_entry1"), SubResource("Resource_entry2"), SubResource("Resource_entry3"), SubResource("Resource_entry4")]
+Name = "Test Campaign"
+Description = "Debug campaign for the geoscape."
