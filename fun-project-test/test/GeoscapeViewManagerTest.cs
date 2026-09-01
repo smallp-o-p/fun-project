@@ -14,16 +14,24 @@ public partial class GeoscapeViewManagerTest
     public void RaiseClosed() => Closed?.Invoke();
   }
 
-  private static GeoscapeViewManager BuildManager(out FakeView liveView)
+  private static GeoscapeViewManager BuildManager(bool open)
   {
     var proto = new FakeView();
     var scene = new PackedScene();
     scene.Pack(proto);
+    proto.Free();
 
     var manager = AutoFree(new GeoscapeViewManager { UnitsView = scene });
     ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
 
-    manager.Open(GeoscapeView.Units);
+    if (open)
+      manager.Open(GeoscapeView.Units);
+    return manager;
+  }
+
+  private static GeoscapeViewManager BuildManager(out FakeView liveView)
+  {
+    var manager = BuildManager(open: true);
     liveView = (FakeView)manager.GetChildren()[0];
     return manager;
   }
@@ -31,11 +39,19 @@ public partial class GeoscapeViewManagerTest
   [TestCase(TestName = "Open instantiates the view, sets Current, raises ViewOpened, adds as child")]
   public void OpenInstantiatesView()
   {
-    var manager = BuildManager(out FakeView view);
+    var manager = BuildManager(open: false);
+    GeoscapeView? firedView = null;
+    Control? firedInstance = null;
+    manager.ViewOpened += (v, inst) => { firedView = v; firedInstance = inst; };
+
+    manager.Open(GeoscapeView.Units);
+    var liveView = (FakeView)manager.GetChildren()[0];
 
     Assert.Equal(GeoscapeView.Units, manager.Current);
     Assert.Equal(1, manager.GetChildCount());
-    Assert.True(view.IsInsideTree());
+    Assert.True(liveView.IsInsideTree());
+    Assert.Equal(GeoscapeView.Units, firedView);
+    Assert.True(ReferenceEquals(liveView, firedInstance));
   }
 
   [TestCase(TestName = "View raising Closed returns to Map, frees the instance, raises ViewClosed")]

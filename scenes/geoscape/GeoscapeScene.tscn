@@ -5,7 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://useilo010t6y" path="res://scenes/geoscape/GeoscapeHud.tscn" id="2_jn255"]
 [ext_resource type="PackedScene" uid="uid://oo7kshnr865k" path="res://scenes/geoscape/resolutions/GeoscapeEventResolution.tscn" id="3_y8l5f"]
 [ext_resource type="Script" path="res://scenes/geoscape/GeoscapeViewManager.cs" id="4_viewmgr"]
-[ext_resource type="PackedScene" uid="uid://dm5w72otw20q2" path="res://scenes/geoscape/units/UnitRoster.tscn" id="5_roster"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitRoster.tscn" id="5_roster"]
 
 [node name="GeoscapeScene" type="Control" unique_id=1401687055]
 layout_mode = 3

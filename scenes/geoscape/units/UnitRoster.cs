@@ -26,10 +26,10 @@ public sealed partial class UnitRoster : PanelContainer, IGeoscapeView
     // idempotent thereafter); every present then rebuilds from the current roster.
     ClearRows();
 
+    PackedScene scene = UnitLabelScene ?? throw new InvalidOperationException(
+      "UnitRoster requires UnitLabelScene; assign a PackedScene in the inspector.");
     foreach (Combatant unit in state.Roster)
     {
-      PackedScene scene = UnitLabelScene ?? throw new InvalidOperationException(
-        "UnitRoster requires UnitLabelScene; assign a PackedScene in the inspector.");
       var label = scene.Instantiate<UnitLabel>();
       _unitLabels.AddChild(label);
       label.Bind(unit);

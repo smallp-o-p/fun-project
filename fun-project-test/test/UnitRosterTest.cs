@@ -38,7 +38,9 @@ public class UnitRosterTest
   private static UnitRoster BuildRoster()
   {
     var labelScene = new PackedScene();
-    labelScene.Pack(BuildLabelProto());
+    var labelProto = BuildLabelProto();
+    labelScene.Pack(labelProto);
+    labelProto.Free();
 
     var roster = AutoFree(new UnitRoster { UnitLabelScene = labelScene });
 

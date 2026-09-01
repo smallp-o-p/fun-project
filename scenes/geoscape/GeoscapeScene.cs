@@ -4,8 +4,8 @@ using CampaignGameState = global::FunProject.GameState.GameState;
 using Godot;
 using System;
 
-// Composition root for the geoscape: builds the session from the authored map, wires the
-// authored map control (region visuals live in the scene), owns the code-built children,
+// Composition root for the geoscape: builds the campaign GameState from the authored
+// CampaignStartData and the session over it, wires the authored map control (region visuals live in the scene), owns the code-built children,
 // feeds frame deltas to the clock.
 public sealed partial class GeoscapeScene : Control
 {
