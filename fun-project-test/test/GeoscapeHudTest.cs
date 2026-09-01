@@ -10,7 +10,7 @@ public class GeoscapeHudTest
 {
   // The GdUnit runner's Godot instance runs with the fun-project-test subproject as its
   // res:// root, so the main project's GeoscapeHud.tscn cannot be loaded from here. The test
-  // rebuilds the authored node tree (ClockLabel, PauseButton, SpeedButton, Alerts) in code
+  // rebuilds the authored node tree (ClockLabel, PauseButton, SpeedButton, UnitsButton, Alerts) in code
   // with unique names and lets _Ready wire it — pinning the HUD's push logic. The scene
   // file's own wiring is exercised by running the game.
   private static GeoscapeHud BuildHud()
@@ -21,14 +21,16 @@ public class GeoscapeHudTest
     var clock = new Label { Name = "ClockLabel" };
     var pause = new Button { Name = "PauseButton" };
     var speed = new Button { Name = "SpeedButton" };
+    var units = new Button { Name = "UnitsButton" };
     var alerts = new VBoxContainer { Name = "Alerts" };
 
-    foreach (Node node in new Node[] { clock, pause, speed, alerts })
+    foreach (Node node in new Node[] { clock, pause, speed, units, alerts })
       node.UniqueNameInOwner = true;
 
     topBar.AddChild(clock);
     topBar.AddChild(pause);
     topBar.AddChild(speed);
+    topBar.AddChild(units);
     hud.AddChild(topBar);
     hud.AddChild(alerts);
     foreach (Node child in topBar.GetChildren())
@@ -47,6 +49,19 @@ public class GeoscapeHudTest
       Option<int>.None,
       OccurredTick: 0,
       expiresAtTick.HasValue ? Some(expiresAtTick.Value) : Option<long>.None);
+  }
+
+  [TestCase(TestName = "Units button raises ViewRequested for the Units view")]
+  public void UnitsButtonRaisesViewRequested()
+  {
+    var hud = BuildHud();
+
+    GeoscapeView? requested = null;
+    hud.ViewRequested += view => requested = view;
+
+    hud.GetNode<Button>("%UnitsButton").EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Equal(GeoscapeView.Units, requested);
   }
 
   [TestCase(TestName = "UpdateClock writes the pushed day and time to the clock label")]

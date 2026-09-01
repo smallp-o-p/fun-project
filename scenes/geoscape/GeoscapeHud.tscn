@@ -37,6 +37,11 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "1x"
 
+[node name="UnitsButton" type="Button" parent="TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Units"
+
 [node name="Alerts" type="VBoxContainer" parent="." unique_id=771948312]
 unique_name_in_owner = true
 anchors_preset = 9

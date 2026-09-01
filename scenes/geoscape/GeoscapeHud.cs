@@ -2,8 +2,8 @@ using FunProject.Strategic;
 using Godot;
 using System;
 
-// Top bar (clock + speed buttons) and left alert list, AUTHORED in GeoscapeHud.tscn
-// (ClockLabel, PauseButton, SpeedButton, Alerts). Pure presentation: state arrives via
+// Top bar (clock + speed buttons + Units view button) and left alert list, AUTHORED in
+// GeoscapeHud.tscn (ClockLabel, PauseButton, SpeedButton, UnitsButton, Alerts). Pure presentation: state arrives via
 // pushes (UpdateClock, RefreshAlerts, UpdateCountdowns); requests flow out as C# events
 // routed by the composition root. No session dependency.
 public sealed partial class GeoscapeHud : CanvasLayer
@@ -11,6 +11,7 @@ public sealed partial class GeoscapeHud : CanvasLayer
   private Label _clockLabel = null!;
   private Button _pauseButton = null!;
   private Button _speedButton = null!;
+  private Button _unitsButton = null!;
   private VBoxContainer _alerts = null!;
   private readonly SysColGeneric.List<(Button Button, GeoscapeEvent Event)> _alertButtons = [];
 
@@ -18,15 +19,18 @@ public sealed partial class GeoscapeHud : CanvasLayer
 
   public event Action<TimeSpeed>? ChangeSpeed;
   public event Action<GeoscapeEvent>? ResolutionRequested;
+  public event Action<GeoscapeView>? ViewRequested;
 
   public override void _Ready()
   {
     _speedButton = GetNode<Button>("%SpeedButton");
+    _unitsButton = GetNode<Button>("%UnitsButton");
     _pauseButton = GetNode<Button>("%PauseButton");
     _clockLabel = GetNode<Label>("%ClockLabel");
     _alerts = GetNode<VBoxContainer>("%Alerts");
 
     _speedButton.Pressed += UpdateSpeed;
+    _unitsButton.Pressed += () => ViewRequested?.Invoke(GeoscapeView.Units);
     _pauseButton.Toggled += pressed =>
       ChangeSpeed?.Invoke(pressed ? TimeSpeed.Paused : _lastActiveSpeed);
   }
