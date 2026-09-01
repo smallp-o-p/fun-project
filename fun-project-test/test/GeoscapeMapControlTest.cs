@@ -10,12 +10,15 @@ public class GeoscapeMapControlTest
 {
   // Builds the authored shape the editor would produce: a RegionButton child of the map,
   // named after its RegionData, with a Polygon2D "Fill" child carrying the polygon (and an
-  // optional offset). Only the map needs AutoFree — children free transitively.
+  // optional offset). The map enters the tree — tree entry stands in for scene load, so
+  // the buttons self-configure (_Ready derives hit areas and wires hover). Only the map
+  // needs AutoFree — children free transitively.
   private static GeoscapeMapControl BuildMap(RegionButton[] buttons)
   {
-    var map = AutoFree(new GeoscapeMapControl());
+    var map = AutoFree(new GeoscapeMapControl { EventMarkerScene = PackMarkerProto() });
     foreach (RegionButton button in buttons)
       map.AddChild(button);
+    ((SceneTree)Engine.GetMainLoop()).Root.AddChild(map);
     return map;
   }
 
@@ -26,6 +29,37 @@ public class GeoscapeMapControlTest
     return button;
   }
 
+  // Stands in for the authored GeoscapeEventMarker.tscn: a RegionButton with a baked
+  // circle Fill and a 56×56 extent. The GdUnit root is the test subproject, so authored
+  // scenes under scenes/ cannot be loaded — pack a proto in code (UnitRosterTest precedent).
+  private static PackedScene PackMarkerProto()
+  {
+    var proto = new RegionButton { Size = new Vector2(56, 56) };
+    var fill = new Polygon2D
+    {
+      Name = "Fill",
+      Polygon = CirclePolygon(28f, new Vector2(28, 28)),
+    };
+    proto.AddChild(fill);
+    fill.Owner = proto; // Pack serializes only nodes owned by the scene root
+    var scene = new PackedScene();
+    scene.Pack(proto);
+    proto.Free();
+    return scene;
+  }
+
+  private static Vector2[] CirclePolygon(float radius, Vector2 center, int segments = 24)
+  {
+    var points = new Vector2[segments];
+    for (int i = 0; i < segments; i++)
+    {
+      float angle = i * Mathf.Tau / segments;
+      points[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+    }
+
+    return points;
+  }
+
   private static readonly Vector2[] Square =
   [
     new Vector2(10, 10), new Vector2(110, 10), new Vector2(110, 110), new Vector2(10, 110),
@@ -34,27 +68,6 @@ public class GeoscapeMapControlTest
   // Authored map bounds passed to Setup — no assertion depends on the value (all test
   // events are region-targeted); it exercises the real parameter shape.
   private static readonly Vector2I TestMapSize = new(1600, 900);
-
-  [TestCase(TestName = "Setup derives the region hit area from the authored Fill polygon")]
-  public void SetupDerivesHitAreaFromFill()
-  {
-    var map = BuildMap(
-    [
-      RegionButtonNamed("Alpha",
-      [
-        new Vector2(0, 0), new Vector2(100, 0), new Vector2(100, 100), new Vector2(0, 100),
-      ], fillOffset: new Vector2(10, 10)),
-    ]);
-    var session = GeoscapeTestFactory.MakeSession(regions: [GeoscapeTestFactory.MakeRegion("Alpha")]);
-
-    map.Setup(session, TestMapSize);
-    var button = (RegionButton)map.GetChild(0);
-
-    Assert.True(button._HasPoint(new Vector2(60, 60))); // effective area (10..110)
-    Assert.True(button._HasPoint(new Vector2(11, 11)));
-    Assert.False(button._HasPoint(new Vector2(5, 5))); // below the Fill offset
-    Assert.False(button._HasPoint(new Vector2(150, 150)));
-  }
 
   [TestCase(TestName = "A region without an authored button throws")]
   public void RegionWithoutButtonThrows()
@@ -85,7 +98,17 @@ public class GeoscapeMapControlTest
     map.Setup(session, TestMapSize); // must not throw
   }
 
-  [TestCase(TestName = "RefreshEvents layers a marker button on the target region's centroid")]
+  [TestCase(TestName = "Setup without an assigned marker scene throws")]
+  public void MissingMarkerSceneThrows()
+  {
+    var map = AutoFree(new GeoscapeMapControl()); // no EventMarkerScene assigned
+    map.AddChild(RegionButtonNamed("Alpha", Square));
+    var session = GeoscapeTestFactory.MakeSession(regions: [GeoscapeTestFactory.MakeRegion("Alpha")]);
+
+    Assert.Throws<InvalidOperationException>(() => map.Setup(session, TestMapSize));
+  }
+
+  [TestCase(TestName = "RefreshEvents stamps a marker button centered on the target region's centroid")]
   public void RefreshEventsLayersMarkerAtCentroid()
   {
     var map = BuildMap([RegionButtonNamed("Alpha", Square)]);
@@ -106,7 +129,8 @@ public class GeoscapeMapControlTest
     Assert.True(marker is RegionButton);
     var markerButton = (RegionButton)marker;
     // Later sibling → drawn above the regions, so overlapping hits land on the marker.
-    Assert.Equal(new Vector2(32, 32), markerButton.Position); // centroid (60,60) − corner (28,28)
+    // Centroid (60,60) − half the marker scene's extent (28,28).
+    Assert.Equal(new Vector2(32, 32), markerButton.Position);
     Assert.True(markerButton._HasPoint(new Vector2(28, 28)));
     Assert.False(markerButton._HasPoint(new Vector2(2, 2)));
   }
@@ -140,7 +164,7 @@ public class GeoscapeMapControlTest
     map.RefreshEvents();
 
     var marker = (RegionButton)map.GetChild(map.GetChildCount() - 1);
-    Assert.Equal(new Vector2(472, 372), marker.Position); // anchor (500,400) − corner (28,28)
+    Assert.Equal(new Vector2(472, 372), marker.Position); // anchor (500,400) − half extent (28,28)
   }
 
   [TestCase(TestName = "A resolved event's marker disappears from the map")]

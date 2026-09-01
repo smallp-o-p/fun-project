@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://oo7kshnr865k" path="res://scenes/geoscape/resolutions/GeoscapeEventResolution.tscn" id="3_y8l5f"]
 [ext_resource type="Script" path="res://scenes/geoscape/GeoscapeViewManager.cs" id="4_viewmgr"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitRoster.tscn" id="5_roster"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeEventMarker.tscn" id="6_marker"]
 
 [node name="GeoscapeScene" type="Control" unique_id=1401687055]
 layout_mode = 3
@@ -29,6 +30,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("2")
+EventMarkerScene = ExtResource("6_marker")
 
 [node name="ViewManager" type="Control" parent="."]
 unique_name_in_owner = true

@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://bs8rgghlkfg2k" path="res://scenes/geoscape/RegionButton.cs" id="1_script"]
+
+[node name="RegionButton" type="Button" unique_id=125647123]
+script = ExtResource("1_script")
+
+[node name="Fill" type="Polygon2D" parent="." unique_id=1024382766]
+color = Color(0.35, 0.45, 0.65, 1)
+polygon = PackedVector2Array(200, 80, 700, 60, 820, 220, 560, 320, 240, 300)
+
+[node name="Outline" type="Line2D" parent="." unique_id=1134225301]
+points = PackedVector2Array(200, 80, 700, 60, 820, 220, 560, 320, 240, 300, 200, 80)
+width = 2.0
+default_color = Color(0, 0, 0, 1)
