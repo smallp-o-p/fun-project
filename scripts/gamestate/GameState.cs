@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using FunProject.Combatants;
 using FunProject.Strategic;
-using Godot;
 
 namespace FunProject.GameState;
 
@@ -43,8 +42,6 @@ public sealed class GameState
     FactionData playerFaction = start.PlayerFaction ?? throw new InvalidOperationException(
       "CampaignStartData requires a PlayerFaction; assign one in the inspector.");
 
-    MapSize = map.Size;
-
     foreach (RegionData region in map.Regions)
     {
       if (!_indexByName.TryAdd(region.Name, _regions.Count))
@@ -69,8 +66,6 @@ public sealed class GameState
         entry.DisplayName.Length > 0 ? Some(entry.DisplayName) : Option<string>.None));
     }
   }
-
-  public Vector2I MapSize { get; }
 
   public IReadOnlyList<RegionData> Regions => _regions;
 

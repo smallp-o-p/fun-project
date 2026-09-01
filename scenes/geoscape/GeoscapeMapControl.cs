@@ -21,6 +21,7 @@ public sealed partial class GeoscapeMapControl : Control
   private const int MarkerCircleSegments = 24;
 
   private GeoscapeSession _session = null!;
+  private Vector2I _mapSize;
   private Vector2[]?[] _visuals = [];
   private Vector2[] _markerAnchors = [];
   private readonly List<RegionButton> _markerNodes = [];
@@ -28,9 +29,10 @@ public sealed partial class GeoscapeMapControl : Control
   [Signal] public delegate void RegionClickedEventHandler(RegionData region);
   [Signal] public delegate void EventClickedEventHandler(GeoscapeEventAdapter adapter);
 
-  public void Setup(GeoscapeSession session)
+  public void Setup(GeoscapeSession session, Vector2I mapSize)
   {
     _session = session;
+    _mapSize = mapSize;
 
     _visuals = new Vector2[session.Regions.Count][];
     _markerAnchors = new Vector2[session.Regions.Count];
@@ -81,7 +83,7 @@ public sealed partial class GeoscapeMapControl : Control
     {
       Vector2 position = active.TargetRegionIndex.Match(
         index => _markerAnchors[index],
-        () => (Vector2)_session.MapSize / 2f); // map-wide marker: map center
+        () => (Vector2)_mapSize / 2f); // map-wide marker: map center
       _markerNodes.Add(BuildMarkerButton(active, position));
     }
   }

@@ -31,6 +31,10 @@ public class GeoscapeMapControlTest
     new Vector2(10, 10), new Vector2(110, 10), new Vector2(110, 110), new Vector2(10, 110),
   ];
 
+  // Authored map bounds passed to Setup — no assertion depends on the value (all test
+  // events are region-targeted); it exercises the real parameter shape.
+  private static readonly Vector2I TestMapSize = new(1600, 900);
+
   [TestCase(TestName = "Setup derives the region hit area from the authored Fill polygon")]
   public void SetupDerivesHitAreaFromFill()
   {
@@ -43,7 +47,7 @@ public class GeoscapeMapControlTest
     ]);
     var session = GeoscapeTestFactory.MakeSession(regions: [GeoscapeTestFactory.MakeRegion("Alpha")]);
 
-    map.Setup(session);
+    map.Setup(session, TestMapSize);
     var button = (RegionButton)map.GetChild(0);
 
     Assert.True(button._HasPoint(new Vector2(60, 60))); // effective area (10..110)
@@ -59,7 +63,7 @@ public class GeoscapeMapControlTest
     var session = GeoscapeTestFactory.MakeSession(
       regions: [GeoscapeTestFactory.MakeRegion("Alpha"), GeoscapeTestFactory.MakeRegion("Beta")]);
 
-    Assert.Throws<InvalidOperationException>(() => map.Setup(session));
+    Assert.Throws<InvalidOperationException>(() => map.Setup(session, TestMapSize));
   }
 
   [TestCase(TestName = "An authored button without region data throws")]
@@ -68,7 +72,7 @@ public class GeoscapeMapControlTest
     var map = BuildMap([RegionButtonNamed("Alpha", Square), RegionButtonNamed("Extra", Square)]);
     var session = GeoscapeTestFactory.MakeSession(regions: [GeoscapeTestFactory.MakeRegion("Alpha")]);
 
-    Assert.Throws<InvalidOperationException>(() => map.Setup(session));
+    Assert.Throws<InvalidOperationException>(() => map.Setup(session, TestMapSize));
   }
 
   [TestCase(TestName = "Non-button children of the map are ignored")]
@@ -78,7 +82,7 @@ public class GeoscapeMapControlTest
     map.AddChild(new Label { Name = "SomeLabel" });
     var session = GeoscapeTestFactory.MakeSession(regions: [GeoscapeTestFactory.MakeRegion("Alpha")]);
 
-    map.Setup(session); // must not throw
+    map.Setup(session, TestMapSize); // must not throw
   }
 
   [TestCase(TestName = "RefreshEvents layers a marker button on the target region's centroid")]
@@ -95,7 +99,7 @@ public class GeoscapeMapControlTest
     session.ChangeSpeed(TimeSpeed.Normal);
     session.Advance(0.1); // fires the raid at tick 1
 
-    map.Setup(session);
+    map.Setup(session, TestMapSize);
     map.RefreshEvents();
 
     var marker = map.GetChild(map.GetChildCount() - 1);
@@ -112,7 +116,7 @@ public class GeoscapeMapControlTest
   {
     var map = BuildMap([RegionButtonNamed("Alpha", Square)]);
     var session = GeoscapeTestFactory.MakeSession(regions: [GeoscapeTestFactory.MakeRegion("Alpha")]);
-    map.Setup(session);
+    map.Setup(session, TestMapSize);
 
     string? clicked = null;
     map.RegionClicked += region => clicked = region.Name;
@@ -132,7 +136,7 @@ public class GeoscapeMapControlTest
     session.ChangeSpeed(TimeSpeed.Normal);
     session.Advance(0.1);
 
-    map.Setup(session);
+    map.Setup(session, TestMapSize);
     map.RefreshEvents();
 
     var marker = (RegionButton)map.GetChild(map.GetChildCount() - 1);
@@ -148,7 +152,7 @@ public class GeoscapeMapControlTest
       timeline: [GeoscapeTestFactory.MakeScheduled(1, GeoscapeTestFactory.MakeEvent("Raid", targetRegionName: "Alpha"))]);
     session.ChangeSpeed(TimeSpeed.Normal);
     session.Advance(0.1);
-    map.Setup(session);
+    map.Setup(session, TestMapSize);
     map.RefreshEvents();
     Assert.Equal(2, map.GetChildCount()); // region button + marker button
 
@@ -169,7 +173,7 @@ public class GeoscapeMapControlTest
     session.ChangeSpeed(TimeSpeed.Normal);
     session.Advance(0.1);
 
-    map.Setup(session);
+    map.Setup(session, TestMapSize);
     map.RefreshEvents();
 
     GeoscapeEventAdapter? envelope = null;

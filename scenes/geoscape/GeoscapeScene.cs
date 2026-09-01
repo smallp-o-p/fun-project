@@ -22,16 +22,17 @@ public sealed partial class GeoscapeScene : Control
 
   public override void _Ready()
   {
-    _state = new CampaignGameState(Start ?? throw new InvalidOperationException(
-      "GeoscapeScene requires a CampaignStartData export; assign one in the inspector."));
+    CampaignStartData start = Start ?? throw new InvalidOperationException(
+      "GeoscapeScene requires a CampaignStartData export; assign one in the inspector.");
+    _state = new CampaignGameState(start);
     _session = new GeoscapeSession(_state);
 
     _map = GetNode<GeoscapeMapControl>("%Map");
-    _map.Setup(_session);
+    _map.Setup(_session, start.Map.Size);
 
     _camera = new GeoscapeCameraRig { Name = "Camera" };
     AddChild(_camera);
-    _camera.Setup(_session.MapSize);
+    _camera.Setup(start.Map.Size); // authored map bounds are a presentation concern
 
     _map.RegionClicked += region => GD.Print(region.FlavorText);
 

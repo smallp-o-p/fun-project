@@ -1,5 +1,4 @@
 using CampaignGameState = global::FunProject.GameState.GameState;
-using Godot;
 using System;
 using System.Collections.Generic;
 
@@ -39,8 +38,6 @@ public sealed class GeoscapeSession
   public event Action<IGeoscapeEvent> EventCommitted = delegate { };
 
   public long Tick => _state.Tick;
-
-  public Vector2I MapSize => _state.MapSize;
 
   public TimeSpeed Speed { get; private set; } = TimeSpeed.Paused;
 
