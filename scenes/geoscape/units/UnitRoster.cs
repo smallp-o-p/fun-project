@@ -11,7 +11,6 @@ public sealed partial class UnitRoster : PanelContainer, IGeoscapeView
   [Export] public PackedScene? UnitLabelScene { get; set; }
 
   private VBoxContainer _unitLabels = null!;
-  private bool _presentedOnce;
 
   public event Action? Closed;
 
@@ -23,10 +22,9 @@ public sealed partial class UnitRoster : PanelContainer, IGeoscapeView
 
   public void Present(FunProject.GameState.GameState state)
   {
-    // First present strips the authored placeholder rows (they preview layout in the
-    // editor only); every present then rebuilds from the current roster.
+    // ClearRows strips the authored placeholder rows on first present (and remains
+    // idempotent thereafter); every present then rebuilds from the current roster.
     ClearRows();
-    _presentedOnce = true;
 
     foreach (Combatant unit in state.Roster)
     {

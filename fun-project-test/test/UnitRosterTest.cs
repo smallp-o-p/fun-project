@@ -16,12 +16,16 @@ public class UnitRosterTest
   {
     var label = new UnitLabel();
     var hbox = new HBoxContainer { Name = "HBoxContainer" };
+    var unitIcon = new TextureRect { Name = "UnitIcon" };
     var name = new RichTextLabel { Name = "Name" };
+    var rankIcon = new TextureRect { Name = "RankIcon" };
     var rank = new RichTextLabel { Name = "RankName" };
     var status = new RichTextLabel { Name = "Status" };
-    foreach (Node node in new Node[] { name, rank, status })
+    foreach (Node node in new Node[] { unitIcon, name, rankIcon, rank, status })
       node.UniqueNameInOwner = true;
+    hbox.AddChild(unitIcon);
     hbox.AddChild(name);
+    hbox.AddChild(rankIcon);
     hbox.AddChild(rank);
     hbox.AddChild(status);
     label.AddChild(hbox);
@@ -117,7 +121,7 @@ public class UnitRosterTest
   [TestCase(TestName = "Bind sets the combatant name (UnitLabel unit test)")]
   public void BindSetsName()
   {
-    var label = BuildLabelProto();
+    var label = AutoFree(BuildLabelProto());
     ((SceneTree)Engine.GetMainLoop()).Root.AddChild(label);
 
     label.Bind(new Combatant(
