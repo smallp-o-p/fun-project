@@ -17,6 +17,8 @@ public sealed partial class GeoscapeScene : Control
   private GeoscapeCameraRig _camera = null!;
   private GeoscapeHud _hud = null!;
   private GeoscapeEventResolution _resolution = null!;
+  private GeoscapeViewManager _viewManager = null!;
+  private bool _viewOpen;
 
   public override void _Ready()
   {
@@ -43,11 +45,35 @@ public sealed partial class GeoscapeScene : Control
 
     _resolution = GetNode<GeoscapeEventResolution>("%ResolutionDialog");
     _resolution.Resolved += _session.CompleteResolution;
+
+    _viewManager = GetNode<GeoscapeViewManager>("%ViewManager");
+    _hud.ViewRequested += _viewManager.Open;
+    _viewManager.ViewOpened += HandleViewOpened;
+    _viewManager.ViewClosed += _ => HandleViewClosed();
   }
 
+  // Full-screen views freeze the clock at the composition root: "the player is browsing"
+  // is presentation, not campaign truth, so the session never learns views exist (the
+  // pending-resolution gate stays session-side because THAT is truth). Speed is left
+  // untouched — ticking resumes at the old speed on close.
   public override void _PhysicsProcess(double delta)
   {
-    _session.Advance(delta);
+    if (!_viewOpen)
+      _session.Advance(delta);
+  }
+
+  private void HandleViewOpened(GeoscapeView view, Control instance)
+  {
+    _viewOpen = true;
+    _hud.Visible = false; // the view brings its own header (X2 full-screen screen shape)
+    if (instance is UnitRoster roster)
+      roster.Present(_state);
+  }
+
+  private void HandleViewClosed()
+  {
+    _viewOpen = false;
+    _hud.Visible = true;
   }
 
   // The sole session-event router: pushes HUD/map updates from committed events. The map

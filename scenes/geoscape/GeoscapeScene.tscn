@@ -4,6 +4,8 @@
 [ext_resource type="Script" uid="uid://b4hs4db12htuv" path="res://scenes/geoscape/GeoscapeMapControl.cs" id="2"]
 [ext_resource type="PackedScene" uid="uid://useilo010t6y" path="res://scenes/geoscape/GeoscapeHud.tscn" id="2_jn255"]
 [ext_resource type="PackedScene" uid="uid://oo7kshnr865k" path="res://scenes/geoscape/resolutions/GeoscapeEventResolution.tscn" id="3_y8l5f"]
+[ext_resource type="Script" path="res://scenes/geoscape/GeoscapeViewManager.cs" id="4_viewmgr"]
+[ext_resource type="PackedScene" uid="uid://dm5w72otw20q2" path="res://scenes/geoscape/units/UnitRoster.tscn" id="5_roster"]
 
 [node name="GeoscapeScene" type="Control" unique_id=1401687055]
 layout_mode = 3
@@ -27,6 +29,11 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("2")
+
+[node name="ViewManager" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("4_viewmgr")
+UnitsView = ExtResource("5_roster")
 
 [node name="ResolutionLayer" type="CanvasLayer" parent="."]
 layer = 10
