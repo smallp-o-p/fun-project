@@ -16,12 +16,12 @@ public class Combatant : HasStats, HasModSlots
   public List<EquippableItem> Inventory { get; private set; } = [];
   public IReadOnlyList<BuffData> InnateBuffs { get; }
 
-  public Combatant(CombatantData data, Faction faction)
+  public Combatant(CombatantData data, Faction faction, Option<string> name = default)
   {
     ArgumentNullException.ThrowIfNull(data);
     ArgumentNullException.ThrowIfNull(faction);
 
-    Name = data.Name;
+    Name = name.IfNone(() => data.Name);
     OwningFaction = faction;
     _stats = new StatSheet(new Dictionary<Type, Stat>
     {
