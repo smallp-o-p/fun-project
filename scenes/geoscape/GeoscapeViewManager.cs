@@ -16,10 +16,13 @@ public interface IGeoscapeView
 }
 
 // Owns which main geoscape view is active and the on-demand view lifecycle (instantiate on
-// open, free on close). Dumb switching only — no session, no GameState: data presentation
-// is wired by GeoscapeScene through ViewOpened. One main view at a time; modals (the
-// resolution dialog) live elsewhere and are unaffected.
-public sealed partial class GeoscapeViewManager : Node
+// open, free on close). This node IS the overlay layer: a full-rect Control parented under
+// GeoscapeScene above the map, so views anchor to the scene's rect (not the raw viewport)
+// and genuinely overlay the geoscape while open. The layer itself passes mouse input
+// through when no view is hosted (authored mouse_filter = ignore). Dumb switching only —
+// no session, no GameState: data presentation is wired by GeoscapeScene through ViewOpened.
+// One main view at a time; modals (the resolution dialog) live elsewhere and are unaffected.
+public sealed partial class GeoscapeViewManager : Control
 {
   [Export] public PackedScene? UnitsView { get; set; }
 
@@ -53,7 +56,7 @@ public sealed partial class GeoscapeViewManager : Node
     var instance = (Control)scene.Instantiate();
     _activeView = instance;
     Current = view;
-    AddChild(instance);
+    AddChild(instance); // the view anchors to this layer's full-rect, i.e. the scene
     if (instance is IGeoscapeView armable)
       armable.ArmClose(Close);
 
