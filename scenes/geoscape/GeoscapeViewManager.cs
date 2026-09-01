@@ -7,10 +7,12 @@ public enum GeoscapeView
   Units,
 }
 
-// Views implement this so the manager can own lifecycle without knowing view contents.
+// Views receive the ability to request their own closing (armed by the manager on open).
+// The manager is the sole performer of a close — it owns state, events, and freeing — so
+// views ask; they never raise a broadcast and never free themselves.
 public interface IGeoscapeView
 {
-  event Action? Closed;
+  void ArmClose(Action requestClose);
 }
 
 // Owns which main geoscape view is active and the on-demand view lifecycle (instantiate on
@@ -52,8 +54,8 @@ public sealed partial class GeoscapeViewManager : Node
     _activeView = instance;
     Current = view;
     AddChild(instance);
-    if (instance is IGeoscapeView closable)
-      closable.Closed += Close;
+    if (instance is IGeoscapeView armable)
+      armable.ArmClose(Close);
 
     ViewOpened?.Invoke(view, instance);
   }
@@ -68,8 +70,6 @@ public sealed partial class GeoscapeViewManager : Node
     Control view = _activeView;
     _activeView = null;
 
-    if (view is IGeoscapeView closable)
-      closable.Closed -= Close;
     RemoveChild(view); // detach now: closed views must not linger to frame end
     view.QueueFree();
 

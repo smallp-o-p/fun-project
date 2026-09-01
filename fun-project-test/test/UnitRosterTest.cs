@@ -108,16 +108,16 @@ public class UnitRosterTest
     Assert.Equal(4, roster.GetNode<VBoxContainer>("%UnitLabels").GetChildCount());
   }
 
-  [TestCase(TestName = "Back button raises Closed")]
-  public void BackButtonRaisesClosed()
+  [TestCase(TestName = "Back button invokes the armed close request")]
+  public void BackButtonInvokesArmedCloseRequest()
   {
     var roster = BuildRoster();
-    bool closed = false;
-    roster.Closed += () => closed = true;
+    bool requested = false;
+    roster.ArmClose(() => requested = true);
 
     roster.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
 
-    Assert.True(closed);
+    Assert.True(requested);
   }
 
   [TestCase(TestName = "Bind sets the combatant name (UnitLabel unit test)")]

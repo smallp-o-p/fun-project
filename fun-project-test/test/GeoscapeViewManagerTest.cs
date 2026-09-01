@@ -10,8 +10,11 @@ public partial class GeoscapeViewManagerTest
   // A minimal IGeoscapeView root we can pack into a PackedScene for the UnitsView slot.
   private sealed partial class FakeView : Control, IGeoscapeView
   {
-    public event Action? Closed;
-    public void RaiseClosed() => Closed?.Invoke();
+    private Action? _requestClose;
+
+    public void ArmClose(Action requestClose) => _requestClose = requestClose;
+
+    public void RequestClose() => _requestClose?.Invoke();
   }
 
   private static GeoscapeViewManager BuildManager(bool open)
@@ -54,14 +57,14 @@ public partial class GeoscapeViewManagerTest
     Assert.True(ReferenceEquals(liveView, firedInstance));
   }
 
-  [TestCase(TestName = "View raising Closed returns to Map, frees the instance, raises ViewClosed")]
-  public void ClosedFreesView()
+  [TestCase(TestName = "View invoking its armed close request returns to Map, frees the instance, raises ViewClosed")]
+  public void ArmedRequestClosesView()
   {
     var manager = BuildManager(out FakeView view);
     GeoscapeView? closedWith = null;
     manager.ViewClosed += v => closedWith = v;
 
-    view.RaiseClosed();
+    view.RequestClose();
 
     Assert.Equal(GeoscapeView.Map, manager.Current);
     Assert.Equal(0, manager.GetChildCount());

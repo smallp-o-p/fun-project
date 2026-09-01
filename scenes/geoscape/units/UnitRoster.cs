@@ -11,14 +11,17 @@ public sealed partial class UnitRoster : PanelContainer, IGeoscapeView
   [Export] public PackedScene? UnitLabelScene { get; set; }
 
   private VBoxContainer _unitLabels = null!;
+  private Action? _requestClose;
 
-  public event Action? Closed;
+  public void ArmClose(Action requestClose) => _requestClose = requestClose;
 
   public override void _Ready()
   {
     _unitLabels = GetNode<VBoxContainer>("%UnitLabels");
-    GetNode<Button>("%BackButton").Pressed += () => Closed?.Invoke();
+    GetNode<Button>("%BackButton").Pressed += OnBackPressed;
   }
+
+  private void OnBackPressed() => _requestClose?.Invoke();
 
   public void Present(FunProject.GameState.GameState state)
   {
