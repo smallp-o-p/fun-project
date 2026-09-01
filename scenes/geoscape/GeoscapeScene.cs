@@ -1,4 +1,6 @@
+using FunProject.GameState;
 using FunProject.Strategic;
+using CampaignGameState = global::FunProject.GameState.GameState;
 using Godot;
 using System;
 
@@ -7,8 +9,9 @@ using System;
 // feeds frame deltas to the clock.
 public sealed partial class GeoscapeScene : Control
 {
-  [Export] public GeoscapeMapData? Map;
+  [Export] public CampaignStartData? Start;
 
+  private CampaignGameState _state = null!;
   private GeoscapeSession _session = null!;
   private GeoscapeMapControl _map = null!;
   private GeoscapeCameraRig _camera = null!;
@@ -17,8 +20,9 @@ public sealed partial class GeoscapeScene : Control
 
   public override void _Ready()
   {
-    _session = new GeoscapeSession(Map ?? throw new InvalidOperationException(
-      "GeoscapeScene requires a GeoscapeMapData export; assign one in the inspector."));
+    _state = new CampaignGameState(Start ?? throw new InvalidOperationException(
+      "GeoscapeScene requires a CampaignStartData export; assign one in the inspector."));
+    _session = new GeoscapeSession(_state);
 
     _map = GetNode<GeoscapeMapControl>("%Map");
     _map.Setup(_session);

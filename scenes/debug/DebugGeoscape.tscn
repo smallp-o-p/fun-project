@@ -1,11 +1,11 @@
 [gd_scene format=3 uid="uid://bb075r51rxteo"]
 
 [ext_resource type="PackedScene" uid="uid://jdkumfovnam8" path="res://scenes/geoscape/GeoscapeScene.tscn" id="1"]
-[ext_resource type="Resource" uid="uid://dmvbgh32f1l1n" path="res://resources/geoscape/TestMap.tres" id="2"]
+[ext_resource type="Resource" path="res://resources/geoscape/TestCampaign.tres" id="2"]
 [ext_resource type="Script" uid="uid://bs8rgghlkfg2k" path="res://scenes/geoscape/RegionButton.cs" id="3_regionbtn"]
 
 [node name="DebugGeoscape" unique_id=958707659 instance=ExtResource("1")]
-Map = ExtResource("2")
+Start = ExtResource("2")
 
 [node name="Northmark" type="Button" parent="Map" parent_id_path=PackedInt32Array(1111572209) index="0" unique_id=1736169534]
 script = ExtResource("3_regionbtn")

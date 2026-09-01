@@ -1,14 +1,20 @@
+using CampaignGameState = global::FunProject.GameState.GameState;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 
 namespace FunProject.Strategic;
 
+/// <summary>
+/// The ephemeral geoscape runtime constructed over the campaign truth (<see cref="GameState"/>):
+/// playback speed, the real-seconds accumulator, event dispatch, and resolution orchestration.
+/// Mutates the state it wraps — the BattleSession-over-BattleBoardState pattern. One session
+/// per campaign; rebuildable at any time (loading a save later reconstructs state, then session).
+/// </summary>
 public sealed class GeoscapeSession
 {
   // One tick advances the in-game clock by one minute.
-  public const int TickGameSeconds = 60;
+  public const int TickGameSeconds = CampaignGameState.TickGameSeconds;
 
   private const double BaseSecondsPerTick = 0.1;
   private static double SecondsPerTick(TimeSpeed speed) => speed switch
@@ -21,93 +27,58 @@ public sealed class GeoscapeSession
     _ => throw new InvalidOperationException($"Unknown time speed '{speed}'."),
   };
 
-  private readonly List<RegionData> _regions = [];
-  private readonly Dictionary<string, int> _indexByName = [];
-  private readonly List<ScheduledFire> _timeline;
-  private readonly List<GeoscapeEvent> _activeEvents = [];
-  private int _nextScheduleIndex;
+  private readonly CampaignGameState _state;
   private double _accumulator;
-  private Option<PendingResolution> _pending = None;
 
-  // A timeline entry baked at construction: definition, fire tick, resolved target (−1 =
-  // map-wide), and absolute expiry tick. Authored resources stay mutable, so nothing is
-  // reread after the bake.
-  private sealed record ScheduledFire(
-    GeoscapeEventDefinition Definition,
-    int AtTick,
-    int TargetRegionIndex,
-    Option<long> ExpiresAtTick);
-
-  public GeoscapeSession(GeoscapeMapData mapData)
+  public GeoscapeSession(CampaignGameState state)
   {
-    ArgumentNullException.ThrowIfNull(mapData);
-
-    MapSize = mapData.Size;
-
-    foreach (RegionData region in mapData.Regions)
-    {
-      if (!_indexByName.TryAdd(region.Name, _regions.Count))
-        throw new InvalidOperationException(
-          $"Duplicate region name '{region.Name}' in GeoscapeMapData.Regions; names must be unique.");
-
-      _regions.Add(region);
-    }
-
-    _timeline = [.. mapData.Timeline.AsValueEnumerable()
-      .Select(BakeEntry)
-      .OrderBy(fire => fire.AtTick)];
+    ArgumentNullException.ThrowIfNull(state);
+    _state = state;
   }
 
   public event Action<IGeoscapeEvent> EventCommitted = delegate { };
 
-  public long Tick { get; private set; }
+  public long Tick => _state.Tick;
 
-  public Vector2I MapSize { get; }
+  public Vector2I MapSize => _state.MapSize;
 
   public TimeSpeed Speed { get; private set; } = TimeSpeed.Paused;
 
-  private readonly DateTime _startTime = DateTime.UnixEpoch;
-  
-  public DateTime CurrentTime => _startTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
+  public DateTime CurrentTime => _state.CurrentTime;
 
-  // Days of game time elapsed since the start, 1-based: Day 1 spans the first 24 game-hours,
-  // so an 08:00 start rolls to Day 2 at the next 08:00 — not at midnight.
-  public int CurrentDay => (int)((CurrentTime - _startTime).TotalDays) + 1;
+  public int CurrentDay => _state.CurrentDay;
 
-  public IReadOnlyList<RegionData> Regions => _regions;
+  public IReadOnlyList<RegionData> Regions => _state.Regions;
 
-  // Index of the region with this name, or -1. The authoritative name-to-index binding,
-  // produced once at construction from the Regions array.
-  public int IndexOfRegion(string name) => _indexByName.GetValueOrDefault(name, -1);
+  public int IndexOfRegion(string name) => _state.IndexOfRegion(name);
 
-  public IReadOnlyList<GeoscapeEvent> ActiveEvents => _activeEvents;
+  public IReadOnlyList<GeoscapeEvent> ActiveEvents => _state.ActiveEvents;
 
-  public Option<PendingResolution> PendingResolution => _pending;
+  public Option<PendingResolution> PendingResolution => _state.Pending;
 
   public void OpenResolution(GeoscapeEvent @event)
   {
     ArgumentNullException.ThrowIfNull(@event);
-    if (_pending.IsSome)
+    if (_state.Pending.IsSome)
       throw new InvalidOperationException("A resolution is already pending; complete it before opening another.");
 
     var pending = new PendingResolution(@event);
-    _pending = pending;
+    _state.Pending = pending;
 
     Commit(new ResolutionEventOpened(pending));
   }
 
   public void CompleteResolution(ResolutionOutcome outcome)
   {
-    if (_pending.IsNone)
+    if (_state.Pending.IsNone)
       throw new InvalidOperationException("CompleteResolution called with no resolution pending.");
 
     // Clear before committing: synchronous subscribers (HUD/map refreshes) must observe the
     // resolution as already closed — the battle layer's "hooks act on post-state" convention.
-    var resolved = _pending;
-    _pending = None;
-    resolved.IfSome(pending =>
+    _state.Pending.IfSome(pending =>
     {
-      _activeEvents.Remove(pending.Event);
+      _state.Pending = Option<PendingResolution>.None;
+      _state.ActiveEvents.Remove(pending.Event);
       Commit(new ResolutionEventClosed(pending, outcome));
     });
   }
@@ -119,7 +90,7 @@ public sealed class GeoscapeSession
 
   public void Advance(double deltaSeconds)
   {
-    if (Speed == TimeSpeed.Paused || _pending.IsSome)
+    if (Speed == TimeSpeed.Paused || _state.Pending.IsSome)
       return;
 
     _accumulator += deltaSeconds;
@@ -130,7 +101,7 @@ public sealed class GeoscapeSession
 
     for (int i = 0; i < ticksToAdvance; i++)
     {
-      Tick++;
+      _state.Tick++;
       Commit(new TimeAdvanced(Tick, CurrentTime));
       FireDueSchedule();
       RemoveExpired();
@@ -144,65 +115,31 @@ public sealed class GeoscapeSession
 
   private void FireDueSchedule()
   {
-    while (_nextScheduleIndex < _timeline.Count && _timeline[_nextScheduleIndex].AtTick <= Tick)
+    while (_state.NextScheduleIndex < _state.Timeline.Count
+           && _state.Timeline[_state.NextScheduleIndex].AtTick <= Tick)
     {
-      ScheduledFire fire = _timeline[_nextScheduleIndex];
-      _nextScheduleIndex++;
+      CampaignGameState.ScheduledFire fire = _state.Timeline[_state.NextScheduleIndex];
+      _state.NextScheduleIndex++;
 
       var active = new GeoscapeEvent(
         fire.Definition,
         fire.TargetRegionIndex >= 0 ? Some(fire.TargetRegionIndex) : Option<int>.None,
         Tick,
         fire.ExpiresAtTick);
-      _activeEvents.Add(active);
+      _state.ActiveEvents.Add(active);
       Commit(new ScheduledEventFired(active));
     }
   }
 
-  // Bakes one authored entry into an immutable firing. Unset events and out-of-range expiry
-  // are authoring mistakes: they fail the load instead of being silently dropped.
-  private ScheduledFire BakeEntry(ScheduledEventData entry)
-  {
-    if (entry.Event is null)
-      throw new InvalidOperationException(
-        $"Timeline entry at tick {entry.AtTick} has no Event assigned in GeoscapeMapData.Timeline.");
-
-    if (entry.Event.ExpiresAfterTicks < -1)
-      throw new InvalidOperationException(
-        $"Event '{entry.Event.Title}' has ExpiresAfterTicks {entry.Event.ExpiresAfterTicks}; -1 means never, otherwise a non-negative tick count is required.");
-
-    return new ScheduledFire(
-      entry.Event,
-      entry.AtTick,
-      ResolveTargetIndex(entry.Event),
-      entry.Event.ExpiresAfterTicks >= 0
-        ? Some((long)entry.AtTick + entry.Event.ExpiresAfterTicks)
-        : Option<long>.None);
-  }
-
-  // Name-to-index resolution for event targets; throws at construction on unknown names so
-  // authoring mistakes fail at load, not at fire time.
-  private int ResolveTargetIndex(GeoscapeEventDefinition definition)
-  {
-    if (definition.TargetRegionName.Length == 0)
-      return -1;
-
-    if (_indexByName.TryGetValue(definition.TargetRegionName, out int index))
-      return index;
-
-    throw new InvalidOperationException(
-      $"Event '{definition.Title}' targets region '{definition.TargetRegionName}' which is not part of the map's Regions.");
-  }
-
   private void RemoveExpired()
   {
-    for (int i = _activeEvents.Count - 1; i >= 0; i--)
+    for (int i = _state.ActiveEvents.Count - 1; i >= 0; i--)
     {
-      GeoscapeEvent active = _activeEvents[i];
+      GeoscapeEvent active = _state.ActiveEvents[i];
       active.ExpiresAtTick.IfSome(expiry =>
       {
         if (expiry > Tick) return;
-        _activeEvents.RemoveAt(i);
+        _state.ActiveEvents.RemoveAt(i);
         Commit(new EventExpired(active));
       });
     }

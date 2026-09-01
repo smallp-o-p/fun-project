@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="CampaignStartData" format=3]
+
+[ext_resource type="Script" path="res://scripts/gamestate/CampaignStartData.cs" id="1_start"]
+[ext_resource type="Script" path="res://scripts/gamestate/RosterEntryData.cs" id="2_entry"]
+[ext_resource type="Resource" path="res://resources/geoscape/TestMap.tres" id="3_map"]
+[ext_resource type="Resource" path="res://resources/factions/player.tres" id="4_faction"]
+[ext_resource type="Resource" path="res://resources/combatants/soldier.tres" id="5_soldier"]
+
+[sub_resource type="Resource" id="Resource_entry1"]
+script = ExtResource("2_entry")
+Unit = ExtResource("5_soldier")
+DisplayName = "Cpl. Ada Voss"
+
+[sub_resource type="Resource" id="Resource_entry2"]
+script = ExtResource("2_entry")
+Unit = ExtResource("5_soldier")
+DisplayName = "Sgt. Bram Okafor"
+
+[sub_resource type="Resource" id="Resource_entry3"]
+script = ExtResource("2_entry")
+Unit = ExtResource("5_soldier")
+DisplayName = "Pvt. June Halloway"
+
+[sub_resource type="Resource" id="Resource_entry4"]
+script = ExtResource("2_entry")
+Unit = ExtResource("5_soldier")
+DisplayName = "Cpl. Dmitri Volkov"
+
+[resource]
+script = ExtResource("1_start")
+Name = "Test Campaign"
+Description = "Debug campaign for the geoscape."
+Map = ExtResource("3_map")
+PlayerFaction = ExtResource("4_faction")
+StartingRoster = [SubResource("Resource_entry1"), SubResource("Resource_entry2"), SubResource("Resource_entry3"), SubResource("Resource_entry4")]

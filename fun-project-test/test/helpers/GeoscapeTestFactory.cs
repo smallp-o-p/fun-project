@@ -1,5 +1,6 @@
 using FunProject.Combatants;
 using FunProject.GameState;
+using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Stats;
 using FunProject.Strategic;
 
@@ -20,11 +21,7 @@ internal static class GeoscapeTestFactory
     RegionData[]? regions = null,
     ScheduledEventData[]? timeline = null)
   {
-    return new GeoscapeSession(new GeoscapeMapData
-    {
-      Regions = regions ?? [],
-      Timeline = timeline ?? [],
-    });
+    return new GeoscapeSession(new CampaignGameState(MakeStart(regions, timeline)));
   }
 
   public static GeoscapeEventDefinition MakeEvent(

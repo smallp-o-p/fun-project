@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="FactionData" format=3]
+
+[ext_resource type="Script" path="res://scripts/combatants/FactionData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+Name = "Xenonaut Command"
+Description = "The player's multinational defense force."
