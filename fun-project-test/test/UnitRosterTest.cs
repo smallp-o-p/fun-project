@@ -120,6 +120,21 @@ public class UnitRosterTest
     Assert.True(requested);
   }
 
+  [TestCase(TestName = "Row press raises UnitSelected with the bound combatant")]
+  public void RowPressRaisesUnitSelected()
+  {
+    var roster = BuildRoster();
+    Combatant? selected = null;
+    roster.UnitSelected += unit => selected = unit;
+
+    roster.Present(MakeState(2));
+    var row = (UnitLabel)roster.GetNode<VBoxContainer>("%UnitLabels").GetChild(0);
+    row.Press();
+
+    Assert.True(selected is not null);
+    Assert.Equal("Soldier 1", selected!.Name);
+  }
+
   [TestCase(TestName = "Bind sets the combatant name (UnitLabel unit test)")]
   public void BindSetsName()
   {

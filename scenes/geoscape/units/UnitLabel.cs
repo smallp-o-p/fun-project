@@ -9,6 +9,16 @@ public partial class UnitLabel : PanelContainer
   public RichTextLabel? Status { get; private set; }
   public TextureRect? UnitIcon { get; private set; }
   public TextureRect? RankIcon { get; private set; }
+  public event Action? Pressed;
+
+  /// <summary>Programmatic press (tests + future keyboard nav); _GuiInput routes mouse clicks here.</summary>
+  public void Press() => Pressed?.Invoke();
+
+  public override void _GuiInput(InputEvent @event)
+  {
+    if (@event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+      Press();
+  }
 
   // Rank/status have no domain concepts yet (progression / assignment FSM are future
   // systems); the view owns the placeholder strings until those land.

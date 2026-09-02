@@ -9,6 +9,7 @@ using System;
 public sealed partial class UnitRoster : PanelContainer, IGeoscapeView
 {
   [Export] public PackedScene? UnitLabelScene { get; set; }
+  public event Action<Combatant>? UnitSelected;
 
   private VBoxContainer _unitLabels = null!;
   private Action? _requestClose;
@@ -36,6 +37,7 @@ public sealed partial class UnitRoster : PanelContainer, IGeoscapeView
       var label = scene.Instantiate<UnitLabel>();
       _unitLabels.AddChild(label);
       label.Bind(unit);
+      label.Pressed += () => UnitSelected?.Invoke(unit);
     }
   }
 
