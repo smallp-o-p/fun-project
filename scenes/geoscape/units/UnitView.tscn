@@ -9,3 +9,113 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="Title" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/normal_font_size = 48
+text = "Unit"
+scroll_active = false
+vertical_alignment = 2
+
+[node name="BackButton" type="Button" parent="MarginContainer/VBoxContainer/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "Back"
+
+[node name="Body" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 64
+
+[node name="StatsColumn" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StatsHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 28
+text = "Stats"
+scroll_active = false
+
+[node name="StatsList" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="BuffsHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 28
+text = "Innate Buffs"
+scroll_active = false
+
+[node name="BuffsList" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ModsHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 28
+text = "Personal Mods"
+scroll_active = false
+
+[node name="PersonalModSlots" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="EquipColumn" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="EquipHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 28
+text = "Equipment"
+scroll_active = false
+
+[node name="WeaponSlot" type="Button" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="WeaponModSlots" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ArmorSlot" type="Button" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="UtilitySlots" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ArmoryHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 28
+text = "Armory"
+scroll_active = false
+
+[node name="UnequipButton" type="Button" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Unequip"
+visible = false
+
+[node name="ArmoryList" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+unique_name_in_owner = true
+layout_mode = 2
