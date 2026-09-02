@@ -1,3 +1,4 @@
+using FunProject.Combatants;
 using FunProject.GameState;
 using FunProject.Strategic;
 using CampaignGameState = global::FunProject.GameState.GameState;
@@ -18,6 +19,7 @@ public sealed partial class GeoscapeScene : Control
   private GeoscapeHud _hud = null!;
   private GeoscapeEventResolution _resolution = null!;
   private GeoscapeViewManager _viewManager = null!;
+  private Combatant? _selectedUnit;
   private bool _viewOpen;
 
   public override void _Ready()
@@ -68,7 +70,22 @@ public sealed partial class GeoscapeScene : Control
     _viewOpen = true;
     _hud.Visible = false; // the view brings its own header (X2 full-screen screen shape)
     if (instance is UnitRoster roster)
+    {
       roster.Present(_state);
+      roster.UnitSelected += OnUnitSelected;
+    }
+    if (instance is UnitView unitView)
+    {
+      unitView.ArmClose(() => _viewManager.Open(GeoscapeView.Units)); // Back returns to the roster
+      unitView.Present(_state, _selectedUnit ?? throw new InvalidOperationException(
+        "UnitView opened with no selected combatant."));
+    }
+  }
+
+  private void OnUnitSelected(Combatant unit)
+  {
+    _selectedUnit = unit;
+    _viewManager.Open(GeoscapeView.Unit);
   }
 
   private void HandleViewClosed()

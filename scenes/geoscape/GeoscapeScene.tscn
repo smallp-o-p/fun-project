@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scenes/geoscape/GeoscapeViewManager.cs" id="4_viewmgr"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitRoster.tscn" id="5_roster"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeEventMarker.tscn" id="6_marker"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitView.tscn" id="7_unitview"]
 
 [node name="GeoscapeScene" type="Control" unique_id=1401687055]
 layout_mode = 3
@@ -43,6 +44,7 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("4_viewmgr")
 UnitsView = ExtResource("5_roster")
+UnitView = ExtResource("7_unitview")
 
 [node name="ResolutionLayer" type="CanvasLayer" parent="."]
 layer = 10

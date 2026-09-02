@@ -5,6 +5,7 @@ public enum GeoscapeView
 {
   Map,
   Units,
+  Unit,
 }
 
 // Views receive the ability to request their own closing (armed by the manager on open).
@@ -36,6 +37,7 @@ public interface IGeoscapeViewBackdrop
 public sealed partial class GeoscapeViewManager : Control
 {
   [Export] public PackedScene? UnitsView { get; set; }
+  [Export] public PackedScene? UnitView { get; set; }
 
   private Control? _activeView;
   private SubViewportContainer _backdropLayer = null!;
@@ -86,6 +88,8 @@ public sealed partial class GeoscapeViewManager : Control
     {
       GeoscapeView.Units => UnitsView ?? throw new InvalidOperationException(
         "GeoscapeViewManager requires UnitsView; assign a PackedScene in the inspector."),
+      GeoscapeView.Unit => UnitView ?? throw new InvalidOperationException(
+        "GeoscapeViewManager requires UnitView; assign a PackedScene in the inspector."),
       _ => throw new ArgumentOutOfRangeException(nameof(view), view, null),
     };
 

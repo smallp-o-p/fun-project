@@ -64,6 +64,18 @@ public partial class GeoscapeViewManagerTest
     return manager;
   }
 
+  private static GeoscapeViewManager BuildUnitManager()
+  {
+    var proto = new FakeView();
+    var scene = new PackedScene();
+    scene.Pack(proto);
+    proto.Free();
+
+    var manager = AutoFree(new GeoscapeViewManager { UnitsView = scene, UnitView = scene });
+    ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
+    return manager;
+  }
+
   private static GeoscapeViewManager BuildBackdropManager(bool open = true, bool supplyBackdrop = true)
   {
     var proto = new FakeBackdropView { SupplyBackdrop = supplyBackdrop };
@@ -111,6 +123,35 @@ public partial class GeoscapeViewManagerTest
       if (child is SubViewport viewport)
         return viewport;
     throw new Exception($"Backdrop layer has no SubViewport child under {layer.Name}.");
+  }
+
+  [TestCase(TestName = "Open(Unit) hosts the UnitView and reports the current view")]
+  public void OpenUnitHostsView()
+  {
+    GeoscapeViewManager manager = BuildUnitManager();
+    GeoscapeView? opened = null;
+    manager.ViewOpened += (view, _) => opened = view;
+
+    manager.Open(GeoscapeView.Unit);
+
+    Assert.Equal(GeoscapeView.Unit, manager.Current);
+    Assert.Equal(GeoscapeView.Unit, opened);
+    Assert.True(manager.GetChildren().AsValueEnumerable().FirstOrDefault(c => c is Control and not GeoscapeViewManager) is not null);
+  }
+
+  [TestCase(TestName = "Open(Unit) closes an open Units view first (one main view at a time)")]
+  public void OpenUnitClosesUnitsFirst()
+  {
+    GeoscapeViewManager manager = BuildUnitManager();
+    manager.Open(GeoscapeView.Units);
+    var closed = new System.Collections.Generic.List<GeoscapeView>();
+    manager.ViewClosed += closed.Add;
+
+    manager.Open(GeoscapeView.Unit);
+
+    Assert.Equal(1, closed.Count);
+    Assert.Equal(GeoscapeView.Units, closed[0]);
+    Assert.Equal(GeoscapeView.Unit, manager.Current);
   }
 
   [TestCase(TestName = "Open instantiates the view, sets Current, raises ViewOpened, adds as child")]
