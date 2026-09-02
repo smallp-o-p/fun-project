@@ -65,10 +65,10 @@ public static class BattleFactory
           for (int count = 0; count < Math.Max(1, entry.Quantity); count++)
           {
             Combatant combatant = new(entry.Combatant, slotFaction);
-            Option<Weapon> weapon = entry.Weapon is null ? None : Some(new Weapon(entry.Weapon));
+            Option<Weapon> weapon = entry.Weapon is null ? None : Some(ItemRuntimeFactory.CreateWeapon(entry.Weapon));
             Option<ItemWith<ArmorCapability>> armor = entry.Armor is null
               ? None
-              : new EquippableItem(entry.Armor).With<ArmorCapability>();
+              : ItemRuntimeFactory.Create(entry.Armor).With<ArmorCapability>();
             loadouts.Add(new UnitLoadout(combatant, weapon, armor));
           }
         }

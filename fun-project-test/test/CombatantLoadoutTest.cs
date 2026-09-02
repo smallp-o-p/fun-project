@@ -1,3 +1,4 @@
+using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
@@ -89,5 +90,21 @@ public class CombatantLoadoutTest
     Combatant unit = MakeUnit();
 
     Assert.Throws<InvalidOperationException>(() => unit.UnequipItem(99));
+  }
+
+  [TestCase(TestName = "ToBattleLoadout maps typed slots 1:1 onto UnitLoadout")]
+  public void ToBattleLoadoutMaps()
+  {
+    Combatant unit = MakeUnit();
+    Weapon pistol = MakeWeapon("Pistol");
+    ItemWith<ArmorCapability> vest = ItemRuntimeFactory.Create(MakeArmorData()).With<ArmorCapability>().ValueUnsafe();
+    unit.EquipWeapon(pistol);
+    unit.EquipArmor(vest);
+
+    UnitLoadout loadout = unit.ToBattleLoadout();
+
+    AssertThat(loadout.Combatant).IsSame(unit);
+    AssertThat(loadout.Weapon.ValueUnsafe() as Weapon).IsSame(pistol);
+    AssertThat(loadout.Armor.ValueUnsafe().Item).IsSame(vest.Item);
   }
 }
