@@ -65,6 +65,8 @@ public sealed class GameState
       _roster.Add(new Combatant(unit, PlayerFaction,
         entry.DisplayName.Length > 0 ? Some(entry.DisplayName) : Option<string>.None));
     }
+
+    Armory = new Armory(start.Armory, start.ModStock);
   }
 
   public IReadOnlyList<RegionData> Regions => _regions;
@@ -76,6 +78,8 @@ public sealed class GameState
   public IReadOnlyList<Combatant> Roster => _roster;
 
   public Faction PlayerFaction { get; }
+
+  public Armory Armory { get; }
 
   public DateTime CurrentTime => _startTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
 

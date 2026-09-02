@@ -118,7 +118,9 @@ internal static class GeoscapeTestFactory
   public static CampaignStartData MakeStart(
     RegionData[]? regions = null,
     ScheduledEventData[]? timeline = null,
-    RosterEntryData[]? roster = null)
+    RosterEntryData[]? roster = null,
+    ArmoryEntryData[]? armory = null,
+    ModStockEntryData[]? modStock = null)
   {
     return new CampaignStartData
     {
@@ -126,6 +128,8 @@ internal static class GeoscapeTestFactory
       Map = new GeoscapeMapData { Regions = regions ?? [], Timeline = timeline ?? [] },
       PlayerFaction = new FactionData { Name = "Test Faction" },
       StartingRoster = roster ?? [],
+      Armory = armory ?? [],
+      ModStock = modStock ?? [],
     };
   }
 }

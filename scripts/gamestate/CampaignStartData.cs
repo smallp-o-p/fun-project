@@ -17,4 +17,8 @@ public partial class CampaignStartData : NamedEntityData
   [Export] public required FactionData PlayerFaction { get; set; }
 
   [Export] public RosterEntryData[] StartingRoster { get; set; } = [];
+
+  [Export] public ArmoryEntryData[] Armory { get; set; } = [];
+
+  [Export] public ModStockEntryData[] ModStock { get; set; } = [];
 }
