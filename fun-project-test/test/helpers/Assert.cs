@@ -22,6 +22,14 @@ public static class Assert
       throw new Exception(string.IsNullOrEmpty(msg) ? $"Expected {expect} but got {real}." : $"Expected {expect} but got {real}. {msg}");
   }
 
+  public static void Contains(string expectedSubstring, string actual, string msg = "")
+  {
+    if (!actual.Contains(expectedSubstring, StringComparison.Ordinal))
+      throw new Exception(string.IsNullOrEmpty(msg)
+        ? $"Expected '{actual}' to contain '{expectedSubstring}'."
+        : $"Expected '{actual}' to contain '{expectedSubstring}'. {msg}");
+  }
+
   public static void Throws<T>(Action body, string msg = "") where T : Exception
   {
     try

@@ -136,4 +136,101 @@ public class UnitViewTest
 
     Assert.True(requested);
   }
+
+  [TestCase(TestName = "Selecting the weapon slot lists only weapon items")]
+  public void WeaponSlotFiltersBrowser()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    GameState state = new(MakeStart(armory:
+    [
+      new ArmoryEntryData { Item = MakeFirearmData("Test Pistol"), Count = 2 },
+      new ArmoryEntryData { Item = MakeArmorData("Vest"), Count = 1 },
+    ]));
+    view.Present(state, unit);
+
+    view.SelectSlot(UnitViewSlot.Weapon);
+
+    var list = view.GetNode<VBoxContainer>("%ArmoryList");
+    Assert.Equal(1, list.GetChildCount());
+    Assert.Contains("Test Pistol", list.GetChild<Button>(0).Text);
+    Assert.Contains("x2", list.GetChild<Button>(0).Text);
+  }
+
+  [TestCase(TestName = "Selecting the armor slot lists only armor-capable items")]
+  public void ArmorSlotFiltersBrowser()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    GameState state = new(MakeStart(armory:
+    [
+      new ArmoryEntryData { Item = MakeFirearmData("Test Pistol"), Count = 2 },
+      new ArmoryEntryData { Item = MakeArmorData("Vest"), Count = 1 },
+    ]));
+    view.Present(state, unit);
+
+    view.SelectSlot(UnitViewSlot.Armor);
+
+    var list = view.GetNode<VBoxContainer>("%ArmoryList");
+    Assert.Equal(1, list.GetChildCount());
+    Assert.Contains("Vest", list.GetChild<Button>(0).Text);
+  }
+
+  [TestCase(TestName = "Browser click equips from armory and decrements stock")]
+  public void BrowserClickEquips()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    EquippableItemData pistolData = MakeFirearmData("Test Pistol");
+    GameState state = new(MakeStart(armory: [new ArmoryEntryData { Item = pistolData, Count = 2 }]));
+    view.Present(state, unit);
+    view.SelectSlot(UnitViewSlot.Weapon);
+
+    view.GetNode<VBoxContainer>("%ArmoryList").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Contains("Test Pistol", view.GetNode<Button>("%WeaponSlot").Text);
+    Assert.Equal(1, state.Armory.ItemStock()[0].Remaining);
+    Assert.True(unit.EquippedWeapon.IsSome);
+  }
+
+  [TestCase(TestName = "Equipping over an occupied slot deposits the displaced item")]
+  public void SwapDepositsDisplaced()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    EquippableItemData pistolData = MakeFirearmData("Test Pistol");
+    EquippableItemData rifleData = MakeFirearmData("Test Rifle");
+    GameState state = new(MakeStart(armory:
+    [
+      new ArmoryEntryData { Item = pistolData, Count = 1 },
+      new ArmoryEntryData { Item = rifleData, Count = 1 },
+    ]));
+    view.Present(state, unit);
+    view.SelectSlot(UnitViewSlot.Weapon);
+    view.GetNode<VBoxContainer>("%ArmoryList").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed); // pistol
+    view.SelectSlot(UnitViewSlot.Weapon);
+    view.GetNode<VBoxContainer>("%ArmoryList").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed); // rifle
+
+    Assert.Equal(1, state.Armory.ItemStock()[0].Remaining); // pistol back on the shelf
+    Assert.Contains("Test Rifle", view.GetNode<Button>("%WeaponSlot").Text);
+  }
+
+  [TestCase(TestName = "Utility swap deposits displaced; unequip restores stock")]
+  public void UtilityUnequipRestoresStock()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    EquippableItemData grenadeData = new() { Name = "Grenade" };
+    GameState state = new(MakeStart(armory: [new ArmoryEntryData { Item = grenadeData, Count = 2 }]));
+    view.Present(state, unit);
+    view.SelectSlot(UnitViewSlot.Utility(0));
+    view.GetNode<VBoxContainer>("%ArmoryList").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
+    Assert.Contains("Grenade", view.GetNode<VBoxContainer>("%UtilitySlots").GetChild<Button>(0).Text);
+
+    view.SelectSlot(UnitViewSlot.Utility(0));
+    view.GetNode<Button>("%UnequipButton").EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Contains("empty", view.GetNode<VBoxContainer>("%UtilitySlots").GetChild<Button>(0).Text);
+    Assert.Equal(2, state.Armory.ItemStock()[0].Remaining);
+  }
 }

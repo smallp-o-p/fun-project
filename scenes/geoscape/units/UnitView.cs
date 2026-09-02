@@ -1,12 +1,33 @@
 using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Buffs;
 using FunProject.Combatants;
+using FunProject.GameState;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using FunProject.Weapons;
 using Godot;
 using System;
+
+// Which slot the armory browser targets. Produced by slot-button clicks (or the test seam);
+// weapon/armor/utility/mod kinds each filter the browser differently.
+public enum UnitViewSlotKind
+{
+  Weapon,
+  Armor,
+  Utility,
+  PersonalMod,
+  WeaponMod,
+}
+
+public readonly record struct UnitViewSlot(UnitViewSlotKind Kind, int Index = 0)
+{
+  public static UnitViewSlot Weapon => new(UnitViewSlotKind.Weapon);
+  public static UnitViewSlot Armor => new(UnitViewSlotKind.Armor);
+  public static UnitViewSlot Utility(int index) => new(UnitViewSlotKind.Utility, index);
+  public static UnitViewSlot PersonalMod(int index) => new(UnitViewSlotKind.PersonalMod, index);
+  public static UnitViewSlot WeaponMod(int index) => new(UnitViewSlotKind.WeaponMod, index);
+}
 
 // Full-screen soldier screen: stats page (base -> effective), equipment slots, and the
 // campaign armory browser. Presentation only — every interaction calls domain operations
@@ -16,19 +37,31 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
   private Action? _requestClose;
   private CampaignGameState? _state;
   private Combatant? _unit;
+  private UnitViewSlot? _selection;
 
   public void ArmClose(Action requestClose) => _requestClose = requestClose;
 
   public override void _Ready()
   {
     GetNode<Button>("%BackButton").Pressed += () => _requestClose?.Invoke();
+    GetNode<Button>("%UnequipButton").Pressed += OnUnequipPressed;
+    GetNode<Button>("%WeaponSlot").Pressed += () => SelectSlot(UnitViewSlot.Weapon);
+    GetNode<Button>("%ArmorSlot").Pressed += () => SelectSlot(UnitViewSlot.Armor);
   }
 
   public void Present(CampaignGameState state, Combatant unit)
   {
     _state = state;
     _unit = unit;
+    _selection = null;
     RebuildAll();
+  }
+
+  /// <summary>Test seam mirroring a slot-button click; production clicks call this too.</summary>
+  public void SelectSlot(UnitViewSlot slot)
+  {
+    _selection = slot;
+    RebuildBrowser();
   }
 
   private void RebuildAll()
@@ -80,8 +113,9 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
   {
     var slots = GetNode<VBoxContainer>("%PersonalModSlots");
     ClearChildren(slots);
-    foreach (ModSlot slot in _unit!.GetModSlots())
-      AddSlotButton(slots, SlotLabel(slot));
+    Godot.Collections.Array<ModSlot> modSlots = _unit!.GetModSlots();
+    for (int i = 0; i < modSlots.Count; i++)
+      AddSlotButton(slots, SlotLabel(modSlots[i]), UnitViewSlot.PersonalMod(i));
   }
 
   private void RebuildWeaponSlot()
@@ -91,8 +125,9 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
     GetNode<Button>("%WeaponSlot").Text = _unit!.EquippedWeapon.Match(
       Some: weapon =>
       {
-        foreach (ModSlot slot in weapon.GetModSlots())
-          AddSlotButton(weaponMods, SlotLabel(slot));
+        Godot.Collections.Array<ModSlot> modSlots = weapon.GetModSlots();
+        for (int i = 0; i < modSlots.Count; i++)
+          AddSlotButton(weaponMods, SlotLabel(modSlots[i]), UnitViewSlot.WeaponMod(i));
         return $"Weapon: {WeaponSummary(weapon)}";
       },
       None: () => "Weapon: — empty —");
@@ -123,7 +158,7 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
       string text = _unit.Inventory.TryGetValue(i, out EquippableItem? item)
         ? $"Utility {i + 1}: {item.ItemName}"
         : $"Utility {i + 1}: — empty —";
-      AddSlotButton(slots, text);
+      AddSlotButton(slots, text, UnitViewSlot.Utility(i));
     }
   }
 
@@ -134,18 +169,160 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
 
   private void RebuildBrowser()
   {
-    GetNode<Button>("%UnequipButton").Visible = false;
-    ClearChildren(GetNode<VBoxContainer>("%ArmoryList"));
+    var list = GetNode<VBoxContainer>("%ArmoryList");
+    var unequip = GetNode<Button>("%UnequipButton");
+    ClearChildren(list);
+
+    if (_selection is null || _state is null || _unit is null)
+    {
+      unequip.Visible = false;
+      return;
+    }
+
+    unequip.Visible = SelectionIsOccupied();
+
+    UnitViewSlot slot = _selection.Value;
+    if (slot.Kind is UnitViewSlotKind.PersonalMod or UnitViewSlotKind.WeaponMod)
+    {
+      foreach (ArmoryModStock line in _state.Armory.ModStock())
+      {
+        ArmoryModStock captured = line;
+        var button = new Button { Text = $"{captured.Mod.Name}  {StockText(captured.Unlimited, captured.Remaining)}" };
+        button.Pressed += () => EquipMod(captured);
+        list.AddChild(button);
+      }
+      return;
+    }
+
+    foreach (ArmoryItemStock line in _state.Armory.ItemStock())
+    {
+      if ((!line.Unlimited && line.Remaining == 0) || !AcceptsItem(slot, line.Data))
+        continue;
+      ArmoryItemStock captured = line;
+      var row = new Button { Text = $"{captured.Data.Name}  {StockText(captured.Unlimited, captured.Remaining)}" };
+      row.Pressed += () => EquipItem(captured);
+      list.AddChild(row);
+    }
   }
+
+  private static string StockText(bool unlimited, int remaining)
+    => unlimited ? "INF" : $"x{remaining}";
+
+  private bool SelectionIsOccupied() => _selection!.Value.Kind switch
+  {
+    UnitViewSlotKind.Weapon => _unit!.EquippedWeapon.IsSome,
+    UnitViewSlotKind.Armor => _unit!.EquippedArmor.IsSome,
+    UnitViewSlotKind.Utility => _unit!.Inventory.ContainsKey(_selection!.Value.Index),
+    UnitViewSlotKind.PersonalMod => _unit!.GetModSlots()[_selection!.Value.Index].HasMod,
+    UnitViewSlotKind.WeaponMod => WeaponModSlot(_selection!.Value.Index).Match(Some: s => s.HasMod, None: () => false),
+    _ => false,
+  };
+
+  private void OnUnequipPressed()
+  {
+    UnitViewSlot slot = _selection!.Value;
+    switch (slot.Kind)
+    {
+      case UnitViewSlotKind.Weapon:
+        _unit!.UnequipWeapon().IfSome(old => _state!.Armory.DepositItem(old));
+        break;
+      case UnitViewSlotKind.Armor:
+        _unit!.UnequipArmor().IfSome(old => _state!.Armory.DepositItem(old.Item));
+        break;
+      case UnitViewSlotKind.Utility:
+        _unit!.UnequipItem(slot.Index).IfSome(old => _state!.Armory.DepositItem(old));
+        break;
+      case UnitViewSlotKind.PersonalMod:
+        _unit!.GetModSlots()[slot.Index].Unequip().IfSome(mod => _state!.Armory.DepositMod(mod));
+        break;
+      case UnitViewSlotKind.WeaponMod:
+        WeaponModSlot(slot.Index).IfSome(modSlot => modSlot.Unequip().IfSome(mod => _state!.Armory.DepositMod(mod)));
+        break;
+    }
+    RebuildAll();
+  }
+
+  private static bool AcceptsItem(UnitViewSlot slot, EquippableItemData data) => slot.Kind switch
+  {
+    UnitViewSlotKind.Weapon => data is WeaponData,
+    UnitViewSlotKind.Armor => HasArmorCapability(data),
+    UnitViewSlotKind.Utility => true,
+    _ => false,
+  };
+
+  private static bool HasArmorCapability(EquippableItemData data)
+  {
+    foreach (ItemCapabilityData capability in data.Capabilities)
+      if (capability is ArmorCapabilityData)
+        return true;
+    return false;
+  }
+
+  private void EquipItem(ArmoryItemStock line)
+  {
+    UnitViewSlot slot = _selection!.Value;
+    Option<EquippableItem> withdrawn = _state!.Armory.TryWithdrawItem(line.Data);
+    withdrawn.IfSome(item =>
+    {
+      switch (slot.Kind)
+      {
+        case UnitViewSlotKind.Weapon:
+          _unit!.EquipWeapon((Weapon)item).IfSome(old => _state.Armory.DepositItem(old));
+          break;
+        case UnitViewSlotKind.Armor:
+          item.With<ArmorCapability>().Match(
+            Some: proof => _unit!.EquipArmor(proof).IfSome(old => _state.Armory.DepositItem(old.Item)),
+            None: () => throw new InvalidOperationException(
+              "The armor browser offered an item without an armor capability; filter bug."));
+          break;
+        case UnitViewSlotKind.Utility:
+          _unit!.UnequipItem(slot.Index).IfSome(old => _state.Armory.DepositItem(old));
+          _unit.EquipItem(item, slot.Index);
+          break;
+      }
+    });
+    RebuildAll();
+  }
+
+  private void EquipMod(ArmoryModStock line)
+  {
+    UnitViewSlot slot = _selection!.Value;
+    Option<EquippableMod> withdrawn = _state!.Armory.TryWithdrawMod(line.Mod);
+    withdrawn.IfSome(mod =>
+    {
+      if (slot.Kind == UnitViewSlotKind.PersonalMod)
+      {
+        ModSlot target = _unit!.GetModSlots()[slot.Index];
+        target.Unequip().IfSome(old => _state!.Armory.DepositMod(old));
+        target.Equip(mod);
+      }
+      else
+      {
+        WeaponModSlot(slot.Index).IfSome(target =>
+        {
+          target.Unequip().IfSome(old => _state!.Armory.DepositMod(old));
+          target.Equip(mod);
+        });
+      }
+    });
+    RebuildAll();
+  }
+
+  private Option<ModSlot> WeaponModSlot(int index)
+    => _unit!.EquippedWeapon.Match(
+      Some: weapon => weapon.GetModSlots().Count > index ? weapon.GetModSlots()[index] : Option<ModSlot>.None,
+      None: () => Option<ModSlot>.None);
 
   private void AddLabelRow(Container parent, string text)
   {
     parent.AddChild(new RichTextLabel { Text = text, FitContent = true, ScrollActive = false });
   }
 
-  private void AddSlotButton(Container parent, string text)
+  private void AddSlotButton(Container parent, string text, UnitViewSlot slot)
   {
-    parent.AddChild(new Button { Text = text });
+    var button = new Button { Text = text };
+    button.Pressed += () => SelectSlot(slot);
+    parent.AddChild(button);
   }
 
   private static void ClearChildren(Container parent)
