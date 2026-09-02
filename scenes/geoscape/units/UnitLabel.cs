@@ -39,7 +39,8 @@ public partial class UnitLabel : PanelContainer
     Status = GetNode<RichTextLabel>("%Status");
     UnitIcon = GetNode<TextureRect>("%UnitIcon");
     RankIcon = GetNode<TextureRect>("%RankIcon");
+
+    foreach (Node node in FindChildren("*", "Control", true, false))
+      ((Control)node).MouseFilter = MouseFilterEnum.Ignore;
   }
-
-
 }

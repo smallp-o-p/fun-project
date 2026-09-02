@@ -29,6 +29,26 @@ public class CampaignContentTest
     }
   }
 
+  [TestCase(TestName = "Combat rifle authors two mod slots while service pistol remains slotless")]
+  public void AuthoredWeaponModSlots()
+  {
+    string rifle = File.ReadAllText(Path.Combine(MainRoot, "resources/weapons/combat_rifle.tres"))
+      .Replace("\r\n", "\n", StringComparison.Ordinal);
+    string pistol = File.ReadAllText(Path.Combine(MainRoot, "resources/weapons/service_pistol.tres"))
+      .Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    Assert.True(rifle.Contains(
+      "path=\"res://scripts/items/capabilities/ModSlotsCapabilityData.cs\" id=\"2_modslots\"",
+      StringComparison.Ordinal));
+    Assert.True(rifle.Contains(
+      "[sub_resource type=\"Resource\" id=\"Resource_modslots\"]\nscript = ExtResource(\"2_modslots\")\nSlotCount = 2",
+      StringComparison.Ordinal));
+    Assert.True(rifle.Contains(
+      "Capabilities = Array[ExtResource(\"2_base\")]([SubResource(\"Resource_modslots\")])",
+      StringComparison.Ordinal));
+    Assert.False(pistol.Contains("ModSlotsCapabilityData.cs", StringComparison.Ordinal));
+  }
+
   [TestCase(TestName = "TestCampaign declares the authored armory and mod stock")]
   public void TestCampaignDeclaresStock()
   {

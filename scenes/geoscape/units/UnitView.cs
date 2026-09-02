@@ -138,8 +138,8 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
     string ammo = weapon is AmmunitionedWeapon magazine
       ? $"  AMMO {magazine.CurrentAmmo}/{magazine.MagazineSize}"
       : "";
-    return $"{weapon.ItemName}  DMG {weapon.GetDamageStat().BaseValue}  RNG {weapon.EffectiveRange}  "
-      + $"CRIT {weapon.GetCritChanceStat().BaseValue}{ammo}";
+    return $"{weapon.ItemName}  DMG {Mathf.RoundToInt(weapon.EffectiveStat<DamageStat>())}  RNG {weapon.EffectiveRange}  "
+      + $"CRIT {Mathf.RoundToInt(weapon.EffectiveStat<CriticalChanceStat>())}{ammo}";
   }
 
   private void RebuildArmorSlot()
@@ -186,6 +186,8 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
     {
       foreach (ArmoryModStock line in _state.Armory.ModStock())
       {
+        if (!line.Unlimited && line.Remaining == 0)
+          continue;
         ArmoryModStock captured = line;
         var button = new Button { Text = $"{captured.Mod.Name}  {StockText(captured.Unlimited, captured.Remaining)}" };
         button.Pressed += () => EquipMod(captured);
@@ -206,7 +208,7 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
   }
 
   private static string StockText(bool unlimited, int remaining)
-    => unlimited ? "INF" : $"x{remaining}";
+    => unlimited ? "∞" : $"x{remaining}";
 
   private bool SelectionIsOccupied() => _selection!.Value.Kind switch
   {

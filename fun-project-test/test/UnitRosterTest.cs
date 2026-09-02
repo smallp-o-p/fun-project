@@ -135,6 +135,16 @@ public class UnitRosterTest
     Assert.Equal("Soldier 1", selected!.Name);
   }
 
+  [TestCase(TestName = "Ready makes every descendant control ignore mouse input")]
+  public void DescendantControlsIgnoreMouseInput()
+  {
+    var label = AutoFree(BuildLabelProto());
+    ((SceneTree)Engine.GetMainLoop()).Root.AddChild(label);
+
+    foreach (Node node in label.FindChildren("*", "Control"))
+      Assert.Equal(Control.MouseFilterEnum.Ignore, ((Control)node).MouseFilter);
+  }
+
   [TestCase(TestName = "Bind sets the combatant name (UnitLabel unit test)")]
   public void BindSetsName()
   {

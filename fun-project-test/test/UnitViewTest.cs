@@ -111,17 +111,26 @@ public class UnitViewTest
     AssertThat(view.GetNode<VBoxContainer>("%PersonalModSlots").GetChild<Button>(0).Text).Contains("Reflex Chip");
   }
 
-  [TestCase(TestName = "Present renders weapon slot summary with ammo for magazine weapons")]
+  [TestCase(TestName = "Present renders effective weapon damage and ammo")]
   public void PresentRendersWeaponSummary()
   {
     var view = BuildView();
     Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
-    unit.EquipWeapon(ItemRuntimeFactory.CreateWeapon(MakeFirearmData("Test Pistol")));
+    var firearmData = MakeFirearmData("Test Pistol");
+    firearmData.Capabilities = [new ModSlotsCapabilityData { SlotCount = 1 }];
+    var weapon = ItemRuntimeFactory.CreateWeapon(firearmData);
+    weapon.GetModSlots()[0].Equip(new MultiStatMod
+    {
+      StatMods = [new DamageStatMod { Modifiers = [StatModifier.Add(2)] }],
+    });
+    unit.EquipWeapon(weapon);
 
     view.Present(MakeStateWithArmory(), unit);
 
     string text = view.GetNode<Button>("%WeaponSlot").Text;
     AssertThat(text).Contains("Test Pistol");
+    AssertThat(text).Contains("DMG 6");
+    Assert.False(text.Contains("DMG 4", StringComparison.Ordinal));
     AssertThat(text).Contains("AMMO");
   }
 
@@ -144,7 +153,7 @@ public class UnitViewTest
     Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
     GameState state = new(MakeStart(armory:
     [
-      new ArmoryEntryData { Item = MakeFirearmData("Test Pistol"), Count = 2 },
+      new ArmoryEntryData { Item = MakeFirearmData("Test Pistol"), Count = -1 },
       new ArmoryEntryData { Item = MakeArmorData("Vest"), Count = 1 },
     ]));
     view.Present(state, unit);
@@ -154,7 +163,7 @@ public class UnitViewTest
     var list = view.GetNode<VBoxContainer>("%ArmoryList");
     Assert.Equal(1, list.GetChildCount());
     Assert.Contains("Test Pistol", list.GetChild<Button>(0).Text);
-    Assert.Contains("x2", list.GetChild<Button>(0).Text);
+    Assert.Contains("∞", list.GetChild<Button>(0).Text);
   }
 
   [TestCase(TestName = "Selecting the armor slot lists only armor-capable items")]
@@ -191,6 +200,38 @@ public class UnitViewTest
     Assert.Contains("Test Pistol", view.GetNode<Button>("%WeaponSlot").Text);
     Assert.Equal(1, state.Armory.ItemStock()[0].Remaining);
     Assert.True(unit.EquippedWeapon.IsSome);
+  }
+
+  [TestCase(TestName = "Exhausted limited item stock is not listed")]
+  public void ExhaustedItemIsNotListed()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    EquippableItemData pistolData = MakeFirearmData("Test Pistol");
+    GameState state = new(MakeStart(armory: [new ArmoryEntryData { Item = pistolData, Count = 1 }]));
+    view.Present(state, unit);
+    view.SelectSlot(UnitViewSlot.Weapon);
+
+    view.GetNode<VBoxContainer>("%ArmoryList").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
+    view.SelectSlot(UnitViewSlot.Weapon);
+
+    Assert.Equal(0, view.GetNode<VBoxContainer>("%ArmoryList").GetChildCount());
+  }
+
+  [TestCase(TestName = "Exhausted limited mod stock is not listed")]
+  public void ExhaustedModIsNotListed()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    MultiStatMod chip = new() { Name = "Reflex Chip" };
+    GameState state = new(MakeStart(modStock: [new ModStockEntryData { Mod = chip, Count = 1 }]));
+    view.Present(state, unit);
+    view.SelectSlot(UnitViewSlot.PersonalMod(0));
+
+    view.GetNode<VBoxContainer>("%ArmoryList").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
+    view.SelectSlot(UnitViewSlot.PersonalMod(0));
+
+    Assert.Equal(0, view.GetNode<VBoxContainer>("%ArmoryList").GetChildCount());
   }
 
   [TestCase(TestName = "Equipping over an occupied slot deposits the displaced item")]
