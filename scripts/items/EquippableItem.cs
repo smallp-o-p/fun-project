@@ -14,9 +14,12 @@ public class EquippableItem : HasModSlots, HasNameAndDescription
 
   public string ItemName { get; }
   public string ItemDescription { get; }
+  public EquippableItemData Data { get; }
 
   public EquippableItem(EquippableItemData data)
   {
+    ArgumentNullException.ThrowIfNull(data);
+    Data = data;
     ItemName = data.Name;
     ItemDescription = data.Description;
 

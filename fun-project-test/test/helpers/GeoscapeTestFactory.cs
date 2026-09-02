@@ -3,6 +3,7 @@ using FunProject.GameState;
 using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Stats;
 using FunProject.Strategic;
+using FunProject.Weapons;
 
 namespace FunProject.Tests;
 
@@ -50,14 +51,52 @@ internal static class GeoscapeTestFactory
     return new CombatantData
     {
       Name = name,
-      HealthStat = new HealthStat(),
-      ActionPointsStat = new ActionPointsStat(),
-      WillStat = new WillStat(),
-      MovementStat = new MovementStat(),
-      VisionStat = new VisionStat(),
-      AimStat = new AimStat(),
+      HealthStat = new HealthStat { BaseValue = 20 },
+      ActionPointsStat = new ActionPointsStat { BaseValue = 8 },
+      WillStat = new WillStat { BaseValue = 60 },
+      MovementStat = new MovementStat { BaseValue = 14 },
+      VisionStat = new VisionStat { BaseValue = 22 },
+      AimStat = new AimStat { BaseValue = 60 },
+      ModSlotCount = 2,
     };
   }
+
+  public static WeaponFrameData MakeFrame() => new()
+  {
+    Name = "Test Frame",
+    Packets = [new DamagePacketData()],
+  };
+
+  public static FirearmWeaponData MakeFirearmData(string name = "Test Pistol") => new()
+  {
+    Name = name,
+    Frame = MakeFrame(),
+    DamageStat = new DamageStat { BaseValue = 4 },
+    RangeStat = new RangeStat { BaseValue = 6 },
+    CriticalChanceStat = new CriticalChanceStat { BaseValue = 10 },
+    AmmunitionStat = new AmmunitionStat { BaseValue = 6 },
+    DefaultAmmoData = new Ammunition { Name = "Test Rounds" },
+  };
+
+  public static AmmunitionedWeaponData MakeAmmunitionedData(string name = "Test Rifle") => new()
+  {
+    Name = name,
+    Frame = MakeFrame(),
+    DamageStat = new DamageStat { BaseValue = 5 },
+    RangeStat = new RangeStat { BaseValue = 8 },
+    CriticalChanceStat = new CriticalChanceStat { BaseValue = 10 },
+    AmmunitionStat = new AmmunitionStat { BaseValue = 8 },
+    DefaultAmmoData = new Ammunition { Name = "Test Rounds" },
+  };
+
+  public static WeaponData MakePlainWeaponData(string name = "Test Weapon") => new()
+  {
+    Name = name,
+    Frame = MakeFrame(),
+    DamageStat = new DamageStat { BaseValue = 4 },
+    RangeStat = new RangeStat { BaseValue = 6 },
+    CriticalChanceStat = new CriticalChanceStat { BaseValue = 10 },
+  };
 
   public static RosterEntryData MakeEntry(string displayName = "", CombatantData? unit = null)
   {
