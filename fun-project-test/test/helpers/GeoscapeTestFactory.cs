@@ -1,5 +1,7 @@
 using FunProject.Combatants;
 using FunProject.GameState;
+using FunProject.Items;
+using FunProject.Items.Capabilities;
 using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Stats;
 using FunProject.Strategic;
@@ -60,6 +62,12 @@ internal static class GeoscapeTestFactory
       ModSlotCount = 2,
     };
   }
+
+  public static EquippableItemData MakeArmorData(string name = "Test Vest") => new()
+  {
+    Name = name,
+    Capabilities = [new ArmorCapabilityData { ArmorStat = new BaseArmorStat { BaseValue = 2 } }],
+  };
 
   public static WeaponFrameData MakeFrame() => new()
   {

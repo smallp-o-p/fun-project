@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using FunProject.Buffs;
 using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Stats;
+using FunProject.Weapons;
 
 namespace FunProject.Combatants;
 
@@ -18,6 +20,13 @@ public class Combatant : HasStats, HasModSlots
   private readonly Dictionary<int, EquippableItem> _inventory = [];
   public IReadOnlyDictionary<int, EquippableItem> Inventory => _inventory;
   public int MaxInventorySize { get; }
+
+  /// <summary>Battle-facing weapon slot; mirrors BattleUnitState.EquippedWeapon.</summary>
+  public Option<Weapon> EquippedWeapon { get; private set; }
+
+  /// <summary>Battle-facing armor slot (capability proof); mirrors BattleUnitState.EquippedArmor.</summary>
+  public Option<ItemWith<ArmorCapability>> EquippedArmor { get; private set; }
+
   public IReadOnlyList<BuffData> InnateBuffs { get; }
 
   public Combatant(CombatantData data, Faction faction, Option<string> name = default)
@@ -62,5 +71,48 @@ public class Combatant : HasStats, HasModSlots
         $"EquipItem slot {slot} is out of range for an inventory of size {MaxInventorySize}.");
 
     _inventory[slot] = item;
+  }
+
+  /// <summary>Equip the weapon slot; returns the displaced weapon (if any) for the caller to return to the armory.</summary>
+  public Option<Weapon> EquipWeapon(Weapon weapon)
+  {
+    ArgumentNullException.ThrowIfNull(weapon);
+    Option<Weapon> displaced = EquippedWeapon;
+    EquippedWeapon = weapon;
+    return displaced;
+  }
+
+  /// <summary>Clear the weapon slot; returns what was there for the caller to return to the armory.</summary>
+  public Option<Weapon> UnequipWeapon()
+  {
+    Option<Weapon> removed = EquippedWeapon;
+    EquippedWeapon = None;
+    return removed;
+  }
+
+  /// <summary>Equip the armor slot from a capability proof; returns the displaced proof (if any).</summary>
+  public Option<ItemWith<ArmorCapability>> EquipArmor(ItemWith<ArmorCapability> armor)
+  {
+    Option<ItemWith<ArmorCapability>> displaced = EquippedArmor;
+    EquippedArmor = armor;
+    return displaced;
+  }
+
+  /// <summary>Clear the armor slot; returns what was there for the caller to return to the armory.</summary>
+  public Option<ItemWith<ArmorCapability>> UnequipArmor()
+  {
+    Option<ItemWith<ArmorCapability>> removed = EquippedArmor;
+    EquippedArmor = None;
+    return removed;
+  }
+
+  /// <summary>Clear one utility inventory slot; returns what was there for the caller to return to the armory.</summary>
+  public Option<EquippableItem> UnequipItem(int slot)
+  {
+    if (slot < 0 || slot >= MaxInventorySize)
+      throw new InvalidOperationException(
+        $"UnequipItem slot {slot} is out of range for an inventory of size {MaxInventorySize}.");
+
+    return _inventory.Remove(slot, out EquippableItem? item) ? item : None;
   }
 }
