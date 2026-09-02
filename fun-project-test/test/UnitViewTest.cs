@@ -233,4 +233,62 @@ public class UnitViewTest
     Assert.Contains("empty", view.GetNode<VBoxContainer>("%UtilitySlots").GetChild<Button>(0).Text);
     Assert.Equal(2, state.Armory.ItemStock()[0].Remaining);
   }
+
+  [TestCase(TestName = "Personal mod browser click equips the mod and decrements mod stock")]
+  public void PersonalModEquip()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    MultiStatMod chip = new() { Name = "Reflex Chip" };
+    GameState state = new(MakeStart(modStock: [new ModStockEntryData { Mod = chip, Count = 1 }]));
+    view.Present(state, unit);
+
+    view.SelectSlot(UnitViewSlot.PersonalMod(0));
+    view.GetNode<VBoxContainer>("%ArmoryList").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Contains("Reflex Chip", view.GetNode<VBoxContainer>("%PersonalModSlots").GetChild<Button>(0).Text);
+    Assert.Equal(0, state.Armory.ModStock()[0].Remaining);
+  }
+
+  [TestCase(TestName = "Personal mod unequip returns it to the mod shelf")]
+  public void PersonalModUnequip()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    MultiStatMod chip = new() { Name = "Reflex Chip" };
+    GameState state = new(MakeStart(modStock: [new ModStockEntryData { Mod = chip, Count = 1 }]));
+    view.Present(state, unit);
+    view.SelectSlot(UnitViewSlot.PersonalMod(0));
+    view.GetNode<VBoxContainer>("%ArmoryList").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
+
+    view.SelectSlot(UnitViewSlot.PersonalMod(0));
+    view.GetNode<Button>("%UnequipButton").EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Equal(1, state.Armory.ModStock()[0].Remaining);
+    Assert.Contains("empty", view.GetNode<VBoxContainer>("%PersonalModSlots").GetChild<Button>(0).Text);
+  }
+
+  [TestCase(TestName = "Weapon mod browser equips into the equipped weapon's slot")]
+  public void WeaponModEquip()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    unit.EquipWeapon(ItemRuntimeFactory.CreateWeapon(MakeFirearmData("Test Pistol")));
+    MultiStatMod barrel = new() { Name = "Long Barrel" };
+    GameState state = new(MakeStart(modStock: [new ModStockEntryData { Mod = barrel, Count = 1 }]));
+    view.Present(state, unit);
+    Assert.Equal(0, view.GetNode<VBoxContainer>("%WeaponModSlots").GetChildCount());
+
+    var slotted = MakeFirearmData("Modded Pistol");
+    slotted.Capabilities = [new ModSlotsCapabilityData { SlotCount = 1 }];
+    unit.EquipWeapon(ItemRuntimeFactory.CreateWeapon(slotted));
+    view.Present(state, unit);
+    Assert.Equal(1, view.GetNode<VBoxContainer>("%WeaponModSlots").GetChildCount());
+
+    view.SelectSlot(UnitViewSlot.WeaponMod(0));
+    view.GetNode<VBoxContainer>("%ArmoryList").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Contains("Long Barrel", view.GetNode<VBoxContainer>("%WeaponModSlots").GetChild<Button>(0).Text);
+    Assert.Equal(0, state.Armory.ModStock()[0].Remaining);
+  }
 }
