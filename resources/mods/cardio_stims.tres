@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="MultiStatMod" format=3 load_steps=6]
+
+[ext_resource type="Script" path="res://scripts/stats/MultiStatMod.cs" id="1_multi"]
+[ext_resource type="Script" path="res://scripts/stats/concrete_mods/MovementStatMod.cs" id="2_move"]
+[ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="3_modifier"]
+
+[sub_resource type="Resource" id="mod_add2"]
+script = ExtResource("3_modifier")
+Operation = 0
+Value = 2.0
+
+[sub_resource type="Resource" id="move_statmod"]
+script = ExtResource("2_move")
+Modifiers = [SubResource("mod_add2")]
+
+[resource]
+script = ExtResource("1_multi")
+Name = "Cardio Stims"
+Description = "Regulation-dose stimulant pack. Lungs open up; boots move faster."
+StatMods = [SubResource("move_statmod")]

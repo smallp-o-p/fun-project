@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="MultiStatMod" format=3 load_steps=6]
+
+[ext_resource type="Script" path="res://scripts/stats/MultiStatMod.cs" id="1_multi"]
+[ext_resource type="Script" path="res://scripts/stats/concrete_mods/AimStatMod.cs" id="2_aim"]
+[ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="3_modifier"]
+
+[sub_resource type="Resource" id="mod_add10"]
+script = ExtResource("3_modifier")
+Operation = 0
+Value = 10.0
+
+[sub_resource type="Resource" id="aim_statmod"]
+script = ExtResource("2_aim")
+Modifiers = [SubResource("mod_add10")]
+
+[resource]
+script = ExtResource("1_multi")
+Name = "Reflex Chip"
+Description = "Neural accelerator implant. Targeting solutions assemble noticeably faster."
+StatMods = [SubResource("aim_statmod")]

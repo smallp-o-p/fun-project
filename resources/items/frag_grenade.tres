@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EquippableItemData" format=3]
+
+[ext_resource type="Script" path="res://scripts/items/EquippableItemData.cs" id="1_item"]
+[ext_resource type="Script" path="res://scripts/items/capabilities/ItemCapabilityData.cs" id="2_base"]
+[ext_resource type="Script" path="res://scripts/items/capabilities/ThrowableCapabilityData.cs" id="3_throw"]
+[ext_resource type="Script" path="res://scripts/items/capabilities/BlastCapabilityData.cs" id="4_blast"]
+
+[sub_resource type="Resource" id="Resource_throw"]
+script = ExtResource("3_throw")
+
+[sub_resource type="Resource" id="Resource_blast"]
+script = ExtResource("4_blast")
+BlastRadius = 1
+
+[resource]
+script = ExtResource("1_item")
+Name = "Frag Grenade"
+Description = "Standard fragmentation grenade. Throw it at problems."
+Capabilities = Array[ExtResource("2_base")]([SubResource("Resource_throw"), SubResource("Resource_blast")])

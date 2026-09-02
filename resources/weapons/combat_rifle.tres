@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="FirearmWeaponData" format=3]
+
+[ext_resource type="Script" uid="uid://dnk85ukx4hsk8" path="res://scripts/stats/concrete_stats/AmmunitionStat.cs" id="1_ammo"]
+[ext_resource type="Script" uid="uid://cogsdmnfr7ro4" path="res://scripts/stats/concrete_stats/CriticalChanceStat.cs" id="1_crit"]
+[ext_resource type="Script" uid="uid://dojdd5hgirkn2" path="res://scripts/stats/concrete_stats/DamageStat.cs" id="1_damage"]
+[ext_resource type="Script" uid="uid://cei4l4eg05jg1" path="res://scripts/weapons/FirearmWeaponData.cs" id="1_fvdq8"]
+[ext_resource type="Script" uid="uid://pkqahop342cp" path="res://scripts/stats/concrete_stats/RangeStat.cs" id="1_range"]
+[ext_resource type="Resource" uid="uid://but3ivq5h35lq" path="res://resources/weapons/frames/standard_kinetic.tres" id="3_frame"]
+[ext_resource type="Resource" uid="uid://b3822r26xoua8" path="res://resources/weapons/ammo/standard_rounds.tres" id="5_4vjy0"]
+
+[sub_resource type="Resource" id="Resource_75boo"]
+script = ExtResource("1_ammo")
+BaseValue = 8
+
+[sub_resource type="Resource" id="Resource_ofjgw"]
+script = ExtResource("1_crit")
+BaseValue = 10
+
+[sub_resource type="Resource" id="Resource_32rhf"]
+script = ExtResource("1_damage")
+BaseValue = 6
+
+[sub_resource type="Resource" id="Resource_njiaa"]
+script = ExtResource("1_range")
+BaseValue = 9
+
+[resource]
+script = ExtResource("1_fvdq8")
+AmmunitionStat = SubResource("Resource_75boo")
+DefaultAmmoData = ExtResource("5_4vjy0")
+Archetype = 2
+Frame = ExtResource("3_frame")
+DamageStat = SubResource("Resource_32rhf")
+RangeStat = SubResource("Resource_njiaa")
+CriticalChanceStat = SubResource("Resource_ofjgw")
+Name = "Combat Rifle"
+Description = "Service rifle. Flatter trajectory, heavier rounds, larger magazine than the pistol."
