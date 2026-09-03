@@ -18,7 +18,7 @@ public class ArmoryTest
   private static MultiStatMod MakeMod(string name, bool unlimited = false)
     => new() { Name = name, UnlimitedStock = unlimited };
 
-  [TestCase(TestName = "A listed scarce item seeds one instance; AddInstances grows the stack at runtime")]
+  [TestCase(TestName = "A listed scarce item seeds one; AddStock grows the count at runtime")]
   public void ScarceEntrySeedsOneInstance()
   {
     EquippableItemData data = MakeItem("Pistol");
@@ -29,7 +29,7 @@ public class ArmoryTest
     Assert.True(first.IsSome);
     Assert.False(second.IsSome);
 
-    armory.AddInstances(data, 2);
+    armory.AddStock(data, 2);
     Assert.True(armory.TryWithdrawItem(data).IsSome);
     Assert.True(armory.TryWithdrawItem(data).IsSome);
     Assert.False(armory.TryWithdrawItem(data).IsSome);
@@ -49,13 +49,12 @@ public class ArmoryTest
     Assert.True(armory.TryWithdrawItem(data).IsSome);
   }
 
-  [TestCase(TestName = "Depositing an unlimited item returns its equipped mods and discards the instance")]
-  public void UnlimitedDepositReturnsMods()
+  [TestCase(TestName = "Depositing an item returns its equipped mods and counts it back into stock")]
+  public void DepositReturnsModsAndCountsIn()
   {
     EquippableItemData data = new()
     {
       Name = "Rifle",
-      UnlimitedStock = true,
       Capabilities = [new ModSlotsCapabilityData { SlotCount = 1 }],
     };
     MultiStatMod mod = MakeMod("Scope");
@@ -66,9 +65,9 @@ public class ArmoryTest
     armory.DepositItem(item);
     EquippableItem fresh = armory.TryWithdrawItem(data).ValueUnsafe();
 
-    Assert.Equal(1, armory.ModStock()[0].Remaining);
-    Assert.False(fresh.GetModSlots()[0].HasMod);
-    AssertThat(fresh).IsNotSame(item);
+    Assert.Equal(1, armory.ModStock()[0].Remaining); // mod back on its shelf
+    Assert.False(fresh.GetModSlots()[0].HasMod); // stock is anonymous: fresh is factory state
+    AssertThat(fresh).IsNotSame(item); // a NEW materialized instance, not the deposited one
   }
 
   [TestCase(TestName = "Mod shelf counts down and back up, and AddModStock grows it at runtime")]
@@ -151,9 +150,9 @@ public class ArmoryTest
     MultiStatMod plentifulMod = MakeMod("Core", unlimited: true);
     var armory = new Armory([scarce, plentiful], [scarceMod, plentifulMod]);
 
-    Assert.Throws<ArgumentOutOfRangeException>(() => armory.AddInstances(scarce, -1));
-    Assert.Throws<InvalidOperationException>(() => armory.AddInstances(MakeItem("Unknown"), 1));
-    Assert.Throws<InvalidOperationException>(() => armory.AddInstances(plentiful, 1));
+    Assert.Throws<ArgumentOutOfRangeException>(() => armory.AddStock(scarce, -1));
+    Assert.Throws<InvalidOperationException>(() => armory.AddStock(MakeItem("Unknown"), 1));
+    Assert.Throws<InvalidOperationException>(() => armory.AddStock(plentiful, 1));
     Assert.Throws<ArgumentOutOfRangeException>(() => armory.AddModStock(scarceMod, -1));
     Assert.Throws<InvalidOperationException>(() => armory.AddModStock(MakeMod("Unknown"), 1));
     Assert.Throws<InvalidOperationException>(() => armory.AddModStock(plentifulMod, 1));

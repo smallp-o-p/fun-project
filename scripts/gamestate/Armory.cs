@@ -5,20 +5,21 @@ using System.Collections.Generic;
 
 namespace FunProject.GameState;
 
-/// <summary>One item shelf line for the UI: the mold, the stock policy, and the instances still on the shelf.</summary>
+/// <summary>One item shelf line for the UI: the mold, the stock policy, and the stock count left.</summary>
 public sealed record ArmoryItemStock(EquippableItemData Data, bool Unlimited, int Remaining);
 
 /// <summary>One mod shelf line for the UI: the template, the stock policy, and the count left.</summary>
 public sealed record ArmoryModStock(EquippableMod Mod, bool Unlimited, int Remaining);
 
 /// <summary>
-/// Campaign armory: the player's stock of equippable items and mods. Stock POLICY is authored
-/// (the <c>UnlimitedStock</c> flag on the item/mod template); stock QUANTITIES are runtime-only.
-/// Campaign start seeds every listed scarce entry with one instance; <see cref="AddInstances"/>/
+/// Campaign armory: the player's stock of equippable items and mods — anonymous, count-based,
+/// with factory-fresh materialization on withdrawal. Stock POLICY is authored (the
+/// <c>UnlimitedStock</c> flag on the item/mod template); stock QUANTITIES are runtime-only.
+/// Campaign start seeds every listed scarce entry with one; <see cref="AddStock"/> and
 /// <see cref="AddModStock"/> are the runtime doors for growing stock (manufacturing later).
-/// Scarce entries hold actual runtime instances (a modded weapon returned to the armory keeps
-/// its mods); unlimited entries instantiate fresh on withdraw and discard on deposit. Mods are
-/// immutable authored resources (no runtime wrapper), so their shelf is counts only.
+/// Items are materialized fresh from their template on withdraw, so per-instance state
+/// (attached mods, charges, magazine) does not survive the shelf: depositing an item
+/// returns its equipped mods to the mod shelf and counts the item back into stock.
 /// Authored resources are unique instances; shelves key on reference identity.
 /// </summary>
 public sealed class Armory
@@ -27,7 +28,7 @@ public sealed class Armory
   {
     public required EquippableItemData Data { get; init; }
     public required bool Unlimited { get; init; }
-    public List<EquippableItem> Stack { get; } = [];
+    public int Remaining { get; set; }
   }
 
   private sealed class ModShelf
@@ -48,11 +49,9 @@ public sealed class Armory
     foreach (EquippableItemData item in items)
     {
       ArgumentNullException.ThrowIfNull(item);
-      var shelf = new ItemShelf { Data = item, Unlimited = item.UnlimitedStock };
+      var shelf = new ItemShelf { Data = item, Unlimited = item.UnlimitedStock, Remaining = 1 };
       if (!_items.TryAdd(item, shelf))
         throw new InvalidOperationException($"Armory lists item '{item.Name}' more than once.");
-      if (!shelf.Unlimited)
-        shelf.Stack.Add(ItemRuntimeFactory.Create(item));
     }
 
     foreach (EquippableMod mod in mods)
@@ -65,10 +64,10 @@ public sealed class Armory
   }
 
   /// <summary>
-  /// Add <paramref name="count"/> instances of a listed scarce item — the runtime door for
+  /// Add <paramref name="count"/> stock of a listed scarce item — the runtime door for
   /// stock growth (manufacturing later; tests today). Unknown or unlimited entries throw.
   /// </summary>
-  public void AddInstances(EquippableItemData data, int count)
+  public void AddStock(EquippableItemData data, int count)
   {
     ArgumentNullException.ThrowIfNull(data);
     ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);
@@ -77,13 +76,12 @@ public sealed class Armory
     if (shelf.Unlimited)
       throw new InvalidOperationException($"Armory item '{data.Name}' is unlimited; its stock is never counted.");
 
-    for (int i = 0; i < count; i++)
-      shelf.Stack.Add(ItemRuntimeFactory.Create(data));
+    shelf.Remaining += count;
   }
 
   /// <summary>
   /// Add <paramref name="count"/> stock of a listed scarce mod — the mod-shelf mirror of
-  /// <see cref="AddInstances"/>. Unknown or unlimited entries throw.
+  /// <see cref="AddStock"/>. Unknown or unlimited entries throw.
   /// </summary>
   public void AddModStock(EquippableMod mod, int count)
   {
@@ -97,7 +95,7 @@ public sealed class Armory
     shelf.Remaining += count;
   }
 
-  /// <summary>Take one instance of this item off the shelf, or None when the shelf is empty/unknown.</summary>
+  /// <summary>Materialize one factory-fresh instance of this item, or None when out of stock/unknown.</summary>
   public Option<EquippableItem> TryWithdrawItem(EquippableItemData data)
   {
     ArgumentNullException.ThrowIfNull(data);
@@ -105,29 +103,29 @@ public sealed class Armory
       return None;
     if (shelf.Unlimited)
       return ItemRuntimeFactory.Create(data);
-    if (shelf.Stack.Count == 0)
+    if (shelf.Remaining == 0)
       return None;
 
-    EquippableItem item = shelf.Stack[^1];
-    shelf.Stack.RemoveAt(shelf.Stack.Count - 1);
-    return item;
+    shelf.Remaining--;
+    return ItemRuntimeFactory.Create(data);
   }
 
-  /// <summary>Return an item to its shelf. Unlimited shelves discard it (re-shelving its mods first); unknown items throw.</summary>
+  /// <summary>
+  /// Return an item to stock: its equipped mods go back to the mod shelf, the template
+  /// counts back in. Unknown items throw. Per-instance state (mods, charges, magazine)
+  /// is deliberately not preserved — stock is anonymous.
+  /// </summary>
   public void DepositItem(EquippableItem item)
   {
     ArgumentNullException.ThrowIfNull(item);
     if (!_items.TryGetValue(item.Data, out ItemShelf? shelf))
       throw new InvalidOperationException(
         $"Armory has no entry for item '{item.ItemName}'; anything withdrawable must be authored.");
-    if (shelf.Unlimited)
-    {
-      foreach (ModSlot slot in item.GetModSlots())
-        slot.Unequip().IfSome(DepositMod);
-      return;
-    }
 
-    shelf.Stack.Add(item);
+    foreach (ModSlot slot in item.GetModSlots())
+      slot.Unequip().IfSome(DepositMod);
+    if (!shelf.Unlimited)
+      shelf.Remaining++;
   }
 
   /// <summary>Take one count of this mod template, or None when exhausted/unknown.</summary>
@@ -159,7 +157,7 @@ public sealed class Armory
   {
     List<ArmoryItemStock> stock = [];
     foreach (ItemShelf shelf in _items.Values)
-      stock.Add(new ArmoryItemStock(shelf.Data, shelf.Unlimited, shelf.Stack.Count));
+      stock.Add(new ArmoryItemStock(shelf.Data, shelf.Unlimited, shelf.Remaining));
     return stock;
   }
 
