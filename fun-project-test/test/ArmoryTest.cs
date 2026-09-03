@@ -1,5 +1,6 @@
 using FunProject.GameState;
 using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using GdUnit4;
 using LanguageExt.UnsafeValueAccess;
@@ -56,6 +57,27 @@ public class ArmoryTest
 
     AssertThat(a).IsNotSame(b);
     Assert.True(armory.TryWithdrawItem(data).IsSome);
+  }
+
+  [TestCase(TestName = "Depositing an unlimited item returns its equipped mods and discards the instance")]
+  public void UnlimitedDepositReturnsMods()
+  {
+    EquippableItemData data = new()
+    {
+      Name = "Rifle",
+      Capabilities = [new ModSlotsCapabilityData { SlotCount = 1 }],
+    };
+    MultiStatMod mod = MakeMod("Scope");
+    var armory = new Armory([Entry(data, -1)], [ModEntry(mod, 1)]);
+    EquippableItem item = armory.TryWithdrawItem(data).ValueUnsafe();
+    item.GetModSlots()[0].Equip(armory.TryWithdrawMod(mod).ValueUnsafe());
+
+    armory.DepositItem(item);
+    EquippableItem fresh = armory.TryWithdrawItem(data).ValueUnsafe();
+
+    Assert.Equal(1, armory.ModStock()[0].Remaining);
+    Assert.False(fresh.GetModSlots()[0].HasMod);
+    AssertThat(fresh).IsNotSame(item);
   }
 
   [TestCase(TestName = "Mod shelf counts down and back up")]

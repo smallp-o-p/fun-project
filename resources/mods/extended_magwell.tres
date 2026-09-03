@@ -1,11 +1,17 @@
-[gd_resource type="Resource" script_class="MultiStatMod" load_steps=4 format=3 uid="uid://iefajrai3ts6"]
+[gd_resource type="Resource" script_class="MultiStatMod" load_steps=6 format=3 uid="uid://iefajrai3ts6"]
 
 [ext_resource type="Script" path="res://scripts/stats/MultiStatMod.cs" id="1_multi"]
 [ext_resource type="Script" path="res://scripts/stats/concrete_mods/AmmunitionStatMod.cs" id="2_ammo"]
+[ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="3_modifier"]
+
+[sub_resource type="Resource" id="ammo_add"]
+script = ExtResource("3_modifier")
+Operation = 0
+Value = 2.0
 
 [sub_resource type="Resource" id="ammo_statmod"]
 script = ExtResource("2_ammo")
-Modifiers = []
+Modifiers = [SubResource("ammo_add")]
 
 [resource]
 script = ExtResource("1_multi")

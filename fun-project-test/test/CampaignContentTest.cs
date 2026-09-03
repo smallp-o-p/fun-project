@@ -32,21 +32,48 @@ public class CampaignContentTest
   [TestCase(TestName = "Combat rifle authors two mod slots while service pistol remains slotless")]
   public void AuthoredWeaponModSlots()
   {
-    string rifle = File.ReadAllText(Path.Combine(MainRoot, "resources/weapons/combat_rifle.tres"))
-      .Replace("\r\n", "\n", StringComparison.Ordinal);
-    string pistol = File.ReadAllText(Path.Combine(MainRoot, "resources/weapons/service_pistol.tres"))
-      .Replace("\r\n", "\n", StringComparison.Ordinal);
+    string rifle = ReadResource("resources/weapons/combat_rifle.tres");
+    string pistol = ReadResource("resources/weapons/service_pistol.tres");
+    string modSlotsScriptId = FindExtResourceId(rifle, "scripts/items/capabilities/ModSlotsCapabilityData.cs");
+    string modSlotsBlock = FindSubResourceByScript(rifle, modSlotsScriptId);
+    string modSlotsId = FindSubResourceId(modSlotsBlock);
+    string rifleResource = MainResourceBlock(rifle);
 
-    Assert.True(rifle.Contains(
-      "path=\"res://scripts/items/capabilities/ModSlotsCapabilityData.cs\" id=\"2_modslots\"",
-      StringComparison.Ordinal));
-    Assert.True(rifle.Contains(
-      "[sub_resource type=\"Resource\" id=\"Resource_modslots\"]\nscript = ExtResource(\"2_modslots\")\nSlotCount = 2",
-      StringComparison.Ordinal));
-    Assert.True(rifle.Contains(
-      "Capabilities = Array[ExtResource(\"2_base\")]([SubResource(\"Resource_modslots\")])",
-      StringComparison.Ordinal));
+    Assert.True(modSlotsBlock.Contains("SlotCount = 2", StringComparison.Ordinal));
+    Assert.True(rifleResource.Contains("Capabilities =", StringComparison.Ordinal));
+    Assert.True(rifleResource.Contains($"SubResource(\"{modSlotsId}\")", StringComparison.Ordinal));
     Assert.False(pistol.Contains("ModSlotsCapabilityData.cs", StringComparison.Ordinal));
+  }
+
+  [TestCase(TestName = "Extended magwell authors an additive ammunition modifier")]
+  public void ExtendedMagwellAddsAmmunition()
+  {
+    string magwell = ReadResource("resources/mods/extended_magwell.tres");
+    string modifierScriptId = FindExtResourceId(magwell, "scripts/stats/StatModifier.cs");
+    string ammunitionModScriptId = FindExtResourceId(magwell, "scripts/stats/concrete_mods/AmmunitionStatMod.cs");
+    string modifierBlock = FindSubResourceByScript(magwell, modifierScriptId);
+    string ammunitionModBlock = FindSubResourceByScript(magwell, ammunitionModScriptId);
+    string modifierId = FindSubResourceId(modifierBlock);
+
+    Assert.True(modifierBlock.Contains("Operation = 0", StringComparison.Ordinal));
+    Assert.True(modifierBlock.Contains("Value = 2.0", StringComparison.Ordinal));
+    Assert.True(ammunitionModBlock.Contains("Modifiers =", StringComparison.Ordinal));
+    Assert.True(ammunitionModBlock.Contains($"SubResource(\"{modifierId}\")", StringComparison.Ordinal));
+  }
+
+  [TestCase(TestName = "Frag grenade blast authors a damage effect")]
+  public void FragGrenadeHasBlastDamage()
+  {
+    string grenade = ReadResource("resources/items/frag_grenade.tres");
+    string blastScriptId = FindExtResourceId(grenade, "scripts/items/capabilities/BlastCapabilityData.cs");
+    string damageScriptId = FindExtResourceId(grenade, "scripts/items/effects/DamageEffectData.cs");
+    string blastBlock = FindSubResourceByScript(grenade, blastScriptId);
+    string damageBlock = FindSubResourceByScript(grenade, damageScriptId);
+    string damageId = FindSubResourceId(damageBlock);
+
+    Assert.True(damageBlock.Contains("BaseDamage = 6", StringComparison.Ordinal));
+    Assert.True(blastBlock.Contains("Effects =", StringComparison.Ordinal));
+    Assert.True(blastBlock.Contains($"SubResource(\"{damageId}\")", StringComparison.Ordinal));
   }
 
   [TestCase(TestName = "TestCampaign declares the authored armory and mod stock")]
@@ -111,8 +138,10 @@ public class CampaignContentTest
     return root;
   }
 
-  private static string ReadCampaign() =>
-    File.ReadAllText(Path.Combine(MainRoot, "resources/geoscape/TestCampaign.tres"))
+  private static string ReadCampaign() => ReadResource("resources/geoscape/TestCampaign.tres");
+
+  private static string ReadResource(string relativePath) =>
+    File.ReadAllText(Path.Combine(MainRoot, relativePath))
       .Replace("\r\n", "\n", StringComparison.Ordinal);
 
   private static string FindExtResourceId(string campaign, string relativePath)
@@ -125,11 +154,41 @@ public class CampaignContentTest
     int lineEnd = campaign.IndexOf('\n', pathPosition);
     string line = campaign[lineStart..lineEnd];
     const string idMarker = "id=\"";
-    int idStart = line.IndexOf(idMarker, StringComparison.Ordinal);
+    int idStart = line.LastIndexOf(idMarker, StringComparison.Ordinal);
     Assert.True(idStart >= 0);
     idStart += idMarker.Length;
     int idEnd = line.IndexOf('"', idStart);
     return line[idStart..idEnd];
+  }
+
+  private static string FindSubResourceByScript(string content, string scriptId)
+  {
+    string scriptReference = $"script = ExtResource(\"{scriptId}\")";
+    int scriptPosition = content.IndexOf(scriptReference, StringComparison.Ordinal);
+    Assert.True(scriptPosition >= 0);
+
+    int blockStart = content.LastIndexOf("[sub_resource", scriptPosition, StringComparison.Ordinal);
+    Assert.True(blockStart >= 0);
+    int blockEnd = content.IndexOf("\n\n", scriptPosition, StringComparison.Ordinal);
+    return content[blockStart..(blockEnd >= 0 ? blockEnd : content.Length)];
+  }
+
+  private static string FindSubResourceId(string block)
+  {
+    const string idMarker = "id=\"";
+    int idStart = block.IndexOf(idMarker, StringComparison.Ordinal);
+    Assert.True(idStart >= 0);
+    idStart += idMarker.Length;
+    int idEnd = block.IndexOf('"', idStart);
+    Assert.True(idEnd >= 0);
+    return block[idStart..idEnd];
+  }
+
+  private static string MainResourceBlock(string content)
+  {
+    int resourceStart = content.LastIndexOf("[resource]", StringComparison.Ordinal);
+    Assert.True(resourceStart >= 0);
+    return content[resourceStart..];
   }
 
   private static string FindStockEntry(

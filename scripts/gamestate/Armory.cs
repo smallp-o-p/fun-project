@@ -96,8 +96,14 @@ public sealed class Armory
     if (!_items.TryGetValue(item.Data, out ItemShelf? shelf))
       throw new InvalidOperationException(
         $"Armory has no entry for item '{item.ItemName}'; anything withdrawable must be authored.");
-    if (!shelf.Unlimited)
-      shelf.Stack.Add(item);
+    if (shelf.Unlimited)
+    {
+      foreach (ModSlot slot in item.GetModSlots())
+        slot.Unequip().IfSome(DepositMod);
+      return;
+    }
+
+    shelf.Stack.Add(item);
   }
 
   /// <summary>Take one count of this mod template, or None when exhausted/unknown.</summary>
@@ -126,10 +132,18 @@ public sealed class Armory
   }
 
   public IReadOnlyList<ArmoryItemStock> ItemStock()
-    => [.. _items.Values.AsValueEnumerable()
-        .Select(shelf => new ArmoryItemStock(shelf.Data, shelf.Unlimited, shelf.Stack.Count)).ToArray()];
+  {
+    List<ArmoryItemStock> stock = [];
+    foreach (ItemShelf shelf in _items.Values)
+      stock.Add(new ArmoryItemStock(shelf.Data, shelf.Unlimited, shelf.Stack.Count));
+    return stock;
+  }
 
   public IReadOnlyList<ArmoryModStock> ModStock()
-    => [.. _mods.Values.AsValueEnumerable()
-        .Select(shelf => new ArmoryModStock(shelf.Mod, shelf.Unlimited, shelf.Remaining)).ToArray()];
+  {
+    List<ArmoryModStock> stock = [];
+    foreach (ModShelf shelf in _mods.Values)
+      stock.Add(new ArmoryModStock(shelf.Mod, shelf.Unlimited, shelf.Remaining));
+    return stock;
+  }
 }

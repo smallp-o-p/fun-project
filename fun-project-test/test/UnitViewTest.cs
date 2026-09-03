@@ -3,6 +3,7 @@ using FunProject.GameState;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Stats;
+using FunProject.Weapons;
 using Godot;
 using GdUnit4;
 using static FunProject.Tests.GeoscapeTestFactory;
@@ -111,27 +112,62 @@ public class UnitViewTest
     AssertThat(view.GetNode<VBoxContainer>("%PersonalModSlots").GetChild<Button>(0).Text).Contains("Reflex Chip");
   }
 
-  [TestCase(TestName = "Present renders effective weapon damage and ammo")]
+  [TestCase(TestName = "Present renders emitted weapon damage and ammo")]
   public void PresentRendersWeaponSummary()
   {
     var view = BuildView();
     Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
     var firearmData = MakeFirearmData("Test Pistol");
     firearmData.Capabilities = [new ModSlotsCapabilityData { SlotCount = 1 }];
-    var weapon = ItemRuntimeFactory.CreateWeapon(firearmData);
-    weapon.GetModSlots()[0].Equip(new MultiStatMod
+    Weapon weapon = ItemRuntimeFactory.CreateWeapon(firearmData);
+    weapon.GetModSlots()[0].Equip(new DamageBundleEquippableMod
     {
-      StatMods = [new DamageStatMod { Modifiers = [StatModifier.Add(2)] }],
+      BundleMods =
+      [
+        new DamageBundleMod
+        {
+          PacketModifiers =
+          [
+            new PacketModifier
+            {
+              AffectAllElements = true,
+              Ops = [StatModifier.Add(2)],
+            },
+          ],
+        },
+      ],
     });
     unit.EquipWeapon(weapon);
 
     view.Present(MakeStateWithArmory(), unit);
 
+    int emittedDamage = weapon.EmitDamage().AsValueEnumerable().Sum(damage => damage.Amount);
     string text = view.GetNode<Button>("%WeaponSlot").Text;
+    Assert.Equal(6, emittedDamage);
     AssertThat(text).Contains("Test Pistol");
     AssertThat(text).Contains("DMG 6");
     Assert.False(text.Contains("DMG 4", StringComparison.Ordinal));
     AssertThat(text).Contains("AMMO");
+  }
+
+  [TestCase(TestName = "Present folds equipped weapon mods into unit stats like battle")]
+  public void PresentRendersWeaponStatContributions()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    var firearmData = MakeFirearmData("Test Rifle");
+    firearmData.Capabilities = [new ModSlotsCapabilityData { SlotCount = 1 }];
+    Weapon weapon = ItemRuntimeFactory.CreateWeapon(firearmData);
+    weapon.GetModSlots()[0].Equip(new MultiStatMod
+    {
+      StatMods = [new MovementStatMod { Modifiers = [StatModifier.Add(2)] }],
+    });
+    unit.EquipWeapon(weapon);
+
+    view.Present(MakeStateWithArmory(), unit);
+
+    var stats = view.GetNode<VBoxContainer>("%StatsList");
+    Assert.Equal("Movement: 14 -> 16", stats.GetChild<RichTextLabel>(3).Text);
   }
 
   [TestCase(TestName = "Back button invokes the armed close request")]
@@ -307,6 +343,21 @@ public class UnitViewTest
 
     Assert.Equal(1, state.Armory.ModStock()[0].Remaining);
     Assert.Contains("empty", view.GetNode<VBoxContainer>("%PersonalModSlots").GetChild<Button>(0).Text);
+  }
+
+  [TestCase(TestName = "Missing weapon mod slot does not consume armory stock")]
+  public void MissingWeaponModSlotPreservesStock()
+  {
+    var view = BuildView();
+    Combatant unit = new(MakeCombatantData("Mold"), new Faction(new FactionData()));
+    MultiStatMod barrel = new() { Name = "Long Barrel" };
+    GameState state = new(MakeStart(modStock: [new ModStockEntryData { Mod = barrel, Count = 1 }]));
+    view.Present(state, unit);
+
+    view.SelectSlot(UnitViewSlot.WeaponMod(0));
+    view.GetNode<VBoxContainer>("%ArmoryList").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Equal(1, state.Armory.ModStock()[0].Remaining);
   }
 
   [TestCase(TestName = "Weapon mod browser equips into the equipped weapon's slot")]

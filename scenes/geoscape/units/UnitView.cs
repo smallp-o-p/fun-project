@@ -8,6 +8,7 @@ using FunProject.Stats;
 using FunProject.Weapons;
 using Godot;
 using System;
+using System.Collections.Generic;
 
 // Which slot the armory browser targets. Produced by slot-button clicks (or the test seam);
 // weapon/armor/utility/mod kinds each filter the browser differently.
@@ -97,9 +98,17 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
   private void AddStatRow<TStat>(string label) where TStat : Stat
   {
     int baseValue = Mathf.RoundToInt(_unit!.GetStat<TStat>().BaseValue);
-    int effective = Mathf.RoundToInt(_unit.Resolve<TStat>(_unit.StatContributions()));
+    int effective = Mathf.RoundToInt(_unit.Resolve<TStat>(GatherStatContributions()));
     AddLabelRow(GetNode<VBoxContainer>("%StatsList"), $"{label}: {baseValue} -> {effective}");
   }
+
+  private IEnumerable<StatMod> GatherStatContributions()
+    => _unit!.StatContributions()
+      .AsValueEnumerable()
+      .Concat(_unit.EquippedWeapon.Match<IEnumerable<StatMod>>(
+        weapon => weapon.StatContributions,
+        () => System.Array.Empty<StatMod>()))
+      .ToArray();
 
   private void RebuildEquipment()
   {
@@ -135,10 +144,11 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
 
   private static string WeaponSummary(Weapon weapon)
   {
+    int damage = weapon.EmitDamage().AsValueEnumerable().Sum(packet => packet.Amount);
     string ammo = weapon is AmmunitionedWeapon magazine
       ? $"  AMMO {magazine.CurrentAmmo}/{magazine.MagazineSize}"
       : "";
-    return $"{weapon.ItemName}  DMG {Mathf.RoundToInt(weapon.EffectiveStat<DamageStat>())}  RNG {weapon.EffectiveRange}  "
+    return $"{weapon.ItemName}  DMG {damage}  RNG {weapon.EffectiveRange}  "
       + $"CRIT {Mathf.RoundToInt(weapon.EffectiveStat<CriticalChanceStat>())}{ammo}";
   }
 
@@ -188,9 +198,8 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
       {
         if (!line.Unlimited && line.Remaining == 0)
           continue;
-        ArmoryModStock captured = line;
-        var button = new Button { Text = $"{captured.Mod.Name}  {StockText(captured.Unlimited, captured.Remaining)}" };
-        button.Pressed += () => EquipMod(captured);
+        var button = new Button { Text = $"{line.Mod.Name}  {StockText(line.Unlimited, line.Remaining)}" };
+        button.Pressed += () => EquipMod(line);
         list.AddChild(button);
       }
       return;
@@ -200,9 +209,8 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
     {
       if ((!line.Unlimited && line.Remaining == 0) || !AcceptsItem(slot, line.Data))
         continue;
-      ArmoryItemStock captured = line;
-      var row = new Button { Text = $"{captured.Data.Name}  {StockText(captured.Unlimited, captured.Remaining)}" };
-      row.Pressed += () => EquipItem(captured);
+      var row = new Button { Text = $"{line.Data.Name}  {StockText(line.Unlimited, line.Remaining)}" };
+      row.Pressed += () => EquipItem(line);
       list.AddChild(row);
     }
   }
@@ -263,6 +271,7 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
   private void EquipItem(ArmoryItemStock line)
   {
     UnitViewSlot slot = _selection!.Value;
+    // AcceptsItem's _ => false arm prevents non-item slots from reaching this withdrawal.
     Option<EquippableItem> withdrawn = _state!.Armory.TryWithdrawItem(line.Data);
     withdrawn.IfSome(item =>
     {
@@ -289,6 +298,9 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
   private void EquipMod(ArmoryModStock line)
   {
     UnitViewSlot slot = _selection!.Value;
+    if (slot.Kind == UnitViewSlotKind.WeaponMod && WeaponModSlot(slot.Index).IsNone)
+      return;
+
     Option<EquippableMod> withdrawn = _state!.Armory.TryWithdrawMod(line.Mod);
     withdrawn.IfSome(mod =>
     {

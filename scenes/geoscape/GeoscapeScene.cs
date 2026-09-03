@@ -76,6 +76,7 @@ public sealed partial class GeoscapeScene : Control
     }
     if (instance is UnitView unitView)
     {
+      // Open arms Close first; ViewOpened fires afterward so this deliberately replaces it with return-to-roster.
       unitView.ArmClose(() => _viewManager.Open(GeoscapeView.Units)); // Back returns to the roster
       unitView.Present(_state, _selectedUnit ?? throw new InvalidOperationException(
         "UnitView opened with no selected combatant."));
