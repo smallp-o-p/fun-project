@@ -20,7 +20,8 @@ public class UnitRosterTest
     var rankIcon = new TextureRect { Name = "RankIcon" };
     var rank = new RichTextLabel { Name = "RankName" };
     var status = new RichTextLabel { Name = "Status" };
-    foreach (Node node in new Node[] { unitIcon, name, rankIcon, rank, status })
+    var clickTarget = new Button { Name = "ClickTarget", Flat = true };
+    foreach (Node node in new Node[] { unitIcon, name, rankIcon, rank, status, clickTarget })
       node.UniqueNameInOwner = true;
     hbox.AddChild(unitIcon);
     hbox.AddChild(name);
@@ -28,7 +29,9 @@ public class UnitRosterTest
     hbox.AddChild(rank);
     hbox.AddChild(status);
     label.AddChild(hbox);
+    label.AddChild(clickTarget); // last child: spans the row above the content, like the authored scene
     hbox.Owner = label;
+    clickTarget.Owner = label;
     foreach (Node child in hbox.GetChildren())
       child.Owner = label;
     return label;

@@ -11,14 +11,8 @@ public partial class UnitLabel : PanelContainer
   public TextureRect? RankIcon { get; private set; }
   public event Action? Pressed;
 
-  /// <summary>Programmatic press (tests + future keyboard nav); _GuiInput routes mouse clicks here.</summary>
+  /// <summary>Programmatic press (tests + future keyboard nav); the ClickTarget button routes mouse clicks here.</summary>
   public void Press() => Pressed?.Invoke();
-
-  public override void _GuiInput(InputEvent @event)
-  {
-    if (@event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
-      Press();
-  }
 
   // Rank/status have no domain concepts yet (progression / assignment FSM are future
   // systems); the view owns the placeholder strings until those land.
@@ -40,7 +34,8 @@ public partial class UnitLabel : PanelContainer
     UnitIcon = GetNode<TextureRect>("%UnitIcon");
     RankIcon = GetNode<TextureRect>("%RankIcon");
 
-    foreach (Node node in FindChildren("*", "Control", true, false))
-      ((Control)node).MouseFilter = MouseFilterEnum.Ignore;
+    // Full-rect flat button drawn above the content (last child): any click inside the
+    // row lands here regardless of the display children's own mouse filters.
+    GetNode<Button>("%ClickTarget").Pressed += Press;
   }
 }
