@@ -31,7 +31,7 @@ public class GeoscapeMapControlTest
 
   // Stands in for the authored GeoscapeEventMarker.tscn: a RegionButton with a baked
   // circle Fill and a 56×56 extent. The GdUnit root is the test subproject, so authored
-  // scenes under scenes/ cannot be loaded — pack a proto in code (UnitRosterTest precedent).
+  // scenes under scenes/ cannot be loaded — pack a proto in code.
   private static PackedScene PackMarkerProto()
   {
     var proto = new RegionButton { Size = new Vector2(56, 56) };
