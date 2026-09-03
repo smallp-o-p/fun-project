@@ -12,44 +12,34 @@ using System;
 [RequireGodotRuntime]
 public class ArmoryTest
 {
-  private static ArmoryEntryData Entry(EquippableItemData item, int count) => new() { Item = item, Count = count };
-  private static ModStockEntryData ModEntry(EquippableMod mod, int count) => new() { Mod = mod, Count = count };
+  private static EquippableItemData MakeItem(string name, bool unlimited = false)
+    => new() { Name = name, UnlimitedStock = unlimited };
 
-  private static MultiStatMod MakeMod(string name) => new() { Name = name };
+  private static MultiStatMod MakeMod(string name, bool unlimited = false)
+    => new() { Name = name, UnlimitedStock = unlimited };
 
-  [TestCase(TestName = "Limited entry hands out exactly Count instances then runs dry")]
-  public void LimitedEntryExhausts()
+  [TestCase(TestName = "A listed scarce item seeds one instance; AddInstances grows the stack at runtime")]
+  public void ScarceEntrySeedsOneInstance()
   {
-    EquippableItemData data = new() { Name = "Pistol" };
-    var armory = new Armory([Entry(data, 2)], []);
+    EquippableItemData data = MakeItem("Pistol");
+    var armory = new Armory([data], []);
 
     Option<EquippableItem> first = armory.TryWithdrawItem(data);
     Option<EquippableItem> second = armory.TryWithdrawItem(data);
-    Option<EquippableItem> third = armory.TryWithdrawItem(data);
-
     Assert.True(first.IsSome);
-    Assert.True(second.IsSome);
-    Assert.False(third.IsSome);
+    Assert.False(second.IsSome);
+
+    armory.AddInstances(data, 2);
+    Assert.True(armory.TryWithdrawItem(data).IsSome);
+    Assert.True(armory.TryWithdrawItem(data).IsSome);
+    Assert.False(armory.TryWithdrawItem(data).IsSome);
   }
 
-  [TestCase(TestName = "Deposit returns the very instance that was withdrawn")]
-  public void DepositReturnsInstance()
-  {
-    EquippableItemData data = new() { Name = "Pistol" };
-    var armory = new Armory([Entry(data, 1)], []);
-    EquippableItem withdrawn = armory.TryWithdrawItem(data).ValueUnsafe();
-
-    armory.DepositItem(withdrawn);
-    EquippableItem again = armory.TryWithdrawItem(data).ValueUnsafe();
-
-    AssertThat(again).IsSame(withdrawn);
-  }
-
-  [TestCase(TestName = "Unlimited entry always yields fresh distinct instances and ignores deposits")]
+  [TestCase(TestName = "Unlimited entries always yield fresh distinct instances and ignore deposits")]
   public void UnlimitedEntryInstantiates()
   {
-    EquippableItemData data = new() { Name = "Grenade" };
-    var armory = new Armory([Entry(data, -1)], []);
+    EquippableItemData data = MakeItem("Grenade", unlimited: true);
+    var armory = new Armory([data], []);
 
     EquippableItem a = armory.TryWithdrawItem(data).ValueUnsafe();
     EquippableItem b = armory.TryWithdrawItem(data).ValueUnsafe();
@@ -65,10 +55,11 @@ public class ArmoryTest
     EquippableItemData data = new()
     {
       Name = "Rifle",
+      UnlimitedStock = true,
       Capabilities = [new ModSlotsCapabilityData { SlotCount = 1 }],
     };
     MultiStatMod mod = MakeMod("Scope");
-    var armory = new Armory([Entry(data, -1)], [ModEntry(mod, 1)]);
+    var armory = new Armory([data], [mod]);
     EquippableItem item = armory.TryWithdrawItem(data).ValueUnsafe();
     item.GetModSlots()[0].Equip(armory.TryWithdrawMod(mod).ValueUnsafe());
 
@@ -80,14 +71,20 @@ public class ArmoryTest
     AssertThat(fresh).IsNotSame(item);
   }
 
-  [TestCase(TestName = "Mod shelf counts down and back up")]
+  [TestCase(TestName = "Mod shelf counts down and back up, and AddModStock grows it at runtime")]
   public void ModShelfCounts()
   {
     MultiStatMod mod = MakeMod("Chip");
-    var armory = new Armory([], [ModEntry(mod, 1)]);
+    var armory = new Armory([], [mod]);
 
     AssertThat(armory.TryWithdrawMod(mod).ValueUnsafe()).IsSame(mod);
     Assert.False(armory.TryWithdrawMod(mod).IsSome);
+
+    armory.AddModStock(mod, 2);
+    Assert.True(armory.TryWithdrawMod(mod).IsSome);
+    Assert.True(armory.TryWithdrawMod(mod).IsSome);
+    Assert.False(armory.TryWithdrawMod(mod).IsSome);
+
     armory.DepositMod(mod);
     Assert.True(armory.TryWithdrawMod(mod).IsSome);
   }
@@ -95,8 +92,8 @@ public class ArmoryTest
   [TestCase(TestName = "Unlimited mods never run dry")]
   public void UnlimitedMods()
   {
-    MultiStatMod mod = MakeMod("Chip");
-    var armory = new Armory([], [ModEntry(mod, -1)]);
+    MultiStatMod mod = MakeMod("Chip", unlimited: true);
+    var armory = new Armory([], [mod]);
 
     armory.TryWithdrawMod(mod);
     armory.TryWithdrawMod(mod);
@@ -107,15 +104,15 @@ public class ArmoryTest
   [TestCase(TestName = "Stock lines report remaining counts and unlimited flags")]
   public void StockLines()
   {
-    EquippableItemData pistol = new() { Name = "Pistol" };
-    EquippableItemData grenade = new() { Name = "Grenade" };
-    MultiStatMod mod = MakeMod("Chip");
-    var armory = new Armory([Entry(pistol, 2), Entry(grenade, -1)], [ModEntry(mod, -1)]);
+    EquippableItemData pistol = MakeItem("Pistol");
+    EquippableItemData grenade = MakeItem("Grenade", unlimited: true);
+    MultiStatMod mod = MakeMod("Chip", unlimited: true);
+    var armory = new Armory([pistol, grenade], [mod]);
 
     armory.TryWithdrawItem(pistol);
 
     Assert.Equal(2, armory.ItemStock().Count);
-    Assert.Equal(1, armory.ItemStock()[0].Remaining);
+    Assert.Equal(0, armory.ItemStock()[0].Remaining);
     Assert.False(armory.ItemStock()[0].Unlimited);
     Assert.True(armory.ItemStock()[1].Unlimited);
     Assert.True(armory.ModStock()[0].Unlimited);
@@ -124,26 +121,41 @@ public class ArmoryTest
   [TestCase(TestName = "Unknown item data withdraws None and unknown deposits throw")]
   public void UnknownEntries()
   {
-    EquippableItemData unknown = new() { Name = "Unknown" };
-    EquippableItemData known = new() { Name = "Known" };
-    var armory = new Armory([Entry(known, 1)], []);
+    EquippableItemData unknown = MakeItem("Unknown");
+    EquippableItemData known = MakeItem("Known");
+    var armory = new Armory([known], []);
 
     Assert.False(armory.TryWithdrawItem(unknown).IsSome);
     Assert.Throws<InvalidOperationException>(() => armory.DepositItem(
       ItemRuntimeFactory.Create(new EquippableItemData { Name = "Also Unknown" })));
   }
 
-  [TestCase(TestName = "Authoring mistakes throw at construction")]
-  public void AuthoringValidation()
+  [TestCase(TestName = "Construction rejects null lists, null entries, and duplicates")]
+  public void ConstructionValidation()
   {
     Assert.Throws<ArgumentNullException>(() => new Armory(null!, []));
-    Assert.Throws<InvalidOperationException>(() => new Armory([new ArmoryEntryData { Item = null! }], []));
-    Assert.Throws<InvalidOperationException>(() => new Armory(
-      [Entry(new EquippableItemData { Name = "P" }, -2)], []));
-    EquippableItemData dup = new() { Name = "Dup" };
-    Assert.Throws<InvalidOperationException>(() => new Armory([Entry(dup, 1), Entry(dup, 1)], []));
-    Assert.Throws<InvalidOperationException>(() => new Armory([], [new ModStockEntryData { Mod = null! }]));
-    MultiStatMod same = MakeMod("A");
-    Assert.Throws<InvalidOperationException>(() => new Armory([], [ModEntry(same, -1), ModEntry(same, 1)]));
+    Assert.Throws<ArgumentNullException>(() => new Armory([null!], []));
+    Assert.Throws<ArgumentNullException>(() => new Armory([], [null!]));
+    EquippableItemData dupItem = MakeItem("Dup");
+    Assert.Throws<InvalidOperationException>(() => new Armory([dupItem, dupItem], []));
+    MultiStatMod dupMod = MakeMod("Dup");
+    Assert.Throws<InvalidOperationException>(() => new Armory([], [dupMod, dupMod]));
+  }
+
+  [TestCase(TestName = "Runtime stock growth validates its inputs")]
+  public void RuntimeGrowthValidation()
+  {
+    EquippableItemData scarce = MakeItem("Pistol");
+    EquippableItemData plentiful = MakeItem("Grenade", unlimited: true);
+    MultiStatMod scarceMod = MakeMod("Chip");
+    MultiStatMod plentifulMod = MakeMod("Core", unlimited: true);
+    var armory = new Armory([scarce, plentiful], [scarceMod, plentifulMod]);
+
+    Assert.Throws<ArgumentOutOfRangeException>(() => armory.AddInstances(scarce, -1));
+    Assert.Throws<InvalidOperationException>(() => armory.AddInstances(MakeItem("Unknown"), 1));
+    Assert.Throws<InvalidOperationException>(() => armory.AddInstances(plentiful, 1));
+    Assert.Throws<ArgumentOutOfRangeException>(() => armory.AddModStock(scarceMod, -1));
+    Assert.Throws<InvalidOperationException>(() => armory.AddModStock(MakeMod("Unknown"), 1));
+    Assert.Throws<InvalidOperationException>(() => armory.AddModStock(plentifulMod, 1));
   }
 }

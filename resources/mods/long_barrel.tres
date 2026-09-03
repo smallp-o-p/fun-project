@@ -16,5 +16,6 @@ Modifiers = [SubResource("mod_add10")]
 [resource]
 script = ExtResource("1_multi")
 Name = "Long Barrel Forging"
+UnlimitedStock = true
 Description = "Cold-hammered extension that lets the propellant burn longer. More muzzle energy translates to flatter trajectories and harder hits at distance."
 StatMods = [SubResource("range_statmod")]

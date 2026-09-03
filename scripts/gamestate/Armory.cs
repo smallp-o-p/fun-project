@@ -12,9 +12,12 @@ public sealed record ArmoryItemStock(EquippableItemData Data, bool Unlimited, in
 public sealed record ArmoryModStock(EquippableMod Mod, bool Unlimited, int Remaining);
 
 /// <summary>
-/// Campaign armory: the player's stock of equippable items and mods. Limited entries hold
-/// actual runtime instances (a modded weapon returned to the armory keeps its mods);
-/// unlimited entries instantiate fresh on withdraw and discard on deposit. Mods are
+/// Campaign armory: the player's stock of equippable items and mods. Stock POLICY is authored
+/// (the <c>UnlimitedStock</c> flag on the item/mod template); stock QUANTITIES are runtime-only.
+/// Campaign start seeds every listed scarce entry with one instance; <see cref="AddInstances"/>/
+/// <see cref="AddModStock"/> are the runtime doors for growing stock (manufacturing later).
+/// Scarce entries hold actual runtime instances (a modded weapon returned to the armory keeps
+/// its mods); unlimited entries instantiate fresh on withdraw and discard on deposit. Mods are
 /// immutable authored resources (no runtime wrapper), so their shelf is counts only.
 /// Authored resources are unique instances; shelves key on reference identity.
 /// </summary>
@@ -37,40 +40,61 @@ public sealed class Armory
   private readonly Dictionary<EquippableItemData, ItemShelf> _items = [];
   private readonly Dictionary<EquippableMod, ModShelf> _mods = [];
 
-  public Armory(IReadOnlyList<ArmoryEntryData> items, IReadOnlyList<ModStockEntryData> mods)
+  public Armory(IReadOnlyList<EquippableItemData> items, IReadOnlyList<EquippableMod> mods)
   {
     ArgumentNullException.ThrowIfNull(items);
     ArgumentNullException.ThrowIfNull(mods);
 
-    foreach (ArmoryEntryData entry in items)
+    foreach (EquippableItemData item in items)
     {
-      ArgumentNullException.ThrowIfNull(entry);
-      if (entry.Item is null)
-        throw new InvalidOperationException("Armory entry has no Item assigned.");
-      if (entry.Count < -1)
-        throw new InvalidOperationException(
-          $"Armory entry for '{entry.Item.Name}' has Count {entry.Count}; -1 means unlimited, otherwise a non-negative count is required.");
-
-      var shelf = new ItemShelf { Data = entry.Item, Unlimited = entry.Count == -1 };
-      if (!_items.TryAdd(entry.Item, shelf))
-        throw new InvalidOperationException($"Armory lists item '{entry.Item.Name}' more than once.");
-      for (int i = 0; i < Math.Max(0, entry.Count); i++)
-        shelf.Stack.Add(ItemRuntimeFactory.Create(entry.Item));
+      ArgumentNullException.ThrowIfNull(item);
+      var shelf = new ItemShelf { Data = item, Unlimited = item.UnlimitedStock };
+      if (!_items.TryAdd(item, shelf))
+        throw new InvalidOperationException($"Armory lists item '{item.Name}' more than once.");
+      if (!shelf.Unlimited)
+        shelf.Stack.Add(ItemRuntimeFactory.Create(item));
     }
 
-    foreach (ModStockEntryData entry in mods)
+    foreach (EquippableMod mod in mods)
     {
-      ArgumentNullException.ThrowIfNull(entry);
-      if (entry.Mod is null)
-        throw new InvalidOperationException("Mod-stock entry has no Mod assigned.");
-      if (entry.Count < -1)
-        throw new InvalidOperationException(
-          $"Mod-stock entry for '{entry.Mod.Name}' has Count {entry.Count}; -1 means unlimited, otherwise a non-negative count is required.");
-
-      var shelf = new ModShelf { Mod = entry.Mod, Unlimited = entry.Count == -1, Remaining = Math.Max(0, entry.Count) };
-      if (!_mods.TryAdd(entry.Mod, shelf))
-        throw new InvalidOperationException($"Mod stock lists '{entry.Mod.Name}' more than once.");
+      ArgumentNullException.ThrowIfNull(mod);
+      var shelf = new ModShelf { Mod = mod, Unlimited = mod.UnlimitedStock, Remaining = 1 };
+      if (!_mods.TryAdd(mod, shelf))
+        throw new InvalidOperationException($"Mod stock lists '{mod.Name}' more than once.");
     }
+  }
+
+  /// <summary>
+  /// Add <paramref name="count"/> instances of a listed scarce item — the runtime door for
+  /// stock growth (manufacturing later; tests today). Unknown or unlimited entries throw.
+  /// </summary>
+  public void AddInstances(EquippableItemData data, int count)
+  {
+    ArgumentNullException.ThrowIfNull(data);
+    ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);
+    if (!_items.TryGetValue(data, out ItemShelf? shelf))
+      throw new InvalidOperationException($"Armory has no entry for item '{data.Name}'.");
+    if (shelf.Unlimited)
+      throw new InvalidOperationException($"Armory item '{data.Name}' is unlimited; its stock is never counted.");
+
+    for (int i = 0; i < count; i++)
+      shelf.Stack.Add(ItemRuntimeFactory.Create(data));
+  }
+
+  /// <summary>
+  /// Add <paramref name="count"/> stock of a listed scarce mod — the mod-shelf mirror of
+  /// <see cref="AddInstances"/>. Unknown or unlimited entries throw.
+  /// </summary>
+  public void AddModStock(EquippableMod mod, int count)
+  {
+    ArgumentNullException.ThrowIfNull(mod);
+    ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);
+    if (!_mods.TryGetValue(mod, out ModShelf? shelf))
+      throw new InvalidOperationException($"Armory has no mod-stock entry for '{mod.Name}'.");
+    if (shelf.Unlimited)
+      throw new InvalidOperationException($"Armory mod '{mod.Name}' is unlimited; its stock is never counted.");
+
+    shelf.Remaining += count;
   }
 
   /// <summary>Take one instance of this item off the shelf, or None when the shelf is empty/unknown.</summary>
@@ -89,7 +113,7 @@ public sealed class Armory
     return item;
   }
 
-  /// <summary>Return an item to its shelf. Unlimited shelves discard it; unknown items throw.</summary>
+  /// <summary>Return an item to its shelf. Unlimited shelves discard it (re-shelving its mods first); unknown items throw.</summary>
   public void DepositItem(EquippableItem item)
   {
     ArgumentNullException.ThrowIfNull(item);

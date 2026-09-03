@@ -16,5 +16,6 @@ ArmorStat = SubResource("Resource_armorstat")
 [resource]
 script = ExtResource("1_item")
 Name = "Ballistic Vest"
+UnlimitedStock = true
 Description = "Woven plate carrier. Stops some of what is coming."
 Capabilities = Array[ExtResource("2_base")]([SubResource("Resource_armor")])

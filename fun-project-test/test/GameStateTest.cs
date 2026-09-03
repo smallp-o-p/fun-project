@@ -62,26 +62,25 @@ public class GameStateTest
     ])));
   }
 
-  [TestCase(TestName = "Armory is built from CampaignStartData entries")]
+  [TestCase(TestName = "Armory is built from CampaignStartData with flag-driven stock policy")]
   public void ArmoryBuiltFromStart()
   {
     EquippableItemData pistol = new() { Name = "Pistol" };
-    var state = new GameState(MakeStart(armory: [new ArmoryEntryData { Item = pistol, Count = 2 }],
-      modStock: [new ModStockEntryData { Mod = new MultiStatMod { Name = "Chip" }, Count = 1 }]));
+    var state = new GameState(MakeStart(armory: [pistol],
+      modStock: [new MultiStatMod { Name = "Chip" }]));
 
     Assert.Equal(1, state.Armory.ItemStock().Count);
-    Assert.Equal(2, state.Armory.ItemStock()[0].Remaining);
+    Assert.Equal(1, state.Armory.ItemStock()[0].Remaining); // scarce entries seed one instance
+    Assert.Equal(1, state.Armory.ModStock().Count);
     Assert.True(state.Armory.TryWithdrawItem(pistol).IsSome);
+    Assert.False(state.Armory.TryWithdrawItem(pistol).IsSome);
   }
 
   [TestCase(TestName = "Bad armory authoring fails GameState construction")]
   public void BadArmoryFailsConstruction()
   {
+    EquippableItemData dup = new() { Name = "Duplicate" };
     Assert.Throws<InvalidOperationException>(() =>
-      new GameState(MakeStart(armory: [new ArmoryEntryData
-      {
-        Item = new EquippableItemData { Name = "Broken" },
-        Count = -2,
-      }])));
+      new GameState(MakeStart(armory: [dup, dup])));
   }
 }

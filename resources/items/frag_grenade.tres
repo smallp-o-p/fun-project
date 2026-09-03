@@ -21,5 +21,6 @@ Effects = [SubResource("Resource_damage")]
 [resource]
 script = ExtResource("1_item")
 Name = "Frag Grenade"
+UnlimitedStock = true
 Description = "Standard fragmentation grenade. Throw it at problems."
 Capabilities = Array[ExtResource("2_base")]([SubResource("Resource_throw"), SubResource("Resource_blast")])

@@ -1,5 +1,7 @@
 using FunProject.Combatants;
 using FunProject.Core;
+using FunProject.Items;
+using FunProject.Stats;
 using FunProject.Strategic;
 using Godot;
 
@@ -18,7 +20,9 @@ public partial class CampaignStartData : NamedEntityData
 
   [Export] public RosterEntryData[] StartingRoster { get; set; } = [];
 
-  [Export] public ArmoryEntryData[] Armory { get; set; } = [];
+  // Which item/mod types the campaign starts stocked with. Stock policy (unlimited or
+  // scarce) is authored on each template's UnlimitedStock flag; quantities are runtime-only.
+  [Export] public EquippableItemData[] Armory { get; set; } = [];
 
-  [Export] public ModStockEntryData[] ModStock { get; set; } = [];
+  [Export] public EquippableMod[] ModStock { get; set; } = [];
 }

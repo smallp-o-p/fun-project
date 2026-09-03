@@ -119,8 +119,8 @@ internal static class GeoscapeTestFactory
     RegionData[]? regions = null,
     ScheduledEventData[]? timeline = null,
     RosterEntryData[]? roster = null,
-    ArmoryEntryData[]? armory = null,
-    ModStockEntryData[]? modStock = null)
+    EquippableItemData[]? armory = null,
+    EquippableMod[]? modStock = null)
   {
     return new CampaignStartData
     {
