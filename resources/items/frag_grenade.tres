@@ -1,10 +1,11 @@
-[gd_resource type="Resource" script_class="EquippableItemData" format=3]
+[gd_resource type="Resource" script_class="EquippableItemData" format=3 uid="uid://dc8mjx04acjau"]
 
-[ext_resource type="Script" path="res://scripts/items/EquippableItemData.cs" id="1_item"]
-[ext_resource type="Script" path="res://scripts/items/capabilities/ItemCapabilityData.cs" id="2_base"]
-[ext_resource type="Script" path="res://scripts/items/capabilities/ThrowableCapabilityData.cs" id="3_throw"]
-[ext_resource type="Script" path="res://scripts/items/capabilities/BlastCapabilityData.cs" id="4_blast"]
-[ext_resource type="Script" path="res://scripts/items/effects/DamageEffectData.cs" id="5_damage"]
+[ext_resource type="Script" uid="uid://blgp7vb6wghmu" path="res://scripts/items/EquippableItemData.cs" id="1_item"]
+[ext_resource type="Script" uid="uid://bhrmb8ckntsto" path="res://scripts/items/capabilities/ItemCapabilityData.cs" id="2_base"]
+[ext_resource type="Script" uid="uid://bjddbaoog3yht" path="res://scripts/items/effects/BattleEffectData.cs" id="3_m3e40"]
+[ext_resource type="Script" uid="uid://cha2v60vvt5lc" path="res://scripts/items/capabilities/ThrowableCapabilityData.cs" id="3_throw"]
+[ext_resource type="Script" uid="uid://c72syv6ko056w" path="res://scripts/items/capabilities/BlastCapabilityData.cs" id="4_blast"]
+[ext_resource type="Script" uid="uid://dag1dcqmvtcvs" path="res://scripts/items/effects/DamageEffectData.cs" id="5_damage"]
 
 [sub_resource type="Resource" id="Resource_throw"]
 script = ExtResource("3_throw")
@@ -15,12 +16,11 @@ BaseDamage = 6
 
 [sub_resource type="Resource" id="Resource_blast"]
 script = ExtResource("4_blast")
-BlastRadius = 1
-Effects = [SubResource("Resource_damage")]
+Effects = Array[ExtResource("3_m3e40")]([SubResource("Resource_damage")])
 
 [resource]
 script = ExtResource("1_item")
-Name = "Frag Grenade"
-UnlimitedStock = true
-Description = "Standard fragmentation grenade. Throw it at problems."
 Capabilities = Array[ExtResource("2_base")]([SubResource("Resource_throw"), SubResource("Resource_blast")])
+UnlimitedStock = true
+Name = "Frag Grenade"
+Description = "Standard fragmentation grenade. Throw it at problems."

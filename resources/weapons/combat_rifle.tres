@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="FirearmWeaponData" format=3]
+[gd_resource type="Resource" script_class="FirearmWeaponData" format=3 uid="uid://dyr12h4jaf6nh"]
 
 [ext_resource type="Script" uid="uid://dnk85ukx4hsk8" path="res://scripts/stats/concrete_stats/AmmunitionStat.cs" id="1_ammo"]
 [ext_resource type="Script" uid="uid://cogsdmnfr7ro4" path="res://scripts/stats/concrete_stats/CriticalChanceStat.cs" id="1_crit"]
@@ -14,6 +14,10 @@
 script = ExtResource("1_ammo")
 BaseValue = 8
 
+[sub_resource type="Resource" id="Resource_modslots"]
+script = ExtResource("2_modslots")
+SlotCount = 2
+
 [sub_resource type="Resource" id="Resource_ofjgw"]
 script = ExtResource("1_crit")
 BaseValue = 10
@@ -26,19 +30,15 @@ BaseValue = 6
 script = ExtResource("1_range")
 BaseValue = 9
 
-[sub_resource type="Resource" id="Resource_modslots"]
-script = ExtResource("2_modslots")
-SlotCount = 2
-
 [resource]
 script = ExtResource("1_fvdq8")
+Archetype = 2
 AmmunitionStat = SubResource("Resource_75boo")
 DefaultAmmoData = ExtResource("5_4vjy0")
-Archetype = 2
 Frame = ExtResource("3_frame")
 DamageStat = SubResource("Resource_32rhf")
 RangeStat = SubResource("Resource_njiaa")
 CriticalChanceStat = SubResource("Resource_ofjgw")
+Capabilities = Array[ExtResource("2_base")]([SubResource("Resource_modslots")])
 Name = "Combat Rifle"
 Description = "Service rifle. Flatter trajectory, heavier rounds, larger magazine than the pistol."
-Capabilities = Array[ExtResource("2_base")]([SubResource("Resource_modslots")])

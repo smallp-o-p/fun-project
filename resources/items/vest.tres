@@ -1,9 +1,9 @@
-[gd_resource type="Resource" script_class="EquippableItemData" format=3]
+[gd_resource type="Resource" script_class="EquippableItemData" format=3 uid="uid://b0pqdcarun4yf"]
 
-[ext_resource type="Script" path="res://scripts/items/EquippableItemData.cs" id="1_item"]
-[ext_resource type="Script" path="res://scripts/items/capabilities/ItemCapabilityData.cs" id="2_base"]
-[ext_resource type="Script" path="res://scripts/items/capabilities/ArmorCapabilityData.cs" id="3_armor"]
-[ext_resource type="Script" path="res://scripts/stats/concrete_stats/BaseArmorStat.cs" id="4_stat"]
+[ext_resource type="Script" uid="uid://blgp7vb6wghmu" path="res://scripts/items/EquippableItemData.cs" id="1_item"]
+[ext_resource type="Script" uid="uid://bhrmb8ckntsto" path="res://scripts/items/capabilities/ItemCapabilityData.cs" id="2_base"]
+[ext_resource type="Script" uid="uid://chbdks66d5oug" path="res://scripts/items/capabilities/ArmorCapabilityData.cs" id="3_armor"]
+[ext_resource type="Script" uid="uid://cg00r2gpg6pxw" path="res://scripts/stats/concrete_stats/BaseArmorStat.cs" id="4_stat"]
 
 [sub_resource type="Resource" id="Resource_armorstat"]
 script = ExtResource("4_stat")
@@ -15,7 +15,7 @@ ArmorStat = SubResource("Resource_armorstat")
 
 [resource]
 script = ExtResource("1_item")
-Name = "Ballistic Vest"
-UnlimitedStock = true
-Description = "Woven plate carrier. Stops some of what is coming."
 Capabilities = Array[ExtResource("2_base")]([SubResource("Resource_armor")])
+UnlimitedStock = true
+Name = "Ballistic Vest"
+Description = "Woven plate carrier. Stops some of what is coming."

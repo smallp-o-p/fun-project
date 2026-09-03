@@ -1,20 +1,20 @@
-[gd_resource type="Resource" script_class="MultiStatMod" load_steps=6 format=3 uid="uid://iefajrai3ts6"]
+[gd_resource type="Resource" script_class="MultiStatMod" format=3 uid="uid://iefajrai3ts6"]
 
-[ext_resource type="Script" path="res://scripts/stats/MultiStatMod.cs" id="1_multi"]
-[ext_resource type="Script" path="res://scripts/stats/concrete_mods/AmmunitionStatMod.cs" id="2_ammo"]
-[ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="3_modifier"]
+[ext_resource type="Script" uid="uid://cl5bjj507pl44" path="res://scripts/stats/StatMod.cs" id="1_07teu"]
+[ext_resource type="Script" uid="uid://cf81mkgys74u2" path="res://scripts/stats/MultiStatMod.cs" id="1_multi"]
+[ext_resource type="Script" uid="uid://bajpqekapfui4" path="res://scripts/stats/concrete_mods/AmmunitionStatMod.cs" id="2_ammo"]
+[ext_resource type="Script" uid="uid://bj231n0dm0h73" path="res://scripts/stats/StatModifier.cs" id="3_modifier"]
 
 [sub_resource type="Resource" id="ammo_add"]
 script = ExtResource("3_modifier")
-Operation = 0
 Value = 2.0
 
 [sub_resource type="Resource" id="ammo_statmod"]
 script = ExtResource("2_ammo")
-Modifiers = [SubResource("ammo_add")]
+Modifiers = Array[ExtResource("3_modifier")]([SubResource("ammo_add")])
 
 [resource]
 script = ExtResource("1_multi")
+StatMods = Array[ExtResource("1_07teu")]([SubResource("ammo_statmod")])
 Name = "Extended Magwell"
 Description = "Machined feed ramp extension. Accepts one more mag's worth of rounds and still drops clean."
-StatMods = [SubResource("ammo_statmod")]

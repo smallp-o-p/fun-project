@@ -1,21 +1,21 @@
-[gd_resource type="Resource" script_class="MultiStatMod" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="MultiStatMod" format=3 uid="uid://v2qbd3a4ixp3"]
 
-[ext_resource type="Script" path="res://scripts/stats/MultiStatMod.cs" id="1_multi"]
-[ext_resource type="Script" path="res://scripts/stats/concrete_mods/RangeStatMod.cs" id="2_range"]
-[ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="3_modifier"]
+[ext_resource type="Script" uid="uid://cl5bjj507pl44" path="res://scripts/stats/StatMod.cs" id="1_eecjx"]
+[ext_resource type="Script" uid="uid://cf81mkgys74u2" path="res://scripts/stats/MultiStatMod.cs" id="1_multi"]
+[ext_resource type="Script" uid="uid://bvmtm8s16hgp4" path="res://scripts/stats/concrete_mods/RangeStatMod.cs" id="2_range"]
+[ext_resource type="Script" uid="uid://bj231n0dm0h73" path="res://scripts/stats/StatModifier.cs" id="3_modifier"]
 
 [sub_resource type="Resource" id="mod_add10"]
 script = ExtResource("3_modifier")
-Operation = 0
 Value = 10.0
 
 [sub_resource type="Resource" id="range_statmod"]
 script = ExtResource("2_range")
-Modifiers = [SubResource("mod_add10")]
+Modifiers = Array[ExtResource("3_modifier")]([SubResource("mod_add10")])
 
 [resource]
 script = ExtResource("1_multi")
+StatMods = Array[ExtResource("1_eecjx")]([SubResource("range_statmod")])
 Name = "Long Barrel Forging"
-UnlimitedStock = true
 Description = "Cold-hammered extension that lets the propellant burn longer. More muzzle energy translates to flatter trajectories and harder hits at distance."
-StatMods = [SubResource("range_statmod")]
+UnlimitedStock = true
