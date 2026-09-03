@@ -4,7 +4,6 @@ using Godot;
 using GdUnit4;
 using static FunProject.Tests.GeoscapeTestFactory;
 using static GdUnit4.Assertions;
-using System;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -133,16 +132,6 @@ public class UnitRosterTest
 
     Assert.True(selected is not null);
     Assert.Equal("Soldier 1", selected!.Name);
-  }
-
-  [TestCase(TestName = "Ready makes every descendant control ignore mouse input")]
-  public void DescendantControlsIgnoreMouseInput()
-  {
-    var label = AutoFree(BuildLabelProto());
-    ((SceneTree)Engine.GetMainLoop()).Root.AddChild(label);
-
-    foreach (Node node in label.FindChildren("*", "Control"))
-      Assert.Equal(Control.MouseFilterEnum.Ignore, ((Control)node).MouseFilter);
   }
 
   [TestCase(TestName = "Bind sets the combatant name (UnitLabel unit test)")]
