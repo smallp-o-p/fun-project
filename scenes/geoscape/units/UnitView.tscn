@@ -1,6 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scenes/geoscape/units/UnitView.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/units/SkillProgressionView.tscn" id="2_paths"]
 
 [node name="UnitView" type="PanelContainer"]
 anchors_preset = 15
@@ -37,6 +38,12 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
 text = "Back"
+
+[node name="PathsButton" type="Button" parent="MarginContainer/VBoxContainer/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "Paths"
 
 [node name="Body" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
@@ -119,3 +126,6 @@ visible = false
 [node name="ArmoryList" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
 unique_name_in_owner = true
 layout_mode = 2
+
+[node name="SkillProgressionView" parent="." instance=ExtResource("2_paths")]
+visible = false

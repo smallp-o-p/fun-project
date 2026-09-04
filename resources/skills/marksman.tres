@@ -1,0 +1,62 @@
+[gd_resource type="Resource" script_class="SkillPathData" format=3]
+
+[ext_resource type="Script" path="res://scripts/progression/SkillPathData.cs" id="1_path"]
+[ext_resource type="Script" path="res://scripts/progression/SkillUpgradeStepData.cs" id="2_step"]
+[ext_resource type="Script" path="res://scripts/progression/UpgradeEffectData.cs" id="3_effect"]
+[ext_resource type="Script" path="res://scripts/progression/effects/StatModUpgradeEffectData.cs" id="4_stateffect"]
+[ext_resource type="Script" path="res://scripts/stats/StatMod.cs" id="5_statmod"]
+[ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="6_modifier"]
+[ext_resource type="Script" path="res://scripts/stats/concrete_mods/AimStatMod.cs" id="7_aim"]
+[ext_resource type="Script" path="res://scripts/stats/concrete_mods/VisionStatMod.cs" id="8_vision"]
+
+[sub_resource type="Resource" id="add5"]
+script = ExtResource("6_modifier")
+Value = 5.0
+
+[sub_resource type="Resource" id="add10"]
+script = ExtResource("6_modifier")
+Value = 10.0
+
+[sub_resource type="Resource" id="aim5"]
+script = ExtResource("7_aim")
+Modifiers = Array[ExtResource("6_modifier")]([SubResource("add5")])
+
+[sub_resource type="Resource" id="aim5_effect"]
+script = ExtResource("4_stateffect")
+StatMods = Array[ExtResource("5_statmod")]([SubResource("aim5")])
+
+[sub_resource type="Resource" id="vision5"]
+script = ExtResource("8_vision")
+Modifiers = Array[ExtResource("6_modifier")]([SubResource("add5")])
+
+[sub_resource type="Resource" id="vision5_effect"]
+script = ExtResource("4_stateffect")
+StatMods = Array[ExtResource("5_statmod")]([SubResource("vision5")])
+
+[sub_resource type="Resource" id="aim10"]
+script = ExtResource("7_aim")
+Modifiers = Array[ExtResource("6_modifier")]([SubResource("add10")])
+
+[sub_resource type="Resource" id="aim10_effect"]
+script = ExtResource("4_stateffect")
+StatMods = Array[ExtResource("5_statmod")]([SubResource("aim10")])
+
+[sub_resource type="Resource" id="step1"]
+script = ExtResource("2_step")
+Effects = Array[ExtResource("3_effect")]([SubResource("aim5_effect")])
+
+[sub_resource type="Resource" id="step2"]
+script = ExtResource("2_step")
+Cost = 2
+Effects = Array[ExtResource("3_effect")]([SubResource("vision5_effect")])
+
+[sub_resource type="Resource" id="step3"]
+script = ExtResource("2_step")
+Cost = 3
+Effects = Array[ExtResource("3_effect")]([SubResource("aim10_effect")])
+
+[resource]
+script = ExtResource("1_path")
+Name = "Marksman"
+Description = "Precision shooting: steadier aim and a sharper eye."
+Steps = Array[ExtResource("2_step")]([SubResource("step1"), SubResource("step2"), SubResource("step3")])

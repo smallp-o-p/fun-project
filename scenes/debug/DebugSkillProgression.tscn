@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/debug/DebugSkillProgression.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/units/SkillProgressionView.tscn" id="2_view"]
+
+[node name="DebugSkillProgression" type="Control"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="SkillProgressionView" parent="." instance=ExtResource("2_view")]

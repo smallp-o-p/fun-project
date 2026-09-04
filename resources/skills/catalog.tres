@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="SkillPathCatalogData" format=3]
+
+[ext_resource type="Script" path="res://scripts/progression/SkillPathCatalogData.cs" id="1_catalog"]
+[ext_resource type="Script" path="res://scripts/progression/SkillPathData.cs" id="2_path"]
+[ext_resource type="Resource" path="res://resources/skills/marksman.tres" id="3_marksman"]
+[ext_resource type="Resource" path="res://resources/skills/guardian.tres" id="4_guardian"]
+
+[resource]
+script = ExtResource("1_catalog")
+Paths = Array[ExtResource("2_path")]([ExtResource("3_marksman"), ExtResource("4_guardian")])

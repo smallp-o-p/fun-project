@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using FunProject.Buffs;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
+using FunProject.Progression;
 using FunProject.Stats;
 using FunProject.Weapons;
 
@@ -27,7 +28,15 @@ public class Combatant : HasStats, HasModSlots
   /// <summary>Battle-facing armor slot (capability proof); mirrors BattleUnitState.EquippedArmor.</summary>
   public Option<ItemWith<ArmorCapability>> EquippedArmor { get; private set; }
 
-  public IReadOnlyList<BuffData> InnateBuffs { get; }
+  private readonly List<BuffData> _innateBuffs;
+
+  /// <summary>Buffs innate to this soldier: authored at birth plus trained skill-path
+  /// grants, live-computed so an unlock lands on the next battle automatically. Identical
+  /// buffs stack — overlaps between sources are deliberate, not deduped.</summary>
+  public IReadOnlyList<BuffData> InnateBuffs
+    => _innateBuffs.AsValueEnumerable().Concat(Progression.GrantedBuffs()).ToArray();
+
+  public UnitProgression Progression { get; } = new();
 
   public Combatant(CombatantData data, Faction faction, Option<string> name = default)
   {
@@ -45,7 +54,7 @@ public class Combatant : HasStats, HasModSlots
       [typeof(VisionStat)] = data.VisionStat,
       [typeof(AimStat)] = data.AimStat,
     });
-    InnateBuffs = [.. data.InnateBuffs];
+    _innateBuffs = [.. data.InnateBuffs];
 
     for (int i = 0; i < data.ModSlotCount; i++)
     {
@@ -61,7 +70,7 @@ public class Combatant : HasStats, HasModSlots
   public Godot.Collections.Array<ModSlot> GetModSlots() => _modSlots;
 
   public IEnumerable<StatMod> StatContributions()
-    => this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).Concat(OwningFaction.StatBonuses).ToArray();
+    => this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).Concat(OwningFaction.StatBonuses).Concat(Progression.StatMods()).ToArray();
 
   public void EquipItem(EquippableItem item, int slot)
   {

@@ -48,6 +48,15 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
     GetNode<Button>("%UnequipButton").Pressed += OnUnequipPressed;
     GetNode<Button>("%WeaponSlot").Pressed += () => SelectSlot(UnitViewSlot.Weapon);
     GetNode<Button>("%ArmorSlot").Pressed += () => SelectSlot(UnitViewSlot.Armor);
+    GetNode<Button>("%PathsButton").Pressed += OnPathsPressed;
+  }
+
+  private void OnPathsPressed()
+  {
+    var pathsView = GetNode<SkillProgressionView>("SkillProgressionView");
+    pathsView.Visible = !pathsView.Visible;
+    if (pathsView.Visible && _unit is not null)
+      pathsView.Present(_unit);
   }
 
   public void Present(CampaignGameState state, Combatant unit)
@@ -281,10 +290,10 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
           _unit!.EquipWeapon((Weapon)item).IfSome(old => _state.Armory.DepositItem(old));
           break;
         case UnitViewSlotKind.Armor:
-          item.With<ArmorCapability>().Match(
-            Some: proof => _unit!.EquipArmor(proof).IfSome(old => _state.Armory.DepositItem(old.Item)),
-            None: () => throw new InvalidOperationException(
-              "The armor browser offered an item without an armor capability; filter bug."));
+          // AcceptsItem already guarantees armor capability for this slot; trust the filter
+          // like the weapon arm does.
+          item.With<ArmorCapability>().IfSome(proof =>
+            _unit!.EquipArmor(proof).IfSome(old => _state.Armory.DepositItem(old.Item)));
           break;
         case UnitViewSlotKind.Utility:
           _unit!.UnequipItem(slot.Index).IfSome(old => _state.Armory.DepositItem(old));

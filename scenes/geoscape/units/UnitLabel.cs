@@ -11,7 +11,7 @@ public partial class UnitLabel : PanelContainer
   public TextureRect? RankIcon { get; private set; }
   public event Action? Pressed;
 
-  /// <summary>Programmatic press (tests + future keyboard nav); the ClickTarget button routes mouse clicks here.</summary>
+  /// <summary>Programmatic press (future keyboard nav); the ClickTarget button routes mouse clicks here.</summary>
   public void Press() => Pressed?.Invoke();
 
   // Rank/status have no domain concepts yet (progression / assignment FSM are future

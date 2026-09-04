@@ -13,8 +13,8 @@ public partial class BuffUnitStateTest
       new HealthBelowPercentConditionData { Percent = 50f },
       statMods: [new AimStatMod { Modifiers = [StatModifier.Add(10)] }]);
 
-  [TestCase(TestName = "Unit aggregates innate and equipped-item buffs, deduped by resource identity")]
-  public void AggregatesAndDedupes()
+  [TestCase(TestName = "Unit aggregates innate and equipped-item buffs; identical buffs stack")]
+  public void AggregatesAndStacks()
   {
     var faction = MakeFaction("Player");
     var session = MakeSession(new Vector3I(8, 1, 8), [faction]);
@@ -27,8 +27,8 @@ public partial class BuffUnitStateTest
       new Vector3I(4, 0, 4),
       MakeWeapon("Charm Blade", grantedBuffs: [shared]));
 
-    Assert.Equal(2, unit.State.Buffs.Count);
-    Assert.Equal(1, unit.State.Buffs.AsValueEnumerable().Count(buff => buff.Data == shared));
+    Assert.Equal(3, unit.State.Buffs.Count);
+    Assert.Equal(2, unit.State.Buffs.AsValueEnumerable().Count(buff => buff.Data == shared));
   }
 
   [TestCase(TestName = "Active buff StatMods flow into EffectiveStat; inactive contribute nothing")]

@@ -1,0 +1,74 @@
+[gd_resource type="Resource" script_class="SkillPathData" format=3]
+
+[ext_resource type="Script" path="res://scripts/progression/SkillPathData.cs" id="1_path"]
+[ext_resource type="Script" path="res://scripts/progression/SkillUpgradeStepData.cs" id="2_step"]
+[ext_resource type="Script" path="res://scripts/progression/UpgradeEffectData.cs" id="3_effect"]
+[ext_resource type="Script" path="res://scripts/progression/effects/StatModUpgradeEffectData.cs" id="4_stateffect"]
+[ext_resource type="Script" path="res://scripts/progression/effects/BuffGrantUpgradeEffectData.cs" id="5_buffeffect"]
+[ext_resource type="Script" path="res://scripts/progression/effects/AbilityGrantUpgradeEffectData.cs" id="6_abilityeffect"]
+[ext_resource type="Script" path="res://scripts/progression/AbilityData.cs" id="7_ability"]
+[ext_resource type="Script" path="res://scripts/stats/StatMod.cs" id="8_statmod"]
+[ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="9_modifier"]
+[ext_resource type="Script" path="res://scripts/stats/concrete_mods/HealthStatMod.cs" id="10_health"]
+[ext_resource type="Script" path="res://scripts/buffs/BuffData.cs" id="11_buff"]
+[ext_resource type="Script" path="res://scripts/buffs/HealthBelowPercentConditionData.cs" id="12_condition"]
+
+[sub_resource type="Resource" id="add10"]
+script = ExtResource("9_modifier")
+Value = 10.0
+
+[sub_resource type="Resource" id="health10"]
+script = ExtResource("10_health")
+Modifiers = Array[ExtResource("9_modifier")]([SubResource("add10")])
+
+[sub_resource type="Resource" id="health10_effect"]
+script = ExtResource("4_stateffect")
+StatMods = Array[ExtResource("8_statmod")]([SubResource("health10")])
+
+[sub_resource type="Resource" id="iron_skin_condition"]
+script = ExtResource("12_condition")
+Percent = 99.0
+
+[sub_resource type="Resource" id="iron_skin_mod"]
+script = ExtResource("10_health")
+Modifiers = Array[ExtResource("9_modifier")]([SubResource("add10")])
+
+[sub_resource type="Resource" id="iron_skin"]
+script = ExtResource("11_buff")
+Condition = SubResource("iron_skin_condition")
+StatMods = Array[ExtResource("8_statmod")]([SubResource("iron_skin_mod")])
+Name = "Iron Skin"
+Description = "Below 99% health: +10 max health."
+
+[sub_resource type="Resource" id="iron_skin_effect"]
+script = ExtResource("5_buffeffect")
+Buffs = Array[ExtResource("11_buff")]([SubResource("iron_skin")])
+
+[sub_resource type="Resource" id="bulwark"]
+script = ExtResource("7_ability")
+Name = "Bulwark"
+Description = "Stub battle ability; inert until the ability system consumes it."
+
+[sub_resource type="Resource" id="bulwark_effect"]
+script = ExtResource("6_abilityeffect")
+Ability = SubResource("bulwark")
+
+[sub_resource type="Resource" id="step1"]
+script = ExtResource("2_step")
+Effects = Array[ExtResource("3_effect")]([SubResource("health10_effect")])
+
+[sub_resource type="Resource" id="step2"]
+script = ExtResource("2_step")
+Cost = 2
+Effects = Array[ExtResource("3_effect")]([SubResource("iron_skin_effect")])
+
+[sub_resource type="Resource" id="step3"]
+script = ExtResource("2_step")
+Cost = 3
+Effects = Array[ExtResource("3_effect")]([SubResource("bulwark_effect")])
+
+[resource]
+script = ExtResource("1_path")
+Name = "Guardian"
+Description = "Survivability at any cost: tougher, then armored skin, then immovable."
+Steps = Array[ExtResource("2_step")]([SubResource("step1"), SubResource("step2"), SubResource("step3")])

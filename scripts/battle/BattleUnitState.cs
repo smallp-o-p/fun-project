@@ -66,13 +66,14 @@ public sealed class BattleUnitState
         inventory.Add(item);
     _inventory = inventory;
 
-    // Dedupe by BuffData reference identity: the same authored buff granted by several
-    // sources (innate + item) must contribute once, mirroring status-effect spec identity.
+    // Stacked, not deduped: a buff granted by several sources (innate, trained skill
+    // paths, equipment) contributes one instance per grant — identical buffs stack, and
+    // overlaps are a designer's choice. Trained grants arrive via Combatant.InnateBuffs.
     IEnumerable<BuffData> granted = combatant.InnateBuffs
       .AsValueEnumerable().Concat(equippedWeapon.Match(w => w.GrantedBuffs, () => (IReadOnlyList<BuffData>)[]))
       .Concat(equippedArmor.Match(a => a.Item.GrantedBuffs, () => (IReadOnlyList<BuffData>)[]))
       .ToArray();
-    foreach (BuffData buffData in granted.AsValueEnumerable().Distinct())
+    foreach (BuffData buffData in granted)
       _buffs.Add(new Buff(buffData));
   }
 

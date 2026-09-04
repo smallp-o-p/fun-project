@@ -106,8 +106,11 @@ public sealed class Armory
     if (shelf.Remaining == 0)
       return None;
 
+    // Construct before consuming: a malformed template throws from the factory and the
+    // scarce count must survive it.
+    EquippableItem item = ItemRuntimeFactory.Create(data);
     shelf.Remaining--;
-    return ItemRuntimeFactory.Create(data);
+    return item;
   }
 
   /// <summary>
