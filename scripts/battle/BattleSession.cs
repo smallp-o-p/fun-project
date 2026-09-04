@@ -741,6 +741,11 @@ public sealed class BattleSession
     {
       Faction = faction,
       Outcome = Outcome.Value(),
+      CombatantsPresent = (SysColGeneric.HashSet<Combatant>)
+      [
+        .. AliveUnits.AsValueEnumerable().Where(unit => unit.Side == faction).Select(unit => unit.Combatant).ToArray(),
+        .. DeadUnits.AsValueEnumerable().Where(unit => unit.Side == faction).Select(unit => unit.Combatant).ToArray(),
+      ],
       CombatantsDead = (SysColGeneric.HashSet<Combatant>)
         [.. DeadUnits.AsValueEnumerable().Where(unit => unit.Side == faction).Select(unit => unit.Combatant).ToArray()],
       CombatantsWounded = (SysColGeneric.HashSet<Combatant>)

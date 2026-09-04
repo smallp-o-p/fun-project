@@ -14,15 +14,14 @@ public partial class UnitLabel : PanelContainer
   /// <summary>Programmatic press (future keyboard nav); the ClickTarget button routes mouse clicks here.</summary>
   public void Press() => Pressed?.Invoke();
 
-  // Rank/status have no domain concepts yet (progression / assignment FSM are future
-  // systems); the view owns the placeholder strings until those land.
-  private const string RankPlaceholder = "—";
+  // Status has no domain concept yet; the view owns the placeholder. Rank comes live from
+  // the combatant's rank ladder (UnitRank).
   private const string StatusPlaceholder = "Ready";
 
   public void Bind(Combatant unit)
   {
     UnitName!.Text = unit.Name;
-    RankName!.Text = RankPlaceholder;
+    RankName!.Text = unit.Rank.RankName;
     Status!.Text = StatusPlaceholder;
   }
 

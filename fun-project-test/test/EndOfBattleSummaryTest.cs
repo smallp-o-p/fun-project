@@ -50,6 +50,9 @@ public class EndOfBattleSummaryTest
     Assert.Equal(battle.Session.TurnNumber, summary.TurnCount);
     Assert.True(summary.CombatantsDead.SetEquals([bravo.Combatant]), "Dead should hold only the fallen player combatant, not enemy dead.");
     Assert.True(summary.CombatantsWounded.SetEquals([charlie.Combatant]), "Wounded should hold only the hurt-but-alive player combatant.");
+    Assert.True(summary.CombatantsPresent.SetEquals(
+      [battle.PlayerUnit.Combatant, bravo.Combatant, charlie.Combatant]),
+      "Present should hold every faction combatant — dead, wounded, and untouched alike.");
     Assert.Equal(1, summary.DefeatedPerCombatant.Count);
     Assert.True(summary.DefeatedPerCombatant[battle.PlayerUnit.Combatant].AsValueEnumerable().SequenceEqual([battle.EnemyUnit.Combatant, bandit2.Combatant]));
   }

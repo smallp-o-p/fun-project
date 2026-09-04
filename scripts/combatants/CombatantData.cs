@@ -1,5 +1,6 @@
 using FunProject.Buffs;
 using FunProject.Core;
+using FunProject.Progression;
 using FunProject.Stats;
 using Godot;
 
@@ -16,5 +17,6 @@ public partial class CombatantData : NamedEntityData
   [Export] required public AimStat AimStat { get; set; }
   [Export] public int ModSlotCount { get; set; }
   [Export] public Godot.Collections.Array<BuffData> InnateBuffs { get; set; } = [];
+  [Export] public RankTableData? RankTable { get; set; }
   [Export] public int InventorySize { get; set; } = 5;
 }

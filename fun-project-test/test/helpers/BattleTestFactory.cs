@@ -43,6 +43,7 @@ internal static class BattleTestFactory
       VisionStat = new VisionStat { BaseValue = vision },
       AimStat = new AimStat { BaseValue = aim },
       ModSlotCount = modSlotCount,
+      RankTable = ProgressionTestFactory.Ladder,
     };
     foreach (BuffData buff in buffs ?? [])
       data.InnateBuffs.Add(buff);

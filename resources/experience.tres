@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="ExperienceTableData" format=3]
+
+[ext_resource type="Script" path="res://scripts/progression/ExperienceTableData.cs" id="1_table"]
+
+[resource]
+script = ExtResource("1_table")
+ParticipationXp = 10
+KillXp = 25

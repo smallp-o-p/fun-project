@@ -4,10 +4,11 @@ using FunProject.Combatants;
 namespace FunProject.Battle;
 
 // End-of-battle summary for one faction: outcome, per-combatant kill attribution, and the
-// faction's dead/wounded roster. Immutable snapshot built from final session state.
+// faction's present/dead/wounded roster. Immutable snapshot built from final session state.
 public sealed record FactionBattleSummary
 {
   public required Faction Faction { get; init; }
+  public required IReadOnlySet<Combatant> CombatantsPresent { get; init; }
   public required IReadOnlyDictionary<Combatant, List<Combatant>> DefeatedPerCombatant { get; init; }
   public required BattleOutcome Outcome { get; init; }
   public required IReadOnlySet<Combatant> CombatantsDead { get; init; }

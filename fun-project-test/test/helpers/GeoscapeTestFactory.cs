@@ -60,6 +60,7 @@ internal static class GeoscapeTestFactory
       VisionStat = new VisionStat { BaseValue = 22 },
       AimStat = new AimStat { BaseValue = 60 },
       ModSlotCount = 2,
+      RankTable = ProgressionTestFactory.Ladder,
     };
   }
 

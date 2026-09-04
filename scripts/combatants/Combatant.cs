@@ -30,13 +30,17 @@ public class Combatant : HasStats, HasModSlots
 
   private readonly List<BuffData> _innateBuffs;
 
-  /// <summary>Buffs innate to this soldier: authored at birth plus trained skill-path
-  /// grants, live-computed so an unlock lands on the next battle automatically. Identical
-  /// buffs stack — overlaps between sources are deliberate, not deduped.</summary>
+  /// <summary>Buffs innate to this soldier: authored at birth plus trained skill-path and
+  /// rank grants, live-computed so an unlock or promotion lands on the next battle
+  /// automatically. Identical buffs stack — overlaps between sources are deliberate, not deduped.</summary>
   public IReadOnlyList<BuffData> InnateBuffs
-    => _innateBuffs.AsValueEnumerable().Concat(Progression.GrantedBuffs()).ToArray();
+    => _innateBuffs.AsValueEnumerable().Concat(Progression.GrantedBuffs()).Concat(Rank.GrantedBuffs()).ToArray();
 
   public UnitProgression Progression { get; } = new();
+
+  /// <summary>Per-unit rank/XP state; ladder (names, factors, effects) from the combatant's
+  /// authored table or the shared default. See <see cref="AwardBattleExperience"/>.</summary>
+  public UnitRank Rank { get; }
 
   public Combatant(CombatantData data, Faction faction, Option<string> name = default)
   {
@@ -55,6 +59,7 @@ public class Combatant : HasStats, HasModSlots
       [typeof(AimStat)] = data.AimStat,
     });
     _innateBuffs = [.. data.InnateBuffs];
+    Rank = new UnitRank(data.RankTable ?? DefaultRankTable.Table);
 
     for (int i = 0; i < data.ModSlotCount; i++)
     {
@@ -70,7 +75,7 @@ public class Combatant : HasStats, HasModSlots
   public Godot.Collections.Array<ModSlot> GetModSlots() => _modSlots;
 
   public IEnumerable<StatMod> StatContributions()
-    => this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).Concat(OwningFaction.StatBonuses).Concat(Progression.StatMods()).ToArray();
+    => this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).Concat(OwningFaction.StatBonuses).Concat(Progression.StatMods()).Concat(Rank.StatMods()).ToArray();
 
   public void EquipItem(EquippableItem item, int slot)
   {

@@ -323,6 +323,7 @@ public class BattleFactoryTest
       MovementStat = new FunProject.Stats.MovementStat { BaseValue = 12 },
       VisionStat = new FunProject.Stats.VisionStat { BaseValue = 20 },
       AimStat = new FunProject.Stats.AimStat { BaseValue = 65 },
+      RankTable = FunProject.Tests.ProgressionTestFactory.Ladder,
     };
 
     var type = new BattleTypeData { Name = "Bomb Defusal" };
@@ -417,6 +418,7 @@ public class BattleFactoryTest
       MovementStat = new FunProject.Stats.MovementStat { BaseValue = 12 },
       VisionStat = new FunProject.Stats.VisionStat { BaseValue = 20 },
       AimStat = new FunProject.Stats.AimStat { BaseValue = 65 },
+      RankTable = FunProject.Tests.ProgressionTestFactory.Ladder,
     };
 
     var type = new BattleTypeData { Name = "Duel" };

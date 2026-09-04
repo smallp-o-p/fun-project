@@ -6,6 +6,22 @@ namespace FunProject.Tests;
 
 internal static class ProgressionTestFactory
 {
+  // Hermetic default for test-built combatants: DefaultRankTable loads res://resources/ranks.tres,
+  // which the test project's separate res:// root does not have — so test data carries its own
+  // ladder. Three full-factor rungs so gains accrue without immediately hitting max.
+  private static RankTableData? _ladder;
+
+  public static RankTableData Ladder => _ladder ??= BuildLadder();
+
+  private static RankTableData BuildLadder()
+  {
+    var table = new RankTableData();
+    table.Levels.Add(new RankLevelData { Name = "Rookie", GainFactorPercent = 100 });
+    table.Levels.Add(new RankLevelData { Name = "Squaddie", GainFactorPercent = 100 });
+    table.Levels.Add(new RankLevelData { Name = "Corporal", GainFactorPercent = 100 });
+    return table;
+  }
+
   public static SkillPathData MakePath(string name, params SkillUpgradeStepData[] steps)
   {
     var path = new SkillPathData { Name = name, Description = $"{name} path" };

@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="RankTableData" format=3]
+
+[ext_resource type="Script" path="res://scripts/progression/RankTableData.cs" id="1_table"]
+[ext_resource type="Script" path="res://scripts/progression/RankLevelData.cs" id="2_level"]
+[ext_resource type="Script" path="res://scripts/progression/UpgradeEffectData.cs" id="3_effect"]
+[ext_resource type="Script" path="res://scripts/progression/effects/StatModUpgradeEffectData.cs" id="4_stateffect"]
+[ext_resource type="Script" path="res://scripts/stats/StatMod.cs" id="5_statmod"]
+[ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="6_modifier"]
+[ext_resource type="Script" path="res://scripts/stats/concrete_mods/AimStatMod.cs" id="7_aim"]
+
+[sub_resource type="Resource" id="plus5"]
+script = ExtResource("6_modifier")
+Value = 5.0
+
+[sub_resource type="Resource" id="aim5"]
+script = ExtResource("7_aim")
+Modifiers = Array[ExtResource("6_modifier")]([SubResource("plus5")])
+
+[sub_resource type="Resource" id="sergeant_effects"]
+script = ExtResource("4_stateffect")
+StatMods = Array[ExtResource("5_statmod")]([SubResource("aim5")])
+
+[sub_resource type="Resource" id="rookie"]
+script = ExtResource("2_level")
+Name = "Rookie"
+GainFactorPercent = 100
+
+[sub_resource type="Resource" id="squaddie"]
+script = ExtResource("2_level")
+Name = "Squaddie"
+GainFactorPercent = 85
+
+[sub_resource type="Resource" id="corporal"]
+script = ExtResource("2_level")
+Name = "Corporal"
+GainFactorPercent = 70
+
+[sub_resource type="Resource" id="sergeant"]
+script = ExtResource("2_level")
+Name = "Sergeant"
+GainFactorPercent = 55
+Effects = Array[ExtResource("3_effect")]([SubResource("sergeant_effects")])
+
+[sub_resource type="Resource" id="captain"]
+script = ExtResource("2_level")
+Name = "Captain"
+GainFactorPercent = 40
+
+[sub_resource type="Resource" id="colonel"]
+script = ExtResource("2_level")
+Name = "Colonel"
+GainFactorPercent = 25
+
+[resource]
+script = ExtResource("1_table")
+Levels = Array[ExtResource("2_level")]([SubResource("rookie"), SubResource("squaddie"), SubResource("corporal"), SubResource("sergeant"), SubResource("captain"), SubResource("colonel")])
