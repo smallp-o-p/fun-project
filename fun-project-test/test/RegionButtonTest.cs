@@ -7,10 +7,7 @@ using System;
 [RequireGodotRuntime]
 public class RegionButtonTest
 {
-  // Builds the authored shape the editor produces: a RegionButton whose shape comes from
-  // its Polygon2D "Fill" child (with an optional offset). Tree entry stands in for scene
-  // load — _Ready derives the hit area and wires hover, exactly as authored scenes do.
-  // AutoFree handles the Root-attached nodes (GeoscapeHudTest precedent).
+  // Mirrors authored scenes; tree entry wires hover and AutoFree cleans up the nodes.
   private static RegionButton AuthoredRegion(Vector2[] polygon, Vector2 fillOffset = default, Color? color = null)
   {
     var button = AutoFree(new RegionButton());
@@ -67,6 +64,49 @@ public class RegionButtonTest
     Assert.False(button._HasPoint(new Vector2(111, 50)));
     Assert.False(button._HasPoint(new Vector2(-1, 50)));
     Assert.False(button._HasPoint(new Vector2(500, 500)));
+  }
+
+  [TestCase]
+  public void HitAreaTracksPolygonEdits()
+  {
+    var button = AuthoredRegion(Square);
+    button.GetNode<Polygon2D>("Fill").Polygon =
+    [
+      new Vector2(200, 200), new Vector2(300, 200), new Vector2(300, 300), new Vector2(200, 300),
+    ];
+
+    Assert.False(button._HasPoint(new Vector2(50, 50)));
+    Assert.True(button._HasPoint(new Vector2(250, 250)));
+  }
+
+  [TestCase]
+  public void HitAreaTracksFillTransformEdits()
+  {
+    var button = AuthoredRegion(Square);
+    var fill = button.GetNode<Polygon2D>("Fill");
+    fill.Position = new Vector2(300, 0);
+    fill.Rotation = Mathf.Pi / 2;
+    fill.Scale = new Vector2(2, 1);
+
+    // Rotated/scaled square occupies x=190..290, y=20..220.
+    Assert.True(button._HasPoint(new Vector2(240, 120)));
+    Assert.False(button._HasPoint(new Vector2(180, 120)));
+    Assert.False(button._HasPoint(new Vector2(50, 50)));
+  }
+
+  [TestCase]
+  public void MarkerAnchorTracksFillEdits()
+  {
+    var button = AuthoredRegion(Square);
+    var fill = button.GetNode<Polygon2D>("Fill");
+    fill.Polygon =
+    [
+      new Vector2(0, 0), new Vector2(20, 0), new Vector2(20, 40), new Vector2(0, 40),
+    ];
+    fill.Position = new Vector2(100, 200);
+    fill.Scale = new Vector2(2, 3);
+
+    Assert.Equal(new Vector2(120, 260), button.MarkerAnchor);
   }
 
   [TestCase(TestName = "Concave polygons exclude the notch")]

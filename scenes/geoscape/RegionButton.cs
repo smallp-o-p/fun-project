@@ -1,86 +1,68 @@
 using Godot;
 using System;
 
-// Button whose hit area is an arbitrary 2D polygon instead of its rectangle: the semantics
-// of a Button, mapped onto the shape. Overriding _HasPoint routes Godot's GUI hit-testing,
-// hover, and click delivery through the real shape, and layered siblings get standard
-// topmost-first semantics — a marker button above a region wins without manual arbitration.
-// MouseFilter.Pass lets a parent gesture layer keep seeing presses — none exists in the
-// first pass (zoom/pan were removed), kept so gestures can return without touching this
-// class. Draws nothing for any button state; visuals are authored as children (Polygon2D
-// "Fill" + Line2D outline) — regions stamp the RegionButton scene, event markers stamp the
-// GeoscapeEventMarker scene. Circle markers bake a many-sided polygon — one shape
-// representation, no circle mode.
-//
-// The authored Fill is the single shape source: entering the tree (scene load) derives the
-// hit area from its polygon and wires hover lightening against its color, so every
-// RegionButton — authored region or stamped marker — self-configures. A button without a
-// Fill child (deleted in the editor) stays unshaped; hit-testing or asking for its marker
-// anchor is then a wiring/authoring bug and fails loud. The parameterless constructor
-// exists only because Godot instantiates script classes for editor authoring and scene
-// deserialization.
+// Invisible button shaped by its authored Polygon2D "Fill" child.
+[Tool]
 [GlobalClass]
 public sealed partial class RegionButton : Button
 {
-  private Polygon2D? _fill;
-  private Color _baseFill;
-  private Vector2[] _polygon = [];
-
   public RegionButton()
   {
     Flat = true;
     MouseFilter = MouseFilterEnum.Pass;
     FocusMode = FocusModeEnum.None;
-    AddThemeStyleboxOverride("normal", new StyleBoxEmpty());
-    AddThemeStyleboxOverride("hover", new StyleBoxEmpty());
-    AddThemeStyleboxOverride("pressed", new StyleBoxEmpty());
-    AddThemeStyleboxOverride("hover_pressed", new StyleBoxEmpty());
-    AddThemeStyleboxOverride("disabled", new StyleBoxEmpty());
+    var empty = new StyleBoxEmpty();
+    string[] states = ["normal", "hover", "pressed", "hover_pressed", "disabled"];
+    foreach (var state in states)
+      AddThemeStyleboxOverride(state, empty);
   }
 
-  // Tree entry stands in for scene load: the authored children are present by now.
   public override void _Ready()
   {
-    _fill = GetNodeOrNull<Polygon2D>("Fill");
-    if (_fill is null)
-      return; // unshaped: Shape fails loud on first use
+    if (Engine.IsEditorHint() || GetNodeOrNull<Polygon2D>("Fill") is not { } fill)
+      return;
 
-    _baseFill = _fill.Color;
-    _polygon = LocalPolygon(_fill);
-    MouseEntered += () => _fill.Color = _baseFill.Lightened(0.25f);
-    MouseExited += () => _fill.Color = _baseFill;
+    var baseColor = fill.Color;
+    MouseEntered += () => fill.Color = baseColor.Lightened(0.25f);
+    MouseExited += () => fill.Color = baseColor;
   }
-
-  // Where targeted-event markers sit: an authored Marker2D "Anchor" child when present
-  // (concave shapes can contain their own vertex average), else the hit polygon centroid.
-  public Vector2 MarkerAnchor => GetNodeOrNull<Marker2D>("Anchor")?.Position ?? Centroid(Shape);
 
   public override bool _HasPoint(Vector2 point)
   {
-    return Geometry2D.IsPointInPolygon(point, Shape);
+    var fill = Fill;
+    return fill is not null && Geometry2D.IsPointInPolygon(
+      fill.Transform.AffineInverse() * point, fill.Polygon);
   }
 
-  private Vector2[] Shape => _polygon.Length > 0
-    ? _polygon
-    : throw new InvalidOperationException(
-      "RegionButton has no hit shape; it needs an authored Polygon2D Fill child (was it deleted?).");
-
-  // The Fill's polygon in this button's local space: its own transform applied to each
-  // point (position, but also any authored rotation/scale).
-  private static Vector2[] LocalPolygon(Polygon2D fill)
+  // An explicit Anchor supports concave regions; otherwise use the vertex average.
+  public Vector2 MarkerAnchor
   {
-    var points = new Vector2[fill.Polygon.Length];
-    for (int i = 0; i < points.Length; i++)
-      points[i] = fill.Transform * fill.Polygon[i];
-    return points;
+    get
+    {
+      if (GetNodeOrNull<Marker2D>("Anchor") is { } anchor)
+        return anchor.Position;
+      if (Fill is not { } fill)
+        return Vector2.Zero;
+
+      var points = fill.Polygon;
+      var sum = Vector2.Zero;
+      foreach (var point in points)
+        sum += point;
+      return fill.Transform * (sum / points.Length);
+    }
   }
 
-  private static Vector2 Centroid(Vector2[] points)
+  private Polygon2D? Fill
   {
-    var sum = Vector2.Zero;
-    foreach (Vector2 point in points)
-      sum += point;
+    get
+    {
+      var fill = GetNodeOrNull<Polygon2D>("Fill");
+      if (fill is not null && fill.Polygon.Length > 0)
+        return fill;
+      if (Engine.IsEditorHint())
+        return null;
 
-    return sum / points.Length;
+      throw new InvalidOperationException("RegionButton needs a Polygon2D Fill child with a nonempty polygon.");
+    }
   }
 }
