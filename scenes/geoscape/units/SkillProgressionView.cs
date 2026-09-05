@@ -124,7 +124,7 @@ public sealed partial class SkillProgressionView : PanelContainer
             parts.Add($"{PrettyStatName(mod.TargetType)}{ModifierText(mod)}");
           break;
         case BuffGrantUpgradeEffectData buffEffect:
-          foreach (FunProject.Buffs.BuffData buff in buffEffect.Buffs)
+          foreach (FunProject.Buffs.Buff buff in buffEffect.Buffs)
             parts.Add($"Buffs: {buff.Name}");
           break;
         case AbilityGrantUpgradeEffectData abilityEffect:

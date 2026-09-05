@@ -39,7 +39,7 @@ public partial class BuffDamageTest
   {
     var damageBuff = MakeBuff(
       "Rampage",
-      new HealthBelowPercentConditionData { Percent = 50f },
+      new HealthBelowPercentCondition { Percent = 50f },
       damageMods: [AddThreeToAllPackets()]);
     var battle = new BattleDuelBuilder
     {

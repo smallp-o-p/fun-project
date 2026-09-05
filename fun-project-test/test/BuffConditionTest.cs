@@ -2,39 +2,31 @@ using FunProject.Battle;
 using FunProject.Buffs;
 using GdUnit4;
 using Godot;
-using System;
 
-// A condition data type deliberately unknown to BuffCondition.Create.
-public partial class UnmappedBuffConditionData : BuffConditionData
+public partial class AlwaysMetBuffCondition : FunProject.Buffs.BuffCondition
 {
+  internal override bool IsMet(BattleSession session, BattleUnitState unit) => true;
 }
 
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BuffConditionTest
 {
-  [TestCase(TestName = "HealthBelowPercent is false at and above the threshold, true strictly below")]
+  [TestCase(TestName = "Health predicate is false at the threshold and true strictly below")]
   public void HealthBelowPercentThreshold()
   {
     var battle = StartSoloBattle(new Vector3I(8, 1, 8), new Vector3I(4, 0, 4), health: 20);
-    var buff = new Buff(MakeBuff("Frenzy", new HealthBelowPercentConditionData { Percent = 50f }));
+    var condition = new FunProject.Buffs.HealthBelowPercentCondition { Percent = 50f };
 
-    Assert.False(buff.Evaluate(battle.Session, battle.Unit.State));
-    Assert.False(buff.IsActive);
-
-    ApplyDamage(battle.Session, battle.Unit.State, 10); // 10/20 = exactly 50%: not strictly below
-    Assert.False(buff.Evaluate(battle.Session, battle.Unit.State));
-
-    ApplyDamage(battle.Session, battle.Unit.State, 1); // 9/20: below
-    Assert.True(buff.Evaluate(battle.Session, battle.Unit.State));
-    Assert.True(buff.IsActive);
-
-    // Condition still met: no flip on re-evaluation.
-    Assert.False(buff.Evaluate(battle.Session, battle.Unit.State));
-    Assert.True(buff.IsActive);
+    Assert.False(condition.IsMet(battle.Session, battle.Unit.State));
+    ApplyDamage(battle.Session, battle.Unit.State, 10);
+    Assert.False(condition.IsMet(battle.Session, battle.Unit.State));
+    ApplyDamage(battle.Session, battle.Unit.State, 1);
+    Assert.True(condition.IsMet(battle.Session, battle.Unit.State));
+    Assert.True(condition.IsMet(battle.Session, battle.Unit.State));
   }
 
-  [TestCase(TestName = "AdjacentEnemy is true only when a living enemy is orthogonally adjacent")]
+  [TestCase(TestName = "Adjacent-enemy predicate reads the supplied battle")]
   public void AdjacentEnemyRequiresAdjacency()
   {
     var adjacent = new BattleDuelBuilder
@@ -42,49 +34,25 @@ public partial class BuffConditionTest
       Player = new DuelSide("Alpha", Position: new Vector3I(4, 0, 3)),
       Enemy = new DuelSide("Hostile", Position: new Vector3I(4, 0, 4)),
     }.Start();
-    var buff = new Buff(MakeBuff("Riposte", new AdjacentEnemyConditionData()));
-    Assert.True(buff.Evaluate(adjacent.Session, adjacent.PlayerUnit.State));
-
     var apart = new BattleDuelBuilder
     {
       Player = new DuelSide("Alpha", Position: new Vector3I(4, 0, 1)),
       Enemy = new DuelSide("Hostile", Position: new Vector3I(4, 0, 4)),
     }.Start();
-    var farBuff = new Buff(MakeBuff("Riposte", new AdjacentEnemyConditionData()));
-    Assert.False(farBuff.Evaluate(apart.Session, apart.PlayerUnit.State));
+    var condition = new FunProject.Buffs.AdjacentEnemyCondition();
+
+    Assert.True(condition.IsMet(adjacent.Session, adjacent.PlayerUnit.State));
+    Assert.False(condition.IsMet(apart.Session, apart.PlayerUnit.State));
   }
 
-  [TestCase(TestName = "Create throws on an unmapped condition data type")]
-  public void CreateThrowsOnUnmappedData()
+  [TestCase(TestName = "A condition subclass activates a buff without factory registration")]
+  public void ConditionSubclassNeedsNoRegistration()
   {
-    bool thrown = false;
-    try
-    {
-      BuffCondition.Create(new UnmappedBuffConditionData());
-    }
-    catch (ArgumentException)
-    {
-      thrown = true;
-    }
+    var faction = MakeFaction("Player");
+    var session = MakeSession(new Vector3I(8, 1, 8), [faction]);
+    var buff = MakeBuff("Custom", new AlwaysMetBuffCondition());
+    var unit = SpawnUnit(session, MakeCombatant("Alpha", faction, buffs: [buff]), new Vector3I(4, 0, 4));
 
-    Assert.True(thrown);
-  }
-
-  [TestCase(TestName = "Buff construction throws when the data has no condition")]
-  public void BuffRequiresCondition()
-  {
-    bool thrown = false;
-    try
-    {
-      // Condition is `required` (compile-time), but authored .tres files can still carry
-      // null past Godot deserialization — the runtime guard is what this test covers.
-      _ = new Buff(new BuffData { Name = "Broken", Condition = null });
-    }
-    catch (InvalidOperationException)
-    {
-      thrown = true;
-    }
-
-    Assert.True(thrown);
+    Assert.Equal(1, unit.State.ActiveBuffs.AsValueEnumerable().Count());
   }
 }

@@ -16,7 +16,7 @@ public partial class CombatantData : NamedEntityData
   [Export] required public VisionStat VisionStat { get; set; } = new VisionStat { BaseValue = 20 };
   [Export] required public AimStat AimStat { get; set; }
   [Export] public int ModSlotCount { get; set; }
-  [Export] public Godot.Collections.Array<BuffData> InnateBuffs { get; set; } = [];
+  [Export] public Godot.Collections.Array<Buff> InnateBuffs { get; set; } = [];
   [Export] public RankTableData? RankTable { get; set; }
   [Export] public int InventorySize { get; set; } = 5;
 }

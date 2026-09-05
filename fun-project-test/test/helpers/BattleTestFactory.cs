@@ -31,7 +31,7 @@ internal static class BattleTestFactory
     int vision = 20,
     int aim = 65,
     int modSlotCount = 0,
-    IEnumerable<BuffData> buffs = null)
+    IEnumerable<Buff> buffs = null)
   {
     var data = new CombatantData
     {
@@ -45,7 +45,7 @@ internal static class BattleTestFactory
       ModSlotCount = modSlotCount,
       RankTable = ProgressionTestFactory.Ladder,
     };
-    foreach (BuffData buff in buffs ?? [])
+    foreach (Buff buff in buffs ?? [])
       data.InnateBuffs.Add(buff);
 
     return new Combatant(data, faction);
@@ -119,7 +119,7 @@ internal static class BattleTestFactory
     return frame;
   }
 
-  public static Weapon MakeWeapon(string name, int damage = 5, int range = 10, WeaponFrameData frame = null, params BuffData[] grantedBuffs)
+  public static Weapon MakeWeapon(string name, int damage = 5, int range = 10, WeaponFrameData frame = null, params Buff[] grantedBuffs)
   {
     var data = new WeaponData
     {
@@ -133,7 +133,7 @@ internal static class BattleTestFactory
     if (grantedBuffs.Length > 0)
     {
       var grant = new BuffGrantCapabilityData();
-      foreach (BuffData buff in grantedBuffs)
+      foreach (Buff buff in grantedBuffs)
         grant.Buffs.Add(buff);
       data.Capabilities = [grant];
     }
@@ -186,13 +186,13 @@ internal static class BattleTestFactory
       RequiresHealthDamage = requiresHealthDamage,
     };
 
-  public static BuffData MakeBuff(
+  public static Buff MakeBuff(
     string name,
-    BuffConditionData condition,
+    BuffCondition condition,
     StatMod[] statMods = null,
     DamageBundleMod[] damageMods = null)
   {
-    var buff = new BuffData
+    var buff = new Buff
     {
       Name = name,
       Description = $"{name} buff",

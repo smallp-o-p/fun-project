@@ -18,7 +18,7 @@ public sealed class BattleUnitState
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _spottedUnits = [];
   private readonly Dictionary<StatusEffectSpecData, ActiveStatusEffect> _activeStatusEffects = [];
-  private readonly List<Buff> _buffs = [];
+  private readonly List<(Buff Buff, bool IsActive)> _buffs = [];
 
   internal int Id { get; }
   public Combatant Combatant { get; }
@@ -38,10 +38,15 @@ public sealed class BattleUnitState
   public bool IsDead => !IsAlive;
   public IReadOnlyCollection<ActiveStatusEffect> ActiveStatusEffects => _activeStatusEffects.Values;
   public bool IsImmobilized => _activeStatusEffects.Values.AsValueEnumerable().Any(effect => !effect.IsExpired && effect.BlocksAction);
-  public IReadOnlyList<Buff> Buffs => _buffs;
-  public IEnumerable<Buff> ActiveBuffs => _buffs.AsValueEnumerable().Where(buff => buff.IsActive).ToArray();
+  public IReadOnlyList<Buff> Buffs
+    => _buffs.AsValueEnumerable().Select(entry => entry.Buff).ToArray();
+
+  public IEnumerable<Buff> ActiveBuffs
+    => _buffs.AsValueEnumerable().Where(entry => entry.IsActive)
+      .Select(entry => entry.Buff).ToArray();
+
   internal IEnumerable<DamageBundleMod> ActiveBuffDamageMods
-    => ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.Data.DamageMods).ToArray();
+    => ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.DamageMods).ToArray();
 
   internal BattleUnitState(
     int unitId,
@@ -66,15 +71,19 @@ public sealed class BattleUnitState
         inventory.Add(item);
     _inventory = inventory;
 
-    // Stacked, not deduped: a buff granted by several sources (innate, trained skill
-    // paths, equipment) contributes one instance per grant — identical buffs stack, and
-    // overlaps are a designer's choice. Trained grants arrive via Combatant.InnateBuffs.
-    IEnumerable<BuffData> granted = combatant.InnateBuffs
-      .AsValueEnumerable().Concat(equippedWeapon.Match(w => w.GrantedBuffs, () => (IReadOnlyList<BuffData>)[]))
-      .Concat(equippedArmor.Match(a => a.Item.GrantedBuffs, () => (IReadOnlyList<BuffData>)[]))
+    // Preserve every grant in source order, including repeated resources.
+    IEnumerable<Buff> granted = combatant.InnateBuffs
+      .AsValueEnumerable().Concat(equippedWeapon.Match(w => w.GrantedBuffs, () => (IReadOnlyList<Buff>)[]))
+      .Concat(equippedArmor.Match(a => a.Item.GrantedBuffs, () => (IReadOnlyList<Buff>)[]))
       .ToArray();
-    foreach (BuffData buffData in granted)
-      _buffs.Add(new Buff(buffData));
+    foreach (Buff buff in granted)
+    {
+      ArgumentNullException.ThrowIfNull(buff);
+      if (buff.Condition is null)
+        throw new InvalidOperationException($"Buff '{buff.Name}' has no activation condition.");
+
+      _buffs.Add((buff, false));
+    }
   }
 
   public void RefreshForNewTurn()
@@ -194,7 +203,7 @@ public sealed class BattleUnitState
     => Combatant.StatContributions()
          .AsValueEnumerable()
          .Concat(EquippedWeapon.Match<IEnumerable<StatMod>>(w => w.StatContributions, () => System.Array.Empty<StatMod>()))
-         .Concat(ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.Data.StatMods).ToArray())
+         .Concat(ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.StatMods).ToArray())
          .ToArray();
 
   internal void ClampCurrentHealthToMax()
@@ -202,5 +211,22 @@ public sealed class BattleUnitState
     // Floor at 1: buffs adjust stats, they never kill. A buff pushing MaxHealth to 0 or
     // below must not bypass the death pipeline (HandleUnitDeath) by zeroing health here.
     CurrentHealth = Math.Min(CurrentHealth, Math.Max(MaxHealth, 1));
+  }
+
+  internal void EvaluateBuffs(BattleSession session)
+  {
+    for (int i = 0; i < _buffs.Count; i++)
+    {
+      (Buff buff, bool wasActive) = _buffs[i];
+      bool isActive = buff.Condition.IsMet(session, this);
+      if (isActive == wasActive)
+        continue;
+
+      _buffs[i] = (buff, isActive);
+      ClampCurrentHealthToMax();
+      session.RaiseEvents(isActive
+        ? new UnitBuffActivatedBattleEvent(this, buff)
+        : new UnitBuffDeactivatedBattleEvent(this, buff));
+    }
   }
 }

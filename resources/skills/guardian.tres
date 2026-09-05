@@ -10,8 +10,8 @@
 [ext_resource type="Script" path="res://scripts/stats/StatMod.cs" id="8_statmod"]
 [ext_resource type="Script" path="res://scripts/stats/StatModifier.cs" id="9_modifier"]
 [ext_resource type="Script" path="res://scripts/stats/concrete_mods/HealthStatMod.cs" id="10_health"]
-[ext_resource type="Script" path="res://scripts/buffs/BuffData.cs" id="11_buff"]
-[ext_resource type="Script" path="res://scripts/buffs/HealthBelowPercentConditionData.cs" id="12_condition"]
+[ext_resource type="Script" path="res://scripts/buffs/Buff.cs" id="11_buff"]
+[ext_resource type="Script" path="res://scripts/buffs/HealthBelowPercentCondition.cs" id="12_condition"]
 
 [sub_resource type="Resource" id="add10"]
 script = ExtResource("9_modifier")

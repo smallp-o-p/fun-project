@@ -8,10 +8,10 @@ using Godot;
 [RequireGodotRuntime]
 public partial class BuffBattleTest
 {
-  private static BuffData HealthBelowAimBuff() =>
+  private static Buff HealthBelowAimBuff() =>
     MakeBuff(
       "Frenzy",
-      new HealthBelowPercentConditionData { Percent = 50f },
+      new HealthBelowPercentCondition { Percent = 50f },
       statMods: [new AimStatMod { Modifiers = [StatModifier.Add(10)] }]);
 
   [TestCase(TestName = "A buff whose condition already holds activates at spawn, after UnitAdded")]
@@ -22,7 +22,7 @@ public partial class BuffBattleTest
     var recorder = new BattleEventRecorder(session);
     var alwaysOn = MakeBuff(
       "Steady",
-      new HealthBelowPercentConditionData { Percent = 200f }, // current < 2*max: always true
+      new HealthBelowPercentCondition { Percent = 200f }, // current < 2*max: always true
       statMods: [new AimStatMod { Modifiers = [StatModifier.Add(5)] }]);
 
     var unit = SpawnUnit(
@@ -30,7 +30,7 @@ public partial class BuffBattleTest
       MakeCombatant("Alpha", faction, buffs: [alwaysOn]),
       new Vector3I(4, 0, 4));
 
-    Assert.True(unit.State.Buffs[0].IsActive);
+    Assert.Equal(1, unit.State.ActiveBuffs.AsValueEnumerable().Count());
     Assert.Equal(alwaysOn, recorder.Single<UnitBuffActivatedBattleEvent>().Buff);
     recorder.AssertCommittedBefore<UnitAddedBattleEvent, UnitBuffActivatedBattleEvent>();
   }
@@ -52,12 +52,12 @@ public partial class BuffBattleTest
         battle.EnemyUnit.AliveIn(battle.Session))));
 
     ApplyDamage(battle.Session, player, 11); // 9/20: condition now holds
-    Assert.False(player.Buffs[0].IsActive);  // poll model: nothing until a turn boundary
+    Assert.Equal(0, player.ActiveBuffs.AsValueEnumerable().Count());  // poll model: nothing until a turn boundary
     Assert.Equal(65, Preview().FinalChance); // open ground, no cover: preview = base aim
 
     EndFactionTurn(battle.Executor, battle.PlayerFaction); // enemy turn starts -> EvaluateAll
 
-    Assert.True(player.Buffs[0].IsActive); // fresh during the ENEMY turn (every-turn-start eval)
+    Assert.Equal(1, player.ActiveBuffs.AsValueEnumerable().Count()); // fresh during the ENEMY turn (every-turn-start eval)
     Assert.Equal(75f, player.EffectiveStat<AimStat>());
     Assert.Equal(75, Preview().FinalChance); // spec test 4: the preview sees the aim buff
     Assert.Equal(1, recorder.OfType<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count());
@@ -71,7 +71,7 @@ public partial class BuffBattleTest
   {
     var apBuff = MakeBuff(
       "Adrenaline",
-      new HealthBelowPercentConditionData { Percent = 50f },
+      new HealthBelowPercentCondition { Percent = 50f },
       statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
     var battle = new BattleDuelBuilder
     {
@@ -96,7 +96,7 @@ public partial class BuffBattleTest
   {
     var aura = MakeBuff(
       "Riposte",
-      new AdjacentEnemyConditionData(),
+      new AdjacentEnemyCondition(),
       statMods: [new AimStatMod { Modifiers = [StatModifier.Add(10)] }]);
     var playerFaction = MakeFaction("Player");
     var enemyFaction = MakeFaction("Enemy");
@@ -111,14 +111,14 @@ public partial class BuffBattleTest
     SpawnUnit(session, MakeCombatant("Backline", enemyFaction), new Vector3I(0, 0, 0));
     StartBattle(session);
 
-    Assert.True(player.State.Buffs[0].IsActive); // activated by the battle-start pass
+    Assert.Equal(1, player.State.ActiveBuffs.AsValueEnumerable().Count()); // activated by the battle-start pass
 
     var executor = ExecutorFor(session);
     var recorder = new BattleEventRecorder(session);
     Attack(session, executor, player.State, adjacentEnemy.State); // kills the adjacent enemy
     EndFactionTurn(executor, playerFaction);             // enemy turn start -> re-evaluate
 
-    Assert.False(player.State.Buffs[0].IsActive);
+    Assert.Equal(0, player.State.ActiveBuffs.AsValueEnumerable().Count());
     Assert.Equal(aura, recorder.Single<UnitBuffDeactivatedBattleEvent>().Buff);
   }
 
@@ -130,7 +130,7 @@ public partial class BuffBattleTest
     var session = MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
     var intimidation = MakeBuff(
       "Intimidated",
-      new AdjacentEnemyConditionData(),
+      new AdjacentEnemyCondition(),
       statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-5)] }]);
 
     SpawnUnit(session, MakeCombatant("Alpha", playerFaction), new Vector3I(4, 0, 3));

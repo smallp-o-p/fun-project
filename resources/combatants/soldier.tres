@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://xdfawnbqt73s" path="res://scripts/combatants/CombatantData.cs" id="1_data"]
 [ext_resource type="Script" uid="uid://djms6r3rwidsu" path="res://scripts/stats/concrete_stats/HealthStat.cs" id="2_health"]
 [ext_resource type="Script" uid="uid://d0nhbkwq5b2ff" path="res://scripts/stats/concrete_stats/ActionPointsStat.cs" id="3_ap"]
-[ext_resource type="Script" uid="uid://cxe071kr5xkam" path="res://scripts/buffs/BuffData.cs" id="4_w884u"]
+[ext_resource type="Script" uid="uid://cxe071kr5xkam" path="res://scripts/buffs/Buff.cs" id="4_w884u"]
 [ext_resource type="Script" uid="uid://cpiulbynpxwny" path="res://scripts/stats/concrete_stats/WillStat.cs" id="4_will"]
 [ext_resource type="Script" uid="uid://bwe2ox33jt5x6" path="res://scripts/stats/concrete_stats/MovementStat.cs" id="5_move"]
 [ext_resource type="Script" uid="uid://d61fbki8h385" path="res://scripts/stats/concrete_stats/VisionStat.cs" id="6_vision"]

@@ -15,7 +15,7 @@ public partial class UnitProgressionAggregationTest
     var progression = new UnitProgression();
     var aimMod = new AimStatMod { Modifiers = [StatModifier.Add(5)] };
     var healthMod = new HealthStatMod { Modifiers = [StatModifier.Add(10)] };
-    var burn = MakeBuff("Burn", new HealthBelowPercentConditionData { Percent = 50f });
+    var burn = MakeBuff("Burn", new HealthBelowPercentCondition { Percent = 50f });
     var scout = MakePath("Scout",
       MakeStep(1, MakeStatModEffect(aimMod)),
       MakeStep(1, MakeAbilityGrantEffect("Sprint")));

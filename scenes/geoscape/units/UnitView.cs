@@ -98,7 +98,7 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
 
     var buffs = GetNode<VBoxContainer>("%BuffsList");
     ClearChildren(buffs);
-    foreach (BuffData buff in _unit!.InnateBuffs)
+    foreach (Buff buff in _unit!.InnateBuffs)
       AddLabelRow(buffs, buff.Name);
     if (buffs.GetChildCount() == 0)
       AddLabelRow(buffs, "—");

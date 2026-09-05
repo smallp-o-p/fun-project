@@ -178,7 +178,7 @@ Resolves unit-owned stats (Aim, Health, ActionPoints, Vision, Movement, Will, et
 1. Stat contributions from the combatant's own mod slots.
 2. The owning faction's `StatBonuses` (`FactionData.FactionBonuses`, surfaced as `Faction.StatBonuses`).
 3. Stat contributions from the equipped weapon's slots (so a scope targeting `AimStat` buffs the wielder).
-4. `StatMod`s from the unit's active buffs (`BuffData.StatMods`, condition-mirrored by `BuffHooks` — `TurnStartBuffHook`/`UnitSpawnedBuffHook`).
+4. `StatMod`s from the unit's active buffs (`Buff.StatMods` — modifiers whose unit-owned activation snapshot is active, refreshed by `TurnStartBuffHook`/`UnitSpawnedBuffHook`).
 
 ```csharp
 int maxHp = Mathf.RoundToInt(unit.EffectiveStat<HealthStat>());
@@ -196,7 +196,7 @@ The following sources are all active participants in stat resolution:
 - Weapon mod slots (`MultiStatMod` resources equipped on `ModSlot`s)
 - `Ammunition.Modifiers` — per-ammo-type stat adjustments
 - `FactionData.FactionBonuses` / `Faction.StatBonuses` — faction-wide stat bonuses
-- Active buffs (`BuffData.StatMods` while the buff's condition holds — see `scripts/buffs/`)
+- Active buffs (`Buff.StatMods` whose unit-owned activation snapshot is active, refreshed by the existing hooks — see `scripts/buffs/`)
 
 `StatMod` is still single-target, but a single `MultiStatMod` can carry multiple `StatMod` entries, each targeting a different stat.
 

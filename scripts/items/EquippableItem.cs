@@ -51,8 +51,8 @@ public class EquippableItem : HasModSlots, HasNameAndDescription
         capability => capability.Slots,
         () => new Array<ModSlot>());
 
-  public IReadOnlyList<BuffData> GrantedBuffs
+  public IReadOnlyList<Buff> GrantedBuffs
     => FindCapability<BuffGrantCapability>().Match(
         capability => capability.Buffs,
-        () => (IReadOnlyList<BuffData>)[]);
+        () => (IReadOnlyList<Buff>)[]);
 }

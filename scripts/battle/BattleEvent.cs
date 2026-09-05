@@ -415,9 +415,9 @@ public sealed record UnitStatusEffectExpiredBattleEvent : BattleEvent, IUnitBatt
 public sealed record UnitBuffActivatedBattleEvent : BattleEvent, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
-  public BuffData Buff { get; }
+  public Buff Buff { get; }
 
-  public UnitBuffActivatedBattleEvent(BattleUnitState unit, BuffData buff)
+  public UnitBuffActivatedBattleEvent(BattleUnitState unit, Buff buff)
   {
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(buff);
@@ -429,9 +429,9 @@ public sealed record UnitBuffActivatedBattleEvent : BattleEvent, IUnitBattleEven
 public sealed record UnitBuffDeactivatedBattleEvent : BattleEvent, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
-  public BuffData Buff { get; }
+  public Buff Buff { get; }
 
-  public UnitBuffDeactivatedBattleEvent(BattleUnitState unit, BuffData buff)
+  public UnitBuffDeactivatedBattleEvent(BattleUnitState unit, Buff buff)
   {
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(buff);

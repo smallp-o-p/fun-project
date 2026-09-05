@@ -96,13 +96,13 @@ public sealed class UnitProgression
   }
 
   /// <summary>Buffs granted by unlocked steps, joining spawn-time buff grants.</summary>
-  public IReadOnlyList<BuffData> GrantedBuffs()
+  public IReadOnlyList<Buff> GrantedBuffs()
   {
-    List<BuffData> result = [];
+    List<Buff> result = [];
     foreach (var (_, _, step) in UnlockedSteps())
       foreach (UpgradeEffectData effect in step.Effects)
         if (effect is BuffGrantUpgradeEffectData buffEffect)
-          foreach (BuffData buff in buffEffect.Buffs)
+          foreach (Buff buff in buffEffect.Buffs)
             result.Add(buff);
     return result;
   }

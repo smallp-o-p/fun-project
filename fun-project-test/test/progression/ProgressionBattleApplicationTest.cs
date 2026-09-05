@@ -42,7 +42,7 @@ public partial class ProgressionBattleApplicationTest
   {
     var faction = MakeFaction("Player");
     var session = MakeSession(new Vector3I(8, 1, 8), [faction]);
-    var condition = new HealthBelowPercentConditionData { Percent = 50f };
+    var condition = new HealthBelowPercentCondition { Percent = 50f };
     var shared = MakeBuff("Shared", condition);
     var innateOnly = MakeBuff("Innate", condition);
     var combatant = MakeCombatant("Charlie", faction, buffs: [shared, innateOnly]);
@@ -57,8 +57,8 @@ public partial class ProgressionBattleApplicationTest
     Assert.Equal(2, combatant.InnateBuffs.AsValueEnumerable().Count(buff => buff == shared));
 
     var unit = SpawnUnit(session, combatant, new Vector3I(4, 0, 4));
-    Assert.Equal(4, unit.State.Buffs.Count); // identical buffs stack, one instance per grant
-    Assert.Equal(2, unit.State.Buffs.AsValueEnumerable().Count(buff => buff.Data == shared));
+    Assert.Equal(4, unit.State.Buffs.Count); // identical buffs stack, one entry per grant
+    Assert.Equal(2, unit.State.Buffs.AsValueEnumerable().Count(buff => buff == shared));
   }
 
   private static void CommitAndUnlock(Combatant combatant, SkillPathData path)

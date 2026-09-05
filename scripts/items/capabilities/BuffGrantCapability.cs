@@ -7,7 +7,7 @@ namespace FunProject.Items.Capabilities;
 /// <summary>Grants the carried buffs to the unit that has this item equipped.</summary>
 public sealed class BuffGrantCapability : ItemCapability
 {
-  public IReadOnlyList<BuffData> Buffs { get; }
+  public IReadOnlyList<Buff> Buffs { get; }
 
   public BuffGrantCapability(BuffGrantCapabilityData data)
   {

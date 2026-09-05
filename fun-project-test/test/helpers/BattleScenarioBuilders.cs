@@ -26,7 +26,7 @@ internal sealed record DuelSide(
   int Aim = 65,
   Weapon Weapon = null,
   Option<ItemWith<ArmorCapability>> Armor = default,
-  BuffData[] Buffs = null);
+  Buff[] Buffs = null);
 
 // A started Player-vs-Enemy battle with one unit per side and a shared reusable executor.
 internal sealed record TwoFactionBattle(

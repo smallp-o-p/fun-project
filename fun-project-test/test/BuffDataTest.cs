@@ -10,7 +10,7 @@ public partial class BuffDataTest
   [TestCase(TestName = "BuffGrantCapabilityData creates a runtime capability exposing its buffs")]
   public void BuffGrantCapabilityExposesBuffs()
   {
-    var buff = MakeBuff("Frenzy", new HealthBelowPercentConditionData { Percent = 50f });
+    var buff = MakeBuff("Frenzy", new HealthBelowPercentCondition { Percent = 50f });
     var item = new EquippableItem(new EquippableItemData
     {
       Name = "Charm",
@@ -27,7 +27,7 @@ public partial class BuffDataTest
   public void CombatantExposesInnateBuffs()
   {
     var faction = MakeFaction("Player");
-    var buff = MakeBuff("Frenzy", new HealthBelowPercentConditionData { Percent = 50f });
+    var buff = MakeBuff("Frenzy", new HealthBelowPercentCondition { Percent = 50f });
     var combatant = MakeCombatant("Alpha", faction, buffs: [buff]);
 
     Assert.Equal(1, combatant.InnateBuffs.Count);

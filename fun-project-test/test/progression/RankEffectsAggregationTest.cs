@@ -85,7 +85,7 @@ public partial class RankEffectsAggregationTest
   {
     var faction = MakeFaction("Player");
     var session = MakeSession(new Vector3I(8, 1, 8), [faction]);
-    var condition = new HealthBelowPercentConditionData { Percent = 50f };
+    var condition = new HealthBelowPercentCondition { Percent = 50f };
     var promoted = MakeBuff("Veteran", condition);
     var combatant = MakeRanked(faction, MakeTable(
       ("Rookie", 100, []),

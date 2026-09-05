@@ -72,12 +72,12 @@ public sealed class UnitRank
   }
 
   /// <summary>Buffs granted by held rungs, joining spawn-time buff grants.</summary>
-  public IReadOnlyList<BuffData> GrantedBuffs()
+  public IReadOnlyList<Buff> GrantedBuffs()
   {
-    List<BuffData> result = [];
+    List<Buff> result = [];
     foreach (UpgradeEffectData effect in HeldEffects())
       if (effect is BuffGrantUpgradeEffectData buffEffect)
-        foreach (BuffData buff in buffEffect.Buffs)
+        foreach (Buff buff in buffEffect.Buffs)
           result.Add(buff);
     return result;
   }

@@ -46,10 +46,10 @@ internal static class ProgressionTestFactory
     return effect;
   }
 
-  public static BuffGrantUpgradeEffectData MakeBuffGrantEffect(params BuffData[] buffs)
+  public static BuffGrantUpgradeEffectData MakeBuffGrantEffect(params Buff[] buffs)
   {
     var effect = new BuffGrantUpgradeEffectData();
-    foreach (BuffData buff in buffs)
+    foreach (Buff buff in buffs)
       effect.Buffs.Add(buff);
     return effect;
   }

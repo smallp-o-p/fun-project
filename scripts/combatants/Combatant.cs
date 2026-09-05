@@ -28,12 +28,12 @@ public class Combatant : HasStats, HasModSlots
   /// <summary>Battle-facing armor slot (capability proof); mirrors BattleUnitState.EquippedArmor.</summary>
   public Option<ItemWith<ArmorCapability>> EquippedArmor { get; private set; }
 
-  private readonly List<BuffData> _innateBuffs;
+  private readonly List<Buff> _innateBuffs;
 
   /// <summary>Buffs innate to this soldier: authored at birth plus trained skill-path and
   /// rank grants, live-computed so an unlock or promotion lands on the next battle
   /// automatically. Identical buffs stack — overlaps between sources are deliberate, not deduped.</summary>
-  public IReadOnlyList<BuffData> InnateBuffs
+  public IReadOnlyList<Buff> InnateBuffs
     => _innateBuffs.AsValueEnumerable().Concat(Progression.GrantedBuffs()).Concat(Rank.GrantedBuffs()).ToArray();
 
   public UnitProgression Progression { get; } = new();
