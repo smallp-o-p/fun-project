@@ -1,6 +1,9 @@
 using CampaignGameState = global::FunProject.GameState.GameState;
 using System;
 using System.Collections.Generic;
+using FunProject.Engineering;
+using FunProject.GameState;
+using FunProject.Items;
 
 namespace FunProject.Strategic;
 
@@ -53,6 +56,27 @@ public sealed class GeoscapeSession
 
   public Option<PendingResolution> PendingResolution => _state.Pending;
 
+  public Option<ManufacturingJob> ActiveManufacturing => _state.Engineering.ActiveJob;
+
+  public IReadOnlyList<ManufacturingOption> GetManufacturingOptions()
+    => _state.Engineering.GetManufacturingOptions(_state.Armory);
+
+  public Either<ManufacturingStartFailure, ManufacturingJob> StartManufacturing(EquippableItemData data)
+    => _state.Engineering.ResolveManufacturing(data, _state.Armory).Map(project =>
+    {
+      var job = new ManufacturingJob(project, Tick, CompletionTick(project.DurationDays));
+      ManufacturingStarted started = _state.Engineering.Start(job);
+      Commit(started);
+      return started.Job;
+    });
+
+  private long CompletionTick(uint durationDays)
+  {
+    long seconds = durationDays * (TimeSpan.TicksPerDay / TimeSpan.TicksPerSecond);
+    long ticks = (seconds + TickGameSeconds - 1) / TickGameSeconds;
+    return checked(Tick + ticks);
+  }
+
   public void OpenResolution(GeoscapeEvent @event)
   {
     ArgumentNullException.ThrowIfNull(@event);
@@ -102,7 +126,15 @@ public sealed class GeoscapeSession
       Commit(new TimeAdvanced(Tick, CurrentTime));
       FireDueSchedule();
       RemoveExpired();
+      _state.Engineering.CompleteIfDue(Tick).IfSome(Handle);
     }
+  }
+
+  private void Handle(ManufacturingCompleted completed)
+  {
+    var project = completed.Job.Project;
+    _state.Armory.AddItem(project.Item, project.UnlimitedStock);
+    Commit(completed);
   }
 
   private void Commit(IGeoscapeEvent geoscapeEvent)

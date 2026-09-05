@@ -1,11 +1,11 @@
+using FunProject.Engineering;
 using FunProject.Strategic;
 using Godot;
 using System;
 
-// Top bar (clock + speed buttons + Units view button) and left alert list, AUTHORED in
-// GeoscapeHud.tscn (ClockLabel, PauseButton, SpeedButton, UnitsButton, Alerts). Pure presentation: state arrives via
-// pushes (UpdateClock, RefreshAlerts, UpdateCountdowns); requests flow out as C# events
-// routed by the composition root. No session dependency.
+// Authored top bar, left alert list and right project status panel. Pure presentation:
+// state arrives via pushes; requests flow out as C# events routed by the composition root.
+// The completion notice persists until replaced by the next completion.
 public sealed partial class GeoscapeHud : CanvasLayer
 {
   private Label _clockLabel = null!;
@@ -13,6 +13,8 @@ public sealed partial class GeoscapeHud : CanvasLayer
   private Button _speedButton = null!;
   private Button _unitsButton = null!;
   private VBoxContainer _alerts = null!;
+  private Label _engineeringProgress = null!;
+  private Label _engineeringNotice = null!;
   private readonly SysColGeneric.List<(Button Button, GeoscapeEvent Event)> _alertButtons = [];
 
   private TimeSpeed _lastActiveSpeed = TimeSpeed.Normal;
@@ -28,12 +30,25 @@ public sealed partial class GeoscapeHud : CanvasLayer
     _pauseButton = GetNode<Button>("%PauseButton");
     _clockLabel = GetNode<Label>("%ClockLabel");
     _alerts = GetNode<VBoxContainer>("%Alerts");
+    _engineeringProgress = GetNode<Label>("%EngineeringProgress");
+    _engineeringNotice = GetNode<Label>("%EngineeringNotice");
 
+    GetNode<Button>("%EngineeringButton").Pressed += () => ViewRequested?.Invoke(GeoscapeView.Engineering);
     _speedButton.Pressed += UpdateSpeed;
     _unitsButton.Pressed += () => ViewRequested?.Invoke(GeoscapeView.Units);
     _pauseButton.Toggled += pressed =>
       ChangeSpeed?.Invoke(pressed ? TimeSpeed.Paused : _lastActiveSpeed);
   }
+
+  public void UpdateManufacturing(Option<ManufacturingJob> manufacturing, long tick)
+  {
+    _engineeringProgress.Text = manufacturing.Match(
+      job => $"Manufacturing: {job.Project.Item.Name} — {ProjectTimeText.Remaining(job.CompletesAtTick, tick)} remaining",
+      () => "No active manufacturing.");
+  }
+
+  public void ShowManufacturingCompleted(ManufacturingJob job)
+    => _engineeringNotice.Text = $"Manufacturing completed: {job.Project.Item.Name}";
 
   private static string Speed2Text(TimeSpeed speed)
   {

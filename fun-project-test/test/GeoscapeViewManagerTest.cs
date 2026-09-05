@@ -1,7 +1,9 @@
 using Godot;
 using GdUnit4;
 using System;
+using System.Threading.Tasks;
 using static GdUnit4.Assertions;
+using static FunProject.Tests.GeoscapeUiTestFactory;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -32,23 +34,12 @@ public partial class GeoscapeViewManagerTest
 
     public void ArmClose(Action requestClose) => _requestClose = requestClose;
 
-    private static PackedScene PackBackdrop()
-    {
-      var proto = new Node3D { Name = "BackdropProto" };
-      var scene = new PackedScene();
-      scene.Pack(proto);
-      proto.Free();
-      return scene;
-    }
+    private static PackedScene PackBackdrop() => Pack(new Node3D { Name = "BackdropProto" });
   }
 
   private static GeoscapeViewManager BuildManager(bool open)
   {
-    var proto = new FakeView();
-    var scene = new PackedScene();
-    scene.Pack(proto);
-    proto.Free();
-
+    var scene = Pack(new FakeView());
     var manager = AutoFree(new GeoscapeViewManager { UnitsView = scene });
     ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
 
@@ -66,11 +57,7 @@ public partial class GeoscapeViewManagerTest
 
   private static GeoscapeViewManager BuildUnitManager()
   {
-    var proto = new FakeView();
-    var scene = new PackedScene();
-    scene.Pack(proto);
-    proto.Free();
-
+    var scene = Pack(new FakeView());
     var manager = AutoFree(new GeoscapeViewManager { UnitsView = scene, UnitView = scene });
     ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
     return manager;
@@ -78,10 +65,7 @@ public partial class GeoscapeViewManagerTest
 
   private static GeoscapeViewManager BuildBackdropManager(bool open = true, bool supplyBackdrop = true)
   {
-    var proto = new FakeBackdropView { SupplyBackdrop = supplyBackdrop };
-    var scene = new PackedScene();
-    scene.Pack(proto);
-    proto.Free();
+    var scene = Pack(new FakeBackdropView { SupplyBackdrop = supplyBackdrop });
 
     var manager = AutoFree(new GeoscapeViewManager { UnitsView = scene });
     ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
@@ -91,14 +75,71 @@ public partial class GeoscapeViewManagerTest
     return manager;
   }
 
-  // The manager hosts permanent backdrop infrastructure below the view instance, so view
-  // assertions locate views by type instead of child index.
-  private static T OnlyChild<T>(Node parent) where T : Node
+  [TestCase]
+  public async Task VisibleBackdropTracksViewportAcrossCameraChangesAndViewSwaps()
   {
-    foreach (Node child in parent.GetChildren())
-      if (child is T typed)
-        return typed;
-    throw new Exception($"Expected one {typeof(T).Name} child under {parent.Name}, found none.");
+    var scene = CreateGeoscapeScene(MakeStart());
+    var viewport = CreateUiViewport(scene, new Vector2I(1600, 900));
+    var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
+    manager.UnitsView = Pack(new FakeBackdropView());
+    manager.Open(GeoscapeView.Units);
+    await WaitForLayout(scene);
+    var layer = OnlyChild<SubViewportContainer>(manager);
+    var backdropViewport = BackdropViewport(layer);
+    var firstBackdrop = backdropViewport.GetChild(0);
+    Assert.True(layer.Visible);
+    Assert.Equal(new Rect2(0, 0, 1600, 900), ScreenRect(layer));
+    Assert.Equal(new Vector2I(1600, 900), backdropViewport.Size);
+
+    var camera = scene.GetNode<GeoscapeCameraRig>("Camera");
+    camera.Position = new Vector2(1234, 567);
+    camera.Zoom = new Vector2(2, 2);
+    viewport.Size = new Vector2I(800, 600);
+    camera.ForceUpdateScroll();
+    await WaitForLayout(scene);
+    Assert.Equal(new Rect2(0, 0, 800, 600), ScreenRect(layer));
+    Assert.Equal(new Vector2I(800, 600), backdropViewport.Size);
+
+    manager.Open(GeoscapeView.Engineering); // a view without a backdrop declaration
+    Assert.False(layer.Visible);
+    Assert.True(firstBackdrop.GetParent() is null);
+    await WaitForLayout(scene);
+    Assert.False(GodotObject.IsInstanceValid(firstBackdrop));
+    Assert.Equal(0, backdropViewport.GetChildCount());
+    manager.Open(GeoscapeView.Units);
+    await WaitForLayout(scene);
+    Assert.True(layer.Visible);
+    Assert.Equal(1, backdropViewport.GetChildCount());
+    Assert.Equal(new Vector2I(800, 600), backdropViewport.Size);
+    var secondBackdrop = backdropViewport.GetChild(0);
+    manager.Close();
+    await WaitForLayout(scene);
+    Assert.False(layer.Visible);
+    Assert.False(GodotObject.IsInstanceValid(secondBackdrop));
+    Assert.True(scene.GetNode<GeoscapeHud>("%GeoscapeHud").Visible);
+  }
+
+  [TestCase]
+  public void OpenProjectCreatesViewAndBackReturnsToMap()
+  {
+    var manager = AddToTree(CreateProjectViewManager());
+    manager.Open(GeoscapeView.Engineering);
+    var view = OnlyChild<EngineeringView>(manager);
+    Assert.True(view.IsInsideTree());
+    Assert.Equal(GeoscapeView.Engineering, manager.Current);
+
+    view.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Equal(GeoscapeView.Map, manager.Current);
+    Assert.True(view.GetParent() is null);
+    Assert.True(view.IsQueuedForDeletion());
+  }
+
+  [TestCase]
+  public void MissingProjectSceneThrowsAuthoringException()
+  {
+    var manager = AddToTree(new GeoscapeViewManager());
+    Assert.Throws<InvalidOperationException>(() => manager.Open(GeoscapeView.Engineering));
   }
 
   private static bool Hosts<T>(Node parent) where T : Node

@@ -150,4 +150,97 @@ public class ArmoryTest
     Assert.Throws<InvalidOperationException>(() => armory.AddModStock(TestData.MakeMod("Unknown"), 1));
     Assert.Throws<InvalidOperationException>(() => armory.AddModStock(plentifulMod, 1));
   }
+
+  [TestCase(false)]
+  [TestCase(true)]
+  public void FirstDeliveryCreatesShelfUsingCapturedStockPolicy(bool unlimited)
+  {
+    var item = MakeItemData(unlimited: !unlimited);
+    var armory = new Armory([], []);
+    Assert.True(armory.TryGetItemStock(item).IsNone);
+    Assert.True(armory.TryWithdrawItem(item).IsNone);
+
+    armory.AddItem(item, unlimited);
+
+    Assert.Equal(1, armory.ItemStock().Count);
+    Assert.Equal(unlimited, armory.TryGetItemStock(item).RequireSome().Unlimited);
+    Assert.True(armory.HasAvailableItem(item));
+    Assert.True(armory.TryWithdrawItem(item).IsSome);
+    Assert.Equal(unlimited, armory.HasAvailableItem(item));
+    Assert.Equal(unlimited, armory.TryGetItemStock(item).RequireSome().Available);
+  }
+
+  [TestCase]
+  public void DeliveryAddsToExistingScarceShelf()
+  {
+    var item = MakeItemData();
+    var armory = new Armory([item], []);
+    armory.AddItem(item, false);
+    Assert.Equal(1, armory.ItemStock().Count);
+    Assert.Equal(2, armory.TryGetItemStock(item).RequireSome().Remaining);
+  }
+
+  [TestCase]
+  public void DeliveryRejectsNullAndExistingUnlimitedSupplyWithoutChangingStock()
+  {
+    var item = MakeItemData(unlimited: true);
+    var armory = new Armory([], []);
+    Assert.Throws<ArgumentNullException>(() => armory.AddItem(null!, true));
+    Assert.Equal(0, armory.ItemStock().Count);
+
+    armory.AddItem(item, true);
+    var stock = armory.TryGetItemStock(item).RequireSome();
+    Assert.Throws<InvalidOperationException>(() => armory.AddItem(item, true));
+    Assert.Equal(stock, armory.TryGetItemStock(item).RequireSome());
+    Assert.Equal(1, armory.ItemStock().Count);
+  }
+
+  [TestCase(TestName = "Unknown lookups return None")]
+  public void UnknownLookupReturnsNone()
+  {
+    var unknown = MakeItemData("Unknown");
+    var armory = new Armory([MakeItemData("Known")], []);
+
+    Assert.False(armory.TryGetItemStock(unknown).IsSome);
+    Assert.False(armory.HasAvailableItem(unknown));
+  }
+
+  [TestCase(TestName = "Depositing without a shelf throws before touching mods")]
+  public void DepositRejectsMissingShelf()
+  {
+    EquippableItemData data = new()
+    {
+      Name = "Supply",
+      UnlimitedStock = true,
+      Capabilities = [new ModSlotsCapabilityData { SlotCount = 1 }],
+    };
+    MultiStatMod mod = MakeMod("Scope");
+    var armory = new Armory([], [mod]);
+    EquippableItem item = ItemRuntimeFactory.Create(data);
+    item.GetModSlots()[0].Equip(armory.TryWithdrawMod(mod).ValueUnsafe());
+
+    Assert.Throws<InvalidOperationException>(() => armory.DepositItem(item));
+    Assert.True(item.GetModSlots()[0].HasMod); // the guard fired before any mod was pulled off
+    Assert.Equal(0, armory.ModStock()[0].Remaining); // and nothing returned to the mod shelf
+  }
+
+  [TestCase(TestName = "Counted stock growth uses checked arithmetic")]
+  public void CountedGrowthUsesCheckedArithmetic()
+  {
+    EquippableItemData item = MakeItemData("Pistol");
+    MultiStatMod mod = MakeMod("Chip");
+    var armory = new Armory([item], [mod]);
+
+    armory.TryWithdrawItem(item); // consume the seeded count; growth starts from zero
+    armory.TryWithdrawMod(mod);
+    armory.AddStock(item, int.MaxValue);
+    Assert.Throws<OverflowException>(() => armory.AddStock(item, 1));
+    Assert.Throws<OverflowException>(() => armory.AddItem(item, false));
+    Assert.Throws<OverflowException>(() => armory.DepositItem(ItemRuntimeFactory.Create(item)));
+    Assert.Equal(int.MaxValue, armory.TryGetItemStock(item).RequireSome().Remaining);
+
+    armory.AddModStock(mod, int.MaxValue);
+    Assert.Throws<OverflowException>(() => armory.AddModStock(mod, 1));
+    Assert.Throws<OverflowException>(() => armory.DepositMod(mod));
+  }
 }

@@ -1,4 +1,5 @@
 using System;
+using FunProject.Engineering;
 
 namespace FunProject.Strategic;
 
@@ -9,6 +10,10 @@ public sealed record GeoscapeEvent(
   Option<int> TargetRegionIndex,
   long OccurredTick,
   Option<long> ExpiresAtTick);
+
+public sealed record ManufacturingStarted(ManufacturingJob Job) : IGeoscapeEvent;
+
+public sealed record ManufacturingCompleted(ManufacturingJob Job) : IGeoscapeEvent;
 
 public sealed record TimeAdvanced(long Tick, DateTime CurrentTime) : IGeoscapeEvent;
 

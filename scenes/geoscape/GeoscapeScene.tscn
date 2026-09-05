@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitRoster.tscn" id="5_roster"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeEventMarker.tscn" id="6_marker"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitView.tscn" id="7_unitview"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/engineering/EngineeringView.tscn" id="9_engineering"]
 
 [node name="GeoscapeScene" type="Control" unique_id=1401687055]
 layout_mode = 3
@@ -33,7 +34,10 @@ mouse_filter = 2
 script = ExtResource("2")
 EventMarkerScene = ExtResource("6_marker")
 
-[node name="ViewManager" type="Control" parent="."]
+[node name="ViewLayer" type="CanvasLayer" parent="."]
+layer = 5
+
+[node name="ViewManager" type="Control" parent="ViewLayer"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -45,6 +49,7 @@ mouse_filter = 2
 script = ExtResource("4_viewmgr")
 UnitsView = ExtResource("5_roster")
 UnitView = ExtResource("7_unitview")
+EngineeringView = ExtResource("9_engineering")
 
 [node name="ResolutionLayer" type="CanvasLayer" parent="."]
 layer = 10

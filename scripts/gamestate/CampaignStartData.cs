@@ -25,4 +25,6 @@ public partial class CampaignStartData : NamedEntityData
   [Export] public EquippableItemData[] Armory { get; set; } = [];
 
   [Export] public EquippableMod[] ModStock { get; set; } = [];
+
+  [Export] public EquippableItemData[] ManufacturableItems { get; set; } = [];
 }

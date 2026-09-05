@@ -269,8 +269,13 @@ internal static class TestData
   }
 
   // Bare armory stock entries: no capabilities, so withdrawal materializes plain items.
-  public static EquippableItemData MakeItemData(string name, bool unlimited = false) =>
-    new() { Name = name, UnlimitedStock = unlimited };
+  public static EquippableItemData MakeItemData(string name = "Item", bool unlimited = false,
+    uint manufacturingDays = 1) => new()
+    {
+      Name = name,
+      UnlimitedStock = unlimited,
+      ManufacturingDurationDays = manufacturingDays,
+    };
 
   public static MultiStatMod MakeMod(string name, bool unlimited = false) =>
     new() { Name = name, UnlimitedStock = unlimited };
@@ -390,7 +395,8 @@ internal static class TestData
     ScheduledEventData[] timeline = null,
     RosterEntryData[] roster = null,
     EquippableItemData[] armory = null,
-    EquippableMod[] modStock = null)
+    EquippableMod[] modStock = null,
+    EquippableItemData[] manufacturableItems = null)
   {
     return new CampaignStartData
     {
@@ -400,6 +406,7 @@ internal static class TestData
       StartingRoster = roster ?? [],
       Armory = armory ?? [],
       ModStock = modStock ?? [],
+      ManufacturableItems = manufacturableItems ?? [],
     };
   }
 

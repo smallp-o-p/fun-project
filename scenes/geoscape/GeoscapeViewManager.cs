@@ -6,6 +6,7 @@ public enum GeoscapeView
   Map,
   Units,
   Unit,
+  Engineering,
 }
 
 // Views receive the ability to request their own closing (armed by the manager on open).
@@ -26,10 +27,10 @@ public interface IGeoscapeViewBackdrop
 }
 
 // Owns which main geoscape view is active and the on-demand view lifecycle (instantiate on
-// open, free on close). This node IS the overlay layer: a full-rect Control parented under
-// GeoscapeScene above the map, so views anchor to the scene's rect (not the raw viewport)
-// and genuinely overlay the geoscape while open. The layer itself passes mouse input
-// through when no view is hosted (authored mouse_filter = ignore). Dumb switching only —
+// open, free on close). This full-rect Control lives under GeoscapeScene's ViewLayer
+// CanvasLayer, so hosted views and backdrops anchor to the viewport independently of the
+// map camera's transform. It passes mouse input through when no view is hosted (authored
+// mouse_filter = ignore). Dumb switching only —
 // no session, no GameState: data presentation is wired by GeoscapeScene through ViewOpened.
 // One main view at a time; modals (the resolution dialog) live elsewhere and are unaffected.
 // It also hosts the view backdrop: one full-rect SubViewport below every view instance,
@@ -38,6 +39,7 @@ public sealed partial class GeoscapeViewManager : Control
 {
   [Export] public PackedScene? UnitsView { get; set; }
   [Export] public PackedScene? UnitView { get; set; }
+  [Export] public PackedScene? EngineeringView { get; set; }
 
   private Control? _activeView;
   private SubViewportContainer _backdropLayer = null!;
@@ -90,13 +92,15 @@ public sealed partial class GeoscapeViewManager : Control
         "GeoscapeViewManager requires UnitsView; assign a PackedScene in the inspector."),
       GeoscapeView.Unit => UnitView ?? throw new InvalidOperationException(
         "GeoscapeViewManager requires UnitView; assign a PackedScene in the inspector."),
+      GeoscapeView.Engineering => EngineeringView ?? throw new InvalidOperationException(
+        "GeoscapeViewManager requires EngineeringView; assign a PackedScene in the inspector."),
       _ => throw new ArgumentOutOfRangeException(nameof(view), view, null),
     };
 
     var instance = (Control)scene.Instantiate();
     _activeView = instance;
     Current = view;
-    AddChild(instance); // the view anchors to this layer's full-rect, i.e. the scene
+    AddChild(instance); // the view anchors to this host's viewport-sized rect
     if (instance is IGeoscapeView armable)
       armable.ArmClose(Close);
     if (instance is IGeoscapeViewBackdrop { BackdropScene: { } backdrop })

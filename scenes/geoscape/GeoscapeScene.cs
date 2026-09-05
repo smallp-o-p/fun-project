@@ -45,6 +45,7 @@ public sealed partial class GeoscapeScene : Control
     _hud.ResolutionRequested += OpenResolution;
     _map.EventClicked += adapter => OpenResolution(adapter.Event);
     _hud.UpdateClock(_session.CurrentDay, _session.CurrentTime); // the session starts paused: no TimeAdvanced yet
+    _hud.UpdateManufacturing(_session.ActiveManufacturing, _session.Tick);
 
     _resolution = GetNode<GeoscapeEventResolution>("%ResolutionDialog");
     _resolution.Resolved += _session.CompleteResolution;
@@ -81,7 +82,20 @@ public sealed partial class GeoscapeScene : Control
       unitView.Present(_state, _selectedUnit ?? throw new InvalidOperationException(
         "UnitView opened with no selected combatant."));
     }
+    if (instance is EngineeringView engineeringView)
+    {
+      PresentEngineering(engineeringView);
+      engineeringView.ManufactureRequested += data =>
+      {
+        var result = _session.StartManufacturing(data);
+        PresentEngineering(engineeringView);
+        result.IfLeft(engineeringView.ShowFailure);
+      };
+    }
   }
+
+  private void PresentEngineering(EngineeringView view) => view.Present(
+    _session.GetManufacturingOptions(), _session.ActiveManufacturing, _session.Tick);
 
   private void OnUnitSelected(Combatant unit)
   {
@@ -99,11 +113,17 @@ public sealed partial class GeoscapeScene : Control
   // and HUD never subscribe to the session themselves.
   private void HandleSessionEvent(IGeoscapeEvent geoscapeEvent)
   {
+    if (geoscapeEvent is TimeAdvanced or ManufacturingStarted or ManufacturingCompleted)
+      _hud.UpdateManufacturing(_session.ActiveManufacturing, _session.Tick);
+
     switch (geoscapeEvent)
     {
       case TimeAdvanced timeAdvanced:
         _hud.UpdateClock(_session.CurrentDay, timeAdvanced.CurrentTime);
         _hud.UpdateCountdowns(_session.Tick); // countdowns tick down, list not rebuilt
+        break;
+      case ManufacturingCompleted manufacturing:
+        _hud.ShowManufacturingCompleted(manufacturing.Job);
         break;
       case ScheduledEventFired or EventExpired:
         _map.RefreshEvents();

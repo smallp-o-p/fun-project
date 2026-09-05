@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FunProject.Combatants;
+using FunProject.Engineering;
 using FunProject.Strategic;
 
 namespace FunProject.GameState;
@@ -66,6 +67,7 @@ public sealed class GameState
         entry.DisplayName.Length > 0 ? Some(entry.DisplayName) : Option<string>.None));
     }
 
+    Engineering = new EngineeringState(start.ManufacturableItems);
     Armory = new Armory(start.Armory, start.ModStock);
   }
 
@@ -80,6 +82,8 @@ public sealed class GameState
   public Faction PlayerFaction { get; }
 
   public Armory Armory { get; }
+
+  public EngineeringState Engineering { get; }
 
   public DateTime CurrentTime => _startTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
 

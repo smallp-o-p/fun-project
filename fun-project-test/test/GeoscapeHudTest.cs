@@ -1,45 +1,50 @@
 using FunProject.Strategic;
+using static FunProject.Tests.GeoscapeUiTestFactory;
 using Godot;
 using GdUnit4;
-using static GdUnit4.Assertions;
 using System;
 
 [TestSuite]
 [RequireGodotRuntime]
 public class GeoscapeHudTest
 {
-  // The GdUnit runner's Godot instance runs with the fun-project-test subproject as its
-  // res:// root, so the main project's GeoscapeHud.tscn cannot be loaded from here. The test
-  // rebuilds the authored node tree (ClockLabel, PauseButton, SpeedButton, UnitsButton, Alerts) in code
-  // with unique names and lets _Ready wire it — pinning the HUD's push logic. The scene
-  // file's own wiring is exercised by running the game.
-  private static GeoscapeHud BuildHud()
+  private static GeoscapeHud BuildHud() => AddToTree(CreateHud());
+
+  [TestCase]
+  public void ManufacturingCountdownRendersFromPushedTick()
   {
-    var hud = AutoFree(new GeoscapeHud());
+    var item = MakeItemData("Field kit", manufacturingDays: 2);
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
+    var session = campaign.Session;
+    Assert.True(session.StartManufacturing(item).IsRight);
+    var hud = AddToTree(CreateHud());
 
-    var topBar = new HBoxContainer { Name = "TopBar" };
-    var clock = new Label { Name = "ClockLabel" };
-    var pause = new Button { Name = "PauseButton" };
-    var speed = new Button { Name = "SpeedButton" };
-    var units = new Button { Name = "UnitsButton" };
-    var alerts = new VBoxContainer { Name = "Alerts" };
+    hud.UpdateManufacturing(session.ActiveManufacturing, 60);
 
-    foreach (Node node in new Node[] { clock, pause, speed, units, alerts })
-      node.UniqueNameInOwner = true;
+    string engineering = hud.GetNode<Label>("%EngineeringProgress").Text;
+    Assert.True(engineering.Contains("Field kit"));
+    Assert.True(engineering.Contains("1d 23h 0m"));
 
-    topBar.AddChild(clock);
-    topBar.AddChild(pause);
-    topBar.AddChild(speed);
-    topBar.AddChild(units);
-    hud.AddChild(topBar);
-    hud.AddChild(alerts);
-    foreach (Node child in topBar.GetChildren())
-      child.Owner = hud;
-    topBar.Owner = hud;
-    alerts.Owner = hud;
+    hud.UpdateManufacturing(None, 60);
+    Assert.Equal("No active manufacturing.", hud.GetNode<Label>("%EngineeringProgress").Text);
+  }
 
-    ((SceneTree)Engine.GetMainLoop()).Root.AddChild(hud); // enter tree -> _Ready wires %nodes
-    return hud;
+  [TestCase]
+  public void ManufacturingCompletionNoticeSurvivesProjectRefreshes()
+  {
+    var item = MakeItemData("Field kit");
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
+    var session = campaign.Session;
+    Assert.True(session.StartManufacturing(item).IsRight);
+    var hud = AddToTree(CreateHud());
+
+    session.ActiveManufacturing.IfSome(hud.ShowManufacturingCompleted);
+    string notice = hud.GetNode<Label>("%EngineeringNotice").Text;
+    Assert.True(notice.Contains("Field kit"));
+
+    hud.UpdateManufacturing(session.ActiveManufacturing, 60);
+    hud.UpdateManufacturing(None, 3000);
+    Assert.Equal(notice, hud.GetNode<Label>("%EngineeringNotice").Text);
   }
 
   private static GeoscapeEvent MakeActive(long? expiresAtTick = null)

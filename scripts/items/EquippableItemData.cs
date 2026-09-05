@@ -14,4 +14,6 @@ public partial class EquippableItemData : NamedEntityData
   // unlimited items instantiate on withdraw; scarce items hold counted runtime instances.
   // Quantities themselves are never authored — they live in the runtime Armory.
   [Export] public bool UnlimitedStock { get; set; }
+
+  [Export(PropertyHint.Range, "1,4294967295,1")] public uint ManufacturingDurationDays { get; set; } = 1;
 }

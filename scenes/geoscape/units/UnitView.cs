@@ -216,7 +216,9 @@ public sealed partial class UnitView : PanelContainer, IGeoscapeView
 
     foreach (ArmoryItemStock line in _state.Armory.ItemStock())
     {
-      if ((!line.Unlimited && line.Remaining == 0) || !AcceptsItem(slot, line.Data))
+      // Available folds the exhaustion and inactive-unlimited cases; registration alone
+      // does not list an item.
+      if (!line.Available || !AcceptsItem(slot, line.Data))
         continue;
       var row = new Button { Text = $"{line.Data.Name}  {StockText(line.Unlimited, line.Remaining)}" };
       row.Pressed += () => EquipItem(line);

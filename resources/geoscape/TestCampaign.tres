@@ -14,6 +14,10 @@
 [ext_resource type="Resource" uid="uid://v2qbd3a4ixp3" path="res://resources/mods/long_barrel.tres" id="14_barrel"]
 [ext_resource type="Resource" uid="uid://iefajrai3ts6" path="res://resources/mods/extended_magwell.tres" id="15_magwell"]
 
+[ext_resource type="Resource" path="res://resources/items/workshop_sample.tres" id="16_workshop"]
+[ext_resource type="Resource" path="res://resources/items/prototype_kit.tres" id="17_prototype"]
+[ext_resource type="Resource" path="res://resources/items/supply_kit.tres" id="18_supply"]
+
 [sub_resource type="Resource" id="Resource_entry1"]
 script = ExtResource("2_entry")
 Unit = ExtResource("5_soldier")
@@ -41,5 +45,6 @@ PlayerFaction = ExtResource("4_faction")
 StartingRoster = [SubResource("Resource_entry1"), SubResource("Resource_entry2"), SubResource("Resource_entry3"), SubResource("Resource_entry4")]
 Armory = [ExtResource("8_pistol"), ExtResource("9_rifle"), ExtResource("10_vest"), ExtResource("11_grenade")]
 ModStock = [ExtResource("12_reflex"), ExtResource("13_cardio"), ExtResource("14_barrel"), ExtResource("15_magwell")]
+ManufacturableItems = [ExtResource("16_workshop"), ExtResource("17_prototype"), ExtResource("18_supply")]
 Name = "Test Campaign"
 Description = "Debug campaign for the geoscape."

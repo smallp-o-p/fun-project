@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EquippableItemData" format=3]
+
+[ext_resource type="Script" path="res://scripts/items/EquippableItemData.cs" id="1_item"]
+
+[resource]
+script = ExtResource("1_item")
+Name = "Supply Kit"
+Description = "Manufacture once to establish unlimited utility-kit supply."
+ManufacturingDurationDays = 1
+UnlimitedStock = true
