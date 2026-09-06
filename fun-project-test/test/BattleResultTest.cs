@@ -8,28 +8,23 @@ using System;
 [RequireGodotRuntime]
 public class BattleResultTest
 {
-  private static BattleRuntime UnwrapStart(Either<BattleSetupFailure, BattleRuntime> result) =>
-    result.Match(
-      Right: runtime => runtime,
-      Left: failure => throw new InvalidOperationException($"Expected Start to succeed but got {failure.Reason}: {failure.Message}"));
-
   [TestCase(TestName = "Result query rejects an in-progress battle")]
   public void RejectsInProgress()
   {
-    var player = BattleTestFactory.MakeFaction("P");
-    var enemy = BattleTestFactory.MakeFaction("E");
-    BattleRuntime runtime = BattleTestFactory.StartRuntime(new Vector3I(4, 1, 4),
-      new StartPlacement(player, BattleTestFactory.MakeCombatant("A", player), new Vector3I(0, 0, 0)),
-      new StartPlacement(enemy, BattleTestFactory.MakeCombatant("B", enemy), new Vector3I(3, 0, 3)));
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
+    using var battle = BattleFixture.Started(new Vector3I(4, 1, 4),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)));
 
-    Assert.True(runtime.Query(new GetBattleResultQuery()).IsLeft);
+    Assert.True(battle.Query(new GetBattleResultQuery()).IsLeft);
   }
 
   [TestCase(TestName = "Ended battle reports outcome, counts, and object tallies")]
   public void EndedBattleCounts()
   {
-    var player = BattleTestFactory.MakeFaction("P");
-    var enemy = BattleTestFactory.MakeFaction("E");
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
     var board = new BattleBoardState(new Vector3I(4, 1, 4));
 
     var bombData = new BattleSpecialObjectData { Name = "Bomb" };
@@ -40,8 +35,8 @@ public class BattleResultTest
       board,
       [player, enemy],
       [
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
       ],
       new System.Collections.Generic.Dictionary<Faction, System.Collections.Generic.IReadOnlyList<ObjectiveData>>
       {
@@ -53,17 +48,13 @@ public class BattleResultTest
       },
       Objects: [new ObjectPlacement(bombData, new Vector3I(2, 0, 2))]);
 
-    BattleRuntime runtime = UnwrapStart(BattleFactory.Start(setup));
+    using var runtime = BattleFactory.Start(setup).RequireRight();
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
 
     // End the player's turn: the bomb expires (deadline 1), the objective fails → Defeat.
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
-    Either<BattleQueryFailure, BattleResult> result = runtime.Query(new GetBattleResultQuery());
-    Assert.True(result.IsRight);
-    BattleResult battleResult = result.Match(
-      Right: battleResult => battleResult,
-      Left: failure => throw new InvalidOperationException($"Expected a battle result but got {failure.Reason}: {failure.Message}"));
+    BattleResult battleResult = runtime.Query(new GetBattleResultQuery()).RequireRight();
     Assert.Equal(BattleOutcome.Defeat, battleResult.Outcome);
     Assert.Equal(1, battleResult.TurnCount);
     Assert.Equal(2, battleResult.Factions.Count);

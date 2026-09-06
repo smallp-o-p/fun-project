@@ -10,11 +10,11 @@ public partial class StatusEffectTest
   [TestCase(TestName = "Packets carry their authored status spec into the emitted bundle")]
   public void PacketsCarryStatusSpecIntoBundle()
   {
-    var burn = MakeBurn();
+    var burn = TestData.MakeBurn();
     var frame = new WeaponFrameData { Name = "Frame", Packets = [] };
     frame.Packets.Add(new DamagePacketData { Element = Element.Thermal, Multiplier = 1f, Status = burn });
     frame.Packets.Add(new DamagePacketData { Element = Element.Kinetic, Multiplier = 1f });
-    var weapon = MakeWeapon("Torch", frame: frame);
+    var weapon = TestData.MakeWeapon("Torch", frame: frame);
 
     var bundle = weapon.EmitDamage();
 
@@ -25,15 +25,15 @@ public partial class StatusEffectTest
 
   private static BattleUnitState MakeUnit()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    return new BattleUnitState(0, BattleTestFactory.MakeCombatant("Alpha", faction), None, None);
+    var faction = TestData.MakeFaction("Player");
+    return new BattleUnitState(0, TestData.MakeCombatant("Alpha", faction), None, None);
   }
 
   [TestCase(TestName = "Applying a status tracks it and re-applying refreshes the duration")]
   public void ApplyStatusTracksAndRefreshes()
   {
     var unit = MakeUnit();
-    var burn = MakeBurn(duration: 3);
+    var burn = TestData.MakeBurn(duration: 3);
 
     var applied = unit.ApplyStatusEffect(burn);
     Assert.Equal(3, applied.RemainingTurns);
@@ -50,8 +50,8 @@ public partial class StatusEffectTest
   public void DistinctSpecResourcesAreDistinctStatuses()
   {
     var unit = MakeUnit();
-    unit.ApplyStatusEffect(MakeBurn());
-    unit.ApplyStatusEffect(MakeBurn());
+    unit.ApplyStatusEffect(TestData.MakeBurn());
+    unit.ApplyStatusEffect(TestData.MakeBurn());
 
     Assert.Equal(2, unit.ActiveStatusEffects.Count);
   }
@@ -62,11 +62,11 @@ public partial class StatusEffectTest
     var unit = MakeUnit();
     Assert.False(unit.IsImmobilized);
 
-    var stun = MakeStun();
+    var stun = TestData.MakeStun();
     unit.ApplyStatusEffect(stun);
     Assert.True(unit.IsImmobilized);
 
-    unit.ApplyStatusEffect(MakeBurn());
+    unit.ApplyStatusEffect(TestData.MakeBurn());
     Assert.True(unit.IsImmobilized);
 
     Assert.True(unit.RemoveStatusEffect(stun));
@@ -77,7 +77,7 @@ public partial class StatusEffectTest
   public void ExpiredImmobilizeNoLongerImmobilizes()
   {
     var unit = MakeUnit();
-    var applied = unit.ApplyStatusEffect(MakeStun(duration: 1));
+    var applied = unit.ApplyStatusEffect(TestData.MakeStun(duration: 1));
     Assert.True(unit.IsImmobilized);
 
     applied.TickDown();
@@ -90,6 +90,6 @@ public partial class StatusEffectTest
   {
     var unit = MakeUnit();
 
-    Assert.False(unit.RemoveStatusEffect(MakeStun()));
+    Assert.False(unit.RemoveStatusEffect(TestData.MakeStun()));
   }
 }

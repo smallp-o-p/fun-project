@@ -24,58 +24,56 @@ public class BombExpiryTest
     return data;
   }
 
-  private static BattleRuntime RuntimeWithBomb(Vector3I bombCell, BattleSpecialObjectData bombData)
+  private static BattleSetup BombSetup(Vector3I bombCell, BattleSpecialObjectData bombData)
   {
-    var player = BattleTestFactory.MakeFaction("P");
-    var enemy = BattleTestFactory.MakeFaction("E");
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
     var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
       [player] = [new FakeObjectiveData()],
       [enemy] = [new FakeObjectiveData()],
     };
 
-    return BattleFactory.Start(new BattleSetup(
+    return new BattleSetup(
       new BattleBoardState(new Vector3I(4, 1, 4)),
       [player, enemy],
       [
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
       ],
       objectives,
       Objects:
       [
         new ObjectPlacement(bombData, bombCell),
-      ])).Match(
-      Right: runtime => runtime,
-      Left: failure => throw new InvalidOperationException($"Expected runtime but got {failure.Reason}: {failure.Message}"));
+      ]);
   }
 
   [TestCase(TestName = "Turn end at the deadline expires: damage applied, event raised, defused bombs skipped")]
   public void ExpiryAtDeadline()
   {
-    BattleRuntime runtime = RuntimeWithBomb(new Vector3I(1, 0, 0), MakeBomb(expireAfterTurns: 1));
+    using var runtime = BattleFactory.Start(BombSetup(new Vector3I(1, 0, 0), MakeBomb(expireAfterTurns: 1))).RequireRight();
     var events = new System.Collections.Generic.List<BattleEvent>();
     runtime.BattleEventCommitted += events.Add;
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
 
     BattleObjectState bomb = runtime.Query(new GetBattleSpecialObjectsQuery())[0];
-    BattleTestUnit victim = new(runtime.Query(new GetUnitAtTile(
-      runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome());
-    int hpBefore = victim.State.CurrentHealth;
+    BattleUnitState victim = runtime.Query(new GetUnitAtTile(
+      runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
+    int hpBefore = victim.CurrentHealth;
 
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
     Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
     Assert.Equal(new Vector3I(1, 0, 0), bomb.Position);
     Assert.True(events.AsValueEnumerable().OfType<ObjectExpiredBattleEvent>().Any());
-    Assert.True(hpBefore > victim.State.CurrentHealth);
+    Assert.True(hpBefore > victim.CurrentHealth);
   }
 
   [TestCase(TestName = "Player wipe defeat stays stable when the defuse objective also fails in the same expiry dispatch")]
   public void ExpiryPlayerWipeDefeatHasStableOutcome()
   {
-    var player = BattleTestFactory.MakeFaction("P");
-    var enemy = BattleTestFactory.MakeFaction("E");
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
     var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
       [player] =
@@ -88,21 +86,19 @@ public class BombExpiryTest
       [enemy] = [new FakeObjectiveData()],
     };
 
-    using BattleRuntime runtime = BattleFactory.Start(new BattleSetup(
+    using var runtime = BattleFactory.Start(new BattleSetup(
       new BattleBoardState(new Vector3I(4, 1, 4)),
       [player, enemy],
       [
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("A", player, health: 6)), new Vector3I(0, 0, 0)),
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player, health: 6)), new Vector3I(0, 0, 0)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
       ],
       objectives,
       PlayerFaction: Some(player),
       Objects:
       [
         new ObjectPlacement(MakeBomb(expireAfterTurns: 1, baseDamage: 8), new Vector3I(1, 0, 0)),
-      ])).Match(
-      Right: started => started,
-      Left: failure => throw new InvalidOperationException($"Expected runtime but got {failure.Reason}: {failure.Message}"));
+      ])).RequireRight();
     var recorder = new BattleEventRecorder(runtime);
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
 
@@ -111,9 +107,7 @@ public class BombExpiryTest
     Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
     Assert.Equal(
       BattleOutcome.Defeat,
-      runtime.Query(new GetBattleResultQuery()).Match(
-        Left: failure => throw new InvalidOperationException(failure.Message),
-        Right: result => result.Outcome));
+      runtime.Query(new GetBattleResultQuery()).RequireRight().Outcome);
     Assert.Equal(1, recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Count());
     Assert.True(recorder.OfType<ObjectExpiredBattleEvent>().AsValueEnumerable().Any());
     Assert.True(recorder.OfType<ObjectiveFailedBattleEvent>().AsValueEnumerable().Any());
@@ -122,14 +116,14 @@ public class BombExpiryTest
   [TestCase(TestName = "Defused bombs do not expire")]
   public void DefusedSkipsExpiry()
   {
-    BattleRuntime runtime = RuntimeWithBomb(new Vector3I(1, 0, 0), MakeBomb(expireAfterTurns: 1));
+    using var runtime = BattleFactory.Start(BombSetup(new Vector3I(1, 0, 0), MakeBomb(expireAfterTurns: 1))).RequireRight();
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
     BattleObjectState bomb = runtime.Query(new GetBattleSpecialObjectsQuery())[0];
-    BattleTestUnit defuser = new(runtime.Query(new GetUnitAtTile(
-      runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome());
+    BattleUnitState defuser = runtime.Query(new GetUnitAtTile(
+      runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
 
     runtime.ExecuteAction(BattleAction.InteractWithObject(
-      runtime.TryGetAlive(defuser.State).RequireSome(),
+      runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(bomb).RequireSome()));
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
@@ -140,7 +134,7 @@ public class BombExpiryTest
   public void ExpiryRunsAfterUpkeep()
   {
     var order = new System.Collections.Generic.List<string>();
-    BattleRuntime runtime = RuntimeWithBomb(new Vector3I(1, 0, 1), MakeBomb(expireAfterTurns: 1));
+    using var runtime = BattleFactory.Start(BombSetup(new Vector3I(1, 0, 1), MakeBomb(expireAfterTurns: 1))).RequireRight();
     runtime.RegisterHook<TurnEndedBattleEvent>(new MarkerHook(() => order.Add("upkeep")), -100);
     runtime.RegisterHook<TurnEndedBattleEvent>(new MarkerHook(() => order.Add("expiry")), 0);
 

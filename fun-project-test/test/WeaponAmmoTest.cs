@@ -9,7 +9,7 @@ public class WeaponAmmoTest
   [TestCase(TestName = "Spending a shot decrements only this weapon instance, never the authored template")]
   public void SpendingNeverMutatesTemplateOrSiblings()
   {
-    var data = BattleTestFactory.MakeAmmoWeaponData("SMG", magazine: 6);
+    var data = TestData.MakeAmmoWeaponData("SMG", magazine: 6);
     var weaponA = new AmmunitionedWeapon(data);
     var weaponB = new AmmunitionedWeapon(data);
 
@@ -23,7 +23,7 @@ public class WeaponAmmoTest
   [TestCase(TestName = "TrySpendShot returns None once the magazine cannot afford a shot")]
   public void TrySpendShotReturnsNoneWhenEmpty()
   {
-    var weapon = BattleTestFactory.MakeAmmoWeapon("Pistol", magazine: 1);
+    var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 1);
 
     Assert.True(weapon.TrySpendShot().IsSome);
     Assert.Equal(0, weapon.CurrentAmmo);
@@ -35,7 +35,7 @@ public class WeaponAmmoTest
   [TestCase(TestName = "Reload refills to magazine size and leaves the authored stat untouched")]
   public void ReloadRefillsToMagazineSize()
   {
-    var data = BattleTestFactory.MakeAmmoWeaponData("Rifle", magazine: 4);
+    var data = TestData.MakeAmmoWeaponData("Rifle", magazine: 4);
     var weapon = new AmmunitionedWeapon(data);
 
     Assert.True(weapon.TrySpendShot().IsSome);
@@ -51,7 +51,7 @@ public class WeaponAmmoTest
   [TestCase(TestName = "A melee weapon always spends a shot successfully")]
   public void MeleeAlwaysSpends()
   {
-    var weapon = BattleTestFactory.MakeWeapon("Sword");
+    var weapon = TestData.MakeWeapon("Sword");
 
     Assert.True(weapon.TrySpendShot().IsSome);
     Assert.True(weapon.TrySpendShot().IsSome);

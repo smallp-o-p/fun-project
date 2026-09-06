@@ -1,7 +1,6 @@
 using System;
 using FunProject.Progression;
 using GdUnit4;
-using static FunProject.Tests.ProgressionTestFactory;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -11,9 +10,9 @@ public partial class UnitProgressionCommitTest
   public void CommitRules()
   {
     var progression = new UnitProgression();
-    var first = MakePath("Alpha", MakeStep(1));
-    var second = MakePath("Beta", MakeStep(1));
-    var third = MakePath("Gamma", MakeStep(1));
+    var first = TestData.MakePath("Alpha", TestData.MakeStep(1));
+    var second = TestData.MakePath("Beta", TestData.MakeStep(1));
+    var third = TestData.MakePath("Gamma", TestData.MakeStep(1));
 
     Assert.True(progression.TryCommit(first));
     Assert.True(progression.TryCommit(second));
@@ -30,7 +29,7 @@ public partial class UnitProgressionCommitTest
   public void DuplicateCommitRejected()
   {
     var progression = new UnitProgression();
-    var path = MakePath("Alpha", MakeStep(1));
+    var path = TestData.MakePath("Alpha", TestData.MakeStep(1));
 
     Assert.True(progression.TryCommit(path));
     Assert.False(progression.TryCommit(path));
@@ -41,7 +40,7 @@ public partial class UnitProgressionCommitTest
   public void EmptyPathThrows()
   {
     var progression = new UnitProgression();
-    Assert.Throws<InvalidOperationException>(() => progression.TryCommit(MakePath("Empty")));
+    Assert.Throws<InvalidOperationException>(() => progression.TryCommit(TestData.MakePath("Empty")));
   }
 
   [TestCase(TestName = "AwardPoints accumulates; non-positive amounts are caller bugs")]

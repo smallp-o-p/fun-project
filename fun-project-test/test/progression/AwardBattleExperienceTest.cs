@@ -25,36 +25,12 @@ public class AwardBattleExperienceTest
       TurnCount = 1,
     };
 
-  private static Combatant MakeRanked(Faction faction, string name, RankTableData? table = null)
-  {
-    var data = new CombatantData
-    {
-      Name = name,
-      HealthStat = new FunProject.Stats.HealthStat { BaseValue = 10 },
-      ActionPointsStat = new FunProject.Stats.ActionPointsStat { BaseValue = 2 },
-      WillStat = new FunProject.Stats.WillStat { BaseValue = 50 },
-      MovementStat = new FunProject.Stats.MovementStat { BaseValue = 8 },
-      VisionStat = new FunProject.Stats.VisionStat { BaseValue = 20 },
-      AimStat = new FunProject.Stats.AimStat { BaseValue = 65 },
-      RankTable = table ?? FullFactorLadder(),
-    };
-    return new Combatant(data, faction);
-  }
-
-  private static RankTableData FullFactorLadder()
-  {
-    var table = new RankTableData();
-    table.Levels.Add(new RankLevelData { Name = "Rookie", GainFactorPercent = 100 });
-    table.Levels.Add(new RankLevelData { Name = "Squaddie", GainFactorPercent = 100 });
-    return table;
-  }
-
   [TestCase(TestName = "Every present combatant earns participation XP")]
   public void ParticipationAwardedToAllPresent()
   {
-    var faction = MakeFaction("Player");
-    var alpha = MakeRanked(faction, "Alpha");
-    var bravo = MakeRanked(faction, "Bravo");
+    var faction = TestData.MakeFaction("Player");
+    var alpha = TestData.MakeCombatant("Alpha", faction, health: 10, actionPoints: 2, movement: 8);
+    var bravo = TestData.MakeCombatant("Bravo", faction, health: 10, actionPoints: 2, movement: 8);
     var table = new ExperienceTableData { ParticipationXp = 10, KillXp = 25 };
 
     var awards = AwardBattleExperience.Award(
@@ -70,10 +46,10 @@ public class AwardBattleExperienceTest
   [TestCase(TestName = "Kills add on top of participation per defeated count")]
   public void KillsAddOnTopOfParticipation()
   {
-    var faction = MakeFaction("Player");
-    var alpha = MakeRanked(faction, "Alpha");
-    var victim1 = MakeCombatant("Bandit1", MakeFaction("Raiders"));
-    var victim2 = MakeCombatant("Bandit2", MakeFaction("Raiders"));
+    var faction = TestData.MakeFaction("Player");
+    var alpha = TestData.MakeCombatant("Alpha", faction, health: 10, actionPoints: 2, movement: 8);
+    var victim1 = TestData.MakeCombatant("Bandit1", TestData.MakeFaction("Raiders"));
+    var victim2 = TestData.MakeCombatant("Bandit2", TestData.MakeFaction("Raiders"));
 
     var awards = AwardBattleExperience.Award(
       MakeSummary(faction,
@@ -88,11 +64,11 @@ public class AwardBattleExperienceTest
   [TestCase(TestName = "The fallen earn nothing — no participation, no posthumous kills")]
   public void DeadCombatantsEarnNothing()
   {
-    var faction = MakeFaction("Player");
-    var alpha = MakeRanked(faction, "Alpha");
-    var bravo = MakeRanked(faction, "Bravo");
-    var charlie = MakeRanked(faction, "Charlie");
-    var victim = MakeCombatant("Bandit", MakeFaction("Raiders"));
+    var faction = TestData.MakeFaction("Player");
+    var alpha = TestData.MakeCombatant("Alpha", faction, health: 10, actionPoints: 2, movement: 8);
+    var bravo = TestData.MakeCombatant("Bravo", faction, health: 10, actionPoints: 2, movement: 8);
+    var charlie = TestData.MakeCombatant("Charlie", faction, health: 10, actionPoints: 2, movement: 8);
+    var victim = TestData.MakeCombatant("Bandit", TestData.MakeFaction("Raiders"));
 
     var awards = AwardBattleExperience.Award(
       MakeSummary(faction,
@@ -115,15 +91,16 @@ public class AwardBattleExperienceTest
   [TestCase(TestName = "One battle is one gain per combatant — a single scaling pass, not per-achievement")]
   public void OneGainPerCombatantPerBattle()
   {
-    var faction = MakeFaction("Player");
+    var faction = TestData.MakeFaction("Player");
     // A 3% ladder: two separate gains of 10+25 would floor to 1 each (2 total); one
     // combined gain of 35 floors to max(1, 1) = 1. The distinction pins the contract.
     var slow = new RankTableData();
     slow.Levels.Add(new RankLevelData { Name = "Rookie", GainFactorPercent = 3 });
     slow.Levels.Add(new RankLevelData { Name = "Squaddie", GainFactorPercent = 3 });
-    var alpha = MakeRanked(faction, "Alpha", slow);
+    var alpha = TestData.MakeCombatant("Alpha", faction, health: 10, actionPoints: 2, movement: 8,
+      rankTable: slow);
 
-    var victim = MakeCombatant("Bandit", MakeFaction("Raiders"));
+    var victim = TestData.MakeCombatant("Bandit", TestData.MakeFaction("Raiders"));
     AwardBattleExperience.Award(
       MakeSummary(faction,
         new System.Collections.Generic.HashSet<Combatant> { alpha },
@@ -136,7 +113,7 @@ public class AwardBattleExperienceTest
   [TestCase(TestName = "Malformed awards throw")]
   public void GuardsThrow()
   {
-    var faction = MakeFaction("Player");
+    var faction = TestData.MakeFaction("Player");
     Assert.Throws<System.InvalidOperationException>(() => AwardBattleExperience.Award(
       MakeSummary(faction, new System.Collections.Generic.HashSet<Combatant>(), new Dictionary<Combatant, List<Combatant>>()),
       new ExperienceTableData { ParticipationXp = 0, KillXp = 25 }));

@@ -11,12 +11,12 @@ public partial class MapDeploymentTest
   [TestCase(TestName = "AssignSpawns pairs each combatant with a spawn cell")]
   public void AssignSpawnsPairsEachCombatantWithASpawnCell()
   {
-    Faction faction = BattleTestFactory.MakeFaction("Player");
-    Combatant a = BattleTestFactory.MakeCombatant("A", faction);
-    Combatant b = BattleTestFactory.MakeCombatant("B", faction);
-    BattleMapData map = MakeMapData(new Vector3I(4, 1, 4),
-      (new Vector3I(0, 0, 0), SpawnTile(0)),
-      (new Vector3I(1, 0, 0), SpawnTile(0)));
+    Faction faction = TestData.MakeFaction("Player");
+    Combatant a = TestData.MakeCombatant("A", faction);
+    Combatant b = TestData.MakeCombatant("B", faction);
+    BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(1, 0, 0), TestData.SpawnTile(0)));
     var rosters = new Dictionary<int, IReadOnlyList<Combatant>> { [0] = new[] { a, b } };
 
     var result = MapDeployment.AssignSpawns(map, rosters);
@@ -34,10 +34,10 @@ public partial class MapDeploymentTest
   [TestCase(TestName = "AssignSpawns fails when a roster slot has no spawn cells")]
   public void AssignSpawnsFailsWhenRosterSlotHasNoSpawnCells()
   {
-    Faction faction = BattleTestFactory.MakeFaction("Player");
-    Combatant a = BattleTestFactory.MakeCombatant("A", faction);
-    BattleMapData map = MakeMapData(new Vector3I(4, 1, 4),
-      (new Vector3I(0, 0, 0), SpawnTile(0)));
+    Faction faction = TestData.MakeFaction("Player");
+    Combatant a = TestData.MakeCombatant("A", faction);
+    BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)));
     var rosters = new Dictionary<int, IReadOnlyList<Combatant>> { [1] = new[] { a } };
 
     var result = MapDeployment.AssignSpawns(map, rosters);
@@ -48,11 +48,11 @@ public partial class MapDeploymentTest
   [TestCase(TestName = "AssignSpawns fails when there are too few spawn cells")]
   public void AssignSpawnsFailsWhenTooFewSpawnCells()
   {
-    Faction faction = BattleTestFactory.MakeFaction("Player");
-    Combatant a = BattleTestFactory.MakeCombatant("A", faction);
-    Combatant b = BattleTestFactory.MakeCombatant("B", faction);
-    BattleMapData map = MakeMapData(new Vector3I(4, 1, 4),
-      (new Vector3I(0, 0, 0), SpawnTile(0)));
+    Faction faction = TestData.MakeFaction("Player");
+    Combatant a = TestData.MakeCombatant("A", faction);
+    Combatant b = TestData.MakeCombatant("B", faction);
+    BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)));
     var rosters = new Dictionary<int, IReadOnlyList<Combatant>> { [0] = new[] { a, b } };
 
     var result = MapDeployment.AssignSpawns(map, rosters);
@@ -63,10 +63,10 @@ public partial class MapDeploymentTest
   [TestCase(TestName = "AssignSpawns fails when a spawn cell is out of bounds")]
   public void AssignSpawnsFailsWhenSpawnCellOutOfBounds()
   {
-    Faction faction = BattleTestFactory.MakeFaction("Player");
-    Combatant a = BattleTestFactory.MakeCombatant("A", faction);
-    BattleMapData map = MakeMapData(new Vector3I(4, 1, 4),
-      (new Vector3I(9, 0, 0), SpawnTile(0))); // dim.X = 4
+    Faction faction = TestData.MakeFaction("Player");
+    Combatant a = TestData.MakeCombatant("A", faction);
+    BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(9, 0, 0), TestData.SpawnTile(0))); // dim.X = 4
     var rosters = new Dictionary<int, IReadOnlyList<Combatant>> { [0] = new[] { a } };
 
     var result = MapDeployment.AssignSpawns(map, rosters);

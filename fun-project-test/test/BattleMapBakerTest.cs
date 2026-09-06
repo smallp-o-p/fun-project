@@ -15,8 +15,8 @@ public partial class BattleMapBakerTest
   {
     var cells = new List<(Godot.Vector3I, BattleMapTileData)>
     {
-      (new Godot.Vector3I(-2, 0, -3), FloorTile()),
-      (new Godot.Vector3I(-1, 0, -3), FloorTile()),
+      (new Godot.Vector3I(-2, 0, -3), TestData.FloorTile()),
+      (new Godot.Vector3I(-1, 0, -3), TestData.FloorTile()),
     };
 
     BattleMapData map = BattleMapAuthoring.BuildMap(cells);
@@ -31,8 +31,8 @@ public partial class BattleMapBakerTest
   {
     var cells = new List<(Godot.Vector3I, BattleMapTileData)>
     {
-      (new Godot.Vector3I(0, 0, 0), FloorTile()),
-      (new Godot.Vector3I(1, 0, 0), WallTile()),
+      (new Godot.Vector3I(0, 0, 0), TestData.FloorTile()),
+      (new Godot.Vector3I(1, 0, 0), TestData.WallTile()),
     };
 
     BattleMapData map = BattleMapAuthoring.BuildMap(cells);
@@ -69,8 +69,8 @@ public partial class BattleMapBakerTest
   {
     var cells = new List<(Godot.Vector3I, BattleMapTileData)>
     {
-      (new Godot.Vector3I(0, 0, 0), FloorTile()),
-      (new Godot.Vector3I(0, 1, 0), FloorTile()),
+      (new Godot.Vector3I(0, 0, 0), TestData.FloorTile()),
+      (new Godot.Vector3I(0, 1, 0), TestData.FloorTile()),
     };
 
     BattleMapData map = BattleMapAuthoring.BuildMap(cells);

@@ -12,14 +12,14 @@ public partial class StandardHitChanceCalculatorTest
     Vector3I attackerPosition,
     Vector3I defenderPosition)
   {
-    var attackerFaction = BattleTestFactory.MakeFaction("Player");
+    var attackerFaction = TestData.MakeFaction("Player");
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
     var attackerPoint = board.At(attackerPosition);
     var defenderPoint = board.At(defenderPosition);
     board.GetTile(defenderPoint).Cover = defenderCover;
 
-    var weapon = BattleTestFactory.MakeWeapon("Rifle");
-    var attacker = new BattleUnitState(1, BattleTestFactory.MakeCombatant("Alpha", attackerFaction, aim: aim), Some(weapon), None);
+    var weapon = TestData.MakeWeapon("Rifle");
+    var attacker = new BattleUnitState(1, TestData.MakeCombatant("Alpha", attackerFaction, aim: aim), Some(weapon), None);
 
     return new AttackContext(attacker, weapon, attackerPoint, defenderPoint, board);
   }

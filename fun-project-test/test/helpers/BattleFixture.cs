@@ -5,6 +5,7 @@ using FunProject.Buffs;
 using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
+using FunProject.Progression;
 using FunProject.Weapons;
 using ZLinq;
 
@@ -82,6 +83,17 @@ public sealed class BattleFixture : IDisposable
   {
     Submit(new SpawnUnit(combatant, At(position), weapon, armor));
     return UnitAt(position);
+  }
+
+  // Progression integration setup: awards the first step's cost, commits the path, and
+  // unlocks that step on the supplied combatant's own progression object. Call before
+  // Spawn so the spawned unit already carries the unlocked effects.
+  public void UnlockFirstStep(Combatant combatant, SkillPathData path)
+  {
+    ThrowIfDisposed();
+    combatant.Progression.AwardPoints(path.Steps[0].Cost);
+    combatant.Progression.TryCommit(path);
+    combatant.Progression.TryUnlockNext(path).RequireSome();
   }
 
   // ---- Scenario factories -------------------------------------------------------------

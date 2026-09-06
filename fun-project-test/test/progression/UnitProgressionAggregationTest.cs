@@ -3,7 +3,6 @@ using FunProject.Buffs;
 using FunProject.Progression;
 using FunProject.Stats;
 using GdUnit4;
-using static FunProject.Tests.ProgressionTestFactory;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -15,12 +14,12 @@ public partial class UnitProgressionAggregationTest
     var progression = new UnitProgression();
     var aimMod = new AimStatMod { Modifiers = [StatModifier.Add(5)] };
     var healthMod = new HealthStatMod { Modifiers = [StatModifier.Add(10)] };
-    var burn = MakeBuff("Burn", new HealthBelowPercentCondition { Percent = 50f });
-    var scout = MakePath("Scout",
-      MakeStep(1, MakeStatModEffect(aimMod)),
-      MakeStep(1, MakeAbilityGrantEffect("Sprint")));
-    var guardian = MakePath("Guardian",
-      MakeStep(1, MakeStatModEffect(healthMod), MakeBuffGrantEffect(burn)));
+    var burn = TestData.MakeBuff("Burn", new HealthBelowPercentCondition { Percent = 50f });
+    var scout = TestData.MakePath("Scout",
+      TestData.MakeStep(1, TestData.MakeStatModEffect(aimMod)),
+      TestData.MakeStep(1, TestData.MakeAbilityGrantEffect("Sprint")));
+    var guardian = TestData.MakePath("Guardian",
+      TestData.MakeStep(1, TestData.MakeStatModEffect(healthMod), TestData.MakeBuffGrantEffect(burn)));
 
     progression.AwardPoints(3);
     progression.TryCommit(scout);
@@ -48,7 +47,7 @@ public partial class UnitProgressionAggregationTest
   {
     var progression = new UnitProgression();
     // Godot bypass shape: no Ability set
-    var path = MakePath("Broken", MakeStep(1, new AbilityGrantUpgradeEffectData { Ability = null }));
+    var path = TestData.MakePath("Broken", TestData.MakeStep(1, new AbilityGrantUpgradeEffectData { Ability = null }));
     progression.AwardPoints(1);
     progression.TryCommit(path);
     progression.TryUnlockNext(path).RequireSome();

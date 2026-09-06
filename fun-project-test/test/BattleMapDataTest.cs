@@ -9,8 +9,8 @@ public partial class BattleMapDataTest
   [TestCase(TestName = "Board from map data applies tile data to runtime tiles")]
   public void BoardFromMapDataAppliesTileDataToRuntimeTiles()
   {
-    BattleMapData mapData = MakeMapData(new Vector3I(4, 1, 4),
-      (new Vector3I(1, 0, 1), WallTile()));
+    BattleMapData mapData = TestData.MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(1, 0, 1), TestData.WallTile()));
 
     BattleBoardState board = new(mapData);
     BattleTileState tile = board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
@@ -22,7 +22,7 @@ public partial class BattleMapDataTest
   [TestCase(TestName = "Board from map data copies cover into runtime tiles")]
   public void BoardFromMapDataCopiesCoverIntoRuntimeTiles()
   {
-    BattleMapData mapData = MakeMapData(new Vector3I(4, 1, 4),
+    BattleMapData mapData = TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(1, 0, 1), new BattleMapTileData
       {
         CoverDirections = CoverDirections.North | CoverDirections.East,
@@ -40,8 +40,8 @@ public partial class BattleMapDataTest
   [TestCase(TestName = "Cells not in the dictionary are holes")]
   public void CellsNotInTheDictionaryAreHoles()
   {
-    BattleMapData mapData = MakeMapData(new Vector3I(4, 1, 4),
-      (new Vector3I(1, 0, 1), FloorTile()));
+    BattleMapData mapData = TestData.MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(1, 0, 1), TestData.FloorTile()));
 
     BattleBoardState board = new(mapData);
     BattleTileState listed = board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
@@ -54,9 +54,9 @@ public partial class BattleMapDataTest
   [TestCase(TestName = "Board from map data supports stacked levels")]
   public void BoardFromMapDataSupportsStackedLevels()
   {
-    var mapData = MakeMapData(new Vector3I(2, 2, 2),
-      (new Vector3I(0, 0, 0), FloorTile()),
-      (new Vector3I(0, 1, 0), FloorTile()));
+    var mapData = TestData.MakeMapData(new Vector3I(2, 2, 2),
+      (new Vector3I(0, 0, 0), TestData.FloorTile()),
+      (new Vector3I(0, 1, 0), TestData.FloorTile()));
 
     BattleBoardState board = new(mapData);
     BattleTileState ground = board.GetTile(board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome());
@@ -97,9 +97,9 @@ public partial class BattleMapDataTest
   [TestCase(TestName = "BlocksVerticalLineOfSight bakes into runtime tile")]
   public void BlocksVerticalLineOfSightBakesIntoRuntimeTile()
   {
-    BattleMapData mapWithFlag = MakeMapData(new Vector3I(4, 1, 4),
+    BattleMapData mapWithFlag = TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(1, 0, 1), new BattleMapTileData { BlocksVerticalLineOfSight = true }));
-    BattleMapData mapWithoutFlag = MakeMapData(new Vector3I(4, 1, 4),
+    BattleMapData mapWithoutFlag = TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(1, 0, 1), new BattleMapTileData { BlocksVerticalLineOfSight = false }));
 
     BattleBoardState boardWith = new(mapWithFlag);

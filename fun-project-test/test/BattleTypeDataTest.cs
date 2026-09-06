@@ -13,8 +13,8 @@ public partial class BattleTypeDataTest
   [TestCase(TestName = "ObjectExpirySystemData registers its hook with the authored priority")]
   public void ObjectExpiryRegistration()
   {
-    var player = BattleTestFactory.MakeFaction("P");
-    var enemy = BattleTestFactory.MakeFaction("E");
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
     var bombData = new BattleSpecialObjectData { Name = "Bomb" };
     bombData.Capabilities.Add(new TimedEffectCapabilityData { FireAfterTurns = 1 });
 
@@ -22,8 +22,8 @@ public partial class BattleTypeDataTest
       new BattleBoardState(new Vector3I(4, 1, 4)),
       [player, enemy],
       [
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
       ],
       new System.Collections.Generic.Dictionary<Faction, System.Collections.Generic.IReadOnlyList<ObjectiveData>>
       {
@@ -31,9 +31,7 @@ public partial class BattleTypeDataTest
         [enemy] = [new FakeObjectiveData()],
       },
       Objects: [new ObjectPlacement(bombData, new Vector3I(1, 0, 0))]);
-    BattleRuntime runtime = BattleFactory.Start(setup).Match(
-      Right: r => r,
-      Left: failure => throw new System.InvalidOperationException($"Start failed: {failure.Message}"));
+    using var runtime = BattleFactory.Start(setup).RequireRight();
     BattleObjectState bomb = runtime.Query(new GetBattleSpecialObjectsQuery())[0];
 
     var observed = new List<Option<ObjectStatus>>();

@@ -111,8 +111,8 @@ public class DamagePipelineTest
   [TestCase(TestName = "EmitDamage derives the frame's packets from base damage")]
   public void EmitDamageDerivesFramePackets()
   {
-    var frame = BattleTestFactory.MakeFrame((Element.Thermal, 0.7f), (Element.Electrical, 0.3f));
-    var weapon = new FirearmWeapon(BattleTestFactory.MakeFirearmWeaponData(damage: 6, frame: frame));
+    var frame = TestData.MakeFrame((Element.Thermal, 0.7f), (Element.Electrical, 0.3f));
+    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 6, frame: frame));
 
     var bundle = weapon.EmitDamage();
 
@@ -124,7 +124,7 @@ public class DamagePipelineTest
   [TestCase(TestName = "EmitDamage applies slot bundle mods in slot order then array order")]
   public void EmitDamageAppliesSlotModsInOrder()
   {
-    var weapon = new FirearmWeapon(BattleTestFactory.MakeFirearmWeaponData(damage: 4, frame: BattleTestFactory.MakeFrame(), modSlots: 1));
+    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: TestData.MakeFrame(), modSlots: 1));
     weapon.GetModSlots()[0].Equip(new DamageBundleEquippableMod
     {
       BundleMods =
@@ -145,7 +145,7 @@ public class DamagePipelineTest
     {
       DamageMods = [new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(1)] }] }],
     };
-    var weapon = new FirearmWeapon(BattleTestFactory.MakeFirearmWeaponData(damage: 4, frame: BattleTestFactory.MakeFrame(), ammo: ammo, modSlots: 1));
+    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: TestData.MakeFrame(), ammo: ammo, modSlots: 1));
     weapon.GetModSlots()[0].Equip(new DamageBundleEquippableMod
     {
       BundleMods = [new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Multiply(2f)] }] }],
@@ -158,7 +158,7 @@ public class DamagePipelineTest
   [TestCase(TestName = "EmitDamage drops packets at or below zero only at emission")]
   public void EmitDamageDropsNonPositivePacketsAtEmissionOnly()
   {
-    var weapon = new FirearmWeapon(BattleTestFactory.MakeFirearmWeaponData(damage: 4, frame: BattleTestFactory.MakeFrame(), modSlots: 1));
+    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: TestData.MakeFrame(), modSlots: 1));
     weapon.GetModSlots()[0].Equip(new DamageBundleEquippableMod
     {
       BundleMods =
@@ -174,8 +174,8 @@ public class DamagePipelineTest
   [TestCase(TestName = "EmitDamage drops a packet zeroed at the end of the pipeline")]
   public void EmitDamageDropsZeroedPacket()
   {
-    var frame = BattleTestFactory.MakeFrame((Element.Kinetic, 1f), (Element.Thermal, 1f));
-    var weapon = new FirearmWeapon(BattleTestFactory.MakeFirearmWeaponData(damage: 4, frame: frame, modSlots: 1));
+    var frame = TestData.MakeFrame((Element.Kinetic, 1f), (Element.Thermal, 1f));
+    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: frame, modSlots: 1));
     weapon.GetModSlots()[0].Equip(new DamageBundleEquippableMod
     {
       BundleMods = [new DamageBundleMod { PacketModifiers = [new PacketModifier { Element = Element.Kinetic, Ops = [StatModifier.Multiply(0f)] }] }],
@@ -190,17 +190,17 @@ public class DamagePipelineTest
   [TestCase(TestName = "Weapon construction rejects a missing or empty frame")]
   public void WeaponConstructionRejectsMissingOrEmptyFrame()
   {
-    var missingFrame = BattleTestFactory.MakeFirearmWeaponData(damage: 4);
+    var missingFrame = TestData.MakeFirearmWeaponData(damage: 4);
     missingFrame.Frame = null;
     Assert.Throws<InvalidOperationException>(() => new FirearmWeapon(missingFrame));
     Assert.Throws<InvalidOperationException>(
-      () => new FirearmWeapon(BattleTestFactory.MakeFirearmWeaponData(damage: 4, frame: new WeaponFrameData { Packets = [] })));
+      () => new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: new WeaponFrameData { Packets = [] })));
   }
 
   [TestCase(TestName = "Stat mods on other stats leave the emitted bundle untouched")]
   public void StatModsOnOtherStatsLeaveBundleUntouched()
   {
-    var weapon = new FirearmWeapon(BattleTestFactory.MakeFirearmWeaponData(damage: 4, frame: BattleTestFactory.MakeFrame(), modSlots: 1));
+    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: TestData.MakeFrame(), modSlots: 1));
     weapon.GetModSlots()[0].Equip(new MultiStatMod { StatMods = [new RangeStatMod { Modifiers = [StatModifier.Add(10)] }] });
 
     Assert.Equal(new Damage(4, Element.Kinetic), weapon.EmitDamage()[0]);

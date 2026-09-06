@@ -11,28 +11,18 @@ public class BattleFactoryTest
 {
   // --- helpers -------------------------------------------------------------
 
-  private static BattleRuntime UnwrapStart(Either<BattleSetupFailure, BattleRuntime> result) =>
-    result.Match(
-      Right: runtime => runtime,
-      Left: failure => throw new Exception($"Expected Start to succeed but got {failure.Reason}: {failure.Message}"));
-
-  private static BattleSetupFailure ExpectFailure(Either<BattleSetupFailure, BattleRuntime> result) =>
-    result.Match(
-      Right: _ => throw new Exception("Expected a setup failure but Start succeeded."),
-      Left: failure => failure);
-
   // Two factions in order [player, enemy], one unit each on distinct cells, an
   // objective for each. A 4x1x4 board has all-walkable tiles by default.
   private static (BattleSetup Setup, Faction Player, Faction Enemy) MinimalSetup()
   {
-    var player = BattleTestFactory.MakeFaction("Player");
-    var enemy = BattleTestFactory.MakeFaction("Enemy");
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
     var board = new BattleBoardState(new Vector3I(4, 1, 4));
 
     var placements = new List<UnitPlacement>
     {
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)), new Vector3I(0, 0, 0)),
-      new(new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)), new Vector3I(3, 0, 3)),
+      new(new UnitLoadout(TestData.MakeCombatant("Alpha", player)), new Vector3I(0, 0, 0)),
+      new(new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)), new Vector3I(3, 0, 3)),
     };
     var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
@@ -50,7 +40,7 @@ public class BattleFactoryTest
   {
     var (setup, player, enemy) = MinimalSetup();
 
-    BattleRuntime runtime = UnwrapStart(BattleFactory.Start(setup));
+    using var runtime = BattleFactory.Start(setup).RequireRight();
 
     var playerUnit = runtime.Query(new GetFactionAliveUnits(player)).AsValueEnumerable().Single();
     var enemyUnit = runtime.Query(new GetFactionAliveUnits(enemy)).AsValueEnumerable().Single();
@@ -75,42 +65,42 @@ public class BattleFactoryTest
       },
     };
 
-    Assert.Equal(BattleSetupFailureReason.MissingObjective, ExpectFailure(BattleFactory.Start(noEnemyObjective)).Reason);
+    Assert.Equal(BattleSetupFailureReason.MissingObjective, BattleFactory.Start(noEnemyObjective).RequireLeft().Reason);
   }
 
   [TestCase(TestName = "Start fails when a placement's faction is not in FactionOrder")]
   public void StartUnknownPlacementFaction()
   {
     var (setup, player, enemy) = MinimalSetup();
-    var stranger = BattleTestFactory.MakeFaction("Stranger");
+    var stranger = TestData.MakeFaction("Stranger");
     var withStranger = setup with
     {
       Placements = new List<UnitPlacement>
       {
-        new(new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)), new Vector3I(0, 0, 0)),
-        new(new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)), new Vector3I(3, 0, 3)),
-        new(new UnitLoadout(BattleTestFactory.MakeCombatant("Ghost", stranger)), new Vector3I(2, 0, 2)),
+        new(new UnitLoadout(TestData.MakeCombatant("Alpha", player)), new Vector3I(0, 0, 0)),
+        new(new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)), new Vector3I(3, 0, 3)),
+        new(new UnitLoadout(TestData.MakeCombatant("Ghost", stranger)), new Vector3I(2, 0, 2)),
       },
     };
 
-    Assert.Equal(BattleSetupFailureReason.UnknownFaction, ExpectFailure(BattleFactory.Start(withStranger)).Reason);
+    Assert.Equal(BattleSetupFailureReason.UnknownFaction, BattleFactory.Start(withStranger).RequireLeft().Reason);
   }
 
   [TestCase(TestName = "Start fails when PlayerFaction is not in FactionOrder")]
   public void StartUnknownPlayerFaction()
   {
     var (setup, _, _) = MinimalSetup();
-    var stranger = BattleTestFactory.MakeFaction("Stranger");
+    var stranger = TestData.MakeFaction("Stranger");
     var withStrangerPlayer = setup with { PlayerFaction = Some(stranger) };
 
-    Assert.Equal(BattleSetupFailureReason.UnknownFaction, ExpectFailure(BattleFactory.Start(withStrangerPlayer)).Reason);
+    Assert.Equal(BattleSetupFailureReason.UnknownFaction, BattleFactory.Start(withStrangerPlayer).RequireLeft().Reason);
   }
 
   [TestCase(TestName = "Start fails when an objective references an unknown faction")]
   public void StartUnknownObjectiveFaction()
   {
     var (setup, player, enemy) = MinimalSetup();
-    var stranger = BattleTestFactory.MakeFaction("Stranger");
+    var stranger = TestData.MakeFaction("Stranger");
     var withStrangerObjective = setup with
     {
       Objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
@@ -121,7 +111,7 @@ public class BattleFactoryTest
       },
     };
 
-    Assert.Equal(BattleSetupFailureReason.UnknownFaction, ExpectFailure(BattleFactory.Start(withStrangerObjective)).Reason);
+    Assert.Equal(BattleSetupFailureReason.UnknownFaction, BattleFactory.Start(withStrangerObjective).RequireLeft().Reason);
   }
 
   [TestCase(TestName = "Start fails when a spawn cell is out of bounds")]
@@ -132,12 +122,12 @@ public class BattleFactoryTest
     {
       Placements = new List<UnitPlacement>
       {
-        new(new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)), new Vector3I(99, 0, 0)),
-        new(new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)), new Vector3I(3, 0, 3)),
+        new(new UnitLoadout(TestData.MakeCombatant("Alpha", player)), new Vector3I(99, 0, 0)),
+        new(new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)), new Vector3I(3, 0, 3)),
       },
     };
 
-    Assert.Equal(BattleSetupFailureReason.SpawnCellUnavailable, ExpectFailure(BattleFactory.Start(offBoard)).Reason);
+    Assert.Equal(BattleSetupFailureReason.SpawnCellUnavailable, BattleFactory.Start(offBoard).RequireLeft().Reason);
   }
 
   [TestCase(TestName = "Start fails when two units share a spawn cell")]
@@ -148,12 +138,12 @@ public class BattleFactoryTest
     {
       Placements = new List<UnitPlacement>
       {
-        new(new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)), new Vector3I(1, 0, 1)),
-        new(new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)), new Vector3I(1, 0, 1)),
+        new(new UnitLoadout(TestData.MakeCombatant("Alpha", player)), new Vector3I(1, 0, 1)),
+        new(new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)), new Vector3I(1, 0, 1)),
       },
     };
 
-    Assert.Equal(BattleSetupFailureReason.DuplicateSpawnCell, ExpectFailure(BattleFactory.Start(collision)).Reason);
+    Assert.Equal(BattleSetupFailureReason.DuplicateSpawnCell, BattleFactory.Start(collision).RequireLeft().Reason);
   }
 
   [TestCase(TestName = "Start throws on null placements")]
@@ -187,19 +177,19 @@ public class BattleFactoryTest
   // non-walkable, then makes walkable only the cells present in Tiles (BattleMapTileData.Walkable
   // defaults to true) — so exactly the two cells below are walkable spawn cells, one per slot.
   private static BattleMapData TwoSlotMap() =>
-    MakeMapData(new Vector3I(4, 1, 4),
-      (new Vector3I(0, 0, 0), SpawnTile(0)),
-      (new Vector3I(3, 0, 3), SpawnTile(1)));
+    TestData.MakeMapData(new Vector3I(4, 1, 4),
+      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(3, 0, 3), TestData.SpawnTile(1)));
 
   [TestCase(TestName = "StartFromMap builds the board, assigns spawns, and starts")]
   public void StartFromMapHappyPath()
   {
-    var player = BattleTestFactory.MakeFaction("Player");
-    var enemy = BattleTestFactory.MakeFaction("Enemy");
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
     var rosters = new Dictionary<int, IReadOnlyList<UnitLoadout>>
     {
-      [0] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)) },
-      [1] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)) },
+      [0] = new[] { new UnitLoadout(TestData.MakeCombatant("Alpha", player)) },
+      [1] = new[] { new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)) },
     };
     var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
@@ -208,7 +198,7 @@ public class BattleFactoryTest
     };
     var setup = new MapBattleSetup(TwoSlotMap(), new[] { player, enemy }, rosters, objectives);
 
-    BattleRuntime runtime = UnwrapStart(BattleFactory.StartFromMap(setup));
+    using var runtime = BattleFactory.StartFromMap(setup).RequireRight();
 
     var alpha = runtime.Query(new GetFactionAliveUnits(player)).AsValueEnumerable().Single();
     var bandit = runtime.Query(new GetFactionAliveUnits(enemy)).AsValueEnumerable().Single();
@@ -219,17 +209,17 @@ public class BattleFactoryTest
   [TestCase(TestName = "StartFromMap fails when a slot has fewer cells than its roster")]
   public void StartFromMapShortfall()
   {
-    var player = BattleTestFactory.MakeFaction("Player");
-    var enemy = BattleTestFactory.MakeFaction("Enemy");
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
     var rosters = new Dictionary<int, IReadOnlyList<UnitLoadout>>
     {
       // Slot 0 has two units but the map only tags one slot-0 cell.
       [0] = new[]
       {
-        new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)),
-        new UnitLoadout(BattleTestFactory.MakeCombatant("Beta", player)),
+        new UnitLoadout(TestData.MakeCombatant("Alpha", player)),
+        new UnitLoadout(TestData.MakeCombatant("Beta", player)),
       },
-      [1] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)) },
+      [1] = new[] { new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)) },
     };
     var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
@@ -238,18 +228,18 @@ public class BattleFactoryTest
     };
     var setup = new MapBattleSetup(TwoSlotMap(), new[] { player, enemy }, rosters, objectives);
 
-    Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall, ExpectFailure(BattleFactory.StartFromMap(setup)).Reason);
+    Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall, BattleFactory.StartFromMap(setup).RequireLeft().Reason);
   }
 
   [TestCase(TestName = "StartFromMap fails when a slot index is out of range")]
   public void StartFromMapInvalidSlot()
   {
-    var player = BattleTestFactory.MakeFaction("Player");
-    var enemy = BattleTestFactory.MakeFaction("Enemy");
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
     var rosters = new Dictionary<int, IReadOnlyList<UnitLoadout>>
     {
-      [0] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)) },
-      [5] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)) }, // out of range
+      [0] = new[] { new UnitLoadout(TestData.MakeCombatant("Alpha", player)) },
+      [5] = new[] { new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)) }, // out of range
     };
     var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
@@ -258,19 +248,19 @@ public class BattleFactoryTest
     };
     var setup = new MapBattleSetup(TwoSlotMap(), new[] { player, enemy }, rosters, objectives);
 
-    Assert.Equal(BattleSetupFailureReason.InvalidSpawnSlot, ExpectFailure(BattleFactory.StartFromMap(setup)).Reason);
+    Assert.Equal(BattleSetupFailureReason.InvalidSpawnSlot, BattleFactory.StartFromMap(setup).RequireLeft().Reason);
   }
 
   [TestCase(TestName = "StartFromMap fails when a slot's unit belongs to the wrong faction")]
   public void StartFromMapSlotFactionMismatch()
   {
-    var player = BattleTestFactory.MakeFaction("Player");
-    var enemy = BattleTestFactory.MakeFaction("Enemy");
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
     var rosters = new Dictionary<int, IReadOnlyList<UnitLoadout>>
     {
       // Slot 0 maps to FactionOrder[0] = player, but this unit belongs to enemy.
-      [0] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Wrong", enemy)) },
-      [1] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)) },
+      [0] = new[] { new UnitLoadout(TestData.MakeCombatant("Wrong", enemy)) },
+      [1] = new[] { new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)) },
     };
     var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
@@ -279,23 +269,23 @@ public class BattleFactoryTest
     };
     var setup = new MapBattleSetup(TwoSlotMap(), new[] { player, enemy }, rosters, objectives);
 
-    Assert.Equal(BattleSetupFailureReason.SlotFactionMismatch, ExpectFailure(BattleFactory.StartFromMap(setup)).Reason);
+    Assert.Equal(BattleSetupFailureReason.SlotFactionMismatch, BattleFactory.StartFromMap(setup).RequireLeft().Reason);
   }
 
   [TestCase(TestName = "StartFromMap fails when a spawn cell is not walkable")]
   public void StartFromMapNonWalkableSpawnCell()
   {
-    var player = BattleTestFactory.MakeFaction("Player");
-    var enemy = BattleTestFactory.MakeFaction("Enemy");
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
     // Slot-0 spawn cell is explicitly non-walkable: AssignSpawns still picks it, but the baked
     // board rejects occupancy, which must surface as a recoverable Left (not a thrown exception).
-    var map = MakeMapData(new Vector3I(4, 1, 4),
+    var map = TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(0, 0, 0), new BattleMapTileData { SpawnFactionSlot = 0, Walkable = false }),
-      (new Vector3I(3, 0, 3), SpawnTile(1)));
+      (new Vector3I(3, 0, 3), TestData.SpawnTile(1)));
     var rosters = new Dictionary<int, IReadOnlyList<UnitLoadout>>
     {
-      [0] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Alpha", player)) },
-      [1] = new[] { new UnitLoadout(BattleTestFactory.MakeCombatant("Bandit", enemy)) },
+      [0] = new[] { new UnitLoadout(TestData.MakeCombatant("Alpha", player)) },
+      [1] = new[] { new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)) },
     };
     var objectives = new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
     {
@@ -304,7 +294,7 @@ public class BattleFactoryTest
     };
     var setup = new MapBattleSetup(map, new[] { player, enemy }, rosters, objectives);
 
-    Assert.Equal(BattleSetupFailureReason.SpawnCellUnavailable, ExpectFailure(BattleFactory.StartFromMap(setup)).Reason);
+    Assert.Equal(BattleSetupFailureReason.SpawnCellUnavailable, BattleFactory.StartFromMap(setup).RequireLeft().Reason);
   }
 
 
@@ -323,21 +313,21 @@ public class BattleFactoryTest
       MovementStat = new FunProject.Stats.MovementStat { BaseValue = 12 },
       VisionStat = new FunProject.Stats.VisionStat { BaseValue = 20 },
       AimStat = new FunProject.Stats.AimStat { BaseValue = 65 },
-      RankTable = FunProject.Tests.ProgressionTestFactory.Ladder,
+      RankTable = TestData.MakeRankTable(),
     };
 
     var type = new BattleTypeData { Name = "Bomb Defusal" };
-    type.MapPool.Add(BattleTestFactory.MakeMapData(
+    type.MapPool.Add(TestData.MakeMapData(
       new Vector3I(4, 1, 4),
-      (new Vector3I(0, 0, 0), BattleTestFactory.SpawnTile(0)),
-      (new Vector3I(1, 0, 0), BattleTestFactory.SpawnTile(0)),
-      (new Vector3I(2, 0, 3), BattleTestFactory.SpawnTile(1)),
-      (new Vector3I(3, 0, 3), BattleTestFactory.FloorTile())));
-    type.MapPool.Add(BattleTestFactory.MakeMapData(
+      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(1, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(2, 0, 3), TestData.SpawnTile(1)),
+      (new Vector3I(3, 0, 3), TestData.FloorTile())));
+    type.MapPool.Add(TestData.MakeMapData(
       new Vector3I(4, 1, 4),
-      (new Vector3I(0, 0, 0), BattleTestFactory.SpawnTile(0)),
-      (new Vector3I(1, 0, 0), BattleTestFactory.SpawnTile(0)),
-      (new Vector3I(0, 0, 1), BattleTestFactory.SpawnTile(1))));
+      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(1, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(0, 0, 1), TestData.SpawnTile(1))));
 
     var playerDeployment = new FactionDeploymentData { Faction = playerFaction };
     playerDeployment.Roster.Add(new RosterEntryData { Combatant = trooper, Quantity = 2 });
@@ -366,7 +356,7 @@ public class BattleFactoryTest
     placement.Positions.Add(new Godot.Vector3I(3, 0, 3));
     type.Objects.Add(placement);
 
-    BattleRuntime runtime = UnwrapStart(BattleFactory.Start(type, seed: 7));
+    using var runtime = BattleFactory.Start(type, seed: 7).RequireRight();
 
     int units = 0;
     for (int x = 0; x < 4; x++)
@@ -389,9 +379,9 @@ public class BattleFactoryTest
   public void SeedDeterminism()
   {
     BattleTypeData type = MakeBattleType();
-    string first = LayoutFingerprint(UnwrapStart(BattleFactory.Start(type, seed: 7)));
-    string second = LayoutFingerprint(UnwrapStart(BattleFactory.Start(type, seed: 7)));
-    Assert.Equal(first, second);
+    using var firstRuntime = BattleFactory.Start(type, seed: 7).RequireRight();
+    using var secondRuntime = BattleFactory.Start(type, seed: 7).RequireRight();
+    Assert.Equal(LayoutFingerprint(firstRuntime), LayoutFingerprint(secondRuntime));
   }
 
   private static string LayoutFingerprint(BattleRuntime runtime)
@@ -418,20 +408,20 @@ public class BattleFactoryTest
       MovementStat = new FunProject.Stats.MovementStat { BaseValue = 12 },
       VisionStat = new FunProject.Stats.VisionStat { BaseValue = 20 },
       AimStat = new FunProject.Stats.AimStat { BaseValue = 65 },
-      RankTable = FunProject.Tests.ProgressionTestFactory.Ladder,
+      RankTable = TestData.MakeRankTable(),
     };
 
     var type = new BattleTypeData { Name = "Duel" };
-    type.MapPool.Add(BattleTestFactory.MakeMapData(
+    type.MapPool.Add(TestData.MakeMapData(
       new Vector3I(2, 1, 1),
-      (new Vector3I(0, 0, 0), BattleTestFactory.SpawnTile(0)),
-      (new Vector3I(1, 0, 0), BattleTestFactory.SpawnTile(1))));
+      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(1, 0, 0), TestData.SpawnTile(1))));
 
     var playerDeployment = new FactionDeploymentData { Faction = playerFaction };
     playerDeployment.Roster.Add(new RosterEntryData
     {
       Combatant = shooter,
-      Weapon = BattleTestFactory.MakeWeaponData(damage: 5, range: 10),
+      Weapon = TestData.MakeWeaponData(damage: 5, range: 10),
     });
     playerDeployment.Objectives.Add(new FakeObjectiveData());
 
@@ -439,7 +429,7 @@ public class BattleFactoryTest
     enemyDeployment.Roster.Add(new RosterEntryData
     {
       Combatant = shooter,
-      Weapon = BattleTestFactory.MakeWeaponData(damage: 5, range: 10),
+      Weapon = TestData.MakeWeaponData(damage: 5, range: 10),
     });
     enemyDeployment.Objectives.Add(new FakeObjectiveData());
 
@@ -475,11 +465,11 @@ public class BattleFactoryTest
     var foreignFaction = new Faction(new FactionData { Name = "Override" });
     var loadouts = new List<UnitLoadout>
     {
-      new(BattleTestFactory.MakeCombatant("Vet", foreignFaction)),
+      new(TestData.MakeCombatant("Vet", foreignFaction)),
     };
 
-    using BattleRuntime runtime = UnwrapStart(BattleFactory.Start(
-      type, seed: 42, playerRosterOverride: Some((IReadOnlyList<UnitLoadout>)loadouts)));
+    using BattleRuntime runtime = BattleFactory.Start(
+      type, seed: 42, playerRosterOverride: Some((IReadOnlyList<UnitLoadout>)loadouts)).RequireRight();
     Faction playerFaction = runtime.Query(new GetPlayerFactionQuery()).RequireSome();
 
     int playerUnits = 0;
@@ -502,8 +492,8 @@ public class BattleFactoryTest
   {
     BattleTypeData type = MakeDuelBattleType();
 
-    using BattleRuntime first = UnwrapStart(BattleFactory.Start(type, seed: 7));
-    using BattleRuntime second = UnwrapStart(BattleFactory.Start(type, seed: 7));
+    using BattleRuntime first = BattleFactory.Start(type, seed: 7).RequireRight();
+    using BattleRuntime second = BattleFactory.Start(type, seed: 7).RequireRight();
 
     Assert.Equal(FirstAttackHits(first), FirstAttackHits(second));
   }
@@ -513,7 +503,7 @@ public class BattleFactoryTest
   {
     var type = new BattleTypeData { Name = "Broken" };
     Assert.Equal(BattleSetupFailureReason.EmptyMapPool,
-      ExpectFailure(BattleFactory.Start(type)).Reason);
+      BattleFactory.Start(type).RequireLeft().Reason);
   }
 
   [TestCase(TestName = "Out-of-range player faction index is a typed failure")]
@@ -522,6 +512,6 @@ public class BattleFactoryTest
     BattleTypeData type = MakeBattleType();
     type.PlayerFactionIndex = 5;
     Assert.Equal(BattleSetupFailureReason.UnknownFaction,
-      ExpectFailure(BattleFactory.Start(type, seed: 42)).Reason);
+      BattleFactory.Start(type, seed: 42).RequireLeft().Reason);
   }
 }

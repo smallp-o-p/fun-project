@@ -13,7 +13,7 @@ public class WeaponSystemTest
     var data = new FirearmWeaponData
     {
       Name = "Fists",
-      Frame = BattleTestFactory.MakeFrame(),
+      Frame = TestData.MakeFrame(),
       DamageStat = new DamageStat { BaseValue = 10 },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
       RangeStat = new RangeStat { BaseValue = 1 },
@@ -33,7 +33,7 @@ public class WeaponSystemTest
   {
     var data = new FirearmWeaponData
     {
-      Frame = BattleTestFactory.MakeFrame(),
+      Frame = TestData.MakeFrame(),
       DamageStat = new DamageStat { BaseValue = 15 },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = 10 },
       RangeStat = new RangeStat { BaseValue = 20 },
@@ -49,14 +49,14 @@ public class WeaponSystemTest
   [TestCase(TestName = "MeleeWeapon stats dictionary has no ammo entry")]
   public void MeleeWeaponStatsDictionaryHasNoAmmoEntry()
   {
-    var weapon = new MeleeWeapon(BattleTestFactory.MakeWeaponData());
+    var weapon = new MeleeWeapon(TestData.MakeWeaponData());
     Assert.True(weapon.TryGetStat<AmmunitionStat>().IsNone);
   }
 
   [TestCase(TestName = "Weapon generic stat lookup returns concrete stats")]
   public void WeaponGenericStatLookupReturnsConcreteStats()
   {
-    var weapon = new MeleeWeapon(BattleTestFactory.MakeWeaponData());
+    var weapon = new MeleeWeapon(TestData.MakeWeaponData());
 
     Assert.Equal(10, weapon.GetStat<DamageStat>().BaseValue);
     Option<RangeStat> range = weapon.TryGetStat<RangeStat>();
@@ -68,7 +68,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "Firearm generic stat lookup returns the ammunition stat")]
   public void FirearmGenericStatLookupReturnsAmmunitionStat()
   {
-    var weapon = new FirearmWeapon(BattleTestFactory.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1));
+    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1));
 
     Option<AmmunitionStat> ammoStat = weapon.TryGetStat<AmmunitionStat>();
     Assert.True(ammoStat.IsSome);
@@ -114,7 +114,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "Concrete stat mods target stats by class without enum metadata")]
   public void ConcreteStatModsTargetStatsByClassWithoutEnumMetadata()
   {
-    var weapon = new MeleeWeapon(BattleTestFactory.MakeWeaponData());
+    var weapon = new MeleeWeapon(TestData.MakeWeaponData());
     StatMod[] sources = [new RangeStatMod { Modifiers = [StatModifier.Add(4)] }];
     Assert.Equal(5f, weapon.Resolve<RangeStat>(sources));
   }
@@ -138,7 +138,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "MultiStatMod stacks two mods on the same stat")]
   public void MultiStatModStacksSameStat()
   {
-    var data = BattleTestFactory.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
+    var data = TestData.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
     data.RangeStat.BaseValue = 10;
     var weapon = new FirearmWeapon(data);
     weapon.GetModSlots()[0].Equip(new MultiStatMod
@@ -156,7 +156,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "Weapon with mod slot produces correct effective range")]
   public void WeaponWithModSlotProducesCorrectRange()
   {
-    var data = BattleTestFactory.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
+    var data = TestData.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
     data.RangeStat.BaseValue = 10;
     var weapon = new FirearmWeapon(data);
     weapon.GetModSlots()[0].Equip(new MultiStatMod
@@ -171,7 +171,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "Weapon mod slot can equip a multi-stat mod")]
   public void WeaponModSlotCanEquipMultiStatMod()
   {
-    var data = BattleTestFactory.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
+    var data = TestData.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
     var weapon = new FirearmWeapon(data);
     weapon.GetModSlots()[0].Equip(new MultiStatMod
     {
@@ -189,7 +189,7 @@ public class WeaponSystemTest
   [TestCase(TestName = "Two slots with different stat targets both apply")]
   public void MultipleModSlotsWithDifferentStatTargets()
   {
-    var data = BattleTestFactory.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
+    var data = TestData.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1);
     data.Capabilities = [new ModSlotsCapabilityData { SlotCount = 2 }];
     var weapon = new FirearmWeapon(data);
     weapon.GetModSlots()[0].Equip(new MultiStatMod { StatMods = [new RangeStatMod { Modifiers = [StatModifier.Add(10)] }] });

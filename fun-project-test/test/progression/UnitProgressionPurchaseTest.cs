@@ -1,7 +1,6 @@
 using System;
 using FunProject.Progression;
 using GdUnit4;
-using static FunProject.Tests.ProgressionTestFactory;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -11,9 +10,9 @@ public partial class UnitProgressionPurchaseTest
   public void LinearUnlockOrderAndCost()
   {
     var progression = new UnitProgression();
-    var step1 = MakeStep(1);
-    var step2 = MakeStep(1);
-    var path = MakePath("Alpha", step1, step2);
+    var step1 = TestData.MakeStep(1);
+    var step2 = TestData.MakeStep(1);
+    var path = TestData.MakePath("Alpha", step1, step2);
     progression.TryCommit(path);
 
     progression.AwardPoints(2);
@@ -33,7 +32,7 @@ public partial class UnitProgressionPurchaseTest
   public void UnaffordableAndCompleteReturnNone()
   {
     var progression = new UnitProgression();
-    var path = MakePath("Alpha", MakeStep(3));
+    var path = TestData.MakePath("Alpha", TestData.MakeStep(3));
     progression.TryCommit(path);
 
     Assert.True(progression.TryUnlockNext(path).IsNone); // 0 < 3: cannot afford
@@ -51,7 +50,7 @@ public partial class UnitProgressionPurchaseTest
   public void ZeroCostStepThrows()
   {
     var progression = new UnitProgression();
-    var path = MakePath("Alpha", MakeStep(0));
+    var path = TestData.MakePath("Alpha", TestData.MakeStep(0));
     progression.TryCommit(path);
 
     Assert.Throws<InvalidOperationException>(() => progression.TryUnlockNext(path));
@@ -62,7 +61,7 @@ public partial class UnitProgressionPurchaseTest
   public void UncommittedPathReturnsNone()
   {
     var progression = new UnitProgression();
-    var path = MakePath("Alpha", MakeStep(1));
+    var path = TestData.MakePath("Alpha", TestData.MakeStep(1));
 
     Assert.True(progression.TryUnlockNext(path).IsNone);
     Assert.True(progression.NextStep(path).IsNone);
