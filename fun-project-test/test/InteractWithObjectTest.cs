@@ -14,45 +14,29 @@ public class InteractWithObjectTest
     return data;
   }
 
-  private static (BattleSession Session, BattleActionExecutor Executor, BattleTestUnit Unit, BattleObjectState Object, BattleBoardState.ValidatedPoint ObjectPoint) ArmedBattle(
-    int unitActionPoints = 4,
-    int actionPointCost = 2)
-  {
-    var player = BattleTestFactory.MakeFaction("P");
-    var enemy = BattleTestFactory.MakeFaction("E");
-    BattleSession session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [player, enemy]);
-    BattleActionExecutor executor = BattleActionTestHelper.ExecutorFor(session);
-
-    var unit = BattleActionTestHelper.SpawnUnit(session,
-      BattleTestFactory.MakeCombatant("A", player, actionPoints: unitActionPoints),
-      new Vector3I(1, 0, 1));
-
-    var point = session.Board.At(new Vector3I(2, 0, 1));
-    executor.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(actionPointCost), point));
-    var bomb = session.Objects.AsValueEnumerable().Single();
-
-    return (session, executor, unit, bomb, point);
-  }
-
   [TestCase(TestName = "Adjacent interact spends AP, defuses, clears occupancy, raises event")]
   public void HappyPathInteract()
   {
-    var (session, executor, unit, bomb, point) = ArmedBattle();
-    var recorder = new BattleEventRecorder(session);
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
+    var unit = battle.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
+    BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
+    var placement = battle.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(), point));
+    var bomb = placement.EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
+    battle.ClearEvents();
 
-    int apBefore = unit.State.CurrentActionPoints;
-    executor.Submit(BattleAction.InteractWithObject(
-      session.TryGetAlive(unit.State).RequireSome(),
-      session.TryGetAliveObject(bomb).RequireSome()));
+    int apBefore = unit.CurrentActionPoints;
+    battle.Interact(unit, bomb);
 
     Assert.Equal(Some(ObjectStatus.Interacted), bomb.Status);
-    Assert.Equal(apBefore - 2, unit.State.CurrentActionPoints);
-    Assert.True(session.TryGetAliveObject(bomb).IsNone);
-    Assert.False(session.Board.IsBlockedByObject(point));
+    Assert.Equal(apBefore - 2, unit.CurrentActionPoints);
+    Assert.True(battle.Session.TryGetAliveObject(bomb).IsNone);
+    Assert.False(battle.Session.Board.IsBlockedByObject(point));
     Assert.Equal(point.Raw, bomb.Position);
 
-    ObjectInteractedBattleEvent @event = recorder.Single<ObjectInteractedBattleEvent>();
-    Assert.Equal(unit.State, @event.Actor);
+    ObjectInteractedBattleEvent @event = battle.Events.SingleEvent<ObjectInteractedBattleEvent>();
+    Assert.Equal(unit, @event.Actor);
     Assert.Equal(bomb, @event.Object);
     Assert.Equal(point, @event.Position);
   }
@@ -60,37 +44,51 @@ public class InteractWithObjectTest
   [TestCase(TestName = "Insufficient action points throw before object mutation")]
   public void InsufficientActionPointsDoNotMutateObject()
   {
-    var (session, executor, unit, bomb, point) = ArmedBattle(unitActionPoints: 1, actionPointCost: 2);
-    var recorder = new BattleEventRecorder(session);
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
+    var unit = battle.Spawn(TestData.MakeCombatant("A", player, actionPoints: 1), new Vector3I(1, 0, 1));
+    BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
+    var placement = battle.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(actionPointCost: 2), point));
+    var bomb = placement.EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
+    battle.ClearEvents();
 
-    Assert.Throws<InvalidOperationException>(() => executor.Submit(
-      BattleAction.InteractWithObject(
-        session.TryGetAlive(unit.State).RequireSome(),
-        session.TryGetAliveObject(bomb).RequireSome())));
+    Assert.Throws<InvalidOperationException>(() => battle.Submit(
+      BattleAction.InteractWithObject(battle.Alive(unit), battle.Live(bomb))));
 
     Assert.True(bomb.Status.IsNone);
-    Assert.True(session.TryGetAliveObject(bomb).IsSome);
-    Assert.True(session.Board.IsBlockedByObject(point));
+    Assert.True(battle.Session.TryGetAliveObject(bomb).IsSome);
+    Assert.True(battle.Session.Board.IsBlockedByObject(point));
     Assert.Equal(point.Raw, bomb.Position);
-    Assert.Equal(0, recorder.OfType<ObjectInteractedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().AsValueEnumerable().Count());
   }
 
   [TestCase(TestName = "Foreign object proofs interrupt instead of touching local occupancy")]
   public void ForeignObjectProofIsInterrupted()
   {
-    var (localSession, _, localUnit, localBomb, localPoint) = ArmedBattle();
-    var (foreignSession, _, _, foreignBomb, _) = ArmedBattle();
-    LiveObject foreignProof = foreignSession.TryGetAliveObject(foreignBomb).RequireSome();
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
+    using var local = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
+    var localUnit = local.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
+    BattleBoardState.ValidatedPoint localPoint = local.At(new Vector3I(2, 0, 1));
+    var localPlacement = local.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(), localPoint));
+    var localBomb = localPlacement.EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
+
+    using var foreign = new BattleFixture(new Vector3I(4, 1, 4), [TestData.MakeFaction("P"), TestData.MakeFaction("E")]);
+    foreign.Spawn(TestData.MakeCombatant("A", foreign.PlayerFaction), new Vector3I(1, 0, 1));
+    BattleBoardState.ValidatedPoint foreignPoint = foreign.At(new Vector3I(2, 0, 1));
+    var foreignPlacement = foreign.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(), foreignPoint));
+    var foreignBomb = foreignPlacement.EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
+
+    LiveObject foreignProof = foreign.Live(foreignBomb);
 
     Assert.Equal(
       BattleAction.Result.Interrupted,
-      BattleAction.InteractWithObject(
-        localSession.TryGetAlive(localUnit.State).RequireSome(),
-        foreignProof).Execute(localSession));
+      BattleAction.InteractWithObject(local.Alive(localUnit), foreignProof).Execute(local.Session));
 
     Assert.True(localBomb.Status.IsNone);
-    Assert.True(localSession.TryGetAliveObject(localBomb).IsSome);
-    Assert.True(localSession.Board.IsBlockedByObject(localPoint));
+    Assert.True(local.Session.TryGetAliveObject(localBomb).IsSome);
+    Assert.True(local.Session.Board.IsBlockedByObject(localPoint));
     Assert.Equal(localPoint.Raw, localBomb.Position);
     Assert.True(foreignBomb.Status.IsNone);
   }
@@ -98,26 +96,21 @@ public class InteractWithObjectTest
   [TestCase(TestName = "A defused object keeps stale proofs from executing")]
   public void StaleProofIsInterrupted()
   {
-    var player = BattleTestFactory.MakeFaction("P");
-    var enemy = BattleTestFactory.MakeFaction("E");
-    BattleSession session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [player, enemy]);
-    BattleActionExecutor executor = BattleActionTestHelper.ExecutorFor(session);
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
+    var unit = battle.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
+    BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
+    var placement = battle.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(), point));
+    var bomb = placement.EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
 
-    var unit = BattleActionTestHelper.SpawnUnit(session,
-      BattleTestFactory.MakeCombatant("A", player),
-      new Vector3I(1, 0, 1));
+    AliveUnit unitProof = battle.Alive(unit);
+    LiveObject objectProof = battle.Live(bomb);
 
-    var point = session.Board.At(new Vector3I(2, 0, 1));
-    executor.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(), point));
-    var bomb = session.Objects.AsValueEnumerable().Single();
+    battle.Submit(BattleAction.InteractWithObject(unitProof, objectProof));
 
-    AliveUnit unitProof = session.TryGetAlive(unit.State).RequireSome();
-    LiveObject objectProof = session.TryGetAliveObject(bomb).RequireSome();
-
-    executor.Submit(BattleAction.InteractWithObject(unitProof, objectProof));
-
-    Assert.True(session.TryGetAliveObject(bomb).IsNone);
+    Assert.True(battle.Session.TryGetAliveObject(bomb).IsNone);
     Assert.Equal(BattleAction.Result.Interrupted,
-      BattleAction.InteractWithObject(unitProof, objectProof).Execute(session));
+      BattleAction.InteractWithObject(unitProof, objectProof).Execute(battle.Session));
   }
 }

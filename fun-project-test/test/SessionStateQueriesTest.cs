@@ -9,18 +9,13 @@ public sealed partial class SessionStateQueriesTest
   [TestCase(TestName = "Active side and phase queries read live session truth")]
   public void ActiveSideAndPhaseQueriesReadSessionTruth()
   {
-    var battle = new BattleDuelBuilder
-    {
-      Player = new("Hero"),
-      Enemy = new("Goon"),
-    }.Start();
-    using var runtime = new BattleRuntime(battle.Session);
+    using var battle = BattleFixture.Duel(player: new("Hero"), enemy: new("Goon"));
 
-    Assert.Equal(BattlePhase.InProgress, runtime.Query(new GetBattlePhaseQuery()));
-    Assert.Equal(battle.PlayerFaction, runtime.Query(new GetActiveSideQuery()));
+    Assert.Equal(BattlePhase.InProgress, battle.Query(new GetBattlePhaseQuery()));
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
 
-    runtime.ExecuteAction(BattleAction.EndFactionTurn(battle.PlayerFaction));
+    battle.EndFactionTurn(battle.PlayerFaction);
 
-    Assert.Equal(battle.EnemyFaction, runtime.Query(new GetActiveSideQuery()));
+    Assert.Equal(battle.EnemyFaction, battle.Query(new GetActiveSideQuery()));
   }
 }

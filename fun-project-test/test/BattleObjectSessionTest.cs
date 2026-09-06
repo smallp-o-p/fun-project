@@ -30,60 +30,60 @@ public class BattleObjectSessionTest
   [TestCase(TestName = "PlaceObject during setup occupies the tile and mints a live proof")]
   public void PlacementBlocksOccupancy()
   {
-    var player = BattleTestFactory.MakeFaction("P");
-    var enemy = BattleTestFactory.MakeFaction("E");
-    BattleSession session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [player, enemy]);
-    BattleActionExecutor executor = BattleActionTestHelper.ExecutorFor(session);
-    BattleActionTestHelper.SpawnUnit(session, BattleTestFactory.MakeCombatant("A", player), new Vector3I(0, 0, 0));
-    BattleActionTestHelper.SpawnUnit(session, BattleTestFactory.MakeCombatant("B", enemy), new Vector3I(3, 0, 3));
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
+    var session = battle.Session;
+    battle.Spawn(TestData.MakeCombatant("A", player), new Vector3I(0, 0, 0));
+    battle.Spawn(TestData.MakeCombatant("B", enemy), new Vector3I(3, 0, 3));
 
-    BattleBoardState.ValidatedPoint point = session.Board.At(new Vector3I(2, 0, 2));
-    executor.Submit(BattleAction.PlaceObject(MakeBombData(), point));
+    BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 2));
+    battle.Submit(BattleAction.PlaceObject(MakeBombData(), point));
 
     BattleObjectState[] objects = [.. session.Objects];
     Assert.Equal(1, objects.Length);
     BattleObjectState bomb = objects[0];
     Assert.True(bomb.Status.IsNone);
-    Assert.Equal(point, session.TryGetAliveObject(bomb).RequireSome().Position);
+    Assert.Equal(point, battle.Live(bomb).Position);
     Assert.Equal(point.Raw, bomb.Position);
 
     // Occupancy: a unit cannot spawn onto the object tile (a rejected SpawnUnit surfaces
     // from Submit as an InvalidOperationException — trusted parameters).
-    var spawn = new SpawnUnit(BattleTestFactory.MakeCombatant("X", player), point);
-    Assert.Throws<System.InvalidOperationException>(() => executor.Submit(spawn));
+    var spawn = new SpawnUnit(TestData.MakeCombatant("X", player), point);
+    Assert.Throws<System.InvalidOperationException>(() => battle.Submit(spawn));
 
     // A second object cannot take the same tile.
-    Assert.Throws<System.InvalidOperationException>(() => executor.Submit(
+    Assert.Throws<System.InvalidOperationException>(() => battle.Submit(
       BattleAction.PlaceObject(MakeBombData(), point)));
   }
 
   [TestCase(TestName = "PlaceObject is rejected once the battle is in progress")]
   public void MidBattlePlacementRejected()
   {
-    var player = BattleTestFactory.MakeFaction("P");
-    var enemy = BattleTestFactory.MakeFaction("E");
-    BattleRuntime runtime = BattleTestFactory.StartRuntime(new Vector3I(4, 1, 4),
-      new StartPlacement(player, BattleTestFactory.MakeCombatant("A", player), new Vector3I(0, 0, 0)),
-      new StartPlacement(enemy, BattleTestFactory.MakeCombatant("B", enemy), new Vector3I(3, 0, 3)));
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
+    using var battle = BattleFixture.Started(new Vector3I(4, 1, 4),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)));
 
-    BattleBoardState.ValidatedPoint point = runtime.TryGetTile(new Vector3I(2, 0, 2)).RequireSome();
-    Assert.Throws<System.InvalidOperationException>(() => runtime.ExecuteAction(
+    BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 2));
+    Assert.Throws<System.InvalidOperationException>(() => battle.Submit(
       BattleAction.PlaceObject(MakeBombData(), point)));
-    Assert.Equal(0, runtime.Query(new GetBattleSpecialObjectsQuery()).Count);
+    Assert.Equal(0, battle.Query(new GetBattleSpecialObjectsQuery()).Count);
   }
 
   [TestCase(TestName = "Player faction query returns the started faction")]
   public void PlayerFactionQueryReturnsStartedFaction()
   {
-    var player = BattleTestFactory.MakeFaction("P");
-    var enemy = BattleTestFactory.MakeFaction("E");
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
 
-    BattleRuntime runtime = UnwrapStart(BattleFactory.Start(new BattleSetup(
+    using BattleRuntime runtime = UnwrapStart(BattleFactory.Start(new BattleSetup(
       new BattleBoardState(new Vector3I(4, 1, 4)),
       [player, enemy],
       [
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
       ],
       new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
       {
@@ -98,8 +98,8 @@ public class BattleObjectSessionTest
   [TestCase(TestName = "Start(setup) places objects and reports typed failures")]
   public void StartPlacesObjectsAndValidates()
   {
-    var player = BattleTestFactory.MakeFaction("P");
-    var enemy = BattleTestFactory.MakeFaction("E");
+    var player = TestData.MakeFaction("P");
+    var enemy = TestData.MakeFaction("E");
 
     // Start mutates the board it is given, so every case builds a FRESH setup + board —
     // never reuse a setup across Start calls.
@@ -107,8 +107,8 @@ public class BattleObjectSessionTest
       new BattleBoardState(new Vector3I(4, 1, 4)),
       [player, enemy],
       [
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
-        new UnitPlacement(new UnitLoadout(BattleTestFactory.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
+        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
       ],
       new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
       {
@@ -118,7 +118,7 @@ public class BattleObjectSessionTest
       Objects: objects);
 
     // Happy path: two objects placed.
-    BattleRuntime runtime = UnwrapStart(BattleFactory.Start(SetupWith(
+    using BattleRuntime runtime = UnwrapStart(BattleFactory.Start(SetupWith(
     [
       new ObjectPlacement(MakeBombData(), new Vector3I(1, 0, 1)),
       new ObjectPlacement(MakeBombData(), new Vector3I(2, 0, 2)),
