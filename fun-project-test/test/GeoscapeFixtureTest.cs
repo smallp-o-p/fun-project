@@ -28,6 +28,19 @@ public partial class GeoscapeFixtureTest
   }
 
   [TestCase]
+  public void NegativeTickAdvancementLeavesSessionUnchanged()
+  {
+    using var campaign = new GeoscapeFixture();
+
+    Assert.Throws<ArgumentOutOfRangeException>(() => campaign.AdvanceTicks(-1));
+
+    Assert.Equal(TimeSpeed.Paused, campaign.Session.Speed);
+    Assert.Equal(0L, campaign.State.Tick);
+    Assert.Equal(0L, campaign.Session.Tick);
+    Assert.Equal(0, campaign.Events.Count);
+  }
+
+  [TestCase]
   public void DisposalDetachesTheRecorderFromTheRetainedSession()
   {
     var campaign = new GeoscapeFixture();

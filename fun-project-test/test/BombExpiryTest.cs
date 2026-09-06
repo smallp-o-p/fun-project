@@ -99,7 +99,7 @@ public class BombExpiryTest
       [
         new ObjectPlacement(MakeBomb(expireAfterTurns: 1, baseDamage: 8), new Vector3I(1, 0, 0)),
       ])).RequireRight();
-    var events = new System.Collections.Generic.List<BattleEvent>();
+    List<BattleEvent> events = [];
     runtime.BattleEventCommitted += events.Add;
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
 
