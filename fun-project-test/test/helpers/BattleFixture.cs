@@ -14,8 +14,11 @@ namespace FunProject.Tests;
 // instance, the runtime owns the session's single executor, and the fixture records every
 // committed event behind an explicit assertion window (ClearEvents starts a new one; nothing
 // clears it implicitly). Spawn/UnitAt return the native BattleUnitState; Alive/Live/At mint
-// current proofs through the runtime on each call. The Solo/Duel/Started scenario factories
-// and the action conveniences are thin wrappers that submit once through those same doors.
+// current proofs through the runtime on each call. The Solo/Duel/Started/UiBattle scenario
+// factories and the action conveniences are thin wrappers that submit once through those same
+// doors. Presentation objects are retained too: Ui mints one controller bound to the same
+// runtime, and OwnNode/AttachDirector transfer fresh Godot nodes to the fixture so disposal
+// frees them alongside the runtime.
 public sealed class BattleFixture : IDisposable
 {
   private readonly List<BattleEvent> _events = [];
@@ -29,12 +32,14 @@ public sealed class BattleFixture : IDisposable
 
   private Option<BattleUnitState> _playerUnit;
   private Option<BattleUnitState> _enemyUnit;
+  private Option<BattleUnitState> _supportUnit;
 
   public Faction PlayerFaction => Factions[0];
   public Faction EnemyFaction => Factions[1];
   public BattleUnitState PlayerUnit => _playerUnit.RequireSome("This fixture has no player-unit role; use its Spawn result.");
   public BattleUnitState EnemyUnit => _enemyUnit.RequireSome("This fixture has no enemy-unit role; use its Spawn result.");
   public BattleUnitState Unit => PlayerUnit;
+  public BattleUnitState SupportUnit => _supportUnit.RequireSome("This fixture has no support-unit role; only UiBattle provides one.");
 
   public BattleFixture(Vector3I dimensions, IEnumerable<Faction> factions,
     IHitChanceCalculator hitChanceCalculator = null, int? randomSeed = null,
@@ -125,6 +130,30 @@ public sealed class BattleFixture : IDisposable
       battle._enemyUnit = Some(battle.SpawnSide(enemyFaction, enemy ?? new UnitSpec("Hostile"), new Vector3I(4, 0, 4)));
       if (start)
         battle.Start();
+      return battle;
+    }
+    catch
+    {
+      battle.Dispose();
+      throw;
+    }
+  }
+
+  // The presentation scenario: the standard duel (8x1x8, Hero at (4,0,1) with a damage-10
+  // rifle, Goon at (4,0,4) with 10 health) plus a surviving Support at (7,0,7) spawned before
+  // Start, AlwaysHit rolls, and the player configured as the battle's player faction. UI and
+  // director wiring stays lazy: tests reach it through Ui and AttachDirector.
+  public static BattleFixture UiBattle()
+  {
+    var battle = Duel(
+      player: new("Hero", Weapon: TestData.MakeWeapon("Rifle", damage: 10)),
+      enemy: new("Goon", Health: 10),
+      hitChanceCalculator: new AlwaysHitCalculator(), playerControlled: true, start: false);
+    try
+    {
+      battle._supportUnit = Some(battle.Spawn(
+        TestData.MakeCombatant("Support", battle.PlayerFaction), new Vector3I(7, 0, 7)));
+      battle.Start();
       return battle;
     }
     catch
@@ -230,16 +259,85 @@ public sealed class BattleFixture : IDisposable
   public bool UnregisterHook<TEventKey>(BattleHook hook) where TEventKey : BattleEventTag =>
     Runtime.UnregisterHook<TEventKey>(hook);
 
-  // Detaches recording first so a close-time event cannot re-enter the window, then closes
-  // the runtime (which owns and disposes the session's only executor). Idempotent; Events and
-  // the raw Session/Board handles stay inspectable afterwards for lifecycle tests.
+  // ---- Presentation ownership ---------------------------------------------------------
+
+  // Fake playback-busy flag shared with the fixture's UI controller; tests flip it directly.
+  public bool Busy;
+
+  private Option<BattleUiController> _ui;
+  private readonly List<Godot.Node> _ownedNodes = [];
+  private readonly List<EventPlaybackDirector> _directors = [];
+
+  // Lazily mints the fixture's single UI controller for the player faction, bound to the
+  // same runtime the fixture owns and reading the Busy field. Repeated reads return the
+  // same controller; only Dispose tears it down.
+  public BattleUiController Ui
+  {
+    get
+    {
+      ThrowIfDisposed();
+      if (_ui.IsNone)
+        _ui = Some(new BattleUiController(Runtime, PlayerFaction, () => Busy));
+      return _ui.RequireSome();
+    }
+  }
+
+  // Transfers ownership of a FRESH test node to the fixture (freed by Dispose in reverse
+  // registration order). Never pass a node an AutoFree scope or another owner still manages.
+  public T OwnNode<T>(T node) where T : Godot.Node
+  {
+    ThrowIfDisposed();
+    ArgumentNullException.ThrowIfNull(node);
+    if (!_ownedNodes.Contains(node))
+      _ownedNodes.Add(node);
+    return node;
+  }
+
+  // Owns and binds the supplied concrete director to the fixture's runtime exactly once,
+  // returning it so local test doubles keep their type. EventPlaybackDirector.Bind has no
+  // unbind, so the publisher and the director share the fixture's lifetime.
+  public T AttachDirector<T>(T director) where T : EventPlaybackDirector
+  {
+    ThrowIfDisposed();
+    ArgumentNullException.ThrowIfNull(director);
+    if (!_directors.Contains(director))
+    {
+      OwnNode(director);
+      director.Bind(Runtime);
+      _directors.Add(director);
+    }
+    return director;
+  }
+
+  // Detaches recording, disposes the UI, frees owned nodes in reverse registration order,
+  // then closes the runtime — all under one idempotent flag set at entry. Events and the raw
+  // Session/Board handles stay inspectable afterwards for lifecycle tests. The runtime and
+  // any bound directors share this lifetime because Bind exposes no unbind.
   public void Dispose()
   {
     if (_disposed)
       return;
-    Runtime.BattleEventCommitted -= RecordEvent;
-    Runtime.Dispose();
     _disposed = true;
+    try
+    {
+      try
+      {
+        _ui.IfSome(ui => ui.Dispose());
+      }
+      finally
+      {
+        for (int i = _ownedNodes.Count - 1; i >= 0; i--)
+          if (Godot.GodotObject.IsInstanceValid(_ownedNodes[i]))
+            _ownedNodes[i].Free();
+        _ownedNodes.Clear();
+        _directors.Clear();
+      }
+    }
+    finally
+    {
+      Runtime.BattleEventCommitted -= RecordEvent;
+      Runtime.Dispose();
+    }
   }
 
   private void RecordEvent(BattleEvent value) => _events.Add(value);

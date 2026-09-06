@@ -61,6 +61,26 @@ public partial class BattleFixtureTest
   }
 
   [TestCase]
+  public void PresentationObjectsAreReusedAndOwnedNodesAreFreed()
+  {
+    using var uiBattle = BattleFixture.UiBattle();
+    Assert.True(ReferenceEquals(uiBattle.Ui, uiBattle.Ui));
+    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [TestData.MakeFaction("Player")]);
+    var mesh = battle.OwnNode(new Godot.Node3D());
+    var director = battle.AttachDirector(new EventPlaybackDirector());
+    Assert.True(ReferenceEquals(director, battle.AttachDirector(director)));
+    battle.Spawn(TestData.MakeCombatant("Extra", battle.PlayerFaction), new Vector3I(0, 0, 0));
+    director.Tick();
+    Assert.False(director.Busy); // one subscription queued one spawn event
+    battle.Dispose();
+    battle.Dispose();
+    Assert.False(Godot.GodotObject.IsInstanceValid(mesh));
+    Assert.False(Godot.GodotObject.IsInstanceValid(director));
+    uiBattle.Dispose();
+    Assert.Throws<ObjectDisposedException>(() => { _ = uiBattle.Ui; });
+  }
+
+  [TestCase]
   public void DisposalDetachesRecordingAndClosesTheRuntime()
   {
     var faction = TestData.MakeFaction("Player");

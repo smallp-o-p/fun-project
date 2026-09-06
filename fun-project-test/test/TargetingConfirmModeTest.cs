@@ -1,8 +1,6 @@
 using FunProject.Battle;
 using FunProject.Weapons;
 using GdUnit4;
-using Godot;
-using LanguageExt;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -11,18 +9,14 @@ public sealed partial class TargetingConfirmModeTest
   [TestCase(TestName = "Move uses click-then-confirm; attack fires immediately")]
   public void ConfirmModesAreAssignedPerVerb()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
-    var runtime = new BattleRuntime(session);
-    BattleTestUnit unit = BattleActionTestHelper.SpawnUnit(
-      session,
-      BattleTestFactory.MakeCombatant("Hero", faction),
-      new Vector3I(1, 0, 1),
-      BattleTestFactory.MakeWeapon("Rifle", range: 10));
+    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [TestData.MakeFaction("Player")]);
+    // The spawn and both targeters share the fixture's one runtime.
+    BattleUnitState unit = battle.Spawn(TestData.MakeCombatant("Hero", battle.PlayerFaction),
+      new Vector3I(1, 0, 1), TestData.MakeWeapon("Rifle", range: 10));
 
-    var move = new MoveTargeting(runtime, unit.State);
-    Weapon weapon = unit.State.EquippedWeapon.RequireSome();
-    var attack = new AttackTargeting(runtime, unit.State, weapon);
+    var move = new MoveTargeting(battle.Runtime, unit);
+    Weapon weapon = unit.EquippedWeapon.RequireSome();
+    var attack = new AttackTargeting(battle.Runtime, unit, weapon);
 
     Assert.Equal(ConfirmMode.Confirm, move.Confirm);
     Assert.Equal(ConfirmMode.Immediate, attack.Confirm);
