@@ -9,42 +9,39 @@ public class BattleEventTest
   [TestCase(TestName = "Committed battle events expose session domain objects")]
   public void CommittedBattleEventsExposeSessionDomainObjects()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [faction]);
-    var runtime = RuntimeFor(session);
-    var recorder = new BattleEventRecorder(runtime);
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [faction]);
+    var runtime = battle.Runtime;
 
-    var start = session.Board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome();
-    var destination = session.Board.ValidatePoint(new Vector3I(1, 0, 2)).RequireSome();
-    var target = session.Board.ValidatePoint(new Vector3I(3, 0, 2)).RequireSome();
-    var unit = BattleActionTestHelper.SpawnUnit(
-      runtime,
-      BattleTestFactory.MakeCombatant("Alpha", faction, actionPoints: 6),
-      start.Raw);
-    var grenade = BattleTestFactory.MakeGrenade("Frag Grenade", throwRange: 4, actionPointCost: 1);
-    unit.State.AddInventoryItem(grenade.Item);
-    BattleActionTestHelper.EnsureEveryFactionHasObjective(session);
-    BattleActionTestHelper.StartBattle(runtime);
+    var start = battle.At(1, 0, 1);
+    var destination = battle.At(1, 0, 2);
+    var target = battle.At(3, 0, 2);
+    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction, actionPoints: 6), start.Raw);
+    var grenade = TestData.MakeGrenade("Frag Grenade", throwRange: 4, actionPointCost: 1);
+    unit.AddInventoryItem(grenade.Item);
+    battle.Start();
 
-    runtime.ExecuteAction(BattleAction.MoveUnit(unit.AliveIn(session), [destination]));
-    runtime.ExecuteAction(BattleAction.ThrowItem(unit.AliveIn(session), grenade, target));
-    runtime.ExecuteAction(BattleAction.ApplyDamage(unit.AliveIn(session), 3));
+    runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [destination]));
+    runtime.ExecuteAction(BattleAction.ThrowItem(battle.Alive(unit), grenade, target));
+    runtime.ExecuteAction(BattleAction.ApplyDamage(battle.Alive(unit), 3));
 
-    var addedEvent = recorder.Single<UnitAddedBattleEvent>();
-    Assert.True(ReferenceEquals(unit.State, addedEvent.Unit));
+    // The fixture window deliberately includes the spawn: UnitAdded is part of what this
+    // test observes, so it is never cleared.
+    var addedEvent = battle.Events.SingleEvent<UnitAddedBattleEvent>();
+    Assert.True(ReferenceEquals(unit, addedEvent.Unit));
     Assert.Equal(start, addedEvent.Position);
 
-    var movedEvent = recorder.Single<UnitMovedBattleEvent>();
-    Assert.True(ReferenceEquals(unit.State, movedEvent.Unit));
+    var movedEvent = battle.Events.SingleEvent<UnitMovedBattleEvent>();
+    Assert.True(ReferenceEquals(unit, movedEvent.Unit));
     Assert.Equal(destination, movedEvent.Position);
     Assert.Equal(start, movedEvent.SourcePosition);
 
-    var thrownEvent = recorder.Single<ItemThrownBattleEvent>();
-    Assert.True(ReferenceEquals(unit.State, thrownEvent.Unit));
+    var thrownEvent = battle.Events.SingleEvent<ItemThrownBattleEvent>();
+    Assert.True(ReferenceEquals(unit, thrownEvent.Unit));
     Assert.True(ReferenceEquals(grenade.Item, thrownEvent.Item));
     Assert.Equal(target, thrownEvent.Position);
 
-    var damagedEvent = recorder.Single<UnitDamagedBattleEvent>();
-    Assert.True(ReferenceEquals(unit.State, damagedEvent.Unit));
+    var damagedEvent = battle.Events.SingleEvent<UnitDamagedBattleEvent>();
+    Assert.True(ReferenceEquals(unit, damagedEvent.Unit));
   }
 }

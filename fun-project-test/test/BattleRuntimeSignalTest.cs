@@ -10,8 +10,8 @@ public sealed partial class BattleRuntimeSignalTest
   [TestCase(TestName = "ExecuteAction raises ActionStarted then ActionCompleted with events attached")]
   public void ExecuteActionRaisesLifecycleSignalsInOrder()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
+    var faction = TestData.MakeFaction("Player");
+    var session = new BattleSession(new BattleBoardState(new Vector3I(3, 1, 3)), [faction]);
     using var runtime = new BattleRuntime(session);
 
     List<string> order = [];
@@ -24,7 +24,7 @@ public sealed partial class BattleRuntimeSignalTest
     };
 
     runtime.ExecuteAction(BattleAction.SpawnUnit(
-      BattleTestFactory.MakeCombatant("Alpha", faction),
+      TestData.MakeCombatant("Alpha", faction),
       session.Board.At(1, 0, 1)));
 
     Assert.Equal(2, order.Count);
@@ -40,8 +40,8 @@ public sealed partial class BattleRuntimeSignalTest
   [TestCase(TestName = "Completed never fires when Submit throws; Started marks the attempt")]
   public void NoCompletedSignalWhenSubmitThrows()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(3, 1, 3), [faction]);
+    var faction = TestData.MakeFaction("Player");
+    var session = new BattleSession(new BattleBoardState(new Vector3I(3, 1, 3)), [faction]);
     using var runtime = new BattleRuntime(session);
     int started = 0;
     int completed = 0;
@@ -49,9 +49,9 @@ public sealed partial class BattleRuntimeSignalTest
     runtime.ActionCompleted += _ => completed++;
 
     runtime.ExecuteAction(BattleAction.SpawnUnit(
-      BattleTestFactory.MakeCombatant("A", faction), session.Board.At(1, 0, 1)));
+      TestData.MakeCombatant("A", faction), session.Board.At(1, 0, 1)));
     Assert.Throws<System.InvalidOperationException>(() => runtime.ExecuteAction(BattleAction.SpawnUnit(
-      BattleTestFactory.MakeCombatant("B", faction), session.Board.At(1, 0, 1))));
+      TestData.MakeCombatant("B", faction), session.Board.At(1, 0, 1))));
 
     // Started marks the attempt (fires before Submit); Completed is the reaction signal and
     // must never fire for a failed submission — spec: "no reaction runs".

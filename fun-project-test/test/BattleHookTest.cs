@@ -1,5 +1,4 @@
 using FunProject.Battle;
-using FunProject.Combatants;
 using GdUnit4;
 using Godot;
 using System;
@@ -36,25 +35,18 @@ public partial class BattleHookTest
     }
   }
 
-  private static (BattleSession session, BattleActionExecutor executor, Faction faction) MakeSessionWithUnit()
-  {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
-    SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
-    var executor = ExecutorFor(session);
-    return (session, executor, faction);
-  }
-
   [TestCase(TestName = "Hook registered for a concrete event type receives only that event")]
   public void HookReceivesOnlyItsConcreteEvent()
   {
-    var (session, executor, _) = MakeSessionWithUnit();
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
     var turnStartedListener = new RecordingHook();
     var damagedListener = new RecordingHook();
-    executor.RegisterHook<TurnStartedBattleEvent>(turnStartedListener);
-    executor.RegisterHook<UnitDamagedBattleEvent>(damagedListener);
+    battle.RegisterHook<TurnStartedBattleEvent>(turnStartedListener);
+    battle.RegisterHook<UnitDamagedBattleEvent>(damagedListener);
 
-    StartBattle(session);
+    battle.Start();
 
     Assert.Equal(1, turnStartedListener.Received.Count);
     Assert.True(turnStartedListener.Received.AsValueEnumerable().Single() is TurnStartedBattleEvent);
@@ -64,12 +56,12 @@ public partial class BattleHookTest
   [TestCase(TestName = "Hook registered for a marker interface receives implementing events")]
   public void HookReceivesMarkerInterfaceEvents()
   {
-    var faction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [faction]);
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
     var unitEventsListener = new RecordingHook();
-    ExecutorFor(session).RegisterHook<IUnitBattleEvent>(unitEventsListener);
+    battle.RegisterHook<IUnitBattleEvent>(unitEventsListener);
 
-    SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
 
     Assert.True(unitEventsListener.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
   }
@@ -77,13 +69,14 @@ public partial class BattleHookTest
   [TestCase(TestName = "A hook registered under concrete and interface keys fires once for one event")]
   public void OneHookRegisteredUnderMultipleMatchingKeysFiresOnce()
   {
-    var (session, executor, faction) = MakeSessionWithUnit();
-    var unit = session.GetFactionAliveUnits(faction).AsValueEnumerable().First();
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
     var hook = new RecordingHook();
-    executor.RegisterHook<UnitKilledBattleEvent>(hook);
-    executor.RegisterHook<IUnitBattleEvent>(hook);
+    battle.RegisterHook<UnitKilledBattleEvent>(hook);
+    battle.RegisterHook<IUnitBattleEvent>(hook);
 
-    ApplyDamage(session, unit, 999);
+    battle.ApplyDamage(unit, 999);
 
     Assert.Equal(1, hook.Received.Count);
   }
@@ -91,17 +84,19 @@ public partial class BattleHookTest
   [TestCase(TestName = "Event raised by a hook dispatches after the current event and reaches other hooks")]
   public void HookRaisedEventDispatchesAfterCurrentEvent()
   {
-    var (session, executor, faction) = MakeSessionWithUnit();
-    executor.RegisterHook<TurnEndedBattleEvent>(new RaiseProbeOnTurnEndedHook());
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.RegisterHook<TurnEndedBattleEvent>(new RaiseProbeOnTurnEndedHook());
     var hook = new CountingHook();
-    executor.RegisterHook<ProbeBattleEvent>(hook);
-    StartBattle(session);
+    battle.RegisterHook<ProbeBattleEvent>(hook);
+    battle.Start();
 
-    var recorder = new BattleEventRecorder(session);
-    executor.Submit(BattleAction.EndFactionTurn(faction));
+    battle.ClearEvents();
+    battle.Submit(BattleAction.EndFactionTurn(faction));
 
-    recorder.AssertCommittedBefore<TurnEndedBattleEvent, ProbeBattleEvent>();
-    recorder.AssertCommittedBefore<ProbeBattleEvent, TurnStartedBattleEvent>();
+    battle.Events.EventBefore<TurnEndedBattleEvent, ProbeBattleEvent>();
+    battle.Events.EventBefore<ProbeBattleEvent, TurnStartedBattleEvent>();
     Assert.Equal(1, hook.Evaluations);
   }
 
@@ -123,32 +118,21 @@ public partial class BattleHookTest
   [TestCase(TestName = "A throwing hook propagates out of Submit and clears undispatched events")]
   public void ThrowingHookPropagatesAndClearsQueue()
   {
-    var (session, executor, faction) = MakeSessionWithUnit();
-    executor.RegisterHook<TurnEndedBattleEvent>(new RaiseThenThrowOnceOnTurnEndedHook());
-    StartBattle(session);
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.RegisterHook<TurnEndedBattleEvent>(new RaiseThenThrowOnceOnTurnEndedHook());
+    battle.Start();
 
-    var recorder = new BattleEventRecorder(session);
+    battle.ClearEvents();
     // The simple execution model lets a hook failure surface as the throw it is; the
     // session clears its dispatch queue on the way out.
     Assert.Throws<InvalidOperationException>(
-      () => executor.Submit(BattleAction.EndFactionTurn(faction)));
-    Assert.False(recorder.OfType<ProbeBattleEvent>().AsValueEnumerable().Any());
+      () => battle.Submit(BattleAction.EndFactionTurn(faction)));
+    Assert.False(battle.Events.EventsOf<ProbeBattleEvent>().AsValueEnumerable().Any());
 
-    executor.Submit(BattleAction.EndFactionTurn(faction));
-    Assert.False(recorder.OfType<ProbeBattleEvent>().AsValueEnumerable().Any());
-  }
-
-  private sealed partial class MarkingHook : BattleHook
-  {
-    private readonly Action _mark;
-
-    public MarkingHook(Action mark) => _mark = mark;
-
-    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
-    {
-      _mark();
-      return [];
-    }
+    battle.Submit(BattleAction.EndFactionTurn(faction));
+    Assert.False(battle.Events.EventsOf<ProbeBattleEvent>().AsValueEnumerable().Any());
   }
 
   private sealed partial class InterruptingHook : BattleHook
@@ -169,20 +153,22 @@ public partial class BattleHookTest
   [TestCase(TestName = "A hook returning interrupts outside an executor action throws")]
   public void InterruptsOutsideExecutorActionThrow()
   {
-    var (session, executor, _) = MakeSessionWithUnit();
-    executor.RegisterHook<TurnStartedBattleEvent>(
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.RegisterHook<TurnStartedBattleEvent>(
       new InterruptingHook(context => BattleAction.EndFactionTurn(context.Session.ActiveSide)));
 
-    // StartBattle raises TurnStarted with no executor action in flight. Replicate the
-    // StartBattle(session) test helper's objective-assignment BEFORE this point, or the
-    // no-objective guard throws the same exception type and the test false-passes; then
-    // assert on the message to pin the right throw.
-    EnsureEveryFactionHasObjective(session);
+    // session.StartBattle raises TurnStarted with no executor action in flight. Pre-assign
+    // the faction's objective exactly as the started path would — or the no-objective guard
+    // throws the same exception type and the test false-passes; then assert on the message
+    // to pin the right throw.
+    battle.Session.AddObjective(faction, new EliminateAllOpposingForcesObjectiveData().Instantiate());
 
     InvalidOperationException thrown = null;
     try
     {
-      session.StartBattle();
+      battle.Session.StartBattle();
     }
     catch (InvalidOperationException exception)
     {
@@ -196,15 +182,15 @@ public partial class BattleHookTest
   [TestCase(TestName = "Hooks receive the in-flight action as SourceAction during executor dispatches")]
   public void HooksReceiveSourceActionInsideExecutorDispatch()
   {
-    var (session, executor, faction) = MakeSessionWithUnit();
-    StartBattle(session);
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.Start();
     var hook = new InterruptingHook(context => BattleAction.PassUnit(
       context.Session.TryGetAlive(context.Session.GetFactionAliveUnits(faction).AsValueEnumerable().First()).RequireSome()));
-    executor.RegisterHook<UnitMovedBattleEvent>(hook);
+    battle.RegisterHook<UnitMovedBattleEvent>(hook);
 
-    var unit = session.GetFactionAliveUnits(faction).AsValueEnumerable().First();
-    executor.Submit(BattleAction.MoveUnit(session.TryGetAlive(unit).RequireSome(), [session.Board.At(1, 0, 2)]))
-      ;
+    battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 2)]));
 
     Assert.True(hook.ObservedSourceAction.IsSome);
     Assert.True(hook.ObservedSourceAction.RequireSome() is MoveUnit);
@@ -213,13 +199,13 @@ public partial class BattleHookTest
   [TestCase(TestName = "One-shot hook retires itself by signalling NeedsToUnregister")]
   public void OneShotHookRetiresItselfThroughNeedsToUnregister()
   {
-    var (session, executor, _, _) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
+    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
 
     var hook = new SelfRetiringHook();
-    executor.RegisterHook<TurnStartedBattleEvent>(hook);
+    battle.RegisterHook<TurnStartedBattleEvent>(hook);
 
-    AdvanceTurn(session);
-    AdvanceTurn(session);
+    battle.AdvanceTurn();
+    battle.AdvanceTurn();
 
     Assert.Equal(1, hook.Evaluations);
   }
@@ -227,19 +213,19 @@ public partial class BattleHookTest
   [TestCase(TestName = "A retired one-shot hook is removed from every key it was registered under")]
   public void RetiredOneShotHookIsRemovedFromEveryKey()
   {
-    var (session, executor, faction, _) = StartSoloBattle(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
+    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
+    var unit = battle.Unit;
 
     // Same instance under two keys: retiring after the UnitMoved firing must also clear
     // the TurnStarted registration — the registry owns removal, not the hook.
     var hook = new SelfRetiringHook();
-    executor.RegisterHook<UnitMovedBattleEvent>(hook);
-    executor.RegisterHook<TurnStartedBattleEvent>(hook);
+    battle.RegisterHook<UnitMovedBattleEvent>(hook);
+    battle.RegisterHook<TurnStartedBattleEvent>(hook);
 
-    var unit = session.GetFactionAliveUnits(faction).AsValueEnumerable().First();
-    executor.Submit(BattleAction.MoveUnit(session.TryGetAlive(unit).RequireSome(), [session.Board.At(1, 0, 0)]));
+    battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)]));
 
-    AdvanceTurn(session);
-    AdvanceTurn(session);
+    battle.AdvanceTurn();
+    battle.AdvanceTurn();
 
     Assert.Equal(1, hook.Evaluations);
   }
