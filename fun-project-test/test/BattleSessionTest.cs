@@ -113,7 +113,7 @@ public class BattleSessionTest
       board,
       [faction]);
 
-    var executor = ExecutorFor(session);
+    using var executor = new BattleActionExecutor(session);
     Assert.Throws<System.InvalidOperationException>(
       () => executor.Submit(BattleAction.SpawnUnit(TestData.MakeCombatant("A1", faction), board.At(1, 0, 0))));
 
