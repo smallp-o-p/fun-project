@@ -3,23 +3,12 @@ using FunProject.Combatants;
 using FunProject.Items.Effects;
 using GdUnit4;
 using Godot;
-using System;
 using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleObjectSessionTest
 {
-  private static BattleRuntime UnwrapStart(Either<BattleSetupFailure, BattleRuntime> result) =>
-    result.Match(
-      Right: runtime => runtime,
-      Left: failure => throw new Exception($"Expected Start to succeed but got {failure.Reason}: {failure.Message}"));
-
-  private static BattleSetupFailure ExpectFailure(Either<BattleSetupFailure, BattleRuntime> result) =>
-    result.Match(
-      Right: _ => throw new Exception("Expected a setup failure but Start succeeded."),
-      Left: failure => failure);
-
   private static BattleSpecialObjectData MakeBombData()
   {
     var data = new BattleSpecialObjectData { Name = "Bomb" };
@@ -78,7 +67,7 @@ public class BattleObjectSessionTest
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
 
-    using BattleRuntime runtime = UnwrapStart(BattleFactory.Start(new BattleSetup(
+    using BattleRuntime runtime = BattleFactory.Start(new BattleSetup(
       new BattleBoardState(new Vector3I(4, 1, 4)),
       [player, enemy],
       [
@@ -90,7 +79,7 @@ public class BattleObjectSessionTest
         [player] = [new FakeObjectiveData()],
         [enemy] = [new FakeObjectiveData()],
       },
-      PlayerFaction: Some(player))));
+      PlayerFaction: Some(player))).RequireRight();
 
     Assert.Equal(player, runtime.Query(new GetPlayerFactionQuery()).RequireSome());
   }
@@ -118,15 +107,15 @@ public class BattleObjectSessionTest
       Objects: objects);
 
     // Happy path: two objects placed.
-    using BattleRuntime runtime = UnwrapStart(BattleFactory.Start(SetupWith(
+    using BattleRuntime runtime = BattleFactory.Start(SetupWith(
     [
       new ObjectPlacement(MakeBombData(), new Vector3I(1, 0, 1)),
       new ObjectPlacement(MakeBombData(), new Vector3I(2, 0, 2)),
-    ])));
+    ])).RequireRight();
     Assert.Equal(2, runtime.Query(new GetBattleSpecialObjectsQuery()).Count);
 
     BattleSetupFailure FailureOf(IReadOnlyList<ObjectPlacement> objects) =>
-      ExpectFailure(BattleFactory.Start(SetupWith(objects)));
+      BattleFactory.Start(SetupWith(objects)).RequireLeft();
 
     // Duplicate cell → DuplicateObjectCell.
     Assert.Equal(BattleSetupFailureReason.DuplicateObjectCell,

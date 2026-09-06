@@ -99,7 +99,8 @@ public class BombExpiryTest
       [
         new ObjectPlacement(MakeBomb(expireAfterTurns: 1, baseDamage: 8), new Vector3I(1, 0, 0)),
       ])).RequireRight();
-    var recorder = new BattleEventRecorder(runtime);
+    var events = new System.Collections.Generic.List<BattleEvent>();
+    runtime.BattleEventCommitted += events.Add;
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
 
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
@@ -108,9 +109,9 @@ public class BombExpiryTest
     Assert.Equal(
       BattleOutcome.Defeat,
       runtime.Query(new GetBattleResultQuery()).RequireRight().Outcome);
-    Assert.Equal(1, recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Count());
-    Assert.True(recorder.OfType<ObjectExpiredBattleEvent>().AsValueEnumerable().Any());
-    Assert.True(recorder.OfType<ObjectiveFailedBattleEvent>().AsValueEnumerable().Any());
+    Assert.Equal(1, events.AsValueEnumerable().OfType<SessionEndedBattleEvent>().Count());
+    Assert.True(events.AsValueEnumerable().OfType<ObjectExpiredBattleEvent>().Any());
+    Assert.True(events.AsValueEnumerable().OfType<ObjectiveFailedBattleEvent>().Any());
   }
 
   [TestCase(TestName = "Defused bombs do not expire")]

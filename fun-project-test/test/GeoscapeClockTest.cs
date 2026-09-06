@@ -1,6 +1,5 @@
 using FunProject.Strategic;
 using GdUnit4;
-using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -75,12 +74,10 @@ public class GeoscapeClockTest
   public void SpeedChangeCommitsNothing()
   {
     using var campaign = new GeoscapeFixture();
-    List<IGeoscapeEvent> committed = [];
-    campaign.Session.EventCommitted += committed.Add;
 
     campaign.ChangeSpeed(TimeSpeed.Fast);
 
-    Assert.Equal(0, committed.Count);
+    Assert.Equal(0, campaign.Events.Count);
   }
 
   [TestCase(TestName = "CurrentTime advances one game-minute per tick")]

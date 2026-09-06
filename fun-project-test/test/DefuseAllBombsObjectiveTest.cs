@@ -66,7 +66,7 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAliveObject(bomb).RequireSome()));
 
     Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
-    Assert.Equal(BattleOutcome.Victory, GetValue(runtime.Query(new GetFactionEndOfBattleSummary(player))).Outcome);
+    Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome);
   }
 
   [TestCase(TestName = "A expiry fails the objective and ends the battle in defeat")]
@@ -82,7 +82,7 @@ public class DefuseAllBombsObjectiveTest
 
     Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
     Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
-    Assert.Equal(BattleOutcome.Defeat, GetValue(runtime.Query(new GetFactionEndOfBattleSummary(player))).Outcome);
+    Assert.Equal(BattleOutcome.Defeat, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome);
   }
 
   // The counting implementation's distinguishing cases: only the delivered stream counts,

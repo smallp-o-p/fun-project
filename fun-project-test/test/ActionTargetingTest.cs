@@ -28,7 +28,7 @@ public class ActionTargetingTest
     IReadOnlyCollection<Vector3I> reachable = move.Begin();
     Assert.True(reachable.AsValueEnumerable().Contains(new Vector3I(2, 0, 1)));
 
-    ActionPreview preview = GetValue(move.Preview(new Vector3I(2, 0, 1)));
+    ActionPreview preview = move.Preview(new Vector3I(2, 0, 1)).RequireRight();
     Assert.True(preview is PathPreview);
     PathPreview pathPreview = (PathPreview)preview;
     Assert.Equal(new Vector3I(0, 0, 0), pathPreview.Path[0]);
@@ -51,7 +51,7 @@ public class ActionTargetingTest
     IReadOnlyCollection<Vector3I> candidates = attack.Begin();
     Assert.True(candidates.AsValueEnumerable().Contains(new Vector3I(3, 0, 0)));   // the enemy's tile, in range + visible
 
-    ActionPreview preview = GetValue(attack.Preview(new Vector3I(3, 0, 0)));
+    ActionPreview preview = attack.Preview(new Vector3I(3, 0, 0)).RequireRight();
     Assert.True(preview is AttackPreview);
 
     Assert.True(attack.CanCommit(new Vector3I(3, 0, 0)));
