@@ -1,7 +1,64 @@
+using FunProject.Battle;
+
 namespace FunProject.Tests;
 
 public static class Assert
 {
+  public static T RequireSome<T>(this Option<T> option, string message = "Expected option to contain a value.")
+  {
+    return option.Match(
+      value => value,
+      () => throw new InvalidOperationException(message));
+  }
+
+  // Sugar for `board.ValidatePoint(...).RequireSome()`, the pervasive test idiom for turning a raw
+  // coordinate into a ValidatedPoint.
+  public static BattleBoardState.ValidatedPoint At(this BattleBoardState board, int x, int y, int z) =>
+    board.ValidatePoint(new Vector3I(x, y, z)).RequireSome();
+
+  public static BattleBoardState.ValidatedPoint At(this BattleBoardState board, Vector3I position) =>
+    board.ValidatePoint(position).RequireSome();
+
+  public static R RequireRight<L, R>(this Either<L, R> result) => result.Match(
+    Left: failure => throw new InvalidOperationException($"Expected Right, got Left: {failure}"),
+    Right: value => value);
+
+  public static L RequireLeft<L, R>(this Either<L, R> result) => result.Match(
+    Left: failure => failure,
+    Right: value => throw new InvalidOperationException($"Expected Left, got Right: {value}"));
+
+  public static T[] EventsOf<T>(this IEnumerable<object> events) =>
+    events.AsValueEnumerable().OfType<T>().ToArray();
+
+  public static T SingleEvent<T>(this IEnumerable<object> events)
+  {
+    T[] matches = events.EventsOf<T>();
+    if (matches.Length != 1)
+      throw new InvalidOperationException($"Expected exactly one {typeof(T).Name}, found {matches.Length}.");
+    return matches[0];
+  }
+
+  public static int EventIndex<T>(this IEnumerable<object> events, Func<T, bool> predicate = null)
+  {
+    int index = 0;
+    foreach (object value in events)
+    {
+      if (value is T typed && (predicate is null || predicate(typed)))
+        return index;
+      index++;
+    }
+    return -1;
+  }
+
+  public static void EventBefore<TFirst, TSecond>(this IEnumerable<object> events)
+  {
+    object[] snapshot = events.AsValueEnumerable().ToArray();
+    int first = snapshot.EventIndex<TFirst>();
+    int second = snapshot.EventIndex<TSecond>();
+    True(first >= 0, $"Expected {typeof(TFirst).Name}.");
+    True(second > first, $"Expected {typeof(TSecond).Name} after {typeof(TFirst).Name}.");
+  }
+
   public static void That(bool condition, string msg = "")
   {
     if (!condition)
