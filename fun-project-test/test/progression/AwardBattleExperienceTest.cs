@@ -29,8 +29,14 @@ public class AwardBattleExperienceTest
   public void ParticipationAwardedToAllPresent()
   {
     var faction = TestData.MakeFaction("Player");
-    var alpha = TestData.MakeCombatant("Alpha", faction, health: 10, actionPoints: 2, movement: 8);
-    var bravo = TestData.MakeCombatant("Bravo", faction, health: 10, actionPoints: 2, movement: 8);
+    var alpha = TestData.MakeCombatant("Alpha", faction, health: 10, actionPoints: 2, movement: 8,
+      rankTable: TestData.MakeRankTable(
+        new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
+        new RankLevelData { Name = "Squaddie", GainFactorPercent = 100 }));
+    var bravo = TestData.MakeCombatant("Bravo", faction, health: 10, actionPoints: 2, movement: 8,
+      rankTable: TestData.MakeRankTable(
+        new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
+        new RankLevelData { Name = "Squaddie", GainFactorPercent = 100 }));
     var table = new ExperienceTableData { ParticipationXp = 10, KillXp = 25 };
 
     var awards = AwardBattleExperience.Award(
@@ -47,7 +53,10 @@ public class AwardBattleExperienceTest
   public void KillsAddOnTopOfParticipation()
   {
     var faction = TestData.MakeFaction("Player");
-    var alpha = TestData.MakeCombatant("Alpha", faction, health: 10, actionPoints: 2, movement: 8);
+    var alpha = TestData.MakeCombatant("Alpha", faction, health: 10, actionPoints: 2, movement: 8,
+      rankTable: TestData.MakeRankTable(
+        new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
+        new RankLevelData { Name = "Squaddie", GainFactorPercent = 100 }));
     var victim1 = TestData.MakeCombatant("Bandit1", TestData.MakeFaction("Raiders"));
     var victim2 = TestData.MakeCombatant("Bandit2", TestData.MakeFaction("Raiders"));
 
@@ -65,9 +74,18 @@ public class AwardBattleExperienceTest
   public void DeadCombatantsEarnNothing()
   {
     var faction = TestData.MakeFaction("Player");
-    var alpha = TestData.MakeCombatant("Alpha", faction, health: 10, actionPoints: 2, movement: 8);
-    var bravo = TestData.MakeCombatant("Bravo", faction, health: 10, actionPoints: 2, movement: 8);
-    var charlie = TestData.MakeCombatant("Charlie", faction, health: 10, actionPoints: 2, movement: 8);
+    var alpha = TestData.MakeCombatant("Alpha", faction, health: 10, actionPoints: 2, movement: 8,
+      rankTable: TestData.MakeRankTable(
+        new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
+        new RankLevelData { Name = "Squaddie", GainFactorPercent = 100 }));
+    var bravo = TestData.MakeCombatant("Bravo", faction, health: 10, actionPoints: 2, movement: 8,
+      rankTable: TestData.MakeRankTable(
+        new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
+        new RankLevelData { Name = "Squaddie", GainFactorPercent = 100 }));
+    var charlie = TestData.MakeCombatant("Charlie", faction, health: 10, actionPoints: 2, movement: 8,
+      rankTable: TestData.MakeRankTable(
+        new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
+        new RankLevelData { Name = "Squaddie", GainFactorPercent = 100 }));
     var victim = TestData.MakeCombatant("Bandit", TestData.MakeFaction("Raiders"));
 
     var awards = AwardBattleExperience.Award(
