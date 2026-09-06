@@ -369,7 +369,7 @@ internal static class TestData
     return new ScheduledEventData { AtTick = atTick, Event = evt };
   }
 
-  public static RosterEntryData MakeEntry(string displayName = "", CombatantData? unit = null)
+  public static RosterEntryData MakeEntry(string displayName = "", CombatantData unit = null)
   {
     return new RosterEntryData
     {
@@ -379,11 +379,11 @@ internal static class TestData
   }
 
   public static CampaignStartData MakeStart(
-    RegionData[]? regions = null,
-    ScheduledEventData[]? timeline = null,
-    RosterEntryData[]? roster = null,
-    EquippableItemData[]? armory = null,
-    EquippableMod[]? modStock = null)
+    RegionData[] regions = null,
+    ScheduledEventData[] timeline = null,
+    RosterEntryData[] roster = null,
+    EquippableItemData[] armory = null,
+    EquippableMod[] modStock = null)
   {
     return new CampaignStartData
     {
