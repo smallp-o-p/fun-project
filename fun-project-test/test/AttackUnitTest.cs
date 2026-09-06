@@ -3,8 +3,6 @@ using FunProject.Core;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
-using System;
-using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -13,45 +11,41 @@ public partial class AttackUnitTest
   [TestCase(TestName = "Guaranteed hit damages the target and raises attack then damage events")]
   public void GuaranteedHitDamagesTargetAndRaisesAttackThenDamageEvents()
   {
-    var battle = new BattleDuelBuilder
-    {
-      Player = new DuelSide("Alpha", Aim: 100, Weapon: BattleTestFactory.MakeWeapon("Rifle", damage: 5)),
-    }.Start();
+    using var battle = BattleFixture.Duel(
+      player: new("Alpha", Aim: 100, Weapon: TestData.MakeWeapon("Rifle", damage: 5)));
     var attacker = battle.PlayerUnit;
     var target = battle.EnemyUnit;
 
-    var recorder = new BattleEventRecorder(battle.Session);
-    Attack(battle.Session, battle.Executor, attacker.State, target.State);
+    battle.ClearEvents();
+    battle.Attack(attacker, target);
 
-    Assert.Equal(target.State.MaxHealth - 5, target.State.CurrentHealth);
-    Assert.Equal(attacker.State.MaxActionPoints - 1, attacker.CurrentActionPoints);
+    Assert.Equal(target.MaxHealth - 5, target.CurrentHealth);
+    Assert.Equal(attacker.MaxActionPoints - 1, attacker.CurrentActionPoints);
 
-    var attackEvent = recorder.Single<UnitAttackedBattleEvent>();
+    var attackEvent = battle.Events.SingleEvent<UnitAttackedBattleEvent>();
     Assert.True(attackEvent.IsHit);
     Assert.Equal(100, attackEvent.Breakdown.FinalChance);
     Assert.True(attackEvent.Roll >= 0);
     Assert.True(attackEvent.Roll < 100);
 
-    recorder.AssertCommittedBefore<UnitAttackedBattleEvent, UnitDamagedBattleEvent>();
+    battle.Events.EventBefore<UnitAttackedBattleEvent, UnitDamagedBattleEvent>();
   }
 
   [TestCase(TestName = "Guaranteed miss spends action points without damage")]
   public void GuaranteedMissSpendsActionPointsWithoutDamage()
   {
-    var battle = new BattleDuelBuilder
-    {
-      Player = new DuelSide("Alpha", Aim: 0, Weapon: BattleTestFactory.MakeWeapon("Rifle")),
-    }.Start();
+    using var battle = BattleFixture.Duel(
+      player: new("Alpha", Aim: 0, Weapon: TestData.MakeWeapon("Rifle")));
     var attacker = battle.PlayerUnit;
     var target = battle.EnemyUnit;
 
-    var recorder = new BattleEventRecorder(battle.Session);
-    Attack(battle.Session, battle.Executor, attacker.State, target.State);
+    battle.ClearEvents();
+    battle.Attack(attacker, target);
 
-    Assert.Equal(target.State.MaxHealth, target.State.CurrentHealth);
-    Assert.Equal(attacker.State.MaxActionPoints - 1, attacker.CurrentActionPoints);
-    Assert.False(recorder.Single<UnitAttackedBattleEvent>().IsHit);
-    Assert.False(recorder.OfType<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
+    Assert.Equal(target.MaxHealth, target.CurrentHealth);
+    Assert.Equal(attacker.MaxActionPoints - 1, attacker.CurrentActionPoints);
+    Assert.False(battle.Events.SingleEvent<UnitAttackedBattleEvent>().IsHit);
+    Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "Applicable cover lowers the resolved hit chance")]
@@ -59,16 +53,14 @@ public partial class AttackUnitTest
   {
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
     board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(CoverDirections.North, 60);
-    var battle = new BattleDuelBuilder
-    {
-      Board = board,
-      Player = new DuelSide("Alpha", Aim: 60, Weapon: BattleTestFactory.MakeWeapon("Rifle")),
-    }.Start();
+    using var battle = BattleFixture.Duel(
+      board: board,
+      player: new("Alpha", Aim: 60, Weapon: TestData.MakeWeapon("Rifle")));
 
-    var recorder = new BattleEventRecorder(battle.Session);
-    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
+    battle.ClearEvents();
+    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
-    var attackEvent = recorder.Single<UnitAttackedBattleEvent>();
+    var attackEvent = battle.Events.SingleEvent<UnitAttackedBattleEvent>();
     Assert.Equal(0, attackEvent.Breakdown.FinalChance);
     Assert.False(attackEvent.IsHit);
     Assert.Equal(StandardHitChanceCalculator.CoverModifierLabel, attackEvent.Breakdown.Modifiers.AsValueEnumerable().Single().Label);
@@ -77,97 +69,91 @@ public partial class AttackUnitTest
   [TestCase(TestName = "Injected calculator replaces the hit chance algorithm")]
   public void InjectedCalculatorReplacesTheHitChanceAlgorithm()
   {
-    var battle = new BattleDuelBuilder
-    {
-      HitChanceCalculator = new AlwaysHitCalculator(),
-      Player = new DuelSide("Alpha", Aim: 0, Weapon: BattleTestFactory.MakeWeapon("Rifle", damage: 5)),
-    }.Start();
+    using var battle = BattleFixture.Duel(
+      hitChanceCalculator: new AlwaysHitCalculator(),
+      player: new("Alpha", Aim: 0, Weapon: TestData.MakeWeapon("Rifle", damage: 5)));
 
-    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
+    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
-    Assert.Equal(battle.EnemyUnit.State.MaxHealth - 5, battle.EnemyUnit.State.CurrentHealth);
+    Assert.Equal(battle.EnemyUnit.MaxHealth - 5, battle.EnemyUnit.CurrentHealth);
   }
 
   [TestCase(TestName = "Infeasible attacks throw without spending action points")]
   public void InfeasibleAttacksThrowWithoutSpendingActionPoints()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    var armedAttacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, aim: 100), new Vector3I(4, 0, 1), BattleTestFactory.MakeWeapon("Rifle"));
-    var unarmedAttacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Bravo", playerFaction), new Vector3I(5, 0, 1));
-    var shortSightedAttacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Charlie", playerFaction, vision: 1, aim: 100), new Vector3I(6, 0, 1), BattleTestFactory.MakeWeapon("Rifle"));
-    var shortRangedAttacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Delta", playerFaction, aim: 100), new Vector3I(7, 0, 1), BattleTestFactory.MakeWeapon("Pistol", range: 1));
-    var ally = SpawnUnit(session, BattleTestFactory.MakeCombatant("Echo", playerFaction), new Vector3I(3, 0, 1));
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    StartBattle(session);
-
-    var executor = ExecutorFor(session);
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
+    var armedAttacker = battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction, aim: 100), new Vector3I(4, 0, 1), TestData.MakeWeapon("Rifle"));
+    var unarmedAttacker = battle.Spawn(TestData.MakeCombatant("Bravo", playerFaction), new Vector3I(5, 0, 1));
+    var shortSightedAttacker = battle.Spawn(TestData.MakeCombatant("Charlie", playerFaction, vision: 1, aim: 100), new Vector3I(6, 0, 1), TestData.MakeWeapon("Rifle"));
+    var shortRangedAttacker = battle.Spawn(TestData.MakeCombatant("Delta", playerFaction, aim: 100), new Vector3I(7, 0, 1), TestData.MakeWeapon("Pistol", range: 1));
+    var ally = battle.Spawn(TestData.MakeCombatant("Echo", playerFaction), new Vector3I(3, 0, 1));
+    var target = battle.Spawn(TestData.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
+    battle.Start();
 
     // Feasibility misses interrupt silently (staleness from interleaved interrupts cannot
     // be distinguished from caller bugs at Execute time): the attack drops, nothing is
     // spent, and the submission completes.
-    void AssertInfeasible(Func<BattleAction> makeAttack, BattleTestUnit unit)
+    void AssertInfeasible(Func<BattleAction> makeAttack, BattleUnitState unit)
     {
       int actionPointsBefore = unit.CurrentActionPoints;
-      executor.Submit(makeAttack());
+      battle.Submit(makeAttack());
       Assert.Equal(actionPointsBefore, unit.CurrentActionPoints);
     }
 
     AssertInfeasible(
-      () => BattleAction.AttackUnit(unarmedAttacker.AliveIn(session), target.AliveIn(session)),
+      () => BattleAction.AttackUnit(battle.Alive(unarmedAttacker), battle.Alive(target)),
       unarmedAttacker);                            // no equipped weapon
     AssertInfeasible(
-      () => BattleAction.AttackUnit(armedAttacker.AliveIn(session), armedAttacker.AliveIn(session)),
+      () => BattleAction.AttackUnit(battle.Alive(armedAttacker), battle.Alive(armedAttacker)),
       armedAttacker);                              // self-target
     AssertInfeasible(
-      () => BattleAction.AttackUnit(armedAttacker.AliveIn(session), ally.AliveIn(session)),
+      () => BattleAction.AttackUnit(battle.Alive(armedAttacker), battle.Alive(ally)),
       armedAttacker);                              // allied target
     AssertInfeasible(
-      () => BattleAction.AttackUnit(shortSightedAttacker.AliveIn(session), target.AliveIn(session)),
+      () => BattleAction.AttackUnit(battle.Alive(shortSightedAttacker), battle.Alive(target)),
       shortSightedAttacker);                       // not visible (vision 1, distance 3)
     AssertInfeasible(
-      () => BattleAction.AttackUnit(shortRangedAttacker.AliveIn(session), target.AliveIn(session)),
+      () => BattleAction.AttackUnit(battle.Alive(shortRangedAttacker), battle.Alive(target)),
       shortRangedAttacker);                        // out of weapon range (range 1, distance > 1)
 
-    ApplyDamage(session, target.State, 999);
+    battle.ApplyDamage(target, 999);
     // The dead-target case dies at the proof mint itself: TryGetAlive refuses to mint for a
     // dead unit, so constructing the action (not executing it) throws.
     Assert.Throws<InvalidOperationException>(()
-      => BattleAction.AttackUnit(armedAttacker.AliveIn(session), session.TryGetAlive(target.State).RequireSome()));
+      => BattleAction.AttackUnit(battle.Alive(armedAttacker), battle.Session.TryGetAlive(target).RequireSome()));
   }
 
   [TestCase(TestName = "A stale attack whose target died to an earlier interrupt interrupts silently")]
   public void StaleAttackOnKilledTargetInterruptsSilently()
   {
-    var weapon = BattleTestFactory.MakeAmmoWeapon("Sentinel Rifle", magazine: 2, damage: 5);
-    var battle = new BattleDuelBuilder
-    {
-      HitChanceCalculator = new AlwaysHitCalculator(),
-      Player = new DuelSide("Alpha", Health: 5),
-      Enemy = new DuelSide("Hostile", Aim: 100, Weapon: weapon),
-    }.Start();
+    var weapon = TestData.MakeAmmoWeapon("Sentinel Rifle", magazine: 2, damage: 5);
+    using var battle = BattleFixture.Duel(
+      hitChanceCalculator: new AlwaysHitCalculator(),
+      player: new("Alpha", Health: 5),
+      enemy: new("Hostile", Aim: 100, Weapon: weapon));
     var mover = battle.PlayerUnit;
     var shooter = battle.EnemyUnit;
 
     // Both overwatch shots are built during the move event's dispatch, while the mover is
     // still alive; the first kill invalidates the second action's target proof.
-    battle.Executor.RegisterHook<UnitMovedBattleEvent>(new BuildInterruptsHook(context =>
+    battle.RegisterHook<UnitMovedBattleEvent>(new BuildInterruptsHook(context =>
     [
       BattleAction.AttackUnit(
-        context.Session.TryGetAlive(shooter.State).RequireSome(),
-        context.Session.TryGetAlive(mover.State).RequireSome()),
+        context.Session.TryGetAlive(shooter).RequireSome(),
+        context.Session.TryGetAlive(mover).RequireSome()),
       BattleAction.AttackUnit(
-        context.Session.TryGetAlive(shooter.State).RequireSome(),
-        context.Session.TryGetAlive(mover.State).RequireSome()),
+        context.Session.TryGetAlive(shooter).RequireSome(),
+        context.Session.TryGetAlive(mover).RequireSome()),
     ]));
-    var recorder = new BattleEventRecorder(battle.Session);
+    battle.ClearEvents();
 
-    Vector3I from = battle.Session.GetUnitPosition(mover.State).RequireSome().Raw;
-    battle.Executor.Submit(BattleAction.MoveUnit(mover.AliveIn(battle.Session), [battle.Session.Board.At(from + new Vector3I(0, 0, 1))]));
+    Vector3I from = battle.Session.GetUnitPosition(mover).RequireSome().Raw;
+    battle.Move(mover, [from + new Vector3I(0, 0, 1)]);
 
-    Assert.True(mover.State.IsDead);
-    Assert.Equal(1, recorder.OfType<UnitAttackedBattleEvent>().AsValueEnumerable().Count());
+    Assert.True(mover.IsDead);
+    Assert.Equal(1, battle.Events.EventsOf<UnitAttackedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(1, weapon.CurrentAmmo);
   }
 
@@ -180,21 +166,19 @@ public partial class AttackUnitTest
   [TestCase(TestName = "Damage event carries the weapon's emitted bundle")]
   public void DamageEventCarriesEmittedBundle()
   {
-    var weapon = BattleTestFactory.MakeWeapon(
-      "Plasma Pistol", damage: 6, frame: BattleTestFactory.MakeFrame((Element.Thermal, 0.7f), (Element.Electrical, 0.3f)));
-    var battle = new BattleDuelBuilder
-    {
-      HitChanceCalculator = new AlwaysHitCalculator(),
-      Player = new DuelSide("Alpha", Aim: 100, Weapon: weapon),
-    }.Start();
+    var weapon = TestData.MakeWeapon(
+      "Plasma Pistol", damage: 6, frame: TestData.MakeFrame((Element.Thermal, 0.7f), (Element.Electrical, 0.3f)));
+    using var battle = BattleFixture.Duel(
+      hitChanceCalculator: new AlwaysHitCalculator(),
+      player: new("Alpha", Aim: 100, Weapon: weapon));
     var target = battle.EnemyUnit;
 
-    var recorder = new BattleEventRecorder(battle.Session);
-    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, target.State);
+    battle.ClearEvents();
+    battle.Attack(battle.PlayerUnit, target);
 
-    var damagedEvent = recorder.Single<UnitDamagedBattleEvent>();
+    var damagedEvent = battle.Events.SingleEvent<UnitDamagedBattleEvent>();
     Assert.Equal(6, damagedEvent.TotalAmount); // 4 Thermal + 2 Electrical
-    Assert.Equal(target.State.MaxHealth - 6, target.State.CurrentHealth);
+    Assert.Equal(target.MaxHealth - 6, target.CurrentHealth);
     Assert.True(damagedEvent.Bundle.AsValueEnumerable().SequenceEqual(
       new[] { new Damage(4, Element.Thermal), new Damage(2, Element.Electrical) }));
   }
@@ -202,12 +186,12 @@ public partial class AttackUnitTest
   [TestCase(TestName = "Int damage path wraps the amount as a single Kinetic packet")]
   public void IntDamagePathWrapsAsKineticPacket()
   {
-    var solo = StartSoloBattle(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0));
+    using var solo = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0));
 
-    var recorder = new BattleEventRecorder(solo.Session);
-    solo.Executor.Submit(BattleAction.ApplyDamage(solo.Unit.AliveIn(solo.Session), 3));
+    solo.ClearEvents();
+    solo.ApplyDamage(solo.Unit, 3);
 
-    var damagedEvent = recorder.Single<UnitDamagedBattleEvent>();
+    var damagedEvent = solo.Events.SingleEvent<UnitDamagedBattleEvent>();
     Assert.Equal(3, damagedEvent.TotalAmount);
     Assert.True(damagedEvent.Bundle.AsValueEnumerable().SequenceEqual(new[] { new Damage(3, Element.Kinetic) }));
   }
@@ -215,57 +199,51 @@ public partial class AttackUnitTest
   [TestCase(TestName = "An empty magazine interrupts the attack without spending AP or raising events")]
   public void EmptyMagazineInterruptsAttack()
   {
-    var weapon = BattleTestFactory.MakeAmmoWeapon("Pistol", magazine: 1, damage: 2);
-    var battle = new BattleDuelBuilder
-    {
-      HitChanceCalculator = new AlwaysHitCalculator(),
-      Player = new DuelSide("Alpha", Weapon: weapon),
-    }.Start();
+    var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 1, damage: 2);
+    using var battle = BattleFixture.Duel(
+      hitChanceCalculator: new AlwaysHitCalculator(),
+      player: new("Alpha", Weapon: weapon));
     var attacker = battle.PlayerUnit;
     var target = battle.EnemyUnit;
 
-    Attack(battle.Session, battle.Executor, attacker.State, target.State);
+    battle.Attack(attacker, target);
     Assert.Equal(0, weapon.CurrentAmmo);
 
-    var recorder = new BattleEventRecorder(battle.Session);
+    battle.ClearEvents();
     int actionPointsBefore = attacker.CurrentActionPoints;
 
-    battle.Executor.Submit(BattleAction.AttackUnit(attacker.AliveIn(battle.Session), target.AliveIn(battle.Session)));
+    battle.Attack(attacker, target);
 
     Assert.Equal(actionPointsBefore, attacker.CurrentActionPoints);
-    Assert.False(recorder.OfType<UnitAttackedBattleEvent>().AsValueEnumerable().Any());
+    Assert.False(battle.Events.EventsOf<UnitAttackedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "A missed shot still spends ammunition")]
   public void MissedShotSpendsAmmo()
   {
-    var weapon = BattleTestFactory.MakeAmmoWeapon("Pistol", magazine: 3);
-    var battle = new BattleDuelBuilder
-    {
-      Player = new DuelSide("Alpha", Aim: 0, Weapon: weapon),
-    }.Start();
+    var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 3);
+    using var battle = BattleFixture.Duel(
+      player: new("Alpha", Aim: 0, Weapon: weapon));
     var target = battle.EnemyUnit;
 
-    Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, target.State);
+    battle.Attack(battle.PlayerUnit, target);
 
-    Assert.Equal(target.State.MaxHealth, target.State.CurrentHealth); // aim 0 -> guaranteed miss
+    Assert.Equal(target.MaxHealth, target.CurrentHealth); // aim 0 -> guaranteed miss
     Assert.Equal(2, weapon.CurrentAmmo);
   }
 
   private static List<bool> RunSeededAttackOutcomes(int seed)
   {
-    var battle = new BattleDuelBuilder
-    {
-      RandomSeed = seed,
-      Player = new DuelSide("Alpha", ActionPoints: 5, Aim: 50, Weapon: BattleTestFactory.MakeWeapon("Rifle")),
-      Enemy = new DuelSide("Hostile", Health: 100),
-    }.Start();
+    using var battle = BattleFixture.Duel(
+      randomSeed: seed,
+      player: new("Alpha", ActionPoints: 5, Aim: 50, Weapon: TestData.MakeWeapon("Rifle")),
+      enemy: new("Hostile", Health: 100));
 
-    var recorder = new BattleEventRecorder(battle.Session);
+    battle.ClearEvents();
     for (int i = 0; i < 5; i++)
-      Attack(battle.Session, battle.Executor, battle.PlayerUnit.State, battle.EnemyUnit.State);
+      battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
-    return recorder.OfType<UnitAttackedBattleEvent>().AsValueEnumerable().Select(attackEvent => attackEvent.IsHit).ToList();
+    return battle.Events.EventsOf<UnitAttackedBattleEvent>().AsValueEnumerable().Select(attackEvent => attackEvent.IsHit).ToList();
   }
 
   private sealed class BuildInterruptsHook(Func<HookContext, IReadOnlyList<BattleAction>> build) : BattleHook<UnitMovedBattleEvent>

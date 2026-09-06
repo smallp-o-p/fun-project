@@ -11,9 +11,9 @@ public class BattleOutcomeTest
   [TestCase(TestName = "A session exposes its declared player faction and no outcome until it ends")]
   public void SessionExposesPlayerFactionAndNoOutcomeUntilEnded()
   {
-    var player = BattleTestFactory.MakeFaction("Player");
-    var enemy = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
+    var session = new BattleSession(new BattleBoardState(new Vector3I(5, 1, 5)), [player, enemy], playerFaction: Some(player));
 
     Assert.Equal(player, session.PlayerFaction.RequireSome());
     Assert.True(session.Outcome.IsNone);
@@ -22,107 +22,97 @@ public class BattleOutcomeTest
   [TestCase(TestName = "A wiped player loses immediately")]
   public void PlayerWipeLosesImmediately()
   {
-    var battle = new BattleDuelBuilder
-    {
-      Dimensions = new Vector3I(5, 1, 5),
-      PlayerControlled = true,
-      Player = new("Alpha", Position: new Vector3I(0, 0, 0)),
-      Enemy = new("Bandit", Position: new Vector3I(2, 0, 0)),
-    }.Start();
-    var recorder = new BattleEventRecorder(battle.Session);
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5),
+      playerControlled: true,
+      player: new("Alpha", Position: new Vector3I(0, 0, 0)),
+      enemy: new("Bandit", Position: new Vector3I(2, 0, 0)));
+    battle.ClearEvents();
 
-    ApplyDamage(battle.Session, battle.PlayerUnit, 999);
+    battle.ApplyDamage(battle.PlayerUnit, 999);
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
-    var ended = recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Single();
+    var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Defeat, ended.Outcome);
   }
 
   [TestCase(TestName = "Player becoming the sole surviving side resolves to Victory the instant the last enemy dies")]
   public void PlayerSoleSurvivorResolvesToVictoryInstantly()
   {
-    var battle = new BattleDuelBuilder
-    {
-      Dimensions = new Vector3I(5, 1, 5),
-      PlayerControlled = true,
-      Player = new("Alpha", Position: new Vector3I(0, 0, 0)),
-      Enemy = new("Bandit", Position: new Vector3I(2, 0, 0)),
-    }.Start();
-    var recorder = new BattleEventRecorder(battle.Session);
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5),
+      playerControlled: true,
+      player: new("Alpha", Position: new Vector3I(0, 0, 0)),
+      enemy: new("Bandit", Position: new Vector3I(2, 0, 0)));
+    battle.ClearEvents();
 
-    ApplyDamage(battle.Session, battle.EnemyUnit, 999);
+    battle.ApplyDamage(battle.EnemyUnit, 999);
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
-    var ended = recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Single();
+    var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Victory, ended.Outcome);
   }
 
   [TestCase(TestName = "Without a player faction a sole survivor keeps playing and the battle does not end")]
   public void NoPlayerSoleSurvivorKeepsPlaying()
   {
-    var battle = new BattleDuelBuilder
-    {
-      Dimensions = new Vector3I(5, 1, 5),
-      Player = new("A1", Position: new Vector3I(0, 0, 0)),
-      Enemy = new("B1", Position: new Vector3I(2, 0, 0)),
-    }.Start();
-    var recorder = new BattleEventRecorder(battle.Session);
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5),
+      player: new("A1", Position: new Vector3I(0, 0, 0)),
+      enemy: new("B1", Position: new Vector3I(2, 0, 0)));
+    battle.ClearEvents();
 
-    ApplyDamage(battle.Session, battle.EnemyUnit, 999);
-    AdvanceTurn(battle.Session);
+    battle.ApplyDamage(battle.EnemyUnit, 999);
+    battle.AdvanceTurn();
 
     Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
     Assert.True(battle.Session.Outcome.IsNone);
-    Assert.False(recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Any());
+    Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
 
     // A lone survivor keeps taking turns across the round boundary — the path
     // adjacent to StartNextRound's impossible-state guard — without ending.
-    AdvanceTurn(battle.Session);
+    battle.AdvanceTurn();
 
     Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
     Assert.Equal(3, battle.Session.TurnNumber);
     Assert.True(battle.Session.Outcome.IsNone);
-    Assert.False(recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Any());
+    Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "Without a player faction total annihilation resolves to Draw at the end of the turn")]
   public void NoPlayerTotalAnnihilationResolvesToDraw()
   {
-    var battle = new BattleDuelBuilder
-    {
-      Dimensions = new Vector3I(5, 1, 5),
-      Player = new("A1", Position: new Vector3I(0, 0, 0)),
-      Enemy = new("B1", Position: new Vector3I(2, 0, 0)),
-    }.Start();
-    var recorder = new BattleEventRecorder(battle.Session);
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5),
+      player: new("A1", Position: new Vector3I(0, 0, 0)),
+      enemy: new("B1", Position: new Vector3I(2, 0, 0)));
+    battle.ClearEvents();
 
-    ApplyDamage(battle.Session, battle.EnemyUnit, 999);
-    ApplyDamage(battle.Session, battle.PlayerUnit, 999);
+    battle.ApplyDamage(battle.EnemyUnit, 999);
+    battle.ApplyDamage(battle.PlayerUnit, 999);
     Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
 
-    AdvanceTurn(battle.Session);
+    battle.AdvanceTurn();
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Draw, battle.Session.Outcome.RequireSome());
-    var ended = recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Single();
+    var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Draw, ended.Outcome);
   }
 
   [TestCase(TestName = "An end-of-turn DoT kill that wipes the player resolves to Defeat without throwing")]
   public void EndOfTurnDotKillResolvesOutcome()
   {
-    var battle = new BattleDuelBuilder
-    {
-      Dimensions = new Vector3I(5, 1, 5),
-      PlayerControlled = true,
-      Player = new("Alpha", Position: new Vector3I(0, 0, 0), Health: 2),
-      Enemy = new("Bandit", Position: new Vector3I(2, 0, 0)),
-    }.Start();
-    var recorder = new BattleEventRecorder(battle.Session);
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5),
+      playerControlled: true,
+      player: new("Alpha", Position: new Vector3I(0, 0, 0), Health: 2),
+      enemy: new("Bandit", Position: new Vector3I(2, 0, 0)));
+    battle.ClearEvents();
 
-    battle.PlayerUnit.State.ApplyStatusEffect(new DamageOverTimeStatusSpecData
+    battle.PlayerUnit.ApplyStatusEffect(new DamageOverTimeStatusSpecData
     {
       Name = "Burn",
       DurationTurns = 2,
@@ -130,11 +120,11 @@ public class BattleOutcomeTest
       TickElement = Element.Kinetic,
     });
 
-    AdvanceTurn(battle.Session);
+    battle.AdvanceTurn();
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
-    var ended = recorder.OfType<SessionEndedBattleEvent>().AsValueEnumerable().Single();
+    var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Defeat, ended.Outcome);
   }
 }

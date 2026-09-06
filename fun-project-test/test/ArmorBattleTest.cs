@@ -10,19 +10,18 @@ public partial class ArmorBattleTest
   [TestCase(TestName = "Spawned unit exposes its equipped armor at full pool")]
   public void SpawnedUnitExposesEquippedArmor()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [playerFaction]);
-    var armor = BattleTestFactory.MakeArmor("Plate", armor: 10, element: Element.Thermal);
+    var playerFaction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [playerFaction]);
+    var armor = TestData.MakeArmor("Plate", armor: 10, element: Element.Thermal);
 
-    var unit = SpawnUnit(
-      session,
-      BattleTestFactory.MakeCombatant("Alpha", playerFaction),
+    var unit = battle.Spawn(
+      TestData.MakeCombatant("Alpha", playerFaction),
       new Vector3I(1, 0, 1),
-      BattleTestFactory.MakeWeapon("Rifle"),
+      TestData.MakeWeapon("Rifle"),
       armor);
 
-    Assert.True(unit.State.EquippedArmor.IsSome);
-    var equipped = unit.State.EquippedArmor.RequireSome();
+    Assert.True(unit.EquippedArmor.IsSome);
+    var equipped = unit.EquippedArmor.RequireSome();
     Assert.Equal(10, equipped.Capability.Current);
     Assert.Equal(Element.Thermal, equipped.Capability.Element);
   }
@@ -30,12 +29,12 @@ public partial class ArmorBattleTest
   [TestCase(TestName = "Units spawn without armor by default")]
   public void UnitsSpawnWithoutArmorByDefault()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [playerFaction]);
+    var playerFaction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [playerFaction]);
 
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction), new Vector3I(1, 0, 1));
+    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction), new Vector3I(1, 0, 1));
 
-    Assert.True(unit.State.EquippedArmor.IsNone);
+    Assert.True(unit.EquippedArmor.IsNone);
   }
 
   // NOTE: BattleAction.ApplyDamage emits a Kinetic packet. Tests that are not about
@@ -44,20 +43,19 @@ public partial class ArmorBattleTest
   [TestCase(TestName = "Damage depletes armor before health and the event carries the split")]
   public void DamageDepletesArmorBeforeHealth()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [playerFaction]);
-    var armor = BattleTestFactory.MakeArmor("Plate", armor: 10, element: Element.Thermal);
-    var executor = ExecutorFor(session);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, health: 20),
-      new Vector3I(1, 0, 1), BattleTestFactory.MakeWeapon("Rifle"), armor);
-    StartBattle(session);
+    var playerFaction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [playerFaction]);
+    var armor = TestData.MakeArmor("Plate", armor: 10, element: Element.Thermal);
+    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction, health: 20),
+      new Vector3I(1, 0, 1), TestData.MakeWeapon("Rifle"), armor);
+    battle.Start();
 
-    var recorder = new BattleEventRecorder(session);
-    executor.Submit(BattleAction.ApplyDamage(unit.AliveIn(session), 4));
+    battle.ClearEvents();
+    battle.ApplyDamage(unit, 4);
 
     Assert.Equal(6, armor.Capability.Current);
-    Assert.Equal(20, unit.State.CurrentHealth);
-    var damagedEvent = recorder.Single<UnitDamagedBattleEvent>();
+    Assert.Equal(20, unit.CurrentHealth);
+    var damagedEvent = battle.Events.SingleEvent<UnitDamagedBattleEvent>();
     Assert.Equal(4, damagedEvent.ArmorDamage);
     Assert.Equal(0, damagedEvent.HealthDamage);
     Assert.Equal(4, damagedEvent.TotalAmount);
@@ -66,45 +64,41 @@ public partial class ArmorBattleTest
   [TestCase(TestName = "Spillover damages health and can kill through armor")]
   public void SpilloverCanKillThroughArmor()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var session = BattleTestFactory.MakeSession(new Vector3I(4, 1, 4), [playerFaction]);
-    var armor = BattleTestFactory.MakeArmor("Vest", armor: 3, element: Element.Thermal);
-    var executor = ExecutorFor(session);
-    var unit = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction, health: 5),
-      new Vector3I(1, 0, 1), BattleTestFactory.MakeWeapon("Rifle"), armor);
-    StartBattle(session);
+    var playerFaction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [playerFaction]);
+    var armor = TestData.MakeArmor("Vest", armor: 3, element: Element.Thermal);
+    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction, health: 5),
+      new Vector3I(1, 0, 1), TestData.MakeWeapon("Rifle"), armor);
+    battle.Start();
 
-    var recorder = new BattleEventRecorder(session);
-    executor.Submit(BattleAction.ApplyDamage(unit.AliveIn(session), 10));
+    battle.ClearEvents();
+    battle.ApplyDamage(unit, 10);
 
     Assert.Equal(0, armor.Capability.Current);
-    Assert.Equal(0, unit.State.CurrentHealth);
-    Assert.True(unit.State.IsDead);
+    Assert.Equal(0, unit.CurrentHealth);
+    Assert.True(unit.IsDead);
     // A killing blow commits death only: no damage event accompanies the kill.
-    Assert.False(recorder.OfType<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
-    Assert.True(recorder.OfType<UnitKilledBattleEvent>().AsValueEnumerable().Any());
+    Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
+    Assert.True(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "Attack strips element-matched armor at 1.5x")]
   public void AttackStripsMatchedArmorAtOnePointFive()
   {
-    var playerFaction = BattleTestFactory.MakeFaction("Player");
-    var enemyFaction = BattleTestFactory.MakeFaction("Enemy");
-    var session = BattleTestFactory.MakeSession(new Vector3I(8, 1, 8), [playerFaction, enemyFaction], new AlwaysHitCalculator());
-    var armor = BattleTestFactory.MakeArmor("Plate", armor: 6, element: Element.Kinetic);
-    var executor = ExecutorFor(session);
-    var attacker = SpawnUnit(session, BattleTestFactory.MakeCombatant("Alpha", playerFaction), new Vector3I(4, 0, 1), BattleTestFactory.MakeWeapon("Rifle", damage: 5));
-    var target = SpawnUnit(session, BattleTestFactory.MakeCombatant("Hostile", enemyFaction, health: 20),
-      new Vector3I(4, 0, 4), BattleTestFactory.MakeWeapon("Pistol"), armor);
-    StartBattle(session);
+    var armor = TestData.MakeArmor("Plate", armor: 6, element: Element.Kinetic);
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(8, 1, 8),
+      hitChanceCalculator: new AlwaysHitCalculator(),
+      player: new("Alpha", Weapon: TestData.MakeWeapon("Rifle", damage: 5)),
+      enemy: new("Hostile", Health: 20, Weapon: TestData.MakeWeapon("Pistol"), Armor: armor));
 
-    var recorder = new BattleEventRecorder(session);
-    Attack(session, executor, attacker.State, target);
+    battle.ClearEvents();
+    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
     // Default weapon frame emits one Kinetic packet of 5: matched -> min(6, 7) = 6 armor, no spill.
     Assert.Equal(0, armor.Capability.Current);
-    Assert.Equal(20, target.State.CurrentHealth);
-    var damagedEvent = recorder.Single<UnitDamagedBattleEvent>();
+    Assert.Equal(20, battle.EnemyUnit.CurrentHealth);
+    var damagedEvent = battle.Events.SingleEvent<UnitDamagedBattleEvent>();
     Assert.Equal(6, damagedEvent.ArmorDamage);
     Assert.Equal(0, damagedEvent.HealthDamage);
     Assert.Equal(5, damagedEvent.TotalAmount);
