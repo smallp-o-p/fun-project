@@ -9,76 +9,76 @@ public class GeoscapeClockTest
   [TestCase(TestName = "Sub-tick deltas do not advance the clock")]
   public void SubTickDeltasDoNotAdvance()
   {
-    var session = GeoscapeTestFactory.MakeSession();
-    session.ChangeSpeed(TimeSpeed.Normal); // 0.1 real seconds per tick
+    using var campaign = new GeoscapeFixture();
+    campaign.ChangeSpeed(TimeSpeed.Normal); // 0.1 real seconds per tick
 
-    session.Advance(0.05);
-    session.Advance(0.009);
+    campaign.Advance(0.05);
+    campaign.Advance(0.009);
 
-    Assert.Equal(0, session.Tick);
+    Assert.Equal(0, campaign.Session.Tick);
   }
 
   [TestCase(TestName = "Accumulator crosses the boundary exactly once")]
   public void AccumulatorCrossesBoundaryOnce()
   {
-    var session = GeoscapeTestFactory.MakeSession();
-    session.ChangeSpeed(TimeSpeed.Normal);
+    using var campaign = new GeoscapeFixture();
+    campaign.ChangeSpeed(TimeSpeed.Normal);
 
-    session.Advance(0.05);
-    session.Advance(0.05);
-    session.Advance(0.05);
+    campaign.Advance(0.05);
+    campaign.Advance(0.05);
+    campaign.Advance(0.05);
 
-    Assert.Equal(1, session.Tick); // 0.15s accrued -> exactly one boundary (0.1) crossed, 0.05 carried
+    Assert.Equal(1, campaign.Session.Tick); // 0.15s accrued -> exactly one boundary (0.1) crossed, 0.05 carried
   }
 
   [TestCase(TestName = "Faster speeds tick more per real second")]
   public void FasterSpeedsTickMore()
   {
-    var normal = GeoscapeTestFactory.MakeSession();
+    using var normal = new GeoscapeFixture();
     normal.ChangeSpeed(TimeSpeed.Normal);
     normal.Advance(1.0);
-    Assert.Equal(10, normal.Tick);
+    Assert.Equal(10, normal.Session.Tick);
 
-    var fast = GeoscapeTestFactory.MakeSession();
+    using var fast = new GeoscapeFixture();
     fast.ChangeSpeed(TimeSpeed.Fast); // 0.02s per tick
     fast.Advance(1.0);
-    Assert.Equal(50, fast.Tick);
+    Assert.Equal(50, fast.Session.Tick);
 
-    var veryFast = GeoscapeTestFactory.MakeSession();
+    using var veryFast = new GeoscapeFixture();
     veryFast.ChangeSpeed(TimeSpeed.VeryFast); // 0.008s per tick (12.5x)
     veryFast.Advance(1.0);
-    Assert.Equal(125, veryFast.Tick);
+    Assert.Equal(125, veryFast.Session.Tick);
 
-    var veryVeryFast = GeoscapeTestFactory.MakeSession();
+    using var veryVeryFast = new GeoscapeFixture();
     veryVeryFast.ChangeSpeed(TimeSpeed.VeryVeryFast); // 0.004s per tick
     veryVeryFast.Advance(1.0);
-    Assert.Equal(250, veryVeryFast.Tick);
+    Assert.Equal(250, veryVeryFast.Session.Tick);
   }
 
   [TestCase(TestName = "Paused speed freezes advancement until changed")]
   public void PausedSpeedFreezesAdvancement()
   {
-    var session = GeoscapeTestFactory.MakeSession();
-    session.Advance(10.0); // starts paused
-    Assert.Equal(0, session.Tick);
+    using var campaign = new GeoscapeFixture();
+    campaign.Advance(10.0); // starts paused
+    Assert.Equal(0, campaign.Session.Tick);
 
-    session.ChangeSpeed(TimeSpeed.Normal);
-    session.Advance(0.1);
-    Assert.Equal(1, session.Tick);
+    campaign.ChangeSpeed(TimeSpeed.Normal);
+    campaign.Advance(0.1);
+    Assert.Equal(1, campaign.Session.Tick);
 
-    session.ChangeSpeed(TimeSpeed.Paused);
-    session.Advance(10.0);
-    Assert.Equal(1, session.Tick);
+    campaign.ChangeSpeed(TimeSpeed.Paused);
+    campaign.Advance(10.0);
+    Assert.Equal(1, campaign.Session.Tick);
   }
 
   [TestCase(TestName = "Speed changes commit no events")]
   public void SpeedChangeCommitsNothing()
   {
-    var session = GeoscapeTestFactory.MakeSession();
+    using var campaign = new GeoscapeFixture();
     List<IGeoscapeEvent> committed = [];
-    session.EventCommitted += committed.Add;
+    campaign.Session.EventCommitted += committed.Add;
 
-    session.ChangeSpeed(TimeSpeed.Fast);
+    campaign.ChangeSpeed(TimeSpeed.Fast);
 
     Assert.Equal(0, committed.Count);
   }
@@ -86,35 +86,35 @@ public class GeoscapeClockTest
   [TestCase(TestName = "CurrentTime advances one game-minute per tick")]
   public void CurrentTimeAdvancesOneMinutePerTick()
   {
-    var session = GeoscapeTestFactory.MakeSession();
-    session.ChangeSpeed(TimeSpeed.Normal);
+    using var campaign = new GeoscapeFixture();
+    campaign.ChangeSpeed(TimeSpeed.Normal);
 
     for (int i = 0; i < 6; i++)
-      session.Advance(0.1); // one tick each: exact at the 0.1s base (no float drift)
+      campaign.Advance(0.1); // one tick each: exact at the 0.1s base (no float drift)
 
-    Assert.Equal(6, session.Tick);
-    Assert.Equal(1, session.CurrentDay);
+    Assert.Equal(6, campaign.Session.Tick);
+    Assert.Equal(1, campaign.Session.CurrentDay);
   }
 
   [TestCase(TestName = "The day counter starts at 1 and rolls on each 24 game-hours")]
   public void DayCounterRollsEveryTwentyFourHours()
   {
-    var session = GeoscapeTestFactory.MakeSession(); // starts 08:00
-    session.ChangeSpeed(TimeSpeed.VeryVeryFast);
+    using var campaign = new GeoscapeFixture(); // starts 08:00
+    campaign.ChangeSpeed(TimeSpeed.VeryVeryFast);
 
-    session.Advance(5.76); // 1440 ticks = 24 game-hours
+    campaign.Advance(5.76); // 1440 ticks = 24 game-hours
 
-    Assert.Equal(2, session.CurrentDay);
+    Assert.Equal(2, campaign.Session.CurrentDay);
   }
 
   [TestCase(TestName = "Crossing midnight does not roll the day before 24 hours elapse")]
   public void MidnightDoesNotRollTheDay()
   {
-    var session = GeoscapeTestFactory.MakeSession(); // starts 08:00
-    session.ChangeSpeed(TimeSpeed.VeryVeryFast);
+    using var campaign = new GeoscapeFixture(); // starts 08:00
+    campaign.ChangeSpeed(TimeSpeed.VeryVeryFast);
 
-    session.Advance(3.84); // 960 ticks = 16 game-hours → 00:00 next calendar day
+    campaign.Advance(3.84); // 960 ticks = 16 game-hours → 00:00 next calendar day
 
-    Assert.Equal(1, session.CurrentDay);
+    Assert.Equal(1, campaign.Session.CurrentDay);
   }
 }

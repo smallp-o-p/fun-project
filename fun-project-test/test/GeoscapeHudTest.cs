@@ -45,7 +45,7 @@ public class GeoscapeHudTest
   private static GeoscapeEvent MakeActive(long? expiresAtTick = null)
   {
     return new GeoscapeEvent(
-      GeoscapeTestFactory.MakeEvent("Raid"),
+      TestData.MakeEvent("Raid"),
       Option<int>.None,
       OccurredTick: 0,
       expiresAtTick.HasValue ? Some(expiresAtTick.Value) : Option<long>.None);

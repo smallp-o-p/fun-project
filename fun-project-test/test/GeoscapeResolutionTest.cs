@@ -5,87 +5,79 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class GeoscapeResolutionTest
 {
-  private static (GeoscapeSession Session, GeoscapeEvent Active) SessionWithFiredEvent()
-  {
-    var session = GeoscapeTestFactory.MakeSession(timeline:
-    [
-      GeoscapeTestFactory.MakeScheduled(1, GeoscapeTestFactory.MakeEvent("Incident")),
-    ]);
-    session.ChangeSpeed(TimeSpeed.Normal);
-    session.Advance(0.1);
-    return (session, session.ActiveEvents[0]);
-  }
-
   [TestCase(TestName = "Opening a resolution freezes time until completed")]
   public void OpenFreezesTimeUntilCompleted()
   {
-    var (session, active) = SessionWithFiredEvent();
+    using var campaign = GeoscapeFixture.WithFiredEvent(TestData.MakeEvent("Incident"));
 
-    session.OpenResolution(active);
-    session.Advance(100.0);
-    Assert.Equal(1, session.Tick); // frozen
-    Assert.True(session.PendingResolution.IsSome);
+    campaign.OpenResolution(campaign.ActiveEvent);
+    campaign.Advance(100.0);
+    Assert.Equal(1, campaign.Session.Tick); // frozen
+    Assert.True(campaign.Session.PendingResolution.IsSome);
 
-    session.CompleteResolution(ResolutionOutcome.Acknowledged);
-    session.Advance(0.1);
-    Assert.Equal(2, session.Tick); // resumed
+    campaign.CompleteResolution(ResolutionOutcome.Acknowledged);
+    campaign.Advance(0.1);
+    Assert.Equal(2, campaign.Session.Tick); // resumed
   }
 
   [TestCase(TestName = "Completing removes the event and clears pending")]
   public void CompleteRemovesEventAndClearsPending()
   {
-    var (session, active) = SessionWithFiredEvent();
+    using var campaign = GeoscapeFixture.WithFiredEvent(TestData.MakeEvent("Incident"));
 
-    session.OpenResolution(active);
-    session.CompleteResolution(ResolutionOutcome.Engaged);
+    campaign.OpenResolution(campaign.ActiveEvent);
+    campaign.CompleteResolution(ResolutionOutcome.Engaged);
 
-    Assert.True(session.PendingResolution.IsNone);
-    Assert.Equal(0, session.ActiveEvents.Count);
+    Assert.True(campaign.Session.PendingResolution.IsNone);
+    Assert.Equal(0, campaign.Session.ActiveEvents.Count);
   }
 
   [TestCase(TestName = "Opening while pending throws")]
   public void DoubleOpenThrows()
   {
-    var (session, active) = SessionWithFiredEvent();
-    session.OpenResolution(active);
+    using var campaign = GeoscapeFixture.WithFiredEvent(TestData.MakeEvent("Incident"));
+    var active = campaign.ActiveEvent;
+    campaign.OpenResolution(active);
 
-    Assert.Throws<System.InvalidOperationException>(() => session.OpenResolution(active));
+    Assert.Throws<System.InvalidOperationException>(() => campaign.OpenResolution(active));
   }
 
   [TestCase(TestName = "Completing without pending throws")]
   public void CompleteWithoutOpenThrows()
   {
-    var (session, _) = SessionWithFiredEvent();
+    using var campaign = GeoscapeFixture.WithFiredEvent(TestData.MakeEvent("Incident"));
 
-    Assert.Throws<System.InvalidOperationException>(() => session.CompleteResolution(ResolutionOutcome.Declined));
+    Assert.Throws<System.InvalidOperationException>(() => campaign.CompleteResolution(ResolutionOutcome.Declined));
   }
 
   [TestCase(TestName = "Open and complete are committed to the event stream")]
   public void LifecycleIsCommitted()
   {
-    var (session, active) = SessionWithFiredEvent();
-    var committed = new System.Collections.Generic.List<IGeoscapeEvent>();
-    session.EventCommitted += committed.Add;
+    using var campaign = GeoscapeFixture.WithFiredEvent(TestData.MakeEvent("Incident"));
+    var active = campaign.ActiveEvent;
+    campaign.ClearEvents();
     // Subscribers of ResolutionEventClosed observe post-state: the resolved event must be
     // gone from ActiveEvents AND the resolution itself must already be closed when the
     // event is committed.
     int activeCountOnClosed = -1;
     bool pendingOnClosed = true;
-    session.EventCommitted += geoscapeEvent =>
+    void Inspector(IGeoscapeEvent geoscapeEvent)
     {
       if (geoscapeEvent is ResolutionEventClosed)
       {
-        activeCountOnClosed = session.ActiveEvents.Count;
-        pendingOnClosed = session.PendingResolution.IsSome;
+        activeCountOnClosed = campaign.Session.ActiveEvents.Count;
+        pendingOnClosed = campaign.Session.PendingResolution.IsSome;
       }
-    };
+    }
 
-    session.OpenResolution(active);
-    session.CompleteResolution(ResolutionOutcome.Declined);
+    campaign.Session.EventCommitted += Inspector;
+    campaign.OpenResolution(active);
+    campaign.CompleteResolution(ResolutionOutcome.Declined);
+    campaign.Session.EventCommitted -= Inspector;
 
-    Assert.Equal(2, committed.Count);
-    Assert.True(committed[0] is ResolutionEventOpened opened && opened.Pending.Event == active);
-    Assert.True(committed[1] is ResolutionEventClosed closed
+    Assert.Equal(2, campaign.Events.Count);
+    Assert.True(campaign.Events[0] is ResolutionEventOpened opened && opened.Pending.Event == active);
+    Assert.True(campaign.Events[1] is ResolutionEventClosed closed
       && closed.Resolved.Event == active
       && closed.SelectedOutcome == ResolutionOutcome.Declined);
     Assert.Equal(0, activeCountOnClosed);

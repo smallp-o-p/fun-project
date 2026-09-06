@@ -41,4 +41,13 @@ public partial class TestDataTest
     Assert.Equal("Rifle weapon", TestData.MakeAmmoWeaponData("Rifle").Description);
     Assert.Equal("Description", TestData.MakeAmmoWeaponData("Rifle", description: "Description").Description);
   }
+
+  [TestCase]
+  public void ArmoryResourceBuildersPreserveStockPolicy()
+  {
+    Assert.True(TestData.MakeItemData("Pistol", unlimited: true).UnlimitedStock);
+    Assert.False(TestData.MakeItemData("Rifle").UnlimitedStock);
+    Assert.True(TestData.MakeMod("Scope", unlimited: true).UnlimitedStock);
+    Assert.False(TestData.MakeMod("Grip").UnlimitedStock);
+  }
 }

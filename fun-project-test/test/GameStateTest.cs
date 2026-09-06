@@ -2,7 +2,6 @@ using FunProject.GameState;
 using FunProject.Items;
 using FunProject.Stats;
 using GdUnit4;
-using static FunProject.Tests.GeoscapeTestFactory;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -11,11 +10,11 @@ public class GameStateTest
   [TestCase(TestName = "Roster is stamped: one Combatant per entry, override wins, empty falls back")]
   public void RosterIsStamped()
   {
-    var state = new GameState(MakeStart(roster:
+    var state = new GameState(TestData.MakeStart(roster:
     [
-      MakeEntry("Cpl. Ada Voss"),
-      MakeEntry(""),            // fallback to the mold name
-      MakeEntry("Sgt. Bram Okafor", unit: MakeCombatantData("Trooper")),
+      TestData.MakeEntry("Cpl. Ada Voss"),
+      TestData.MakeEntry(""),            // fallback to the mold name
+      TestData.MakeEntry("Sgt. Bram Okafor", unit: TestData.MakeCombatantData("Trooper", actionPoints: 8, movement: 14, vision: 22, aim: 60, modSlotCount: 2, will: 60)),
     ]));
 
     Assert.Equal(3, state.Roster.Count);
@@ -27,7 +26,7 @@ public class GameStateTest
   [TestCase(TestName = "Every roster combatant belongs to the player faction")]
   public void RosterBelongsToPlayerFaction()
   {
-    var state = new GameState(MakeStart(roster: [MakeEntry("A"), MakeEntry("B")]));
+    var state = new GameState(TestData.MakeStart(roster: [TestData.MakeEntry("A"), TestData.MakeEntry("B")]));
 
     foreach (var unit in state.Roster)
       Assert.Equal(state.PlayerFaction, unit.OwningFaction);
@@ -36,7 +35,7 @@ public class GameStateTest
   [TestCase(TestName = "Map size and regions bind from the campaign map")]
   public void MapBinds()
   {
-    var state = new GameState(MakeStart(regions: [MakeRegion("Northmark")]));
+    var state = new GameState(TestData.MakeStart(regions: [TestData.MakeRegion("Northmark")]));
 
     Assert.Equal(1, state.Regions.Count);
     Assert.Equal(0, state.IndexOfRegion("Northmark"));
@@ -56,7 +55,7 @@ public class GameStateTest
   [TestCase(TestName = "Roster entry without a unit throws at construction")]
   public void EntryWithoutUnitThrows()
   {
-    Assert.Throws<System.InvalidOperationException>(() => new GameState(MakeStart(roster:
+    Assert.Throws<System.InvalidOperationException>(() => new GameState(TestData.MakeStart(roster:
     [
       new RosterEntryData { Unit = null!, DisplayName = "Broken" },
     ])));
@@ -66,7 +65,7 @@ public class GameStateTest
   public void ArmoryBuiltFromStart()
   {
     EquippableItemData pistol = new() { Name = "Pistol" };
-    var state = new GameState(MakeStart(armory: [pistol],
+    var state = new GameState(TestData.MakeStart(armory: [pistol],
       modStock: [new MultiStatMod { Name = "Chip" }]));
 
     Assert.Equal(1, state.Armory.ItemStock().Count);
@@ -81,6 +80,6 @@ public class GameStateTest
   {
     EquippableItemData dup = new() { Name = "Duplicate" };
     Assert.Throws<InvalidOperationException>(() =>
-      new GameState(MakeStart(armory: [dup, dup])));
+      new GameState(TestData.MakeStart(armory: [dup, dup])));
   }
 }

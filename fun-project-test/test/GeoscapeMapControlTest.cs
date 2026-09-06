@@ -73,19 +73,19 @@ public class GeoscapeMapControlTest
   public void RegionWithoutButtonThrows()
   {
     var map = BuildMap([RegionButtonNamed("Alpha", Square)]);
-    var session = GeoscapeTestFactory.MakeSession(
-      regions: [GeoscapeTestFactory.MakeRegion("Alpha"), GeoscapeTestFactory.MakeRegion("Beta")]);
+    using var campaign = new GeoscapeFixture(
+      regions: [TestData.MakeRegion("Alpha"), TestData.MakeRegion("Beta")]);
 
-    Assert.Throws<InvalidOperationException>(() => map.Setup(session, TestMapSize));
+    Assert.Throws<InvalidOperationException>(() => map.Setup(campaign.Session, TestMapSize));
   }
 
   [TestCase(TestName = "An authored button without region data throws")]
   public void ButtonWithoutRegionThrows()
   {
     var map = BuildMap([RegionButtonNamed("Alpha", Square), RegionButtonNamed("Extra", Square)]);
-    var session = GeoscapeTestFactory.MakeSession(regions: [GeoscapeTestFactory.MakeRegion("Alpha")]);
+    using var campaign = new GeoscapeFixture(regions: [TestData.MakeRegion("Alpha")]);
 
-    Assert.Throws<InvalidOperationException>(() => map.Setup(session, TestMapSize));
+    Assert.Throws<InvalidOperationException>(() => map.Setup(campaign.Session, TestMapSize));
   }
 
   [TestCase(TestName = "Non-button children of the map are ignored")]
@@ -93,9 +93,9 @@ public class GeoscapeMapControlTest
   {
     var map = BuildMap([RegionButtonNamed("Alpha", Square)]);
     map.AddChild(new Label { Name = "SomeLabel" });
-    var session = GeoscapeTestFactory.MakeSession(regions: [GeoscapeTestFactory.MakeRegion("Alpha")]);
+    using var campaign = new GeoscapeFixture(regions: [TestData.MakeRegion("Alpha")]);
 
-    map.Setup(session, TestMapSize); // must not throw
+    map.Setup(campaign.Session, TestMapSize); // must not throw
   }
 
   [TestCase(TestName = "Setup without an assigned marker scene throws")]
@@ -103,26 +103,25 @@ public class GeoscapeMapControlTest
   {
     var map = AutoFree(new GeoscapeMapControl()); // no EventMarkerScene assigned
     map.AddChild(RegionButtonNamed("Alpha", Square));
-    var session = GeoscapeTestFactory.MakeSession(regions: [GeoscapeTestFactory.MakeRegion("Alpha")]);
+    using var campaign = new GeoscapeFixture(regions: [TestData.MakeRegion("Alpha")]);
 
-    Assert.Throws<InvalidOperationException>(() => map.Setup(session, TestMapSize));
+    Assert.Throws<InvalidOperationException>(() => map.Setup(campaign.Session, TestMapSize));
   }
 
   [TestCase(TestName = "RefreshEvents stamps a marker button centered on the target region's centroid")]
   public void RefreshEventsLayersMarkerAtCentroid()
   {
     var map = BuildMap([RegionButtonNamed("Alpha", Square)]);
-    var session = GeoscapeTestFactory.MakeSession(
-      regions: [GeoscapeTestFactory.MakeRegion("Alpha")],
+    using var campaign = new GeoscapeFixture(
+      regions: [TestData.MakeRegion("Alpha")],
       timeline:
       [
-        GeoscapeTestFactory.MakeScheduled(1, GeoscapeTestFactory.MakeEvent(
+        TestData.MakeScheduled(1, TestData.MakeEvent(
           "Raid", GeoscapeEventKind.TacticalBattle, targetRegionName: "Alpha")),
       ]);
-    session.ChangeSpeed(TimeSpeed.Normal);
-    session.Advance(0.1); // fires the raid at tick 1
+    campaign.AdvanceTicks(1); // fires the raid at tick 1
 
-    map.Setup(session, TestMapSize);
+    map.Setup(campaign.Session, TestMapSize);
     map.RefreshEvents();
 
     var marker = map.GetChild(map.GetChildCount() - 1);
@@ -139,8 +138,8 @@ public class GeoscapeMapControlTest
   public void RegionPressedEmitsRegionClicked()
   {
     var map = BuildMap([RegionButtonNamed("Alpha", Square)]);
-    var session = GeoscapeTestFactory.MakeSession(regions: [GeoscapeTestFactory.MakeRegion("Alpha")]);
-    map.Setup(session, TestMapSize);
+    using var campaign = new GeoscapeFixture(regions: [TestData.MakeRegion("Alpha")]);
+    map.Setup(campaign.Session, TestMapSize);
 
     string? clicked = null;
     map.RegionClicked += region => clicked = region.Name;
@@ -154,13 +153,12 @@ public class GeoscapeMapControlTest
   {
     var map = BuildMap([RegionButtonNamed("Alpha", Square)]);
     ((RegionButton)map.GetChild(0)).AddChild(new Marker2D { Name = "Anchor", Position = new Vector2(500, 400) });
-    var session = GeoscapeTestFactory.MakeSession(
-      regions: [GeoscapeTestFactory.MakeRegion("Alpha")],
-      timeline: [GeoscapeTestFactory.MakeScheduled(1, GeoscapeTestFactory.MakeEvent("Raid", targetRegionName: "Alpha"))]);
-    session.ChangeSpeed(TimeSpeed.Normal);
-    session.Advance(0.1);
+    using var campaign = new GeoscapeFixture(
+      regions: [TestData.MakeRegion("Alpha")],
+      timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Raid", targetRegionName: "Alpha"))]);
+    campaign.AdvanceTicks(1);
 
-    map.Setup(session, TestMapSize);
+    map.Setup(campaign.Session, TestMapSize);
     map.RefreshEvents();
 
     var marker = (RegionButton)map.GetChild(map.GetChildCount() - 1);
@@ -171,17 +169,16 @@ public class GeoscapeMapControlTest
   public void MarkerDisappearsAfterResolutionCompletes()
   {
     var map = BuildMap([RegionButtonNamed("Alpha", Square)]);
-    var session = GeoscapeTestFactory.MakeSession(
-      regions: [GeoscapeTestFactory.MakeRegion("Alpha")],
-      timeline: [GeoscapeTestFactory.MakeScheduled(1, GeoscapeTestFactory.MakeEvent("Raid", targetRegionName: "Alpha"))]);
-    session.ChangeSpeed(TimeSpeed.Normal);
-    session.Advance(0.1);
-    map.Setup(session, TestMapSize);
+    using var campaign = new GeoscapeFixture(
+      regions: [TestData.MakeRegion("Alpha")],
+      timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Raid", targetRegionName: "Alpha"))]);
+    campaign.AdvanceTicks(1);
+    map.Setup(campaign.Session, TestMapSize);
     map.RefreshEvents();
     Assert.Equal(2, map.GetChildCount()); // region button + marker button
 
-    session.OpenResolution(session.ActiveEvents[0]);
-    session.CompleteResolution(ResolutionOutcome.Acknowledged);
+    campaign.OpenResolution(campaign.ActiveEvent);
+    campaign.CompleteResolution(ResolutionOutcome.Acknowledged);
     map.RefreshEvents(); // what the composition root does on ResolutionEventClosed
 
     Assert.Equal(1, map.GetChildCount()); // the marker is gone
@@ -191,13 +188,12 @@ public class GeoscapeMapControlTest
   public void MarkerPressedEmitsEventClicked()
   {
     var map = BuildMap([RegionButtonNamed("Alpha", Square)]);
-    var session = GeoscapeTestFactory.MakeSession(
-      regions: [GeoscapeTestFactory.MakeRegion("Alpha")],
-      timeline: [GeoscapeTestFactory.MakeScheduled(1, GeoscapeTestFactory.MakeEvent("Raid", targetRegionName: "Alpha"))]);
-    session.ChangeSpeed(TimeSpeed.Normal);
-    session.Advance(0.1);
+    using var campaign = new GeoscapeFixture(
+      regions: [TestData.MakeRegion("Alpha")],
+      timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Raid", targetRegionName: "Alpha"))]);
+    campaign.AdvanceTicks(1);
 
-    map.Setup(session, TestMapSize);
+    map.Setup(campaign.Session, TestMapSize);
     map.RefreshEvents();
 
     GeoscapeEventAdapter? envelope = null;

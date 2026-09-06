@@ -268,6 +268,13 @@ internal static class TestData
     return item.With<ChargesCapability>().RequireSome();
   }
 
+  // Bare armory stock entries: no capabilities, so withdrawal materializes plain items.
+  public static EquippableItemData MakeItemData(string name, bool unlimited = false) =>
+    new() { Name = name, UnlimitedStock = unlimited };
+
+  public static MultiStatMod MakeMod(string name, bool unlimited = false) =>
+    new() { Name = name, UnlimitedStock = unlimited };
+
   public static DamageOverTimeStatusSpecData MakeBurn(
     int duration = 2,
     int tickDamage = 2,
