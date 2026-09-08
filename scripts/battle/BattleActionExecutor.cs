@@ -42,9 +42,10 @@ public sealed class BattleActionExecutor : IDisposable
     _session = session;
     _session.BattleEventCommitted += OnEventCommitted;
 
-    // Order matters here. Status effects tick before armor regen at turn end.
+    // Status effects and armor regen run before conscious stun recovery at turn end.
     RegisterHook<TurnEndedBattleEvent>(new StatusEffectSystem(), priority: -100);
     RegisterHook<TurnEndedBattleEvent>(new ArmorRegenSystem(), priority: -100);
+    RegisterHook<TurnEndedBattleEvent>(new StunRecoverySystem(), priority: -90);
     RegisterHook<ItemThrownBattleEvent>(new CapabilityEffectSystem());
 
     RegisterHook<TurnStartedBattleEvent>(new TurnStartBuffHook());

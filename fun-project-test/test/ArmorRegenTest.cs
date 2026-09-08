@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Core;
+using FunProject.Weapons;
 using GdUnit4;
 
 [TestSuite]
@@ -66,6 +67,21 @@ public partial class ArmorRegenTest
     battle.ApplyDamage(battle.PlayerUnit, 1);
 
     Assert.Equal(2, armor.Capability.RegenDelayRemaining);
+  }
+
+  [TestCase]
+  public void StunOnlyDamagePreservesTheExistingRegenDelay()
+  {
+    var armor = TestData.MakeArmor("Recharger", armor: 10, element: Element.Thermal, regenDelayTurns: 2, regenPerTurn: 3);
+    using var battle = BattleFixture.Duel(
+      player: new("Alpha", Health: 30, Weapon: TestData.MakeWeapon("Rifle"), Armor: armor));
+    battle.ApplyDamage(battle.PlayerUnit, 3);
+    battle.EndFactionTurn(battle.PlayerFaction);   // delay 2 -> 1
+    Assert.Equal(1, armor.Capability.RegenDelayRemaining);
+
+    battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
+
+    Assert.Equal(1, armor.Capability.RegenDelayRemaining);
   }
 
   [TestCase(TestName = "Armor without a regen rate never regenerates")]

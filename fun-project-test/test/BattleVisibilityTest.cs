@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
@@ -255,8 +256,65 @@ public class BattleVisibilityTest
     Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(longSighted), battle.Alive(target))));
   }
 
-  [TestCase(TestName = "Faction visible tiles are the union of all living allies")]
-  public void FactionVisibleTilesAreTheUnionOfAllLivingAllies()
+  [TestCase(TestName = "Knockout removes only its own vision contribution before broadcast")]
+  public void KnockoutRemovesOnlyItsOwnVisionContributionBeforeBroadcast()
+  {
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    using var battle = new BattleFixture(new Vector3I(5, 1, 3), [playerFaction, enemyFaction]);
+    var observer = battle.Spawn(TestData.MakeCombatant("Observer", playerFaction, vision: 5), new Vector3I(0, 0, 0));
+    battle.Spawn(TestData.MakeCombatant("Support", playerFaction, vision: 1), new Vector3I(0, 0, 2));
+    battle.Spawn(TestData.MakeCombatant("Enemy", enemyFaction, vision: 5), new Vector3I(3, 0, 0));
+    battle.Start();
+    var exclusiveTile = battle.At(3, 0, 0);
+    var sharedTile = battle.At(0, 0, 1);
+    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile)));
+
+    bool observedKnockout = false;
+    battle.Session.BattleEventCommitted += battleEvent =>
+    {
+      if (battleEvent is not UnitUnconsciousBattleEvent)
+        return;
+      observedKnockout = true;
+      Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile)));
+      Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, sharedTile)));
+    };
+
+    battle.ApplyDamage(observer, 20, DamageKind.Stun);
+
+    Assert.True(observedKnockout);
+  }
+
+  [TestCase(TestName = "Knockout preserves explored tiles")]
+  public void KnockoutPreservesExploredTiles()
+  {
+    using var battle = BattleFixture.Duel();
+    var enemyTile = battle.Alive(battle.EnemyUnit).Position;
+
+    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+
+    Assert.True(battle.Query(new HasFactionExploredTile(battle.PlayerFaction, enemyTile)));
+  }
+
+  [TestCase(false)]
+  [TestCase(true)]
+  public void UnconsciousObserverCachesStayEmptyDuringVisibilityUpdates(bool forceFullRebuild)
+  {
+    using var battle = BattleFixture.Duel();
+    var observer = battle.PlayerUnit;
+    var support = battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction, vision: 1), Vector3I.Zero);
+    battle.ApplyDamage(observer, 20, DamageKind.Stun);
+    if (forceFullRebuild)
+      battle.Session.InvalidateVisibility();
+
+    battle.Move(support, [new Vector3I(0, 0, 1)]);
+
+    Assert.Equal(0, observer.VisibleTiles.Count);
+    Assert.Equal(0, observer.VisibleUnits.Count);
+  }
+
+  [TestCase(TestName = "Faction visible tiles are the union of conscious allies")]
+  public void FactionVisibleTilesAreTheUnionOfConsciousAllies()
   {
     var playerFaction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [playerFaction]);

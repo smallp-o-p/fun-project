@@ -132,6 +132,12 @@ internal static class TestData
     return new MeleeWeapon(data);
   }
 
+  public static Weapon MakeStunWeapon(string name = "Stunner", int damage = 5)
+    => MakeWeapon(name, damage: damage, frame: new WeaponFrameData
+    {
+      Packets = [new DamagePacketData { Kind = DamageKind.Stun }],
+    });
+
   // A base Weapon whose single packet carries an authored status spec, applied on hit.
   public static Weapon MakeStatusWeapon(StatusEffectSpecData status, int damage = 3, Element element = Element.Kinetic)
   {

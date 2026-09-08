@@ -123,6 +123,42 @@ public class GetAvailableActionsForUnitTest
     Assert.True(Row<EndTurnActionDefinition>(actions).IsAvailable);
   }
 
+  [TestCase(TestName = "Unconscious unit has no available catalog actions, including EndTurn")]
+  public void UnconsciousUnitHasNoAvailableActions()
+  {
+    using var battle = MakeBattle(TestData.MakeAmmoWeapon("SMG"));
+    AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
+    battle.ApplyDamage(hero.State, 20, DamageKind.Stun);
+
+    var actions = battle.Query(new GetAvailableActionsForUnit(hero));
+
+    Assert.True(actions.AsValueEnumerable().All(action => !action.IsAvailable));
+    Assert.False(Row<EndTurnActionDefinition>(actions).IsAvailable);
+  }
+
+  [TestCase(TestName = "Unconscious unit has no possible move tiles")]
+  public void UnconsciousUnitHasNoPossibleMoveTiles()
+  {
+    using var battle = MakeBattle(None);
+    AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
+    battle.ApplyDamage(hero.State, 20, DamageKind.Stun);
+
+    Assert.Equal(0, battle.Query(new GetPossibleMoveTilesForUnit(hero)).Count);
+  }
+
+  [TestCase(TestName = "FindPath remains a geometric query for an unconscious unit")]
+  public void FindPathRemainsGeometricForUnconsciousUnit()
+  {
+    using var battle = MakeBattle(None);
+    AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
+    battle.ApplyDamage(hero.State, 20, DamageKind.Stun);
+
+    var path = battle.Query(new FindPathForUnit(hero, battle.At(new Vector3I(1, 0, 0))));
+
+    Vector3I[] expected = [Vector3I.Zero, new Vector3I(1, 0, 0)];
+    Assert.True(path.AsValueEnumerable().Select(point => point.Raw).SequenceEqual(expected));
+  }
+
   [TestCase(TestName = "A walkable tile directly above counts as an open neighbor for Move")]
   public void VerticalNeighborKeepsMoveAvailable()
   {

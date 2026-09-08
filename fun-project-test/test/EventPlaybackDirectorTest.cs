@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System;
@@ -86,6 +87,57 @@ public sealed partial class EventPlaybackDirectorTest
     Assert.False(director.Busy);
   }
 
+  [TestCase(TestName = "Playback uses the stored unconscious event after the unit changes")]
+  public void PlaybackUsesStoredUnconsciousEventAfterUnitChanges()
+  {
+    using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1));
+    var director = battle.OwnNode(new BareDirector()); // unbound: steps are driven directly
+    var mesh = battle.OwnNode(new Node3D { Position = BoardCoordinates.TileToWorldCenter(new Vector3I(1, 0, 1)) });
+    director.RegisterUnitMesh(battle.Unit, mesh);
+    var unconscious = new UnitUnconsciousBattleEvent(battle.Unit, battle.At(1, 0, 1), None);
+
+    BattleActionExecResult killResult = battle.ApplyDamage(battle.Unit, 999);
+    UnitKilledBattleEvent killed = killResult.EventsThatOccurred.AsValueEnumerable()
+      .OfType<UnitKilledBattleEvent>()
+      .Single();
+
+    bool done = false;
+    director.PlayStepPublic(unconscious, () => done = true);
+    Assert.True(done);
+    Assert.True(mesh.Visible);
+
+    done = false;
+    director.PlayStepPublic(killed, () => done = true);
+    Assert.True(done);
+    Assert.False(mesh.Visible);
+  }
+
+  [TestCase]
+  public void StunDamageAndRecoveryPlaybackCompleteInstantly()
+  {
+    using var battle = BattleFixture.Duel();
+    var director = battle.OwnNode(new BareDirector()); // unbound: steps are driven directly
+    var mesh = battle.OwnNode(new Node3D());
+    director.RegisterUnitMesh(battle.PlayerUnit, mesh);
+
+    battle.ClearEvents();
+    battle.ApplyDamage(battle.PlayerUnit, 5, DamageKind.Stun);
+    battle.EndFactionTurn(battle.PlayerFaction);
+    BattleEvent[] events =
+    [
+      battle.Events.SingleEvent<UnitDamagedBattleEvent>(),
+      battle.Events.SingleEvent<UnitStunRecoveredBattleEvent>(),
+    ];
+
+    foreach (BattleEvent battleEvent in events)
+    {
+      bool done = false;
+      director.PlayStepPublic(battleEvent, () => done = true);
+      Assert.True(done);
+      Assert.True(mesh.Visible);
+    }
+  }
+
   [TestCase(TestName = "Move steps for hidden (dead) meshes complete instantly without moving")]
   public void MoveStepsForHiddenMeshesCompleteInstantlyWithoutMoving()
   {
@@ -148,5 +200,6 @@ public sealed partial class EventPlaybackDirectorTest
   private sealed partial class BareDirector : EventPlaybackDirector
   {
     public void MoveStepPublic(IReadOnlyList<UnitMovedBattleEvent> run, Action done) => PlayMoveStep(run, done);
+    public void PlayStepPublic(BattleEvent battleEvent, Action done) => PlayStep(battleEvent, done);
   }
 }

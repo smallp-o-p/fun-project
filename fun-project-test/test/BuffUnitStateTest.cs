@@ -3,7 +3,6 @@ using FunProject.Buffs;
 using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
-using Godot;
 
 [TestSuite]
 [RequireGodotRuntime]

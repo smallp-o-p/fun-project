@@ -25,10 +25,10 @@ public sealed class BattleSession
   public const int DefaultAttackActionPointCost = 1;
   public const int DefaultReloadActionPointCost = 1;
   public const int DefaultUseItemActionPointCost = 1;
-
   private readonly IHitChanceCalculator _hitChanceCalculator;
   private readonly Random _random;
   private readonly List<BattleUnitState> _units = [];
+  private IReadOnlyList<Combatant> _capturedEnemies = [];
   private readonly SysColGeneric.List<BattleObjectState> _objects = [];
   private readonly VisibilityService _visibility = new();
   private readonly Dictionary<Faction, List<Objective>> _objectives = [];
@@ -38,21 +38,21 @@ public sealed class BattleSession
 
   private bool _isDispatchingEvents;
 
-  // Visible sets depend only on board occupancy: a unit's vision range resolves from
+  // Visible sets depend on board occupancy and consciousness: a unit's vision range resolves from
   // stat contributions that are fixed for the battle (combatant + equipped weapon; no
   // action swaps weapons, equips mods, or applies a vision-affecting effect mid-battle),
   // and tile BlocksLineOfSight is set during setup. So visibility only needs recomputing
-  // after an occupancy mutation, at two granularities:
+  // after an occupancy or consciousness mutation, at two granularities:
   //   - _visibilityFullRefreshPending forces a clear-and-recompute-everyone pass. Used on
   //     battle start, where tile BlocksLineOfSight authoring may have changed without any
   //     occupancy event (so no affected-unit set could capture it). Starts true so the first
   //     dispatch performs the initial compute.
   //   - _visibilityAffectedUnits accumulates the units whose own cell changed (move/spawn/
-  //     death) since the last refresh. An incremental pass then recomputes only those units
-  //     and their visibility to others — byte-identical to a full recompute, because an
-  //     unaffected observer's visible-tile set cannot change when some other unit moves.
-  // Both are written at the three Board.Try* occupancy chokepoints (affected) and on battle
-  // start (full). NOTE: if a runtime effect that changes a unit's vision is ever added, force
+  //     death) or who became unconscious since the last refresh. The incremental pass
+  //     recomputes those units and their visibility to others, matching a full recompute:
+  //     an unaffected observer's visible tiles cannot change when another unit changes.
+  // Mark affected units at Board.Try* occupancy chokepoints and unconscious transitions;
+  // battle start requests a full refresh. If a runtime effect changes a unit's vision, force
   // a full refresh (or mark that unit affected) there too. Likewise, any runtime mutation to
   // a tile's BlocksLineOfSight or BlocksVerticalLineOfSight (e.g. destructible terrain) must
   // call InvalidateVisibility() — tile flag changes are NOT occupancy events and are not
@@ -129,7 +129,7 @@ public sealed class BattleSession
 
     Board = board;
     PlayerFaction = playerFaction;
-    _scheduler = new TurnScheduler(HasLivingUnits, GetFactionAliveUnits);
+    _scheduler = new TurnScheduler(HasConsciousUnits, GetFactionConsciousUnits);
 
     foreach (var faction in globalFactionOrder)
     {
@@ -149,6 +149,13 @@ public sealed class BattleSession
     ArgumentNullException.ThrowIfNull(side);
     return AliveUnits.AsValueEnumerable().Where(unit => unit.Side == side).ToArray();
   }
+
+  internal IEnumerable<BattleUnitState> GetFactionConsciousUnits(Faction side)
+    => GetFactionAliveUnits(side).AsValueEnumerable()
+      .Where(unit => !unit.IsUnconscious).ToArray();
+
+  internal bool HasConsciousUnits(Faction side)
+    => GetFactionConsciousUnits(side).AsValueEnumerable().Any();
 
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetFactionVisibleTiles(Faction side)
   {
@@ -193,9 +200,9 @@ public sealed class BattleSession
     if (Phase != BattlePhase.Setup)
       throw new InvalidOperationException("Battle session can only be started from setup.");
 
-    _scheduler.RebuildRoundQueueFromLivingSides();
+    _scheduler.RebuildRoundQueueFromConsciousSides();
     if (_scheduler.RoundQueueCount == 0)
-      throw new InvalidOperationException("Cannot start a battle without at least one living faction in the session.");
+      throw new InvalidOperationException("Cannot start a battle without at least one conscious faction in the session.");
 
     foreach (var side in _scheduler.GlobalFactionTurnOrder)
     {
@@ -271,8 +278,8 @@ public sealed class BattleSession
     RaiseEvents(new ObjectPlacedBattleEvent(state, position));
   }
 
-  internal void ApplyDamageTo(BattleUnitState unit, int amount)
-    => ApplyDamageTo(unit, [new Damage(amount, Element.Kinetic)], None);
+  internal void ApplyDamageTo(BattleUnitState unit, int amount, DamageKind kind = DamageKind.Health)
+    => ApplyDamageTo(unit, [new Damage(amount, Element.Kinetic, Kind: kind)], None);
 
   internal void ApplyDamageTo(BattleUnitState unit, IReadOnlyList<Damage> bundle, Option<BattleUnitState> cause)
   {
@@ -280,7 +287,8 @@ public sealed class BattleSession
     ArgumentNullException.ThrowIfNull(bundle);
     if (unit.IsDead)
       throw new InvalidOperationException($"Cannot damage unit {unit.Id} because it is already dead.");
-    if (Board.FindOccupantPosition(unit.Id).IsNone)
+    var unitPoint = Board.FindOccupantPosition(unit.Id);
+    if (unitPoint.IsNone)
       throw new InvalidOperationException($"Cannot damage unit {unit.Id} because it is not on the board.");
 
     Option<ArmorState> armorState =
@@ -294,7 +302,9 @@ public sealed class BattleSession
       if (resolution.ArmorDamage > 0 || resolution.HealthDamage > 0)
         armor.Capability.RearmRegenDelay();
     });
+    bool wasUnconscious = unit.IsUnconscious;
     unit.ReceiveDamage(resolution.HealthDamage);
+    unit.ReceiveStun(resolution.StunDamage);
 
     if (unit.IsDead)
     {
@@ -302,7 +312,19 @@ public sealed class BattleSession
       return;
     }
 
-    RaiseEvents(new UnitDamagedBattleEvent(unit, cause, bundle, resolution.ArmorDamage, resolution.HealthDamage));
+    if (unit.IsUnconscious && !wasUnconscious)
+    {
+      var unitSide = unit.Side;
+      MarkVisibilityAffected(unit);
+      _scheduler.TryConsumeAvailableUnit(unit);
+      RaiseEvents(new UnitUnconsciousBattleEvent(unit, unitPoint.Value(), cause));
+      HandleFactionLoss(unitSide);
+      return;
+    }
+
+    RaiseEvents(new UnitDamagedBattleEvent(unit, cause, bundle,
+      resolution.ArmorDamage, resolution.HealthDamage, resolution.StunDamage));
+
     ApplyStatusEffectsFrom(unit, bundle, packetResolutions);
   }
 
@@ -379,11 +401,6 @@ public sealed class BattleSession
     RaiseEvents(new UnitKilledBattleEvent(unit, unitPoint, killedBy));
 
     HandleFactionLoss(unitSide);
-
-    if (Phase == BattlePhase.InProgress
-        && PlayerFaction.Match(Some: player => player == unitSide, None: () => false)
-        && !HasLivingUnits(unitSide))
-      EndBattle(BattleOutcome.Defeat);
   }
 
   internal void EndUnitActivation(BattleUnitState unit)
@@ -422,7 +439,7 @@ public sealed class BattleSession
       return;
 
     // With no player faction there is no backstop: if every faction is wiped, Draw.
-    if (!_scheduler.GlobalFactionTurnOrder.AsValueEnumerable().Any(HasLivingUnits))
+    if (!_scheduler.GlobalFactionTurnOrder.AsValueEnumerable().Any(HasConsciousUnits))
     {
       EndBattle(BattleOutcome.Draw);
       return;
@@ -456,6 +473,17 @@ public sealed class BattleSession
   {
     if (Phase == BattlePhase.Ended)
       return;
+
+    var captured = new SysColGeneric.HashSet<Combatant>(
+      System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    if (outcome == BattleOutcome.Victory)
+      PlayerFaction.IfSome(player =>
+      {
+        foreach (var unit in AliveUnits)
+          if (unit.Side != player && unit.IsUnconscious)
+            captured.Add(unit.Combatant);
+      });
+    _capturedEnemies = System.Array.AsReadOnly(captured.AsValueEnumerable().ToArray());
 
     _scheduler.ClearActiveFactionAvailability();
     _scheduler.ClearTurnQueue();
@@ -557,7 +585,7 @@ public sealed class BattleSession
     return GetFactionAliveUnits(side).AsValueEnumerable().Any();
   }
 
-  // Records a unit whose own board cell changed (spawned/moved/removed) so the next dispatch
+  // Records a unit whose board cell or consciousness changed so the next dispatch
   // can scope its visibility recompute to the affected units instead of the whole pool. A
   // pending full refresh (battle start) still takes priority and clears this set.
   private void MarkVisibilityAffected(BattleUnitState unit)
@@ -647,10 +675,13 @@ public sealed class BattleSession
 
   private void HandleFactionLoss(Faction side)
   {
-    if (HasLivingUnits(side))
+    if (HasConsciousUnits(side))
       return;
 
     _scheduler.OnFactionEliminated(side, Phase == BattlePhase.InProgress && ActiveSide == side);
+    if (Phase == BattlePhase.InProgress
+        && PlayerFaction.Match(player => player == side, () => false))
+      EndBattle(BattleOutcome.Defeat);
   }
 
   internal void AddObjective(Faction faction, Objective objective)
@@ -702,18 +733,23 @@ public sealed class BattleSession
   {
     TurnNumber++;
     _scheduler.ClearSidesActedThisRound();
-    _scheduler.RebuildRoundQueueFromLivingSides();
+    _scheduler.RebuildRoundQueueFromConsciousSides();
 
     if (_scheduler.RoundQueueCount == 0)
       throw new InvalidOperationException(
-        "StartNextRound reached with no living factions; AdvanceTurn should end the battle at the prior turn end.");
+        "StartNextRound reached with no conscious factions; AdvanceTurn should end the battle at the prior turn end.");
 
     BeginNextQueuedSideTurn();
   }
 
   private void BeginNextQueuedSideTurn()
   {
+    if (_scheduler.RoundQueueCount == 0)
+      throw new InvalidOperationException("Cannot begin a turn with an empty conscious-faction queue.");
+
     var nextSide = _scheduler.AdvanceActiveSideToQueueHead();
+    if (!HasConsciousUnits(nextSide))
+      throw new InvalidOperationException("Cannot begin a turn for a faction without conscious units.");
 
     // Refresh availability immediately after the active side flips: no observer may see the
     // previous side's units as still available.
@@ -741,6 +777,9 @@ public sealed class BattleSession
     {
       Faction = faction,
       Outcome = Outcome.Value(),
+      CapturedEnemies = Outcome == Some(BattleOutcome.Victory) && PlayerFaction == Some(faction)
+        ? _capturedEnemies
+        : [],
       CombatantsPresent = (SysColGeneric.HashSet<Combatant>)
       [
         .. AliveUnits.AsValueEnumerable().Where(unit => unit.Side == faction).Select(unit => unit.Combatant).ToArray(),

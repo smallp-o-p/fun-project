@@ -26,6 +26,36 @@ public class DamagePipelineTest
     Assert.Equal(new Damage(5, Element.Kinetic), new DamagePacketData().Derive(5));
   }
 
+  [TestCase]
+  public void DerivationAndModifiersPreserveStunKind()
+  {
+    var frame = new WeaponFrameData
+    {
+      Packets =
+      [
+        new DamagePacketData { Element = Element.Electrical, Kind = DamageKind.Stun, Multiplier = 2f },
+        new DamagePacketData { Element = Element.Thermal, Kind = DamageKind.Stun, Multiplier = 1f },
+      ],
+    };
+    var weapon = TestData.MakeWeapon("Stunner", damage: 3, frame: frame);
+    var emitted = weapon.EmitDamage();
+    var modifier = new PacketModifier
+    {
+      Element = Element.Electrical,
+      Ops = [StatModifier.Add(2), StatModifier.Multiply(2f)],
+    };
+
+    var modified = modifier.Apply(emitted).AsValueEnumerable().ToArray();
+
+    // The matching packet becomes (6 + 2) * 2; the other element passes through.
+    Damage[] expected =
+    [
+      new(16, Element.Electrical, Kind: DamageKind.Stun),
+      new(3, Element.Thermal, Kind: DamageKind.Stun),
+    ];
+    Assert.True(modified.AsValueEnumerable().SequenceEqual(expected));
+  }
+
   [TestCase(TestName = "PacketModifier scaling all elements folds ops over every packet")]
   public void UniformFoldsOpsOverEveryPacket()
   {

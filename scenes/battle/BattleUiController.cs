@@ -10,8 +10,8 @@ using System.Collections.Generic;
 // (1) non-submission intents (select, cancel, begin targeting) run inside the intent method;
 // (2) every submission-caused transition lives in OnActionResult, the runtime's ActionCompleted
 // signal handler — the FSM reacts identically no matter which actor submitted (player, stub, AI).
-// While in Targeting/TargetingLocked the gate is open and nothing is in flight, so any result
-// arriving there was caused by the FSM's own submission — no per-action bookkeeping.
+// Results can also arrive during targeting from foreign submissions. Selection and targeting
+// are reconciled against the committed unit state without per-action bookkeeping.
 public enum UiState { Unselected, UnitSelected, Targeting, TargetingLocked, BattleOver }
 public enum InputGate { Open, PlaybackBusy, NotPlayerTurn }
 
@@ -80,7 +80,7 @@ public sealed class BattleUiController : IDisposable
     return _runtime.TryGetTile(tile).Bind(point => _runtime.Query(new GetUnitAtTile(point))).Match(
       Some: unit =>
       {
-        if (!ReferenceEquals(unit.Side, _playerFaction))
+        if (!ReferenceEquals(unit.Side, _playerFaction) || unit.IsUnconscious)
           return false;
         ResetTargeting();
         _selected = Some(unit);
@@ -241,7 +241,8 @@ public sealed class BattleUiController : IDisposable
       return;
     }
 
-    _selected = _selected.Bind(_runtime.TryGetAlive).Map(alive => alive.State);
+    _selected = _selected.Bind(_runtime.TryGetAlive).Map(alive => alive.State)
+      .Filter(unit => !unit.IsUnconscious);
     if (_selected.IsNone)
     {
       ResetTargeting();

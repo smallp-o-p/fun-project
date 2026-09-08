@@ -14,6 +14,7 @@ public sealed record FactionBattleSummary
   public required IReadOnlySet<Combatant> CombatantsDead { get; init; }
   public required IReadOnlySet<Combatant> CombatantsWounded { get; init; }
   public required int TurnCount { get; init; }
+  public IReadOnlyList<Combatant> CapturedEnemies { get; init; } = [];
 }
 
 public sealed class GetFactionEndOfBattleSummary(Faction faction)

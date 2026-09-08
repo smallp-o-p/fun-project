@@ -11,7 +11,7 @@ public abstract class UnitActionCondition
 }
 
 // Battle is in progress and the scheduler allows this unit to act right now
-// (active side, still available this turn, alive, not immobilized).
+// (active side, still available this turn, alive, and not incapacitated).
 public sealed class UnitCanActNowCondition : UnitActionCondition
 {
   internal override bool IsMet(BattleSession session, AliveUnit unit)

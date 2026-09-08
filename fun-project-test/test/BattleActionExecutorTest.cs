@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System;
@@ -117,6 +118,26 @@ public partial class BattleActionExecutorTest
     int damage = events.EventIndex<UnitDamagedBattleEvent>();
     int secondMove = events.EventIndex<UnitMovedBattleEvent>(moved => moved.Position.Raw == end);
     Assert.True(firstMove < damage && damage < secondMove);
+  }
+
+  [TestCase(TestName = "A stun reaction after the first movement step interrupts the remaining route")]
+  public void StunReactionInterruptsRemainingMovementSteps()
+  {
+    var start = new Vector3I(0, 0, 0);
+    var mid = new Vector3I(1, 0, 0);
+    var end = new Vector3I(2, 0, 0);
+    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), start, health: 10, actionPoints: 5);
+    var unit = battle.Unit;
+    battle.RegisterHook<UnitMovedBattleEvent>(
+      new DamageOnTileOccupiedHook<UnitMovedBattleEvent>(mid, unit, 10, oneShot: true, kind: DamageKind.Stun));
+
+    BattleAction action = BattleAction.MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)]);
+    BattleActionExecResult result = battle.Submit(action);
+
+    Assert.Equal(1, result.EventsThatOccurred.ToArray().EventsOf<UnitMovedBattleEvent>().Length);
+    Assert.Equal(mid, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
+    Assert.Equal(4, unit.CurrentActionPoints);
+    Assert.True(unit.IsUnconscious);
   }
 
   [TestCase(TestName = "MoveUnit emits movement and tile occupation events after commit")]
@@ -538,16 +559,23 @@ public partial class BattleActionExecutorTest
     private readonly BattleUnitState _targetUnit;
     private readonly int _damage;
     private readonly bool _oneShot;
+    private readonly DamageKind _kind;
     private bool _spent;
 
     public Option<Vector3I> ObservedTargetPositionDuringEvaluation { get; private set; }
 
-    public DamageOnTileOccupiedHook(Vector3I position, BattleUnitState targetUnit, int damage, bool oneShot)
+    public DamageOnTileOccupiedHook(
+      Vector3I position,
+      BattleUnitState targetUnit,
+      int damage,
+      bool oneShot,
+      DamageKind kind = DamageKind.Health)
     {
       _position = position;
       _targetUnit = targetUnit;
       _damage = damage;
       _oneShot = oneShot;
+      _kind = kind;
     }
 
     public override bool NeedsToUnregister => _spent;
@@ -565,7 +593,7 @@ public partial class BattleActionExecutorTest
 
       System.Collections.Generic.List<BattleAction> interrupts = [];
       context.Session.TryGetAlive(_targetUnit)
-        .IfSome(alive => interrupts.Add(BattleAction.ApplyDamage(alive, _damage)));
+        .IfSome(alive => interrupts.Add(BattleAction.ApplyDamage(alive, _damage, _kind)));
       return interrupts;
     }
   }

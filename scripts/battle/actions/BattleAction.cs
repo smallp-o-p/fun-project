@@ -78,9 +78,9 @@ public abstract class BattleAction
     return new ReloadWeapon(unit, weapon);
   }
 
-  public static ApplyDamage ApplyDamage(AliveUnit unit, int amount)
+  public static ApplyDamage ApplyDamage(AliveUnit unit, int amount, DamageKind kind = DamageKind.Health)
   {
-    return new ApplyDamage(unit, amount);
+    return new ApplyDamage(unit, amount, kind);
   }
 
   public static PassUnit PassUnit(AliveUnit unit)
@@ -117,6 +117,9 @@ public sealed class MoveUnit : BattleAction
 
   public override Result Execute(BattleSession session)
   {
+    if (session.TryGetAlive(Unit).IsNone || Unit.IsIncapacitated)
+      return Result.Interrupted;
+
     var route = _validatedRoute ?? ValidateRoute(session);
 
     if (route is null)

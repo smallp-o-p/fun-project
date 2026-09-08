@@ -264,8 +264,7 @@ public static class BattleFactory
           setup.Objectives,
           setup.Seed,
           setup.PlayerFaction,
-          setup.HitChance,
-          null);
+          setup.HitChance);
         return Start(coreSetup);
       });
   }

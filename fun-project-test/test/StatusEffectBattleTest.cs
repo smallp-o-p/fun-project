@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Core;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
@@ -50,6 +51,30 @@ public partial class StatusEffectBattleTest
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
     Assert.True(target.IsImmobilized);
+  }
+
+  [TestCase]
+  public void StunPacketCannotBorrowSiblingHealthDamageForStatusApplication()
+  {
+    var stun = TestData.MakeStun(requiresHealthDamage: true);
+    using var battle = BattleFixture.Duel(
+      hitChanceCalculator: new AlwaysHitCalculator(),
+      player: new("Alpha", Weapon: TestData.MakeWeapon("Mixed", damage: 3, frame: new WeaponFrameData
+      {
+        Packets =
+        [
+          new DamagePacketData(),
+          new DamagePacketData { Kind = DamageKind.Stun, Status = stun },
+        ],
+      })));
+    var target = battle.EnemyUnit;
+    battle.ClearEvents();
+
+    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
+
+    Assert.Equal(17, target.CurrentHealth);
+    Assert.False(target.IsImmobilized);
+    Assert.False(battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "Apply chance rolls on the session RNG")]

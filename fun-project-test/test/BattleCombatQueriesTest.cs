@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
@@ -87,5 +88,31 @@ public partial class BattleCombatQueriesTest
     AssertFails(battle.Alive(armedAttacker), battle.Alive(unarmedAttacker), BattleQueryFailureReason.InvalidBattleState); // allied target
     AssertFails(battle.Alive(shortSightedAttacker), battle.Alive(target), BattleQueryFailureReason.InvalidBattleState); // not visible
     AssertFails(battle.Alive(shortRangedAttacker), battle.Alive(target), BattleQueryFailureReason.InvalidBattleState);  // out of range
+  }
+
+  [TestCase(TestName = "Unconscious targets still allow hit chance previews")]
+  public void UnconsciousTargetsStillAllowHitChancePreviews()
+  {
+    using var battle = BattleFixture.Duel(
+      player: new("Alpha", Weapon: TestData.MakeAmmoWeapon("Rifle")));
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+
+    Assert.True(battle.Query(new GetHitChanceForAttack(
+      battle.Alive(battle.PlayerUnit), battle.Alive(battle.EnemyUnit))).IsRight);
+  }
+
+  [TestCase(TestName = "Hit chance preview ignores action points and phase availability")]
+  public void HitChancePreviewIgnoresActionPointAndPhaseAvailability()
+  {
+    using var battle = BattleFixture.Duel(
+      player: new("Alpha", Weapon: TestData.MakeAmmoWeapon("Rifle")));
+    var attacker = battle.Alive(battle.PlayerUnit);
+    var target = battle.Alive(battle.EnemyUnit);
+    battle.PlayerUnit.SpendActionPoints(battle.PlayerUnit.CurrentActionPoints);
+    Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight);
+
+    battle.Session.EndBattle(BattleOutcome.Draw);
+
+    Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight);
   }
 }

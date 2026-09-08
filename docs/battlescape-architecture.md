@@ -32,7 +32,7 @@ flowchart LR
     subgraph Runtime["Authoritative Tactical Runtime"]
         BattleSession["BattleSession\nsingle source of truth\nturn flow + bookkeeping"]
         BoardState["BattleBoardState\nBattleTileState[x,y,z]\noccupancy + spatial path queries"]
-        UnitState["BattleUnitState[]\nAP, health,\ninventory refs,\ncurrent visibility"]
+        UnitState["BattleUnitState[]\nAP, health, stun,\ninventory refs,\ncurrent visibility"]
         VisibilityMemory["Explored tile memory\nper faction"]
         EventStream["BattleEvent stream"]
         Actions["BattleAction\nqueued intent + primitive commands"]
@@ -155,7 +155,7 @@ The session owns:
 - rebuilding and advancing the round queue
 - refreshing action-point availability for the active side
 - rebuilding faction visibility after successful actions
-- ending the battle when no living factions remain
+- ending a no-player battle as a draw at turn end when no conscious factions remain
 
 Beyond that bookkeeping, the session is turn scheduling, state, and event dispatch only: it announces `BattleEvent`s through its dispatch loop (a queued drain with a re-entrancy guard, refreshing visibility before each broadcast) and knows nothing about hooks or the executor. The session announces; the executor reacts.
 
@@ -166,6 +166,38 @@ var result = runtime.Query(new SomeBattleQuery(...));
 ```
 
 The session may keep internal helpers for actions and query objects, but controllers and AI should not depend on those helpers directly.
+
+### Life, incapacity, and conscious forces
+
+`BattleUnitState.CurrentStun` starts at zero. The predicates have literal meanings:
+
+- `IsAlive`: `CurrentHealth > 0`; `IsDead`: zero health.
+- `IsUnconscious`: `IsAlive && CurrentStun >= CurrentHealth`. Death excludes unconsciousness.
+- `IsIncapacitated`: `IsDead || IsUnconscious || IsImmobilized`.
+- `CanAct()`: positive AP and no incapacity. `CanUnitActNow` additionally requires an in-progress battle, the active side, and current-turn availability.
+- Conscious forces: living units that are not unconscious. `HasConsciousUnits`/`GetFactionConsciousUnits` drive faction elimination and scheduling. AP exhaustion and temporary immobilization do not eliminate a faction. `HasLivingUnits` retains its health-based meaning, including for survival objectives.
+
+`AliveUnit` proves life and board presence, including unconscious units. Bodies stay in alive storage on their tile, block occupancy, and remain targetable under normal weapon/self/ally/visibility/range rules. Damage actions can affect them. Incapacitated actors have no available catalog actions or reachable move tiles; `FindPathForUnit` remains a geometric query. Health-based survivor and casualty summaries keep unconscious participants alive.
+
+### Damage, disabling, and recovery
+
+`DamageKind.Health` is the default for authored and runtime packets. Health packets resolve in bundle order against remaining armor: matching elements strip 1.5× armor (floored), while health spill uses the un-multiplied amount. `DamageKind.Stun` bypasses armor, leaves it available to later packets, and increases only `CurrentStun`. `DamageResolution` and nonlethal `UnitDamagedBattleEvent` expose `ArmorDamage`, `HealthDamage`, and `StunDamage`. Non-positive packets resolve to zero. Only armor/health damage re-arms armor regeneration. Status `RequiresHealthDamage` checks its own packet's spill, so a stun packet cannot borrow another packet's health damage.
+
+Health/stun damage that kills or newly knocks out a unit consumes activation availability and invalidates observer visibility before broadcasting. Death enters `HandleUnitDeath`, clears occupancy, records kill credit, and emits `UnitKilledBattleEvent`. A new knockout emits `UnitUnconsciousBattleEvent` and retains the body on its tile. Hits that cause neither transition emit `UnitDamagedBattleEvent`; extra stun on an unconscious unit does not repeat the unconscious event. A lethal bundle emits only the kill event, including death after earlier unconsciousness. Elimination objectives observe both types; death playback and kill-only hooks continue to consume `UnitKilledBattleEvent`. Routing max-health debuff effects through the damage pipeline is deferred.
+
+`StunRecoverySystem` is a default executor system, running on `TurnEndedBattleEvent` at priority −90, after `StatusEffectSystem` then `ArmorRegenSystem` at −100. Living conscious units of the ending faction recover up to a fixed 5 stun, clamped at zero. AP exhaustion and temporary immobilization permit recovery; unconscious/dead units recover nothing. DoT can cross the unconscious threshold before recovery runs. A positive reduction raises `UnitStunRecoveredBattleEvent`; zero stun emits nothing. Ended sessions do not recover.
+
+The hook owns its fixed `uint` rate, phase checks, and event emission. Battle types, setup, and runtime constructors expose no recovery configuration. `BattleSession` has no recovery-specific methods; the hook uses existing unit access and `RaiseEvents`. The recovered amount is also `uint` and is clamped to current stun before narrowing for subtraction.
+
+### Capture summary and campaign lifetime
+
+The first `EndBattle` freezes capture membership before broadcasting `SessionEndedBattleEvent`. Victory with a designated player captures every living unconscious unit from another faction, regardless of who caused the knockout. The stored list deduplicates original `Combatant` references and is read-only; later unit changes do not alter its membership. The Combatants themselves remain the original mutable objects. Death, consciousness, friendly units, non-victory outcomes, and sessions without a designated player produce no captures for those cases.
+
+`runtime.Query(new GetFactionEndOfBattleSummary(player))` exposes `FactionBattleSummary.CapturedEnemies` only for the designated player's victory summary. Other faction summaries have empty capture lists. Unconscious player participants remain survivors, wounds remain health-based, and `DefeatedPerCombatant` remains kill-only.
+
+Each `GameState` owns a `Captivity` collection for its campaign lifetime. Adding a captive retains the original Combatant and faction by reference, without cloning, reassigning ownership, or adding it to the player's roster. The collection deduplicates by reference and returns detached membership snapshots.
+
+Standalone battle capture summaries are available through runtime queries. Applying these results to `GameState.Captivity` and the campaign-to-battle scene handoff are deferred; `BattleScene` currently boots a standalone runtime.
 
 ### IBattleSessionQuery
 
@@ -220,7 +252,8 @@ Pathfinding is currently integrated directly into the board as a pure-C# breadth
 
 Current behavior:
 
-- uses `VisionStat` as the maximum sight range per unit
+- uses `VisionStat` as the maximum sight range per living conscious observer
+- clears unconscious units' visible-tile/unit caches and removes their contribution to faction vision; exploration persists, and conscious observers can still see their bodies
 - flood-fills visible tiles through same-level orthogonal neighbors inside the observer's vision range
 - treats whole-tile LOS blockers as visible, then stops visibility expansion past that blocker
 - includes same-level adjacent diagonal tiles as visible without using them as flood-fill expansion points
@@ -272,9 +305,9 @@ Current responsibilities:
 
 That is the whole surface: no lifecycle events, no `LastResult`. Outcomes are observed through the returned result's committed `BattleEvent` stream and through committed session state. If a battle ends mid-submission, the executor drops remaining composite steps and queued interrupts rather than running them against an ended session.
 
-The executor is the session's reaction engine: it owns the `BattleHookRegistry`, registers the default systems in its constructor (status effects, armor regen, and `ObjectiveSystem`, which is registered once under the `BattleEventTag` catch-all at priority +100, receives every event, and filters objectives by their declared observed keys internally; it has no self-registration or executor back-reference; it flips when a committed event makes an objective's `Check` return Passed or Failed, and the authored directive then decides what that flip means — capability effects on `ItemThrownBattleEvent`; buff evaluation on `TurnStartedBattleEvent` and `UnitAddedBattleEvent`), subscribes to `session.BattleEventCommitted`, and fires the matching hooks once per committed event, after the broadcast. It opens an executor-local action window around each primitive so hook-returned interrupts have somewhere to land; a hook returning interrupts with no window open throws. `BattleRuntime.RegisterHook` remains the public facade door — it delegates to the executor — and the session knows nothing about hooks: it only announces events.
+The executor is the session's reaction engine: it owns the `BattleHookRegistry`, registers the default systems in its constructor (status effects, armor regen, stun recovery, and `ObjectiveSystem`, which is registered once under the `BattleEventTag` catch-all at priority +100, receives every event, and filters objectives by their declared observed keys internally; it has no self-registration or executor back-reference; it flips when a committed event makes an objective's `Check` return Passed or Failed, and the authored directive then decides what that flip means — capability effects on `ItemThrownBattleEvent`; buff evaluation on `TurnStartedBattleEvent` and `UnitAddedBattleEvent`), subscribes to `session.BattleEventCommitted`, and fires the matching hooks once per committed event, after the broadcast. It opens an executor-local action window around each primitive so hook-returned interrupts have somewhere to land; a hook returning interrupts with no window open throws. `BattleRuntime.RegisterHook` remains the public facade door — it delegates to the executor — and the session knows nothing about hooks: it only announces events.
 
-One executor per session is a hard invariant: a second executor attached to the same session would double-register the default systems (statuses would tick twice). Production code uses the executor owned by `BattleRuntime`; test helpers cache one executor per session (see [BattleActionExecutor Design](./battle-action-executor.md)).
+Only one executor may be live for a session at a time: a second live executor attached to the same session would double-register the default systems (statuses would tick twice). Production code uses the executor owned by `BattleRuntime`; tests reuse `BattleFixture.Runtime` and dispose the fixture. Direct lifecycle tests dispose the previous owner before creating its replacement (see [BattleActionExecutor Design](./battle-action-executor.md)).
 
 The executor does not currently:
 
@@ -335,12 +368,13 @@ sequenceDiagram
 
 - The battle starts from `BattlePhase.Setup` and transitions to `InProgress` through `StartBattle`.
 - Setup initializes the turn queue from the stable global faction order.
-- `StartBattle` rebuilds the active round queue from living factions in that order.
+- `StartBattle` rebuilds the active round queue from factions with conscious forces in that order; setup with no conscious faction throws.
 - `ActiveSide` and `TurnNumber` are owned by the session.
 - `EndFactionTurn` is the explicit faction-turn action.
 - Turn start is the same shape at both invocation sites: refresh the relevant faction's action-point availability, then raise the turn-start events (`TurnStarted`, plus `ActiveSideChanged` on a side flip or `SessionStarted` on battle start), then refresh `RefreshForNewTurn` for the affected units. Buff evaluation is an ordinary hook on `TurnStartedBattleEvent` (`TurnStartBuffHook`) and on `UnitAddedBattleEvent` at spawn (`UnitSpawnedBuffHook`) — both registered by the executor's constructor and fired after the event's broadcast — so a buff flip lands during the dispatch and, for turn start, before the AP refresh that runs once the dispatch completes and reads (possibly buffed) `MaxActionPoints`. Mid-dispatch observers of `SessionStarted`/`TurnStarted` see pre-refresh action points; this is deliberate, since the refresh always completes before `Submit`/`StartBattle` returns.
 - `PassUnit` ends a unit activation and currently advances the turn automatically if that side has no remaining actable units.
-- Unit death updates alive/dead storage, board occupancy, current-turn availability, and faction queue membership through session bookkeeping.
+- Unit death updates alive/dead storage, board occupancy, current-turn availability, and faction queue membership through session bookkeeping. Unconsciousness consumes availability and removes the faction from future turns when no conscious ally remains, while preserving the body and its occupancy. A disabled active faction keeps its current queue head until explicit turn end.
+- The designated player's loss of all conscious forces ends the battle as defeat. `ObjectiveSystem` suppresses directives on that final death or unconscious event so an objective cannot override the player-wipe backstop. Without a designated player, total knockout remains in progress until turn end resolves a draw.
 
 ## Current Battle Events
 
@@ -356,9 +390,11 @@ The current event stream is intentionally small and authoritative. Presentation 
 - `UnitMoved`
 - `TileOccupied`
 - `UnitAttacked` — carries attacker, target, weapon, hit-chance breakdown, roll, and whether the attack hit
-- `UnitDamaged` — carries the pre-mitigation damage bundle plus the post-mitigation `ArmorDamage` and `HealthDamage` split
+- `UnitDamaged` — carries the pre-mitigation damage bundle plus resolved `ArmorDamage`, `HealthDamage`, and `StunDamage` for a surviving target
 - `UnitArmorRegenerated` — raised at the owning faction's turn end only when armor is actually restored; carries unit, amount regenerated, and current armor
-- `UnitKilled`
+- `UnitStunRecovered` — carries unit, positive amount recovered, and remaining stun at the owner's turn end
+- `UnitKilled` — carries unit, position, and optional cause of death
+- `UnitUnconscious` — carries unit, position, and optional cause of a new unconscious transition
 - `ItemThrown`
 
 Presentation code should react to these events instead of inferring state changes from executor internals.
@@ -367,7 +403,7 @@ Hook registration keys on `BattleEventTag` types, not an enum, and lives on the 
 
 Event dispatch is queue-drained: an event raised mid-dispatch is deferred until after the current event finishes processing (breadth-first, not inline). A throwing hook clears the queue and surfaces the exception. `BattleActionExecutor.Submit` throws if called while the session is dispatching events — no hook may inject a second execution loop; a hook's only write channel outward is the interrupt actions it returns from `OnEvent`, which the executor applies through the normal action path once the current primitive's action window closes.
 
-The executor's `BattleHookRegistry` is the one hook registry: every hook is a `BattleHook` (or `BattleHook<TEvent>`) registered against an event-tag type with an int priority, and may mutate state directly and raise follow-up events. `ArmorRegenSystem` is one of the default systems the executor registers in its constructor, on `TurnEndedBattleEvent`, ticking armor regen and raising `UnitArmorRegeneratedBattleEvent`. Damage to an armored unit flows through the pure `DamageResolver` (scripts/battle/combat/) inside `BattleSession.ApplyDamageTo`: each bundle packet is split into armor damage (1.5x floored on element match) and health damage (always from the un-multiplied amount); `UnitDamagedBattleEvent` carries the `ArmorDamage`/`HealthDamage` split alongside the pre-mitigation bundle.
+The executor's `BattleHookRegistry` is the one hook registry: every hook is a `BattleHook` (or `BattleHook<TEvent>`) registered against an event-tag type with an int priority, and may mutate state directly and raise follow-up events. `ArmorRegenSystem` is one of the default systems the executor registers in its constructor, on `TurnEndedBattleEvent`, ticking armor regen and raising `UnitArmorRegeneratedBattleEvent`. Damage to an armored unit flows through the pure `DamageResolver` (scripts/battle/combat/) inside `BattleSession.ApplyDamageTo`: health packets split into armor damage (1.5x floored on element match) and health damage (always from the un-multiplied amount); stun packets bypass both. `UnitDamagedBattleEvent` carries the `ArmorDamage`/`HealthDamage`/`StunDamage` split alongside the pre-mitigation bundle.
 
 ## Future Extensions
 

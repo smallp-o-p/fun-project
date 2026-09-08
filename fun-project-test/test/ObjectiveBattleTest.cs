@@ -1,4 +1,6 @@
+using System;
 using FunProject.Battle;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System.Collections.Generic;
@@ -200,6 +202,49 @@ public class ObjectiveBattleTest
     Assert.Equal(1, battle.Session.TurnNumber);
   }
 
+  [TestCase]
+  public void MixedKillAndStunCompletesEliminationOnlyOnceEvenWhenTheBodyLaterDies()
+  {
+    using var battle = BattleFixture.Duel();
+    var secondEnemy = battle.Spawn(TestData.MakeCombatant("Second", battle.EnemyFaction), new Vector3I(0, 0, 0));
+    var objective = battle.Session.GetObjectives(battle.PlayerFaction)[0];
+    battle.ClearEvents();
+
+    battle.ApplyDamage(secondEnemy, 20);
+    Assert.Equal(ObjectiveResult.Ongoing, objective.State);
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+    Assert.Equal(1, battle.Events.EventsOf<ObjectiveCompletedBattleEvent>().AsValueEnumerable().Count(e => e.Faction == battle.PlayerFaction));
+
+    battle.ApplyDamage(battle.EnemyUnit, 20);
+
+    Assert.Equal(1, battle.Events.EventsOf<ObjectiveCompletedBattleEvent>().AsValueEnumerable().Count(e => e.Faction == battle.PlayerFaction));
+  }
+
+  [TestCase(typeof(UnitUnconsciousBattleEvent), ObjectiveResult.Ongoing)]
+  [TestCase(typeof(BattleEventTag), ObjectiveResult.Passed)]
+  public void ObjectivesCannotOverrideFinalPlayerKnockout(Type observedEvent,
+    ObjectiveResult expectedObjectiveResult)
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    var objective = new FakeObjective(new FakeObjectiveData
+    {
+      Observe = observedEvent,
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    });
+    // Adding an objective itself commits an event, which a catch-all observes.
+    // Arm completion only after that setup event has drained.
+    battle.Session.AddObjective(battle.PlayerFaction, objective);
+    objective.Complete = true;
+    battle.ClearEvents();
+
+    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+
+    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+    Assert.Equal(expectedObjectiveResult, objective.State);
+    if (expectedObjectiveResult == ObjectiveResult.Passed)
+      battle.Events.EventBefore<SessionEndedBattleEvent, ObjectiveCompletedBattleEvent>();
+  }
+
   [TestCase(TestName = "A silent objective completion records once and leaves the battle running")]
   public void SilentObjectiveCompletionRecordsOnceAndLeavesBattleRunning()
   {
@@ -293,8 +338,9 @@ public class ObjectiveBattleTest
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome()); // the backstop, not a directive
   }
 
-  [TestCase(TestName = "Directives cannot rescue a wiped player")]
-  public void DirectivesCannotRescueAWipedPlayer()
+  [TestCase(DamageKind.Health, TestName = "Directives cannot rescue a wiped player")]
+  [TestCase(DamageKind.Stun, TestName = "Directives cannot rescue an unconscious player")]
+  public void DirectivesCannotRescueAWipedPlayer(DamageKind kind)
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -309,7 +355,7 @@ public class ObjectiveBattleTest
     battle.ClearEvents();
     battle.Start();
 
-    battle.ApplyDamage(playerUnit, 999); // owner wiped -> backstop Defeat, not the authored rescue directive
+    battle.ApplyDamage(playerUnit, 999, kind); // owner wiped -> backstop Defeat, not the authored rescue directive
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());

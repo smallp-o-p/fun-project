@@ -1,0 +1,142 @@
+using System;
+using FunProject.Battle;
+using FunProject.Core;
+using FunProject.Weapons;
+using GdUnit4;
+
+[TestSuite]
+[RequireGodotRuntime]
+public class StunRecoveryTest
+{
+  [TestCase(8, 5u, 3)]
+  [TestCase(3, 3u, 0)]
+  public void DefaultRecoveryReducesOnlyTheOwnersStun(int initialStun, uint recovered, int remaining)
+  {
+    using var battle = BattleFixture.Duel();
+    battle.ApplyDamage(battle.PlayerUnit, initialStun, DamageKind.Stun);
+    battle.ApplyDamage(battle.EnemyUnit, 8, DamageKind.Stun);
+    battle.ClearEvents();
+
+    battle.EndFactionTurn(battle.PlayerFaction);
+
+    Assert.Equal(remaining, battle.PlayerUnit.CurrentStun);
+    Assert.Equal(8, battle.EnemyUnit.CurrentStun);
+    Assert.Equal(recovered, battle.Events.SingleEvent<UnitStunRecoveredBattleEvent>().AmountRecovered);
+  }
+
+  [TestCase]
+  public void UnsignedMaximumRecoveryClampsToCurrentStun()
+  {
+    using var battle = BattleFixture.Duel();
+    battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
+
+    uint recovered = battle.PlayerUnit.RecoverStun(uint.MaxValue);
+
+    Assert.Equal(0, battle.PlayerUnit.CurrentStun);
+    Assert.Equal(8u, recovered);
+  }
+
+  [TestCase]
+  public void ZeroStunEmitsNoRecoveryEvent()
+  {
+    using var battle = BattleFixture.Duel();
+    battle.ClearEvents();
+
+    battle.EndFactionTurn(battle.PlayerFaction);
+
+    Assert.False(battle.Events.EventsOf<UnitStunRecoveredBattleEvent>().AsValueEnumerable().Any());
+  }
+
+  [TestCase]
+  public void UnconsciousUnitDoesNotRecoverAcrossItsFactionsTurns()
+  {
+    using var battle = BattleFixture.Duel();
+    battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction), new Vector3I(0, 0, 0));
+    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+    battle.ClearEvents();
+
+    battle.EndFactionTurn(battle.PlayerFaction);
+    battle.EndFactionTurn(battle.EnemyFaction);
+    battle.EndFactionTurn(battle.PlayerFaction);
+
+    Assert.Equal(20, battle.PlayerUnit.CurrentStun);
+    Assert.False(battle.Events.EventsOf<UnitStunRecoveredBattleEvent>().AsValueEnumerable().Any());
+  }
+
+  [TestCase]
+  public void DotCausesUnconsciousnessBeforeRecovery()
+  {
+    using var battle = BattleFixture.Duel();
+    battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction), new Vector3I(0, 0, 0));
+    battle.ApplyDamage(battle.PlayerUnit, 10, DamageKind.Stun);
+    battle.PlayerUnit.ApplyStatusEffect(TestData.MakeBurn(duration: 2, tickDamage: 10));
+    battle.ClearEvents();
+
+    battle.EndFactionTurn(battle.PlayerFaction);
+
+    Assert.Equal(10, battle.PlayerUnit.CurrentStun);
+    Assert.True(battle.PlayerUnit.IsUnconscious);
+    Assert.False(battle.Events.EventsOf<UnitStunRecoveredBattleEvent>().AsValueEnumerable().Any());
+  }
+
+  [TestCase]
+  public void DeadUnitsDoNotRecover()
+  {
+    using var battle = BattleFixture.Duel();
+    battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
+    battle.ApplyDamage(battle.PlayerUnit, 20);
+
+    Assert.Equal(0u, battle.PlayerUnit.RecoverStun(5));
+    Assert.Equal(8, battle.PlayerUnit.CurrentStun);
+  }
+
+  [TestCase]
+  public void ExhaustedAndImmobilizedUnitsStillRecover()
+  {
+    using var battle = BattleFixture.Duel();
+    battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
+    battle.PlayerUnit.SpendActionPoints(battle.PlayerUnit.CurrentActionPoints);
+    battle.PlayerUnit.ApplyStatusEffect(TestData.MakeStun(duration: 2));
+
+    battle.EndFactionTurn(battle.PlayerFaction);
+
+    Assert.Equal(3, battle.PlayerUnit.CurrentStun);
+  }
+
+  [TestCase]
+  public void RecoveryFollowsArmorRegeneration()
+  {
+    var armor = TestData.MakeArmor("Shield", element: Element.Thermal, regenPerTurn: 3);
+    using var battle = BattleFixture.Duel(player: new("Alpha", Armor: armor));
+    battle.ApplyDamage(battle.PlayerUnit, 4);
+    battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
+    battle.ClearEvents();
+
+    battle.EndFactionTurn(battle.PlayerFaction);
+
+    battle.Events.EventBefore<UnitArmorRegeneratedBattleEvent, UnitStunRecoveredBattleEvent>();
+  }
+
+  [TestCase]
+  public void EndedSessionIgnoresRecoveryHook()
+  {
+    using var battle = BattleFixture.Duel();
+    battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
+    battle.Session.EndBattle(BattleOutcome.Draw);
+    BattleHook hook = new StunRecoverySystem();
+
+    hook.OnEvent(new HookContext(battle.Session, None),
+      new TurnEndedBattleEvent(battle.PlayerFaction, battle.Session.TurnNumber));
+
+    Assert.Equal(8, battle.PlayerUnit.CurrentStun);
+  }
+
+  [TestCase]
+  public void RecoveryEventRejectsInvalidPayloads()
+  {
+    using var battle = BattleFixture.Duel();
+    Assert.Throws<ArgumentNullException>(() => new UnitStunRecoveredBattleEvent(null, 1, 0));
+    Assert.Throws<ArgumentOutOfRangeException>(() => new UnitStunRecoveredBattleEvent(battle.PlayerUnit, 0, 0));
+    Assert.Throws<ArgumentOutOfRangeException>(() => new UnitStunRecoveredBattleEvent(battle.PlayerUnit, 1, -1));
+  }
+}

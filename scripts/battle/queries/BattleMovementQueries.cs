@@ -17,7 +17,7 @@ public sealed class GetPossibleMoveTilesForUnit(AliveUnit unit, int actionPointC
   {
     ArgumentOutOfRangeException.ThrowIfLessThan(actionPointCostPerStep, 0);
 
-    if (unit.State.CurrentActionPoints < actionPointCostPerStep)
+    if (unit.State.IsIncapacitated || unit.State.CurrentActionPoints < actionPointCostPerStep)
       return [];
 
     int maxSteps = actionPointCostPerStep == 0

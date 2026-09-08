@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
@@ -6,6 +7,78 @@ using Godot;
 [RequireGodotRuntime]
 public class EndOfBattleSummaryTest
 {
+  [TestCase]
+  public void CapturesAreAvailableBeforeSessionEndedIsBroadcast()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    int endedEvents = 0;
+    battle.Runtime.BattleEventCommitted += evt =>
+    {
+      if (evt is not SessionEndedBattleEvent)
+        return;
+      endedEvents++;
+      var summary = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
+      Assert.Equal(1, summary.CapturedEnemies.Count);
+      Assert.True(ReferenceEquals(battle.EnemyUnit.Combatant, summary.CapturedEnemies[0]));
+    };
+
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+
+    Assert.Equal(1, endedEvents);
+  }
+
+  [TestCase]
+  public void CapturedMembershipIsFrozenAtTheFirstEndBattle()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+    var captured = battle.EnemyUnit.Combatant;
+
+    // Deliberate internal mutation probes frozen membership; this is not a supported gameplay action.
+    battle.EnemyUnit.ReceiveDamage(20);
+    captured.OwningFaction = battle.PlayerFaction;
+    battle.Session.EndBattle(BattleOutcome.Defeat);
+    var after = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
+
+    Assert.Equal(1, after.CapturedEnemies.Count);
+    Assert.True(ReferenceEquals(captured, after.CapturedEnemies[0]));
+  }
+
+  [TestCase]
+  public void OnlyTheDesignatedPlayerSummaryReceivesVictoryCaptures()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+
+    Assert.Equal(1, battle.Query(
+      new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count);
+    Assert.Equal(0, battle.Query(
+      new GetFactionEndOfBattleSummary(battle.EnemyFaction)).RequireRight().CapturedEnemies.Count);
+    Assert.Equal(0, battle.Query(
+      new GetFactionEndOfBattleSummary(TestData.MakeFaction("Player"))).RequireRight().CapturedEnemies.Count);
+  }
+
+  [TestCase]
+  public void UnconsciousParticipantsRemainPresentAndAliveInHealthBasedSummaries()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    var support = battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction), new Vector3I(0, 0, 0));
+    battle.ApplyDamage(battle.PlayerUnit, 1);
+    battle.ApplyDamage(battle.PlayerUnit, 19, DamageKind.Stun);
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+    var player = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
+    var enemy = battle.Query(new GetFactionEndOfBattleSummary(battle.EnemyFaction)).RequireRight();
+
+    Assert.True(player.CombatantsPresent.SetEquals([battle.PlayerUnit.Combatant, support.Combatant]));
+    Assert.True(player.CombatantsWounded.SetEquals([battle.PlayerUnit.Combatant]));
+    Assert.Equal(0, player.CombatantsDead.Count);
+    Assert.Equal(0, player.DefeatedPerCombatant.Count);
+    Assert.True(enemy.CombatantsPresent.SetEquals([battle.EnemyUnit.Combatant]));
+    Assert.Equal(0, enemy.CombatantsDead.Count);
+    Assert.Equal(0, enemy.CombatantsWounded.Count);
+    Assert.Equal(0, enemy.DefeatedPerCombatant.Count);
+  }
+
   [TestCase(TestName = "The summary query fails while the battle has not ended")]
   public void SummaryQueryFailsWhileBattleInProgress()
   {

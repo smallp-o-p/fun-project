@@ -28,17 +28,18 @@ internal sealed class VisibilityService
     ArgumentNullException.ThrowIfNull(allUnits);
     ArgumentNullException.ThrowIfNull(aliveUnits);
 
+    // Include unconscious living units so the full pass clears their stale caches too.
     var alive = new SysColGeneric.HashSet<BattleUnitState>(aliveUnits);
     return RefreshAffected(board, allUnits, alive, alive);
   }
 
-  // Incremental counterpart to a full recompute (RefreshAllUnits), applied after an occupancy change that touches only a
-  // known set of units (a move/spawn/death). Line-of-sight blocking is a tile property and the
+  // Incremental counterpart to a full recompute (RefreshAllUnits), applied after an occupancy
+  // or consciousness change (move/spawn/death/knockout). Line-of-sight blocking is a tile property and the
   // position/vision of every UNaffected observer is unchanged, so their visible-TILE sets are
   // invariant under another unit moving, spawning, or dying. Therefore we only:
   //   (1) fully recompute each affected unit's own visible tiles + units (and union its newly
   //       seen tiles into its faction's explored memory, exactly as a full pass would), and
-  //   (2) refresh, for each unaffected alive observer, whether every affected unit now belongs
+  //   (2) refresh, for each unaffected conscious observer, whether every affected unit now belongs
   //       to its visible-UNIT set (the only membership that can flip is that of a unit whose own
   //       cell changed or that left the board), leaving all other memberships untouched.
   // The resulting per-unit sets and per-faction explored memory are byte-identical to recomputing
@@ -64,8 +65,8 @@ internal sealed class VisibilityService
       priors[affected] = new SysColGeneric.HashSet<BattleUnitState>(affected.VisibleUnits);
       affected.ClearVisibility();
       // A living unit is always indexed on the board (Refresh enforces the same invariant);
-      // a dead/removed unit sees nothing, so its just-cleared sets are already correct.
-      if (affected.IsAlive)
+      // dead and unconscious units see nothing, so their just-cleared sets are correct.
+      if (affected.IsAlive && !affected.IsUnconscious)
         RecomputeObserver(board, allUnits, affected);
     }
 
@@ -75,10 +76,10 @@ internal sealed class VisibilityService
         if (!prior.Contains(target))
           spotted.Add((observer, target));
 
-    // For each unaffected alive observer, re-test membership of every affected unit.
+    // Conscious observers can still see affected living bodies as targets.
     foreach (var observer in aliveUnits)
     {
-      if (affectedUnits.Contains(observer))
+      if (!observer.IsAlive || observer.IsUnconscious || affectedUnits.Contains(observer))
         continue;
 
       foreach (var affected in affectedUnits)

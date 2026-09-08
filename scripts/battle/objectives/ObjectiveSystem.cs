@@ -31,10 +31,10 @@ public sealed class ObjectiveSystem : BattleHook
   public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
   {
     // The player-wipe backstop owns this ending; already-flipped objectives stay in
-    // history, but the wipe kill does not double-resolve through authored directives.
-    if (battleEvent is UnitKilledBattleEvent killed
+    // history, but the final disabling does not double-resolve through authored directives.
+    if (battleEvent is (UnitKilledBattleEvent or UnitUnconsciousBattleEvent) and IUnitBattleEvent unitEvent
         && context.Session.PlayerFaction.Match(
-          Some: player => killed.Unit.Side == player && !context.Session.HasLivingUnits(player),
+          Some: player => unitEvent.Unit.Side == player && !context.Session.HasConsciousUnits(player),
           None: () => false))
       return [];
 
@@ -107,6 +107,12 @@ public sealed class ObjectiveSystem : BattleHook
       case null:
         return;
       case EndBattleDirectiveData endBattle:
+        // Causal and parent events still update objective history, but the player-wipe
+        // backstop owns the outcome once no conscious player forces remain.
+        if (_session.PlayerFaction.Match(
+              Some: player => !_session.HasConsciousUnits(player),
+              None: () => false))
+          return;
         _session.EndBattle(endBattle.Outcome);
         return;
       case QueueDirectiveData queue:

@@ -60,10 +60,13 @@ the compiler, not at runtime. Proofs cannot go stale because capability sets
 are fixed at item construction. This is the same pattern as
 `BattleBoardState.ValidatedPoint` and `AliveUnit`.
 
-`Execute` re-checks only the state-dependent facts that can change between
-construction and commit (phase, active side, occupancy, attack feasibility
-via `AttackContext.Resolve`, route legality); possession and throw range are
-the caller's job, same as the rest of the trusted-parameters model.
+`Execute` re-checks state-dependent facts that can change between construction
+and commit. Actor actions interrupt on lost liveness or incapacity before
+spending AP, ammunition, charges, or items. Incapacity includes death,
+unconsciousness, and temporary immobilization; `AliveUnit` still includes
+unconscious bodies that remain on the board. Item possession, remaining
+charges, and equipment are also re-checked for stale actions. Capability
+proofs establish item shape, while throw range remains the caller's job.
 
 ## Consumption semantics
 
@@ -80,6 +83,32 @@ always consumes. `SpendOnce(owner)` is the single home for the consumption rules
 `BattleSession.DefaultUseItemActionPointCost`, raising `ItemUsedBattleEvent`;
 effect payloads belong to hooks reacting to that event (the same split as
 `ItemThrownBattleEvent` → `CapabilityEffectSystem`).
+
+## Health and stun damage packets
+
+`DamagePacketData.Kind` and runtime `Damage.Kind` default to `DamageKind.Health`.
+The kind travels with amount, element, and optional status through packet
+derivation and damage modifiers; mixed health/stun bundles are supported.
+
+`DamageResolver` processes packets in bundle order. Health packets consume
+remaining armor (1.5× floored armor loss on an element match); health spill
+always uses the un-multiplied amount. Stun packets bypass armor completely,
+leave it for later packets, and increase only `BattleUnitState.CurrentStun`.
+They neither reduce health nor re-arm armor regeneration. Non-positive
+packets resolve to zero while preserving per-packet alignment.
+`DamageResolution` and nonlethal `UnitDamagedBattleEvent` carry separate
+`ArmorDamage`, `HealthDamage`, and `StunDamage` totals. A status requiring
+health damage checks its own packet's health spill; stun cannot borrow health
+damage from another packet to satisfy that condition.
+
+Stun starts at zero. A living unit becomes unconscious when stun is at least
+its current health; zero health means death. Unconscious bodies keep their
+inventory/equipment, tile occupancy, and normal targetability, but cannot act
+or contribute vision. Conscious units recover up to 5 stun at their owner's turn
+end, after status effects and armor regen; unconscious units recover nothing.
+`StunRecoverySystem` is a default executor system with a fixed unsigned rate.
+Battle types, setup, and runtime constructors expose no recovery setting;
+`BattleSession` has no recovery-specific machinery.
 
 ## Adding a capability
 

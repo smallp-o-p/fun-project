@@ -17,6 +17,7 @@ public sealed partial class BattleScene : Node3D
   private ReachableTileHighlighter _highlighter = null!;
   private Container _verbButtons = null!;
   private Label _hitChanceLabel = null!;
+  private Label _unitStatusLabel = null!;
   private Label _bannerLabel = null!;
   private Faction _playerFaction = null!;
   private readonly List<Faction> _factions = [];
@@ -170,6 +171,9 @@ public sealed partial class BattleScene : Node3D
     box.AddChild(cancel);
     cancel.Pressed += () => _ui.Cancel();
 
+    _unitStatusLabel = new Label { Name = "UnitStatus" };
+    box.AddChild(_unitStatusLabel);
+
     _hitChanceLabel = new Label { Name = "HitChance", Visible = false };
     box.AddChild(_hitChanceLabel);
 
@@ -185,8 +189,16 @@ public sealed partial class BattleScene : Node3D
     layer.AddChild(_bannerLabel);
   }
 
+  internal static string FormatUnitReadout(BattleUnitState unit)
+    => $"{unit.Combatant.Name}  HP {unit.CurrentHealth}/{unit.MaxHealth}  STUN {unit.CurrentStun}"
+      + (unit.IsUnconscious ? "  Unconscious" : "");
+
   private void RefreshHud()
   {
+    var queriedUnits = _runtime.Query(new GetFactionAliveUnits(_playerFaction))
+      .AsValueEnumerable().Select(unit => unit.State).ToArray();
+    _unitStatusLabel.Text = string.Join("\n", queriedUnits.AsValueEnumerable().Select(FormatUnitReadout).ToArray());
+
     foreach (Node child in _verbButtons.GetChildren())
       child.QueueFree();
 

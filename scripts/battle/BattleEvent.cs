@@ -196,20 +196,40 @@ public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent, ICa
   public int TotalAmount { get; }
   public int ArmorDamage { get; }
   public int HealthDamage { get; }
+  public int StunDamage { get; }
   public Option<BattleUnitState> MaybeCause { get; }
 
-  public UnitDamagedBattleEvent(BattleUnitState unit, Option<BattleUnitState> cause, IReadOnlyList<Damage> bundle, int armorDamage, int healthDamage)
+  public UnitDamagedBattleEvent(BattleUnitState unit, Option<BattleUnitState> cause, IReadOnlyList<Damage> bundle, int armorDamage, int healthDamage, int stunDamage = 0)
   {
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(bundle);
     ArgumentOutOfRangeException.ThrowIfNegative(armorDamage);
     ArgumentOutOfRangeException.ThrowIfNegative(healthDamage);
+    ArgumentOutOfRangeException.ThrowIfNegative(stunDamage);
     Unit = unit;
     Bundle = bundle;
     TotalAmount = bundle.AsValueEnumerable().Sum(damage => damage.Amount);
     ArmorDamage = armorDamage;
     HealthDamage = healthDamage;
+    StunDamage = stunDamage;
     MaybeCause = cause;
+  }
+}
+
+public sealed record UnitStunRecoveredBattleEvent : BattleEvent, IUnitBattleEvent
+{
+  public BattleUnitState Unit { get; }
+  public uint AmountRecovered { get; }
+  public int CurrentStun { get; }
+
+  public UnitStunRecoveredBattleEvent(BattleUnitState unit, uint amountRecovered, int currentStun)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    ArgumentOutOfRangeException.ThrowIfZero(amountRecovered);
+    ArgumentOutOfRangeException.ThrowIfNegative(currentStun);
+    Unit = unit;
+    AmountRecovered = amountRecovered;
+    CurrentStun = currentStun;
   }
 }
 
@@ -237,6 +257,21 @@ public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPos
   public Option<BattleUnitState> MaybeCause { get; }
 
   public UnitKilledBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position, Option<BattleUnitState> cause)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    Unit = unit;
+    Position = position;
+    MaybeCause = cause;
+  }
+}
+
+public sealed record UnitUnconsciousBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, ICausedByUnit
+{
+  public BattleUnitState Unit { get; }
+  public BattleBoardState.ValidatedPoint Position { get; }
+  public Option<BattleUnitState> MaybeCause { get; }
+
+  public UnitUnconsciousBattleEvent(BattleUnitState unit, BattleBoardState.ValidatedPoint position, Option<BattleUnitState> cause)
   {
     ArgumentNullException.ThrowIfNull(unit);
     Unit = unit;

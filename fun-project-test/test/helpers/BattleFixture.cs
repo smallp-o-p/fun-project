@@ -239,8 +239,8 @@ public sealed class BattleFixture : IDisposable
   public BattleActionExecResult Attack(BattleUnitState attacker, BattleUnitState target) =>
     Submit(BattleAction.AttackUnit(Alive(attacker), Alive(target)));
 
-  public BattleActionExecResult ApplyDamage(BattleUnitState unit, int amount) =>
-    Submit(BattleAction.ApplyDamage(Alive(unit), amount));
+  public BattleActionExecResult ApplyDamage(BattleUnitState unit, int amount, DamageKind kind = DamageKind.Health) =>
+    Submit(BattleAction.ApplyDamage(Alive(unit), amount, kind));
 
   public BattleActionExecResult Pass(BattleUnitState unit) =>
     Submit(BattleAction.PassUnit(Alive(unit)));

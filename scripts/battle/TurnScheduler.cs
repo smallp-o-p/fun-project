@@ -12,8 +12,8 @@ namespace FunProject.Battle;
 // Operations that depend on the live unit pool (session state) are injected as delegates.
 internal sealed class TurnScheduler
 {
-  private readonly Func<Faction, bool> _hasLivingUnits;
-  private readonly Func<Faction, IEnumerable<BattleUnitState>> _aliveUnitsOf;
+  private readonly Func<Faction, bool> _hasConsciousUnits;
+  private readonly Func<Faction, IEnumerable<BattleUnitState>> _eligibleUnitsOf;
 
   private readonly Queue<Faction> _globalFactionOrder = [];
   private Queue<Faction> _turnQueue = [];
@@ -21,11 +21,11 @@ internal sealed class TurnScheduler
   private readonly SysColGeneric.HashSet<BattleUnitState> _activeFactionUnitsAvailable = [];
 
   public TurnScheduler(
-    Func<Faction, bool> hasLivingUnits,
-    Func<Faction, IEnumerable<BattleUnitState>> aliveUnitsOf)
+    Func<Faction, bool> hasConsciousUnits,
+    Func<Faction, IEnumerable<BattleUnitState>> eligibleUnitsOf)
   {
-    _hasLivingUnits = hasLivingUnits ?? throw new ArgumentNullException(nameof(hasLivingUnits));
-    _aliveUnitsOf = aliveUnitsOf ?? throw new ArgumentNullException(nameof(aliveUnitsOf));
+    _hasConsciousUnits = hasConsciousUnits ?? throw new ArgumentNullException(nameof(hasConsciousUnits));
+    _eligibleUnitsOf = eligibleUnitsOf ?? throw new ArgumentNullException(nameof(eligibleUnitsOf));
   }
 
   public Faction ActiveSide { get; private set; } = null!;
@@ -44,20 +44,20 @@ internal sealed class TurnScheduler
   }
 
   // Setup-time round queue seed (constructor): build the queue from the full global order
-  // and point ActiveSide at its head, before any living-unit filtering applies.
+  // and point ActiveSide at its head, before any conscious-force filtering applies.
   public void InitializeQueueFromGlobalOrder()
   {
     _turnQueue = new Queue<Faction>(_globalFactionOrder);
     ActiveSide = _turnQueue.Peek();
   }
 
-  public void RebuildRoundQueueFromLivingSides()
+  public void RebuildRoundQueueFromConsciousSides()
   {
     _turnQueue.Clear();
 
     foreach (var side in _globalFactionOrder)
     {
-      if (_hasLivingUnits(side))
+      if (_hasConsciousUnits(side))
         _turnQueue.Enqueue(side);
     }
   }
@@ -75,7 +75,7 @@ internal sealed class TurnScheduler
   public void RefreshActiveFactionAvailability()
   {
     _activeFactionUnitsAvailable.Clear();
-    foreach (var unit in _aliveUnitsOf(ActiveSide))
+    foreach (var unit in _eligibleUnitsOf(ActiveSide))
       _activeFactionUnitsAvailable.Add(unit);
   }
 
@@ -90,6 +90,9 @@ internal sealed class TurnScheduler
   // it joins the active side, otherwise queue its side unless it already acted or is queued).
   public void AddSpawnedUnit(BattleUnitState unit)
   {
+    if (!unit.IsAlive || unit.IsUnconscious)
+      return;
+
     if (unit.Side == ActiveSide)
     {
       _activeFactionUnitsAvailable.Add(unit);
@@ -164,7 +167,7 @@ internal sealed class TurnScheduler
 
   private void RemoveEliminatedSidesFromQueue()
   {
-    _turnQueue = new Queue<Faction>(_turnQueue.AsValueEnumerable().Where(_hasLivingUnits).ToArray());
+    _turnQueue = new Queue<Faction>(_turnQueue.AsValueEnumerable().Where(_hasConsciousUnits).ToArray());
   }
 
   private void RemoveSideFromQueue(Faction side)

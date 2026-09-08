@@ -7,6 +7,18 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class GameStateTest
 {
+  [TestCase]
+  public void CampaignCaptivityIsIsolatedFromOtherCampaigns()
+  {
+    var first = new GameState(MakeStart());
+    var second = new GameState(MakeStart());
+    var combatant = TestData.MakeCombatant("Hostile", TestData.MakeFaction("Enemy"));
+    first.Captivity.Add(combatant);
+
+    Assert.Equal(1, first.Captivity.Combatants.Count);
+    Assert.Equal(0, second.Captivity.Combatants.Count);
+  }
+
   [TestCase(TestName = "Roster is stamped: one Combatant per entry, override wins, empty falls back")]
   public void RosterIsStamped()
   {

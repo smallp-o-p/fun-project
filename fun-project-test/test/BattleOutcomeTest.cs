@@ -1,6 +1,7 @@
 using FunProject.Battle;
 using FunProject.Core;
 using FunProject.Items.Effects;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
@@ -8,6 +9,33 @@ using Godot;
 [RequireGodotRuntime]
 public class BattleOutcomeTest
 {
+  [TestCase(false, BattleOutcome.Victory, TestName = "Knocking out the last enemy wins the battle")]
+  [TestCase(true, BattleOutcome.Defeat, TestName = "Knocking out the last player unit loses the battle")]
+  public void LastConsciousUnitKnockoutEndsTheBattle(bool playerWiped, BattleOutcome expected)
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    battle.ClearEvents();
+
+    battle.ApplyDamage(playerWiped ? battle.PlayerUnit : battle.EnemyUnit, 20, DamageKind.Stun);
+
+    Assert.Equal(expected, battle.Session.Outcome.RequireSome());
+    battle.Events.EventBefore<UnitUnconsciousBattleEvent, SessionEndedBattleEvent>();
+  }
+
+  [TestCase]
+  public void NoPlayerTotalKnockoutDrawsOnlyAfterEndingTheCurrentSide()
+  {
+    using var battle = BattleFixture.Duel();
+
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+
+    battle.EndFactionTurn(battle.PlayerFaction);
+
+    Assert.Equal(BattleOutcome.Draw, battle.Session.Outcome.RequireSome());
+  }
+
   [TestCase(TestName = "A session exposes its declared player faction and no outcome until it ends")]
   public void SessionExposesPlayerFactionAndNoOutcomeUntilEnded()
   {

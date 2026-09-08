@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Weapons;
 using GdUnit4;
 using System;
 
@@ -247,6 +248,67 @@ public sealed partial class BattleUiControllerTest
       battle.Runtime.TryGetAlive(battle.PlayerUnit).RequireSome(), 999));
 
     Assert.Equal(UiState.Unselected, battle.Ui.State);
+  }
+
+  [TestCase(UiState.UnitSelected)]
+  [TestCase(UiState.Targeting)]
+  [TestCase(UiState.TargetingLocked)]
+  public void ForeignKnockoutDeselectsAndClearsActions(UiState initialState)
+  {
+    using var battle = BattleFixture.UiBattle();
+    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
+    if (initialState is UiState.Targeting or UiState.TargetingLocked)
+    {
+      battle.Ui.BeginAction(battle.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
+      battle.Ui.PreviewAt(new Vector3I(4, 0, 2));
+      if (initialState == UiState.TargetingLocked)
+        battle.Ui.ClickTile(new Vector3I(4, 0, 2));
+    }
+    Assert.Equal(initialState, battle.Ui.State);
+
+    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+
+    Assert.Equal(UiState.Unselected, battle.Ui.State);
+    Assert.True(battle.Ui.SelectedUnit.IsNone);
+    Assert.Equal(0, battle.Ui.ActionOptions.Count);
+    Assert.Equal(0, battle.Ui.CandidateCells.Count);
+    Assert.True(battle.Ui.PendingTarget.IsNone);
+    Assert.True(battle.Ui.LastPreview.IsNone);
+    Assert.False(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));
+  }
+
+  [TestCase]
+  public void ExhaustedActionPointsKeepSelectionAndAllowReselection()
+  {
+    using var battle = BattleFixture.UiBattle();
+    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
+    battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2)], actionPointCost: 4);
+
+    Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
+    Assert.Equal(UiState.UnitSelected, battle.Ui.State);
+    Assert.Equal(battle.PlayerUnit, battle.Ui.SelectedUnit.RequireSome());
+    battle.Ui.Cancel();
+    Assert.True(battle.Ui.TrySelectAt(new Vector3I(4, 0, 2)));
+  }
+
+  [TestCase]
+  public void TemporaryImmobilizationKeepsSelectionAndAllowsReselection()
+  {
+    using var battle = BattleFixture.Duel(
+      player: new("Hero"),
+      enemy: new("Goon", Health: 10,
+        Weapon: TestData.MakeStatusWeapon(TestData.MakeStun(duration: 2), damage: 1)),
+      hitChanceCalculator: new AlwaysHitCalculator(), playerControlled: true);
+    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
+    battle.EndFactionTurn(battle.PlayerFaction);
+    battle.Attack(battle.EnemyUnit, battle.PlayerUnit);
+
+    Assert.True(battle.PlayerUnit.IsImmobilized);
+    Assert.Equal(UiState.UnitSelected, battle.Ui.State);
+    Assert.Equal(battle.PlayerUnit, battle.Ui.SelectedUnit.RequireSome());
+    battle.EndFactionTurn(battle.EnemyFaction);
+    battle.Ui.Cancel();
+    Assert.True(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));
   }
 
   [TestCase(TestName = "Switching selection refreshes readouts without a state transition")]

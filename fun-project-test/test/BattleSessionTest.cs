@@ -427,6 +427,99 @@ public class BattleSessionTest
     Assert.Equal(faction, session.ActiveSide);
   }
 
+  [TestCase]
+  public void KnockedOutActiveFactionKeepsItsQueueHeadUntilEndTurnThenIsSkipped()
+  {
+    using var battle = BattleFixture.Duel();
+    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+
+    Assert.Equal(battle.PlayerFaction, battle.Session.ActiveSide);
+    Assert.Equal(battle.PlayerFaction, battle.Session.TurnQueue.AsValueEnumerable().First());
+
+    battle.EndFactionTurn(battle.PlayerFaction);
+    Assert.Equal(battle.EnemyFaction, battle.Session.ActiveSide);
+    battle.AdvanceTurn();
+    Assert.Equal(battle.EnemyFaction, battle.Session.ActiveSide);
+    Assert.Equal(2, battle.Session.TurnNumber);
+    Assert.False(battle.Session.TurnQueue.AsValueEnumerable().Contains(battle.PlayerFaction));
+  }
+
+  [TestCase]
+  public void ConsciousAllyRemainsAvailableWhileTheBodyStaysUnavailableNextRound()
+  {
+    using var battle = BattleFixture.Duel();
+    var ally = battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction), new Vector3I(0, 0, 0));
+    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+
+    battle.AdvanceTurn();
+    battle.AdvanceTurn();
+
+    Assert.Equal(battle.PlayerFaction, battle.Session.ActiveSide);
+    Assert.True(battle.Query(new IsUnitStillAvailableThisTurn(ally)));
+    Assert.False(battle.Query(new IsUnitStillAvailableThisTurn(battle.PlayerUnit)));
+  }
+
+  [TestCase]
+  public void ImmobilizationAndExhaustedApDoNotRemoveConsciousFactionsFromFutureTurns()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    battle.PlayerUnit.ApplyStatusEffect(MakeStun(duration: 2));
+    battle.EnemyUnit.SpendActionPoints(battle.EnemyUnit.CurrentActionPoints);
+    Assert.False(battle.Query(new CanUnitActNow(battle.PlayerUnit)));
+
+    battle.EndFactionTurn(battle.PlayerFaction);
+    Assert.Equal(battle.EnemyFaction, battle.Session.ActiveSide);
+    Assert.True(battle.Query(new IsUnitStillAvailableThisTurn(battle.EnemyUnit)));
+
+    battle.EndFactionTurn(battle.EnemyFaction);
+    Assert.Equal(battle.PlayerFaction, battle.Session.ActiveSide);
+    Assert.True(battle.Query(new IsUnitStillAvailableThisTurn(battle.PlayerUnit)));
+  }
+
+  [TestCase(false)]
+  [TestCase(true)]
+  public void SchedulerIgnoresDisabledSpawnCandidates(bool killed)
+  {
+    using var battle = BattleFixture.Duel();
+    var kind = killed ? DamageKind.Health : DamageKind.Stun;
+    battle.ApplyDamage(battle.PlayerUnit, 20, kind);
+    var scheduler = new TurnScheduler(battle.Session.HasConsciousUnits, battle.Session.GetFactionConsciousUnits);
+    scheduler.RegisterFaction(battle.PlayerFaction);
+    scheduler.InitializeQueueFromGlobalOrder();
+
+    scheduler.AddSpawnedUnit(battle.PlayerUnit);
+
+    Assert.False(scheduler.IsUnitAvailable(battle.PlayerUnit));
+  }
+
+  [TestCase]
+  public void SetupSkipsUnconsciousFactions()
+  {
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
+    using var battle = new BattleFixture(new Vector3I(3, 1, 1), [player, enemy]);
+    var body = battle.Spawn(TestData.MakeCombatant("Observer", player), Vector3I.Zero);
+    battle.Spawn(TestData.MakeCombatant("Enemy", enemy), new Vector3I(2, 0, 0));
+    battle.ApplyDamage(body, 20, DamageKind.Stun);
+
+    battle.Start();
+
+    Assert.Equal(enemy, battle.Session.ActiveSide);
+    Assert.Equal(1, battle.Session.TurnQueue.Count);
+  }
+
+  [TestCase]
+  public void SetupRejectsOnlyUnconsciousForces()
+  {
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(2, 1, 1), [faction]);
+    var unit = battle.Spawn(TestData.MakeCombatant("Observer", faction), Vector3I.Zero);
+    battle.ApplyDamage(unit, 20, DamageKind.Stun);
+
+    Assert.Throws<InvalidOperationException>(() => battle.Start());
+    Assert.Equal(BattlePhase.Setup, battle.Session.Phase);
+  }
+
   [TestCase(TestName = "Killing the only active unit on an eliminated faction does not auto-advance")]
   public void KillingTheOnlyActiveUnitOnAnEliminatedFactionDoesNotAutoAdvance()
   {

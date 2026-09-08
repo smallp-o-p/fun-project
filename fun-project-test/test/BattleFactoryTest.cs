@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System;
@@ -31,6 +32,21 @@ public class BattleFactoryTest
     };
     var setup = new BattleSetup(board, new[] { player, enemy }, placements, objectives);
     return (setup, player, enemy);
+  }
+
+  [TestCase]
+  public void BoardSetupIncludesDefaultStunRecovery()
+  {
+    var (setup, _, _) = MinimalSetup();
+    using var runtime = BattleFactory.Start(setup).RequireRight();
+    var faction = runtime.Query(new GetActiveSideQuery());
+    var unit = runtime.Query(new GetFactionAliveUnits(faction)).AsValueEnumerable().First();
+    runtime.ExecuteAction(BattleAction.ApplyDamage(runtime.TryGetAlive(unit.State).RequireSome(), 8, DamageKind.Stun));
+    List<BattleEvent> committed = [];
+    runtime.BattleEventCommitted += committed.Add;
+    runtime.ExecuteAction(BattleAction.EndFactionTurn(faction));
+    Assert.Equal(3, unit.State.CurrentStun);
+    Assert.Equal(5u, committed.SingleEvent<UnitStunRecoveredBattleEvent>().AmountRecovered);
   }
 
   // --- tests ---------------------------------------------------------------

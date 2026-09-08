@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
@@ -38,6 +39,30 @@ public class ObjectiveTest
     battle.ApplyDamage(battle.PlayerUnit, 999);
 
     Assert.Equal(ObjectiveResult.Failed, objective.Check(battle.PlayerFaction, anyEvent, battle.Session));
+  }
+
+  [TestCase]
+  public void EliminationIgnoresActionPointExhaustionAndImmobilization()
+  {
+    using var battle = BattleFixture.Duel();
+    var objective = new EliminateAllOpposingForcesObjectiveData().Instantiate();
+    var turnEnd = new TurnEndedBattleEvent(battle.PlayerFaction, 1);
+    battle.PlayerUnit.ApplyStatusEffect(MakeStun());
+    battle.EnemyUnit.SpendActionPoints(battle.EnemyUnit.CurrentActionPoints);
+
+    Assert.Equal(ObjectiveResult.Ongoing, objective.Check(battle.PlayerFaction, turnEnd, battle.Session));
+    Assert.Equal(ObjectiveResult.Ongoing, objective.Check(battle.EnemyFaction, turnEnd, battle.Session));
+  }
+
+  [TestCase]
+  public void SurvivalStillCountsAnUnconsciousLivingOwner()
+  {
+    using var battle = BattleFixture.Duel();
+    var objective = new SurviveUntilTurnObjectiveData { TargetTurn = 1 }.Instantiate();
+    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+
+    Assert.Equal(ObjectiveResult.Passed, objective.Check(battle.PlayerFaction,
+      new TurnStartedBattleEvent(battle.PlayerFaction, 1), battle.Session));
   }
 
   [TestCase(TestName = "SurviveUntilTurn passes once the target turn is reached")]

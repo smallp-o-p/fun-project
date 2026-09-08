@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using FunProject.Combatants;
 using FunProject.Engineering;
+using FunProject.Combatants;
 using FunProject.Strategic;
 
 namespace FunProject.GameState;
@@ -82,6 +82,8 @@ public sealed class GameState
   public Faction PlayerFaction { get; }
 
   public Armory Armory { get; }
+
+  public Captivity Captivity { get; } = new();
 
   public EngineeringState Engineering { get; }
 

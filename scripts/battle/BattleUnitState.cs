@@ -31,11 +31,14 @@ public sealed class BattleUnitState
 
   public int MaxHealth => Mathf.RoundToInt(EffectiveStat<HealthStat>());
   public int CurrentHealth { get; private set; }
+  public int CurrentStun { get; private set; }
   public int MaxActionPoints => Mathf.RoundToInt(EffectiveStat<ActionPointsStat>());
   public int CurrentActionPoints { get; private set; }
   public int Vision => Mathf.RoundToInt(EffectiveStat<VisionStat>());
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
+  public bool IsUnconscious => IsAlive && CurrentStun >= CurrentHealth;
+  public bool IsIncapacitated => IsDead || IsUnconscious || IsImmobilized;
   public IReadOnlyCollection<ActiveStatusEffect> ActiveStatusEffects => _activeStatusEffects.Values;
   public bool IsImmobilized => _activeStatusEffects.Values.AsValueEnumerable().Any(effect => !effect.IsExpired && effect.BlocksAction);
   public IReadOnlyList<Buff> Buffs
@@ -117,6 +120,21 @@ public sealed class BattleUnitState
     CurrentHealth = Math.Max(CurrentHealth - amount, 0);
   }
 
+  internal void ReceiveStun(int amount)
+  {
+    ArgumentOutOfRangeException.ThrowIfNegative(amount);
+    CurrentStun = checked(CurrentStun + amount);
+  }
+
+  internal uint RecoverStun(uint maximum)
+  {
+    if (IsDead || IsUnconscious)
+      return 0;
+    uint recovered = Math.Min((uint)CurrentStun, maximum);
+    CurrentStun -= (int)recovered;
+    return recovered;
+  }
+
   internal ActiveStatusEffect ApplyStatusEffect(StatusEffectSpecData spec)
   {
     ArgumentNullException.ThrowIfNull(spec);
@@ -188,10 +206,7 @@ public sealed class BattleUnitState
     return _spottedUnits.Add(unit);
   }
 
-  public bool CanAct()
-  {
-    return CurrentActionPoints > 0 && !IsDead && !IsImmobilized;
-  }
+  public bool CanAct() => CurrentActionPoints > 0 && !IsIncapacitated;
 
   public float EffectiveStat<TStat>() where TStat : Stat
     => Combatant.Resolve<TStat>(GatherStatContributions());

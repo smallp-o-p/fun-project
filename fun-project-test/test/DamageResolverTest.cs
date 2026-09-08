@@ -26,6 +26,20 @@ public class DamageResolverTest
     Assert.Equal(new DamageResolution(4, 0), resolution);
   }
 
+  [TestCase]
+  public void StunBypassesArmorAndLeavesItForTheNextPacket()
+  {
+    Damage[] bundle =
+    [
+      new(8, Element.Kinetic, Kind: DamageKind.Stun),
+      new(4, Element.Thermal),
+    ];
+    var packets = DamageResolver.ResolvePackets(bundle,
+      Some(new ArmorState(10, Element.Kinetic)));
+    Assert.Equal(new DamageResolution(0, 0, 8), packets[0]);
+    Assert.Equal(new DamageResolution(4, 0, 0), packets[1]);
+  }
+
   [TestCase(TestName = "Health spill is computed from armor before the hit")]
   public void SpillComputedFromArmorBeforeHit()
   {
@@ -79,6 +93,29 @@ public class DamageResolverTest
       Some(new ArmorState(10, Element.Kinetic)));
 
     Assert.Equal(new DamageResolution(0, 0), resolution);
+  }
+
+  [TestCase]
+  public void StunWithoutEffectiveArmorReachesStunOnly()
+  {
+    Assert.Equal(new DamageResolution(0, 0, 5), DamageResolver.Resolve(
+      [new Damage(5, Element.Kinetic, Kind: DamageKind.Stun)], None));
+    Assert.Equal(new DamageResolution(0, 0, 5), DamageResolver.Resolve(
+      [new Damage(5, Element.Kinetic, Kind: DamageKind.Stun)], Some(new ArmorState(0, Element.Kinetic))));
+  }
+
+  [TestCase]
+  public void MixedPacketResolutionDoesNotDependOnStunOrdering()
+  {
+    var healthFirst = DamageResolver.Resolve(
+      [new Damage(8, Element.Kinetic), new Damage(3, Element.Thermal, Kind: DamageKind.Stun)],
+      Some(new ArmorState(5, Element.Kinetic)));
+    var stunFirst = DamageResolver.Resolve(
+      [new Damage(3, Element.Thermal, Kind: DamageKind.Stun), new Damage(8, Element.Kinetic)],
+      Some(new ArmorState(5, Element.Kinetic)));
+
+    Assert.Equal(new DamageResolution(5, 3, 3), healthFirst);
+    Assert.Equal(new DamageResolution(5, 3, 3), stunFirst);
   }
 
   [TestCase(TestName = "Depleted armor passes everything to health")]

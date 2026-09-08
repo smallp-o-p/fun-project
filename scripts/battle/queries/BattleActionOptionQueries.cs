@@ -17,7 +17,8 @@ public sealed class GetAvailableActionsForUnit(AliveUnit unit) : IBattleSessionQ
       .AsValueEnumerable().Where(definition => definition.ExistsFor(unit.State))
       .Select(definition => new UnitAction(
         definition,
-        definition.Conditions.AsValueEnumerable().All(condition => condition.IsMet(session, unit))))
+        !unit.State.IsIncapacitated
+        && definition.Conditions.AsValueEnumerable().All(condition => condition.IsMet(session, unit))))
       .ToList();
   }
 }
