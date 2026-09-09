@@ -168,6 +168,7 @@ public class GeoscapeProjectsIntegrationTest
     Assert.Equal("No items available to manufacture.",
       OnlyChild<Label>(view.GetNode<VBoxContainer>("%ManufacturableItems")).Text);
     Assert.Equal("No active manufacturing.", view.GetNode<Label>("%ActiveJob").Text);
-    Assert.True(view.GetNode<Label>("%Status").Text.Contains("not part of this campaign"));
+    Assert.Equal("This item is not available for manufacturing.",
+      view.GetNode<Label>("%Status").Text);
   }
 }

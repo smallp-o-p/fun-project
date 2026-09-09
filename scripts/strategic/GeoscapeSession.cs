@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using FunProject.Engineering;
 using FunProject.GameState;
 using FunProject.Items;
+using FunProject.Research;
 
 namespace FunProject.Strategic;
 
@@ -57,6 +58,22 @@ public sealed class GeoscapeSession
   public Option<PendingResolution> PendingResolution => _state.Pending;
 
   public Option<ManufacturingJob> ActiveManufacturing => _state.Engineering.ActiveJob;
+
+  public Option<ResearchJob> ActiveResearch => _state.Research.ActiveJob;
+
+  public IReadOnlyList<ResearchProject> GetResearchProjects() => _state.Research.Projects;
+
+  public IReadOnlyList<ResearchProject> GetAvailableResearchProjects()
+    => _state.Research.GetAvailableProjects(_state);
+
+  public Either<ResearchStartFailure, ResearchJob> StartResearch(ResearchProject project)
+    => _state.Research.ResolveResearch(project, _state).Map(definition =>
+    {
+      var job = new ResearchJob(definition.Project, Tick, CompletionTick(definition.DurationDays));
+      var started = _state.Research.Start(job);
+      Commit(started);
+      return started.Job;
+    });
 
   public IReadOnlyList<ManufacturingOption> GetManufacturingOptions()
     => _state.Engineering.GetManufacturingOptions(_state.Armory);
@@ -127,6 +144,7 @@ public sealed class GeoscapeSession
       FireDueSchedule();
       RemoveExpired();
       _state.Engineering.CompleteIfDue(Tick).IfSome(Handle);
+      _state.Research.CompleteIfDue(Tick).IfSome(Handle);
     }
   }
 
@@ -134,6 +152,12 @@ public sealed class GeoscapeSession
   {
     var project = completed.Job.Project;
     _state.Armory.AddItem(project.Item, project.UnlimitedStock);
+    Commit(completed);
+  }
+
+  private void Handle(ResearchCompleted completed)
+  {
+    _state.Engineering.Unlock(completed.ManufacturingUnlocks);
     Commit(completed);
   }
 

@@ -1,6 +1,7 @@
 using FunProject.Combatants;
 using FunProject.Core;
 using FunProject.Items;
+using FunProject.Research;
 using FunProject.Stats;
 using FunProject.Strategic;
 using Godot;
@@ -27,4 +28,6 @@ public partial class CampaignStartData : NamedEntityData
   [Export] public EquippableMod[] ModStock { get; set; } = [];
 
   [Export] public EquippableItemData[] ManufacturableItems { get; set; } = [];
+
+  [Export] public ResearchProject[] ResearchProjects { get; set; } = [];
 }

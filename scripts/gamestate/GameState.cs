@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using FunProject.Engineering;
 using FunProject.Combatants;
+using FunProject.Research;
 using FunProject.Strategic;
 
 namespace FunProject.GameState;
@@ -67,6 +68,8 @@ public sealed class GameState
         entry.DisplayName.Length > 0 ? Some(entry.DisplayName) : Option<string>.None));
     }
 
+    Research = new ResearchState(start.ResearchProjects);
+
     Engineering = new EngineeringState(start.ManufacturableItems);
     Armory = new Armory(start.Armory, start.ModStock);
   }
@@ -86,6 +89,8 @@ public sealed class GameState
   public Captivity Captivity { get; } = new();
 
   public EngineeringState Engineering { get; }
+
+  public ResearchState Research { get; }
 
   public DateTime CurrentTime => _startTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
 

@@ -270,7 +270,7 @@ public class EngineeringViewTest
     Assert.True(view.IsInsideTree() && !view.IsQueuedForDeletion());
   }
 
-  [TestCase(ManufacturingStartFailure.UnknownItem, "This item is not part of this campaign.")]
+  [TestCase(ManufacturingStartFailure.UnknownItem, "This item is not available for manufacturing.")]
   [TestCase(ManufacturingStartFailure.Busy, "Another manufacturing project is already in progress.")]
   [TestCase(ManufacturingStartFailure.AlreadyAvailable, "Unlimited supply for this item is already established.")]
   public void FailureExplainsRejectionAndNextPresentClearsIt(ManufacturingStartFailure failure, string message)

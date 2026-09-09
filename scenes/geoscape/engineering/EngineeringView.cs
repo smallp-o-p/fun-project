@@ -54,7 +54,7 @@ public sealed partial class EngineeringView : PanelContainer, IGeoscapeView
   {
     GetNode<Label>("%Status").Text = failure switch
     {
-      ManufacturingStartFailure.UnknownItem => "This item is not part of this campaign.",
+      ManufacturingStartFailure.UnknownItem => "This item is not available for manufacturing.",
       ManufacturingStartFailure.Busy => "Another manufacturing project is already in progress.",
       ManufacturingStartFailure.AlreadyAvailable => "Unlimited supply for this item is already established.",
       _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, "Unknown manufacturing failure."),

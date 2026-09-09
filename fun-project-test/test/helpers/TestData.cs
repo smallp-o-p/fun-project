@@ -7,6 +7,7 @@ using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
 using FunProject.Progression;
+using FunProject.Research;
 using FunProject.Stats;
 using FunProject.Strategic;
 using FunProject.Weapons;
@@ -402,7 +403,8 @@ internal static class TestData
     RosterEntryData[] roster = null,
     EquippableItemData[] armory = null,
     EquippableMod[] modStock = null,
-    EquippableItemData[] manufacturableItems = null)
+    EquippableItemData[] manufacturableItems = null,
+    ResearchProject[] researchProjects = null)
   {
     return new CampaignStartData
     {
@@ -413,8 +415,21 @@ internal static class TestData
       Armory = armory ?? [],
       ModStock = modStock ?? [],
       ManufacturableItems = manufacturableItems ?? [],
+      ResearchProjects = researchProjects ?? [],
     };
   }
+
+  public static ResearchProject MakeResearch(
+    string name = "Research", uint days = 1,
+    ResearchCondition condition = null,
+    EquippableItemData[] manufacturingUnlocks = null)
+    => new()
+    {
+      Name = name,
+      DurationDays = days,
+      Condition = condition ?? new AlwaysResearchCondition(),
+      ManufacturingUnlocks = manufacturingUnlocks ?? [],
+    };
 
   public static SkillPathData MakePath(string name, params SkillUpgradeStepData[] steps)
   {

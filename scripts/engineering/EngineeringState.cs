@@ -12,15 +12,24 @@ public sealed class EngineeringState
   private readonly List<ManufacturingProject> _projects = [];
   private readonly Dictionary<EquippableItemData, ManufacturingProject> _projectsByItem = new(ReferenceEqualityComparer.Instance);
 
-  internal EngineeringState(IReadOnlyList<EquippableItemData> items)
+  internal EngineeringState(IReadOnlyList<EquippableItemData> initialItems)
+  {
+    Unlock(initialItems);
+  }
+
+  // Registers unseen item references, baking duration and stock policy at first registration.
+  // Validate the whole batch first so null input never leaves a partial registry update.
+  internal void Unlock(IReadOnlyList<EquippableItemData> items)
   {
     ArgumentNullException.ThrowIfNull(items);
-
-    foreach (EquippableItemData item in items)
-    {
+    foreach (var item in items)
       ArgumentNullException.ThrowIfNull(item);
+
+    foreach (var item in items)
+    {
+      if (_projectsByItem.ContainsKey(item)) continue;
       var project = new ManufacturingProject(item, item.ManufacturingDurationDays, item.UnlimitedStock);
-      _projectsByItem.TryAdd(item, project);
+      _projectsByItem.Add(item, project);
       _projects.Add(project);
     }
   }
@@ -32,7 +41,7 @@ public sealed class EngineeringState
     ArgumentNullException.ThrowIfNull(armory);
     return _projects.AsValueEnumerable()
       .Where(project => !project.UnlimitedStock || armory.TryGetItemStock(project.Item).IsNone)
-      .Select(project => new ManufacturingOption(project, 
+      .Select(project => new ManufacturingOption(project,
         armory.TryGetItemStock(project.Item).Match(stock => stock.Remaining, () => 0)))
       .ToImmutableList();
   }
