@@ -23,7 +23,7 @@ dotnet test fun-project.sln --no-restore                         # solution-leve
 dotnet test fun-project-test\fun-project-test.csproj --filter "FullyQualifiedName~WeaponSystemTest"  # one test class
 ```
 
-Open `project.godot` in the Godot editor for scene/resource editing and playtesting.
+Open `project.godot` in the Godot editor for scene/resource editing and playtesting; while it runs, do all scene and editor work through the `godot-ai` MCP server (see *Godot scene and editor work* below).
 
 ### Testing
 - For code changes, run `dotnet format`, build, and run tests covering the affected behavior. Use the full test project for shared runtime, executor, hook-ordering, or cross-subsystem changes. Broaden or repeat checks when changes, failures, or unresolved concerns justify it.
@@ -34,6 +34,16 @@ Open `project.godot` in the Godot editor for scene/resource editing and playtest
 - Use `using var` for fixtures. `BattleFixture.Runtime` owns the session's sole executor; fixture operations reuse it. Use fixture `Alive`/`At` methods for fresh proofs and raw `Submit` for tests of explicit/stale actions.
 - Fixture event capture begins before setup. Use `ClearEvents()` explicitly to start an assertion window; actions and start methods do not reset it.
 - Direct factory/constructor/lifecycle tests retain and dispose their subject directly. Do not create a second live executor for a fixture session.
+
+### Godot scene and editor work
+
+The project ships the `godot_ai` editor plugin (`addons/godot_ai`) with its `godot-ai` MCP server. Whenever anything needs to be done with a Godot scene or the editor — opening, inspecting the tree hierarchy, editing, running — use these tools rather than hand-editing `.tscn`/`.tres` text or directing the user through the editor UI.
+- Confirm the session first (`editor_state`, or `session_manage` op `list`): readiness, open scene, play state. Writes are rejected while the game runs; after stopping, one `editor_state` call refreshes the cache.
+- Inspect before writing: `scene_get_hierarchy` for the tree, `node_find` to locate nodes, `node_get_properties` (pass `fields` to trim the read) to confirm exact property names — `node_set_property` needs Godot's exact identifier, which often differs from intuition.
+- Edit via `scene_open`, `node_create`, `node_set_property`, `node_manage` (rename/reparent/reorder/delete/groups), and the specialized managers (`ui_manage`, `theme_manage`, `animation_create`/`animation_manage`, `camera_manage`, `audio_manage`, `tilemap_manage`, `tileset_manage`, `gridmap_manage`, `resource_manage`, `signal_manage`, `input_map_manage`). Use `batch_execute` for multi-step edits so a later failure rolls back the earlier ones.
+- Scene paths are relative to the edited scene root (e.g. `/Main/Camera3D`), never runtime `/root/...` paths. Mutations stay in editor memory until `scene_save` (or `scene_manage` op `save_as`) persists them — save explicitly.
+- Verify from the same surface: `project_run` / `project_manage` op `stop`, `game_manage` for runtime inspection and simulated input, `logs_read` (plugin/editor/game sources) for errors, `editor_screenshot` for visual checks.
+- With no editor session connected (e.g. headless CI), fall back to direct file edits and say so.
 
 ## Architecture
 
