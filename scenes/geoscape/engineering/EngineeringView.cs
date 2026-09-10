@@ -1,32 +1,32 @@
 using System;
 using System.Collections.Generic;
+using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Engineering;
-using FunProject.Items;
 using FunProject.Strategic;
 using Godot;
 
-// Displays pushed campaign snapshots and emits requests; the composition root owns starts.
-public sealed partial class EngineeringView : PanelContainer, IGeoscapeView
+// Owns its session binding: activation captures the session, the Manufacture button runs
+// StartManufacturing on it, refreshes the snapshot, and shows failures — the composition
+// root has no per-view logic. The explicit snapshot Present overload stays for direct
+// callers (tests) that supply options/job/tick themselves. Back asks the manager to pop.
+public sealed partial class EngineeringView : GeoscapeView
 {
-  private Action? _requestClose;
+  private GeoscapeSession? _session;
   private IReadOnlyList<ManufacturingOption> _options = [];
   private Option<ManufacturingJob> _active = None;
   private Option<ManufacturingOption> _selection = None;
 
-  public event Action<EquippableItemData>? ManufactureRequested;
-
-  public void ArmClose(Action requestClose) => _requestClose = requestClose;
-
   public override void _Ready()
   {
-    GetNode<Button>("%BackButton").Pressed += () => _requestClose?.Invoke();
-    GetNode<Button>("%ManufactureButton").Pressed += () =>
-    {
-      // Disabled controls can still receive programmatic signals.
-      if (!GetNode<Button>("%ManufactureButton").Disabled)
-        _selection.IfSome(option => ManufactureRequested?.Invoke(option.Project.Item));
-    };
+    base._Ready();
+    GetNode<Button>("%ManufactureButton").Pressed += OnManufacturePressed;
     RefreshSelection();
+  }
+
+  public override void Present(CampaignGameState state, GeoscapeSession session)
+  {
+    _session = session;
+    Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
   }
 
   public void Present(IReadOnlyList<ManufacturingOption> options,
@@ -59,6 +59,21 @@ public sealed partial class EngineeringView : PanelContainer, IGeoscapeView
       ManufacturingStartFailure.AlreadyAvailable => "Unlimited supply for this item is already established.",
       _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, "Unknown manufacturing failure."),
     };
+  }
+
+  private void OnManufacturePressed()
+  {
+    // Disabled controls can still receive programmatic signals.
+    if (GetNode<Button>("%ManufactureButton").Disabled)
+      return;
+    GeoscapeSession session = _session ?? throw new InvalidOperationException(
+      "EngineeringView requires a session; it is bound when the view becomes active.");
+    _selection.IfSome(option =>
+    {
+      var result = session.StartManufacturing(option.Project.Item);
+      Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+      result.IfLeft(ShowFailure); // after the refresh: it clears the status line
+    });
   }
 
   private void RebuildItems()

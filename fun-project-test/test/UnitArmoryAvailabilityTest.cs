@@ -29,4 +29,27 @@ public class UnitArmoryAvailabilityTest
     view.SelectSlot(UnitViewSlot.Utility(0));
     Assert.Equal(unlimited ? 1 : 0, view.GetNode<VBoxContainer>("%ArmoryList").GetChildCount());
   }
+
+  // Activation (returning from a covered view) refreshes the retained unit while keeping
+  // the selected slot: the weapon filter survives and reflects stock that moved meanwhile.
+  [TestCase]
+  public void ActivationRefreshesTheRetainedUnitWithoutClearingSlotSelection()
+  {
+    var rifle = MakeWeaponData(name: "Rifle");
+    var cannon = MakeWeaponData(name: "Cannon");
+    using var campaign = new GeoscapeFixture(MakeStart(
+      roster: [MakeEntry()], armory: [rifle, cannon, MakeItemData("Kit")]));
+    var state = campaign.State;
+    var view = AddToTree(CreateUnitView());
+    view.BindUnit(state.Roster[0]);
+    view.Present(state, campaign.Session);
+    view.SelectSlot(UnitViewSlot.Weapon);
+    var armory = view.GetNode<VBoxContainer>("%ArmoryList");
+    Assert.Equal(2, armory.GetChildCount()); // weapon slot: the two guns, not the kit
+
+    state.Armory.TryWithdrawItem(rifle).RequireSome(); // domain moves while covered
+
+    view.Present(state, campaign.Session); // reactivation reruns the refresh
+    Assert.Equal(1, armory.GetChildCount()); // refreshed AND still weapon-filtered
+  }
 }

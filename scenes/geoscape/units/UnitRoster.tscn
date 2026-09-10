@@ -1,36 +1,43 @@
-[gd_scene format=3 uid="uid://dm5w72otw20q2"]
+[gd_scene load_steps=5 format=3 uid="uid://dm5w72otw20q2"]
 
-[ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitLabel.tscn" id="1_pisvb"]
-[ext_resource type="Script" uid="uid://cs2b2vwhkbjeb" path="res://scenes/geoscape/units/UnitRoster.cs" id="2_script"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitLabel.tscn" id="2_label"]
+[ext_resource type="Script" path="res://scenes/geoscape/units/UnitRoster.cs" id="3_script"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitView.tscn" id="4_unitview"]
 
-[node name="UnitRoster" type="PanelContainer" unique_id=161475801]
+[node name="UnitRoster" instance=ExtResource("1_base") node_paths=PackedStringArray("BackButton")]
+script = ExtResource("3_script")
+BackButton = NodePath("Content/MarginContainer/VBoxContainer/Header/HBox/BackButton")
+UnitLabelScene = ExtResource("2_label")
+UnitViewScene = ExtResource("4_unitview")
+
+[node name="Content" type="PanelContainer" parent="."]
+layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("2_script")
-UnitLabelScene = ExtResource("1_pisvb")
 
-[node name="MarginContainer" type="MarginContainer" parent="." unique_id=654992870]
+[node name="MarginContainer" type="MarginContainer" parent="Content" unique_id=654992870]
 layout_mode = 2
 theme_override_constants/margin_left = 4
 theme_override_constants/margin_top = 4
 theme_override_constants/margin_right = 4
 theme_override_constants/margin_bottom = 4
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer" unique_id=1109419286]
+[node name="VBoxContainer" type="VBoxContainer" parent="Content/MarginContainer" unique_id=1109419286]
 layout_mode = 2
 
-[node name="Header" type="MarginContainer" parent="MarginContainer/VBoxContainer" unique_id=1973534816]
+[node name="Header" type="MarginContainer" parent="Content/MarginContainer/VBoxContainer" unique_id=1973534816]
 custom_minimum_size = Vector2(0, 96)
 layout_mode = 2
 theme_override_constants/margin_bottom = 16
 
-[node name="HBox" type="HBoxContainer" parent="MarginContainer/VBoxContainer/Header" unique_id=1299085671]
+[node name="HBox" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer/Header" unique_id=1299085671]
 layout_mode = 2
 
-[node name="Title" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Header/HBox" unique_id=1828378539]
+[node name="Title" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Header/HBox" unique_id=1828378539]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -39,50 +46,50 @@ text = "Units"
 scroll_active = false
 vertical_alignment = 2
 
-[node name="BackButton" type="Button" parent="MarginContainer/VBoxContainer/Header/HBox" unique_id=1077662828]
+[node name="BackButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Header/HBox" unique_id=1077662828]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
 text = "Back"
 
-[node name="TableHeader" type="HBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=1298819191]
+[node name="TableHeader" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer" unique_id=1298819191]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 72)
 layout_mode = 2
 theme_override_constants/separation = 32
 
-[node name="NameHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/TableHeader" unique_id=463276382]
+[node name="NameHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/TableHeader" unique_id=463276382]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Name"
 vertical_alignment = 1
 
-[node name="RankHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/TableHeader" unique_id=894196081]
+[node name="RankHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/TableHeader" unique_id=894196081]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Rank"
 vertical_alignment = 1
 
-[node name="StatusHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/TableHeader" unique_id=1418123614]
+[node name="StatusHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/TableHeader" unique_id=1418123614]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Status"
 vertical_alignment = 1
 
-[node name="HSeparator" type="HSeparator" parent="MarginContainer/VBoxContainer" unique_id=552138463]
+[node name="HSeparator" type="HSeparator" parent="Content/MarginContainer/VBoxContainer" unique_id=552138463]
 layout_mode = 2
 
-[node name="UnitLabels" type="VBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=1334131116]
+[node name="UnitLabels" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer" unique_id=1334131116]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 8
 
-[node name="UnitLabel" parent="MarginContainer/VBoxContainer/UnitLabels" unique_id=1450525365 instance=ExtResource("1_pisvb")]
+[node name="UnitLabel" parent="Content/MarginContainer/VBoxContainer/UnitLabels" unique_id=1450525365 instance=ExtResource("2_label")]
 layout_mode = 2
 
-[node name="UnitLabel2" parent="MarginContainer/VBoxContainer/UnitLabels" unique_id=1497590307 instance=ExtResource("1_pisvb")]
+[node name="UnitLabel2" parent="Content/MarginContainer/VBoxContainer/UnitLabels" unique_id=1497590307 instance=ExtResource("2_label")]
 layout_mode = 2

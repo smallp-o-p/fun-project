@@ -21,6 +21,7 @@ public sealed partial class DebugSkillProgression : Control
     soldier.Progression.AwardPoints(3);
 
     var view = GetNode<SkillProgressionView>("SkillProgressionView");
+    view.BackRequested += view.Hide; // standalone host: Close hides, the stack owns it in-game
     view.Visible = true;
     view.Present(soldier);
   }

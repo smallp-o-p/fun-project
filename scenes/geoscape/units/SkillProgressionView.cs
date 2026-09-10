@@ -1,19 +1,23 @@
+using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Combatants;
 using FunProject.Progression;
 using FunProject.Stats;
+using FunProject.Strategic;
 using Godot;
+using System;
 using System.Collections.Generic;
 
 // Quick-and-dirty skill-path screen: currency, committed path chains (unlock next), and
 // the available-path catalog (commit). Presentation only — every interaction calls domain
 // operations on UnitProgression and re-presents; nothing is cached beyond the bound unit.
-public sealed partial class SkillProgressionView : PanelContainer
+// The unit view binds the unit before the push; activation refreshes it.
+public sealed partial class SkillProgressionView : GeoscapeView
 {
   private Combatant? _unit;
 
   public override void _Ready()
   {
-    GetNode<Button>("%CloseButton").Pressed += () => Visible = false;
+    base._Ready();
     GetNode<Button>("%AwardButton").Pressed += () =>
     {
       _unit?.Progression.AwardPoints(5); // DEBUG: stands in for unwired mission/kill rewards
@@ -21,9 +25,21 @@ public sealed partial class SkillProgressionView : PanelContainer
     };
   }
 
+  // The unit view binds the inspected combatant before requesting this view.
+  public void BindUnit(Combatant unit) => _unit = unit;
+
+  // Direct-caller entry point (standalone debug bring-up): binds and rebuilds in one step.
   public void Present(Combatant unit)
   {
     _unit = unit;
+    Rebuild();
+  }
+
+  public override void Present(CampaignGameState state, GeoscapeSession session)
+  {
+    if (_unit is null)
+      throw new InvalidOperationException(
+        "SkillProgressionView requires a bound combatant; the unit view binds it before requesting the view.");
     Rebuild();
   }
 

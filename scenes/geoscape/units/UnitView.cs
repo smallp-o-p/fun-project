@@ -5,6 +5,7 @@ using FunProject.GameState;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Stats;
+using FunProject.Strategic;
 using FunProject.Weapons;
 using Godot;
 using System;
@@ -33,38 +34,64 @@ public readonly record struct UnitViewSlot(UnitViewSlotKind Kind, int Index = 0)
 // Full-screen soldier screen: stats page (base -> effective), equipment slots, and the
 // campaign armory browser. Presentation only — every interaction calls domain operations
 // on GameState/Combatant/Armory and re-presents; nothing is cached beyond the bound unit.
-public sealed partial class UnitView : PanelContainer, IGeoscapeView
+// Activation (Present(state, session)) refreshes the retained unit WITHOUT clearing the
+// equipment selection, so returning from skill paths keeps the inspected slot. The Paths
+// button builds a fresh SkillProgressionView, binds the unit before it enters the tree,
+// and requests it.
+public sealed partial class UnitView : GeoscapeView
 {
-  private Action? _requestClose;
+  [Export] public PackedScene? SkillProgressionViewScene { get; set; }
+
   private CampaignGameState? _state;
   private Combatant? _unit;
   private UnitViewSlot? _selection;
 
-  public void ArmClose(Action requestClose) => _requestClose = requestClose;
-
   public override void _Ready()
   {
-    GetNode<Button>("%BackButton").Pressed += () => _requestClose?.Invoke();
+    base._Ready();
     GetNode<Button>("%UnequipButton").Pressed += OnUnequipPressed;
     GetNode<Button>("%WeaponSlot").Pressed += () => SelectSlot(UnitViewSlot.Weapon);
     GetNode<Button>("%ArmorSlot").Pressed += () => SelectSlot(UnitViewSlot.Armor);
     GetNode<Button>("%PathsButton").Pressed += OnPathsPressed;
   }
 
-  private void OnPathsPressed()
-  {
-    var pathsView = GetNode<SkillProgressionView>("SkillProgressionView");
-    pathsView.Visible = !pathsView.Visible;
-    if (pathsView.Visible && _unit is not null)
-      pathsView.Present(_unit);
-  }
+  // The roster binds the selected combatant before requesting this view.
+  public void BindUnit(Combatant unit) => _unit = unit;
 
+  // Direct-caller entry point (tests, future callers): full rebuild with a fresh unit.
   public void Present(CampaignGameState state, Combatant unit)
   {
     _state = state;
     _unit = unit;
     _selection = null;
     RebuildAll();
+  }
+
+  public override void Present(CampaignGameState state, GeoscapeSession session)
+  {
+    if (_unit is null)
+      throw new InvalidOperationException(
+        "UnitView requires a bound combatant; the roster binds it before requesting the view.");
+    _state = state;
+    RebuildAll(); // keeps _selection: returning from paths refreshes without clearing it
+  }
+
+  private void OnPathsPressed()
+  {
+    if (_unit is null)
+      throw new InvalidOperationException(
+        "UnitView requires a bound combatant before opening skill paths.");
+    PackedScene scene = SkillProgressionViewScene ?? throw new InvalidOperationException(
+      "UnitView requires SkillProgressionViewScene; assign a PackedScene in the inspector.");
+    Node instance = scene.Instantiate();
+    if (instance is not SkillProgressionView paths)
+    {
+      instance.Free(); // free now: rejected roots must not linger to frame end
+      throw new InvalidOperationException(
+        "UnitView requires SkillProgressionViewScene whose root is a SkillProgressionView.");
+    }
+    paths.BindUnit(_unit); // retain the unit before the view enters the tree
+    RequestView(paths);
   }
 
   /// <summary>Test seam mirroring a slot-button click; production clicks call this too.</summary>

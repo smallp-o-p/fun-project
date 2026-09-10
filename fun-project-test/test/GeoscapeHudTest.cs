@@ -3,11 +3,14 @@ using static FunProject.Tests.GeoscapeUiTestFactory;
 using Godot;
 using GdUnit4;
 using System;
+using static GdUnit4.Assertions;
 
 [TestSuite]
 [RequireGodotRuntime]
-public class GeoscapeHudTest
+public partial class GeoscapeHudTest
 {
+  internal sealed partial class ProbeView : GeoscapeView;
+
   private static GeoscapeHud BuildHud() => AddToTree(CreateHud());
 
   [TestCase]
@@ -56,17 +59,63 @@ public class GeoscapeHudTest
       expiresAtTick.HasValue ? Some(expiresAtTick.Value) : Option<long>.None);
   }
 
-  [TestCase(TestName = "Units button raises ViewRequested for the Units view")]
-  public void UnitsButtonRaisesViewRequested()
+  [TestCase(TestName = "Ordinary bound buttons forward fresh views through the signal")]
+  public void BoundButtonsForwardFreshViews()
   {
     var hud = BuildHud();
-
-    GeoscapeView? requested = null;
-    hud.ViewRequested += view => requested = view;
+    GeoscapeView? first = null;
+    GeoscapeView? second = null;
+    Assert.Equal(Error.Ok, hud.Connect(GeoscapeHud.SignalName.ViewRequested,
+      Callable.From((GeoscapeView view) =>
+      {
+        if (first is null)
+          first = view;
+        else
+          second = view;
+      })));
 
     hud.GetNode<Button>("%UnitsButton").EmitSignal(Button.SignalName.Pressed);
+    hud.GetNode<Button>("%UnitsButton").EmitSignal(Button.SignalName.Pressed);
 
-    Assert.Equal(GeoscapeView.Units, requested);
+    Assert.True(first is UnitRoster);
+    Assert.True(second is UnitRoster);
+    Assert.False(ReferenceEquals(first, second));
+    AutoFree(first!);
+    AutoFree(second!);
+  }
+
+  [TestCase(TestName = "An arbitrary ordinary button can bind another view")]
+  public void AddedOrdinaryButtonBindsAnotherViewWithoutHudChanges()
+  {
+    var hud = CreateHud();
+    var third = new Button { Name = "ThirdButton" };
+    PackedScene probeScene = Pack(new ProbeView());
+    Error connection = third.Connect(Button.SignalName.Pressed,
+      Callable.From(() => hud.RequestView(probeScene)));
+    Assert.Equal(Error.Ok, connection);
+    hud.GetNode<HBoxContainer>("%ViewButtons").AddChild(third);
+    AddToTree(hud);
+    GeoscapeView? received = null;
+    Assert.Equal(Error.Ok, hud.Connect(GeoscapeHud.SignalName.ViewRequested,
+      Callable.From((GeoscapeView view) => received = view)));
+
+    third.EmitSignal(Button.SignalName.Pressed);
+
+    Assert.True(received is ProbeView);
+    AutoFree(received!);
+  }
+
+  [TestCase]
+  public void MissingOrWrongViewScenesAreAuthoringErrors()
+  {
+    var hud = BuildHud();
+    GeoscapeView? received = null;
+    hud.ViewRequested += view => received = view;
+
+    Assert.Throws<InvalidOperationException>(() => hud.RequestView(null));
+    Assert.Throws<InvalidOperationException>(() => hud.RequestView(Pack(new Control { Name = "NotAView" })));
+
+    Assert.True(received is null);
   }
 
   [TestCase(TestName = "UpdateClock writes the pushed day and time to the clock label")]

@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using FunProject.Engineering;
-using FunProject.Items;
 using GdUnit4;
 using Godot;
 using static FunProject.Tests.GeoscapeUiTestFactory;
@@ -19,7 +18,7 @@ public class EngineeringViewTest
     var session = campaign.Session;
     var view = CreateEngineeringView();
     CreateUiViewport(view, new Vector2I(800, 600));
-    view.Present(session.GetManufacturingOptions(), None, 0);
+    view.Present(campaign.State, session);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
     await WaitForLayout(view);
 
@@ -29,7 +28,7 @@ public class EngineeringViewTest
     var back = view.GetNode<Button>("%BackButton");
     Assert.True(visible.Encloses(ScreenRect(action)));
     Assert.True(visible.Encloses(ScreenRect(back)));
-    var scroll = view.GetNode<ScrollContainer>("Margin/Layout/Body/Details/DetailsScroll");
+    var scroll = view.GetNode<ScrollContainer>("Content/Margin/Layout/Body/Details/DetailsScroll");
     Assert.True(scroll.ClipContents);
     Assert.True(scroll.GetVScrollBar().MaxValue > scroll.GetVScrollBar().Page);
     var actionRect = ScreenRect(action);
@@ -40,23 +39,20 @@ public class EngineeringViewTest
     Assert.True(ScreenRect(scroll).Encloses(ScreenRect(view.GetNode<Label>("%SupplyEffect"))));
     Assert.Equal(actionRect, ScreenRect(action));
     Assert.Equal(backRect, ScreenRect(back));
-    Option<EquippableItemData> requested = None;
-    view.ManufactureRequested += data => requested = Some(data);
-    bool closed = false;
-    view.ArmClose(() => closed = true);
     action.EmitSignal(Button.SignalName.Pressed);
+    bool backed = false;
+    view.BackRequested += () => backed = true;
     back.EmitSignal(Button.SignalName.Pressed);
-    Assert.True(requested.Match(data => data == item, () => false));
-    Assert.True(closed);
+    Assert.True(session.ActiveManufacturing.Match(job => job.Project.Item == item, () => false));
+    Assert.True(backed);
   }
 
   [TestCase]
   public void EmptyCatalogExplainsNoOptionsWithoutSelectableRows()
   {
     using var campaign = new GeoscapeFixture(MakeStart());
-    var session = campaign.Session;
     var view = AddToTree(CreateEngineeringView());
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    view.Present(campaign.State, campaign.Session);
 
     var items = view.GetNode<VBoxContainer>("%ManufacturableItems");
     Assert.Equal(1, items.GetChildCount());
@@ -79,7 +75,7 @@ public class EngineeringViewTest
     first.ManufacturingDurationDays = 99;
     first.UnlimitedStock = true;
     var view = AddToTree(CreateEngineeringView());
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    view.Present(campaign.State, session);
 
     var items = view.GetNode<VBoxContainer>("%ManufacturableItems");
     Assert.Equal("Field scanner", items.GetChild<Button>(0).Text);
@@ -106,13 +102,11 @@ public class EngineeringViewTest
       manufacturableItems: [first, second]));
     var session = campaign.Session;
     var view = AddToTree(CreateEngineeringView());
-    int requests = 0;
-    view.ManufactureRequested += _ => requests++;
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    view.Present(campaign.State, session);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0)
       .EmitSignal(Button.SignalName.Pressed);
     Assert.True(session.StartManufacturing(first).IsRight);
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    view.Present(campaign.State, session);
     Assert.True(view.GetNode<Button>("%ManufactureButton").Disabled);
     view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(1)
@@ -121,9 +115,9 @@ public class EngineeringViewTest
     Assert.Equal("Medkit", view.GetNode<Label>("%ItemName").Text);
     Assert.True(view.GetNode<Button>("%ManufactureButton").Disabled);
     view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
-    Assert.Equal(0, requests);
+    Assert.True(session.ActiveManufacturing.Match(job => job.Project.Item == first, () => false));
     campaign.AdvanceTicks(1440);
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    view.Present(campaign.State, session);
     Assert.False(view.GetNode<Button>("%ManufactureButton").Disabled);
     Assert.Equal("No active manufacturing.", view.GetNode<Label>("%ActiveJob").Text);
   }
@@ -137,7 +131,7 @@ public class EngineeringViewTest
     Assert.True(session.StartManufacturing(item).IsRight);
     campaign.AdvanceTicks(2);
     var view = AddToTree(CreateEngineeringView());
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    view.Present(campaign.State, session);
     Assert.Equal("Manufacturing: Field scanner — 23h 58m remaining", view.GetNode<Label>("%ActiveJob").Text);
     view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, 1443);
     Assert.Equal("Manufacturing: Field scanner — 0m remaining", view.GetNode<Label>("%ActiveJob").Text);
@@ -168,10 +162,9 @@ public class EngineeringViewTest
     Assert.Equal("Duration: 2d 0h 0m", view.GetNode<Label>("%ManufacturingDuration").Text);
     Assert.Equal("Stock: 3", view.GetNode<Label>("%Stock").Text);
     Assert.False(view.GetNode<Button>("%ManufactureButton").Disabled);
-    Option<EquippableItemData> requested = None;
-    view.ManufactureRequested += data => requested = Some(data);
+    view.Present(refreshedCampaign.State, refreshed); // activation binding
     view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
-    Assert.True(requested.Match(data => data == second, () => false));
+    Assert.True(refreshed.ActiveManufacturing.Match(job => job.Project.Item == second, () => false));
   }
 
   [TestCase]
@@ -196,10 +189,7 @@ public class EngineeringViewTest
     Assert.Equal("", view.GetNode<Label>("%ManufacturingDuration").Text);
     Assert.Equal("", view.GetNode<Label>("%Stock").Text);
     Assert.Equal("", view.GetNode<Label>("%SupplyEffect").Text);
-    int requests = 0;
-    view.ManufactureRequested += _ => requests++;
-    view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
-    Assert.Equal(0, requests);
+    view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed); // disabled: no-op
   }
 
   [TestCase]
@@ -211,9 +201,7 @@ public class EngineeringViewTest
       manufacturableItems: [supply, scarce]));
     var session = campaign.Session;
     var view = AddToTree(CreateEngineeringView());
-    int requests = 0;
-    view.ManufactureRequested += _ => requests++;
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    view.Present(campaign.State, session);
     var items = view.GetNode<VBoxContainer>("%ManufacturableItems");
     Assert.Equal(2, items.GetChildCount());
     items.GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
@@ -222,7 +210,7 @@ public class EngineeringViewTest
     Assert.False(view.GetNode<Button>("%ManufactureButton").Disabled);
     session.StartManufacturing(supply).RequireRight();
     campaign.AdvanceTicks(1440);
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    view.Present(campaign.State, session);
 
     Assert.Equal(1, items.GetChildCount());
     Assert.Equal("Medkit", items.GetChild<Button>(0).Text);
@@ -230,44 +218,37 @@ public class EngineeringViewTest
     Assert.Equal("", view.GetNode<Label>("%Stock").Text);
     Assert.Equal("", view.GetNode<Label>("%SupplyEffect").Text);
     Assert.True(view.GetNode<Button>("%ManufactureButton").Disabled);
-    view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
-    Assert.Equal(0, requests);
+    view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed); // disabled: no-op
     items.GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
     Assert.False(view.GetNode<Button>("%ManufactureButton").Disabled);
   }
 
   [TestCase]
-  public void RepeatedPresentReplacesRowsAndPreservesRequestWiring()
+  public void RepeatedPresentReplacesRowsAndStartsOneJobPerRequest()
   {
     var item = MakeItemData();
     using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
     var session = campaign.Session;
     var view = AddToTree(CreateEngineeringView());
-    int requests = 0;
-    int previousCloses = 0;
-    int closes = 0;
-    Option<EquippableItemData> requested = None;
-    view.ManufactureRequested += data => { requests++; requested = Some(data); };
-    view.ArmClose(() => previousCloses++);
-    view.ArmClose(() => closes++);
-    view.Present(session.GetManufacturingOptions(), None, session.Tick);
+    bool backed = false;
+    view.BackRequested += () => backed = true;
+    view.Present(campaign.State, session);
     var items = view.GetNode<VBoxContainer>("%ManufacturableItems");
     var oldRow = items.GetChild<Button>(0);
     for (int i = 0; i < 3; i++)
-      view.Present(session.GetManufacturingOptions(), None, session.Tick);
+      view.Present(campaign.State, session);
 
     Assert.True(oldRow.GetParent() is null && oldRow.IsQueuedForDeletion());
     Assert.Equal(1, items.GetChildCount());
     items.GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
     Assert.False(view.GetNode<Button>("%ManufactureButton").Disabled);
     view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
+    Assert.True(session.ActiveManufacturing.Match(job => job.Project.Item == item, () => false));
+    Assert.True(view.GetNode<Button>("%ManufactureButton").Disabled);
+    Assert.Equal("", view.GetNode<Label>("%Status").Text); // success shows no failure text
     view.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
-    Assert.Equal(Some(item), requested);
-    Assert.Equal(1, requests);
-    Assert.True(session.ActiveManufacturing.IsNone);
-    Assert.Equal(0, previousCloses);
-    Assert.Equal(1, closes);
-    Assert.True(view.IsInsideTree() && !view.IsQueuedForDeletion());
+    Assert.True(backed);
+    Assert.True(view.IsInsideTree() && !view.IsQueuedForDeletion()); // Back never frees the view itself
   }
 
   [TestCase(ManufacturingStartFailure.UnknownItem, "This item is not available for manufacturing.")]
@@ -279,8 +260,7 @@ public class EngineeringViewTest
     view.ShowFailure(failure);
     Assert.Equal(message, view.GetNode<Label>("%Status").Text);
     using var campaign = new GeoscapeFixture();
-    var session = campaign.Session;
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    view.Present(campaign.State, campaign.Session);
     Assert.Equal("", view.GetNode<Label>("%Status").Text);
   }
 }

@@ -5,10 +5,8 @@
 [ext_resource type="PackedScene" uid="uid://useilo010t6y" path="res://scenes/geoscape/GeoscapeHud.tscn" id="2_jn255"]
 [ext_resource type="PackedScene" uid="uid://oo7kshnr865k" path="res://scenes/geoscape/resolutions/GeoscapeEventResolution.tscn" id="3_y8l5f"]
 [ext_resource type="Script" path="res://scenes/geoscape/GeoscapeViewManager.cs" id="4_viewmgr"]
-[ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitRoster.tscn" id="5_roster"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="5_view"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeEventMarker.tscn" id="6_marker"]
-[ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitView.tscn" id="7_unitview"]
-[ext_resource type="PackedScene" path="res://scenes/geoscape/engineering/EngineeringView.tscn" id="9_engineering"]
 
 [node name="GeoscapeScene" type="Control" unique_id=1401687055]
 layout_mode = 3
@@ -19,25 +17,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="GeoscapeHud" parent="." unique_id=1886936763 instance=ExtResource("2_jn255")]
-unique_name_in_owner = true
-
-[node name="Map" type="Control" parent="." unique_id=1111572209]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-script = ExtResource("2")
-EventMarkerScene = ExtResource("6_marker")
-
-[node name="ViewLayer" type="CanvasLayer" parent="."]
-layer = 5
-
-[node name="ViewManager" type="Control" parent="ViewLayer"]
+[node name="ViewManager" type="Control" parent="." node_paths=PackedStringArray("RootView")]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -47,9 +27,36 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("4_viewmgr")
-UnitsView = ExtResource("5_roster")
-UnitView = ExtResource("7_unitview")
-EngineeringView = ExtResource("9_engineering")
+RootView = NodePath("MapView")
+
+[node name="MapView" parent="ViewManager" instance=ExtResource("5_view")]
+layout_mode = 1
+
+[node name="MapViewport" type="SubViewportContainer" parent="ViewManager/MapView"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+stretch = true
+
+[node name="Viewport" type="SubViewport" parent="ViewManager/MapView/MapViewport"]
+transparent_bg = true
+
+[node name="Map" type="Control" parent="ViewManager/MapView/MapViewport/Viewport" unique_id=1111572209]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2")
+EventMarkerScene = ExtResource("6_marker")
+
+[node name="GeoscapeHud" parent="ViewManager/MapView" unique_id=1886936763 instance=ExtResource("2_jn255")]
+unique_name_in_owner = true
 
 [node name="ResolutionLayer" type="CanvasLayer" parent="."]
 layer = 10

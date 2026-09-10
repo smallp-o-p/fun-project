@@ -1,12 +1,21 @@
 [gd_scene format=3 uid="uid://useilo010t6y"]
 
 [ext_resource type="Script" uid="uid://utsd13okho7v" path="res://scenes/geoscape/GeoscapeHud.cs" id="1_7h8wm"]
-
-[node name="GeoscapeHud" type="CanvasLayer" unique_id=1886936763]
+[ext_resource type="PackedScene" uid="uid://dm5w72otw20q2" path="res://scenes/geoscape/units/UnitRoster.tscn" id="2_roster"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/engineering/EngineeringView.tscn" id="3_engineering"]
+[node name="GeoscapeHud" type="Control" unique_id=1886936763]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 script = ExtResource("1_7h8wm")
 
 [node name="TopBar" type="HBoxContainer" parent="." unique_id=931898494]
 unique_name_in_owner = true
+layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_bottom = 31.0
@@ -37,23 +46,29 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "1x"
 
-[node name="UnitsButton" type="Button" parent="TopBar"]
+[node name="ViewButtons" type="HBoxContainer" parent="TopBar" unique_id=650970639]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="UnitsButton" type="Button" parent="TopBar/ViewButtons" unique_id=409197301]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Units"
 
-[node name="EngineeringButton" type="Button" parent="TopBar"]
+[node name="EngineeringButton" type="Button" parent="TopBar/ViewButtons" unique_id=409197302]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Engineering"
 
 [node name="Alerts" type="VBoxContainer" parent="." unique_id=771948312]
 unique_name_in_owner = true
+layout_mode = 1
 anchors_preset = 9
 anchor_bottom = 1.0
 offset_top = 60.0
 
 [node name="Projects" type="PanelContainer" parent="."]
+layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -73,13 +88,16 @@ theme_override_constants/margin_bottom = 12
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="EngineeringProgress" type="Label" parent="Projects/Margin/Status"]
+[node name="EngineeringProgress" type="Label" parent="Projects/Margin/Status" unique_id=1127459340]
 unique_name_in_owner = true
 layout_mode = 2
 text = "No active manufacturing."
 autowrap_mode = 3
 
-[node name="EngineeringNotice" type="Label" parent="Projects/Margin/Status"]
+[node name="EngineeringNotice" type="Label" parent="Projects/Margin/Status" unique_id=1127459341]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
+
+[connection signal="pressed" from="TopBar/ViewButtons/UnitsButton" to="." method="RequestView" binds=[ExtResource("2_roster")]]
+[connection signal="pressed" from="TopBar/ViewButtons/EngineeringButton" to="." method="RequestView" binds=[ExtResource("3_engineering")]]

@@ -1,141 +1,111 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 
-public enum GeoscapeView
-{
-  Map,
-  Units,
-  Unit,
-  Engineering,
-}
-
-// Views receive the ability to request their own closing (armed by the manager on open).
-// The manager is the sole performer of a close — it owns state, events, and freeing — so
-// views ask; they never raise a broadcast and never free themselves.
-public interface IGeoscapeView
-{
-  void ArmClose(Action requestClose);
-}
-
-// Views that want a full-screen backdrop behind their UI implement this. The manager owns
-// the viewport infrastructure and the backdrop lifecycle: it instantiates BackdropScene
-// into its SubViewport on open, frees it on close. The scene can be 3D or 2D — a
-// SubViewport renders either — and never receives input.
-public interface IGeoscapeViewBackdrop
-{
-  PackedScene? BackdropScene { get; }
-}
-
-// Owns which main geoscape view is active and the on-demand view lifecycle (instantiate on
-// open, free on close). This full-rect Control lives under GeoscapeScene's ViewLayer
-// CanvasLayer, so hosted views and backdrops anchor to the viewport independently of the
-// map camera's transform. It passes mouse input through when no view is hosted (authored
-// mouse_filter = ignore). Dumb switching only —
-// no session, no GameState: data presentation is wired by GeoscapeScene through ViewOpened.
-// One main view at a time; modals (the resolution dialog) live elsewhere and are unaffected.
-// It also hosts the view backdrop: one full-rect SubViewport below every view instance,
-// filled from the view's IGeoscapeViewBackdrop declaration on open, emptied on close.
+// Owns the geoscape view stack: which view is visible, and the pushed views' lifecycle.
+// The authored RootView export (the permanent map+HUD view) is installed as the stack
+// bottom in _Ready and can never be popped. Push accepts only fresh, unparented, live
+// GeoscapeView nodes — caller bugs are rejected before the current view is touched.
+// Covered views keep their instance and state but are hidden, processing-disabled, and
+// disconnected from navigation; Pop detaches and frees the top immediately. The manager is
+// fully generic: it knows no concrete view types, scene factories, session, GameState,
+// background rendering, or HUD — data presentation is the composition root's job through
+// ViewChanged, which fires once the stack and tree state are already correct. Pushed views
+// retain their authored layout.
 public sealed partial class GeoscapeViewManager : Control
 {
-  [Export] public PackedScene? UnitsView { get; set; }
-  [Export] public PackedScene? UnitView { get; set; }
-  [Export] public PackedScene? EngineeringView { get; set; }
+  [Export] public GeoscapeView RootView { get; set; } = null!;
 
-  private Control? _activeView;
-  private SubViewportContainer _backdropLayer = null!;
-  private SubViewport _backdropViewport = null!;
+  private readonly Stack<GeoscapeView> _views = new();
 
-  public GeoscapeView Current { get; private set; } = GeoscapeView.Map;
+  public GeoscapeView Current => _views.Peek();
 
-  public event Action<GeoscapeView, Control>? ViewOpened;
-  public event Action<GeoscapeView>? ViewClosed;
+  [Signal] public delegate void ViewChangedEventHandler(GeoscapeView view);
 
-  // Code-built like GeoscapeCameraRig: one full-rect viewport added first, so it draws
-  // behind every view instance. Stretch resizes the viewport to the layer (full-bleed
-  // backdrops); the viewport's default update mode (when visible) means a hidden layer
-  // renders nothing while the map is shown.
+  public override void _EnterTree()
+  {
+    // _Ready fires once, but a removed-and-readded manager adopts its retained stack here.
+    if (_views.Count > 0)
+      SubscribeNavigation(Current);
+  }
+
   public override void _Ready()
   {
-    _backdropLayer = new SubViewportContainer
-    {
-      Name = "Backdrop",
-      Stretch = true,
-      MouseFilter = MouseFilterEnum.Ignore, // backdrops are decorative; they never take input
-      Visible = false,
-    };
-    _backdropLayer.SetAnchorsPreset(LayoutPreset.FullRect);
-    _backdropViewport = new SubViewport
-    {
-      Name = "Viewport",
-      OwnWorld3D = true, // 3D backdrops never pick up an outer world
-    };
-    _backdropLayer.AddChild(_backdropViewport);
-    AddChild(_backdropLayer);
+    if (RootView is null)
+      throw new InvalidOperationException(
+        "GeoscapeViewManager requires RootView; assign its direct child in the inspector.");
+    if (RootView.GetParent() != this)
+      throw new InvalidOperationException(
+        "GeoscapeViewManager RootView must be a direct child of the manager.");
+
+    _views.Push(RootView);
+    SubscribeNavigation(RootView);
   }
 
-  public void Open(GeoscapeView view)
+  public void Push(GeoscapeView view)
   {
-    if (view == Current)
-      return;
+    if (view is null)
+      throw new ArgumentNullException(nameof(view), "Push requires a view.");
+    if (!IsInstanceValid(view) || view.IsQueuedForDeletion())
+      throw new InvalidOperationException("Push requires a live view not queued for deletion.");
+    if (view.GetParent() is not null)
+      throw new InvalidOperationException("Push requires an unparented view.");
+    // A view already on the stack is parented to the manager, so the check above rejects it.
 
-    if (view == GeoscapeView.Map)
-    {
-      Close();
-      return;
-    }
-
-    Close(); // one main view at a time
-
-    PackedScene scene = view switch
-    {
-      GeoscapeView.Units => UnitsView ?? throw new InvalidOperationException(
-        "GeoscapeViewManager requires UnitsView; assign a PackedScene in the inspector."),
-      GeoscapeView.Unit => UnitView ?? throw new InvalidOperationException(
-        "GeoscapeViewManager requires UnitView; assign a PackedScene in the inspector."),
-      GeoscapeView.Engineering => EngineeringView ?? throw new InvalidOperationException(
-        "GeoscapeViewManager requires EngineeringView; assign a PackedScene in the inspector."),
-      _ => throw new ArgumentOutOfRangeException(nameof(view), view, null),
-    };
-
-    var instance = (Control)scene.Instantiate();
-    _activeView = instance;
-    Current = view;
-    AddChild(instance); // the view anchors to this host's viewport-sized rect
-    if (instance is IGeoscapeView armable)
-      armable.ArmClose(Close);
-    if (instance is IGeoscapeViewBackdrop { BackdropScene: { } backdrop })
-    {
-      _backdropViewport.AddChild(backdrop.Instantiate());
-      _backdropLayer.Visible = true;
-    }
-
-    ViewOpened?.Invoke(view, instance);
+    // All caller bugs are rejected above, before the active view is touched.
+    Deactivate(Current);
+    _views.Push(view);
+    AddChild(view);
+    SubscribeNavigation(view);
+    view.Show();
+    view.ProcessMode = ProcessModeEnum.Inherit;
+    EmitSignal(SignalName.ViewChanged, view);
   }
 
-  public void Close()
+  public void Pop()
   {
-    if (_activeView is null)
-      return;
+    if (_views.Count <= 1)
+      return; // the permanent root never pops
 
-    GeoscapeView closing = Current;
-    Current = GeoscapeView.Map;
-    Control view = _activeView;
-    _activeView = null;
+    GeoscapeView removed = _views.Pop();
+    UnsubscribeNavigation(removed);
+    RemoveChild(removed); // detach now: popped views must not linger to frame end
+    removed.QueueFree();
 
-    RemoveChild(view); // detach now: closed views must not linger to frame end
-    view.QueueFree();
-    ClearBackdrop();
-
-    ViewClosed?.Invoke(closing);
+    GeoscapeView prior = Current;
+    SubscribeNavigation(prior);
+    prior.Show();
+    prior.ProcessMode = ProcessModeEnum.Inherit;
+    EmitSignal(SignalName.ViewChanged, prior);
   }
 
-  private void ClearBackdrop()
+  public override void _ExitTree()
   {
-    foreach (Node child in _backdropViewport.GetChildren())
-    {
-      _backdropViewport.RemoveChild(child); // detach now: mirrors the view free
-      child.QueueFree();
-    }
-    _backdropLayer.Visible = false;
+    if (_views.Count > 0)
+      UnsubscribeNavigation(Current);
+  }
+
+  // Only the stack top may navigate: covered and popped senders stay disconnected.
+  private void SubscribeNavigation(GeoscapeView view)
+  {
+    view.ViewRequested += OnViewRequested;
+    view.BackRequested += OnBackRequested;
+  }
+
+  private void UnsubscribeNavigation(GeoscapeView view)
+  {
+    view.ViewRequested -= OnViewRequested;
+    view.BackRequested -= OnBackRequested;
+  }
+
+  private void OnViewRequested(GeoscapeView view) => Push(view);
+
+  private void OnBackRequested() => Pop();
+
+  private void Deactivate(GeoscapeView view)
+  {
+    UnsubscribeNavigation(view);
+    view.Hide();
+    view.ProcessMode = ProcessModeEnum.Disabled;
   }
 }

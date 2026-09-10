@@ -1,30 +1,36 @@
-[gd_scene format=3]
+[gd_scene load_steps=4 format=3]
 
-[ext_resource type="Script" path="res://scenes/geoscape/units/UnitView.cs" id="1_script"]
-[ext_resource type="PackedScene" path="res://scenes/geoscape/units/SkillProgressionView.tscn" id="2_paths"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
+[ext_resource type="Script" path="res://scenes/geoscape/units/UnitView.cs" id="2_script"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/units/SkillProgressionView.tscn" id="3_paths"]
 
-[node name="UnitView" type="PanelContainer"]
+[node name="UnitView" instance=ExtResource("1_base") node_paths=PackedStringArray("BackButton")]
+script = ExtResource("2_script")
+BackButton = NodePath("Content/MarginContainer/VBoxContainer/Header/BackButton")
+SkillProgressionViewScene = ExtResource("3_paths")
+
+[node name="Content" type="PanelContainer" parent="."]
+layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_script")
 
-[node name="MarginContainer" type="MarginContainer" parent="."]
+[node name="MarginContainer" type="MarginContainer" parent="Content"]
 layout_mode = 2
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="Content/MarginContainer"]
 layout_mode = 2
 
-[node name="Header" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+[node name="Header" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer"]
 layout_mode = 2
 
-[node name="Title" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Header"]
+[node name="Title" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Header"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -33,99 +39,96 @@ text = "Unit"
 scroll_active = false
 vertical_alignment = 2
 
-[node name="BackButton" type="Button" parent="MarginContainer/VBoxContainer/Header"]
+[node name="BackButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Header"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
 text = "Back"
 
-[node name="PathsButton" type="Button" parent="MarginContainer/VBoxContainer/Header"]
+[node name="PathsButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Header"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
 text = "Paths"
 
-[node name="Body" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+[node name="Body" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 64
 
-[node name="StatsColumn" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body"]
+[node name="StatsColumn" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="StatsHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+[node name="StatsHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
 layout_mode = 2
 theme_override_font_sizes/normal_font_size = 28
 text = "Stats"
 scroll_active = false
 
-[node name="StatsList" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+[node name="StatsList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="BuffsHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+[node name="BuffsHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
 layout_mode = 2
 theme_override_font_sizes/normal_font_size = 28
 text = "Innate Buffs"
 scroll_active = false
 
-[node name="BuffsList" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+[node name="BuffsList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="ModsHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+[node name="ModsHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
 layout_mode = 2
 theme_override_font_sizes/normal_font_size = 28
 text = "Personal Mods"
 scroll_active = false
 
-[node name="PersonalModSlots" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/StatsColumn"]
+[node name="PersonalModSlots" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="EquipColumn" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body"]
+[node name="EquipColumn" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
-[node name="EquipHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="EquipHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
 layout_mode = 2
 theme_override_font_sizes/normal_font_size = 28
 text = "Equipment"
 scroll_active = false
 
-[node name="WeaponSlot" type="Button" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="WeaponSlot" type="Button" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="WeaponModSlots" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="WeaponModSlots" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="ArmorSlot" type="Button" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="ArmorSlot" type="Button" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="UtilitySlots" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="UtilitySlots" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="ArmoryHeader" type="RichTextLabel" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="ArmoryHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
 layout_mode = 2
 theme_override_font_sizes/normal_font_size = 28
 text = "Armory"
 scroll_active = false
 
-[node name="UnequipButton" type="Button" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="UnequipButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Unequip"
 visible = false
 
-[node name="ArmoryList" type="VBoxContainer" parent="MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="ArmoryList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
 unique_name_in_owner = true
 layout_mode = 2
-
-[node name="SkillProgressionView" parent="." instance=ExtResource("2_paths")]
-visible = false

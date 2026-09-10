@@ -3,15 +3,18 @@ using FunProject.Strategic;
 using Godot;
 using System;
 
-// Authored top bar, left alert list and right project status panel. Pure presentation:
-// state arrives via pushes; requests flow out as C# events routed by the composition root.
-// The completion notice persists until replaced by the next completion.
-public sealed partial class GeoscapeHud : CanvasLayer
+// Authored top bar, left alert list and right project status panel over the permanent map
+// view. A full-rect Control (input-ignoring at the root) so hiding the root view hides
+// every HUD descendant. Pure presentation: state arrives via pushes; requests flow out as
+// C# events and the ViewRequested Godot signal routed by the composition root. Authored
+// ordinary Buttons bind their destination PackedScene directly to RequestView. The HUD
+// has no per-view branches or button discovery. The completion notice persists until
+// replaced by the next completion.
+public sealed partial class GeoscapeHud : Control
 {
   private Label _clockLabel = null!;
   private Button _pauseButton = null!;
   private Button _speedButton = null!;
-  private Button _unitsButton = null!;
   private VBoxContainer _alerts = null!;
   private Label _engineeringProgress = null!;
   private Label _engineeringNotice = null!;
@@ -21,23 +24,37 @@ public sealed partial class GeoscapeHud : CanvasLayer
 
   public event Action<TimeSpeed>? ChangeSpeed;
   public event Action<GeoscapeEvent>? ResolutionRequested;
-  public event Action<GeoscapeView>? ViewRequested;
+
+  [Signal] public delegate void ViewRequestedEventHandler(GeoscapeView view);
 
   public override void _Ready()
   {
     _speedButton = GetNode<Button>("%SpeedButton");
-    _unitsButton = GetNode<Button>("%UnitsButton");
     _pauseButton = GetNode<Button>("%PauseButton");
     _clockLabel = GetNode<Label>("%ClockLabel");
     _alerts = GetNode<VBoxContainer>("%Alerts");
     _engineeringProgress = GetNode<Label>("%EngineeringProgress");
     _engineeringNotice = GetNode<Label>("%EngineeringNotice");
 
-    GetNode<Button>("%EngineeringButton").Pressed += () => ViewRequested?.Invoke(GeoscapeView.Engineering);
     _speedButton.Pressed += UpdateSpeed;
-    _unitsButton.Pressed += () => ViewRequested?.Invoke(GeoscapeView.Units);
     _pauseButton.Toggled += pressed =>
       ChangeSpeed?.Invoke(pressed ? TimeSpeed.Paused : _lastActiveSpeed);
+  }
+
+  // A real Godot signal: any ordinary Button can bind a PackedScene to this method.
+  public void RequestView(PackedScene? scene)
+  {
+    PackedScene target = scene ?? throw new InvalidOperationException(
+      "GeoscapeHud RequestView requires a PackedScene destination.");
+    Node instance = target.Instantiate();
+    if (instance is not GeoscapeView view)
+    {
+      string kind = instance.GetClass();
+      instance.Free();
+      throw new InvalidOperationException(
+        $"GeoscapeHud RequestView destination root must be a GeoscapeView; got {kind}.");
+    }
+    EmitSignal(SignalName.ViewRequested, view);
   }
 
   public void UpdateManufacturing(Option<ManufacturingJob> manufacturing, long tick)

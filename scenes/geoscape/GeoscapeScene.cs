@@ -1,4 +1,3 @@
-using FunProject.Combatants;
 using FunProject.GameState;
 using FunProject.Strategic;
 using CampaignGameState = global::FunProject.GameState.GameState;
@@ -6,8 +5,10 @@ using Godot;
 using System;
 
 // Composition root for the geoscape: builds the campaign GameState from the authored
-// CampaignStartData and the session over it, wires the authored map control (region visuals live in the scene), owns the code-built children,
-// feeds frame deltas to the clock.
+// CampaignStartData and the session over it, wires the authored map control (region
+// visuals live in the scene), owns the code-built camera, feeds frame deltas to the clock,
+// and presents the active view of the stack. The map and HUD form the permanent root view;
+// the manager owns the stack, this scene only routes events and presents.
 public sealed partial class GeoscapeScene : Control
 {
   [Export] public CampaignStartData? Start;
@@ -19,8 +20,6 @@ public sealed partial class GeoscapeScene : Control
   private GeoscapeHud _hud = null!;
   private GeoscapeEventResolution _resolution = null!;
   private GeoscapeViewManager _viewManager = null!;
-  private Combatant? _selectedUnit;
-  private bool _viewOpen;
 
   public override void _Ready()
   {
@@ -32,8 +31,11 @@ public sealed partial class GeoscapeScene : Control
     _map = GetNode<GeoscapeMapControl>("%Map");
     _map.Setup(_session, start.Map.Size);
 
+    // The camera lives inside the map's own SubViewport so its transform never reaches
+    // other screens. Setup runs now: the stretched viewport is sized on tree entry,
+    // before this (parent) _Ready.
     _camera = new GeoscapeCameraRig { Name = "Camera" };
-    AddChild(_camera);
+    _map.GetViewport().AddChild(_camera);
     _camera.Setup(start.Map.Size); // authored map bounds are a presentation concern
 
     _map.RegionClicked += region => GD.Print(region.FlavorText);
@@ -51,62 +53,23 @@ public sealed partial class GeoscapeScene : Control
     _resolution.Resolved += _session.CompleteResolution;
 
     _viewManager = GetNode<GeoscapeViewManager>("%ViewManager");
-    _hud.ViewRequested += _viewManager.Open;
-    _viewManager.ViewOpened += HandleViewOpened;
-    _viewManager.ViewClosed += _ => HandleViewClosed();
+    // HUD buttons produce their views; their requests route through the permanent root so
+    // the manager only ever hears from stack members. ViewChanged presents the active
+    // view; the root is presented once here because the manager's _Ready (and its
+    // install) ran before this subscription existed.
+    _hud.ViewRequested += _viewManager.RootView.RequestView;
+    _viewManager.ViewChanged += view => view.Present(_state, _session);
+    _viewManager.RootView.Present(_state, _session);
   }
 
-  // Full-screen views freeze the clock at the composition root: "the player is browsing"
+  // Covered views freeze the clock at the composition root: "the player is browsing"
   // is presentation, not campaign truth, so the session never learns views exist (the
   // pending-resolution gate stays session-side because THAT is truth). Speed is left
-  // untouched — ticking resumes at the old speed on close.
+  // untouched — ticking resumes at the old speed once the root is active again.
   public override void _PhysicsProcess(double delta)
   {
-    if (!_viewOpen)
+    if (_viewManager.Current == _viewManager.RootView)
       _session.Advance(delta);
-  }
-
-  private void HandleViewOpened(GeoscapeView view, Control instance)
-  {
-    _viewOpen = true;
-    _hud.Visible = false; // the view brings its own header (X2 full-screen screen shape)
-    if (instance is UnitRoster roster)
-    {
-      roster.Present(_state);
-      roster.UnitSelected += OnUnitSelected;
-    }
-    if (instance is UnitView unitView)
-    {
-      // Open arms Close first; ViewOpened fires afterward so this deliberately replaces it with return-to-roster.
-      unitView.ArmClose(() => _viewManager.Open(GeoscapeView.Units)); // Back returns to the roster
-      unitView.Present(_state, _selectedUnit ?? throw new InvalidOperationException(
-        "UnitView opened with no selected combatant."));
-    }
-    if (instance is EngineeringView engineeringView)
-    {
-      PresentEngineering(engineeringView);
-      engineeringView.ManufactureRequested += data =>
-      {
-        var result = _session.StartManufacturing(data);
-        PresentEngineering(engineeringView);
-        result.IfLeft(engineeringView.ShowFailure);
-      };
-    }
-  }
-
-  private void PresentEngineering(EngineeringView view) => view.Present(
-    _session.GetManufacturingOptions(), _session.ActiveManufacturing, _session.Tick);
-
-  private void OnUnitSelected(Combatant unit)
-  {
-    _selectedUnit = unit;
-    _viewManager.Open(GeoscapeView.Unit);
-  }
-
-  private void HandleViewClosed()
-  {
-    _viewOpen = false;
-    _hud.Visible = true;
   }
 
   // The sole session-event router: pushes HUD/map updates from committed events. The map

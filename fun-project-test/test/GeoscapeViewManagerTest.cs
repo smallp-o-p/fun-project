@@ -1,7 +1,9 @@
-using Godot;
-using GdUnit4;
 using System;
 using System.Threading.Tasks;
+using CampaignGameState = global::FunProject.GameState.GameState;
+using FunProject.Strategic;
+using Godot;
+using GdUnit4;
 using static GdUnit4.Assertions;
 using static FunProject.Tests.GeoscapeUiTestFactory;
 
@@ -9,333 +11,391 @@ using static FunProject.Tests.GeoscapeUiTestFactory;
 [RequireGodotRuntime]
 public partial class GeoscapeViewManagerTest
 {
-  // A minimal IGeoscapeView root we can pack into a PackedScene for the UnitsView slot.
-  private sealed partial class FakeView : Control, IGeoscapeView
+  // Minimal stack member with retained local state and a Present counter.
+  private sealed partial class FakeView : GeoscapeView
   {
-    private Action? _requestClose;
+    public string Marker = "";
+    public int Presents;
 
-    public void ArmClose(Action requestClose) => _requestClose = requestClose;
-
-    public void RequestClose() => _requestClose?.Invoke();
+    public override void Present(CampaignGameState state, GeoscapeSession session)
+      => Presents++;
   }
 
-  // An IGeoscapeViewBackdrop root whose declaration is test-controlled: SupplyBackdrop
-  // toggles a non-null BackdropScene, packed lazily at first access (the manager reads it
-  // during Open) so the fake needs no serialized resource graph. The proto scene's root is
-  // named BackdropProto, letting assertions identify the instanced backdrop by hand.
-  private sealed partial class FakeBackdropView : Control, IGeoscapeView, IGeoscapeViewBackdrop
+  private static GeoscapeViewManager BuildManager()
   {
-    [Export] public bool SupplyBackdrop = true;
-
-    private PackedScene? _backdrop;
-    private Action? _requestClose;
-
-    public PackedScene? BackdropScene => SupplyBackdrop ? _backdrop ??= PackBackdrop() : null;
-
-    public void ArmClose(Action requestClose) => _requestClose = requestClose;
-
-    private static PackedScene PackBackdrop() => Pack(new Node3D { Name = "BackdropProto" });
-  }
-
-  private static GeoscapeViewManager BuildManager(bool open)
-  {
-    var scene = Pack(new FakeView());
-    var manager = AutoFree(new GeoscapeViewManager { UnitsView = scene });
-    ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
-
-    if (open)
-      manager.Open(GeoscapeView.Units);
-    return manager;
-  }
-
-  private static GeoscapeViewManager BuildManager(out FakeView liveView)
-  {
-    var manager = BuildManager(open: true);
-    liveView = OnlyChild<FakeView>(manager);
-    return manager;
-  }
-
-  private static GeoscapeViewManager BuildUnitManager()
-  {
-    var scene = Pack(new FakeView());
-    var manager = AutoFree(new GeoscapeViewManager { UnitsView = scene, UnitView = scene });
+    var root = new FakeView { Name = "Root" };
+    var manager = AutoFree(new GeoscapeViewManager { RootView = root });
+    manager.AddChild(root); // the authored shape: RootView is a direct child
     ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
     return manager;
   }
 
-  private static GeoscapeViewManager BuildBackdropManager(bool open = true, bool supplyBackdrop = true)
+  // A code-built manager with no AutoFree: this suite frees it via QueueFree itself.
+  private static GeoscapeViewManager BuildSelfFreeingManager()
   {
-    var scene = Pack(new FakeBackdropView { SupplyBackdrop = supplyBackdrop });
-
-    var manager = AutoFree(new GeoscapeViewManager { UnitsView = scene });
+    var root = new FakeView { Name = "Root" };
+    var manager = new GeoscapeViewManager { RootView = root };
+    manager.AddChild(root);
     ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
-
-    if (open)
-      manager.Open(GeoscapeView.Units);
     return manager;
   }
 
   [TestCase]
-  public async Task VisibleBackdropTracksViewportAcrossCameraChangesAndViewSwaps()
+  public void OpeningAViewHidesTheMapAndHud()
+  {
+    var scene = AddToTree(CreateGeoscapeScene(MakeStart()));
+    var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
+    var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
+
+    hud.GetNode<Button>("%EngineeringButton").EmitSignal(Button.SignalName.Pressed);
+
+    Assert.True(manager.Current is EngineeringView);
+    Assert.False(MapViewport(scene).IsVisibleInTree()); // the covered map viewport stops rendering
+    Assert.False(hud.IsVisibleInTree());
+
+    ((EngineeringView)manager.Current).GetNode<Button>("%BackButton")
+      .EmitSignal(Button.SignalName.Pressed);
+    Assert.True(MapViewport(scene).IsVisibleInTree());
+    Assert.True(hud.IsVisibleInTree());
+    Assert.True(ReferenceEquals(manager.RootView, manager.Current));
+  }
+
+  [TestCase]
+  public void PushShowsOnlyTheTopViewAndDisablesCoveredViews()
+  {
+    var manager = BuildManager();
+    var root = manager.RootView;
+    var a = new FakeView { Name = "A" };
+    var b = new FakeView { Name = "B" };
+
+    manager.Push(a);
+    manager.Push(b);
+
+    Assert.True(ReferenceEquals(b, manager.Current));
+    Assert.True(b.IsVisibleInTree());
+    Assert.Equal(Node.ProcessModeEnum.Inherit, b.ProcessMode);
+    Assert.False(a.IsVisibleInTree());
+    Assert.Equal(Node.ProcessModeEnum.Disabled, a.ProcessMode);
+    Assert.False(root.IsVisibleInTree());
+    Assert.Equal(Node.ProcessModeEnum.Disabled, root.ProcessMode);
+
+    manager.Pop();
+    Assert.True(ReferenceEquals(a, manager.Current));
+    Assert.True(a.IsVisibleInTree());
+    Assert.Equal(Node.ProcessModeEnum.Inherit, a.ProcessMode);
+    Assert.True(b.GetParent() is null && b.IsQueuedForDeletion());
+
+    manager.Pop();
+    Assert.True(ReferenceEquals(root, manager.Current));
+    Assert.True(root.IsVisibleInTree());
+  }
+
+  [TestCase]
+  public void PushPreservesAuthoredLayoutAcrossCoverAndPop()
+  {
+    var manager = BuildManager();
+    var view = new FakeView { Name = "AuthoredLayout" };
+    view.AnchorLeft = 0.2f;
+    view.AnchorTop = 0.3f;
+    view.AnchorRight = 0.8f;
+    view.AnchorBottom = 0.9f;
+    view.OffsetLeft = 11;
+    view.OffsetTop = 13;
+    view.OffsetRight = -17;
+    view.OffsetBottom = -19;
+
+    manager.Push(view);
+    manager.Push(new FakeView { Name = "Cover" });
+    manager.Pop();
+
+    Assert.Equal(0.2f, view.AnchorLeft);
+    Assert.Equal(0.3f, view.AnchorTop);
+    Assert.Equal(0.8f, view.AnchorRight);
+    Assert.Equal(0.9f, view.AnchorBottom);
+    Assert.Equal(11f, view.OffsetLeft);
+    Assert.Equal(13f, view.OffsetTop);
+    Assert.Equal(-17f, view.OffsetRight);
+    Assert.Equal(-19f, view.OffsetBottom);
+  }
+
+  [TestCase]
+  public void BackReturnsToTheSameCoveredInstanceWithRetainedState()
+  {
+    var manager = BuildManager();
+    var a = new FakeView { Name = "A", Marker = "kept" };
+    manager.Push(a);
+    manager.Push(new FakeView { Name = "B" });
+
+    manager.Pop();
+
+    var restored = (FakeView)manager.Current;
+    Assert.True(ReferenceEquals(a, restored));
+    Assert.Equal("kept", restored.Marker);
+  }
+
+  [TestCase]
+  public void BackOnTheRootIsASafeNoOp()
+  {
+    var manager = BuildManager();
+    var root = manager.RootView;
+    int changed = 0;
+    manager.ViewChanged += _ => changed++;
+
+    manager.Pop();
+    root.RequestBack();
+
+    Assert.True(ReferenceEquals(root, manager.Current));
+    Assert.True(root.IsVisibleInTree());
+    Assert.Equal(0, changed);
+  }
+
+  [TestCase]
+  public void AuthoredBackButtonPopsItsViewOnce()
+  {
+    var manager = BuildManager();
+    var button = new Button { Name = "BackButton" };
+    var view = new GeoscapeView { Name = "View", BackButton = button };
+    view.AddChild(button);
+    manager.Push(view);
+    int requests = 0;
+    view.BackRequested += () => requests++;
+
+    button.EmitSignal(BaseButton.SignalName.Pressed);
+
+    Assert.Equal(1, requests);
+    Assert.True(ReferenceEquals(manager.RootView, manager.Current));
+  }
+
+  [TestCase]
+  public void RootWithoutBackButtonIsValid()
+  {
+    var root = new GeoscapeView { Name = "Root" };
+    var manager = AutoFree(new GeoscapeViewManager { RootView = root });
+    manager.AddChild(root);
+    ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
+
+    Assert.True(ReferenceEquals(root, manager.Current));
+  }
+
+  [TestCase]
+  public void InvalidPushesLeaveTheStackUnchanged()
+  {
+    var manager = BuildManager();
+    var a = new FakeView { Name = "A" };
+    manager.Push(a);
+    var b = new FakeView { Name = "B" };
+    manager.Push(b);
+
+    var parented = new FakeView { Name = "Parented" };
+    manager.AddChild(parented); // now owned by the manager, not a fresh view
+    var queued = new FakeView { Name = "Queued" };
+    queued.QueueFree();
+    var freed = new FakeView { Name = "Freed" };
+    freed.Free();
+
+    Assert.Throws<InvalidOperationException>(() => manager.Push(a)); // already stacked (covered)
+    Assert.Throws<InvalidOperationException>(() => manager.Push(b)); // already stacked (current)
+    Assert.Throws<InvalidOperationException>(() => manager.Push(manager.RootView)); // root instance
+    Assert.Throws<InvalidOperationException>(() => manager.Push(parented));
+    Assert.Throws<InvalidOperationException>(() => manager.Push(queued));
+    Assert.Throws<InvalidOperationException>(() => manager.Push(freed));
+    Assert.Throws<ArgumentNullException>(() => manager.Push(null!));
+
+    Assert.True(ReferenceEquals(b, manager.Current));
+    Assert.True(b.IsVisibleInTree());
+    manager.Pop();
+    Assert.True(ReferenceEquals(a, manager.Current));
+    manager.Pop();
+    Assert.True(ReferenceEquals(manager.RootView, manager.Current));
+  }
+
+  [TestCase]
+  public void MissingOrDetachedRootViewIsAnAuthoringError()
+  {
+    var bare = AutoFree(new GeoscapeViewManager());
+    Assert.Throws<InvalidOperationException>(() => bare._Ready());
+
+    var root = AutoFree(new FakeView { Name = "Root" });
+    var detachedRoot = AutoFree(new GeoscapeViewManager { RootView = root });
+    Assert.Throws<InvalidOperationException>(() => detachedRoot._Ready());
+  }
+
+  [TestCase]
+  public async Task ConcreteViewBuildsItsAssignedBackgroundAcrossCoverAndPop()
+  {
+    var manager = BuildManager();
+    var view = CreateEngineeringView(); // real concrete controller, not a fake subclass
+    AddBackdrop(view, new Node3D { Name = "BackdropProto" });
+
+    manager.Push(view);
+
+    var layer = view.GetNode<SubViewportContainer>("Background");
+    Assert.True(layer.IsVisibleInTree());
+    var backgroundViewport = layer.GetNode<SubViewport>("Viewport");
+    Assert.True(backgroundViewport.GetChild(0).Name == "BackdropProto");
+
+    manager.Push(new FakeView { Name = "Cover" });
+    Assert.False(layer.IsVisibleInTree()); // hidden with its covered view, but retained
+    Assert.True(backgroundViewport.GetChild(0).GetParent() is not null);
+
+    manager.Pop();
+    Assert.True(layer.IsVisibleInTree()); // restored on Back without re-instantiation
+
+    manager.Pop(); // the concrete view pops: its background goes with it
+    Assert.True(view.GetParent() is null);
+    Assert.True(view.IsQueuedForDeletion());
+    await WaitForDeferredDeletion(manager.GetTree());
+    Assert.False(GodotObject.IsInstanceValid(view));
+    Assert.False(GodotObject.IsInstanceValid(layer));
+  }
+
+  [TestCase]
+  public void CoveredViewsCannotNavigate()
+  {
+    var manager = BuildManager();
+    var a = new FakeView { Name = "A" };
+    var b = new FakeView { Name = "B" };
+    manager.Push(a);
+    manager.Push(b);
+    var ignored = AutoFree(new FakeView { Name = "C" }); // produced, never hosted
+
+    a.RequestBack();
+    a.RequestView(ignored);
+
+    Assert.True(ReferenceEquals(b, manager.Current));
+    Assert.True(b.IsVisibleInTree());
+    Assert.Equal(3, manager.GetChildCount()); // root + a + b, nothing pushed or popped
+  }
+
+  [TestCase]
+  public async Task PoppedViewsCannotNavigateAndAreInvalidAfterFrame()
+  {
+    var manager = BuildManager();
+    var a = new FakeView { Name = "A" };
+    var b = new FakeView { Name = "B" };
+    manager.Push(a);
+    manager.Push(b);
+    manager.Pop();
+
+    Assert.True(b.GetParent() is null);
+    Assert.True(b.IsQueuedForDeletion());
+    var ignored = AutoFree(new FakeView { Name = "C" }); // produced, never hosted
+    b.RequestBack();
+    b.RequestView(ignored);
+    Assert.True(ReferenceEquals(a, manager.Current));
+
+    await WaitForDeferredDeletion(manager.GetTree());
+    Assert.False(GodotObject.IsInstanceValid(b));
+  }
+
+  [TestCase]
+  public void ExitTreeDisconnectsNavigationUntilReentry()
+  {
+    var manager = BuildManager();
+    var a = new FakeView { Name = "A" };
+    manager.Push(a);
+
+    manager.GetParent()!.RemoveChild(manager);
+    a.RequestBack();
+    Assert.True(ReferenceEquals(a, manager.Current)); // disconnected on exit
+
+    ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
+    a.RequestBack();
+    Assert.True(ReferenceEquals(manager.RootView, manager.Current)); // resubscribed on reentry
+  }
+
+  [TestCase]
+  public async Task DisposalReleasesRetainedViewsAndBackgrounds()
+  {
+    var manager = BuildSelfFreeingManager();
+    var root = (FakeView)manager.RootView;
+    var backgrounded = new FakeView { Name = "Backgrounded" };
+    ConfigureBaseView(backgrounded, null);
+    AddBackdrop(backgrounded, new Node3D { Name = "BackdropProto" });
+    manager.Push(backgrounded);
+    var layer = backgrounded.GetNode<SubViewportContainer>("Background");
+    var tree = (SceneTree)Engine.GetMainLoop();
+
+    manager.QueueFree();
+    Assert.True(manager.IsQueuedForDeletion());
+    await WaitForDeferredDeletion(tree);
+
+    Assert.False(GodotObject.IsInstanceValid(manager));
+    Assert.False(GodotObject.IsInstanceValid(backgrounded));
+    Assert.False(GodotObject.IsInstanceValid(root));
+    Assert.False(GodotObject.IsInstanceValid(layer));
+  }
+
+  [TestCase]
+  public void ViewChangedFiresAfterStackAndTreeStateIsCorrect()
+  {
+    var manager = BuildManager();
+    var a = new FakeView { Name = "A" };
+    var b = new FakeView { Name = "B" };
+    var seen = new System.Collections.Generic.List<GeoscapeView>();
+    var states = new System.Collections.Generic.List<bool>();
+    manager.ViewChanged += view =>
+    {
+      seen.Add(view);
+      states.Add(view.IsInsideTree() && view.Visible && ReferenceEquals(view, manager.Current));
+    };
+
+    manager.Push(a);
+    manager.Push(b);
+    manager.Pop();
+    manager.Pop(); // reactivates the root
+
+    Assert.Equal(4, seen.Count);
+    Assert.True(ReferenceEquals(a, seen[0]));
+    Assert.True(ReferenceEquals(b, seen[1]));
+    Assert.True(ReferenceEquals(a, seen[2]));
+    Assert.True(ReferenceEquals(manager.RootView, seen[3]));
+    foreach (bool correct in states)
+      Assert.True(correct, "ViewChanged must fire after stack and tree state are correct.");
+  }
+
+  [TestCase]
+  public async Task BackgroundTracksTheScreenRegardlessOfMapCameraAndSurvivesCoveringUntilPop()
   {
     var scene = CreateGeoscapeScene(MakeStart());
     var viewport = CreateUiViewport(scene, new Vector2I(1600, 900));
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
-    manager.UnitsView = Pack(new FakeBackdropView());
-    manager.Open(GeoscapeView.Units);
+    var view = new FakeView { Name = "Backgrounded" };
+    ConfigureBaseView(view, null);
+    AddBackdrop(view, new Node3D { Name = "BackdropProto" });
+    view.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+    manager.Push(view);
     await WaitForLayout(scene);
-    var layer = OnlyChild<SubViewportContainer>(manager);
-    var backdropViewport = BackdropViewport(layer);
-    var firstBackdrop = backdropViewport.GetChild(0);
-    Assert.True(layer.Visible);
+    var layer = view.GetNode<SubViewportContainer>("Background");
+    var backgroundViewport = layer.GetNode<SubViewport>("Viewport");
+    Node firstBackdrop = backgroundViewport.GetChild(0);
+    Assert.True(layer.IsVisibleInTree());
     Assert.Equal(new Rect2(0, 0, 1600, 900), ScreenRect(layer));
-    Assert.Equal(new Vector2I(1600, 900), backdropViewport.Size);
+    Assert.Equal(new Vector2I(1600, 900), backgroundViewport.Size);
 
-    var camera = scene.GetNode<GeoscapeCameraRig>("Camera");
+    var camera = MapCamera(scene);
     camera.Position = new Vector2(1234, 567);
     camera.Zoom = new Vector2(2, 2);
     viewport.Size = new Vector2I(800, 600);
     camera.ForceUpdateScroll();
     await WaitForLayout(scene);
     Assert.Equal(new Rect2(0, 0, 800, 600), ScreenRect(layer));
-    Assert.Equal(new Vector2I(800, 600), backdropViewport.Size);
+    Assert.Equal(new Vector2I(800, 600), backgroundViewport.Size);
 
-    manager.Open(GeoscapeView.Engineering); // a view without a backdrop declaration
-    Assert.False(layer.Visible);
-    Assert.True(firstBackdrop.GetParent() is null);
+    manager.Push(new FakeView { Name = "Cover" });
     await WaitForLayout(scene);
-    Assert.False(GodotObject.IsInstanceValid(firstBackdrop));
-    Assert.Equal(0, backdropViewport.GetChildCount());
-    manager.Open(GeoscapeView.Units);
-    await WaitForLayout(scene);
-    Assert.True(layer.Visible);
-    Assert.Equal(1, backdropViewport.GetChildCount());
-    Assert.Equal(new Vector2I(800, 600), backdropViewport.Size);
-    var secondBackdrop = backdropViewport.GetChild(0);
-    manager.Close();
-    await WaitForLayout(scene);
-    Assert.False(layer.Visible);
-    Assert.False(GodotObject.IsInstanceValid(secondBackdrop));
-    Assert.True(scene.GetNode<GeoscapeHud>("%GeoscapeHud").Visible);
-  }
+    Assert.False(layer.IsVisibleInTree()); // hidden with its covered view, but retained
+    Assert.True(firstBackdrop.GetParent() is not null);
 
-  [TestCase]
-  public void OpenProjectCreatesViewAndBackReturnsToMap()
-  {
-    var manager = AddToTree(CreateProjectViewManager());
-    manager.Open(GeoscapeView.Engineering);
-    var view = OnlyChild<EngineeringView>(manager);
-    Assert.True(view.IsInsideTree());
-    Assert.Equal(GeoscapeView.Engineering, manager.Current);
+    manager.Pop();
+    Assert.True(layer.IsVisibleInTree()); // restored on Back without re-instantiation
+    Assert.True(ReferenceEquals(firstBackdrop, backgroundViewport.GetChild(0)));
 
-    view.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
-
-    Assert.Equal(GeoscapeView.Map, manager.Current);
+    manager.Pop(); // the backgrounded view itself pops: background goes with it
     Assert.True(view.GetParent() is null);
-    Assert.True(view.IsQueuedForDeletion());
-  }
-
-  [TestCase]
-  public void MissingProjectSceneThrowsAuthoringException()
-  {
-    var manager = AddToTree(new GeoscapeViewManager());
-    Assert.Throws<InvalidOperationException>(() => manager.Open(GeoscapeView.Engineering));
-  }
-
-  private static bool Hosts<T>(Node parent) where T : Node
-  {
-    foreach (Node child in parent.GetChildren())
-      if (child is T)
-        return true;
-    return false;
-  }
-
-  private static SubViewportContainer? BackdropLayer(GeoscapeViewManager manager)
-  {
-    foreach (Node child in manager.GetChildren())
-      if (child is SubViewportContainer container)
-        return container;
-    return null;
-  }
-
-  private static SubViewport BackdropViewport(SubViewportContainer layer)
-  {
-    foreach (Node child in layer.GetChildren())
-      if (child is SubViewport viewport)
-        return viewport;
-    throw new Exception($"Backdrop layer has no SubViewport child under {layer.Name}.");
-  }
-
-  [TestCase(TestName = "Open(Unit) hosts the UnitView and reports the current view")]
-  public void OpenUnitHostsView()
-  {
-    GeoscapeViewManager manager = BuildUnitManager();
-    GeoscapeView? opened = null;
-    manager.ViewOpened += (view, _) => opened = view;
-
-    manager.Open(GeoscapeView.Unit);
-
-    Assert.Equal(GeoscapeView.Unit, manager.Current);
-    Assert.Equal(GeoscapeView.Unit, opened);
-    Assert.True(manager.GetChildren().AsValueEnumerable().FirstOrDefault(c => c is Control and not GeoscapeViewManager) is not null);
-  }
-
-  [TestCase(TestName = "Open(Unit) closes an open Units view first (one main view at a time)")]
-  public void OpenUnitClosesUnitsFirst()
-  {
-    GeoscapeViewManager manager = BuildUnitManager();
-    manager.Open(GeoscapeView.Units);
-    var closed = new System.Collections.Generic.List<GeoscapeView>();
-    manager.ViewClosed += closed.Add;
-
-    manager.Open(GeoscapeView.Unit);
-
-    Assert.Equal(1, closed.Count);
-    Assert.Equal(GeoscapeView.Units, closed[0]);
-    Assert.Equal(GeoscapeView.Unit, manager.Current);
-  }
-
-  [TestCase(TestName = "Open instantiates the view, sets Current, raises ViewOpened, adds as child")]
-  public void OpenInstantiatesView()
-  {
-    var manager = BuildManager(open: false);
-    GeoscapeView? firedView = null;
-    Control? firedInstance = null;
-    manager.ViewOpened += (v, inst) => { firedView = v; firedInstance = inst; };
-
-    manager.Open(GeoscapeView.Units);
-    var liveView = OnlyChild<FakeView>(manager);
-
-    Assert.Equal(GeoscapeView.Units, manager.Current);
-    Assert.True(liveView.IsInsideTree());
-    Assert.Equal(GeoscapeView.Units, firedView);
-    Assert.True(ReferenceEquals(liveView, firedInstance));
-  }
-
-  [TestCase(TestName = "View invoking its armed close request returns to Map, frees the instance, raises ViewClosed")]
-  public void ArmedRequestClosesView()
-  {
-    var manager = BuildManager(out FakeView view);
-    GeoscapeView? closedWith = null;
-    manager.ViewClosed += v => closedWith = v;
-
-    view.RequestClose();
-
-    Assert.Equal(GeoscapeView.Map, manager.Current);
-    Assert.False(Hosts<FakeView>(manager));
-    Assert.True(view.IsQueuedForDeletion());
-    Assert.Equal(GeoscapeView.Units, closedWith);
-  }
-
-  [TestCase(TestName = "Opening the already-open view is a no-op")]
-  public void ReopenIsNoOp()
-  {
-    var manager = BuildManager(out _);
-    int opened = 0;
-    manager.ViewOpened += (_, _) => opened++;
-
-    manager.Open(GeoscapeView.Units);
-
-    Assert.Equal(0, opened);
-    Assert.True(Hosts<FakeView>(manager));
-  }
-
-  [TestCase(TestName = "Open without an assigned scene throws (caller bug)")]
-  public void MissingSceneThrows()
-  {
-    var manager = AutoFree(new GeoscapeViewManager());
-    ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
-
-    Assert.Throws<System.InvalidOperationException>(() => manager.Open(GeoscapeView.Units));
-  }
-
-  [TestCase(TestName = "Closing and reopening yields a fresh instance")]
-  public void ReopenAfterCloseIsFresh()
-  {
-    var manager = BuildManager(out FakeView first);
-    manager.Close();
-
-    manager.Open(GeoscapeView.Units);
-    var second = OnlyChild<FakeView>(manager);
-
-    Assert.True(!ReferenceEquals(first, second));
-  }
-
-  [TestCase(TestName = "Open(Map) closes the active view")]
-  public void OpenMapCloses()
-  {
-    var manager = BuildManager(out FakeView view);
-
-    manager.Open(GeoscapeView.Map);
-
-    Assert.Equal(GeoscapeView.Map, manager.Current);
-    Assert.False(Hosts<FakeView>(manager));
-    Assert.True(view.IsQueuedForDeletion());
-  }
-
-  [TestCase(TestName = "Open with a backdrop-declaring view shows the layer with the backdrop instanced in its SubViewport")]
-  public void BackdropShownOnOpen()
-  {
-    var manager = BuildBackdropManager();
-
-    SubViewportContainer? layer = BackdropLayer(manager);
-    Assert.True(layer is not null, "Manager should host a SubViewportContainer backdrop layer.");
-    Assert.True(layer!.Visible, "Backdrop layer should be visible while a backdrop view is open.");
-
-    SubViewport viewport = BackdropViewport(layer);
-    Assert.Equal(1, viewport.GetChildCount());
-    Assert.True(viewport.GetChild(0).Name == "BackdropProto");
-  }
-
-  [TestCase(TestName = "A view without IGeoscapeViewBackdrop leaves the layer hidden and empty")]
-  public void NoInterfaceLeavesLayerHidden()
-  {
-    var manager = BuildManager(open: true);
-
-    SubViewportContainer? layer = BackdropLayer(manager);
-    Assert.True(layer is not null, "Manager should host a SubViewportContainer backdrop layer.");
-    Assert.False(layer!.Visible);
-    Assert.Equal(0, BackdropViewport(layer).GetChildCount());
-  }
-
-  [TestCase(TestName = "A null BackdropScene is treated as no backdrop")]
-  public void NullBackdropSceneTreatedAsNone()
-  {
-    var manager = BuildBackdropManager(supplyBackdrop: false);
-    SubViewportContainer layer = BackdropLayer(manager)!;
-
-    Assert.False(layer.Visible);
-    Assert.Equal(0, BackdropViewport(layer).GetChildCount());
-  }
-
-  [TestCase(TestName = "Close frees the backdrop instance and hides the layer")]
-  public void CloseFreesBackdrop()
-  {
-    var manager = BuildBackdropManager();
-    SubViewportContainer layer = BackdropLayer(manager)!;
-    Node backdrop = BackdropViewport(layer).GetChild(0);
-
-    manager.Close();
-
-    Assert.False(layer.Visible);
-    Assert.Equal(0, BackdropViewport(layer).GetChildCount());
-    Assert.True(backdrop.IsQueuedForDeletion());
-  }
-
-  [TestCase(TestName = "Reopening after close shows a fresh backdrop, not a second one")]
-  public void ReopenYieldsFreshBackdrop()
-  {
-    var manager = BuildBackdropManager();
-    SubViewportContainer layer = BackdropLayer(manager)!;
-    Node first = BackdropViewport(layer).GetChild(0);
-    manager.Close();
-
-    manager.Open(GeoscapeView.Units);
-    SubViewport viewport = BackdropViewport(layer);
-
-    Assert.True(layer.Visible);
-    Assert.Equal(1, viewport.GetChildCount());
-    Assert.True(!ReferenceEquals(first, viewport.GetChild(0)));
-    Assert.True(first.IsQueuedForDeletion());
+    await WaitForLayout(scene);
+    Assert.False(GodotObject.IsInstanceValid(view));
+    Assert.False(GodotObject.IsInstanceValid(firstBackdrop));
+    Assert.True(MapViewport(scene).IsVisibleInTree());
   }
 }
