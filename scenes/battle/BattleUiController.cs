@@ -5,8 +5,10 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
-// Presentation-side UI state machine (pure C#, no Godot beyond Vector3I). Owns selection, the
-// verb options cache, and the targeting sub-states. Two transition sources, and only two:
+// Presentation-side UI state machine (pure C#, no Godot beyond Vector3I). Owns selection and
+// targeting sub-states. The runtime cache owns per-unit option identity; the UI memoizes presentation
+// adapters against the runtime's returned lists so the two can never disagree. Two transition sources,
+// and only two:
 // (1) non-submission intents (select, cancel, begin targeting) run inside the intent method;
 // (2) every submission-caused transition lives in OnActionResult, the runtime's ActionCompleted
 // signal handler — the FSM reacts identically no matter which actor submitted (player, stub, AI).
@@ -23,7 +25,7 @@ public sealed class BattleUiController : IDisposable
 
   private UiState _state = UiState.Unselected;
   private Option<BattleUnitState> _selected;
-  private readonly Dictionary<BattleUnitState, IReadOnlyList<UnitActionOption>> _optionsByUnit = [];
+  private readonly Dictionary<IReadOnlyList<UnitAction>, IReadOnlyList<UnitActionOption>> _optionsByList = [];
   private IReadOnlyList<UnitActionOption> _options = [];
   private Option<IActionTargeting> _targeter;
   private Option<Vector3I> _pendingTarget;
@@ -74,7 +76,7 @@ public sealed class BattleUiController : IDisposable
   public void Dispose()
   {
     _runtime.ActionCompleted -= OnActionResult;
-    _optionsByUnit.Clear();
+    _optionsByList.Clear();
     _options = [];
     _selected = None;
     ResetTargeting();
@@ -276,17 +278,17 @@ public sealed class BattleUiController : IDisposable
   {
     // Mint the aliveness proof at the query door; a dead selected unit yields empty options.
     _options = _selected.Bind(_runtime.TryGetAlive).Match(
-      Some: GetOrBuildOptions,
+      Some: alive => GetOrBuildOptions(_runtime.Query(new GetAvailableActionsForUnit(alive))),
       None: []);
   }
 
-  private IReadOnlyList<UnitActionOption> GetOrBuildOptions(AliveUnit unit)
+  private IReadOnlyList<UnitActionOption> GetOrBuildOptions(IReadOnlyList<UnitAction> actions)
   {
-    if (_optionsByUnit.TryGetValue(unit.State, out IReadOnlyList<UnitActionOption>? options))
+    if (_optionsByList.TryGetValue(actions, out var options))
       return options;
 
-    options = BuildOptions(_runtime.Query(new GetAvailableActionsForUnit(unit)));
-    _optionsByUnit.Add(unit.State, options);
+    options = BuildOptions(actions);
+    _optionsByList.Add(actions, options);
     return options;
   }
 
