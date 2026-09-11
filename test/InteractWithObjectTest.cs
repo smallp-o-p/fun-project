@@ -2,6 +2,7 @@ using FunProject.Battle;
 using GdUnit4;
 using Godot;
 using System;
+using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -39,6 +40,52 @@ public class InteractWithObjectTest
     Assert.Equal(unit, @event.Actor);
     Assert.Equal(bomb, @event.Object);
     Assert.Equal(point, @event.Position);
+  }
+
+  [TestCase(TestName = "Interaction spending the actor's last AP refreshes retained actions only for that actor")]
+  public void InteractionSpendingLastActionPointRefreshesActorOptions()
+  {
+    var weapon = TestData.MakeWeapon("Rifle");
+    using var battle = BattleFixture.Duel(
+      player: new("Alpha", ActionPoints: 2, Weapon: weapon),
+      enemy: new("Hostile"),
+      start: false);
+    BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(5, 0, 1));
+    BattleActionExecResult placement = battle.Submit(
+      BattleAction.PlaceObject(MakeInteractiveObjectData(actionPointCost: 2), point));
+    BattleObjectState bomb = placement.EventsThatOccurred.ToArray()
+      .SingleEvent<ObjectPlacedBattleEvent>().Object;
+    battle.Start();
+
+    IReadOnlyList<UnitAction> playerActions = battle.Query(
+      new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
+    IReadOnlyList<UnitAction> enemyActions = battle.Query(
+      new GetAvailableActionsForUnit(battle.Alive(battle.EnemyUnit)));
+    foreach (UnitAction action in playerActions)
+      _ = action.IsAvailable;
+    foreach (UnitAction action in enemyActions)
+      _ = action.IsAvailable;
+    int turnNumber = battle.Session.TurnNumber;
+
+    battle.Interact(battle.PlayerUnit, bomb);
+
+    Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
+    Assert.Equal(BattlePhase.InProgress, battle.Query(new GetBattlePhaseQuery()));
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
+    Assert.Equal(turnNumber, battle.Session.TurnNumber);
+    Assert.False(playerActions.AsValueEnumerable()
+      .Single(action => action.Action is MoveActionDefinition).IsAvailable);
+    Assert.False(playerActions.AsValueEnumerable()
+      .Single(action => action.Action is AttackActionDefinition).IsAvailable);
+    Assert.False(playerActions.AsValueEnumerable()
+      .Single(action => action.Action is PassActionDefinition).IsAvailable);
+    Assert.True(playerActions.AsValueEnumerable()
+      .Single(action => action.Action is EndTurnActionDefinition).IsAvailable);
+    Assert.True(enemyActions.AsValueEnumerable().All(action => !action.IsDirty));
+    Assert.True(ReferenceEquals(playerActions, battle.Query(
+      new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)))));
+    Assert.True(ReferenceEquals(enemyActions, battle.Query(
+      new GetAvailableActionsForUnit(battle.Alive(battle.EnemyUnit)))));
   }
 
   [TestCase(TestName = "Insufficient action points throw before object mutation")]

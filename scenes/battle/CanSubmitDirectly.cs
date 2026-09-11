@@ -2,5 +2,5 @@ using FunProject.Battle;
 
 interface CanActDirectly
 {
-  public BattleAction MakeAction();
+  public BattleAction MakeAction(BattleRuntime runtime);
 };

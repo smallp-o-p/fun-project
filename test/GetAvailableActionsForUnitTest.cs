@@ -88,8 +88,8 @@ public class GetAvailableActionsForUnitTest
     Assert.True(actions.AsValueEnumerable().All(action => !action.IsAvailable));
   }
 
-  [TestCase(TestName = "Boxed-in unit: Move unavailable")]
-  public void BoxedInMoveUnavailable()
+  [TestCase(TestName = "Boxed-in unit: Move available with no reachable destinations")]
+  public void BoxedInMoveAvailableWithoutDestinations()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -102,7 +102,8 @@ public class GetAvailableActionsForUnitTest
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
 
     var move = Row<MoveActionDefinition>(battle.Query(new GetAvailableActionsForUnit(hero)));
-    Assert.False(move.IsAvailable);
+    Assert.True(move.IsAvailable);
+    Assert.Equal(0, battle.Query(new GetPossibleMoveTilesForUnit(hero)).Count);
   }
 
   [TestCase(TestName = "Out-of-AP unit: only EndTurn is available")]
@@ -159,13 +160,13 @@ public class GetAvailableActionsForUnitTest
     Assert.True(path.AsValueEnumerable().Select(point => point.Raw).SequenceEqual(expected));
   }
 
-  [TestCase(TestName = "A walkable tile directly above counts as an open neighbor for Move")]
-  public void VerticalNeighborKeepsMoveAvailable()
+  [TestCase(TestName = "A walkable tile directly above is reachable for Move")]
+  public void VerticalNeighborIsReachable()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
     // 2x2x1 board. Hero's only horizontal neighbor is walled off; the tile directly above is
-    // open — the same vertical adjacency the pathfinder connects, so Move must stay available.
+    // open — the same vertical adjacency the pathfinder connects, so it must be reachable.
     var board = new BattleBoardState(new Vector3I(2, 2, 1));
     board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(), false);
     using var battle = BattleFixture.Started(board,
@@ -173,6 +174,7 @@ public class GetAvailableActionsForUnitTest
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Goon", enemy)), new Vector3I(1, 1, 0)));
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
 
-    Assert.True(Row<MoveActionDefinition>(battle.Query(new GetAvailableActionsForUnit(hero))).IsAvailable);
+    var reachable = battle.Query(new GetPossibleMoveTilesForUnit(hero));
+    Assert.True(reachable.AsValueEnumerable().Select(point => point.Raw).Contains(new Vector3I(0, 1, 0)));
   }
 }

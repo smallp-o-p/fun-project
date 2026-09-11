@@ -100,8 +100,8 @@ public sealed class InteractWithObject(AliveUnit unit, LiveObject obj) : BattleA
 }
 
 // Target feasibility (weapon/self/ally/liveness/visibility/range) resolves once through
-// AttackContext.Resolve — the gate shared with GetHitChanceForAttack and
-// HasAttackableTargetCondition — so the write side can never drift from the preview.
+// AttackContext.Resolve — the gate shared with GetHitChanceForAttack — so the write side
+// can never drift from the preview.
 // A feasibility miss interrupts the action silently rather than rejecting: interrupts
 // interleave inside one submission, so a target can die, move out of range/sight, or the
 // magazine can be spent by an earlier interrupt after this action was constructed — a

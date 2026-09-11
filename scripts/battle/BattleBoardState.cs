@@ -259,24 +259,6 @@ public sealed class BattleBoardState
     new(-1, 0, 0), new(1, 0, 0), new(0, 0, -1), new(0, 0, 1), new(0, -1, 0), new(0, 1, 0),
   ];
 
-  /// <summary>
-  /// True when any adjacent tile (the same neighborhood the path search walks) can be
-  /// occupied right now — the cheap no-search proxy for "some move exists".
-  /// </summary>
-  public bool HasOccupiableNeighbor(ValidatedPoint point)
-  {
-    foreach (Vector3I direction in OrthogonalDirections)
-    {
-      bool occupiable = ValidatePoint(point.Raw + direction).Match(
-        Some: CanOccupy,
-        None: () => false);
-      if (occupiable)
-        return true;
-    }
-
-    return false;
-  }
-
   public static int GetGridDistance(Vector3I source, Vector3I destination)
   {
     var delta = source - destination;

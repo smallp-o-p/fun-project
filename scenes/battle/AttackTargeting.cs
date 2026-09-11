@@ -5,9 +5,9 @@ using System;
 using System.Collections.Generic;
 
 // Enemy-target targeting: candidate tiles are visible enemies within weapon range; preview is the
-// hit-chance breakdown for the enemy under the cursor; commit attacks that enemy. Availability of the
-// Attack verb (a target exists) and its candidate set are both derived from this same enemy-in-range
-// computation, so they cannot disagree.
+// hit-chance breakdown for the enemy under the cursor; commit attacks that enemy. The candidate
+// set may be empty — Attack availability is independent of target discovery, so an otherwise
+// usable Attack option stays enabled while targeting finds nothing to hit.
 public sealed class AttackTargeting : IActionTargeting
 {
   private readonly BattleRuntime _runtime;

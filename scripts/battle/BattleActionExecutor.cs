@@ -40,6 +40,7 @@ public sealed class BattleActionExecutor : IDisposable
   {
     ArgumentNullException.ThrowIfNull(session);
     _session = session;
+    _session.ActionOptions.InvalidateAll();
     _session.BattleEventCommitted += OnEventCommitted;
 
     // Status effects and armor regen run before conscious stun recovery at turn end.
@@ -93,6 +94,7 @@ public sealed class BattleActionExecutor : IDisposable
   {
     int logStart = _eventLog.Count;
     _pendingActions.Push(action);
+    _session.ActionOptions.BeginExecution();
 
     try
     {
@@ -143,12 +145,14 @@ public sealed class BattleActionExecutor : IDisposable
       // A failed submission is fully unwound: nothing queued stays executable, so a later
       // Submit starts from a clean slate instead of resuming stale work.
       _pendingActions.Clear();
+      _session.ActionOptions.InvalidateAll();
       throw;
     }
     finally
     {
       _inFlightAction = None;
       _capturedInterrupts.Clear();
+      _session.ActionOptions.EndExecution();
     }
 
     return new BattleActionExecResult(action, _eventLog, logStart, _eventLog.Count - logStart);
