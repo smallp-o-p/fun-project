@@ -6,6 +6,7 @@
 addons/**/*
 handoffs/*
 test/TestResults/
+/TestResults/
 fun-project-test/TestResults/
 gdunit4_testadapter_v5/**/*
 fun-project-test/gdunit4_testadapter_v5/

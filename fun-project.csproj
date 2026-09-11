@@ -6,13 +6,36 @@
     <RootNamespace>funproject</RootNamespace>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <!-- Development-only test hosting. Export configurations compile no test sources
+         and reference no test packages, so exports ship without the GdUnit/VSTest stack. -->
+    <IsTestProject>true</IsTestProject>
+    <TestFramework>GdUnit4</TestFramework>
+    <IsPackable>false</IsPackable>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory).runsettings</RunSettingsFilePath>
+  </PropertyGroup>
   <ItemGroup>
+    <!-- Root bin/obj strays never compile in; DefaultItemExcludes here covers only
+         the .godot/mono/temp outputs. -->
+    <Compile Remove="bin\**\*.cs" />
+    <Compile Remove="obj\**\*.cs" />
     <Compile Remove="scenes\DemoBattle*.cs" />
-    <Compile Remove="gdunit4_testadapter_v5\**\*.cs" />
     <Compile Remove="fun-project-test\**\*.cs" />
+    <!-- The GdUnit adapter extracts its runner scene into gdunit4_testadapter_v5/ at test
+         time; it must compile into this assembly for development runs but never into exports. -->
+    <Compile Remove="gdunit4_testadapter_v5\**\*.cs" Condition="'$(Configuration)' != 'Debug'" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+    <Compile Remove="test\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="LanguageExt.Core" Version="5.0.0-beta-77" />
     <PackageReference Include="ZLinq" Version="1.5.6" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="gdUnit4.api" Version="5.0.0" />
+    <PackageReference Include="gdUnit4.test.adapter" Version="3.0.0" />
   </ItemGroup>
 </Project>

@@ -2,12 +2,13 @@ using FunProject.Combatants;
 using Godot;
 using System;
 
-// NOTE: this file deliberately lives in the MAIN project (not fun-project-test) even though it
-// exists only for content testing. The GdUnit4 suite runs inside the fun-project-test Godot
-// project, whose res:// root cannot see main-project .tres resources; BombDefusalContentTest
-// therefore spawns `godot --headless --path <main root> --script res://tests/...` as a
-// subprocess. A C# --script run resolves its class from the host project's compiled assembly,
-// so this probe must be part of fun-project's compilation — a folder here, never in scripts/.
+// NOTE: this file deliberately lives in the MAIN project (under tests/) even though it
+// exists only for content testing. BombDefusalContentTest spawns `godot --headless
+// --path <this project> --script res://tests/...` as a separate process because the probe
+// installs a SceneTree main loop, which cannot run inside the test runtime's own
+// SceneTree. A C# --script run resolves its class from the host project's compiled
+// assembly, so this probe must be part of fun-project's compilation — a folder here,
+// never in scripts/.
 
 namespace FunProject.Battle;
 

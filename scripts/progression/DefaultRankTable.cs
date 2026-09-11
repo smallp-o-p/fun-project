@@ -3,10 +3,10 @@ using Godot;
 
 namespace FunProject.Progression;
 
-// The shared rank ladder for combatants without an authored bespoke table: loads
-// resources/ranks.tres once and caches it (same pattern as SkillPathCatalog). Test data
-// carries its own ladder (see TestData.MakeRankTable) — the test project's separate
-// res:// root has no resources/ directory, so the default load must throw there.
+// The shared authored rank ladder for combatants without a bespoke table: loads
+// resources/ranks.tres once and caches it (same pattern as SkillPathCatalog). Authors
+// give a combatant its own RankTable when it needs a custom ladder; everything else
+// resolves through this shared default.
 public static class DefaultRankTable
 {
   private static RankTableData? _table;

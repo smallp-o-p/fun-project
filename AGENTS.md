@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Godot 4.6.2 (mono) C# tactical skirmish game targeting .NET 10. X-COM-inspired; reference material in `.openxcom-research/`, design notes in `docs/`.
+Godot 4.7.2 (mono) C# tactical skirmish game targeting .NET 10. X-COM-inspired; reference material in `.openxcom-research/`, design notes in `docs/`.
 
 ## Working approach
 
@@ -18,19 +18,19 @@ For library, framework, SDK, API, CLI, or cloud-service behavior, resolve the li
 
 ```sh
 dotnet build                                                     # build
-dotnet test fun-project-test\fun-project-test.csproj --no-restore  # tests
+dotnet test fun-project.csproj --no-restore                     # tests (Debug only)
 dotnet test fun-project.sln --no-restore                         # solution-level
-dotnet test fun-project-test\fun-project-test.csproj --filter "FullyQualifiedName~WeaponSystemTest"  # one test class
+dotnet test fun-project.csproj --filter "FullyQualifiedName~WeaponSystemTest"  # one test class
 ```
 
 Open `project.godot` in the Godot editor for scene/resource editing and playtesting; while it runs, do all scene and editor work through the `godot-ai` MCP server (see *Godot scene and editor work* below).
 
 ### Testing
-- For code changes, run `dotnet format`, build, and run tests covering the affected behavior. Use the full test project for shared runtime, executor, hook-ordering, or cross-subsystem changes. Broaden or repeat checks when changes, failures, or unresolved concerns justify it.
+- For code changes, run `dotnet format`, build, and run tests covering the affected behavior. Use the full suite (`dotnet test fun-project.csproj --no-restore`) for shared runtime, executor, hook-ordering, or cross-subsystem changes. Broaden or repeat checks when changes, failures, or unresolved concerns justify it.
 - Add regression tests for meaningful behavior changes using the shared helpers. Documentation-only and Codex-configuration changes need diff, link, and configuration checks; they do not require game tests or formatting.
-- **GdUnit4** tests run *inside* a Godot runtime (not xUnit/NUnit); require `GODOT_BIN` → Godot mono binary, hardcoded in `.runsettings` (`C:\Program Files\Godot_v4.6.2-stable_mono_win64\...`; update if Godot moves — tests fail to launch otherwise). `.runsettings` is auto-picked-up (2 CPUs, no HTML logger).
-- Tests live in the separate `fun-project-test` project (`fun-project-test/test/`; the main csproj excludes test C#, the gdUnit adapter, and `scenes/DemoBattle*.cs` from compilation). Use shared helpers in `fun-project-test/test/helpers/` — never ad-hoc setup.
-- Shared test support lives in `fun-project-test/test/helpers/`: `TestData` builds authored/runtime data, `BattleFixture` and `GeoscapeFixture` own per-test simulations, and `Assert` supplies assertions/extraction/extensions.
+- **GdUnit4** tests run *inside* a Godot runtime (not xUnit/NUnit); require `GODOT_BIN` → Godot mono binary, hardcoded in `.runsettings` (`C:\Program Files\Godot_v4.7.2-stable_mono_win64\...`; update if Godot moves — tests fail to launch otherwise). `.runsettings` is auto-picked-up (2 CPUs, no HTML logger).
+- Tests live in the root `test/` directory and compile into `fun-project.csproj` **only in Debug** (development) configuration; export configurations exclude `test/` sources and all test NuGet packages from the exported assembly. The csproj always excludes the retired `fun-project-test/` leftovers (ignored caches behind a `.gdignore`) and `scenes/DemoBattle*.cs`; the gdUnit generated test runner (`gdunit4_testadapter_v5/`) compiles into the Debug assembly and is excluded from export configurations. Use shared helpers in `test/helpers/` — never ad-hoc setup.
+- Shared test support lives in `test/helpers/`: `TestData` builds authored/runtime data, `BattleFixture` and `GeoscapeFixture` own per-test simulations, and `Assert` supplies assertions/extraction/extensions.
 - Use `using var` for fixtures. `BattleFixture.Runtime` owns the session's sole executor; fixture operations reuse it. Use fixture `Alive`/`At` methods for fresh proofs and raw `Submit` for tests of explicit/stale actions.
 - Fixture event capture begins before setup. Use `ClearEvents()` explicitly to start an assertion window; actions and start methods do not reset it.
 - Direct factory/constructor/lifecycle tests retain and dispose their subject directly. Do not create a second live executor for a fixture session.
