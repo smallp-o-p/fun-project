@@ -61,6 +61,7 @@ public sealed class BattleSession
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibilityAffectedUnits = [];
 
   public BattleBoardState Board { get; }
+  internal UnitActionCache ActionOptions { get; }
   public BattlePhase Phase { get; private set; } = BattlePhase.Setup;
   public int TurnNumber { get; private set; } = 1;
   public Faction ActiveSide => _scheduler.ActiveSide;
@@ -130,6 +131,7 @@ public sealed class BattleSession
     Board = board;
     PlayerFaction = playerFaction;
     _scheduler = new TurnScheduler(HasConsciousUnits, GetFactionConsciousUnits);
+    ActionOptions = new UnitActionCache(this);
 
     foreach (var faction in globalFactionOrder)
     {
@@ -630,6 +632,7 @@ public sealed class BattleSession
         // first-time spottings, before this event is broadcast (preserves the mid-move guarantee).
         RefreshVisibilityAndQueueSpottings();
 
+        ActionOptions.Invalidate(battleEvent);
         BattleEventCommitted?.Invoke(battleEvent);
       }
     }

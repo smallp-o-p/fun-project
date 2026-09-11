@@ -5,8 +5,10 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
-// Presentation-side UI state machine (pure C#, no Godot beyond Vector3I). Owns selection, the
-// verb options cache, and the targeting sub-states. Two transition sources, and only two:
+// Presentation-side UI state machine (pure C#, no Godot beyond Vector3I). Owns selection and
+// targeting sub-states. The runtime cache owns per-unit option identity; the UI memoizes presentation
+// adapters against the runtime's returned lists so the two can never disagree. Two transition sources,
+// and only two:
 // (1) non-submission intents (select, cancel, begin targeting) run inside the intent method;
 // (2) every submission-caused transition lives in OnActionResult, the runtime's ActionCompleted
 // signal handler — the FSM reacts identically no matter which actor submitted (player, stub, AI).
@@ -23,6 +25,7 @@ public sealed class BattleUiController : IDisposable
 
   private UiState _state = UiState.Unselected;
   private Option<BattleUnitState> _selected;
+  private readonly Dictionary<IReadOnlyList<UnitAction>, IReadOnlyList<UnitActionOption>> _optionsByList = [];
   private IReadOnlyList<UnitActionOption> _options = [];
   private Option<IActionTargeting> _targeter;
   private Option<Vector3I> _pendingTarget;
@@ -70,7 +73,14 @@ public sealed class BattleUiController : IDisposable
   public IReadOnlyCollection<Vector3I> CandidateCells =>
     _targeter.Match(handler => handler.Candidates, () => System.Array.Empty<Vector3I>());
 
-  public void Dispose() => _runtime.ActionCompleted -= OnActionResult;
+  public void Dispose()
+  {
+    _runtime.ActionCompleted -= OnActionResult;
+    _optionsByList.Clear();
+    _options = [];
+    _selected = None;
+    ResetTargeting();
+  }
 
   public bool TrySelectAt(Vector3I tile)
   {
@@ -123,6 +133,8 @@ public sealed class BattleUiController : IDisposable
     ArgumentNullException.ThrowIfNull(option);
     if (Gate != InputGate.Open || _state != UiState.UnitSelected)
       return;
+    if (!_selected.Contains(option.Unit) || !option.IsAvailable)
+      return;
 
     switch (option)
     {
@@ -136,7 +148,7 @@ public sealed class BattleUiController : IDisposable
         break;
       case CanActDirectly instant:
         // OnActionResult (via the signal) refreshes options synchronously.
-        _runtime.ExecuteAction(instant.MakeAction());
+        _runtime.ExecuteAction(instant.MakeAction(_runtime));
         break;
       default:
         throw new InvalidOperationException($"Unhandled action option {option.GetType().Name}.");
@@ -266,21 +278,30 @@ public sealed class BattleUiController : IDisposable
   {
     // Mint the aliveness proof at the query door; a dead selected unit yields empty options.
     _options = _selected.Bind(_runtime.TryGetAlive).Match(
-      Some: proof => BuildOptions(proof, _runtime.Query(new GetAvailableActionsForUnit(proof))),
+      Some: alive => GetOrBuildOptions(_runtime.Query(new GetAvailableActionsForUnit(alive))),
       None: []);
   }
 
-  private static IReadOnlyList<UnitActionOption> BuildOptions(
-    AliveUnit unit, IReadOnlyList<UnitAction> actions) =>
-    actions.AsValueEnumerable().Select(action => MakeOption(unit, action)).ToList();
-
-  private static UnitActionOption MakeOption(AliveUnit unit, UnitAction action) => action.Action switch
+  private IReadOnlyList<UnitActionOption> GetOrBuildOptions(IReadOnlyList<UnitAction> actions)
   {
-    MoveActionDefinition => new MoveActionOption(unit, action.IsAvailable),
-    AttackActionDefinition => new AttackActionOption(unit, RequireWeapon(unit.State), action.IsAvailable),
-    ReloadActionDefinition => new ReloadActionOption(unit, action.IsAvailable),
-    PassActionDefinition => new PassActionOption(unit, action.IsAvailable),
-    EndTurnActionDefinition => new EndTurnActionOption(unit, action.IsAvailable),
+    if (_optionsByList.TryGetValue(actions, out var options))
+      return options;
+
+    options = BuildOptions(actions);
+    _optionsByList.Add(actions, options);
+    return options;
+  }
+
+  private static IReadOnlyList<UnitActionOption> BuildOptions(IReadOnlyList<UnitAction> actions) =>
+    actions.AsValueEnumerable().Select(MakeOption).ToList().AsReadOnly();
+
+  private static UnitActionOption MakeOption(UnitAction action) => action.Action switch
+  {
+    MoveActionDefinition => new MoveActionOption(action),
+    AttackActionDefinition => new AttackActionOption(action, RequireWeapon(action.Unit)),
+    ReloadActionDefinition => new ReloadActionOption(action),
+    PassActionDefinition => new PassActionOption(action),
+    EndTurnActionDefinition => new EndTurnActionOption(action),
     _ => throw new InvalidOperationException($"No presentation option for {action.Action.GetType().Name}."),
   };
 

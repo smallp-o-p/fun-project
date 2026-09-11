@@ -2,6 +2,7 @@ using FunProject.Battle;
 using FunProject.Weapons;
 using GdUnit4;
 using System;
+using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -23,6 +24,61 @@ public sealed partial class BattleUiControllerTest
     Assert.Equal(UiState.UnitSelected, battle.Ui.State);
     Assert.Equal(battle.PlayerUnit, battle.Ui.SelectedUnit.RequireSome());
     Assert.True(battle.Ui.ActionOptions.Count > 0);
+  }
+
+  [TestCase(TestName = "Action options retain identity and reflect live availability across selection changes")]
+  public void ActionOptionsRetainIdentityAndLiveAvailability()
+  {
+    using var battle = BattleFixture.UiBattle();
+    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
+    IReadOnlyList<UnitActionOption> options = battle.Ui.ActionOptions;
+    MoveActionOption move = options.AsValueEnumerable().OfType<MoveActionOption>().Single();
+
+    battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2)], actionPointCost: 4);
+
+    Assert.True(ReferenceEquals(options, battle.Ui.ActionOptions));
+    Assert.False(move.IsAvailable);
+
+    battle.Ui.TrySelectAt(new Vector3I(7, 0, 7));
+    battle.Ui.TrySelectAt(new Vector3I(4, 0, 2));
+
+    Assert.True(ReferenceEquals(options, battle.Ui.ActionOptions));
+  }
+
+  [TestCase(TestName = "Disposal clears retained UI state and detaches runtime handling")]
+  public void DisposalClearsStateAndDetachesRuntimeHandling()
+  {
+    using var battle = BattleFixture.UiBattle();
+    BattleUiController ui = battle.Ui;
+    Assert.True(ui.TrySelectAt(new Vector3I(4, 0, 1)));
+    ui.BeginAction(ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
+    Assert.True(ui.ClickTile(new Vector3I(4, 0, 2)));
+    Assert.True(ui.ActionOptions.Count > 0);
+    Assert.True(ui.CandidateCells.Count > 0);
+    Assert.True(ui.PendingTarget.IsSome);
+    Assert.True(ui.LastPreview.IsSome);
+    int stateChanges = 0;
+    int readoutsChanged = 0;
+    ui.StateChanged += () => stateChanges++;
+    ui.ReadoutsChanged += () => readoutsChanged++;
+
+    ui.Dispose();
+
+    Assert.True(ui.SelectedUnit.IsNone);
+    Assert.Equal(0, ui.ActionOptions.Count);
+    Assert.Equal(0, ui.CandidateCells.Count);
+    Assert.True(ui.PendingTarget.IsNone);
+    Assert.True(ui.LastPreview.IsNone);
+
+    battle.Move(battle.SupportUnit, [new Vector3I(6, 0, 7)]);
+
+    Assert.Equal(0, stateChanges);
+    Assert.Equal(0, readoutsChanged);
+    Assert.True(ui.SelectedUnit.IsNone);
+    Assert.Equal(0, ui.ActionOptions.Count);
+    Assert.Equal(0, ui.CandidateCells.Count);
+    Assert.True(ui.PendingTarget.IsNone);
+    Assert.True(ui.LastPreview.IsNone);
   }
 
   [TestCase(TestName = "Clicking enemy or empty tiles does not select")]
@@ -101,6 +157,84 @@ public sealed partial class BattleUiControllerTest
     Assert.Equal(UiState.Targeting, battle.Ui.State);
   }
 
+  [TestCase(TestName = "A disabled retained option starts neither targeting nor a submission")]
+  public void DisabledRetainedOptionDoesNothing()
+  {
+    using var battle = BattleFixture.UiBattle();
+    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
+    PassActionOption pass = battle.Ui.ActionOptions.AsValueEnumerable().OfType<PassActionOption>().Single();
+    battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2)], actionPointCost: 4);
+    int submissions = 0;
+    battle.Runtime.ActionCompleted += _ => submissions++;
+    battle.ClearEvents();
+
+    Assert.False(pass.IsAvailable);
+    battle.Ui.BeginAction(pass);
+
+    Assert.Equal(UiState.UnitSelected, battle.Ui.State);
+    Assert.Equal(0, battle.Ui.CandidateCells.Count);
+    Assert.Equal(0, submissions);
+    Assert.Equal(0, battle.Events.Count);
+  }
+
+  [TestCase(TestName = "An option retained from another selection cannot act")]
+  public void ForeignRetainedOptionDoesNothing()
+  {
+    using var battle = BattleFixture.UiBattle();
+    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
+    PassActionOption playerPass = battle.Ui.ActionOptions.AsValueEnumerable().OfType<PassActionOption>().Single();
+    battle.Ui.TrySelectAt(new Vector3I(7, 0, 7));
+    int submissions = 0;
+    battle.Runtime.ActionCompleted += _ => submissions++;
+    battle.ClearEvents();
+
+    battle.Ui.BeginAction(playerPass);
+
+    Assert.Equal(UiState.UnitSelected, battle.Ui.State);
+    Assert.Equal(battle.SupportUnit, battle.Ui.SelectedUnit.RequireSome());
+    Assert.Equal(0, submissions);
+    Assert.Equal(0, battle.Events.Count);
+  }
+
+  [TestCase(TestName = "A boxed-in available move can enter empty targeting and cancel")]
+  public void BoxedInAvailableMoveCanCancelEmptyTargeting()
+  {
+    var board = new BattleBoardState(new Vector3I(8, 1, 8));
+    Vector3I[] walls = [new(4, 0, 0), new(4, 0, 2), new(3, 0, 1), new(5, 0, 1)];
+    foreach (Vector3I wall in walls)
+      board.SetTileWalkable(board.ValidatePoint(wall).RequireSome(), false);
+    using var battle = BattleFixture.Duel(board: board, playerControlled: true);
+    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
+    MoveActionOption move = battle.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single();
+
+    Assert.True(move.IsAvailable);
+    battle.Ui.BeginAction(move);
+
+    Assert.Equal(UiState.Targeting, battle.Ui.State);
+    Assert.Equal(0, battle.Ui.CandidateCells.Count);
+    battle.Ui.Cancel();
+    Assert.Equal(UiState.UnitSelected, battle.Ui.State);
+  }
+
+  [TestCase(TestName = "An available out-of-range attack can enter empty targeting and cancel")]
+  public void OutOfRangeAvailableAttackCanCancelEmptyTargeting()
+  {
+    using var battle = BattleFixture.Duel(
+      player: new("Hero", Position: new Vector3I(0, 0, 0), Weapon: TestData.MakeWeapon("Knife", range: 1)),
+      enemy: new("Goon", Position: new Vector3I(7, 0, 7)),
+      playerControlled: true);
+    battle.Ui.TrySelectAt(new Vector3I(0, 0, 0));
+    AttackActionOption attack = battle.Ui.ActionOptions.AsValueEnumerable().OfType<AttackActionOption>().Single();
+
+    Assert.True(attack.IsAvailable);
+    battle.Ui.BeginAction(attack);
+
+    Assert.Equal(UiState.Targeting, battle.Ui.State);
+    Assert.Equal(0, battle.Ui.CandidateCells.Count);
+    battle.Ui.Cancel();
+    Assert.Equal(UiState.UnitSelected, battle.Ui.State);
+  }
+
   [TestCase(TestName = "Move locks then confirms; commit exits targeting via the signal")]
   public void MoveLocksThenConfirmsAndCommits()
   {
@@ -172,6 +306,24 @@ public sealed partial class BattleUiControllerTest
     Assert.Equal(UiState.UnitSelected, battle.Ui.State);
     battle.Ui.Cancel();
     Assert.Equal(UiState.Unselected, battle.Ui.State);
+  }
+
+  [TestCase(TestName = "Retained direct options refuse to mint actions after their unit dies")]
+  public void RetainedDirectOptionsRequireFreshAliveProof()
+  {
+    using var battle = BattleFixture.Duel(
+      player: new("Hero", Weapon: TestData.MakeAmmoWeapon("Rifle")),
+      playerControlled: true);
+    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
+    PassActionOption pass = battle.Ui.ActionOptions.AsValueEnumerable().OfType<PassActionOption>().Single();
+    EndTurnActionOption endTurn = battle.Ui.ActionOptions.AsValueEnumerable().OfType<EndTurnActionOption>().Single();
+    ReloadActionOption reload = battle.Ui.ActionOptions.AsValueEnumerable().OfType<ReloadActionOption>().Single();
+
+    battle.ApplyDamage(battle.PlayerUnit, 999);
+
+    Assert.Throws<InvalidOperationException>(() => pass.MakeAction(battle.Runtime));
+    Assert.Throws<InvalidOperationException>(() => endTurn.MakeAction(battle.Runtime));
+    Assert.Throws<InvalidOperationException>(() => reload.MakeAction(battle.Runtime));
   }
 
   [TestCase(TestName = "Instant verbs submit directly and stay in UnitSelected")]
@@ -328,7 +480,7 @@ public sealed partial class BattleUiControllerTest
     Assert.True(readoutsChanged >= 2);      // both selections mutated readouts
     Assert.Equal(battle.SupportUnit, battle.Ui.SelectedUnit.RequireSome());
     // The cached options now belong to the NEW unit:
-    Assert.True(battle.Ui.ActionOptions.AsValueEnumerable().All(o => ReferenceEquals(o.Unit.State, battle.SupportUnit)));
+    Assert.True(battle.Ui.ActionOptions.AsValueEnumerable().All(o => ReferenceEquals(o.Unit, battle.SupportUnit)));
   }
 
   [TestCase(TestName = "Invalid hover clears the stale preview; gated previews are refused")]

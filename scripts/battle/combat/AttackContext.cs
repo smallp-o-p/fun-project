@@ -14,12 +14,11 @@ public sealed record AttackContext(
   BattleBoardState Board)
 {
   // Single source of truth for attack target-feasibility, shared by the write side
-  // (AttackUnit), the read side (GetHitChanceForAttack), and availability
-  // (HasAttackableTargetCondition) so the three can never drift. Covers only target
-  // feasibility — attacker liveness/incapacitation/AP/phase/turn gating is the caller's job
-  // (the action checks mutable actor state; AliveUnit proofs guard the query). Conditions
-  // are checked in one fixed order so a shot rejected for multiple reasons surfaces a
-  // single, stable failure message.
+  // (AttackUnit) and the read side (GetHitChanceForAttack) so the two can never drift.
+  // Covers only target feasibility — attacker liveness/incapacitation/AP/phase/turn
+  // gating is the caller's job (the action checks mutable actor state; AliveUnit proofs
+  // guard the query). Conditions are checked in one fixed order so a shot rejected for
+  // multiple reasons surfaces a single, stable failure message.
   internal static Either<string, AttackContext> Resolve(
     BattleSession session, BattleUnitState attacker, BattleUnitState target)
   {
