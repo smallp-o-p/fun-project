@@ -39,7 +39,9 @@ public partial class BattleBoardStateTest
 
     Assert.Equal(new Vector3I(0, 0, 1), path[0].Raw);
     Assert.Equal(new Vector3I(2, 0, 1), path[^1].Raw);
-    Assert.Equal(5, path.Length);
+    Assert.Equal(3, path.Length);
+    // The +X neighbor is the blocked tile itself, so the detour rounds it via the +Z side.
+    Assert.Equal(new Vector3I(1, 0, 2), path[1].Raw);
     Assert.False(path.AsValueEnumerable().Any(point => point.Raw == new Vector3I(1, 0, 1)));
   }
 
@@ -70,12 +72,13 @@ public partial class BattleBoardStateTest
   [TestCase(TestName = "FindPath breaks equal-length ties by the fixed direction order")]
   public void FindPathBreaksEqualLengthTiesByTheFixedDirectionOrder()
   {
-    // From (0,0,0) to (1,0,1) two shortest routes exist — via (1,0,0) or via (0,0,1). The
-    // search visits the +X neighbor before the +Z neighbor, so the path runs X-first. This
-    // pins the deterministic tie-break that the fixed OrthogonalDirections order provides.
+    // From (0,0,0) to (2,0,1) two 2-step routes exist — +X then the (1,0,1) diagonal, or the
+    // (1,0,1) diagonal then +X. The search visits the +X neighbor before the diagonal, so the
+    // path runs X-first. This pins the deterministic tie-break that the fixed AdjacentDirections
+    // order provides.
     BattleBoardState board = new(new Vector3I(3, 1, 3));
 
-    BattleBoardState.ValidatedPoint[] path = board.FindPath(board.At(0, 0, 0), board.At(1, 0, 1));
+    BattleBoardState.ValidatedPoint[] path = board.FindPath(board.At(0, 0, 0), board.At(2, 0, 1));
 
     Assert.Equal(3, path.Length);
     Assert.Equal(new Vector3I(1, 0, 0), path[1].Raw);
@@ -92,7 +95,7 @@ public partial class BattleBoardStateTest
     BattleBoardState.ValidatedPoint[] pathAroundOccupant = board.FindPath(board.At(0, 0, 1), board.At(2, 0, 1));
     BattleBoardState.ValidatedPoint[] pathFromOccupiedSource = board.FindPath(board.At(1, 0, 1), board.At(2, 0, 1));
 
-    Assert.Equal(5, pathAroundOccupant.Length);
+    Assert.Equal(3, pathAroundOccupant.Length);
     Assert.False(pathAroundOccupant.AsValueEnumerable().Any(point => point.Raw == new Vector3I(1, 0, 1)));
     Assert.Equal(2, pathFromOccupiedSource.Length);
     Assert.Equal(new Vector3I(1, 0, 1), pathFromOccupiedSource[0].Raw);
@@ -102,6 +105,53 @@ public partial class BattleBoardStateTest
 
     BattleBoardState.ValidatedPoint[] pathAfterClearingOccupant = board.FindPath(board.At(0, 0, 1), board.At(2, 0, 1));
     Assert.Equal(3, pathAfterClearingOccupant.Length);
+  }
+
+  [TestCase(TestName = "Same-level diagonals are reachable in a single step")]
+  public void SameLevelDiagonalsAreReachableInASingleStep()
+  {
+    BattleBoardState board = new(new Vector3I(3, 1, 3));
+
+    var reachable = board.GetReachableTiles(board.At(1, 0, 1), 1);
+
+    Assert.Equal(8, reachable.Count);
+    Assert.True(reachable.AsValueEnumerable().Any(point => point.Raw == new Vector3I(0, 0, 0)));
+    Assert.True(reachable.AsValueEnumerable().Any(point => point.Raw == new Vector3I(2, 0, 0)));
+    Assert.True(reachable.AsValueEnumerable().Any(point => point.Raw == new Vector3I(0, 0, 2)));
+    Assert.True(reachable.AsValueEnumerable().Any(point => point.Raw == new Vector3I(2, 0, 2)));
+  }
+
+  [TestCase(TestName = "Diagonal steps cannot cut a corner sealed on both flanks")]
+  public void DiagonalStepsCannotCutASealedCorner()
+  {
+    BattleBoardState board = new(new Vector3I(3, 1, 3));
+    board.SetTileWalkable(board.At(1, 0, 0), false);
+    board.SetTileWalkable(board.At(0, 0, 1), false);
+
+    var reachable = board.GetReachableTiles(board.At(0, 0, 0), 1);
+    Assert.False(reachable.AsValueEnumerable().Any(point => point.Raw == new Vector3I(1, 0, 1)));
+    Assert.Equal(0, board.FindPath(board.At(0, 0, 0), board.At(1, 0, 1)).Length);
+
+    // One open flank is enough to round the corner.
+    board.SetTileWalkable(board.At(1, 0, 0), true);
+    Assert.Equal(2, board.FindPath(board.At(0, 0, 0), board.At(1, 0, 1)).Length);
+  }
+
+  [TestCase(TestName = "HasOccupiableNeighbor is false only when boxed in")]
+  public void HasOccupiableNeighborIsFalseOnlyWhenBoxedIn()
+  {
+    BattleBoardState board = new(new Vector3I(3, 1, 3));
+    Assert.True(board.HasOccupiableNeighbor(board.At(1, 0, 1)));
+
+    // Occupying the four orthogonals also seals every diagonal flank, so no step out exists.
+    Assert.True(board.TryPlaceOccupant(board.At(1, 0, 0), 1));
+    Assert.True(board.TryPlaceOccupant(board.At(1, 0, 2), 2));
+    Assert.True(board.TryPlaceOccupant(board.At(0, 0, 1), 3));
+    Assert.True(board.TryPlaceOccupant(board.At(2, 0, 1), 4));
+    Assert.False(board.HasOccupiableNeighbor(board.At(1, 0, 1)));
+
+    Assert.True(board.TryClearOccupant(board.At(1, 0, 0), 1));
+    Assert.True(board.HasOccupiableNeighbor(board.At(1, 0, 1)));
   }
 
   [TestCase(TestName = "TryMoveOccupant moves only the matching unit")]

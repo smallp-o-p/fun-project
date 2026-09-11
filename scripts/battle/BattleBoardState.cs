@@ -190,7 +190,7 @@ public sealed class BattleBoardState
   /// this with a best-first search, keeping the neighbor rule below). Every tile the search
   /// enters — the destination included — must be occupiable (walkable and unoccupied); the
   /// source is seeded without testing, so an occupied source still paths out of it. The fixed
-  /// <see cref="OrthogonalDirections"/> order makes the choice among equal-length paths
+  /// <see cref="AdjacentDirections"/> order makes the choice among equal-length paths
   /// deterministic.
   /// </summary>
   /// <param name="source"></param>
@@ -214,7 +214,7 @@ public sealed class BattleBoardState
       if (current == destination)
         return ReconstructPath(parentByNode, source, destination);
 
-      foreach (Vector3I direction in OrthogonalDirections)
+      foreach (Vector3I direction in AdjacentDirections)
       {
         Vector3I neighborCoordinates = current.Raw + direction;
         if (!IsInBounds(neighborCoordinates))
@@ -223,7 +223,7 @@ public sealed class BattleBoardState
         var neighbor = new ValidatedPoint(neighborCoordinates);
         if (parentByNode.ContainsKey(neighbor))
           continue;
-        if (!CanOccupy(neighbor))
+        if (!CanOccupy(neighbor) || !CanStep(current, direction))
           continue;
 
         parentByNode[neighbor] = current;
@@ -252,24 +252,58 @@ public sealed class BattleBoardState
     return GetTile(point).IsWalkable && !_occupants.ContainsKey(point) && !_objectOccupants.ContainsKey(point);
   }
 
-  // The board's single definition of orthogonal adjacency; the path search and every
-  // adjacency question must share it so movement rules cannot drift. The order is load-bearing:
-  // searches visit neighbors in this order, which fixes the tie-break among equal-cost paths.
-  private static readonly Vector3I[] OrthogonalDirections =
+  private bool IsOccupiable(Vector3I coordinates)
+    => ValidatePoint(coordinates).Match(Some: CanOccupy, None: () => false);
+
+  // A diagonal step is legal only when at least one of the two orthogonals flanking it is
+  // occupiable, so a unit cannot cut a corner sealed on both sides. Orthogonal and vertical
+  // steps never cut a corner.
+  private bool CanStep(ValidatedPoint from, Vector3I direction)
+  {
+    if (direction.X == 0 || direction.Z == 0)
+      return true;
+
+    return IsOccupiable(from.Raw + new Vector3I(direction.X, 0, 0))
+      || IsOccupiable(from.Raw + new Vector3I(0, 0, direction.Z));
+  }
+
+  // The board's single definition of tile adjacency; the path search, the reachability flood,
+  // and every adjacency question must share it so movement rules cannot drift. Diagonals stay
+  // on one level (Y is fixed — Godot's up axis gets no diagonals), and a diagonal step is legal
+  // only past an open flank (see CanStep) so units cannot cut a sealed corner. The order is
+  // load-bearing: searches visit neighbors in this order, which fixes the tie-break among
+  // equal-cost paths.
+  private static readonly Vector3I[] AdjacentDirections =
   [
     new(-1, 0, 0), new(1, 0, 0), new(0, 0, -1), new(0, 0, 1), new(0, -1, 0), new(0, 1, 0),
-    new(1, 1, 0), new(-1, -1, 0), new(1, -1, 0), new(-1, 1, 0) // don't worry about diagonally on the z axis
+    new(1, 0, 1), new(-1, 0, -1), new(1, 0, -1), new(-1, 0, 1) // no diagonals across the Y axis
   ];
 
   public static double GetGridDistance(Vector3I source, Vector3I destination)
   {
-    return Math.Abs(Vector3.Distance(new Vector3(source.X, source.Y, source.Z),
-      new Vector3(destination.X, destination.Y, destination.Z)));
+    return Vector3.Distance(new Vector3(source.X, source.Y, source.Z),
+      new Vector3(destination.X, destination.Y, destination.Z));
   }
 
   public static bool AreAdjacent(ValidatedPoint source, ValidatedPoint destination)
   {
-    return GetGridDistance(source.Raw, destination.Raw) <= Math.Sqrt(2);
+    var distance = GetGridDistance(source.Raw, destination.Raw);
+    return distance != 0 && distance <= Math.Sqrt(2);
+  }
+
+  /// <summary>
+  /// True when any adjacent tile (the same neighborhood the path search walks) can be
+  /// occupied right now — the cheap no-search proxy for "some move exists".
+  /// </summary>
+  public bool HasOccupiableNeighbor(ValidatedPoint point)
+  {
+    foreach (Vector3I direction in AdjacentDirections)
+    {
+      if (IsOccupiable(point.Raw + direction) && CanStep(point, direction))
+        return true;
+    }
+
+    return false;
   }
 
   public IEnumerable<ValidatedPoint> EnumerateBoardPoints()
@@ -334,7 +368,7 @@ public sealed class BattleBoardState
       if (steps >= maxSteps)
         continue;
 
-      foreach (Vector3I direction in OrthogonalDirections)
+      foreach (Vector3I direction in AdjacentDirections)
       {
         Vector3I neighborCoordinates = current.Raw + direction;
         if (!IsInBounds(neighborCoordinates))
@@ -343,7 +377,7 @@ public sealed class BattleBoardState
         var neighbor = new ValidatedPoint(neighborCoordinates);
         if (!visited.Add(neighbor))
           continue;
-        if (!CanOccupy(neighbor))
+        if (!CanOccupy(neighbor) || !CanStep(current, direction))
           continue;
 
         reachable.Add(neighbor);

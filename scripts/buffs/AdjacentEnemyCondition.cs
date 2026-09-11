@@ -3,7 +3,7 @@ using Godot;
 
 namespace FunProject.Buffs;
 
-/// <summary>True while a living enemy occupies an orthogonally adjacent tile.</summary>
+/// <summary>True while a living enemy occupies an adjacent tile, orthogonally or diagonally.</summary>
 [GlobalClass]
 public partial class AdjacentEnemyCondition : BuffCondition
 {

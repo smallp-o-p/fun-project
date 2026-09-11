@@ -62,7 +62,7 @@ public class WeaponSystemTest
     Assert.Equal(10, weapon.GetStat<DamageStat>().BaseValue);
     Option<RangeStat> range = weapon.TryGetStat<RangeStat>();
     Assert.True(range.IsSome);
-    Assert.Equal(1, range.RequireSome().BaseValue);
+    Assert.Equal(2, range.RequireSome().BaseValue);
     Assert.True(weapon.TryGetStat<HealthStat>().IsNone);
   }
 
@@ -117,7 +117,7 @@ public class WeaponSystemTest
   {
     var weapon = new MeleeWeapon(TestData.MakeWeaponData());
     StatMod[] sources = [new RangeStatMod { Modifiers = [StatModifier.Add(4)] }];
-    Assert.Equal(5f, weapon.Resolve<RangeStat>(sources));
+    Assert.Equal(6f, weapon.Resolve<RangeStat>(sources));
   }
 
   [TestCase(TestName = "MultiStatMod add remove and clear manage internal list")]

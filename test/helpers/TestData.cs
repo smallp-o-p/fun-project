@@ -109,7 +109,9 @@ internal static class TestData
     return frame;
   }
 
-  public static WeaponData MakeWeaponData(int damage = 10, int critChance = 5, int range = 1, WeaponFrameData frame = null, string name = "Name") =>
+  // Melee reach defaults to 2: under Euclidean grid distance that covers the eight adjacent
+  // tiles (a diagonal is √2) that melee is meant to threaten.
+  public static WeaponData MakeWeaponData(int damage = 10, int critChance = 5, int range = 2, WeaponFrameData frame = null, string name = "Name") =>
     new()
     {
       Name = name,
