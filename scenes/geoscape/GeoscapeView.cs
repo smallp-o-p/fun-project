@@ -8,6 +8,7 @@ using Godot;
 public partial class GeoscapeView : Control
 {
   [Export] public BaseButton? BackButton { get; set; }
+  [Export] public bool HidesPreviousScene { get; set; } = true;
 
   [Signal] public delegate void ViewRequestedEventHandler(GeoscapeView view);
   [Signal] public delegate void BackRequestedEventHandler();
@@ -21,5 +22,7 @@ public partial class GeoscapeView : Control
   {
     if (BackButton is not null)
       BackButton.Pressed += RequestBack;
+    if (!HidesPreviousScene)
+      GetNode<SubViewportContainer>("Background").Visible = false;
   }
 }

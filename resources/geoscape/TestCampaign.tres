@@ -13,7 +13,6 @@
 [ext_resource type="Resource" uid="uid://bolsg00opwvqm" path="res://resources/mods/cardio_stims.tres" id="13_cardio"]
 [ext_resource type="Resource" uid="uid://v2qbd3a4ixp3" path="res://resources/mods/long_barrel.tres" id="14_barrel"]
 [ext_resource type="Resource" uid="uid://iefajrai3ts6" path="res://resources/mods/extended_magwell.tres" id="15_magwell"]
-
 [ext_resource type="Resource" path="res://resources/items/workshop_sample.tres" id="16_workshop"]
 [ext_resource type="Resource" path="res://resources/items/prototype_kit.tres" id="17_prototype"]
 [ext_resource type="Resource" path="res://resources/items/supply_kit.tres" id="18_supply"]

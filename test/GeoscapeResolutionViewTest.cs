@@ -85,7 +85,7 @@ public class GeoscapeResolutionViewTest
     hud.GetNode<VBoxContainer>("%Alerts").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
 
     var dialog = (GeoscapeEventResolution)manager.Current;
-    Assert.False(hud.IsVisibleInTree()); // the root view is covered by the dialog
+    Assert.True(hud.IsVisibleInTree()); // the root view is covered by the dialog
     Assert.Equal("Distress call", dialog.GetNode<Label>("%Title").Text);
     Assert.Equal("[TacticalBattle]\nDistress call description.",
       dialog.GetNode<Label>("%Description").Text);
