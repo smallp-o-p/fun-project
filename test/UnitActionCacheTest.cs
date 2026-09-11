@@ -12,8 +12,6 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public class UnitActionCacheTest
 {
-  private sealed record UnknownBattleEvent : BattleEvent;
-
   private sealed class TestActionDefinition(UnitActionCondition condition) : UnitActionDefinition
   {
     private readonly IReadOnlyList<UnitActionCondition> _conditions = [condition];
@@ -562,7 +560,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void KnownIrrelevantAndUnknownEventsUseTheirDocumentedFallbacks()
+  public void KnownIrrelevantEventsLeaveMaterializedOptionsClean()
   {
     using var battle = BattleFixture.UiBattle();
     IReadOnlyList<UnitAction> playerActions = battle.Query(
@@ -577,12 +575,6 @@ public class UnitActionCacheTest
 
     Assert.True(playerActions.AsValueEnumerable().All(action => !action.IsDirty));
     Assert.True(supportActions.AsValueEnumerable().All(action => !action.IsDirty));
-
-    battle.Session.RaiseEvents(new UnknownBattleEvent());
-
-    Assert.True(playerActions.AsValueEnumerable().All(action => action.IsDirty));
-    Assert.True(supportActions.AsValueEnumerable().All(action => action.IsDirty));
-    Assert.Equal(2, MaterializedSetCount(battle.Session.ActionOptions));
   }
 
   [TestCase]

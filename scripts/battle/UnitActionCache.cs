@@ -77,12 +77,6 @@ internal sealed class UnitActionCache(BattleSession session)
 
   internal void Invalidate(BattleEvent battleEvent)
   {
-    if (!IsKnown(battleEvent))
-    {
-      InvalidateAll();
-      return;
-    }
-
     foreach (IReadOnlyList<UnitAction> actions in _entries.Values)
       foreach (UnitAction action in actions)
         action.Invalidate(battleEvent);
@@ -98,37 +92,4 @@ internal sealed class UnitActionCache(BattleSession session)
   internal void BeginExecution() => IsExecuting = true;
 
   internal void EndExecution() => IsExecuting = false;
-
-  private static bool IsKnown(BattleEvent battleEvent) => battleEvent is
-    SessionStartedBattleEvent or
-    SessionEndedBattleEvent or
-    TurnStartedBattleEvent or
-    TurnEndedBattleEvent or
-    ActiveSideChangedBattleEvent or
-    UnitAddedBattleEvent or
-    ObjectPlacedBattleEvent or
-    ObjectInteractedBattleEvent or
-    ObjectExpiredBattleEvent or
-    UnitActivationEndedBattleEvent or
-    UnitMovedBattleEvent or
-    TileOccupiedBattleEvent or
-    UnitDamagedBattleEvent or
-    UnitStunRecoveredBattleEvent or
-    UnitArmorRegeneratedBattleEvent or
-    UnitKilledBattleEvent or
-    UnitUnconsciousBattleEvent or
-    ItemThrownBattleEvent or
-    ItemUsedBattleEvent or
-    CapabilityResolvedBattleEvent or
-    UnitAttackedBattleEvent or
-    UnitReloadedWeaponBattleEvent or
-    UnitSpottedBattleEvent or
-    UnitStatusEffectAppliedBattleEvent or
-    UnitStatusEffectTickedBattleEvent or
-    UnitStatusEffectExpiredBattleEvent or
-    UnitBuffActivatedBattleEvent or
-    UnitBuffDeactivatedBattleEvent or
-    ObjectiveAddedBattleEvent or
-    ObjectiveCompletedBattleEvent or
-    ObjectiveFailedBattleEvent;
 }
