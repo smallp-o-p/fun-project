@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using Vector3 = System.Numerics.Vector3;
 
 namespace FunProject.Battle;
 
@@ -257,35 +258,18 @@ public sealed class BattleBoardState
   private static readonly Vector3I[] OrthogonalDirections =
   [
     new(-1, 0, 0), new(1, 0, 0), new(0, 0, -1), new(0, 0, 1), new(0, -1, 0), new(0, 1, 0),
+    new(1, 1, 0), new(-1, -1, 0), new(1, -1, 0), new(-1, 1, 0) // don't worry about diagonally on the z axis
   ];
 
-  /// <summary>
-  /// True when any adjacent tile (the same neighborhood the path search walks) can be
-  /// occupied right now — the cheap no-search proxy for "some move exists".
-  /// </summary>
-  public bool HasOccupiableNeighbor(ValidatedPoint point)
+  public static double GetGridDistance(Vector3I source, Vector3I destination)
   {
-    foreach (Vector3I direction in OrthogonalDirections)
-    {
-      bool occupiable = ValidatePoint(point.Raw + direction).Match(
-        Some: CanOccupy,
-        None: () => false);
-      if (occupiable)
-        return true;
-    }
-
-    return false;
-  }
-
-  public static int GetGridDistance(Vector3I source, Vector3I destination)
-  {
-    var delta = source - destination;
-    return Math.Abs(delta.X) + Math.Abs(delta.Y) + Math.Abs(delta.Z);
+    return Math.Abs(Vector3.Distance(new Vector3(source.X, source.Y, source.Z),
+      new Vector3(destination.X, destination.Y, destination.Z)));
   }
 
   public static bool AreAdjacent(ValidatedPoint source, ValidatedPoint destination)
   {
-    return GetGridDistance(source.Raw, destination.Raw) == 1;
+    return GetGridDistance(source.Raw, destination.Raw) <= Math.Sqrt(2);
   }
 
   public IEnumerable<ValidatedPoint> EnumerateBoardPoints()

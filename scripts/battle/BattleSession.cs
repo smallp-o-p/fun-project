@@ -568,7 +568,7 @@ public sealed class BattleSession
     return unit.Side == ActiveSide && _scheduler.IsUnitAvailable(unit) && unit.CanAct();
   }
 
-  internal static int GetGridDistance(Vector3I source, Vector3I destination)
+  internal static double GetGridDistance(Vector3I source, Vector3I destination)
   {
     return BattleBoardState.GetGridDistance(source, destination);
   }
