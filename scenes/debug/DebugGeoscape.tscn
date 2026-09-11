@@ -66,6 +66,3 @@ polygon = PackedVector2Array(1120, 300, 1380, 380, 1420, 650, 1050, 700, 980, 52
 points = PackedVector2Array(1120, 300, 1380, 380, 1420, 650, 1050, 700, 980, 520, 1120, 300)
 width = 2.0
 default_color = Color(0, 0, 0, 1)
-
-[node name="ResolutionDialog" parent="ResolutionLayer" index="0" unique_id=752477989]
-layout_mode = 3

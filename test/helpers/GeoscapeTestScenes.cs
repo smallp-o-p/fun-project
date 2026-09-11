@@ -31,6 +31,10 @@ internal static class GeoscapeTestScenes
     => GD.Load<PackedScene>("res://scenes/geoscape/engineering/EngineeringView.tscn")
       .Instantiate<EngineeringView>();
 
+  public static GeoscapeEventResolution CreateResolutionView()
+    => GD.Load<PackedScene>("res://scenes/geoscape/resolutions/GeoscapeEventResolution.tscn")
+      .Instantiate<GeoscapeEventResolution>();
+
   // Base background shell for generic view-manager background/lifetime contracts.
   public static GeoscapeView CreateBaseView()
     => GD.Load<PackedScene>("res://scenes/geoscape/GeoscapeView.tscn").Instantiate<GeoscapeView>();

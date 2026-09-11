@@ -1,8 +1,14 @@
+using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Strategic;
 using Godot;
 using System;
 
-public sealed partial class GeoscapeEventResolution : Control
+// The pending-resolution modal. A transparent GeoscapeView over the covered stack: the
+// base shell's background stays hidden and the Dim wash blocks the map/HUD beneath. The
+// composition root pushes a fresh instance on ResolutionEventOpened and pops it on the
+// session's committed ResolutionEventClosed — buttons resolve through the session, so
+// Back navigation never applies while a resolution is pending.
+public sealed partial class GeoscapeEventResolution : GeoscapeView
 {
   public event Action<ResolutionOutcome>? Resolved;
 
@@ -12,16 +18,30 @@ public sealed partial class GeoscapeEventResolution : Control
 
   public override void _Ready()
   {
+    base._Ready();
     _title = GetNode<Label>("%Title");
     _description = GetNode<Label>("%Description");
     _buttons = GetNode<HBoxContainer>("%Buttons");
-    Visible = false;
   }
 
-  public void Present(PendingResolution pending, string regionSuffix)
+  // Renders the session's pending resolution; pushed only while one is open, so a missing
+  // pending resolution is a caller bug.
+  public override void Present(CampaignGameState state, GeoscapeSession session)
   {
+    PendingResolution pending = session.PendingResolution.Match(
+      value => value,
+      () => throw new InvalidOperationException(
+        "GeoscapeEventResolution requires a pending resolution; it is presented only while one is open."));
+
+    foreach (Node child in _buttons.GetChildren())
+    {
+      _buttons.RemoveChild(child);
+      child.QueueFree();
+    }
+
     _title.Text = pending.Event.Definition.Title;
-    _description.Text = $"[{pending.Event.Definition.Kind}{regionSuffix}]\n{pending.Event.Definition.Description}";
+    _description.Text =
+      $"[{pending.Event.Definition.Kind}{RegionSuffix(session, pending)}]\n{pending.Event.Definition.Description}";
 
     foreach (var (txt, outcome) in ButtonsFor(pending.Event.Definition.Kind))
     {
@@ -29,21 +49,13 @@ public sealed partial class GeoscapeEventResolution : Control
       button.Pressed += () => Resolved?.Invoke(outcome);
       _buttons.AddChild(button);
     }
-
-    Visible = true;
   }
 
-  public void Dismiss()
+  private static string RegionSuffix(GeoscapeSession session, PendingResolution pending)
   {
-    _title.Text = string.Empty;
-    _description.Text = string.Empty;
-    Visible = false;
-
-    foreach (Node child in _buttons.GetChildren())
-    {
-      _buttons.RemoveChild(child);
-      child.QueueFree();
-    }
+    return pending.Event.TargetRegionIndex.Match(
+      index => $" — {session.Regions[index].Name}",
+      () => "");
   }
 
   private static (string Text, ResolutionOutcome Outcome)[] ButtonsFor(GeoscapeEventKind kind)

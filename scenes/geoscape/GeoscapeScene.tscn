@@ -16,6 +16,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
+ResolutionViewScene = ExtResource("3_y8l5f")
 
 [node name="ViewManager" type="Control" parent="." node_paths=PackedStringArray("RootView")]
 unique_name_in_owner = true
@@ -57,10 +58,3 @@ EventMarkerScene = ExtResource("6_marker")
 
 [node name="GeoscapeHud" parent="ViewManager/MapView" unique_id=1886936763 instance=ExtResource("2_jn255")]
 unique_name_in_owner = true
-
-[node name="ResolutionLayer" type="CanvasLayer" parent="."]
-layer = 10
-
-[node name="ResolutionDialog" parent="ResolutionLayer" unique_id=752477989 instance=ExtResource("3_y8l5f")]
-unique_name_in_owner = true
-visible = false

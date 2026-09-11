@@ -12,19 +12,22 @@ using System;
 public sealed partial class GeoscapeScene : Control
 {
   [Export] public CampaignStartData? Start;
+  [Export] public PackedScene? ResolutionViewScene { get; set; }
 
   private CampaignGameState _state = null!;
   private GeoscapeSession _session = null!;
   private GeoscapeMapControl _map = null!;
   private GeoscapeCameraRig _camera = null!;
   private GeoscapeHud _hud = null!;
-  private GeoscapeEventResolution _resolution = null!;
+  private PackedScene _resolutionViewScene = null!;
   private GeoscapeViewManager _viewManager = null!;
 
   public override void _Ready()
   {
     CampaignStartData start = Start ?? throw new InvalidOperationException(
       "GeoscapeScene requires a CampaignStartData export; assign one in the inspector.");
+    _resolutionViewScene = ResolutionViewScene ?? throw new InvalidOperationException(
+      "GeoscapeScene requires a ResolutionViewScene export; assign one in the inspector.");
     _state = new CampaignGameState(start);
     _session = new GeoscapeSession(_state);
 
@@ -48,9 +51,6 @@ public sealed partial class GeoscapeScene : Control
     _map.EventClicked += adapter => OpenResolution(adapter.Event);
     _hud.UpdateClock(_session.CurrentDay, _session.CurrentTime); // the session starts paused: no TimeAdvanced yet
     _hud.UpdateManufacturing(_session.ActiveManufacturing, _session.Tick);
-
-    _resolution = GetNode<GeoscapeEventResolution>("%ResolutionDialog");
-    _resolution.Resolved += _session.CompleteResolution;
 
     _viewManager = GetNode<GeoscapeViewManager>("%ViewManager");
     // HUD buttons produce their views; their requests route through the permanent root so
@@ -92,23 +92,35 @@ public sealed partial class GeoscapeScene : Control
         _map.RefreshEvents();
         _hud.RefreshAlerts(_session.ActiveEvents);
         break;
-      case ResolutionEventOpened opened:
-        _resolution.Present(opened.Pending, RegionSuffix(opened.Pending));
+      case ResolutionEventOpened:
+        var resolution = InstantiateResolutionView();
+        resolution.Resolved += _session.CompleteResolution;
+        _viewManager.Push(resolution); // ViewChanged presents from the now-pending session state
         _hud.RefreshAlerts(_session.ActiveEvents);
         break;
       case ResolutionEventClosed:
-        _resolution.Dismiss();
+        // The dialog's buttons are the only close path, so it is the stack top here; the
+        // type check keeps a stray close from popping an innocent view.
+        if (_viewManager.Current is GeoscapeEventResolution)
+          _viewManager.Pop();
         _map.RefreshEvents();
         _hud.RefreshAlerts(_session.ActiveEvents);
         break;
     }
   }
 
-  private string RegionSuffix(PendingResolution pending)
+  // A fresh dialog per pending resolution: the manager frees popped views.
+  private GeoscapeEventResolution InstantiateResolutionView()
   {
-    return pending.Event.TargetRegionIndex.Match(
-      index => $" — {_session.Regions[index].Name}",
-      () => "");
+    Node instance = _resolutionViewScene.Instantiate();
+    if (instance is not GeoscapeEventResolution view)
+    {
+      string kind = instance.GetClass();
+      instance.Free();
+      throw new InvalidOperationException(
+        $"GeoscapeScene ResolutionViewScene root must be a GeoscapeEventResolution; got {kind}.");
+    }
+    return view;
   }
 
   private void OpenResolution(GeoscapeEvent active)
