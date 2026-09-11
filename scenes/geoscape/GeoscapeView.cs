@@ -22,7 +22,5 @@ public partial class GeoscapeView : Control
   {
     if (BackButton is not null)
       BackButton.Pressed += RequestBack;
-    if (!HidesPreviousScene)
-      GetNode<SubViewportContainer>("Background").Visible = false;
   }
 }

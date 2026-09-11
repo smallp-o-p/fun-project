@@ -55,7 +55,7 @@ public sealed partial class GeoscapeViewManager : Control
     // All caller bugs are rejected above, before the active view is touched.
     Deactivate(Current);
 
-    if(view.HidesPreviousScene)
+    if (view.HidesPreviousScene)
       Current.Hide();
 
     _views.Push(view);

@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using FunProject.GameState;
+using FunProject.Geoscape;
 using Godot;
 using static GdUnit4.Assertions;
 
@@ -26,6 +27,10 @@ internal static class GeoscapeTestScenes
 
   public static UnitView CreateUnitView()
     => GD.Load<PackedScene>("res://scenes/geoscape/units/UnitView.tscn").Instantiate<UnitView>();
+
+  public static SquadLoadoutView CreateSquadLoadoutView()
+    => GD.Load<PackedScene>("res://scenes/geoscape/squad/SquadLoadoutView.tscn")
+      .Instantiate<SquadLoadoutView>();
 
   public static EngineeringView CreateEngineeringView()
     => GD.Load<PackedScene>("res://scenes/geoscape/engineering/EngineeringView.tscn")

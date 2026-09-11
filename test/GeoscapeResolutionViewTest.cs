@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using FunProject.Geoscape;
 using FunProject.Strategic;
 using Godot;
 using GdUnit4;
@@ -13,8 +14,9 @@ public class GeoscapeResolutionViewTest
   // included) and the button -> outcome mapping. Presenting without a pending resolution
   // is a caller bug. The dialog is a transparent GeoscapeView with no backdrop of its own.
   [TestCase]
-  public void PresentRendersPendingResolutionWithRegionAndMapsTacticalOutcomes()
+  public async Task PresentRendersPendingResolutionWithRegionAndMapsTacticalOutcomes()
   {
+    await using var cleanup = new DeferredNodeCleanup();
     var view = AddToTree(CreateResolutionView());
     using var campaign = GeoscapeFixture.WithFiredEvent(
       MakeEvent("Distress call", GeoscapeEventKind.TacticalBattle, "Northmark"),
@@ -34,11 +36,18 @@ public class GeoscapeResolutionViewTest
 
     SysColGeneric.List<ResolutionOutcome> outcomes = [];
     view.Resolved += outcomes.Add;
-    buttons.GetChild<Button>(1).EmitSignal(Button.SignalName.Pressed);
-    buttons.GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
-    Assert.Equal(2, outcomes.Count);
+    buttons.GetChild<Button>(1).EmitSignal(Button.SignalName.Pressed); // Decline resolves
+    Assert.Equal(1, outcomes.Count);
     Assert.Equal(ResolutionOutcome.Declined, outcomes[0]);
-    Assert.Equal(ResolutionOutcome.Engaged, outcomes[1]);
+
+    // Engage navigates instead: it produces the squad view from the authored export.
+    GeoscapeView? produced = null;
+    view.ViewRequested += requested => produced = requested;
+    buttons.GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
+    Assert.True(produced is SquadLoadoutView);
+    Assert.True(produced!.GetParent() is null); // emitted live and unparented
+    Assert.True(campaign.Session.PendingResolution.IsSome); // the mission stays pending
+    produced.Free(); // never pushed here; free directly
   }
 
   [TestCase]

@@ -1,0 +1,100 @@
+[gd_scene format=3 uid="uid://cdwdnbjwh26ok"]
+
+[ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_58wu3"]
+[ext_resource type="Script" uid="uid://b5nrf7gxdi0dm" path="res://scenes/geoscape/squad/SquadLoadoutView.cs" id="1_k02uv"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitView.tscn" id="2_lvidv"]
+[ext_resource type="PackedScene" uid="uid://b2qpwhgni581u" path="res://scenes/geoscape/squad/SquadSlotCard.tscn" id="4_58wu3"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mqfjw"]
+bg_color = Color(0.039215688, 0.039215688, 0.039215688, 1)
+
+[node name="SquadLoadoutView" unique_id=300858332 instance=ExtResource("1_58wu3")]
+script = ExtResource("1_k02uv")
+UnitViewScene = ExtResource("2_lvidv")
+SquadSlotCardScene = ExtResource("4_58wu3")
+
+[node name="Background" parent="." index="0"]
+visible = true
+
+[node name="Viewport" parent="Background" index="0"]
+handle_input_locally = false
+size = Vector2i(1600, 900)
+render_target_update_mode = 4
+
+[node name="Panel" type="Panel" parent="Background/Viewport" index="0" unique_id=1969743015]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_mqfjw")
+
+[node name="Content" type="PanelContainer" parent="." index="1" unique_id=1519989588]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="MarginContainer" type="MarginContainer" parent="Content" index="0" unique_id=799776898]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Content/MarginContainer" index="0" unique_id=1708955770]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer" index="0" unique_id=1343586106]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Content/MarginContainer/VBoxContainer/Header" index="0" unique_id=1395050881]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 48
+text = "Mission"
+
+[node name="SquadCount" type="Label" parent="Content/MarginContainer/VBoxContainer/Header" index="1" unique_id=1943044614]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Squad: 0/3"
+
+[node name="BackButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Header" index="2" unique_id=1077662828]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "Back"
+
+[node name="SelectionPrompt" type="Label" parent="Content/MarginContainer/VBoxContainer" index="1" unique_id=2142065969]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Body" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer" index="2" unique_id=2145005474]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 32
+
+[node name="SlotsScroll" type="ScrollContainer" parent="Content/MarginContainer/VBoxContainer/Body" index="0" unique_id=1106614743]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Slots" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/SlotsScroll" index="0" unique_id=224192345]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="RosterScroll" type="ScrollContainer" parent="Content/MarginContainer/VBoxContainer/Body" index="1" unique_id=1921368189]
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RosterChoices" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/RosterScroll" index="0" unique_id=2006274826]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[connection signal="pressed" from="Content/MarginContainer/VBoxContainer/Header/BackButton" to="." method="RequestBack"]

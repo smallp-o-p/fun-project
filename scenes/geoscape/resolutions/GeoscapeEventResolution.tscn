@@ -2,6 +2,7 @@
 
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
 [ext_resource type="Script" uid="uid://bq8e6okud6r7" path="res://scenes/geoscape/resolutions/GeoscapeEventResolution.cs" id="2_script"]
+[ext_resource type="PackedScene" uid="uid://cdwdnbjwh26ok" path="res://scenes/geoscape/squad/SquadLoadoutView.tscn" id="3_squad"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_k0foj"]
 
@@ -11,6 +12,7 @@ size = Vector2(128, 128)
 [node name="GeoscapeEventResolution" unique_id=752477989 instance=ExtResource("1_base")]
 script = ExtResource("2_script")
 HidesPreviousScene = false
+SquadViewScene = ExtResource("3_squad")
 
 [node name="Viewport" parent="Background" index="0"]
 handle_input_locally = false
