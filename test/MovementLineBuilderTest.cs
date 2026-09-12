@@ -6,187 +6,118 @@ using Godot;
 [RequireGodotRuntime]
 public partial class MovementLineBuilderTest
 {
-  [TestCase(TestName = "CreateLine hides paths with fewer than two points")]
-  public void CreateLineHidesPathsWithFewerThanTwoPoints()
-  {
-    MeshInstance3D line = MovementLineBuilder.CreateLine([new Vector3(-3.5f, 0.08f, -3.5f)]);
+  private const int RadialSegments = 64;
+  private const int RingVertexCount = RadialSegments + 1;
+  private const float Tolerance = 0.001f;
 
-    try
-    {
-      Assert.False(line.Visible);
-      Assert.Equal(0, line.Mesh.GetSurfaceCount());
-    }
-    finally
-    {
-      line.Free();
-    }
-  }
-
-  [TestCase(TestName = "CreateLine returns a configured parentable mesh instance")]
-  public void CreateLineReturnsAConfiguredParentableMeshInstance()
+  [TestCase(TestName = "CreateMesh hides paths with fewer than two points")]
+  public void CreateMeshHidesPathsWithFewerThanTwoPoints()
   {
-    MeshInstance3D line = MovementLineBuilder.CreateLine(
-      [new Vector3(-3.5f, 0.08f, -3.5f), new Vector3(-2.5f, 0.08f, -3.5f)],
-      Colors.Green,
-      cornerRadius: 0.0f,
+    ArrayMesh empty = MovementLineBuilder.CreateMesh([], cornerRadius: 0.25f, width: 0.2f);
+    ArrayMesh single = MovementLineBuilder.CreateMesh(
+      [new Vector3(-3.5f, 0.08f, -3.5f)],
+      cornerRadius: 0.25f,
       width: 0.2f);
 
-    try
-    {
-      Assert.True(line.Visible);
-      Assert.Equal("MovementLine", line.Name.ToString());
-      Assert.Equal(1, line.Mesh.GetSurfaceCount());
-      ArrayMesh mesh = RequireArrayMesh(line);
-      Assert.Equal(Mesh.PrimitiveType.Triangles, mesh.SurfaceGetPrimitiveType(0));
-      Assert.True(mesh.SurfaceGetArrayIndexLen(0) > 0);
-
-      StandardMaterial3D material = line.Mesh.SurfaceGetMaterial(0) as StandardMaterial3D;
-      Assert.True(material != null);
-      Assert.True(material.AlbedoColor.IsEqualApprox(Colors.Green));
-      Assert.Equal(BaseMaterial3D.ShadingModeEnum.Unshaded, material.ShadingMode);
-      Assert.Equal(BaseMaterial3D.CullModeEnum.Disabled, material.CullMode);
-    }
-    finally
-    {
-      line.Free();
-    }
+    Assert.Equal(0, empty.GetSurfaceCount());
+    Assert.Equal(0, single.GetSurfaceCount());
   }
 
-  [TestCase(TestName = "CreateLine adds length UVs for shader animation")]
-  public void CreateLineAddsLengthUvsForShaderAnimation()
+  [TestCase(TestName = "CreateMesh builds a straight tube spanning its endpoints")]
+  public void CreateMeshBuildsStraightTubeSpanningEndpoints()
   {
-    MeshInstance3D line = MovementLineBuilder.CreateLine(
-      [new Vector3(0.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 1.0f)],
-      cornerRadius: 0.0f,
-      width: 0.2f);
+    float width = 0.2f;
+    ArrayMesh mesh = MovementLineBuilder.CreateMesh(
+      [new Vector3(0.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f)],
+      cornerRadius: 0.25f,
+      width: width);
 
-    try
-    {
-      ArrayMesh mesh = RequireArrayMesh(line);
-      Godot.Collections.Array arrays = mesh.SurfaceGetArrays(0);
-      Vector2[] uvs = arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
-      int ringVertexCount = uvs.Length / 3;
+    Assert.Equal(1, mesh.GetSurfaceCount());
+    Assert.Equal(Mesh.PrimitiveType.Triangles, mesh.SurfaceGetPrimitiveType(0));
 
-      Assert.Equal(mesh.SurfaceGetArrayLen(0), uvs.Length);
-      Assert.Equal(0, uvs.Length % 3);
-      Assert.True(ringVertexCount >= 4);
-      Assert.True(Mathf.IsEqualApprox(0.0f, uvs[0].X));
-      Assert.True(Mathf.IsEqualApprox(0.0f, uvs[ringVertexCount - 1].X));
-      Assert.True(Mathf.IsEqualApprox(0.5f, uvs[ringVertexCount].X));
-      Assert.True(Mathf.IsEqualApprox(0.5f, uvs[(ringVertexCount * 2) - 1].X));
-      Assert.True(Mathf.IsEqualApprox(1.0f, uvs[^ringVertexCount].X));
-      Assert.True(Mathf.IsEqualApprox(1.0f, uvs[^1].X));
-    }
-    finally
-    {
-      line.Free();
-    }
+    int vertexCount = mesh.SurfaceGetArrayLen(0);
+    Assert.Equal(0, vertexCount % RingVertexCount);
+    Assert.True(vertexCount / RingVertexCount >= 2); // at least two rings
+
+    Assert.Equal((vertexCount / RingVertexCount - 1) * RadialSegments * 6, mesh.SurfaceGetArrayIndexLen(0));
+
+    Aabb bounds = mesh.GetAabb();
+    Assert.True(Mathf.Abs(bounds.Size.X - 1.0f) < Tolerance);
+    Assert.True(Mathf.Abs(bounds.Size.Y - (2.0f * width)) < Tolerance);
+    Assert.True(Mathf.Abs(bounds.Size.Z - (2.0f * width)) < Tolerance);
   }
 
-  [TestCase(TestName = "CreateLine applies width as the tube radius")]
-  public void CreateLineAppliesWidthAsTheTubeRadius()
+  [TestCase(TestName = "CreateMesh UVs advance from 0 to 1 along the path")]
+  public void CreateMeshUvsAdvanceAlongThePath()
   {
-    MeshInstance3D line = MovementLineBuilder.CreateLine(
-      [new Vector3(-3.5f, 0.08f, -3.5f), new Vector3(-2.5f, 0.08f, -3.5f)],
-      cornerRadius: 0.0f,
-      width: 0.2f);
-
-    try
-    {
-      Aabb bounds = line.Mesh.GetAabb();
-      Assert.True(Mathf.IsEqualApprox(1.0f, bounds.Size.X));
-      Assert.True(Mathf.IsEqualApprox(0.4f, bounds.Size.Y));
-      Assert.True(Mathf.IsEqualApprox(0.4f, bounds.Size.Z));
-    }
-    finally
-    {
-      line.Free();
-    }
-  }
-
-  [TestCase(TestName = "CreateLine adds tube rings for rounded turns")]
-  public void CreateLineAddsTubeRingsForRoundedTurns()
-  {
-    MeshInstance3D line = MovementLineBuilder.CreateLine(
+    ArrayMesh mesh = MovementLineBuilder.CreateMesh(
       [new Vector3(0.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 1.0f)],
       cornerRadius: 0.25f,
-      cornerSegments: 4,
       width: 0.2f);
 
-    try
-    {
-      Assert.Equal(1, line.Mesh.GetSurfaceCount());
-      ArrayMesh mesh = RequireArrayMesh(line);
-      int roundedPathPointCount = 7;
-      int ringVertexCount = mesh.SurfaceGetArrayLen(0) / roundedPathPointCount;
+    Godot.Collections.Array arrays = mesh.SurfaceGetArrays(0);
+    Vector2[] uvs = arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
+    int rings = uvs.Length / RingVertexCount;
 
-      Assert.Equal(0, mesh.SurfaceGetArrayLen(0) % roundedPathPointCount);
-      Assert.True(ringVertexCount >= 9);
-      Assert.Equal((roundedPathPointCount - 1) * (ringVertexCount - 1) * 6, mesh.SurfaceGetArrayIndexLen(0));
-    }
-    finally
-    {
-      line.Free();
-    }
+    for (int s = 0; s < RingVertexCount; s++)
+      Assert.True(Mathf.IsEqualApprox(0.0f, uvs[s].X));
+    for (int s = 0; s < RingVertexCount; s++)
+      Assert.True(Mathf.IsEqualApprox(1.0f, uvs[^(RingVertexCount - s)].X));
+    for (int ring = 1; ring < rings; ring++)
+      Assert.True(uvs[ring * RingVertexCount].X >= uvs[(ring - 1) * RingVertexCount].X);
   }
 
-  [TestCase(TestName = "UpdateLine replaces the existing mesh with new geometry")]
-  public void UpdateLineReplacesTheExistingMeshWithNewGeometry()
+  [TestCase(TestName = "CreateMesh rounds corners away from the corner vertex")]
+  public void CreateMeshRoundsCornersAwayFromTheCornerVertex()
   {
-    MeshInstance3D line = MovementLineBuilder.CreateLine(
-      [new Vector3(-3.5f, 0.08f, -3.5f), new Vector3(-2.5f, 0.08f, -3.5f)],
-      cornerRadius: 0.0f,
-      width: 0.2f);
+    Vector3[] path = [new Vector3(0.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 1.0f)];
 
-    try
+    ArrayMesh rounded = MovementLineBuilder.CreateMesh(path, cornerRadius: 0.25f, width: 0.02f);
+    bool hasCenterInsideTheCorner = false;
+    float deepestCutDepth = 0.0f;
+    foreach (Vector3 center in RingCenters(rounded))
     {
-      MovementLineBuilder.UpdateLine(
-        ref line,
-        [new Vector3(-3.5f, 0.08f, -3.5f), new Vector3(-1.5f, 0.08f, -3.5f)],
-        cornerRadius: 0.0f,
-        width: 0.4f);
+      if (center.X >= 0.995f || center.Z <= 0.005f)
+        continue;
 
-      Assert.True(line.Visible);
-      Assert.Equal(1, line.Mesh.GetSurfaceCount());
-
-      Aabb bounds = line.Mesh.GetAabb();
-      Assert.True(Mathf.IsEqualApprox(2.0f, bounds.Size.X));
-      Assert.True(Mathf.IsEqualApprox(0.8f, bounds.Size.Y));
-      Assert.True(Mathf.IsEqualApprox(0.8f, bounds.Size.Z));
+      hasCenterInsideTheCorner = true;
+      // Perpendicular distance from the corner-cut diagonal S=(0.75,0,0)→E=(1,0,0.25) toward the
+      // corner vertex C=(1,0,0) — the fillet's cut depth. A circular-arc fillet of radius 0.25
+      // cuts ≈ 0.2929·0.25 ≈ 0.073 deep; the quadratic fillet with handles on C cuts ≈ 0.133.
+      float cutDepth = ((center.X - 0.75f) - center.Z) / Mathf.Sqrt2;
+      deepestCutDepth = Mathf.Max(deepestCutDepth, cutDepth);
     }
-    finally
+
+    Assert.True(hasCenterInsideTheCorner);
+    Assert.True(deepestCutDepth >= 0.06f && deepestCutDepth <= 0.09f);
+
+    ArrayMesh sharp = MovementLineBuilder.CreateMesh(path, cornerRadius: 0.0f, width: 0.02f);
+    bool allCentersOnALeg = true;
+    foreach (Vector3 center in RingCenters(sharp))
     {
-      line.Free();
+      if (Mathf.Abs(center.Z) >= 0.005f && Mathf.Abs(center.X - 1.0f) >= 0.005f)
+        allCentersOnALeg = false;
     }
+
+    Assert.True(allCentersOnALeg);
   }
 
-  [TestCase(TestName = "UpdateLine hides an existing line when the path becomes invalid")]
-  public void UpdateLineHidesAnExistingLineWhenThePathBecomesInvalid()
+  // Rings are consecutive blocks of RingVertexCount vertices; a block's average is the sampled
+  // path point because the radial offsets cancel over a full ring.
+  private static Vector3[] RingCenters(ArrayMesh mesh)
   {
-    MeshInstance3D line = MovementLineBuilder.CreateLine(
-      [new Vector3(-3.5f, 0.08f, -3.5f), new Vector3(-2.5f, 0.08f, -3.5f)],
-      cornerRadius: 0.0f,
-      width: 0.2f);
+    Godot.Collections.Array arrays = mesh.SurfaceGetArrays(0);
+    Vector3[] vertices = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
 
-    try
+    Vector3[] centers = new Vector3[vertices.Length / RingVertexCount];
+    for (int ring = 0; ring < centers.Length; ring++)
     {
-      Assert.True(line.Visible);
-
-      MovementLineBuilder.UpdateLine(ref line, [new Vector3(-3.5f, 0.08f, -3.5f)]);
-
-      Assert.False(line.Visible);
-      Assert.Equal(0, line.Mesh.GetSurfaceCount());
+      Vector3 sum = Vector3.Zero;
+      for (int vertex = 0; vertex < RingVertexCount; vertex++)
+        sum += vertices[(ring * RingVertexCount) + vertex];
+      centers[ring] = sum / RingVertexCount;
     }
-    finally
-    {
-      line.Free();
-    }
-  }
 
-  private static ArrayMesh RequireArrayMesh(MeshInstance3D line)
-  {
-    ArrayMesh mesh = line.Mesh as ArrayMesh;
-    Assert.True(mesh != null);
-    return mesh;
+    return centers;
   }
 }

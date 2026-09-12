@@ -39,7 +39,6 @@ public sealed partial class BattleScene : Node3D
 
     _movementLine = new MovementLine { Name = "MovementLine" };
     AddChild(_movementLine);
-    _movementLine.Visible = false; // MovementLine._Ready rebuilds + shows a default line; hide it after AddChild
     _highlighter = new ReachableTileHighlighter { Name = "ReachableTileHighlighter" };
     AddChild(_highlighter);
 
@@ -199,7 +198,7 @@ public sealed partial class BattleScene : Node3D
     var queriedUnits = _runtime.Query(new GetFactionAliveUnits(_playerFaction))
       .AsValueEnumerable().Select(unit => unit.State).ToArray();
     _unitStatusLabel.Text = string.Join("\n", queriedUnits.AsValueEnumerable().Select(FormatUnitReadout).ToArray());
-    
+
     _verbButtons.QueueFreeAllChildren();
 
     foreach (UnitActionOption option in _ui.ActionOptions)
@@ -299,10 +298,8 @@ public sealed partial class BattleScene : Node3D
       return;
     }
 
-    _movementLine.Points = path.AsValueEnumerable()
+    _movementLine.ShowPath(path.AsValueEnumerable()
       .Select(tile => BoardCoordinates.TileToWorldCenter(tile) + new Vector3(0f, 0.05f, 0f))
-      .ToArray();
-    _movementLine.Rebuild();
-    _movementLine.Visible = true;
+      .ToArray());
   }
 }
