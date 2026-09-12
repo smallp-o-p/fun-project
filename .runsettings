@@ -4,7 +4,9 @@
         <MaxCpuCount>2</MaxCpuCount>
         <TestAdaptersPaths>./test</TestAdaptersPaths>
         <ResultsDirectory>./TestResults</ResultsDirectory>
-        <TestSessionTimeout>1800000</TestSessionTimeout>
+        <!-- Healthy full-suite runs finish in well under a minute; this only bounds a
+             crashed or wedged Godot host instead of hanging the session for 30 minutes. -->
+        <TestSessionTimeout>300000</TestSessionTimeout>
         <TreatNoTestsAsError>true</TreatNoTestsAsError>
         <!-- Environment variables available to tests -->
         <EnvironmentVariables>
@@ -36,8 +38,8 @@
 
     <!-- GdUnit4-specific configuration -->
     <GdUnit4>
-        <!-- Additional Godot runtime parameters -->
-        <Parameters>--verbose</Parameters>
+        <!-- Godot's verbose flag is deliberately omitted: it logs every resource load
+             and the captured output bloats the TRX and slows every test run. -->
 
         <!-- Test display name format: SimpleName or FullyQualifiedName -->
         <DisplayName>FullyQualifiedName</DisplayName>
