@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Engineering;
+using FunProject.Scenes.Ext;
 using FunProject.Strategic;
 using Godot;
 
@@ -79,11 +80,8 @@ public sealed partial class EngineeringView : GeoscapeView
   private void RebuildItems()
   {
     var list = GetNode<VBoxContainer>("%ManufacturableItems");
-    foreach (Node child in list.GetChildren())
-    {
-      list.RemoveChild(child);
-      child.QueueFree();
-    }
+    
+    list.QueueFreeAllChildren();
     foreach (var option in _options)
     {
       var button = new Button

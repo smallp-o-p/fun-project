@@ -6,6 +6,7 @@ using FunProject.Strategic;
 using Godot;
 using System;
 using System.Linq;
+using FunProject.Scenes.Ext;
 using LanguageExt.UnsafeValueAccess;
 
 namespace FunProject.Geoscape;
@@ -61,7 +62,7 @@ public sealed partial class SquadLoadoutView : GeoscapeView
   private void RebuildSlots()
   {
     var slots = GetNode<VBoxContainer>("%Slots");
-    ClearChildren(slots);
+    slots.QueueFreeAllChildren();
     for (uint slot = 0; slot < Capacity; slot++)
       BuildCard(slots, slot);
   }
@@ -96,7 +97,8 @@ public sealed partial class SquadLoadoutView : GeoscapeView
   private void RebuildChoices()
   {
     var choices = GetNode<VBoxContainer>("%RosterChoices");
-    ClearChildren(choices);
+    choices.QueueFreeAllChildren();
+
     if (_state!.Roster.Count == 0)
     {
       choices.AddChild(new Label { Text = "No units available for this mission." });
@@ -212,14 +214,5 @@ public sealed partial class SquadLoadoutView : GeoscapeView
       .ToArray();
 
     return $"{label}: {Mathf.RoundToInt(unit.Resolve<TStat>(contributions))}";
-  }
-
-  private static void ClearChildren(Container parent)
-  {
-    foreach (Node child in parent.GetChildren())
-    {
-      parent.RemoveChild(child); // detach now: replaced rows must not linger to frame end
-      child.QueueFree();
-    }
   }
 }

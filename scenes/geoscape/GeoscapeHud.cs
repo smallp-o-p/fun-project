@@ -2,6 +2,7 @@ using FunProject.Engineering;
 using FunProject.Strategic;
 using Godot;
 using System;
+using FunProject.Scenes.Ext;
 
 // Authored top bar, left alert list and right project status panel over the permanent map
 // view. A full-rect Control (input-ignoring at the root) so hiding the root view hides
@@ -102,11 +103,7 @@ public sealed partial class GeoscapeHud : Control
   // resolved); per-tick countdown updates go through UpdateCountdowns.
   public void RefreshAlerts(SysColGeneric.IReadOnlyList<GeoscapeEvent> activeEvents)
   {
-    foreach (Node child in _alerts.GetChildren())
-    {
-      _alerts.RemoveChild(child); // detach now: replaced alerts must not linger to frame end
-      child.QueueFree();
-    }
+    _alerts.QueueFreeAllChildren();
     _alertButtons.Clear();
 
     foreach (GeoscapeEvent active in activeEvents)

@@ -2,6 +2,7 @@ using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Strategic;
 using Godot;
 using System;
+using FunProject.Scenes.Ext;
 
 // The pending-resolution modal. A transparent GeoscapeView over the covered stack: the
 // base shell's background stays hidden and the Dim wash blocks the map/HUD beneath. The
@@ -36,12 +37,8 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
       value => value,
       () => throw new InvalidOperationException(
         "GeoscapeEventResolution requires a pending resolution; it is presented only while one is open."));
-
-    foreach (Node child in _buttons.GetChildren())
-    {
-      _buttons.RemoveChild(child);
-      child.QueueFree();
-    }
+    
+    _buttons.QueueFreeAllChildren();
 
     _title.Text = pending.Event.Definition.Title;
     _description.Text =

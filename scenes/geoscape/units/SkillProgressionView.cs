@@ -6,6 +6,7 @@ using FunProject.Strategic;
 using Godot;
 using System;
 using System.Collections.Generic;
+using FunProject.Scenes.Ext;
 
 // Quick-and-dirty skill-path screen: currency, committed path chains (unlock next), and
 // the available-path catalog (commit). Presentation only — every interaction calls domain
@@ -57,7 +58,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
   private void RebuildCommitted()
   {
     var list = GetNode<VBoxContainer>("%CommittedList");
-    ClearChildren(list);
+    list.QueueFreeAllChildren();
 
     foreach (SkillPathData path in _unit!.Progression.CommittedPaths)
     {
@@ -95,7 +96,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
   private void RebuildAvailable()
   {
     var list = GetNode<VBoxContainer>("%AvailableList");
-    ClearChildren(list);
+    list.QueueFreeAllChildren();
 
     UnitProgression progression = _unit!.Progression;
     bool slotsFree = progression.CommittedPaths.Count < UnitProgression.MaxCommittedPaths;
@@ -181,14 +182,5 @@ public sealed partial class SkillProgressionView : GeoscapeView
     };
     label.AddThemeFontSizeOverride("normal_font_size", fontSize);
     parent.AddChild(label);
-  }
-
-  private static void ClearChildren(Container parent)
-  {
-    foreach (Node child in parent.GetChildren())
-    {
-      parent.RemoveChild(child);
-      child.QueueFree();
-    }
   }
 }

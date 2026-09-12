@@ -2,6 +2,7 @@ using FunProject.Battle;
 using FunProject.Combatants;
 using Godot;
 using System.Collections.Generic;
+using FunProject.Scenes.Ext;
 
 // Minimal scaffolding host: boots a small BattleRuntime via BattleFactory, builds the scene tree in
 // code (camera, light, ground, unit meshes, HUD), and connects the presentation FSM to input and
@@ -198,9 +199,8 @@ public sealed partial class BattleScene : Node3D
     var queriedUnits = _runtime.Query(new GetFactionAliveUnits(_playerFaction))
       .AsValueEnumerable().Select(unit => unit.State).ToArray();
     _unitStatusLabel.Text = string.Join("\n", queriedUnits.AsValueEnumerable().Select(FormatUnitReadout).ToArray());
-
-    foreach (Node child in _verbButtons.GetChildren())
-      child.QueueFree();
+    
+    _verbButtons.QueueFreeAllChildren();
 
     foreach (UnitActionOption option in _ui.ActionOptions)
     {

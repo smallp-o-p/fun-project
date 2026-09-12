@@ -10,6 +10,7 @@ using FunProject.Weapons;
 using Godot;
 using System;
 using System.Collections.Generic;
+using FunProject.Scenes.Ext;
 
 // Which slot the armory browser targets. Produced by slot-button clicks (or the test seam);
 // weapon/armor/utility/mod kinds each filter the browser differently.
@@ -115,7 +116,7 @@ public sealed partial class UnitView : GeoscapeView
   private void RebuildStats()
   {
     var stats = GetNode<VBoxContainer>("%StatsList");
-    ClearChildren(stats);
+    stats.QueueFreeAllChildren();
     AddStatRow<HealthStat>("Health");
     AddStatRow<ActionPointsStat>("Action Points");
     AddStatRow<WillStat>("Will");
@@ -124,7 +125,7 @@ public sealed partial class UnitView : GeoscapeView
     AddStatRow<AimStat>("Aim");
 
     var buffs = GetNode<VBoxContainer>("%BuffsList");
-    ClearChildren(buffs);
+    buffs.QueueFreeAllChildren();
     foreach (Buff buff in _unit!.InnateBuffs)
       AddLabelRow(buffs, buff.Name);
     if (buffs.GetChildCount() == 0)
@@ -157,7 +158,7 @@ public sealed partial class UnitView : GeoscapeView
   private void RebuildPersonalMods()
   {
     var slots = GetNode<VBoxContainer>("%PersonalModSlots");
-    ClearChildren(slots);
+    slots.QueueFreeAllChildren();
     Godot.Collections.Array<ModSlot> modSlots = _unit!.GetModSlots();
     for (int i = 0; i < modSlots.Count; i++)
       AddSlotButton(slots, SlotLabel(modSlots[i]), UnitViewSlot.PersonalMod(i));
@@ -166,7 +167,7 @@ public sealed partial class UnitView : GeoscapeView
   private void RebuildWeaponSlot()
   {
     var weaponMods = GetNode<VBoxContainer>("%WeaponModSlots");
-    ClearChildren(weaponMods);
+    weaponMods.QueueFreeAllChildren();
     GetNode<Button>("%WeaponSlot").Text = _unit!.EquippedWeapon.Match(
       Some: weapon =>
       {
@@ -198,7 +199,7 @@ public sealed partial class UnitView : GeoscapeView
   private void RebuildUtilitySlots()
   {
     var slots = GetNode<VBoxContainer>("%UtilitySlots");
-    ClearChildren(slots);
+    slots.QueueFreeAllChildren();
     for (int i = 0; i < _unit!.MaxInventorySize; i++)
     {
       string text = _unit.Inventory.TryGetValue(i, out EquippableItem? item)
@@ -217,7 +218,7 @@ public sealed partial class UnitView : GeoscapeView
   {
     var list = GetNode<VBoxContainer>("%ArmoryList");
     var unequip = GetNode<Button>("%UnequipButton");
-    ClearChildren(list);
+    list.QueueFreeAllChildren();
 
     if (_selection is null || _state is null || _unit is null)
     {
@@ -375,14 +376,5 @@ public sealed partial class UnitView : GeoscapeView
     var button = new Button { Text = text };
     button.Pressed += () => SelectSlot(slot);
     parent.AddChild(button);
-  }
-
-  private static void ClearChildren(Container parent)
-  {
-    foreach (Node child in parent.GetChildren())
-    {
-      parent.RemoveChild(child);
-      child.QueueFree();
-    }
   }
 }

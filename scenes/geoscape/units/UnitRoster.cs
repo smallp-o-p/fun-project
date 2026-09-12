@@ -3,6 +3,7 @@ using FunProject.Combatants;
 using FunProject.Strategic;
 using Godot;
 using System;
+using FunProject.Scenes.Ext;
 
 // Full-screen roster view over the campaign state. Presentation only: every activation
 // rebuilds rows from GameState.Roster (query, not copy). A row click builds a fresh
@@ -26,7 +27,7 @@ public sealed partial class UnitRoster : GeoscapeView
   {
     // ClearRows strips the authored placeholder rows on first present (and remains
     // idempotent thereafter); every present then rebuilds from the current roster.
-    ClearRows();
+    _unitLabels.QueueFreeAllChildren();
 
     PackedScene scene = UnitLabelScene ?? throw new InvalidOperationException(
       "UnitRoster requires UnitLabelScene; assign a PackedScene in the inspector.");
@@ -53,14 +54,5 @@ public sealed partial class UnitRoster : GeoscapeView
     }
     view.BindUnit(unit); // retain the selection before the view enters the tree
     RequestView(view);
-  }
-
-  private void ClearRows()
-  {
-    foreach (Node child in _unitLabels.GetChildren())
-    {
-      _unitLabels.RemoveChild(child); // detach now: replaced rows must not linger to frame end
-      child.QueueFree();
-    }
   }
 }
