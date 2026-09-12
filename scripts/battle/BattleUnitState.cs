@@ -183,6 +183,11 @@ public sealed class BattleUnitState
     _visibleTiles.Clear();
   }
 
+  internal void ClearVisibleUnits()
+  {
+    _visibleUnits.Clear();
+  }
+
   internal void AddVisibleTile(BattleBoardState.ValidatedPoint tile)
   {
     _visibleTiles.Add(tile);
@@ -192,12 +197,6 @@ public sealed class BattleUnitState
   {
     ArgumentNullException.ThrowIfNull(unit);
     _visibleUnits.Add(unit);
-  }
-
-  internal void RemoveVisibleUnit(BattleUnitState unit)
-  {
-    ArgumentNullException.ThrowIfNull(unit);
-    _visibleUnits.Remove(unit);
   }
 
   internal bool RecordFirstSpotting(BattleUnitState unit)

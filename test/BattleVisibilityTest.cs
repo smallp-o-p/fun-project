@@ -591,6 +591,35 @@ public class BattleVisibilityTest
     Assert.Equal(1, MatchingSpottings(battle, observer, target));
   }
 
+  // Mirror of the spot-on-move tests with the roles reversed: the TARGET moves while the
+  // observer stays put. The observer is unaffected by the move, so only its visible-UNIT
+  // membership is rebuilt (its visible-tile set is invariant) — that rebuild must replace
+  // stale members, not merely add new ones.
+  [TestCase(TestName = "Target moving out of sight drops from the stationary observer")]
+  public void TargetMovingOutOfSightDropsFromStationaryObserver()
+  {
+    // Board: 6 wide × 1 tall × 1 deep. Enemy observer (vision 2) stationary at (4,0,0);
+    // player target starts at (3,0,0), distance 1 ≤ 2 → visible at battle start.
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    using var battle = new BattleFixture(new Vector3I(6, 1, 1), [playerFaction, enemyFaction]);
+    var observer = battle.Spawn(TestData.MakeCombatant("Observer", enemyFaction, vision: 2), new Vector3I(4, 0, 0));
+    var target = battle.Spawn(TestData.MakeCombatant("Target", playerFaction, vision: 1), new Vector3I(3, 0, 0));
+
+    battle.Start();
+    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+
+    // Still within sight at distance 2, then out of sight at distance 3.
+    battle.Move(target, [new Vector3I(2, 0, 0)]);
+    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    battle.Move(target, [new Vector3I(1, 0, 0)]);
+    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+
+    // Returning to distance 2 makes the target visible to the observer again.
+    battle.Move(target, [new Vector3I(2, 0, 0)]);
+    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+  }
+
   private static int MatchingSpottings(BattleFixture battle, BattleUnitState observer, BattleUnitState target) =>
     battle.Events.EventsOf<UnitSpottedBattleEvent>()
       .AsValueEnumerable()

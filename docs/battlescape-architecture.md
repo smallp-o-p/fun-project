@@ -254,14 +254,13 @@ Current behavior:
 
 - uses `VisionStat` as the maximum sight range per living conscious observer
 - clears unconscious units' visible-tile/unit caches and removes their contribution to faction vision; exploration persists, and conscious observers can still see their bodies
-- flood-fills visible tiles through same-level orthogonal neighbors inside the observer's vision range
-- treats whole-tile LOS blockers as visible, then stops visibility expansion past that blocker
-- includes same-level adjacent diagonal tiles as visible without using them as flood-fill expansion points
+- computes visible tiles by scanning a 3D bounding box within Euclidean vision range (vertical distance included) and raytracing line of sight to each candidate tile
+- blocks sight at whole-tile LOS blockers (a diagonal between two blockers passes only if not both flanking tiles block) and at vertical passages through tiles that block vertical line of sight
 - treats units as visible when they stand on a currently visible tile
 - stores each unit's current visible `BattleBoardState.ValidatedPoint`s and visible `BattleUnitState` handles on `BattleUnitState`
 - stores explored `BattleBoardState.ValidatedPoint` memory per faction on `BattleSession`
 - keeps own living units known to their faction even without direct LOS
-- refreshes current unit visibility after committed battle events
+- refreshes visibility after committed battle events: only units whose own cell or consciousness changed recompute their visible tiles, while every conscious observer rebuilds its visible-unit membership wholesale from its visible tiles
 
 Current limitations:
 

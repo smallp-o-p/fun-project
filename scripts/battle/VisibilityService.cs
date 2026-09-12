@@ -30,87 +30,83 @@ internal sealed class VisibilityService
 
     // Include unconscious living units so the full pass clears their stale caches too.
     var alive = new SysColGeneric.HashSet<BattleUnitState>(aliveUnits);
-    return RefreshAffected(board, allUnits, alive, alive);
+    return RefreshAffected(board, allUnits, alive);
   }
 
   // Incremental counterpart to a full recompute (RefreshAllUnits), applied after an occupancy
-  // or consciousness change (move/spawn/death/knockout). Line-of-sight blocking is a tile property and the
-  // position/vision of every UNaffected observer is unchanged, so their visible-TILE sets are
-  // invariant under another unit moving, spawning, or dying. Therefore we only:
-  //   (1) fully recompute each affected unit's own visible tiles + units (and union its newly
-  //       seen tiles into its faction's explored memory, exactly as a full pass would), and
-  //   (2) refresh, for each unaffected conscious observer, whether every affected unit now belongs
-  //       to its visible-UNIT set (the only membership that can flip is that of a unit whose own
-  //       cell changed or that left the board), leaving all other memberships untouched.
-  // The resulting per-unit sets and per-faction explored memory are byte-identical to recomputing
-  // every alive unit from scratch (which RefreshAllUnits does by calling this with affected == alive).
-  // NOTE: units don't occlude, only tiles — an unaffected observer's visible-tile set is stable.
+  // or consciousness change (move/spawn/death/knockout). Line-of-sight blocking is a tile
+  // property and the position/vision of every UNaffected observer is unchanged, so their
+  // visible-TILE sets are invariant under another unit moving, spawning, or dying. Therefore:
+  //   (1) recompute each affected unit's own visible tiles (and union its newly seen tiles
+  //       into its faction's explored memory, exactly as a full pass would), then
+  //   (2) rebuild every conscious observer's visible-UNIT membership wholesale from its
+  //       visible tiles — the same rule a full pass applies — instead of surgically flipping
+  //       individual memberships. With battle-scale unit counts the O(observers × units) set
+  //       lookups are trivial and the membership derivation becomes one uniform code path.
+  // The resulting per-unit sets and per-faction explored memory are identical to recomputing
+  // every alive unit from scratch (which RefreshAllUnits does by calling this with
+  // affected == every alive unit). First-time spottings are detected directly through
+  // RecordFirstSpotting's lifetime memory: a currently visible pair that was never recorded
+  // cannot have been visible at any earlier refresh (it would have been recorded then), so no
+  // prior-set snapshot is needed to detect novelty.
   internal IReadOnlyList<(BattleUnitState Observer, BattleUnitState Target)> RefreshAffected(
     BattleBoardState board,
     IReadOnlyList<BattleUnitState> allUnits,
-    IEnumerable<BattleUnitState> aliveUnits,
     IReadOnlySet<BattleUnitState> affectedUnits)
   {
     ArgumentNullException.ThrowIfNull(board);
     ArgumentNullException.ThrowIfNull(allUnits);
-    ArgumentNullException.ThrowIfNull(aliveUnits);
     ArgumentNullException.ThrowIfNull(affectedUnits);
 
     var spotted = new List<(BattleUnitState, BattleUnitState)>();
 
-    // Snapshot affected units' visible-unit sets BEFORE clearing, then clear and recompute.
-    var priors = new Dictionary<BattleUnitState, SysColGeneric.HashSet<BattleUnitState>>();
+    // (1) Recompute visible tiles for affected observers only. A living unit is always
+    // indexed on the board (Refresh enforces the same invariant); dead and unconscious units
+    // see nothing, so their just-cleared sets are correct.
     foreach (var affected in affectedUnits)
     {
-      priors[affected] = new SysColGeneric.HashSet<BattleUnitState>(affected.VisibleUnits);
       affected.ClearVisibility();
-      // A living unit is always indexed on the board (Refresh enforces the same invariant);
-      // dead and unconscious units see nothing, so their just-cleared sets are correct.
       if (affected.IsAlive && !affected.IsUnconscious)
-        RecomputeObserver(board, allUnits, affected);
+        RecomputeObserver(board, affected);
     }
 
-    // Diff affected observers against their snapshots.
-    foreach (var (observer, prior) in priors)
-      foreach (var target in observer.VisibleUnits)
-        if (!prior.Contains(target))
-          spotted.Add((observer, target));
-
-    // Conscious observers can still see affected living bodies as targets.
-    foreach (var observer in aliveUnits)
+    // (2) Rebuild visible-UNIT membership for every conscious observer from its visible
+    // tiles (freshly recomputed for affected observers, invariant for the rest): a target is
+    // visible iff it is alive and stands on a visible tile.
+    var positionedTargets =
+      new List<(BattleUnitState Target, BattleBoardState.ValidatedPoint Position)>();
+    foreach (var candidate in allUnits)
     {
-      if (!observer.IsAlive || observer.IsUnconscious || affectedUnits.Contains(observer))
+      if (!candidate.IsAlive)
+        continue;
+      var position = board.FindOccupantPosition(candidate.Id);
+      if (position.IsSome)
+        positionedTargets.Add((candidate, position.Value()));
+    }
+
+    foreach (var observer in allUnits)
+    {
+      if (!observer.IsAlive || observer.IsUnconscious)
         continue;
 
-      foreach (var affected in affectedUnits)
-      {
-        if (ReferenceEquals(affected, observer))
-          continue;
+      // Replace, not merge: membership must reflect exactly the targets currently standing on
+      // visible tiles, so a target that moved out of sight loses its stale membership even
+      // though this observer's visible-tile set itself was never recomputed.
+      observer.ClearVisibleUnits();
+      foreach (var (target, position) in positionedTargets)
+        if (!ReferenceEquals(target, observer) && observer.VisibleTiles.Contains(position))
+          observer.AddVisibleUnit(target);
 
-        bool wasVisible = observer.VisibleUnits.Contains(affected);
-        bool visible = affected.IsAlive
-          && board.FindOccupantPosition(affected.Id).Match(
-               position => observer.VisibleTiles.Contains(position),
-               () => false);
-
-        if (visible)
-          observer.AddVisibleUnit(affected);
-        else
-          observer.RemoveVisibleUnit(affected);
-
-        if (visible && !wasVisible)
-          spotted.Add((observer, affected));
-      }
+      foreach (var target in observer.VisibleUnits)
+        if (observer.RecordFirstSpotting(target))
+          spotted.Add((observer, target));
     }
 
     spotted.Sort(CompareSpottedDelta);
     return spotted;
   }
 
-  private void RecomputeObserver(
-    BattleBoardState board,
-    IReadOnlyList<BattleUnitState> allUnits,
-    BattleUnitState observer)
+  private void RecomputeObserver(BattleBoardState board, BattleUnitState observer)
   {
     var observerPositionOption = board.FindOccupantPosition(observer.Id);
     if (observerPositionOption.IsNone)
@@ -118,24 +114,11 @@ internal sealed class VisibilityService
         $"Living unit {observer.Id} is missing from the session position index.");
     var observerPosition = observerPositionOption.Value();
 
-    SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> observerVisibleTiles =
-      GetVisibleTiles(board, observer, observerPosition);
+    var observerVisibleTiles = GetVisibleTiles(board, observer, observerPosition);
     foreach (var visibleTile in observerVisibleTiles)
       observer.AddVisibleTile(visibleTile);
 
     MarkTilesExplored(observer.Side, observerVisibleTiles);
-
-    foreach (var visibleTile in observerVisibleTiles)
-    {
-      var occupantId = board.GetOccupant(visibleTile);
-      if (occupantId.IsNone)
-        continue;
-      var target = allUnits[occupantId.Value()];
-      if (ReferenceEquals(target, observer) || target.IsDead)
-        continue;
-
-      observer.AddVisibleUnit(target);
-    }
   }
 
   private void MarkTilesExplored(Faction side, IEnumerable<BattleBoardState.ValidatedPoint> tiles)

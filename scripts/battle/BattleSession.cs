@@ -649,26 +649,25 @@ public sealed class BattleSession
 
   private void RefreshVisibilityAndQueueSpottings()
   {
-    IReadOnlyList<(BattleUnitState Observer, BattleUnitState Target)> spottedDelta;
+    IReadOnlyList<(BattleUnitState Observer, BattleUnitState Target)> firstSpottings;
     if (_visibilityFullRefreshPending)
     {
-      spottedDelta = _visibility.RefreshAllUnits(Board, _units, AliveUnits);
+      firstSpottings = _visibility.RefreshAllUnits(Board, _units, AliveUnits);
       _visibilityFullRefreshPending = false;
       _visibilityAffectedUnits.Clear();
     }
     else if (_visibilityAffectedUnits.Count > 0)
     {
-      spottedDelta = _visibility.RefreshAffected(Board, _units, AliveUnits, _visibilityAffectedUnits);
+      firstSpottings = _visibility.RefreshAffected(Board, _units, _visibilityAffectedUnits);
       _visibilityAffectedUnits.Clear();
     }
     else
     {
-      spottedDelta = [];
+      firstSpottings = [];
     }
 
-    foreach (var (observer, target) in spottedDelta)
-      if (observer.RecordFirstSpotting(target))
-        _eventDispatchQueue.Enqueue(new UnitSpottedBattleEvent(observer, target));
+    foreach (var (observer, target) in firstSpottings)
+      _eventDispatchQueue.Enqueue(new UnitSpottedBattleEvent(observer, target));
   }
 
   private void EnqueueFactionInGlobalOrder(Faction side)
