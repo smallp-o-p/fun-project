@@ -39,7 +39,9 @@ public class GeoscapeSquadLoadoutTest
     CampaignGameState state, GeoscapeSession session)
   {
     var view = AddToTree(CreateSquadLoadoutView());
-    view.Present(state, session); // Present pulls the pending mission from the session
+    // The opener supplies the mission configuration: title, three editable slots.
+    view.Configure(pending.Event.Definition.Title, 3, allowEquipmentEditing: true);
+    view.Present(state, session);
     return view;
   }
 
@@ -70,6 +72,83 @@ public class GeoscapeSquadLoadoutTest
     => $"{card.GetNode<Label>("%CardTitle").Text}\n"
       + $"{card.GetNode<RichTextLabel>("%Equipment").Text}\n"
       + $"{card.GetNode<RichTextLabel>("%Stats").Text}";
+
+  [TestCase(TestName = "Presenting without Configure is rejected and the view stays usable")]
+  public async Task PresentWithoutConfigureIsRejectedAndTheViewStaysUsable()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    using var fixture = new GeoscapeFixture(); // no timeline: nothing is ever pending
+    var view = AddToTree(CreateSquadLoadoutView());
+
+    Assert.Throws<InvalidOperationException>(() => view.Present(fixture.State, fixture.Session));
+
+    // The rejected call left no partial configuration: an explicit Configure then presents.
+    view.Configure("Interrogation — Alpha (Cult)", 2, allowEquipmentEditing: false);
+    view.Present(fixture.State, fixture.Session);
+
+    Assert.Equal("Interrogation — Alpha (Cult)", view.GetNode<Label>("%Title").Text);
+    Assert.Equal(2, view.GetNode<VBoxContainer>("%Slots").GetChildCount());
+    Assert.Equal("Squad: 0/2", view.GetNode<Label>("%SquadCount").Text);
+    Assert.Equal(0, view.GetSelectedCombatants().Count);
+    Assert.Throws<InvalidOperationException>(() => view.EditUnit(0)); // editing stays disabled
+  }
+
+  [TestCase(TestName = "Configure resizes slots, resets picks, and rejects nonsense arguments")]
+  public async Task ConfigureResizesResetsAndRejectsNonsenseCapacity()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (fixture, pending) = Mission([MakeEntry("Alpha"), MakeEntry("Bravo")]);
+    using var _ = fixture;
+    var view = PresentedSquadView(pending, fixture.State, fixture.Session);
+    ChooseIntoSlot(view, 0, "Alpha");
+
+    view.Configure("Interrogation prep", 2, allowEquipmentEditing: true);
+    view.Present(fixture.State, fixture.Session);
+
+    Assert.Equal(2, view.GetNode<VBoxContainer>("%Slots").GetChildCount());
+    Assert.Equal("Squad: 0/2", view.GetNode<Label>("%SquadCount").Text); // picks were reset
+    Assert.Equal(0, view.GetSelectedCombatants().Count);
+    Assert.Equal("Interrogation prep", view.GetNode<Label>("%Title").Text);
+    Assert.Equal("Interrogation prep", view.GetNode<Label>("%Title").TooltipText);
+
+    ChooseIntoSlot(view, 0, "Alpha");
+    ChooseIntoSlot(view, 1, "Bravo");
+    var selected = view.GetSelectedCombatants();
+    Assert.Equal(2, selected.Count);
+    Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
+    Assert.True(ReferenceEquals(fixture.State.Roster[1], selected[1]));
+
+    Assert.Throws<ArgumentNullException>(() => view.Configure(null, 3, true)); // a heading is required
+    Assert.Throws<ArgumentOutOfRangeException>(() => view.Configure("Zero", 0, true));
+    view.Present(fixture.State, fixture.Session); // rejections preserved the prior configuration
+    Assert.Equal("Interrogation prep", view.GetNode<Label>("%Title").Text);
+    Assert.Equal("Squad: 2/2", view.GetNode<Label>("%SquadCount").Text);
+  }
+
+  [TestCase(TestName = "Editing-disabled configuration hides Edit and rejects the direct route")]
+  public async Task EditingDisabledConfigurationHidesEditAndRejectsTheDirectRoute()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (fixture, pending) = Mission([MakeEntry("Alpha")]);
+    using var _ = fixture;
+    var view = AddToTree(CreateSquadLoadoutView());
+    view.Configure("Interrogation — Alpha (Cult)", 2, allowEquipmentEditing: false);
+    view.Present(fixture.State, fixture.Session);
+    ChooseIntoSlot(view, 0, "Alpha");
+
+    Control card = SlotCard(view, 0);
+    Assert.False(card.GetNode<Button>("%EditUnit").Visible); // hidden on an occupied card
+    Assert.True(card.GetNode<Button>("%RemoveUnit").Visible); // squad picks still work
+
+    SysColGeneric.List<GeoscapeView> requested = [];
+    view.ViewRequested += requested.Add;
+
+    // Direct call: exceptions inside pressed-signal handlers are logged by Godot, not
+    // raised through EmitSignal, so the misuse guard is invoked directly.
+    Assert.Throws<InvalidOperationException>(() => view.EditUnit(0));
+    Assert.Equal(0, requested.Count); // the rejected route never navigates
+    Assert.Equal(1, view.GetSelectedCombatants().Count); // selection untouched
+  }
 
   [TestCase(TestName = "An empty-roster mission presents three empty slots and no choices")]
   public async Task EmptyRosterPresentsThreeEmptySlots()
@@ -104,6 +183,22 @@ public class GeoscapeSquadLoadoutTest
 
     Assert.True(baseState is not null, "SquadLoadoutView.tscn must inherit the shared shell scene.");
     Assert.Equal("res://scenes/geoscape/GeoscapeView.tscn", baseState!.GetPath());
+  }
+
+  [TestCase(TestName = "The authored title passes the mouse through so its tooltip is reachable")]
+  public void AuthoredTitlePassesMouseThroughForTooltip()
+  {
+    var view = GD.Load<PackedScene>("res://scenes/geoscape/squad/SquadLoadoutView.tscn")
+      .Instantiate<SquadLoadoutView>();
+    try
+    {
+      // The label clips long target lists; MouseFilter.Pass keeps its tooltip hoverable.
+      Assert.Equal(Control.MouseFilterEnum.Pass, view.GetNode<Label>("%Title").MouseFilter);
+    }
+    finally
+    {
+      view.Free(); // never entered the tree; keep the orphan monitor clean
+    }
   }
 
   [TestCase(TestName = "Choices are inert without a destination and occupied units stay unavailable")]
@@ -229,7 +324,8 @@ public class GeoscapeSquadLoadoutTest
     manager.ViewChanged += view => view.Present(fixture.State, fixture.Session);
 
     var view = CreateSquadLoadoutView();
-    manager.Push(view); // ViewChanged presents; Present sources the mission from the session
+    view.Configure(pending.Event.Definition.Title, 3, allowEquipmentEditing: true);
+    manager.Push(view); // ViewChanged presents the configured view
     ChooseIntoSlot(view, 0, "Alpha");
 
     // Open the nested editor through the real button and drive its armory browser.
@@ -307,6 +403,7 @@ public class GeoscapeSquadLoadoutTest
     var (fixture, _) = Mission([MakeEntry("Alpha")]);
     using var __ = fixture;
     var view = AddToTree(CreateSquadLoadoutView());
+    view.Configure("Operation Iron", 3, allowEquipmentEditing: true);
     view.SquadSlotCardScene = null;
 
     // Direct call: Present builds every card, and exceptions inside signal handlers are
@@ -324,6 +421,7 @@ public class GeoscapeSquadLoadoutTest
     var (fixture, _) = Mission([MakeEntry("Alpha")]);
     using var __ = fixture;
     var view = AddToTree(CreateSquadLoadoutView());
+    view.Configure("Operation Iron", 3, allowEquipmentEditing: true);
     var probe = new Label { Name = "NotASquadSlotCard" };
     var packed = new PackedScene();
     Error error = packed.Pack(probe);

@@ -9,7 +9,6 @@ using FunProject.Strategic;
 using FunProject.Weapons;
 using Godot;
 using System;
-using System.Collections.Generic;
 using FunProject.Scenes.Ext;
 
 // Which slot the armory browser targets. Produced by slot-button clicks (or the test seam);
@@ -117,12 +116,13 @@ public sealed partial class UnitView : GeoscapeView
   {
     var stats = GetNode<VBoxContainer>("%StatsList");
     stats.QueueFreeAllChildren();
-    AddStatRow<HealthStat>("Health");
-    AddStatRow<ActionPointsStat>("Action Points");
-    AddStatRow<WillStat>("Will");
-    AddStatRow<MovementStat>("Movement");
-    AddStatRow<VisionStat>("Vision");
-    AddStatRow<AimStat>("Aim");
+    var contributions = _unit!.CampaignStatContributions();
+    AddStatRow<HealthStat>("Health", contributions);
+    AddStatRow<ActionPointsStat>("Action Points", contributions);
+    AddStatRow<WillStat>("Will", contributions);
+    AddStatRow<MovementStat>("Movement", contributions);
+    AddStatRow<VisionStat>("Vision", contributions);
+    AddStatRow<AimStat>("Aim", contributions);
 
     var buffs = GetNode<VBoxContainer>("%BuffsList");
     buffs.QueueFreeAllChildren();
@@ -132,20 +132,13 @@ public sealed partial class UnitView : GeoscapeView
       AddLabelRow(buffs, "—");
   }
 
-  private void AddStatRow<TStat>(string label) where TStat : Stat
+  private void AddStatRow<TStat>(string label, SysColGeneric.IEnumerable<StatMod> contributions)
+    where TStat : Stat
   {
     int baseValue = Mathf.RoundToInt(_unit!.GetStat<TStat>().BaseValue);
-    int effective = Mathf.RoundToInt(_unit.Resolve<TStat>(GatherStatContributions()));
+    int effective = Mathf.RoundToInt(_unit.Resolve<TStat>(contributions));
     AddLabelRow(GetNode<VBoxContainer>("%StatsList"), $"{label}: {baseValue} -> {effective}");
   }
-
-  private IEnumerable<StatMod> GatherStatContributions()
-    => _unit!.StatContributions()
-      .AsValueEnumerable()
-      .Concat(_unit.EquippedWeapon.Match<IEnumerable<StatMod>>(
-        weapon => weapon.StatContributions,
-        () => System.Array.Empty<StatMod>()))
-      .ToArray();
 
   private void RebuildEquipment()
   {

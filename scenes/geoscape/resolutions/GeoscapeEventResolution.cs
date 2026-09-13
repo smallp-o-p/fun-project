@@ -2,6 +2,7 @@ using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Strategic;
 using Godot;
 using System;
+using FunProject.Geoscape;
 using FunProject.Scenes.Ext;
 
 // The pending-resolution modal. A transparent GeoscapeView over the covered stack: the
@@ -9,8 +10,9 @@ using FunProject.Scenes.Ext;
 // composition root pushes a fresh instance on ResolutionEventOpened and pops it on the
 // session's committed ResolutionEventClosed — so the dialog carries no back button and a
 // stray close (top not the dialog) pops nothing. Outcome buttons resolve through the
-// session; tactical Engage instead produces the pre-mission squad view from the exported
-// SquadViewScene and requests it as the next stacked view, so the mission stays pending.
+// session; tactical Engage instead produces a pre-mission squad view from the exported
+// SquadViewScene, configures it with the pending mission's title and three editable
+// slots, and requests it as the next stacked view, so the mission stays pending.
 public sealed partial class GeoscapeEventResolution : GeoscapeView
 {
   [Export] public PackedScene? SquadViewScene { get; set; }
@@ -30,17 +32,17 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
   }
 
   // Renders the session's pending resolution; pushed only while one is open, so a missing
-  // pending resolution is a caller bug.
+  // pending resolution is a caller bug. The displayed title feeds the Engage handover.
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
     PendingResolution pending = session.PendingResolution.Match(
       value => value,
       () => throw new InvalidOperationException(
         "GeoscapeEventResolution requires a pending resolution; it is presented only while one is open."));
-    
+    string heading = pending.Event.Definition.Title;
     _buttons.QueueFreeAllChildren();
 
-    _title.Text = pending.Event.Definition.Title;
+    _title.Text = heading;
     _description.Text =
       $"[{pending.Event.Definition.Kind}{RegionSuffix(session, pending)}]\n{pending.Event.Definition.Description}";
 
@@ -49,7 +51,7 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
       var button = new Button { Text = txt };
       if (outcome == ResolutionOutcome.Engaged)
       {
-        button.Pressed += () => RequestView(SquadViewScene);
+        button.Pressed += () => RequestSquadView(heading);
       }
       else
       {
@@ -59,19 +61,23 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
     }
   }
 
-  public void RequestView(PackedScene? scene)
+  // The tactical handover: a fresh SquadLoadoutView configured with the pending mission's
+  // title and three editable slots. Missing or wrong-root exports are freed and thrown,
+  // HUD-style; the mission stays pending.
+  private void RequestSquadView(string heading)
   {
-    PackedScene target = scene ?? throw new InvalidOperationException(
-      "GeoscapeEventResolution RequestView requires a PackedScene destination.");
+    PackedScene target = SquadViewScene ?? throw new InvalidOperationException(
+      "GeoscapeEventResolution requires SquadViewScene; assign a PackedScene in the inspector.");
     Node instance = target.Instantiate();
-    if (instance is not GeoscapeView view)
+    if (instance is not SquadLoadoutView view)
     {
       string kind = instance.GetClass();
-      instance.Free();
+      instance.Free(); // free now: rejected roots must not linger to frame end
       throw new InvalidOperationException(
-        $"GeoscapeEventResolution RequestView destination root must be a GeoscapeView; got {kind}.");
+        $"GeoscapeEventResolution SquadViewScene root must be a SquadLoadoutView; got {kind}.");
     }
-    EmitSignal(GeoscapeView.SignalName.ViewRequested, view);
+    view.Configure(heading, 3, allowEquipmentEditing: true);
+    RequestView(view);
   }
 
   private static string RegionSuffix(GeoscapeSession session, PendingResolution pending)

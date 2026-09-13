@@ -86,32 +86,27 @@ public class GeoscapeSquadNavigationTest
     produced.Free(); // the standalone dialog never pushed it; free directly
   }
 
-  [TestCase(TestName = "Missing and wrong-root squad destinations are authoring errors")]
-  public async Task BadSquadDestinationsThrowAndLeaveStateUnchanged()
+  [TestCase(TestName = "Engage produces a squad view configured with the mission title")]
+  public async Task EngageProducesAConfiguredSquadView()
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var fixture = GeoscapeFixture.WithFiredEvent(
-      MakeEvent("Operation", GeoscapeEventKind.TacticalBattle));
+      MakeEvent("Operation Iron", GeoscapeEventKind.TacticalBattle));
     fixture.OpenResolution(fixture.ActiveEvent);
     var dialog = AddToTree(CreateResolutionView());
     dialog.Present(fixture.State, fixture.Session);
     fixture.ClearEvents();
 
-    // Signal handlers swallow exceptions, so the guards are invoked directly.
-    dialog.SquadViewScene = null;
-    Assert.Throws<InvalidOperationException>(() => dialog.RequestView(dialog.SquadViewScene));
+    GeoscapeView? produced = null;
+    dialog.ViewRequested += view => produced = view;
+    DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
 
-    var probe = new Label { Name = "NotAView" };
-    var packed = new PackedScene();
-    Error error = packed.Pack(probe);
-    probe.Free();
-    if (error != Error.Ok)
-      throw new InvalidOperationException($"Test scene packing failed: {error}");
-    dialog.SquadViewScene = packed;
-    Assert.Throws<InvalidOperationException>(() => dialog.RequestView(dialog.SquadViewScene));
-
-    Assert.True(fixture.Session.PendingResolution.IsSome);
-    Assert.Equal(0, fixture.Events.Count);
+    var squad = AddToTree((SquadLoadoutView)produced!);
+    squad.Present(fixture.State, fixture.Session); // materializes the handed-over configuration
+    Assert.Equal("Operation Iron", squad.GetNode<Label>("%Title").Text);
+    Assert.Equal("Squad: 0/3", squad.GetNode<Label>("%SquadCount").Text); // default three slots
+    Assert.Equal(0, squad.GetSelectedCombatants().Count);
+    Assert.Equal(0, fixture.Events.Count); // still no resolution lifecycle
   }
 
   [TestCase(TestName = "Marker route: Engage covers the dialog with squad preparation")]

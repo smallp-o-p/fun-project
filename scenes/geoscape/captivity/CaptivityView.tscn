@@ -1,0 +1,142 @@
+[gd_scene format=3 uid="uid://la0pq1jhi1xu"]
+
+[ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_bs1ur"]
+[ext_resource type="Script" path="res://scenes/geoscape/captivity/CaptivityView.cs" id="2_pf3f6"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/squad/SquadLoadoutView.tscn" id="3_bs1ur"]
+
+[node name="CaptivityView" unique_id=1153850114 node_paths=PackedStringArray("BackButton") instance=ExtResource("1_bs1ur")]
+script = ExtResource("2_pf3f6")
+SquadViewScene = ExtResource("3_bs1ur")
+BackButton = NodePath("Content/MarginContainer/VBoxContainer/Header/HBox/BackButton")
+
+[node name="Viewport" parent="Background" index="0"]
+handle_input_locally = false
+render_target_update_mode = 0
+
+[node name="Content" type="PanelContainer" parent="." index="1" unique_id=80095951]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="Content" index="0" unique_id=654992870]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Content/MarginContainer" index="0" unique_id=1109419286]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Header" type="MarginContainer" parent="Content/MarginContainer/VBoxContainer" index="0" unique_id=1973534816]
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+theme_override_constants/margin_bottom = 16
+
+[node name="HBox" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer/Header" index="0" unique_id=1299085671]
+layout_mode = 2
+
+[node name="Title" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Header/HBox" index="0" unique_id=1828378539]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/normal_font_size = 64
+text = "Captivity"
+scroll_active = false
+vertical_alignment = 2
+
+[node name="BackButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Header/HBox" index="1" unique_id=1077662828]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "Back"
+
+[node name="HSeparator" type="HSeparator" parent="Content/MarginContainer/VBoxContainer" index="1" unique_id=552138463]
+layout_mode = 2
+
+[node name="Inspection" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer" index="2" unique_id=1238920964]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="Instructions" type="Label" parent="Content/MarginContainer/VBoxContainer/Inspection" index="0" unique_id=322860906]
+layout_mode = 2
+text = "Select captives to prepare an interrogation. Select a row to inspect its details."
+autowrap_mode = 3
+
+[node name="Body" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer/Inspection" index="1" unique_id=135001110]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 24
+
+[node name="Captives" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Inspection/Body" index="0" unique_id=1108039549]
+custom_minimum_size = Vector2(320, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.85
+theme_override_constants/separation = 12
+
+[node name="ListHeading" type="Label" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/Captives" index="0" unique_id=1220709067]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Captured enemies"
+
+[node name="EmptyState" type="Label" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/Captives" index="1" unique_id=40079381]
+unique_name_in_owner = true
+layout_mode = 2
+text = "No captured enemies in captivity."
+autowrap_mode = 3
+
+[node name="ListScroll" type="ScrollContainer" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/Captives" index="2" unique_id=1003188860]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="CaptiveList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/Captives/ListScroll" index="0" unique_id=895669821]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="Divider" type="VSeparator" parent="Content/MarginContainer/VBoxContainer/Inspection/Body" index="1" unique_id=474496341]
+layout_mode = 2
+
+[node name="InspectionDetails" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Inspection/Body" index="2" unique_id=773233395]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="DetailsHeading" type="Label" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/InspectionDetails" index="0" unique_id=1961087345]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Captive details"
+
+[node name="Details" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/InspectionDetails" index="1" unique_id=142630427]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+text = "Select a captive to inspect."
+
+[node name="FooterDivider" type="HSeparator" parent="Content/MarginContainer/VBoxContainer/Inspection" index="2" unique_id=894204847]
+layout_mode = 2
+
+[node name="Footer" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer/Inspection" index="3" unique_id=1301764436]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="SelectionCount" type="Label" parent="Content/MarginContainer/VBoxContainer/Inspection/Footer" index="0" unique_id=1078574959]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Selected: 0"
+
+[node name="PrepareButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Inspection/Footer" index="1" unique_id=984817310]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(230, 42)
+layout_mode = 2
+disabled = true
+text = "Prepare interrogation"

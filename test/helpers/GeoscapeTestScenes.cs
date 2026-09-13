@@ -32,6 +32,10 @@ internal static class GeoscapeTestScenes
     => GD.Load<PackedScene>("res://scenes/geoscape/squad/SquadLoadoutView.tscn")
       .Instantiate<SquadLoadoutView>();
 
+  public static CaptivityView CreateCaptivityView()
+    => GD.Load<PackedScene>("res://scenes/geoscape/captivity/CaptivityView.tscn")
+      .Instantiate<CaptivityView>();
+
   public static EngineeringView CreateEngineeringView()
     => GD.Load<PackedScene>("res://scenes/geoscape/engineering/EngineeringView.tscn")
       .Instantiate<EngineeringView>();

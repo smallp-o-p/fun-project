@@ -74,6 +74,70 @@ public class GameStateTest
     ])));
   }
 
+  [TestCase(TestName = "Captives are stamped with override and fallback names and leave the roster untouched")]
+  public void CaptivesAreStamped()
+  {
+    var state = new GameState(TestData.MakeStart(roster: [TestData.MakeEntry("Sgt. Bram Okafor")], captives:
+    [
+      TestData.MakeCaptiveEntry("Captured Grunt 01"),
+      TestData.MakeCaptiveEntry(),
+    ]));
+
+    var captives = state.Captivity.Combatants;
+    Assert.Equal(2, captives.Count);
+    Assert.True(captives.AsValueEnumerable().Any(c => c.Name == "Captured Grunt 01"));
+    Assert.True(captives.AsValueEnumerable().Any(c => c.Name == "Grunt")); // MakeCaptiveEntry's default mold name
+    Assert.Equal(1, state.Roster.Count); // captives never join the roster
+  }
+
+  [TestCase(TestName = "Captives keep their authored faction, separate from the player's and shared by seed reference")]
+  public void CaptiveFactionsAreSeparateAndShared()
+  {
+    var raiders = new FunProject.Combatants.FactionData { Name = "Alien Raiders" };
+    var state = new GameState(TestData.MakeStart(captives:
+    [
+      TestData.MakeCaptiveEntry("One", faction: raiders),
+      TestData.MakeCaptiveEntry("Two", faction: raiders),
+      TestData.MakeCaptiveEntry("Three", faction: new FunProject.Combatants.FactionData { Name = "Cultists" }),
+    ]));
+
+    var captives = state.Captivity.Combatants;
+    var one = captives.AsValueEnumerable().Single(c => c.Name == "One");
+    var two = captives.AsValueEnumerable().Single(c => c.Name == "Two");
+    var three = captives.AsValueEnumerable().Single(c => c.Name == "Three");
+    Assert.Equal("Alien Raiders", one.OwningFaction.Name);
+    Assert.False(ReferenceEquals(one.OwningFaction, state.PlayerFaction));
+    Assert.True(ReferenceEquals(one.OwningFaction, two.OwningFaction));
+    Assert.False(ReferenceEquals(one.OwningFaction, three.OwningFaction));
+  }
+
+  [TestCase(TestName = "Rebuilding the campaign mints fresh captive combatants and factions")]
+  public void CaptivesAreFreshAcrossCampaigns()
+  {
+    var start = TestData.MakeStart(captives: [TestData.MakeCaptiveEntry("One")]);
+    var first = new GameState(start);
+    var second = new GameState(start);
+
+    var firstCaptive = first.Captivity.Combatants[0];
+    var secondCaptive = second.Captivity.Combatants[0];
+    Assert.False(ReferenceEquals(firstCaptive, secondCaptive));
+    Assert.False(ReferenceEquals(firstCaptive.OwningFaction, secondCaptive.OwningFaction));
+  }
+
+  [TestCase(TestName = "Captive entry without a unit or faction throws at construction")]
+  public void CaptiveWithoutUnitOrFactionThrows()
+  {
+    Assert.Throws<System.InvalidOperationException>(() => new GameState(TestData.MakeStart(captives:
+    [
+      new CaptiveEntryData { Unit = null!, Faction = new FunProject.Combatants.FactionData() },
+    ])));
+
+    Assert.Throws<System.InvalidOperationException>(() => new GameState(TestData.MakeStart(captives:
+    [
+      new CaptiveEntryData { Unit = TestData.MakeCombatantData("Grunt"), Faction = null! },
+    ])));
+  }
+
   [TestCase(TestName = "Armory is built from CampaignStartData with flag-driven stock policy")]
   public void ArmoryBuiltFromStart()
   {

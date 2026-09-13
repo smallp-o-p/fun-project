@@ -23,11 +23,13 @@ public partial class SquadSlotCard : PanelContainer
   private const string NoUnitAssigned = "No unit assigned.";
 
   // Bind follows tree entry (as with UnitLabel): the %nodes resolve in _Ready, so callers
-  // add the card to a container before pushing state through this single door.
-  public void Bind(string title, bool occupied, string equipmentText, string statsText)
+  // add the card to a container before pushing state through this single door. Editing
+  // can be turned off for read-only uses (interrogation preparation hides the Edit button).
+  public void Bind(string title, bool occupied, string equipmentText, string statsText,
+    bool allowEquipmentEditing = true)
   {
     CardTitle!.Text = title;
-    EditUnit!.Visible = occupied;
+    EditUnit!.Visible = occupied && allowEquipmentEditing;
     RemoveUnit!.Visible = occupied;
     ChooseUnit!.Text = occupied ? "Replace" : "Choose";
     Equipment!.Text = occupied ? equipmentText : NoUnitAssigned;

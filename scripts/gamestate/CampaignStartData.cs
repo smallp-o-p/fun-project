@@ -21,6 +21,10 @@ public partial class CampaignStartData : NamedEntityData
 
   [Export] public RosterEntryData[] StartingRoster { get; set; } = [];
 
+  // Authored captives stamped into Captivity at construction; each keeps its own runtime
+  // faction (one per distinct FactionData reference) and never enters the roster.
+  [Export] public CaptiveEntryData[] StartingCaptives { get; set; } = [];
+
   // Which item/mod types the campaign starts stocked with. Stock policy (unlimited or
   // scarce) is authored on each template's UnlimitedStock flag; quantities are runtime-only.
   [Export] public EquippableItemData[] Armory { get; set; } = [];

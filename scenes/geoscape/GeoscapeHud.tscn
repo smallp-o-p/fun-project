@@ -3,6 +3,8 @@
 [ext_resource type="Script" uid="uid://utsd13okho7v" path="res://scenes/geoscape/GeoscapeHud.cs" id="1_7h8wm"]
 [ext_resource type="PackedScene" uid="uid://dm5w72otw20q2" path="res://scenes/geoscape/units/UnitRoster.tscn" id="2_roster"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/engineering/EngineeringView.tscn" id="3_engineering"]
+[ext_resource type="PackedScene" uid="uid://la0pq1jhi1xu" path="res://scenes/geoscape/captivity/CaptivityView.tscn" id="4_30twl"]
+
 [node name="GeoscapeHud" type="Control" unique_id=1886936763]
 layout_mode = 3
 anchors_preset = 15
@@ -60,6 +62,11 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Engineering"
 
+[node name="CaptivityButton" type="Button" parent="TopBar/ViewButtons" unique_id=1820489285]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Captivity"
+
 [node name="Alerts" type="VBoxContainer" parent="." unique_id=771948312]
 unique_name_in_owner = true
 layout_mode = 1
@@ -67,7 +74,7 @@ anchors_preset = 9
 anchor_bottom = 1.0
 offset_top = 60.0
 
-[node name="Projects" type="PanelContainer" parent="."]
+[node name="Projects" type="PanelContainer" parent="." unique_id=1687629175]
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
@@ -77,14 +84,14 @@ offset_top = 60.0
 offset_right = -16.0
 grow_horizontal = 0
 
-[node name="Margin" type="MarginContainer" parent="Projects"]
+[node name="Margin" type="MarginContainer" parent="Projects" unique_id=1279881290]
 layout_mode = 2
 theme_override_constants/margin_left = 12
 theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 12
 theme_override_constants/margin_bottom = 12
 
-[node name="Status" type="VBoxContainer" parent="Projects/Margin"]
+[node name="Status" type="VBoxContainer" parent="Projects/Margin" unique_id=302089569]
 layout_mode = 2
 theme_override_constants/separation = 8
 
@@ -99,5 +106,6 @@ unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
-[connection signal="pressed" from="TopBar/ViewButtons/UnitsButton" to="." method="RequestView" binds=[ExtResource("2_roster")]]
-[connection signal="pressed" from="TopBar/ViewButtons/EngineeringButton" to="." method="RequestView" binds=[ExtResource("3_engineering")]]
+[connection signal="pressed" from="TopBar/ViewButtons/UnitsButton" to="." method="RequestView" binds= [ExtResource("2_roster")]]
+[connection signal="pressed" from="TopBar/ViewButtons/EngineeringButton" to="." method="RequestView" binds= [ExtResource("3_engineering")]]
+[connection signal="pressed" from="TopBar/ViewButtons/CaptivityButton" to="." method="RequestView" binds= [ExtResource("4_30twl")]]

@@ -400,6 +400,19 @@ internal static class TestData
     };
   }
 
+  public static CaptiveEntryData MakeCaptiveEntry(
+    string displayName = "",
+    CombatantData unit = null,
+    FactionData faction = null)
+  {
+    return new CaptiveEntryData
+    {
+      Unit = unit ?? MakeCombatantData("Grunt"),
+      Faction = faction ?? new FactionData { Name = "Enemy Faction" },
+      DisplayName = displayName,
+    };
+  }
+
   public static CampaignStartData MakeStart(
     RegionData[] regions = null,
     ScheduledEventData[] timeline = null,
@@ -407,7 +420,8 @@ internal static class TestData
     EquippableItemData[] armory = null,
     EquippableMod[] modStock = null,
     EquippableItemData[] manufacturableItems = null,
-    ResearchProject[] researchProjects = null)
+    ResearchProject[] researchProjects = null,
+    CaptiveEntryData[] captives = null)
   {
     return new CampaignStartData
     {
@@ -419,6 +433,7 @@ internal static class TestData
       ModStock = modStock ?? [],
       ManufacturableItems = manufacturableItems ?? [],
       ResearchProjects = researchProjects ?? [],
+      StartingCaptives = captives ?? [],
     };
   }
 

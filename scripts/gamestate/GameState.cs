@@ -68,6 +68,29 @@ public sealed class GameState
         entry.DisplayName.Length > 0 ? Some(entry.DisplayName) : Option<string>.None));
     }
 
+    // Starting captives stamp into Captivity with their own runtime factions: one fresh
+    // Faction per distinct authored FactionData reference, so entries sharing a seed share
+    // the faction while campaigns never share instances. They never join roster or
+    // PlayerFaction, and the authored resources stay untouched.
+    var captiveFactions = new Dictionary<FactionData, Faction>(
+      SysColGeneric.ReferenceEqualityComparer.Instance);
+    foreach (CaptiveEntryData entry in start.StartingCaptives)
+    {
+      CombatantData unit = entry.Unit ?? throw new InvalidOperationException(
+        $"Starting captive entry '{entry.DisplayName}' has no Unit assigned in CampaignStartData.StartingCaptives.");
+      FactionData factionData = entry.Faction ?? throw new InvalidOperationException(
+        $"Starting captive entry '{entry.DisplayName}' has no Faction assigned in CampaignStartData.StartingCaptives.");
+
+      if (!captiveFactions.TryGetValue(factionData, out Faction? faction))
+      {
+        faction = new Faction(factionData);
+        captiveFactions[factionData] = faction;
+      }
+
+      Captivity.Add(new Combatant(unit, faction,
+        entry.DisplayName.Length > 0 ? Some(entry.DisplayName) : Option<string>.None));
+    }
+
     Research = new ResearchState(start.ResearchProjects);
 
     Engineering = new EngineeringState(start.ManufacturableItems);

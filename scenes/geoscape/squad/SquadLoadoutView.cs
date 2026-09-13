@@ -1,41 +1,57 @@
 using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Combatants;
-using FunProject.Items;
-using FunProject.Stats;
 using FunProject.Strategic;
 using Godot;
 using System;
-using System.Linq;
 using FunProject.Scenes.Ext;
 using LanguageExt.UnsafeValueAccess;
 
 namespace FunProject.Geoscape;
 
-// Pre-mission squad preparation: three fixed slots filled from the campaign roster, with
-// each occupied unit's current equipment and effective stats. Presentation only — the
-// screen owns nothing but a temporary SquadSelection over the roster's live combatant
-// references and re-presents from campaign truth on every activation, so equipment edits
-// made in the nested UnitView show up on return without this view caching anything.
-// Back discards the squad selection; it never mutates campaign state.
+// Shared squad selection screen behind openers that configure it: mission preparation
+// (three editable slots, the mission's title) and interrogation preparation (two slots,
+// equipment editing disabled, a captive-targets heading). Presentation only — the screen
+// owns nothing but a temporary slot selection over the roster's live combatant references
+// and re-presents from campaign truth on every activation, so equipment edits made in the
+// nested UnitView show up on return without this view caching anything. Back discards the
+// slot selection; it never mutates campaign state.
 public sealed partial class SquadLoadoutView : GeoscapeView
 {
   [Export] public PackedScene? UnitViewScene { get; set; }
   [Export] public PackedScene? SquadSlotCardScene { get; set; }
 
-  private const uint Capacity = 3U;
-
   private CampaignGameState? _state;
-  private PendingResolution? _mission;
-  private uint? _choosingSlot;
-  private readonly Option<Combatant>[] _slots = new Option<Combatant>[Capacity];
+  private string? _heading;
+  private bool _allowEquipmentEditing;
+  private int? _choosingSlot;
+  private Option<Combatant>[] _slots = [];
 
-  // The mission dialog stays open while this view lives, so every activation reads the
-  // pending mission straight from the session and retains it for the title.
+  // The opener's required configuration door (mission preparation: three editable slots
+  // under the mission title; interrogation: two slots, editing disabled). It resets the
+  // temporary slot selection so a reconfigured view never carries stale picks into a
+  // different destination.
+  public void Configure(string heading, uint capacity, bool allowEquipmentEditing)
+  {
+    ArgumentNullException.ThrowIfNull(heading);
+    if (capacity == 0U)
+      throw new ArgumentOutOfRangeException(nameof(capacity), capacity,
+        "SquadLoadoutView capacity must be positive.");
+    // Allocate the replacement slots before touching config so allocation failure cannot
+    // partially reconfigure the view.
+    var slots = new Option<Combatant>[capacity];
+    _heading = heading;
+    _allowEquipmentEditing = allowEquipmentEditing;
+    _choosingSlot = null;
+    _slots = slots;
+  }
+
+  // Openers must Configure before Present; presenting unconfigured is a caller bug.
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
+    if (_heading is null)
+      throw new InvalidOperationException(
+        "SquadLoadoutView requires Configure(heading, capacity, allowEquipmentEditing) before Present.");
     _state = state;
-    _mission = session.PendingResolution.RequireSome(
-      "SquadLoadoutView requires a pending mission; it is only reachable while a mission dialog is open.");
     RebuildAll();
   }
 
@@ -44,9 +60,11 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     if (_state is null)
       return;
 
-    GetNode<Label>("%Title").Text = _mission?.Event.Definition.Title ?? "";
+    var title = GetNode<Label>("%Title");
+    title.Text = _heading;
+    title.TooltipText = _heading; // the authored label clips; the tooltip keeps long target lists readable
     GetNode<Label>("%SquadCount").Text =
-      $"Squad: {_slots.Count(c => c.IsSome)}/{Capacity}";
+      $"Squad: {_slots.AsValueEnumerable().Count(c => c.IsSome)}/{_slots.Length}";
     GetNode<Label>("%SelectionPrompt").Text = _choosingSlot is { } slot
       ? $"Assigning Slot {slot + 1} — pick a unit below."
       : "Pick Choose on a slot, then select a unit.";
@@ -63,11 +81,11 @@ public sealed partial class SquadLoadoutView : GeoscapeView
   {
     var slots = GetNode<VBoxContainer>("%Slots");
     slots.QueueFreeAllChildren();
-    for (uint slot = 0; slot < Capacity; slot++)
+    for (int slot = 0; slot < _slots.Length; slot++)
       BuildCard(slots, slot);
   }
 
-  private void BuildCard(VBoxContainer slots, uint slot)
+  private void BuildCard(VBoxContainer slots, int slot)
   {
     var scene = SquadSlotCardScene ?? throw new InvalidOperationException(
       "SquadLoadoutView requires SquadSlotCardScene; assign a PackedScene in the inspector.");
@@ -90,8 +108,9 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     card.Bind(
       unit is not null ? $"Slot {slot + 1} — {unit.Name}" : $"Slot {slot + 1} — empty",
       unit is not null,
-      unit is not null ? EquipmentText(unit) : "",
-      unit is not null ? StatsText(unit) : "");
+      unit is not null ? CombatantSummary.EquipmentText(unit, includeMods: true) : "",
+      unit is not null ? CombatantSummary.StatsText(unit, "Health") : "",
+      allowEquipmentEditing: _allowEquipmentEditing);
   }
 
   private void RebuildChoices()
@@ -120,16 +139,16 @@ public sealed partial class SquadLoadoutView : GeoscapeView
 
   private bool InSquad(Combatant unit)
   {
-    return _slots.Any(opt => opt.Exists(c => ReferenceEquals(c, unit)));
+    return _slots.AsValueEnumerable().Any(opt => opt.Exists(c => ReferenceEquals(c, unit)));
   }
 
-  private void BeginChoose(uint slot)
+  private void BeginChoose(int slot)
   {
     _choosingSlot = slot;
     RebuildAll(); // the prompt must name the destination before any unit is picked
   }
 
-  private void RemoveUnit(uint slot)
+  private void RemoveUnit(int slot)
   {
     _slots[slot] = None;
     RebuildAll();
@@ -139,15 +158,20 @@ public sealed partial class SquadLoadoutView : GeoscapeView
   {
     if (_choosingSlot is null)
       return;
+    if (InSquad(unit))
+      return; // already picked (including the destination's current occupant): inert, the chooser stays open
 
-    _slots[(int)_choosingSlot] = unit;
+    _slots[_choosingSlot.Value] = unit;
     _choosingSlot = null;
 
     RebuildAll();
   }
 
-  public void EditUnit(uint slot)
+  public void EditUnit(int slot)
   {
+    if (!_allowEquipmentEditing)
+      throw new InvalidOperationException(
+        "SquadLoadoutView.EditUnit is unavailable: Configure disabled equipment editing for this squad.");
     _slots[slot].IfSome(OpenEditor);
   }
 
@@ -164,55 +188,5 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     }
     view.BindUnit(unit); // retain the slot's unit before the view enters the tree
     RequestView(view);
-  }
-
-  private static string EquipmentText(Combatant unit)
-  {
-    SysColGeneric.List<string> lines =
-    [
-      unit.EquippedWeapon.Match(
-        weapon => $"Weapon: {weapon.ItemName}", () => "Weapon: — empty —"),
-      unit.EquippedArmor.Match(
-        armor => $"Armor: {armor.Item.ItemName}", () => "Armor: — empty —"),
-    ];
-
-    for (int i = 0; i < unit.MaxInventorySize; i++)
-      lines.Add(unit.Inventory.TryGetValue(i, out EquippableItem? item)
-        ? $"Utility {i + 1}: {item.ItemName}"
-        : $"Utility {i + 1}: — empty —");
-
-    lines.Add(ModsText("Personal mods", unit.GetModSlots()));
-    unit.EquippedWeapon.IfSome(weapon => lines.Add(ModsText("Weapon mods", weapon.GetModSlots())));
-
-    return string.Join("\n", lines);
-  }
-
-  private static string ModsText(string label, Godot.Collections.Array<ModSlot> slots)
-  {
-    SysColGeneric.List<string> names = [];
-    foreach (ModSlot slot in slots)
-      slot.EquippedMod.IfSome(mod => names.Add(mod.Name));
-    return names.Count > 0 ? $"{label}: {string.Join(", ", names)}" : $"{label}: — empty —";
-  }
-
-  private static string StatsText(Combatant unit) => string.Join("  ",
-    StatText<HealthStat>(unit, "Health"),
-    StatText<ActionPointsStat>(unit, "Action Points"),
-    StatText<WillStat>(unit, "Will"),
-    StatText<MovementStat>(unit, "Movement"),
-    StatText<VisionStat>(unit, "Vision"),
-    StatText<AimStat>(unit, "Aim"));
-
-  // Same contribution set as UnitView: the combatant's own mods/buffs plus the equipped
-  // weapon's, so a weapon's stat mods change the presented effective stats.
-  private static string StatText<TStat>(Combatant unit, string label) where TStat : Stat
-  {
-    var contributions = unit.StatContributions().AsValueEnumerable()
-      .Concat(unit.EquippedWeapon.Match<SysColGeneric.IEnumerable<StatMod>>(
-       weapon => weapon.StatContributions,
-       []))
-      .ToArray();
-
-    return $"{label}: {Mathf.RoundToInt(unit.Resolve<TStat>(contributions))}";
   }
 }
