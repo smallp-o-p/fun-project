@@ -3,6 +3,7 @@ using FunProject.Core;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
+using FunProject.Stats;
 using FunProject.Weapons;
 using LanguageExt.UnsafeValueAccess;
 using System;
@@ -244,13 +245,14 @@ public sealed class BattleSession
     Combatant combatant,
     BattleBoardState.ValidatedPoint position,
     Option<Weapon> equippedWeapon,
-    Option<ItemWith<ArmorCapability>> equippedArmor)
+    Option<ItemWith<ArmorCapability>> equippedArmor,
+    IReadOnlyList<StatMod>? statMods = null)
   {
     ArgumentNullException.ThrowIfNull(combatant);
     if (Phase == BattlePhase.Ended)
       throw new InvalidOperationException("Cannot add units after the battle has ended.");
 
-    var unit = new BattleUnitState(_units.Count, combatant, equippedWeapon, equippedArmor);
+    var unit = new BattleUnitState(_units.Count, combatant, equippedWeapon, equippedArmor, statMods);
     bool occupantSet = Board.TryPlaceOccupant(position, unit.Id);
     if (!occupantSet)
       throw new InvalidOperationException($"Could not place unit {unit.Id} at {position.Raw}.");
@@ -798,7 +800,23 @@ public sealed class BattleSession
         .Select(unitKilled =>
           (unitKilled.Key.Combatant, unitKilled.Value.AsValueEnumerable().Select(killed => killed.Combatant).ToList()))
         .ToDictionary(entry => entry.Item1, entry => entry.Item2),
-      TurnCount = TurnNumber
+      TurnCount = TurnNumber,
+      HealthByCombatant = BuildHealthByCombatant(faction),
     };
+  }
+
+  // Health reports for the faction's living participants — unconscious included. Dead
+  // participants stay represented by the present/dead sets and the campaign skips them
+  // when consuming returns.
+  private Dictionary<Combatant, BattleHealthSummary> BuildHealthByCombatant(Faction faction)
+  {
+    var health = new Dictionary<Combatant, BattleHealthSummary>();
+
+    foreach (BattleUnitState unit in GetFactionAliveUnits(faction))
+    {
+      health[unit.Combatant] = new BattleHealthSummary(unit.MaxHealth, unit.TotalHealthDamageTaken);
+    }
+
+    return health;
   }
 }

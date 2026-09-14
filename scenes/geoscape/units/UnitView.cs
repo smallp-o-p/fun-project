@@ -116,7 +116,7 @@ public sealed partial class UnitView : GeoscapeView
   {
     var stats = GetNode<VBoxContainer>("%StatsList");
     stats.QueueFreeAllChildren();
-    var contributions = _unit!.CampaignStatContributions();
+    var contributions = _state!.CampaignStatContributions(_unit!);
     AddStatRow<HealthStat>("Health", contributions);
     AddStatRow<ActionPointsStat>("Action Points", contributions);
     AddStatRow<WillStat>("Will", contributions);

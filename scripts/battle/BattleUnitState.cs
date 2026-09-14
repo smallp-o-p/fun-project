@@ -14,6 +14,7 @@ namespace FunProject.Battle;
 public sealed class BattleUnitState
 {
   private readonly List<EquippableItem> _inventory;
+  private readonly StatMod[] _loadoutStatMods;
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _spottedUnits = [];
@@ -31,6 +32,7 @@ public sealed class BattleUnitState
 
   public int MaxHealth => Mathf.RoundToInt(EffectiveStat<HealthStat>());
   public int CurrentHealth { get; private set; }
+  public long TotalHealthDamageTaken { get; private set; }
   public int CurrentStun { get; private set; }
   public int MaxActionPoints => Mathf.RoundToInt(EffectiveStat<ActionPointsStat>());
   public int CurrentActionPoints { get; private set; }
@@ -55,7 +57,8 @@ public sealed class BattleUnitState
     int unitId,
     Combatant combatant,
     Option<Weapon> equippedWeapon,
-    Option<ItemWith<ArmorCapability>> equippedArmor)
+    Option<ItemWith<ArmorCapability>> equippedArmor,
+    IReadOnlyList<StatMod>? statMods = null)
   {
     ArgumentOutOfRangeException.ThrowIfLessThan(unitId, 0);
 
@@ -64,6 +67,9 @@ public sealed class BattleUnitState
     Combatant = combatant;
     EquippedWeapon = equippedWeapon;
     EquippedArmor = equippedArmor;
+    // Capture the supplied modifier membership once at spawn (deployment-time snapshot),
+    // before the initial health/AP reads below.
+    _loadoutStatMods = [.. statMods ?? []];
     CurrentHealth = MaxHealth;
     CurrentActionPoints = MaxActionPoints;
     // Ascending slot order: the battle inventory is positional, and Dictionary enumeration
@@ -117,7 +123,11 @@ public sealed class BattleUnitState
     if (amount <= 0)
       return;
 
-    CurrentHealth = Math.Max(CurrentHealth - amount, 0);
+    // Only health actually lost counts toward the mission's damage metrics: overkill past
+    // zero never inflates the campaign's injury bookkeeping.
+    int actualLoss = Math.Min(amount, CurrentHealth);
+    TotalHealthDamageTaken = checked(TotalHealthDamageTaken + actualLoss);
+    CurrentHealth -= actualLoss;
   }
 
   internal void ReceiveStun(int amount)
@@ -216,6 +226,7 @@ public sealed class BattleUnitState
   private IEnumerable<StatMod> GatherStatContributions()
     => Combatant.StatContributions()
          .AsValueEnumerable()
+         .Concat(_loadoutStatMods)
          .Concat(EquippedWeapon.Match<IEnumerable<StatMod>>(w => w.StatContributions, () => System.Array.Empty<StatMod>()))
          .Concat(ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.StatMods).ToArray())
          .ToArray();

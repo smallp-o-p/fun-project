@@ -8,9 +8,11 @@ namespace FunProject.Geoscape;
 // Shared stat/equipment summary text for the soldier screens (captivity inspection, squad cards).
 public static class CombatantSummary
 {
-  public static string StatsText(Combatant unit, string healthLabel)
+  // Contributions are the caller's campaign composition (GameState.CampaignStatContributions);
+  // this shared text never gathers them itself.
+  public static string StatsText(Combatant unit, string healthLabel,
+    SysColGeneric.IEnumerable<StatMod> contributions)
   {
-    var contributions = unit.CampaignStatContributions();
     return string.Join("  ",
       StatText<HealthStat>(unit, healthLabel, contributions),
       StatText<ActionPointsStat>(unit, "Action Points", contributions),

@@ -57,7 +57,7 @@ public sealed partial class CaptivityView : GeoscapeView
   {
     if (_selected.Count == 0)
       return;
-    
+
     var view = SquadViewScene.InstantiateAs<SquadLoadoutView>(
       "CaptivityView SquadViewScene");
     view.Configure($"Interrogation", InterrogationCapacity,
@@ -130,10 +130,10 @@ public sealed partial class CaptivityView : GeoscapeView
     SysColGeneric.IReadOnlyList<Combatant> captives)
     => captives.AsValueEnumerable().Any(captive => ReferenceEquals(captive, combatant));
 
-  private static string DetailsText(Combatant captive) => string.Join("\n",
+  private string DetailsText(Combatant captive) => string.Join("\n",
     $"Name: {captive.Name}",
     $"Faction: {captive.OwningFaction.Name}",
-    CombatantSummary.StatsText(captive, "Health (max)"),
+    CombatantSummary.StatsText(captive, "Health (max)", _state!.CampaignStatContributions(captive)),
     CombatantSummary.EquipmentText(captive, includeMods: false),
     BuffsText(captive));
 

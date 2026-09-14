@@ -1,6 +1,7 @@
 using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
+using FunProject.Stats;
 using FunProject.Weapons;
 using System.Collections.Generic;
 
@@ -10,7 +11,12 @@ namespace FunProject.Battle;
 public sealed record UnitLoadout(
   Combatant Combatant,
   Option<Weapon> Weapon = default,
-  Option<ItemWith<ArmorCapability>> Armor = default);
+  Option<ItemWith<ArmorCapability>> Armor = default)
+{
+  /// <summary>Stat contributions supplied with the loadout (e.g. deployment-time
+  /// campaign condition penalties). Empty by default; standalone battles need none.</summary>
+  public IReadOnlyList<StatMod> StatMods { get; init; } = [];
+}
 
 /// <summary>One spawned unit at an explicit board cell.</summary>
 public sealed record UnitPlacement(UnitLoadout Loadout, Vector3I Position);

@@ -1,7 +1,13 @@
+using System;
 using System.Collections.Generic;
 using FunProject.Combatants;
 
 namespace FunProject.Battle;
+
+/// <summary>Per-combatant mission health metrics: the combatant's effective max health at
+/// summary creation (including active condition/equipment/buff effects) and the actual
+/// health damage taken during the battle. Numeric values are snapshots.</summary>
+public sealed record BattleHealthSummary(int MaxHealth, long HealthDamageTaken);
 
 // End-of-battle summary for one faction: outcome, per-combatant kill attribution, and the
 // faction's present/dead/wounded roster. Immutable snapshot built from final session state.
@@ -15,6 +21,11 @@ public sealed record FactionBattleSummary
   public required IReadOnlySet<Combatant> CombatantsWounded { get; init; }
   public required int TurnCount { get; init; }
   public IReadOnlyList<Combatant> CapturedEnemies { get; init; } = [];
+
+  /// <summary>
+  /// Health report to calculate Combatants' injuries
+  /// </summary>
+  public IReadOnlyDictionary<Combatant, BattleHealthSummary> HealthByCombatant { get; init; } = new Dictionary<Combatant, BattleHealthSummary>();
 }
 
 public sealed class GetFactionEndOfBattleSummary(Faction faction)

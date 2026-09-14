@@ -7,6 +7,7 @@ using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Progression;
+using FunProject.Stats;
 using FunProject.Weapons;
 using ZLinq;
 
@@ -80,9 +81,10 @@ public sealed class BattleFixture : IDisposable
     => Query(new GetFactionAliveUnits(faction)).AsValueEnumerable().Single();
 
   public BattleUnitState Spawn(Combatant combatant, Vector3I position,
-    Option<Weapon> weapon = default, Option<ItemWith<ArmorCapability>> armor = default)
+    Option<Weapon> weapon = default, Option<ItemWith<ArmorCapability>> armor = default,
+    IReadOnlyList<StatMod>? statMods = null)
   {
-    Submit(new SpawnUnit(combatant, At(position), weapon, armor));
+    Submit(new SpawnUnit(combatant, At(position), weapon, armor, statMods));
     return UnitAt(position);
   }
 
@@ -192,7 +194,7 @@ public sealed class BattleFixture : IDisposable
         battle.Session.AddObjective(faction, new FakeObjective());
       foreach (UnitPlacement placement in placements)
         battle.Spawn(placement.Loadout.Combatant, placement.Position,
-          placement.Loadout.Weapon, placement.Loadout.Armor);
+          placement.Loadout.Weapon, placement.Loadout.Armor, placement.Loadout.StatMods);
       battle.Start();
       return battle;
     }

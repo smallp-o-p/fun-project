@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using FunProject.Engineering;
 using FunProject.Items;
 using FunProject.Research;
+using FunProject.Combatants;
 
 namespace FunProject.Strategic;
 
@@ -32,3 +33,5 @@ public sealed record EventExpired(GeoscapeEvent Event) : IGeoscapeEvent;
 public sealed record ResolutionEventOpened(PendingResolution Pending) : IGeoscapeEvent;
 
 public sealed record ResolutionEventClosed(PendingResolution Resolved, ResolutionOutcome SelectedOutcome) : IGeoscapeEvent;
+
+public sealed record CombatantConditionsChanged(Combatant Combatant) : IGeoscapeEvent;

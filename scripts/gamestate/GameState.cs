@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using FunProject.Engineering;
 using FunProject.Combatants;
 using FunProject.Research;
+using FunProject.Stats;
 using FunProject.Strategic;
 
 namespace FunProject.GameState;
@@ -10,11 +11,12 @@ namespace FunProject.GameState;
 /// <summary>
 /// The campaign truth container: everything that holds for the life of the campaign —
 /// clock position, the baked event timeline, active events, the pending resolution, the
-/// region binding, the roster, and the player faction. <see cref="Strategic.GeoscapeSession"/>
-/// is the ephemeral runtime constructed over this state (the BattleSession-over-
-/// BattleBoardState pattern); playback knobs (TimeSpeed, the frame accumulator) stay out
-/// of the truth layer, mirroring X2's split where the strategy world is persisted whole
-/// but time speed is not persisted at all.
+/// region binding, the roster, the player faction, and the condition registry
+/// (<see cref="Conditions"/>). <see cref="Strategic.GeoscapeSession"/> is the ephemeral runtime
+/// constructed over this state (the BattleSession-over-BattleBoardState pattern);
+/// playback knobs (TimeSpeed, the frame accumulator) stay out of the truth layer,
+/// mirroring X2's split where the strategy world is persisted whole but time speed is
+/// not persisted at all.
 /// </summary>
 public sealed class GameState
 {
@@ -93,6 +95,8 @@ public sealed class GameState
 
     Research = new ResearchState(start.ResearchProjects);
 
+    Conditions = new CombatantConditionSystem(start.ConditionRules);
+
     Engineering = new EngineeringState(start.ManufacturableItems);
     Armory = new Armory(start.Armory, start.ModStock);
   }
@@ -104,6 +108,22 @@ public sealed class GameState
   public int IndexOfRegion(string name) => _indexByName.GetValueOrDefault(name, -1);
 
   public IReadOnlyList<Combatant> Roster => _roster;
+
+  // The campaign's condition registry: injury/fatigue records keyed by combatant identity.
+  public CombatantConditionSystem Conditions { get; }
+
+  /// <summary>The single campaign-owned contribution policy: this combatant's own
+  /// mods/faction/progression/rank contributions, the current condition penalties, then the
+  /// currently equipped weapon's. Freshly materialized per call. Battle aggregates
+  /// separately (BattleUnitState) because a battle may equip a different weapon, receives
+  /// condition penalties only as explicit loadout stat mods, and stacks active-buff mods on
+  /// top.</summary>
+  public IEnumerable<StatMod> CampaignStatContributions(Combatant combatant)
+    => combatant.StatContributions().AsValueEnumerable()
+      .Concat(Conditions.StatContributions(combatant))
+      .Concat(combatant.EquippedWeapon.Match<IEnumerable<StatMod>>(
+        weapon => weapon.StatContributions, []))
+      .ToArray();
 
   public Faction PlayerFaction { get; }
 

@@ -164,7 +164,8 @@ public static class BattleFactory
         placement.Loadout.Combatant,
         spawnPointOption.Value(),
         placement.Loadout.Weapon,
-        placement.Loadout.Armor);
+        placement.Loadout.Armor,
+        placement.Loadout.StatMods);
       try
       {
         // Rejected parameters surface as the executor's invariant-break throw; the only

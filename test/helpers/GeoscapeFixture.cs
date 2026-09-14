@@ -2,8 +2,11 @@
 using System;
 using System.Collections.Generic;
 using CampaignGameState = global::FunProject.GameState.GameState;
+using FunProject.Battle;
+using FunProject.Combatants;
 using FunProject.GameState;
 using FunProject.Strategic;
+using FunProject.Weapons;
 using ZLinq;
 
 namespace FunProject.Tests;
@@ -66,6 +69,39 @@ public sealed class GeoscapeFixture : IDisposable
     Session.ChangeSpeed(TimeSpeed.Normal);
     Session.Advance(ticks * 0.1);
   }
+
+  // ---- Mission-return seeding ----------------------------------------------------------
+
+  // One genuine battle per call over this campaign's own roster references: spawns the
+  // squad with the campaign's current condition penalties as explicit spawn stat mods,
+  // routes damage/stun through the normal damage pipeline, ends the battle, and returns
+  // the un-applied player summary so tests can seed conditions exactly the way production
+  // does (ApplyMissionReturn of a real battle result).
+  public FactionBattleSummary PlayMission(
+    BattleOutcome outcome = BattleOutcome.Victory,
+    params (Combatant Combatant, int Damage, int Stun)[] squad)
+  {
+    ThrowIfDisposed();
+    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [State.PlayerFaction]);
+    int slot = 0;
+    foreach ((Combatant combatant, int damage, int stun) in squad)
+    {
+      BattleUnitState unit = battle.Spawn(combatant, new Vector3I(slot++, 0, 0),
+        combatant.EquippedWeapon, combatant.EquippedArmor,
+        State.Conditions.StatContributions(combatant));
+      if (damage > 0)
+        battle.ApplyDamage(unit, damage);
+      if (stun > 0)
+        battle.ApplyDamage(unit, stun, DamageKind.Stun);
+    }
+    battle.Session.EndBattle(outcome);
+    return battle.Query(new GetFactionEndOfBattleSummary(State.PlayerFaction)).RequireRight();
+  }
+
+  // PlayMission plus the return application, for tests that only need the resulting
+  // roster conditions.
+  public void ReturnFromMission(params (Combatant Combatant, int Damage, int Stun)[] squad)
+    => Session.ApplyMissionReturn(PlayMission(squad: squad));
 
   public void Dispose()
   {

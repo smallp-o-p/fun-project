@@ -10,12 +10,16 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class CombatantSummaryTest
 {
-  // One soldier with a personal Aim mod and a weapon carrying its own Aim mod: the
-  // campaign contribution set is own + equipped weapon, each counted exactly once.
-  private static Combatant EquippedSoldier()
+  // One campaign with one soldier carrying a personal Aim mod and a weapon with its own
+  // Aim mod: the campaign contribution set is own + condition tiers + equipped weapon,
+  // each counted exactly once.
+  private static GeoscapeFixture EquippedSoldierCampaign()
   {
-    var combatant = MakeCombatant("Alpha", MakeFaction("Cult"), aim: 60, modSlotCount: 1);
-    combatant.GetModSlots()[0].Equip(new MultiStatMod
+    var campaign = new GeoscapeFixture(TestData.MakeStart(
+      roster: [TestData.MakeEntry("Alpha", TestData.MakeCombatantData(
+        "Alpha", health: 20, aim: 60, modSlotCount: 1))]));
+    var alpha = campaign.State.Roster[0];
+    alpha.GetModSlots()[0].Equip(new MultiStatMod
     {
       Name = "Scope",
       StatMods = [new AimStatMod { Modifiers = [StatModifier.Add(10)] }],
@@ -26,35 +30,40 @@ public class CombatantSummaryTest
       Name = "Rail",
       StatMods = [new AimStatMod { Modifiers = [StatModifier.Add(5)] }],
     });
-    combatant.EquipWeapon(rifle);
-    return combatant;
+    alpha.EquipWeapon(rifle);
+    return campaign;
   }
 
   [TestCase(TestName = "Campaign aggregation folds own mods and the equipped weapon's once")]
   public void CampaignAggregationFoldsOwnAndWeaponContributionsOnce()
   {
-    var combatant = EquippedSoldier();
+    using var campaign = EquippedSoldierCampaign();
+    var combatant = campaign.State.Roster[0];
 
-    Assert.Equal(75, Mathf.RoundToInt(combatant.Resolve<AimStat>(combatant.CampaignStatContributions())));
+    Assert.Equal(75, Mathf.RoundToInt(combatant.Resolve<AimStat>(campaign.State.CampaignStatContributions(combatant))));
     // Fresh materialization per call: repeated gathering never accumulates.
-    Assert.Equal(75, Mathf.RoundToInt(combatant.Resolve<AimStat>(combatant.CampaignStatContributions())));
+    Assert.Equal(75, Mathf.RoundToInt(combatant.Resolve<AimStat>(campaign.State.CampaignStatContributions(combatant))));
   }
 
   [TestCase(TestName = "Without a weapon only fresh gathering drops its contributions")]
-  public void WithoutAWeaponOnlyOwnContributionsRemain()
+  public void WithoutAWeaponOnlyFreshGatheringDropsItsContributions()
   {
-    var combatant = EquippedSoldier();
-    var before = combatant.CampaignStatContributions(); // snapshot gathered while equipped
+    using var campaign = EquippedSoldierCampaign();
+    var combatant = campaign.State.Roster[0];
+    var before = campaign.State.CampaignStatContributions(combatant); // gathered while equipped
     combatant.UnequipWeapon();
 
     Assert.Equal(75, Mathf.RoundToInt(combatant.Resolve<AimStat>(before)));
-    Assert.Equal(70, Mathf.RoundToInt(combatant.Resolve<AimStat>(combatant.CampaignStatContributions())));
+    Assert.Equal(70, Mathf.RoundToInt(combatant.Resolve<AimStat>(campaign.State.CampaignStatContributions(combatant))));
   }
 
-  [TestCase(TestName = "StatsText resolves every stat against the single gathered set")]
-  public void StatsTextResolvesAllStatsAgainstOneGatheredSet()
+  [TestCase(TestName = "StatsText resolves every stat against the supplied contribution set")]
+  public void StatsTextResolvesAllStatsAgainstTheSuppliedSet()
   {
-    string text = CombatantSummary.StatsText(EquippedSoldier(), "Health");
+    using var campaign = EquippedSoldierCampaign();
+    var combatant = campaign.State.Roster[0];
+    string text = CombatantSummary.StatsText(combatant, "Health",
+      campaign.State.CampaignStatContributions(combatant));
 
     Assert.True(text.Contains("Health: 20"), text);
     Assert.True(text.Contains("Action Points: 4"), text);
@@ -67,17 +76,20 @@ public class CombatantSummaryTest
   [TestCase(TestName = "Captivity and squad summaries differ only in the Health label")]
   public void CaptivityAndSquadSummariesDifferOnlyInTheHealthLabel()
   {
-    var combatant = EquippedSoldier();
+    using var campaign = EquippedSoldierCampaign();
+    var combatant = campaign.State.Roster[0];
+    var contributions = campaign.State.CampaignStatContributions(combatant);
 
     Assert.Equal(
-      CombatantSummary.StatsText(combatant, "Health").Replace("Health:", "Health (max):"),
-      CombatantSummary.StatsText(combatant, "Health (max)"));
+      CombatantSummary.StatsText(combatant, "Health", contributions).Replace("Health:", "Health (max):"),
+      CombatantSummary.StatsText(combatant, "Health (max)", contributions));
   }
 
   [TestCase(TestName = "EquipmentText lists weapon, armor, and utility slots; mods optional")]
   public void EquipmentTextListsSlotsWithOptionalModRows()
   {
-    var combatant = EquippedSoldier();
+    using var campaign = EquippedSoldierCampaign();
+    var combatant = campaign.State.Roster[0];
     combatant.EquipArmor(MakeArmor("Vest"));
     combatant.EquipItem(new EquippableItem(MakeItemData("Medkit")), 0);
 
@@ -98,7 +110,9 @@ public class CombatantSummaryTest
   [TestCase(TestName = "Unequipped slots have explicit empty text on every row")]
   public void UnequippedSlotsHaveExplicitEmptyText()
   {
-    var bare = MakeCombatant("Bare", MakeFaction("Cult"));
+    using var campaign = new GeoscapeFixture(TestData.MakeStart(
+      roster: [TestData.MakeEntry("Bare", TestData.MakeCombatantData("Bare"))]));
+    var bare = campaign.State.Roster[0];
 
     string text = CombatantSummary.EquipmentText(bare, includeMods: true);
     Assert.True(text.Contains("Weapon: — empty —"), text);

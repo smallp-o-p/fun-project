@@ -1,6 +1,7 @@
 #nullable disable warnings
 using System;
 using System.Threading.Tasks;
+using FunProject.Combatants;
 using FunProject.Geoscape;
 using FunProject.GameState;
 using FunProject.Items;
@@ -64,6 +65,31 @@ public class GeoscapeSquadNavigationTest
   private static int AlertCount(GeoscapeScene scene)
     => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<VBoxContainer>("%Alerts").GetChildCount();
 
+  // A roster entry with explicit baselines (100 health keeps damage percentages on whole
+  // tiers) so condition labels and deployment gates have hand-checkable values.
+  private static RosterEntryData ConditionEntry(string name)
+    => MakeEntry(name, MakeCombatantData(name, health: 100, actionPoints: 8,
+      movement: 14, vision: 22, aim: 60, modSlotCount: 2, will: 50));
+
+  private static Button RosterChoice(SquadLoadoutView view, string unitName)
+    => view.GetNode<VBoxContainer>("%RosterChoices").GetChildren()
+      .AsValueEnumerable().OfType<Button>()
+      .Single(button => button.Text.Contains(unitName));
+
+  // Drives the real dialog's Engage handover and returns the presented squad view it
+  // produced, so a test can assert the opener forwarded the pending mission's policy.
+  private static SquadLoadoutView EngagedSquadView(GeoscapeFixture fixture)
+  {
+    var dialog = AddToTree(CreateResolutionView());
+    dialog.Present(fixture.State, fixture.Session);
+    GeoscapeView? produced = null;
+    dialog.ViewRequested += view => produced = view;
+    DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
+    var squad = AddToTree((SquadLoadoutView)produced!);
+    squad.Present(fixture.State, fixture.Session); // materializes the handed-over configuration
+    return squad;
+  }
+
   [TestCase(TestName = "Engage produces a squad view without resolving the mission")]
   public async Task EngageProducesTheSquadViewWithoutResolving()
   {
@@ -107,6 +133,52 @@ public class GeoscapeSquadNavigationTest
     Assert.Equal("Squad: 0/3", squad.GetNode<Label>("%SquadCount").Text); // default three slots
     Assert.Equal(0, squad.GetSelectedCombatants().Count);
     Assert.Equal(0, fixture.Events.Count); // still no resolution lifecycle
+  }
+
+  [TestCase(TestName = "Engage forwards the mission's policy: injured units stay blocked")]
+  public async Task EngageForwardsTheOrdinaryMissionPolicy()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    using var fixture = new GeoscapeFixture(MakeStart(
+      roster: [ConditionEntry("Alpha")],
+      timeline: [MakeScheduled(1, MakeEvent("Operation Iron", GeoscapeEventKind.TacticalBattle))]));
+    fixture.AdvanceTicks(1);
+    fixture.OpenResolution(fixture.ActiveEvent);
+    Combatant alpha = fixture.State.Roster[0];
+    fixture.ReturnFromMission((alpha, 25, 0)); // Injured + Tired: barred from the mission
+
+    var squad = EngagedSquadView(fixture);
+
+    Assert.False(squad.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"),
+      "An ordinary mission shows no exceptional-deployment notice.");
+    squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(0)
+      .GetNode<Button>("VBox/Header/ChooseUnit").EmitSignal(Button.SignalName.Pressed);
+    Assert.True(RosterChoice(squad, "Alpha").Disabled); // the opener's mission context blocks Alpha
+  }
+
+  [TestCase(TestName = "Engage forwards an override mission: unfit units deploy with notice")]
+  public async Task EngageForwardsTheOverrideMissionPolicy()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    using var fixture = new GeoscapeFixture(MakeStart(
+      roster: [ConditionEntry("Alpha")],
+      timeline: [MakeScheduled(1,
+        MakeEvent("Last Stand", GeoscapeEventKind.TacticalBattle, allowUnfitDeployment: true))]));
+    fixture.AdvanceTicks(1);
+    fixture.OpenResolution(fixture.ActiveEvent);
+    Combatant alpha = fixture.State.Roster[0];
+    fixture.ReturnFromMission((alpha, 25, 0)); // Injured + Tired: deployable only via the override
+
+    var squad = EngagedSquadView(fixture);
+
+    Assert.True(squad.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional deployment"));
+    squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(0)
+      .GetNode<Button>("VBox/Header/ChooseUnit").EmitSignal(Button.SignalName.Pressed);
+    Assert.False(RosterChoice(squad, "Alpha").Disabled); // the override authorized the unfit unit
+    RosterChoice(squad, "Alpha").EmitSignal(BaseButton.SignalName.Pressed);
+    var selected = squad.GetSelectedCombatants();
+    Assert.Equal(1, selected.Count);
+    Assert.True(ReferenceEquals(alpha, selected[0]));
   }
 
   [TestCase(TestName = "Marker route: Engage covers the dialog with squad preparation")]

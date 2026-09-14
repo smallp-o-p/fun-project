@@ -75,17 +75,11 @@ public class Combatant : HasStats, HasModSlots
   public Godot.Collections.Array<ModSlot> GetModSlots() => _modSlots;
 
   public IEnumerable<StatMod> StatContributions()
-    => this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).Concat(OwningFaction.StatBonuses).Concat(Progression.StatMods()).Concat(Rank.StatMods()).ToArray();
-
-  /// <summary>The single campaign-owned contribution policy: this combatant's own
-  /// mods/faction/progression/rank contributions plus the currently equipped weapon's.
-  /// Freshly materialized per call. Battle aggregates separately (BattleUnitState) because
-  /// a battle may equip a different weapon and stacks active-buff mods on top.</summary>
-  public IEnumerable<StatMod> CampaignStatContributions()
-    => StatContributions().AsValueEnumerable()
-      .Concat(EquippedWeapon.Match<SysColGeneric.IEnumerable<StatMod>>(
-        weapon => weapon.StatContributions, []))
-      .ToArray();
+    => this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions)
+         .Concat(OwningFaction.StatBonuses)
+         .Concat(Progression.StatMods())
+         .Concat(Rank.StatMods())
+         .ToArray();
 
   public void EquipItem(EquippableItem item, int slot)
   {

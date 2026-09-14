@@ -1,8 +1,10 @@
 using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
+using FunProject.Stats;
 using FunProject.Weapons;
 using System;
+using System.Collections.Generic;
 namespace FunProject.Battle;
 
 public sealed class StartBattle : BattleAction
@@ -23,6 +25,7 @@ public sealed class SpawnUnit : BattleAction
   private BattleBoardState.ValidatedPoint Position { get; }
   private Option<Weapon> EquippedWeapon { get; }
   private Option<ItemWith<ArmorCapability>> EquippedArmor { get; }
+  private IReadOnlyList<StatMod> StatMods { get; }
 
   internal SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position)
     : this(combatant, position, None, None)
@@ -38,13 +41,15 @@ public sealed class SpawnUnit : BattleAction
     Combatant combatant,
     BattleBoardState.ValidatedPoint position,
     Option<Weapon> equippedWeapon,
-    Option<ItemWith<ArmorCapability>> equippedArmor)
+    Option<ItemWith<ArmorCapability>> equippedArmor,
+    IReadOnlyList<StatMod>? statMods = null)
   {
     ArgumentNullException.ThrowIfNull(combatant);
     Combatant = combatant;
     Position = position;
     EquippedWeapon = equippedWeapon;
     EquippedArmor = equippedArmor;
+    StatMods = statMods ?? [];
   }
 
   public override Result Execute(BattleSession session)
@@ -52,7 +57,7 @@ public sealed class SpawnUnit : BattleAction
     if (session.Phase == BattlePhase.Ended || !session.Board.CanOccupy(Position))
       return Result.Rejected;
 
-    session.AddUnit(Combatant, Position, EquippedWeapon, EquippedArmor);
+    session.AddUnit(Combatant, Position, EquippedWeapon, EquippedArmor, StatMods);
     return Result.Completed;
   }
 }

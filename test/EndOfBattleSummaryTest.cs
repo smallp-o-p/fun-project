@@ -79,6 +79,23 @@ public class EndOfBattleSummaryTest
     Assert.Equal(0, enemy.DefeatedPerCombatant.Count);
   }
 
+  [TestCase(TestName = "Summaries carry per-combatant health reports")]
+  public void SummaryCarriesHealthReports()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    battle.ApplyDamage(battle.PlayerUnit, 3);
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+
+    var first = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
+    var report = first.HealthByCombatant[battle.PlayerUnit.Combatant];
+    Assert.Equal(20, report.MaxHealth);
+    Assert.Equal(3L, report.HealthDamageTaken);
+
+    // Issued summaries are copies: raw post-battle mutation never rewrites them.
+    battle.PlayerUnit.ReceiveDamage(5);
+    Assert.Equal(3L, first.HealthByCombatant[battle.PlayerUnit.Combatant].HealthDamageTaken);
+  }
+
   [TestCase(TestName = "The summary query fails while the battle has not ended")]
   public void SummaryQueryFailsWhileBattleInProgress()
   {

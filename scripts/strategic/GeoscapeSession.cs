@@ -1,6 +1,8 @@
 using CampaignGameState = global::FunProject.GameState.GameState;
 using System;
 using System.Collections.Generic;
+using FunProject.Battle;
+using FunProject.Combatants;
 using FunProject.Engineering;
 using FunProject.GameState;
 using FunProject.Items;
@@ -126,6 +128,17 @@ public sealed class GeoscapeSession
     Speed = speed;
   }
 
+  public void ApplyMissionReturn(FactionBattleSummary summary)
+  {
+    foreach ((Combatant combatant, BattleHealthSummary health) in summary.HealthByCombatant)
+      _state.Conditions.ApplyMissionReturn(combatant, health.HealthDamageTaken, health.MaxHealth, Tick);
+    foreach (Combatant combatant in summary.HealthByCombatant.Keys)
+      Commit(new CombatantConditionsChanged(combatant));
+  }
+
+  public bool CanDeploy(Combatant combatant, GeoscapeEventDefinition mission)
+    => _state.Conditions.CanDeploy(combatant, mission.AllowUnfitDeployment);
+
   public void Advance(double deltaSeconds)
   {
     if (Speed == TimeSpeed.Paused || _state.Pending.IsSome)
@@ -145,7 +158,17 @@ public sealed class GeoscapeSession
       RemoveExpired();
       _state.Engineering.CompleteIfDue(Tick).IfSome(Handle);
       _state.Research.CompleteIfDue(Tick).IfSome(Handle);
+      RecoverRoster();
     }
+  }
+
+  // Roster recovery, last in the tick order: the campaign registry advances every roster
+  // record first (each ladder one tier per elapsed chained deadline), then this loop
+  // broadcasts one change per returned identity; unchanged records never notify.
+  private void RecoverRoster()
+  {
+    foreach (Combatant combatant in _state.Conditions.Recover(_state.Roster, Tick))
+      Commit(new CombatantConditionsChanged(combatant));
   }
 
   private void Handle(ManufacturingCompleted completed)

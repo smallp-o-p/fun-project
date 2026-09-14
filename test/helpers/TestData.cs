@@ -2,6 +2,7 @@
 using FunProject.Battle;
 using FunProject.Buffs;
 using FunProject.Combatants;
+using FunProject.Combatants.Conditions;
 using FunProject.Core;
 using FunProject.GameState;
 using FunProject.Items;
@@ -374,7 +375,8 @@ internal static class TestData
     string title,
     GeoscapeEventKind kind = GeoscapeEventKind.Plot,
     string targetRegionName = "",
-    int expiresAfterTicks = -1)
+    int expiresAfterTicks = -1,
+    bool allowUnfitDeployment = false)
   {
     return new GeoscapeEventDefinition
     {
@@ -383,6 +385,7 @@ internal static class TestData
       Description = $"{title} description.",
       ExpiresAfterTicks = expiresAfterTicks,
       TargetRegionName = targetRegionName,
+      AllowUnfitDeployment = allowUnfitDeployment,
     };
   }
 
@@ -421,7 +424,8 @@ internal static class TestData
     EquippableMod[] modStock = null,
     EquippableItemData[] manufacturableItems = null,
     ResearchProject[] researchProjects = null,
-    CaptiveEntryData[] captives = null)
+    CaptiveEntryData[] captives = null,
+    CombatantConditionRulesData? conditionRules = null)
   {
     return new CampaignStartData
     {
@@ -434,6 +438,7 @@ internal static class TestData
       ManufacturableItems = manufacturableItems ?? [],
       ResearchProjects = researchProjects ?? [],
       StartingCaptives = captives ?? [],
+      ConditionRules = conditionRules,
     };
   }
 

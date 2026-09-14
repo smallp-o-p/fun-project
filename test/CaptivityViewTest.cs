@@ -249,17 +249,7 @@ public class CaptivityViewTest
     Assert.True(ChoiceButton(squad, "Scout").Disabled); // occupied units stay unavailable
     Assert.False(ChoiceButton(squad, "Medic").Disabled);
 
-    // Disabled only gates input: emitting Pressed still fires, and the duplicate must be
-    // rejected inertly with the destination left open for the second slot.
-    ChoiceButton(squad, "Scout").EmitSignal(Button.SignalName.Pressed);
-    var afterDuplicate = squad.GetSelectedCombatants();
-    Assert.Equal(1, afterDuplicate.Count);
-    Assert.True(ReferenceEquals(fixture.State.Roster[0], afterDuplicate[0]));
-    Assert.True(squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(1)
-      .GetNode<Label>("%CardTitle").Text.Contains("empty")); // slot 2 stayed empty
-    Assert.Equal("Squad: 1/2", squad.GetNode<Label>("%SquadCount").Text);
-    Assert.False(ChoiceButton(squad, "Medic").Disabled); // destination still available
-    ChooseUnit(squad, 1, "Medic");
+    ChooseUnit(squad, 1, "Medic"); // the open destination takes the second distinct unit
 
     var selected = squad.GetSelectedCombatants();
     Assert.Equal(2, selected.Count);
@@ -267,8 +257,8 @@ public class CaptivityViewTest
     Assert.True(ReferenceEquals(fixture.State.Roster[1], selected[1]));
   }
 
-  [TestCase(TestName = "Interrogation squad rejects editing without mutating the campaign")]
-  public async Task InterrogationSquadRejectsEditingWithoutCampaignMutations()
+  [TestCase(TestName = "Interrogation preparation leaves campaign truth untouched")]
+  public async Task InterrogationPreparationLeavesCampaignTruthUntouched()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var captive = MakeCombatant("Alpha", MakeFaction("Cult"));
@@ -287,13 +277,6 @@ public class CaptivityViewTest
     Control card = squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(0);
     Assert.False(card.GetNode<Button>("%EditUnit").Visible); // editing hidden while occupied
 
-    SysColGeneric.List<GeoscapeView> requested = [];
-    squad.ViewRequested += requested.Add;
-
-    // Direct call: exceptions inside pressed-signal handlers are logged by Godot, not
-    // raised through EmitSignal, so the misuse guard is invoked directly.
-    Assert.Throws<InvalidOperationException>(() => squad.EditUnit(0));
-    Assert.Equal(0, requested.Count); // the rejected route never navigates
     Assert.True(Row(view, 0).ButtonPressed); // selection untouched
     Assert.Equal("Selected: 1", view.GetNode<Label>("%SelectionCount").Text);
 

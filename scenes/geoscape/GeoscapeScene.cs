@@ -9,7 +9,7 @@ using System;
 // visuals live in the scene), owns the code-built camera, feeds frame deltas to the clock,
 // and presents the active view of the stack. The map and HUD form the permanent root view;
 // the manager owns the stack, this scene only routes events and presents.
-public sealed partial class GeoscapeScene : Control
+public partial class GeoscapeScene : Control
 {
   [Export] public CampaignStartData? Start;
   [Export] public PackedScene? ResolutionViewScene { get; set; }
@@ -28,7 +28,7 @@ public sealed partial class GeoscapeScene : Control
       "GeoscapeScene requires a CampaignStartData export; assign one in the inspector.");
     _resolutionViewScene = ResolutionViewScene ?? throw new InvalidOperationException(
       "GeoscapeScene requires a ResolutionViewScene export; assign one in the inspector.");
-    _state = new CampaignGameState(start);
+    _state = CreateGameState(start);
     _session = new GeoscapeSession(_state);
 
     _map = GetNode<GeoscapeMapControl>("%Map");
@@ -61,6 +61,11 @@ public sealed partial class GeoscapeScene : Control
     _viewManager.ViewChanged += view => view.Present(_state, _session);
     _viewManager.RootView.Present(_state, _session);
   }
+
+  // Construction hook for derived scenes (debug playtests): the state exists before the
+  // session, map, HUD and views, so overrides can stamp it freely while _Ready's wiring
+  // above stays untouched.
+  protected virtual CampaignGameState CreateGameState(CampaignStartData start) => new(start);
 
   // Covered views freeze the clock at the composition root: "the player is browsing"
   // is presentation, not campaign truth, so the session never learns views exist (the

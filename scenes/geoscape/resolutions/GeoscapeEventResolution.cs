@@ -51,7 +51,7 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
       var button = new Button { Text = txt };
       if (outcome == ResolutionOutcome.Engaged)
       {
-        button.Pressed += () => RequestSquadView(heading);
+        button.Pressed += () => RequestSquadView(pending.Event.Definition);
       }
       else
       {
@@ -62,9 +62,9 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
   }
 
   // The tactical handover: a fresh SquadLoadoutView configured with the pending mission's
-  // title and three editable slots. Missing or wrong-root exports are freed and thrown,
-  // HUD-style; the mission stays pending.
-  private void RequestSquadView(string heading)
+  // title, three editable slots, and the mission itself as explicit deployment context.
+  // Missing or wrong-root exports are freed and thrown, HUD-style; the mission stays pending.
+  private void RequestSquadView(GeoscapeEventDefinition mission)
   {
     PackedScene target = SquadViewScene ?? throw new InvalidOperationException(
       "GeoscapeEventResolution requires SquadViewScene; assign a PackedScene in the inspector.");
@@ -76,7 +76,7 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
       throw new InvalidOperationException(
         $"GeoscapeEventResolution SquadViewScene root must be a SquadLoadoutView; got {kind}.");
     }
-    view.Configure(heading, 3, allowEquipmentEditing: true);
+    view.Configure(mission.Title, 3, allowEquipmentEditing: true, mission: mission);
     RequestView(view);
   }
 

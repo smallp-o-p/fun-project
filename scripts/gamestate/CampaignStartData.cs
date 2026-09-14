@@ -1,4 +1,5 @@
 using FunProject.Combatants;
+using FunProject.Combatants.Conditions;
 using FunProject.Core;
 using FunProject.Items;
 using FunProject.Research;
@@ -24,6 +25,10 @@ public partial class CampaignStartData : NamedEntityData
   // Authored captives stamped into Captivity at construction; each keeps its own runtime
   // faction (one per distinct FactionData reference) and never enters the roster.
   [Export] public CaptiveEntryData[] StartingCaptives { get; set; } = [];
+
+  // The campaign-wide injury/fatigue ladders; unassigned campaigns use the shared default
+  // ruleset. Validated and sorted once by GameState.Conditions at construction.
+  [Export] public CombatantConditionRulesData? ConditionRules { get; set; }
 
   // Which item/mod types the campaign starts stocked with. Stock policy (unlimited or
   // scarce) is authored on each template's UnlimitedStock flag; quantities are runtime-only.

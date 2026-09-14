@@ -24,4 +24,8 @@ public partial class GeoscapeEventDefinition : Resource
   // Region name matching a RegionData.Name in GeoscapeMapData.Regions; empty = map-wide.
   // Resolved to an index when the session is constructed — unknown names throw at load.
   [Export] public string TargetRegionName { get; set; } = "";
+
+  // Deployment eligibility override: unfit combatants (injured or exhausted) may join this
+  // mission anyway. Default false — the roster gate stands.
+  [Export] public bool AllowUnfitDeployment { get; set; } = false;
 }

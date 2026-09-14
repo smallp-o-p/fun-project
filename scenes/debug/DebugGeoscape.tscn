@@ -2,13 +2,41 @@
 
 [ext_resource type="PackedScene" uid="uid://jdkumfovnam8" path="res://scenes/geoscape/GeoscapeScene.tscn" id="1"]
 [ext_resource type="Resource" uid="uid://bijygom520bfo" path="res://resources/geoscape/TestCampaign.tres" id="2"]
+[ext_resource type="Script" uid="uid://wkycw2iyc2d4" path="res://scenes/debug/DebugGeoscape.cs" id="2_uy6vk"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/RegionButton.tscn" id="4_region"]
 
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_ps6ol"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_cu413"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_vnblr"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_abk5t"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_3va1g"]
+
 [node name="DebugGeoscape" unique_id=958707659 instance=ExtResource("1")]
+script = ExtResource("2_uy6vk")
 Start = ExtResource("2")
 
-[node name="Northmark" parent="ViewManager/MapView/MapViewport/Viewport/Map" parent_id_path=PackedInt32Array(1111572209) index="0" unique_id=1736169534 instance=ExtResource("4_region")]
+[node name="Viewport" parent="ViewManager/MapView/MapViewport" index="0"]
+handle_input_locally = false
+size = Vector2i(1600, 900)
+render_target_update_mode = 4
+
+[node name="Map" parent="ViewManager/MapView/MapViewport/Viewport" index="0" unique_id=1111572209]
+layout_mode = 3
+
+[node name="Northmark" parent="ViewManager/MapView/MapViewport/Viewport/Map" index="0" unique_id=1736169534 instance=ExtResource("4_region")]
 layout_mode = 0
+focus_mode = 0
+mouse_filter = 1
+theme_override_styles/normal = SubResource("StyleBoxEmpty_ps6ol")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_ps6ol")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_ps6ol")
+theme_override_styles/hover_pressed = SubResource("StyleBoxEmpty_ps6ol")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_ps6ol")
+flat = true
 
 [node name="Fill2" type="Polygon2D" parent="ViewManager/MapView/MapViewport/Viewport/Map/Northmark" index="0" unique_id=1132142056]
 color = Color(0.35, 0.45, 0.65, 1)
@@ -19,8 +47,16 @@ points = PackedVector2Array(200, 80, 700, 60, 820, 220, 560, 320, 240, 300, 200,
 width = 2.0
 default_color = Color(0, 0, 0, 1)
 
-[node name="Velden" parent="ViewManager/MapView/MapViewport/Viewport/Map" parent_id_path=PackedInt32Array(1111572209) index="1" unique_id=1370932033 instance=ExtResource("4_region")]
+[node name="Velden" parent="ViewManager/MapView/MapViewport/Viewport/Map" index="1" unique_id=1370932033 instance=ExtResource("4_region")]
 layout_mode = 0
+focus_mode = 0
+mouse_filter = 1
+theme_override_styles/normal = SubResource("StyleBoxEmpty_cu413")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_cu413")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_cu413")
+theme_override_styles/hover_pressed = SubResource("StyleBoxEmpty_cu413")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_cu413")
+flat = true
 
 [node name="Fill2" type="Polygon2D" parent="ViewManager/MapView/MapViewport/Viewport/Map/Velden" index="0" unique_id=2054779897]
 color = Color(0.3, 0.55, 0.3, 1)
@@ -31,8 +67,16 @@ points = PackedVector2Array(240, 300, 560, 320, 700, 480, 520, 620, 220, 560, 24
 width = 2.0
 default_color = Color(0, 0, 0, 1)
 
-[node name="Eastreach" parent="ViewManager/MapView/MapViewport/Viewport/Map" parent_id_path=PackedInt32Array(1111572209) index="2" unique_id=202013912 instance=ExtResource("4_region")]
+[node name="Eastreach" parent="ViewManager/MapView/MapViewport/Viewport/Map" index="2" unique_id=202013912 instance=ExtResource("4_region")]
 layout_mode = 0
+focus_mode = 0
+mouse_filter = 1
+theme_override_styles/normal = SubResource("StyleBoxEmpty_vnblr")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_vnblr")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_vnblr")
+theme_override_styles/hover_pressed = SubResource("StyleBoxEmpty_vnblr")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_vnblr")
+flat = true
 
 [node name="Fill2" type="Polygon2D" parent="ViewManager/MapView/MapViewport/Viewport/Map/Eastreach" index="0" unique_id=1177671081]
 color = Color(0.75, 0.65, 0.35, 1)
@@ -43,8 +87,16 @@ points = PackedVector2Array(820, 220, 560, 320, 700, 480, 980, 520, 1120, 300, 1
 width = 2.0
 default_color = Color(0, 0, 0, 1)
 
-[node name="Sorrow Isles" parent="ViewManager/MapView/MapViewport/Viewport/Map" parent_id_path=PackedInt32Array(1111572209) index="3" unique_id=141756287 instance=ExtResource("4_region")]
+[node name="Sorrow Isles" parent="ViewManager/MapView/MapViewport/Viewport/Map" index="3" unique_id=141756287 instance=ExtResource("4_region")]
 layout_mode = 0
+focus_mode = 0
+mouse_filter = 1
+theme_override_styles/normal = SubResource("StyleBoxEmpty_abk5t")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_abk5t")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_abk5t")
+theme_override_styles/hover_pressed = SubResource("StyleBoxEmpty_abk5t")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_abk5t")
+flat = true
 
 [node name="Fill2" type="Polygon2D" parent="ViewManager/MapView/MapViewport/Viewport/Map/Sorrow Isles" index="0" unique_id=1753986740]
 color = Color(0.3, 0.55, 0.55, 1)
@@ -55,8 +107,16 @@ points = PackedVector2Array(300, 700, 520, 660, 600, 780, 380, 840, 300, 700)
 width = 2.0
 default_color = Color(0, 0, 0, 1)
 
-[node name="Cinder Wastes" parent="ViewManager/MapView/MapViewport/Viewport/Map" parent_id_path=PackedInt32Array(1111572209) index="4" unique_id=1165056032 instance=ExtResource("4_region")]
+[node name="Cinder Wastes" parent="ViewManager/MapView/MapViewport/Viewport/Map" index="4" unique_id=1165056032 instance=ExtResource("4_region")]
 layout_mode = 0
+focus_mode = 0
+mouse_filter = 1
+theme_override_styles/normal = SubResource("StyleBoxEmpty_3va1g")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_3va1g")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_3va1g")
+theme_override_styles/hover_pressed = SubResource("StyleBoxEmpty_3va1g")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_3va1g")
+flat = true
 
 [node name="Fill2" type="Polygon2D" parent="ViewManager/MapView/MapViewport/Viewport/Map/Cinder Wastes" index="0" unique_id=607820880]
 color = Color(0.7, 0.4, 0.3, 1)
@@ -66,3 +126,6 @@ polygon = PackedVector2Array(1120, 300, 1380, 380, 1420, 650, 1050, 700, 980, 52
 points = PackedVector2Array(1120, 300, 1380, 380, 1420, 650, 1050, 700, 980, 520, 1120, 300)
 width = 2.0
 default_color = Color(0, 0, 0, 1)
+
+[node name="GeoscapeHud" parent="ViewManager/MapView" index="2" unique_id=1886936763]
+layout_mode = 1
