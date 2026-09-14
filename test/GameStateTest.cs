@@ -159,4 +159,12 @@ public class GameStateTest
     Assert.Throws<InvalidOperationException>(() =>
       new GameState(TestData.MakeStart(armory: [dup, dup])));
   }
+
+  [TestCase(TestName = "TicksFromDays covers whole days at 1440 ticks per day")]
+  public void TicksFromDaysCoversWholeDays()
+  {
+    Assert.Equal(0L, GameState.TicksFromDays(0));
+    Assert.Equal(1440L, GameState.TicksFromDays(1));
+    Assert.Equal(4320L, GameState.TicksFromDays(3));
+  }
 }

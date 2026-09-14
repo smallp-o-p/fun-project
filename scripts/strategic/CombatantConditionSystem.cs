@@ -19,9 +19,6 @@ public sealed record InjuryState(int Tier, long RecoveryTick);
 /// </summary>
 public sealed class CombatantConditionSystem
 {
-  // TODO: Not a fan of this
-  private const long SecondsPerDay = 86400;
-
   private readonly Godot.Collections.Array<InjuryTierData> _injuryTiers;
   private readonly Godot.Collections.Array<ConditionTierData> _fatigueTiers;
   private readonly Dictionary<Combatant, InjuryState> _injuries = [];
@@ -94,7 +91,7 @@ public sealed class CombatantConditionSystem
         + EarnedInjuryTiers(healthDamageTaken, maxHealth));
       nextInjury = tier == 0
         ? None
-        : new InjuryState(tier, checked(tick + TicksFromDays(InjuryTierAt(tier).RecoveryDays)));
+        : new InjuryState(tier, checked(tick + CampaignGameState.TicksFromDays(InjuryTierAt(tier).RecoveryDays)));
     }
 
     // The accrual gate is the injury record BEFORE this return, never the newly computed
@@ -106,7 +103,7 @@ public sealed class CombatantConditionSystem
         (currentFatigue.Case is FatigueState prior ? prior.Tier : 0) + 1);
       nextFatigue = tier == 0
         ? None
-        : new FatigueState(tier, checked(tick + TicksFromDays(FatigueTierAt(tier).RecoveryDays)));
+        : new FatigueState(tier, checked(tick + CampaignGameState.TicksFromDays(FatigueTierAt(tier).RecoveryDays)));
     }
 
     if (nextInjury.Case is InjuryState activeInjury)
@@ -132,14 +129,14 @@ public sealed class CombatantConditionSystem
         nextInjury = injury.Tier == 1
           ? None
           : new InjuryState(injury.Tier - 1,
-            checked(injury.RecoveryTick + TicksFromDays(InjuryTierAt(injury.Tier - 1).RecoveryDays)));
+            checked(injury.RecoveryTick + CampaignGameState.TicksFromDays(InjuryTierAt(injury.Tier - 1).RecoveryDays)));
 
       Option<FatigueState> nextFatigue = currentFatigue;
       while (nextFatigue.Case is FatigueState fatigue && tick >= fatigue.RecoveryTick)
         nextFatigue = fatigue.Tier == 1
           ? None
           : new FatigueState(fatigue.Tier - 1,
-            checked(fatigue.RecoveryTick + TicksFromDays(FatigueTierAt(fatigue.Tier - 1).RecoveryDays)));
+            checked(fatigue.RecoveryTick + CampaignGameState.TicksFromDays(FatigueTierAt(fatigue.Tier - 1).RecoveryDays)));
 
       if (nextInjury == currentInjury && nextFatigue == currentFatigue)
         continue;
@@ -184,7 +181,4 @@ public sealed class CombatantConditionSystem
   private InjuryTierData InjuryTierAt(int position) => _injuryTiers[position - 1];
 
   private ConditionTierData FatigueTierAt(int position) => _fatigueTiers[position - 1];
-
-  private static long TicksFromDays(uint recoveryDays)
-    => checked(recoveryDays * SecondsPerDay / CampaignGameState.TickGameSeconds);
 }

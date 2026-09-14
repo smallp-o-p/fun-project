@@ -23,6 +23,16 @@ public sealed class GameState
   // One tick advances the in-game clock by one minute (mirrors GeoscapeSession.TickGameSeconds).
   public const int TickGameSeconds = 60;
 
+  // Game seconds in one game day (24 game hours).
+  private const long SecondsPerDay = 86_400;
+
+  /// <summary>Ticks required for the given number of whole game days to elapse — the
+  /// campaign's single day-to-tick conversion (condition recovery, project deadlines,
+  /// remaining-day display all derive from it; 1,440 ticks per day at 60 game seconds
+  /// per tick).</summary>
+  public static long TicksFromDays(uint days)
+    => checked((days * SecondsPerDay + TickGameSeconds - 1) / TickGameSeconds);
+
   // A timeline entry baked at construction: definition, fire tick, resolved target (−1 =
   // map-wide), and absolute expiry tick. Authored resources stay mutable, so nothing is
   // reread after the bake.

@@ -89,12 +89,7 @@ public sealed class GeoscapeSession
       return started.Job;
     });
 
-  private long CompletionTick(uint durationDays)
-  {
-    long seconds = durationDays * (TimeSpan.TicksPerDay / TimeSpan.TicksPerSecond);
-    long ticks = (seconds + TickGameSeconds - 1) / TickGameSeconds;
-    return checked(Tick + ticks);
-  }
+  private long CompletionTick(uint durationDays) => checked(Tick + CampaignGameState.TicksFromDays(durationDays));
 
   public void OpenResolution(GeoscapeEvent @event)
   {

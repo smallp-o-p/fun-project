@@ -23,8 +23,6 @@ public sealed partial class SquadLoadoutView : GeoscapeView
   [Export] public PackedScene? UnitViewScene { get; set; }
   [Export] public PackedScene? SquadSlotCardScene { get; set; }
 
-  private const long TicksPerDay = 86_400 / CampaignGameState.TickGameSeconds;
-
   // Bound by Configure (heading/policy) and Present (state/session); render paths assume
   // both ran.
   private CampaignGameState _state = null!;
@@ -238,7 +236,7 @@ public sealed partial class SquadLoadoutView : GeoscapeView
   // Remaining campaign ticks until the tier's next improvement, shown as whole days
   // rounded up so a positive interval never displays as zero.
   private static string FormatRemaining(long ticksRemaining) =>
-    $"{CeilDiv(Math.Max(0, ticksRemaining), TicksPerDay)}d";
+    $"{CeilDiv(Math.Max(0, ticksRemaining), CampaignGameState.TicksFromDays(1))}d";
 
   private static long CeilDiv(long value, long divisor) => (value + divisor - 1) / divisor;
 }
