@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="DialogueSequenceData" format=3]
+
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueSequenceData.cs" id="1"]
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueLineData.cs" id="2"]
+[ext_resource type="Resource" path="res://resources/dialogue/speakers/council-spokesman.tres" id="3"]
+
+[sub_resource type="Resource" id="DialogueLineData_line1"]
+script = ExtResource("2")
+Speaker = ExtResource("3")
+Text = "This is the Council. The transmission you intercepted was not a test."
+
+[sub_resource type="Resource" id="DialogueLineData_line2"]
+script = ExtResource("2")
+Speaker = ExtResource("3")
+Text = "We will say no more on open channels. Continue your work, Commander."
+
+[resource]
+script = ExtResource("1")
+Lines = [SubResource("DialogueLineData_line1"), SubResource("DialogueLineData_line2")]

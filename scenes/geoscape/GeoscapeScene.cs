@@ -1,3 +1,4 @@
+using FunProject.Dialogue;
 using FunProject.GameState;
 using FunProject.Strategic;
 using CampaignGameState = global::FunProject.GameState.GameState;
@@ -13,6 +14,7 @@ public partial class GeoscapeScene : Control
 {
   [Export] public CampaignStartData? Start;
   [Export] public PackedScene? ResolutionViewScene { get; set; }
+  [Export] public PackedScene? DialogueViewScene { get; set; }
 
   private CampaignGameState _state = null!;
   private GeoscapeSession _session = null!;
@@ -20,6 +22,7 @@ public partial class GeoscapeScene : Control
   private GeoscapeCameraRig _camera = null!;
   private GeoscapeHud _hud = null!;
   private PackedScene _resolutionViewScene = null!;
+  private PackedScene _dialogueViewScene = null!;
   private GeoscapeViewManager _viewManager = null!;
 
   public override void _Ready()
@@ -28,6 +31,8 @@ public partial class GeoscapeScene : Control
       "GeoscapeScene requires a CampaignStartData export; assign one in the inspector.");
     _resolutionViewScene = ResolutionViewScene ?? throw new InvalidOperationException(
       "GeoscapeScene requires a ResolutionViewScene export; assign one in the inspector.");
+    _dialogueViewScene = DialogueViewScene ?? throw new InvalidOperationException(
+      "GeoscapeScene requires a DialogueViewScene export; assign one in the inspector.");
     _state = CreateGameState(start);
     _session = new GeoscapeSession(_state);
 
@@ -97,10 +102,11 @@ public partial class GeoscapeScene : Control
         _map.RefreshEvents();
         _hud.RefreshAlerts(_session.ActiveEvents);
         break;
-      case ResolutionEventOpened:
+      case ResolutionEventOpened opened:
         var resolution = InstantiateResolutionView();
         resolution.Resolved += _session.CompleteResolution;
         _viewManager.Push(resolution); // ViewChanged presents from the now-pending session state
+        PushEventDialogue(opened.Pending);
         _hud.RefreshAlerts(_session.ActiveEvents);
         break;
       case ResolutionEventClosed:
@@ -116,16 +122,31 @@ public partial class GeoscapeScene : Control
 
   // A fresh dialog per pending resolution: the manager frees popped views.
   private GeoscapeEventResolution InstantiateResolutionView()
+    => InstantiateRoot<GeoscapeEventResolution>(_resolutionViewScene, "ResolutionViewScene");
+
+  private T InstantiateRoot<T>(PackedScene scene, string exportName) where T : Node
   {
-    Node instance = _resolutionViewScene.Instantiate();
-    if (instance is not GeoscapeEventResolution view)
+    Node instance = scene.Instantiate();
+    if (instance is not T view)
     {
       string kind = instance.GetClass();
-      instance.Free();
-      throw new InvalidOperationException(
-        $"GeoscapeScene ResolutionViewScene root must be a GeoscapeEventResolution; got {kind}.");
+      instance.Free(); // free now: rejected roots must not linger to frame end
+      throw new InvalidOperationException($"{exportName} root must be a {typeof(T).Name}; got {kind}.");
     }
     return view;
+  }
+
+  // A dialogue-carrying event plays its conversation over the just-pushed resolution
+  // view: the dialogue covers it and pops back to the retained dialog when finished.
+  private void PushEventDialogue(PendingResolution pending)
+  {
+    DialogueSequenceData? dialogue = pending.Event.Definition.Dialogue;
+    if (dialogue is null)
+      return;
+
+    DialogueView view = InstantiateRoot<DialogueView>(_dialogueViewScene, "DialogueViewScene");
+    view.Configure(dialogue);
+    _viewManager.Push(view);
   }
 
   private void OpenResolution(GeoscapeEvent active)

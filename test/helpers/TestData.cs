@@ -4,6 +4,7 @@ using FunProject.Buffs;
 using FunProject.Combatants;
 using FunProject.Combatants.Conditions;
 using FunProject.Core;
+using FunProject.Dialogue;
 using FunProject.GameState;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
@@ -376,7 +377,8 @@ internal static class TestData
     GeoscapeEventKind kind = GeoscapeEventKind.Plot,
     string targetRegionName = "",
     int expiresAfterTicks = -1,
-    bool allowUnfitDeployment = false)
+    bool allowUnfitDeployment = false,
+    DialogueSequenceData? dialogue = null)
   {
     return new GeoscapeEventDefinition
     {
@@ -386,6 +388,7 @@ internal static class TestData
       ExpiresAfterTicks = expiresAfterTicks,
       TargetRegionName = targetRegionName,
       AllowUnfitDeployment = allowUnfitDeployment,
+      Dialogue = dialogue,
     };
   }
 

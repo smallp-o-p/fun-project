@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://e5sdmq8l4a3a" path="res://scripts/strategic/RegionData.cs" id="2"]
 [ext_resource type="Script" uid="uid://wteelogkx2oj" path="res://scripts/strategic/GeoscapeEventDefinition.cs" id="3"]
 [ext_resource type="Script" uid="uid://cvsrysjc061la" path="res://scripts/strategic/ScheduledEventData.cs" id="4"]
+[ext_resource type="Resource" path="res://resources/dialogue/council-broadcast.tres" id="5_dialogue"]
 
 [sub_resource type="Resource" id="Region_northmark"]
 script = ExtResource("2")
@@ -51,6 +52,7 @@ Event = SubResource("Event_tactical")
 script = ExtResource("3")
 Title = "Council Broadcast"
 Description = "An unscheduled transmission cuts across every channel in the region. The Council insists it is a test. It is not."
+Dialogue = ExtResource("5_dialogue")
 
 [sub_resource type="Resource" id="Schedule_plot"]
 script = ExtResource("4")

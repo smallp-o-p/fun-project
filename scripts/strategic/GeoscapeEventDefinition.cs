@@ -1,3 +1,4 @@
+using FunProject.Dialogue;
 using Godot;
 
 namespace FunProject.Strategic;
@@ -28,4 +29,7 @@ public partial class GeoscapeEventDefinition : Resource
   // Deployment eligibility override: unfit combatants (injured or exhausted) may join this
   // mission anyway. Default false — the roster gate stands.
   [Export] public bool AllowUnfitDeployment { get; set; } = false;
+  
+  // If dialogue needs to be triggered
+  [Export] public DialogueSequenceData? Dialogue { get; set; }
 }

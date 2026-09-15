@@ -44,9 +44,20 @@ internal static class GeoscapeTestScenes
     => GD.Load<PackedScene>("res://scenes/geoscape/resolutions/GeoscapeEventResolution.tscn")
       .Instantiate<GeoscapeEventResolution>();
 
+  public static DialogueView CreateDialogueView()
+    => GD.Load<PackedScene>("res://scenes/dialogue/DialogueView.tscn").Instantiate<DialogueView>();
+
   // Base background shell for generic view-manager background/lifetime contracts.
   public static GeoscapeView CreateBaseView()
     => GD.Load<PackedScene>("res://scenes/geoscape/GeoscapeView.tscn").Instantiate<GeoscapeView>();
+
+  public static Button SpeedButton(GeoscapeScene scene)
+    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Button>("%SpeedButton");
+
+  // Opens the newest alert's resolution dialog, as a player click would.
+  public static void OpenResolutionViaAlert(GeoscapeScene scene)
+    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<VBoxContainer>("%Alerts")
+      .GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
 
   public static Node3D AddBackdrop(GeoscapeView view, Node3D backdrop)
   {
