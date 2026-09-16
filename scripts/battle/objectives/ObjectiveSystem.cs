@@ -1,5 +1,6 @@
 using FunProject.Combatants;
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 
 namespace FunProject.Battle;
@@ -9,7 +10,8 @@ namespace FunProject.Battle;
 /// <see cref="BattleEventTag"/> at priority +100, so it receives every committed event.
 /// Objectives filter by their declared <see cref="Objective.ObservedEventKeys"/> inside
 /// the router. The router supplies each objective's owning faction to <see cref="Objective.Check"/>.
-/// The event's concrete type and tag interfaces are cached by event type.
+/// Dispatch keys are owned by the event itself (per-closed-type statics behind
+/// <see cref="BattleEvent{TSelf}.EventKeys"/>).
 /// Candidates are snapshotted for each event in global faction order, then objective add
 /// order; this is the determinism contract. Follow-ups added by a directive are therefore
 /// visible from the next event, not retroactively in the event that queued them. On a flip
@@ -21,7 +23,6 @@ namespace FunProject.Battle;
 public sealed class ObjectiveSystem : BattleHook
 {
   private readonly BattleSession _session;
-  private readonly Dictionary<Type, Type[]> _eventKeyCache = [];
 
   public ObjectiveSystem(BattleSession session)
   {
@@ -69,35 +70,16 @@ public sealed class ObjectiveSystem : BattleHook
   // The faction-order × objective-add-order traversal is the determinism contract.
   private (Faction Owner, Objective Objective)[] InterestedIn(BattleEvent battleEvent)
   {
-    Type[] eventKeys = EventKeysFor(battleEvent);
+    FrozenSet<Type> eventKeys = battleEvent.EventKeys;
     List<(Faction Owner, Objective Objective)> candidates = [];
 
     foreach (Faction faction in _session.GlobalFactionTurnOrder)
       foreach (Objective objective in _session.GetObjectives(faction))
         if (objective.State == ObjectiveResult.Ongoing
-            && objective.ObservedEventKeys.AsValueEnumerable().Any(eventType => eventKeys.AsValueEnumerable().Contains(eventType)))
+            && objective.ObservedEventKeys.AsValueEnumerable().Any(eventKeys.Contains))
           candidates.Add((faction, objective));
 
     return [.. candidates];
-  }
-
-  // Same walk as the hook registry: the concrete event type first, then its tag
-  // interfaces, cached once per concrete event type.
-  private Type[] EventKeysFor(BattleEvent battleEvent)
-  {
-    Type eventType = battleEvent.GetType();
-    if (_eventKeyCache.TryGetValue(eventType, out Type[]? cached))
-      return cached;
-
-    Type[] keys =
-    [
-      eventType,
-      .. eventType
-        .GetInterfaces()
-        .AsValueEnumerable().Where(interfaceType => typeof(BattleEventTag).IsAssignableFrom(interfaceType)),
-    ];
-    _eventKeyCache[eventType] = keys;
-    return keys;
   }
 
   private void ApplyDirective(Faction owner, ObjectiveDirectiveData? directive)

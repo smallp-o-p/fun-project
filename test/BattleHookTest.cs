@@ -9,7 +9,7 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public partial class BattleHookTest
 {
-  private sealed record ProbeBattleEvent : BattleEvent;
+  private sealed record ProbeBattleEvent : BattleEvent<ProbeBattleEvent>;
 
   private sealed class RaiseProbeOnTurnEndedHook : BattleHook
   {
@@ -32,6 +32,26 @@ public partial class BattleHookTest
         return [];
 
       Evaluations++;
+      return [];
+    }
+  }
+
+  private sealed class OrderedHook : BattleHook
+  {
+    private readonly string _label;
+    private readonly List<string> _log;
+
+    public OrderedHook(string label, List<string> log)
+    {
+      _label = label;
+      _log = log;
+    }
+
+    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
+    {
+      if (battleEvent is UnitAddedBattleEvent)
+        _log.Add(_label);
+
       return [];
     }
   }
@@ -65,6 +85,41 @@ public partial class BattleHookTest
     battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
 
     Assert.True(unitEventsListener.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
+  }
+
+  [TestCase(TestName = "A hook registered under the root event tag receives every committed event")]
+  public void RootTagRegistrationReceivesEveryCommittedEvent()
+  {
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    var catchAll = new RecordingHook();
+    battle.RegisterHook<BattleEventTag>(catchAll);
+
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.Start();
+
+    Assert.True(catchAll.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
+    Assert.True(catchAll.Received.AsValueEnumerable().OfType<TurnStartedBattleEvent>().Any());
+
+    battle.ClearEvents();
+    battle.Submit(BattleAction.EndFactionTurn(faction));
+
+    Assert.True(catchAll.Received.AsValueEnumerable().OfType<TurnEndedBattleEvent>().Any());
+  }
+
+  [TestCase(TestName = "Hook firing order follows priority then registration across different event keys")]
+  public void PriorityThenRegistrationOrderHoldsAcrossDifferentEventKeys()
+  {
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    var log = new List<string>();
+    battle.RegisterHook<IUnitBattleEvent>(new OrderedHook("unit-default", log));
+    battle.RegisterHook<IPositionedBattleEvent>(new OrderedHook("positioned-low-priority", log), -5);
+    battle.RegisterHook<UnitAddedBattleEvent>(new OrderedHook("concrete-default", log));
+
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+
+    Assert.Equal("positioned-low-priority|unit-default|concrete-default", string.Join("|", log));
   }
 
   [TestCase(TestName = "A hook registered under concrete and interface keys fires once for one event")]

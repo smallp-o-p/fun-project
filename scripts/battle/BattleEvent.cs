@@ -4,6 +4,7 @@ using FunProject.Items;
 using FunProject.Items.Effects;
 using FunProject.Weapons;
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 
 namespace FunProject.Battle;
@@ -14,6 +15,27 @@ public interface BattleEventTag
 
 public abstract record BattleEvent : BattleEventTag
 {
+  internal abstract FrozenSet<Type> EventKeys { get; }
+}
+
+// Self-keyed: each closed BattleEvent<TSelf> owns one static per-closed-type dispatch-keys
+// frozen set — its concrete type plus its BattleEventTag-assignable interfaces. The set is
+// unordered; firing order comes from BattleHookRegistry.Fire's priority-then-registration
+// sort. Concrete events must be sealed so the runtime type always equals TSelf and the
+// static set stays authoritative for every instance.
+public abstract record BattleEvent<TSelf> : BattleEvent
+  where TSelf : BattleEvent<TSelf>
+{
+  private static readonly FrozenSet<Type> Keys = FrozenSet.ToFrozenSet(
+    [
+      typeof(TSelf),
+      .. typeof(TSelf)
+        .GetInterfaces()
+        .AsValueEnumerable()
+        .Where(interfaceType => typeof(BattleEventTag).IsAssignableFrom(interfaceType)),
+    ]);
+
+  internal sealed override FrozenSet<Type> EventKeys => Keys;
 }
 
 public interface IUnitBattleEvent : BattleEventTag
@@ -26,11 +48,11 @@ public interface IPositionedBattleEvent : BattleEventTag
   BattleBoardState.ValidatedPoint Position { get; }
 }
 
-public sealed record SessionStartedBattleEvent : BattleEvent
+public sealed record SessionStartedBattleEvent : BattleEvent<SessionStartedBattleEvent>
 {
 }
 
-public sealed record SessionEndedBattleEvent : BattleEvent
+public sealed record SessionEndedBattleEvent : BattleEvent<SessionEndedBattleEvent>
 {
   public BattleOutcome Outcome { get; }
 
@@ -48,7 +70,7 @@ public interface ICausedByUnit : BattleEventTag
   Option<BattleUnitState> MaybeCause { get; }
 }
 
-public sealed record TurnStartedBattleEvent : BattleEvent
+public sealed record TurnStartedBattleEvent : BattleEvent<TurnStartedBattleEvent>
 {
   public Faction Faction { get; }
   public int TurnNumber { get; }
@@ -60,7 +82,7 @@ public sealed record TurnStartedBattleEvent : BattleEvent
   }
 }
 
-public sealed record TurnEndedBattleEvent : BattleEvent
+public sealed record TurnEndedBattleEvent : BattleEvent<TurnEndedBattleEvent>
 {
   public Faction Faction { get; }
   public int TurnNumber { get; }
@@ -72,7 +94,7 @@ public sealed record TurnEndedBattleEvent : BattleEvent
   }
 }
 
-public sealed record ActiveSideChangedBattleEvent : BattleEvent
+public sealed record ActiveSideChangedBattleEvent : BattleEvent<ActiveSideChangedBattleEvent>
 {
   public Faction Faction { get; }
 
@@ -82,7 +104,7 @@ public sealed record ActiveSideChangedBattleEvent : BattleEvent
   }
 }
 
-public sealed record UnitAddedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
+public sealed record UnitAddedBattleEvent : BattleEvent<UnitAddedBattleEvent>, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
@@ -96,7 +118,7 @@ public sealed record UnitAddedBattleEvent : BattleEvent, IUnitBattleEvent, IPosi
 }
 
 /// <summary>Raised when a special board object is placed onto a tile.</summary>
-public sealed record ObjectPlacedBattleEvent : BattleEvent, IPositionedBattleEvent
+public sealed record ObjectPlacedBattleEvent : BattleEvent<ObjectPlacedBattleEvent>, IPositionedBattleEvent
 {
   public BattleObjectState Object { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
@@ -110,7 +132,7 @@ public sealed record ObjectPlacedBattleEvent : BattleEvent, IPositionedBattleEve
 }
 
 /// <summary>Raised when a unit successfully interacts with a placed object.</summary>
-public sealed record ObjectInteractedBattleEvent : BattleEvent, IPositionedBattleEvent
+public sealed record ObjectInteractedBattleEvent : BattleEvent<ObjectInteractedBattleEvent>, IPositionedBattleEvent
 {
   public BattleUnitState Actor { get; }
   public BattleObjectState Object { get; }
@@ -127,7 +149,7 @@ public sealed record ObjectInteractedBattleEvent : BattleEvent, IPositionedBattl
 }
 
 /// <summary>Raised after an object's expiry trigger resolves its payload.</summary>
-public sealed record ObjectExpiredBattleEvent : BattleEvent, IPositionedBattleEvent
+public sealed record ObjectExpiredBattleEvent : BattleEvent<ObjectExpiredBattleEvent>, IPositionedBattleEvent
 {
   public BattleObjectState Object { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
@@ -140,7 +162,7 @@ public sealed record ObjectExpiredBattleEvent : BattleEvent, IPositionedBattleEv
   }
 }
 
-public sealed record UnitActivationEndedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
+public sealed record UnitActivationEndedBattleEvent : BattleEvent<UnitActivationEndedBattleEvent>, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
@@ -153,7 +175,7 @@ public sealed record UnitActivationEndedBattleEvent : BattleEvent, IUnitBattleEv
   }
 }
 
-public sealed record UnitMovedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
+public sealed record UnitMovedBattleEvent : BattleEvent<UnitMovedBattleEvent>, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
@@ -171,7 +193,7 @@ public sealed record UnitMovedBattleEvent : BattleEvent, IUnitBattleEvent, IPosi
   }
 }
 
-public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
+public sealed record TileOccupiedBattleEvent : BattleEvent<TileOccupiedBattleEvent>, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
@@ -189,7 +211,7 @@ public sealed record TileOccupiedBattleEvent : BattleEvent, IUnitBattleEvent, IP
 /// <summary>
 /// Carries one resolved damage application.
 /// </summary>
-public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent, ICausedByUnit
+public sealed record UnitDamagedBattleEvent : BattleEvent<UnitDamagedBattleEvent>, IUnitBattleEvent, ICausedByUnit
 {
   public BattleUnitState Unit { get; }
   public IReadOnlyList<Damage> Bundle { get; }
@@ -216,7 +238,7 @@ public sealed record UnitDamagedBattleEvent : BattleEvent, IUnitBattleEvent, ICa
   }
 }
 
-public sealed record UnitStunRecoveredBattleEvent : BattleEvent, IUnitBattleEvent
+public sealed record UnitStunRecoveredBattleEvent : BattleEvent<UnitStunRecoveredBattleEvent>, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
   public uint AmountRecovered { get; }
@@ -233,7 +255,7 @@ public sealed record UnitStunRecoveredBattleEvent : BattleEvent, IUnitBattleEven
   }
 }
 
-public sealed record UnitArmorRegeneratedBattleEvent : BattleEvent, IUnitBattleEvent
+public sealed record UnitArmorRegeneratedBattleEvent : BattleEvent<UnitArmorRegeneratedBattleEvent>, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
   public int AmountRegenerated { get; }
@@ -250,7 +272,7 @@ public sealed record UnitArmorRegeneratedBattleEvent : BattleEvent, IUnitBattleE
   }
 }
 
-public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, ICausedByUnit
+public sealed record UnitKilledBattleEvent : BattleEvent<UnitKilledBattleEvent>, IUnitBattleEvent, IPositionedBattleEvent, ICausedByUnit
 {
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
@@ -265,7 +287,7 @@ public sealed record UnitKilledBattleEvent : BattleEvent, IUnitBattleEvent, IPos
   }
 }
 
-public sealed record UnitUnconsciousBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent, ICausedByUnit
+public sealed record UnitUnconsciousBattleEvent : BattleEvent<UnitUnconsciousBattleEvent>, IUnitBattleEvent, IPositionedBattleEvent, ICausedByUnit
 {
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
@@ -280,7 +302,7 @@ public sealed record UnitUnconsciousBattleEvent : BattleEvent, IUnitBattleEvent,
   }
 }
 
-public sealed record ItemThrownBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
+public sealed record ItemThrownBattleEvent : BattleEvent<ItemThrownBattleEvent>, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
@@ -301,7 +323,7 @@ public sealed record ItemThrownBattleEvent : BattleEvent, IUnitBattleEvent, IPos
 /// Carries the acting unit and the item; effect payloads are resolved by hooks reacting to
 /// this event, mirroring how blast effects follow <see cref="ItemThrownBattleEvent"/>.
 /// </summary>
-public sealed record ItemUsedBattleEvent : BattleEvent, IUnitBattleEvent
+public sealed record ItemUsedBattleEvent : BattleEvent<ItemUsedBattleEvent>, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
   public EquippableItem Item { get; }
@@ -320,7 +342,7 @@ public sealed record ItemUsedBattleEvent : BattleEvent, IUnitBattleEvent
 /// resolved against the affected units. Carries the resolved item and the resolution
 /// point so presentation can play an effect at that tile.
 /// </summary>
-public sealed record CapabilityResolvedBattleEvent : BattleEvent, IPositionedBattleEvent
+public sealed record CapabilityResolvedBattleEvent : BattleEvent<CapabilityResolvedBattleEvent>, IPositionedBattleEvent
 {
   public EquippableItem Item { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
@@ -333,7 +355,7 @@ public sealed record CapabilityResolvedBattleEvent : BattleEvent, IPositionedBat
   }
 }
 
-public sealed record UnitAttackedBattleEvent : BattleEvent, IUnitBattleEvent, IPositionedBattleEvent
+public sealed record UnitAttackedBattleEvent : BattleEvent<UnitAttackedBattleEvent>, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
   public BattleUnitState Target { get; }
@@ -366,7 +388,7 @@ public sealed record UnitAttackedBattleEvent : BattleEvent, IUnitBattleEvent, IP
   }
 }
 
-public sealed record UnitReloadedWeaponBattleEvent : BattleEvent, IUnitBattleEvent
+public sealed record UnitReloadedWeaponBattleEvent : BattleEvent<UnitReloadedWeaponBattleEvent>, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
   public AmmunitionedWeapon Weapon { get; }
@@ -385,7 +407,7 @@ public sealed record UnitReloadedWeaponBattleEvent : BattleEvent, IUnitBattleEve
 /// OBSERVER, so a second observer spotting an already-team-known target still raises this once for
 /// that observer. <see cref="Unit"/> is the observer; <see cref="Target"/> is the unit it spotted.
 /// </summary>
-public sealed record UnitSpottedBattleEvent : BattleEvent, IUnitBattleEvent
+public sealed record UnitSpottedBattleEvent : BattleEvent<UnitSpottedBattleEvent>, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
   public BattleUnitState Target { get; }
@@ -399,7 +421,7 @@ public sealed record UnitSpottedBattleEvent : BattleEvent, IUnitBattleEvent
   }
 }
 
-public sealed record UnitStatusEffectAppliedBattleEvent : BattleEvent, IUnitBattleEvent
+public sealed record UnitStatusEffectAppliedBattleEvent : BattleEvent<UnitStatusEffectAppliedBattleEvent>, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
   public StatusEffectSpecData Spec { get; }
@@ -416,7 +438,7 @@ public sealed record UnitStatusEffectAppliedBattleEvent : BattleEvent, IUnitBatt
   }
 }
 
-public sealed record UnitStatusEffectTickedBattleEvent : BattleEvent, IUnitBattleEvent
+public sealed record UnitStatusEffectTickedBattleEvent : BattleEvent<UnitStatusEffectTickedBattleEvent>, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
   public StatusEffectSpecData Spec { get; }
@@ -433,7 +455,7 @@ public sealed record UnitStatusEffectTickedBattleEvent : BattleEvent, IUnitBattl
   }
 }
 
-public sealed record UnitStatusEffectExpiredBattleEvent : BattleEvent, IUnitBattleEvent
+public sealed record UnitStatusEffectExpiredBattleEvent : BattleEvent<UnitStatusEffectExpiredBattleEvent>, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
   public StatusEffectSpecData Spec { get; }
@@ -447,7 +469,7 @@ public sealed record UnitStatusEffectExpiredBattleEvent : BattleEvent, IUnitBatt
   }
 }
 
-public sealed record UnitBuffActivatedBattleEvent : BattleEvent, IUnitBattleEvent
+public sealed record UnitBuffActivatedBattleEvent : BattleEvent<UnitBuffActivatedBattleEvent>, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
   public Buff Buff { get; }
@@ -461,7 +483,7 @@ public sealed record UnitBuffActivatedBattleEvent : BattleEvent, IUnitBattleEven
   }
 }
 
-public sealed record UnitBuffDeactivatedBattleEvent : BattleEvent, IUnitBattleEvent
+public sealed record UnitBuffDeactivatedBattleEvent : BattleEvent<UnitBuffDeactivatedBattleEvent>, IUnitBattleEvent
 {
   public BattleUnitState Unit { get; }
   public Buff Buff { get; }
@@ -475,7 +497,7 @@ public sealed record UnitBuffDeactivatedBattleEvent : BattleEvent, IUnitBattleEv
   }
 }
 
-public sealed record ObjectiveAddedBattleEvent : BattleEvent
+public sealed record ObjectiveAddedBattleEvent : BattleEvent<ObjectiveAddedBattleEvent>
 {
   public Faction Faction { get; }
   public Objective Objective { get; }
@@ -489,7 +511,7 @@ public sealed record ObjectiveAddedBattleEvent : BattleEvent
   }
 }
 
-public sealed record ObjectiveCompletedBattleEvent : BattleEvent
+public sealed record ObjectiveCompletedBattleEvent : BattleEvent<ObjectiveCompletedBattleEvent>
 {
   public Faction Faction { get; }
   public Objective Objective { get; }
@@ -503,7 +525,7 @@ public sealed record ObjectiveCompletedBattleEvent : BattleEvent
   }
 }
 
-public sealed record ObjectiveFailedBattleEvent : BattleEvent
+public sealed record ObjectiveFailedBattleEvent : BattleEvent<ObjectiveFailedBattleEvent>
 {
   public Faction Faction { get; }
   public Objective Objective { get; }

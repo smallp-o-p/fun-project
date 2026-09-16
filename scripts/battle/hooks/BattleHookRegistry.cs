@@ -71,7 +71,6 @@ internal sealed class BattleHookRegistry
 internal sealed class EventKeyedRegistry<T>
 {
   private readonly Dictionary<Type, List<T>> _itemsByEventType = [];
-  private readonly Dictionary<Type, Type[]> _keyCache = [];
 
   internal void Register<TEventKey>(T item)
     where TEventKey : BattleEventTag
@@ -108,12 +107,13 @@ internal sealed class EventKeyedRegistry<T>
   }
 
   /// <summary>
-  /// Items matching the event, in key order — the event's concrete type first, then its tag
-  /// interfaces in reflection order — and in registration order within each key.
+  /// Items matching the event's key set (per <see cref="BattleEvent{TSelf}.EventKeys"/>), in
+  /// unspecified order — <see cref="BattleHookRegistry.Fire"/>'s priority-then-stamp sort
+  /// determines firing order.
   /// </summary>
   internal IEnumerable<T> GetMatching(BattleEvent battleEvent)
   {
-    foreach (Type eventKey in KeysFor(battleEvent))
+    foreach (Type eventKey in battleEvent.EventKeys)
     {
       if (!_itemsByEventType.TryGetValue(eventKey, out var items))
         continue;
@@ -121,22 +121,5 @@ internal sealed class EventKeyedRegistry<T>
       foreach (T item in items)
         yield return item;
     }
-  }
-
-  private Type[] KeysFor(BattleEvent battleEvent)
-  {
-    Type eventType = battleEvent.GetType();
-    if (_keyCache.TryGetValue(eventType, out Type[]? cached))
-      return cached;
-
-    Type[] keys =
-    [
-      eventType,
-      .. eventType
-        .GetInterfaces()
-        .AsValueEnumerable().Where(interfaceType => typeof(BattleEventTag).IsAssignableFrom(interfaceType)),
-    ];
-    _keyCache[eventType] = keys;
-    return keys;
   }
 }
