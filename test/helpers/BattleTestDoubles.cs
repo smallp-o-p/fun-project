@@ -19,6 +19,33 @@ internal sealed class RecordingHook : BattleHook
   }
 }
 
+// Setup-time declared-system double: records the runtime it registered with and forwards to
+// a test-supplied callback, so lifecycle tests can hook in during startup.
+internal sealed partial class SetupSystemData : BattleTypeSystemData
+{
+  public Action<BattleRuntime> OnRegister { get; init; } = _ => { };
+  public BattleRuntime? RegisteredRuntime { get; private set; }
+
+  public override void Register(BattleRuntime runtime)
+  {
+    RegisteredRuntime = runtime;
+    OnRegister(runtime);
+  }
+}
+
+// Throws the supplied failure when the matching event type commits; startup-fault tests use
+// it to prove the original exception survives and the runtime is disposed.
+internal sealed class ThrowOnSetupEvent(Type eventType, Exception failure) : BattleHook
+{
+  public override IReadOnlyList<BattleAction> OnEvent(
+    HookContext context, BattleEvent battleEvent)
+  {
+    if (battleEvent.GetType() == eventType)
+      throw failure;
+    return [];
+  }
+}
+
 // Logs a message when it sees a positioned event on the target tile; counts every evaluation.
 internal sealed partial class PositionRecordingHook : BattleHook
 {

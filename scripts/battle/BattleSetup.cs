@@ -24,33 +24,38 @@ public sealed record UnitPlacement(UnitLoadout Loadout, Vector3I Position);
 /// <summary>One special board object at an explicit board cell.</summary>
 public sealed record ObjectPlacement(BattleSpecialObjectData Data, Vector3I Position);
 
-/// <summary>Board-level input for starting a battle session.</summary>
-public sealed record BattleSetup(
-  BattleBoardState Board,
-  IReadOnlyList<Faction> FactionOrder,
-  IReadOnlyList<UnitPlacement> Placements,
-  IReadOnlyDictionary<Faction, IReadOnlyList<ObjectiveData>> Objectives,
-  int? Seed = null,
-  Option<Faction> PlayerFaction = default,
-  IHitChanceCalculator? HitChance = null,
-  IReadOnlyList<ObjectPlacement>? Objects = null);
+/// <summary>One battle side: its faction, its objectives, and its positioned units.
+/// List order across sides is the global turn order; unit order within a side is retained.</summary>
+public sealed record BattleSideSetup(
+  Faction Faction,
+  IReadOnlyList<ObjectiveData> Objectives,
+  IReadOnlyList<UnitPlacement> Units);
 
-/// <summary>Map-level convenience input whose spawns are derived from authored slots.</summary>
-public sealed record MapBattleSetup(
+/// <summary>Campaign-supplied player deployment: the runtime faction reference plus its
+/// explicit loadouts, in deployment order. Every combatant must already belong to the faction.</summary>
+public sealed record PlayerDeployment(
+  Faction Faction,
+  IReadOnlyList<UnitLoadout> Loadouts);
+
+/// <summary>The concrete launch description: one selected map, ordered sides, and an
+/// already-resolved seed. Objects/systems default to empty; explicit null is a caller error.</summary>
+public sealed record BattleSetup(
   BattleMapData Map,
-  IReadOnlyList<Faction> FactionOrder,
-  IReadOnlyDictionary<int, IReadOnlyList<UnitLoadout>> RostersBySlot,
-  IReadOnlyDictionary<Faction, IReadOnlyList<ObjectiveData>> Objectives,
-  int? Seed = null,
-  Option<Faction> PlayerFaction = default,
-  IHitChanceCalculator? HitChance = null);
+  IReadOnlyList<BattleSideSetup> Sides,
+  int Seed,
+  Option<Faction> PlayerFaction = default)
+{
+  public IReadOnlyList<ObjectPlacement> Objects { get; init; } = [];
+
+  public IReadOnlyList<BattleTypeSystemData> Systems { get; init; } = [];
+}
 
 /// <summary>Typed reasons a battle request/setup can fail before the session starts.</summary>
 public enum BattleSetupFailureReason
 {
-  /// <summary>A faction was missing its required objective list.</summary>
+  /// <summary>A side was missing its required objective list.</summary>
   MissingObjective,
-  /// <summary>A referenced faction was not part of the battle's faction order.</summary>
+  /// <summary>A referenced faction was not part of the battle's side list.</summary>
   UnknownFaction,
   /// <summary>The authored battle type had no candidate maps to choose from.</summary>
   EmptyMapPool,
@@ -58,13 +63,11 @@ public enum BattleSetupFailureReason
   SpawnCellUnavailable,
   /// <summary>Two units were assigned to the same spawn cell.</summary>
   DuplicateSpawnCell,
-  /// <summary>A map spawn slot index was outside the faction-order range.</summary>
-  InvalidSpawnSlot,
-  /// <summary>A unit's owning faction did not match the slot it was assigned to.</summary>
-  SlotFactionMismatch,
-  /// <summary>The chosen map did not have enough spawn cells for a slot's roster.</summary>
+  /// <summary>A unit's owning faction did not match its containing side or deployment faction.</summary>
+  FactionMismatch,
+  /// <summary>The chosen map did not have enough spawn cells for a side's roster.</summary>
   SpawnSlotShortfall,
-  /// <summary>An object placement cell was out of bounds or not occupiable.</summary>
+  /// <summary>An object placement cell was out of bounds, occupied, or not occupiable.</summary>
   ObjectCellUnavailable,
   /// <summary>Two objects were assigned to the same placement cell.</summary>
   DuplicateObjectCell,

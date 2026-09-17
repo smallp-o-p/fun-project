@@ -25,28 +25,27 @@ public class BattleResultTest
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
-    var board = new BattleBoardState(new Vector3I(4, 1, 4));
 
     var bombData = new BattleSpecialObjectData { Name = "Bomb" };
     bombData.Capabilities.Add(new InteractiveCapabilityData());
     bombData.Capabilities.Add(new TimedEffectCapabilityData { FireAfterTurns = 1 });
 
     var setup = new BattleSetup(
-      board,
-      [player, enemy],
+      TestData.MakeOpenBattleMap(),
       [
-        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
-        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
+        new BattleSideSetup(player,
+          [new DefuseAllBombsObjectiveData
+          {
+            OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
+          }],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0))]),
+        new BattleSideSetup(enemy, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
       ],
-      new System.Collections.Generic.Dictionary<Faction, System.Collections.Generic.IReadOnlyList<ObjectiveData>>
-      {
-        [player] = [new DefuseAllBombsObjectiveData
-        {
-          OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
-        }],
-        [enemy] = [new FakeObjectiveData()],
-      },
-      Objects: [new ObjectPlacement(bombData, new Vector3I(2, 0, 2))]);
+      Seed: 7)
+    {
+      Objects = [new ObjectPlacement(bombData, new Vector3I(2, 0, 2))],
+    };
 
     using var runtime = BattleFactory.Start(setup).RequireRight();
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());

@@ -19,18 +19,17 @@ public partial class BattleTypeDataTest
     bombData.Capabilities.Add(new TimedEffectCapabilityData { FireAfterTurns = 1 });
 
     var setup = new BattleSetup(
-      new BattleBoardState(new Vector3I(4, 1, 4)),
-      [player, enemy],
+      TestData.MakeOpenBattleMap(),
       [
-        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
-        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
+        new BattleSideSetup(player, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0))]),
+        new BattleSideSetup(enemy, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
       ],
-      new System.Collections.Generic.Dictionary<Faction, System.Collections.Generic.IReadOnlyList<ObjectiveData>>
-      {
-        [player] = [new FakeObjectiveData()],
-        [enemy] = [new FakeObjectiveData()],
-      },
-      Objects: [new ObjectPlacement(bombData, new Vector3I(1, 0, 0))]);
+      Seed: 7)
+    {
+      Objects = [new ObjectPlacement(bombData, new Vector3I(1, 0, 0))],
+    };
     using var runtime = BattleFactory.Start(setup).RequireRight();
     BattleObjectState bomb = runtime.Query(new GetBattleSpecialObjectsQuery())[0];
 

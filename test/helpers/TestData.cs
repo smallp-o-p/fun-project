@@ -363,6 +363,39 @@ internal static class TestData
     };
   }
 
+  // An all-walkable, all-floor height-one board; every cell is an authored tile.
+  public static BattleMapData MakeOpenBattleMap(int width = 4, int depth = 4)
+  {
+    List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
+    for (int x = 0; x < width; x++)
+      for (int z = 0; z < depth; z++)
+        tiles.Add((new Vector3I(x, 0, z), FloorTile()));
+    return MakeMapData(new Vector3I(width, 1, depth), [.. tiles]);
+  }
+
+  // Two-faction duel on a 2x1x1 map: one spawn cell per side, one unit per side (health 20,
+  // aim 65, damage-1 range-10 weapon), one inert objective each.
+  public static BattleTypeData MakeDuelBattleType()
+  {
+    var type = new BattleTypeData { Name = "Setup duel" };
+    type.MapPool.Add(MakeMapData(new Vector3I(2, 1, 1),
+      (new Vector3I(0, 0, 0), SpawnTile(0)),
+      (new Vector3I(1, 0, 0), SpawnTile(1))));
+    string[] names = ["Player", "Enemy"];
+    foreach (string name in names)
+    {
+      var side = new FactionDeploymentData { Faction = new FactionData { Name = name } };
+      side.Roster.Add(new FunProject.Battle.RosterEntryData
+      {
+        Combatant = MakeCombatantData(name, health: 20, aim: 65),
+        Weapon = MakeWeaponData(damage: 1, critChance: 0, range: 10),
+      });
+      side.Objectives.Add(new FakeObjectiveData());
+      type.Factions.Add(side);
+    }
+    return type;
+  }
+
   public static RegionData MakeRegion(string name)
   {
     return new RegionData

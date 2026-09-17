@@ -68,17 +68,14 @@ public class BattleObjectSessionTest
     var enemy = TestData.MakeFaction("E");
 
     using BattleRuntime runtime = BattleFactory.Start(new BattleSetup(
-      new BattleBoardState(new Vector3I(4, 1, 4)),
-      [player, enemy],
+      TestData.MakeOpenBattleMap(),
       [
-        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
-        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
+        new BattleSideSetup(player, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0))]),
+        new BattleSideSetup(enemy, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
       ],
-      new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
-      {
-        [player] = [new FakeObjectiveData()],
-        [enemy] = [new FakeObjectiveData()],
-      },
+      Seed: 7,
       PlayerFaction: Some(player))).RequireRight();
 
     Assert.Equal(player, runtime.Query(new GetPlayerFactionQuery()).RequireSome());
@@ -90,21 +87,20 @@ public class BattleObjectSessionTest
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
 
-    // Start mutates the board it is given, so every case builds a FRESH setup + board —
-    // never reuse a setup across Start calls.
+    // Start mutates nothing on the setup, but each case gets a FRESH setup description so a
+    // failed Start cannot be confounded by a prior case.
     BattleSetup SetupWith(IReadOnlyList<ObjectPlacement> objects) => new(
-      new BattleBoardState(new Vector3I(4, 1, 4)),
-      [player, enemy],
+      TestData.MakeOpenBattleMap(),
       [
-        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
-        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
+        new BattleSideSetup(player, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0))]),
+        new BattleSideSetup(enemy, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
       ],
-      new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
-      {
-        [player] = [new FakeObjectiveData()],
-        [enemy] = [new FakeObjectiveData()],
-      },
-      Objects: objects);
+      Seed: 7)
+    {
+      Objects = objects,
+    };
 
     // Happy path: two objects placed.
     using BattleRuntime runtime = BattleFactory.Start(SetupWith(

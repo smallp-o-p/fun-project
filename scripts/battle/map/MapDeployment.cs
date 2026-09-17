@@ -1,53 +1,37 @@
-using FunProject.Combatants;
+using System;
 using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
-// Pure: turns a baked map's spawn cells (tiles whose SpawnFactionSlot >= 0) + per-slot rosters
-// into spawn placements. SpawnFactionSlot is the index into the BattleSession faction order.
-// Callers (BattleFactory) validate each (Combatant, Vector3I) against the board before feeding
-// it into BattleAction.SpawnUnit, which takes a ValidatedPoint.
+// Pure: turns a baked map's spawn cells (tiles whose SpawnFactionSlot >= 0) + one slot's
+// loadouts into spawn placements. SpawnFactionSlot is the index into the battle's side order.
+// Pairing decides capacity and order only; bounds, walkability, and collisions are checked
+// against the fresh board during BattleFactory.Start.
 public static class MapDeployment
 {
-  public static Either<string, IReadOnlyList<(Combatant Combatant, Vector3I Position)>> AssignSpawns(
-    BattleMapData map,
-    IReadOnlyDictionary<int, IReadOnlyList<Combatant>> rostersBySlot)
+  public static Either<BattleSetupFailure, IReadOnlyList<UnitPlacement>> AssignSpawns(
+    BattleMapData map, int slot, IReadOnlyList<UnitLoadout> loadouts)
   {
-    var placements = new List<(Combatant Combatant, Vector3I Position)>();
-
-    foreach (KeyValuePair<int, IReadOnlyList<Combatant>> roster in rostersBySlot)
-    {
-      int slot = roster.Key;
-      IReadOnlyList<Combatant> combatants = roster.Value;
-
-      List<Vector3I> cells = SpawnCellsForSlot(map, slot);
-      if (cells.Count < combatants.Count)
-        return Left<string, IReadOnlyList<(Combatant Combatant, Vector3I Position)>>(
-          $"Spawn slot {slot} has {cells.Count} cells but {combatants.Count} are needed.");
-
-      for (int i = 0; i < combatants.Count; i++)
-      {
-        Vector3I cell = cells[i];
-        var mapDimensions = new Vector3I(map.Dimensions.X, map.Dimensions.Y, map.Dimensions.Z);
-        if (!IsInBounds(cell, mapDimensions))
-          return Left<string, IReadOnlyList<(Combatant Combatant, Vector3I Position)>>(
-            $"Spawn cell {cell} for slot {slot} is out of bounds for dimensions {map.Dimensions}.");
-
-        placements.Add((combatants[i], cell));
-      }
-    }
-
-    IReadOnlyList<(Combatant Combatant, Vector3I Position)> result = placements;
-    return Right<string, IReadOnlyList<(Combatant Combatant, Vector3I Position)>>(result);
+    ArgumentNullException.ThrowIfNull(map);
+    ArgumentNullException.ThrowIfNull(loadouts);
+    ArgumentOutOfRangeException.ThrowIfNegative(slot);
+    List<Vector3I> cells = SpawnCellsForSlot(map, slot);
+    if (cells.Count < loadouts.Count)
+      return Left<BattleSetupFailure, IReadOnlyList<UnitPlacement>>(new(
+        BattleSetupFailureReason.SpawnSlotShortfall,
+        $"Spawn slot {slot} has {cells.Count} cells but {loadouts.Count} are needed."));
+    var placements = new List<UnitPlacement>(loadouts.Count);
+    for (int i = 0; i < loadouts.Count; i++)
+      placements.Add(new UnitPlacement(loadouts[i], cells[i]));
+    return Right<BattleSetupFailure, IReadOnlyList<UnitPlacement>>(placements);
   }
 
   // Cells whose tile is tagged with the given spawn slot, in a deterministic (X, Y, Z) order so
-  // roster[i] -> cell[i] assignment is stable regardless of dictionary iteration order.
+  // loadouts[i] -> cell[i] assignment is stable. Godot.Vector3I keys (the authored map's
+  // coordinate type) are converted to the runtime Vector3I as they are read off the map.
   private static List<Vector3I> SpawnCellsForSlot(BattleMapData map, int slot)
   {
     var cells = new List<Vector3I>();
-    // Godot.Vector3I keys (the authored map's coordinate type) are converted to the runtime
-    // Vector3I as they are read off the map.
     foreach (var entry in map.Tiles)
     {
       if (entry.Value is not null && entry.Value.SpawnFactionSlot == slot)
@@ -67,11 +51,5 @@ public static class MapDeployment
     if (cmp != 0)
       return cmp;
     return a.Z.CompareTo(b.Z);
-  }
-
-  private static bool IsInBounds(Vector3I cell, Vector3I dimensions)
-  {
-    return cell.X >= 0 && cell.Y >= 0 && cell.Z >= 0
-      && cell.X < dimensions.X && cell.Y < dimensions.Y && cell.Z < dimensions.Z;
   }
 }

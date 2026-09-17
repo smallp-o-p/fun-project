@@ -31,23 +31,23 @@ public class DefuseAllBombsObjectiveTest
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
     var setup = new BattleSetup(
-      new BattleBoardState(new Vector3I(4, 1, 4)),
-      [player, enemy],
+      TestData.MakeOpenBattleMap(),
       [
-        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
-        new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)),
+        new BattleSideSetup(player,
+          [new DefuseAllBombsObjectiveData
+          {
+            OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+            OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
+          }],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0))]),
+        new BattleSideSetup(enemy, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
       ],
-      new Dictionary<Faction, IReadOnlyList<ObjectiveData>>
-      {
-        [player] = [new DefuseAllBombsObjectiveData
-        {
-          OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
-          OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
-        }],
-        [enemy] = [new FakeObjectiveData()],
-      },
-      PlayerFaction: Some(player),
-      Objects: objects ?? [new ObjectPlacement(MakeBomb(), new Vector3I(1, 0, 0))]);
+      Seed: 7,
+      PlayerFaction: Some(player))
+    {
+      Objects = objects ?? [new ObjectPlacement(MakeBomb(), new Vector3I(1, 0, 0))],
+    };
 
     return (setup, player);
   }
