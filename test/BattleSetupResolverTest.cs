@@ -127,6 +127,23 @@ public class BattleSetupResolverTest
     Assert.True(ReferenceEquals(foreign, outsider.OwningFaction));
   }
 
+  [TestCase(TestName = "Resolve guards the supplied deployment's required inputs")]
+  public void SuppliedDeploymentGuards()
+  {
+    var type = TestData.MakeDuelBattleType();
+    var campaign = TestData.MakeFaction("Campaign");
+    var loadout = new UnitLoadout(TestData.MakeCombatant("Vet", campaign));
+
+    Assert.Throws<ArgumentNullException>(() => BattleSetupResolver.Resolve(type, seed: 7,
+      playerDeployment: Some(new PlayerDeployment(null!, [loadout]))));
+    Assert.Throws<ArgumentNullException>(() => BattleSetupResolver.Resolve(type, seed: 7,
+      playerDeployment: Some(new PlayerDeployment(campaign, null!))));
+    Assert.Throws<ArgumentNullException>(() => BattleSetupResolver.Resolve(type, seed: 7,
+      playerDeployment: Some(new PlayerDeployment(campaign, [null!]))));
+    Assert.Throws<ArgumentNullException>(() => BattleSetupResolver.Resolve(type, seed: 7,
+      playerDeployment: Some(new PlayerDeployment(campaign, [new UnitLoadout(null!)]))));
+  }
+
   [TestCase(TestName = "An empty deployment keeps its faction and does not restore the authored roster")]
   public void EmptyDeployment()
   {
