@@ -127,6 +127,20 @@ flowchart LR
 
 ## Runtime Components
 
+### Battle startup
+
+`BattleFactory` is the production startup entry point, and `Start(type)` composes both phases — authored-input resolution and runtime launch — so the scene need not orchestrate them: `BattleSetupResolver.Resolve(type, seed?, playerDeployment?)` turns the authored battle type into a grouped `BattleSetup`, and `Start(setup)` launches it. Startup runs in this order:
+
+1. Resolve map / factions / loadouts / positions / seed
+2. Create fresh board and parse the complete layout
+3. Create session and objectives
+4. Create runtime and default hooks
+5. Register declared systems
+6. Submit unit spawns, then object placements, then StartBattle
+7. Return runtime; dispose and rethrow if initialization throws
+
+Declared systems register before any unit spawns, so they observe spawning, session start, and the first turn. Typed layout failures (unavailable or duplicate cells, `SpawnSlotShortfall`) return a `BattleSetupFailure` before the session exists; exceptions after that point dispose the runtime and propagate unchanged. The campaign-to-battle scene integration remains deferred; `BattleScene` currently boots a standalone runtime through this entry point.
+
 ### BattleSession
 
 `BattleSession` currently exposes authoritative state and bookkeeping around:

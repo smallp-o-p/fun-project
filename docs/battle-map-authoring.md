@@ -48,7 +48,17 @@ MeshLibrary item name isn't in `Brushes` bakes as a plain walkable floor.
 
 ## Spawning from a baked map
 
-`MapDeployment.AssignSpawns(map, rostersBySlot)` pairs each faction-slot roster with that slot's
-spawn-zone cells, returning `(Combatant, Vector3I)` placements that `BattleFactory` validates
-into `ValidatedPoint`s and feeds into `BattleAction.SpawnUnit`. `FactionSlot` indexes the
-session's faction order (0 = first faction).
+`BattleSetupResolver.Resolve(type, seed?, playerDeployment?)` chooses the map and
+builds ordered sides. `MapDeployment.AssignSpawns(map, slot, loadouts)` pairs each
+side's roster directly with that slot's cells, sorted X/Y/Z. The slot is the
+side's index in `BattleTypeData.Factions`; roster order is preserved.
+
+The resolved `BattleSetup` groups each faction with its objectives and positioned
+units. `BattleFactory.Start(setup)` creates a fresh board, checks all placements,
+registers systems, and submits the spawn, object-placement, and start actions.
+An out-of-bounds or blocked cell is a cell failure; insufficient slot capacity
+is `SpawnSlotShortfall`.
+
+A supplied `PlayerDeployment` retains its campaign faction and combatants. It
+replaces the player roster while keeping that side's authored objectives and
+spawn slot. Startup never reassigns a combatant's owning faction.
