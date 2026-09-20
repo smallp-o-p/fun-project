@@ -1,18 +1,14 @@
 using System;
 using System.Collections.Generic;
-using CampaignGameState = global::FunProject.GameState.GameState;
+using CampaignGameState = FunProject.GameState.GameState;
 using FunProject.Engineering;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
 using Godot;
 
-// Owns its session binding: activation captures the session, the Manufacture button runs
-// StartManufacturing on it, refreshes the snapshot, and shows failures — the composition
-// root has no per-view logic. The explicit snapshot Present overload stays for direct
-// callers (tests) that supply options/job/tick themselves. Back asks the manager to pop.
 public sealed partial class EngineeringView : GeoscapeView
 {
-  private GeoscapeSession? _session;
+  private GeoscapeSession _session = null!;
   private IReadOnlyList<ManufacturingOption> _options = [];
   private Option<ManufacturingJob> _active = None;
   private Option<ManufacturingOption> _selection = None;
@@ -64,15 +60,12 @@ public sealed partial class EngineeringView : GeoscapeView
 
   private void OnManufacturePressed()
   {
-    // Disabled controls can still receive programmatic signals.
     if (GetNode<Button>("%ManufactureButton").Disabled)
       return;
-    GeoscapeSession session = _session ?? throw new InvalidOperationException(
-      "EngineeringView requires a session; it is bound when the view becomes active.");
     _selection.IfSome(option =>
     {
-      var result = session.StartManufacturing(option.Project.Item);
-      Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+      var result = _session.StartManufacturing(option.Project.Item);
+      Present(_session.GetManufacturingOptions(), _session.ActiveManufacturing, _session.Tick);
       result.IfLeft(ShowFailure); // after the refresh: it clears the status line
     });
   }
@@ -111,7 +104,7 @@ public sealed partial class EngineeringView : GeoscapeView
     GetNode<Label>("%ItemDescription").Text = _selection.Match(
       option => option.Project.Item.Description, () => "");
     GetNode<Label>("%ManufacturingDuration").Text = _selection.Match(
-      option => $"Duration: {ProjectTimeText.Duration(option.Project.DurationDays)}", () => "");
+      option => $"Duration: {option.Project.DurationDays}d", () => "");
     GetNode<Label>("%Stock").Text = _selection.Match(
       option => option.Project.UnlimitedStock ? "Stock: Not established" : $"Stock: {option.Remaining}", () => "");
     GetNode<Label>("%SupplyEffect").Text = _selection.Match(

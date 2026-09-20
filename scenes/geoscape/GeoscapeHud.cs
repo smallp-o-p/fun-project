@@ -4,13 +4,9 @@ using Godot;
 using System;
 using FunProject.Scenes.Ext;
 
-// Authored top bar, left alert list and right project status panel over the permanent map
-// view. A full-rect Control (input-ignoring at the root) so hiding the root view hides
-// every HUD descendant. Pure presentation: state arrives via pushes; requests flow out as
-// C# events and the ViewRequested Godot signal routed by the composition root. Authored
-// ordinary Buttons bind their destination PackedScene directly to RequestView. The HUD
-// has no per-view branches or button discovery. The completion notice persists until
-// replaced by the next completion.
+/// <summary>
+/// Geoscape HUD controls. GeoscapeScene wires callbacks into the buttons and pushes state updates to be presented.
+/// </summary>
 public sealed partial class GeoscapeHud : Control
 {
   private Label _clockLabel = null!;
@@ -42,20 +38,9 @@ public sealed partial class GeoscapeHud : Control
       ChangeSpeed?.Invoke(pressed ? TimeSpeed.Paused : _lastActiveSpeed);
   }
 
-  // A real Godot signal: any ordinary Button can bind a PackedScene to this method.
-  public void RequestView(PackedScene? scene)
+  public void RequestView(PackedScene scene)
   {
-    PackedScene target = scene ?? throw new InvalidOperationException(
-      "GeoscapeHud RequestView requires a PackedScene destination.");
-    Node instance = target.Instantiate();
-    if (instance is not GeoscapeView view)
-    {
-      string kind = instance.GetClass();
-      instance.Free();
-      throw new InvalidOperationException(
-        $"GeoscapeHud RequestView destination root must be a GeoscapeView; got {kind}.");
-    }
-    EmitSignal(SignalName.ViewRequested, view);
+    EmitSignal(SignalName.ViewRequested, scene.InstantiateAs<GeoscapeView>());
   }
 
   public void UpdateManufacturing(Option<ManufacturingJob> manufacturing, long tick)
@@ -76,6 +61,7 @@ public sealed partial class GeoscapeHud : Control
       TimeSpeed.Fast => "5x",
       TimeSpeed.VeryFast => "12.5x",
       TimeSpeed.VeryVeryFast => "25x",
+      TimeSpeed.Paused => "0x",
       _ => throw new ArgumentOutOfRangeException(nameof(speed), speed, null)
     };
   }
@@ -89,6 +75,7 @@ public sealed partial class GeoscapeHud : Control
       TimeSpeed.VeryFast => TimeSpeed.VeryVeryFast,
       _ => TimeSpeed.Normal,
     };
+
     _pauseButton.SetPressedNoSignal(false); // selecting a speed implies running
     _speedButton.Text = Speed2Text(_lastActiveSpeed);
     ChangeSpeed?.Invoke(_lastActiveSpeed);
@@ -99,8 +86,7 @@ public sealed partial class GeoscapeHud : Control
     _clockLabel.Text = $"Day {day} {newTime:HH:mm}";
   }
 
-  // Rebuilds the alert list — only when membership changes (event fired, expired, or
-  // resolved); per-tick countdown updates go through UpdateCountdowns.
+  // Rebuild alert list when one of them changes
   public void RefreshAlerts(SysColGeneric.IReadOnlyList<GeoscapeEvent> activeEvents)
   {
     _alerts.QueueFreeAllChildren();
@@ -115,18 +101,14 @@ public sealed partial class GeoscapeHud : Control
     }
   }
 
-  // Countdown labels tick down without rebuilding the list.
   public void UpdateCountdowns(long currentTick)
   {
     foreach ((Button button, GeoscapeEvent active) in _alertButtons)
-      button.Text = AlertText(active, currentTick);
-  }
-
-  private static string AlertText(GeoscapeEvent active, long currentTick)
-  {
-    string countdown = active.ExpiresAtTick.Match(
-      expiresAt => $" ({Math.Max(0L, expiresAt - currentTick) * GeoscapeSession.TickGameSeconds / 60} min)",
-      () => "");
-    return $"[{active.Definition.Kind}] {active.Definition.Title}{countdown}";
+    {
+      string countdown = active.ExpiresAtTick.Match(
+        expiresAt => $" ({Math.Max(0L, expiresAt - currentTick) * GeoscapeSession.TickGameSeconds / 60} min)",
+        () => "");
+      button.Text = $"[{active.Definition.Kind}] {active.Definition.Title}{countdown}" ;
+    }
   }
 }

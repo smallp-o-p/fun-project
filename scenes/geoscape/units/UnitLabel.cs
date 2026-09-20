@@ -11,11 +11,8 @@ public partial class UnitLabel : PanelContainer
   public TextureRect? RankIcon { get; private set; }
   public event Action? Pressed;
 
-  /// <summary>Programmatic press (future keyboard nav); the ClickTarget button routes mouse clicks here.</summary>
   public void Press() => Pressed?.Invoke();
 
-  // Status has no domain concept yet; the view owns the placeholder. Rank comes live from
-  // the combatant's rank ladder (UnitRank).
   private const string StatusPlaceholder = "Ready";
 
   public void Bind(Combatant unit)
@@ -32,9 +29,6 @@ public partial class UnitLabel : PanelContainer
     Status = GetNode<RichTextLabel>("%Status");
     UnitIcon = GetNode<TextureRect>("%UnitIcon");
     RankIcon = GetNode<TextureRect>("%RankIcon");
-
-    // Full-rect flat button drawn above the content (last child): any click inside the
-    // row lands here regardless of the display children's own mouse filters.
     GetNode<Button>("%ClickTarget").Pressed += Press;
   }
 }

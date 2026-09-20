@@ -19,7 +19,7 @@ public partial class GeoscapeEventDefinition : Resource
 
   [Export(PropertyHint.MultilineText)] public string Description { get; set; } = "";
 
-  // -1 = never expires (Godot cannot export Nullable<int>).
+  // -1 = never expires
   [Export] public int ExpiresAfterTicks { get; set; } = -1;
 
   // Region name matching a RegionData.Name in GeoscapeMapData.Regions; empty = map-wide.

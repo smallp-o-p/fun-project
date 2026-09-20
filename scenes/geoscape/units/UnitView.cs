@@ -1,4 +1,4 @@
-using CampaignGameState = global::FunProject.GameState.GameState;
+using CampaignGameState = FunProject.GameState.GameState;
 using FunProject.Buffs;
 using FunProject.Combatants;
 using FunProject.GameState;
@@ -31,16 +31,12 @@ public readonly record struct UnitViewSlot(UnitViewSlotKind Kind, int Index = 0)
   public static UnitViewSlot WeaponMod(int index) => new(UnitViewSlotKind.WeaponMod, index);
 }
 
-// Full-screen soldier screen: stats page (base -> effective), equipment slots, and the
-// campaign armory browser. Presentation only — every interaction calls domain operations
-// on GameState/Combatant/Armory and re-presents; nothing is cached beyond the bound unit.
-// Activation (Present(state, session)) refreshes the retained unit WITHOUT clearing the
-// equipment selection, so returning from skill paths keeps the inspected slot. The Paths
-// button builds a fresh SkillProgressionView, binds the unit before it enters the tree,
-// and requests it.
+/// <summary>
+/// Present a summary of a Combatant. Stats, equipment slots and armory are accessible from this view.
+/// </summary>
 public sealed partial class UnitView : GeoscapeView
 {
-  [Export] public PackedScene? SkillProgressionViewScene { get; set; }
+  [Export] public PackedScene SkillProgressionViewScene { get; set; } = null!;
 
   private CampaignGameState? _state;
   private Combatant? _unit;
@@ -55,10 +51,8 @@ public sealed partial class UnitView : GeoscapeView
     GetNode<Button>("%PathsButton").Pressed += OnPathsPressed;
   }
 
-  // The roster binds the selected combatant before requesting this view.
   public void BindUnit(Combatant unit) => _unit = unit;
 
-  // Direct-caller entry point (tests, future callers): full rebuild with a fresh unit.
   public void Present(CampaignGameState state, Combatant unit)
   {
     _state = state;
@@ -81,16 +75,9 @@ public sealed partial class UnitView : GeoscapeView
     if (_unit is null)
       throw new InvalidOperationException(
         "UnitView requires a bound combatant before opening skill paths.");
-    PackedScene scene = SkillProgressionViewScene ?? throw new InvalidOperationException(
-      "UnitView requires SkillProgressionViewScene; assign a PackedScene in the inspector.");
-    Node instance = scene.Instantiate();
-    if (instance is not SkillProgressionView paths)
-    {
-      instance.Free(); // free now: rejected roots must not linger to frame end
-      throw new InvalidOperationException(
-        "UnitView requires SkillProgressionViewScene whose root is a SkillProgressionView.");
-    }
-    paths.BindUnit(_unit); // retain the unit before the view enters the tree
+
+    var paths = SkillProgressionViewScene.InstantiateAs<SkillProgressionView>();
+    paths.Unit = _unit;
     RequestView(paths);
   }
 

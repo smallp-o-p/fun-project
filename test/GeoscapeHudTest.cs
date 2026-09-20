@@ -127,7 +127,6 @@ public partial class GeoscapeHudTest
     GeoscapeView? received = null;
     hud.ViewRequested += view => received = view;
 
-    Assert.Throws<InvalidOperationException>(() => hud.RequestView(null));
     Assert.Throws<InvalidOperationException>(() => hud.RequestView(Pack(new Control { Name = "NotAView" })));
 
     Assert.True(received is null);

@@ -84,13 +84,13 @@ public class EngineeringViewTest
     items.GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
     Assert.Equal("Field scanner", view.GetNode<Label>("%ItemName").Text);
     Assert.Equal(first.Description, view.GetNode<Label>("%ItemDescription").Text);
-    Assert.Equal("Duration: 1d 0h 0m", view.GetNode<Label>("%ManufacturingDuration").Text);
+    Assert.Equal("Duration: 1d", view.GetNode<Label>("%ManufacturingDuration").Text);
     Assert.Equal("Stock: 2", view.GetNode<Label>("%Stock").Text);
     Assert.Equal("Produces 1 item.", view.GetNode<Label>("%SupplyEffect").Text);
     items.GetChild<Button>(1).EmitSignal(Button.SignalName.Pressed);
     Assert.Equal("Medkit", view.GetNode<Label>("%ItemName").Text);
     Assert.Equal(second.Description, view.GetNode<Label>("%ItemDescription").Text);
-    Assert.Equal("Duration: 2d 0h 0m", view.GetNode<Label>("%ManufacturingDuration").Text);
+    Assert.Equal("Duration: 2d", view.GetNode<Label>("%ManufacturingDuration").Text);
     Assert.Equal("Stock: 0", view.GetNode<Label>("%Stock").Text);
   }
 
@@ -163,7 +163,7 @@ public class EngineeringViewTest
     view.Present(refreshed.GetManufacturingOptions(), refreshed.ActiveManufacturing, refreshed.Tick);
 
     Assert.Equal("Second", view.GetNode<Label>("%ItemName").Text);
-    Assert.Equal("Duration: 2d 0h 0m", view.GetNode<Label>("%ManufacturingDuration").Text);
+    Assert.Equal("Duration: 2d", view.GetNode<Label>("%ManufacturingDuration").Text);
     Assert.Equal("Stock: 3", view.GetNode<Label>("%Stock").Text);
     Assert.False(view.GetNode<Button>("%ManufactureButton").Disabled);
     view.Present(refreshedCampaign.State, refreshed); // activation binding

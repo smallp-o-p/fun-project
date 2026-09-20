@@ -33,11 +33,6 @@ public sealed partial class SquadLoadoutView : GeoscapeView
   private int? _choosingSlot;
   private Option<Combatant>[] _slots = [];
 
-  // The opener's required configuration door (mission preparation: three editable slots
-  // under the mission title, with the pending mission as explicit deployment context;
-  // interrogation: two slots, editing disabled, no mission context). It resets the
-  // temporary slot selection — and the mission context — so a reconfigured view never
-  // carries stale picks or stale deployment policy into a different destination.
   public void Configure(string heading, uint capacity, bool allowEquipmentEditing,
     Option<GeoscapeEventDefinition> mission = default)
   {

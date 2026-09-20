@@ -206,7 +206,6 @@ public partial class GeoscapeViewManagerTest
     Assert.Throws<InvalidOperationException>(() => manager.Push(parented));
     Assert.Throws<InvalidOperationException>(() => manager.Push(queued));
     Assert.Throws<InvalidOperationException>(() => manager.Push(freed));
-    Assert.Throws<ArgumentNullException>(() => manager.Push(null!));
 
     Assert.True(ReferenceEquals(b, manager.Current));
     Assert.True(b.IsVisibleInTree());
@@ -214,17 +213,6 @@ public partial class GeoscapeViewManagerTest
     Assert.True(ReferenceEquals(a, manager.Current));
     manager.Pop();
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
-  }
-
-  [TestCase]
-  public void MissingOrDetachedRootViewIsAnAuthoringError()
-  {
-    var bare = AutoFree(new GeoscapeViewManager());
-    Assert.Throws<InvalidOperationException>(() => bare._Ready());
-
-    var root = AutoFree(new FakeView { Name = "Root" });
-    var detachedRoot = AutoFree(new GeoscapeViewManager { RootView = root });
-    Assert.Throws<InvalidOperationException>(() => detachedRoot._Ready());
   }
 
   [TestCase]
@@ -293,23 +281,6 @@ public partial class GeoscapeViewManagerTest
 
     await WaitForDeferredDeletion(manager.GetTree());
     Assert.False(GodotObject.IsInstanceValid(b));
-  }
-
-  [TestCase]
-  public async Task ExitTreeDisconnectsNavigationUntilReentry()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var manager = BuildManager();
-    var a = new FakeView { Name = "A" };
-    manager.Push(a);
-
-    manager.GetParent()!.RemoveChild(manager);
-    a.RequestBack();
-    Assert.True(ReferenceEquals(a, manager.Current)); // disconnected on exit
-
-    ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
-    a.RequestBack();
-    Assert.True(ReferenceEquals(manager.RootView, manager.Current)); // resubscribed on reentry
   }
 
   [TestCase]

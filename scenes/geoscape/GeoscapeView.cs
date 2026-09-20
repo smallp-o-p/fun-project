@@ -2,9 +2,10 @@ using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Strategic;
 using Godot;
 
-// Base class of every geoscape screen. The shared Background/Viewport shell and each
-// screen's foreground are authored in scenes. Views request navigation through Godot
-// signals; Present is the composition root's single binding/refresh entry point.
+/// <summary>
+/// Base class for a screen in the Geoscape. Must implement a way to go back.
+/// This also accommodates "transparent" views e.g. modal dialogs.
+/// </summary>
 public partial class GeoscapeView : Control
 {
   [Export] public BaseButton? BackButton { get; set; }

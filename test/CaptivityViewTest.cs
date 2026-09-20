@@ -352,9 +352,6 @@ public class CaptivityViewTest
     SysColGeneric.List<GeoscapeView> requested = [];
     view.ViewRequested += requested.Add;
 
-    view.SquadViewScene = null;
-    Assert.Throws<InvalidOperationException>(() => view.PrepareInterrogation());
-
     var probe = new Label { Name = "NotASquadLoadoutView" };
     var packed = new PackedScene();
     Error error = packed.Pack(probe);

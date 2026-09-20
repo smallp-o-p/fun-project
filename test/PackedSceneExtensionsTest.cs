@@ -35,23 +35,6 @@ public partial class PackedSceneExtensionsTest
     AutoFree(view); // register for cleanup or it leaks as an orphan
   }
 
-  [TestCase(TestName = "A missing scene is an authoring error naming the role")]
-  public void MissingSceneThrowsNamingTheRole()
-  {
-    InvalidOperationException thrown = null;
-    try
-    {
-      ((PackedScene?)null).InstantiateAs<ProbeView>("CaptivityView SquadViewScene");
-    }
-    catch (InvalidOperationException exception)
-    {
-      thrown = exception;
-    }
-
-    Assert.True(thrown is not null, "Expected a missing scene to throw.");
-    Assert.True(thrown.Message.Contains("CaptivityView SquadViewScene"), thrown.Message);
-  }
-
   [TestCase(TestName = "A wrong root is freed immediately and throws with role and types")]
   public async Task WrongRootIsFreedImmediatelyAndThrows()
   {

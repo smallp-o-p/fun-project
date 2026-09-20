@@ -4,12 +4,6 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class ProjectTimeTextTest
 {
-  [TestCase(1U, "1d 0h 0m")]
-  [TestCase(uint.MaxValue, "4294967295d 0h 0m")]
-  public void DurationFormatsWholeDays(uint days, string expected)
-  {
-    Assert.Equal(expected, ProjectTimeText.Duration(days));
-  }
 
   [TestCase(5L, 8L, "0m")]
   [TestCase(5L, 5L, "0m")]

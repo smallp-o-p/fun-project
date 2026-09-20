@@ -8,49 +8,33 @@ using System;
 using System.Collections.Generic;
 using FunProject.Scenes.Ext;
 
-// Quick-and-dirty skill-path screen: currency, committed path chains (unlock next), and
-// the available-path catalog (commit). Presentation only — every interaction calls domain
-// operations on UnitProgression and re-presents; nothing is cached beyond the bound unit.
-// The unit view binds the unit before the push; activation refreshes it.
 public sealed partial class SkillProgressionView : GeoscapeView
 {
-  private Combatant? _unit;
+  public Combatant? Unit;
 
   public override void _Ready()
   {
     base._Ready();
     GetNode<Button>("%AwardButton").Pressed += () =>
     {
-      _unit?.Progression.AwardPoints(5); // DEBUG: stands in for unwired mission/kill rewards
+      Unit?.Progression.AwardPoints(5); // DEBUG: stands in for unwired mission/kill rewards
       Rebuild();
     };
   }
 
-  // The unit view binds the inspected combatant before requesting this view.
-  public void BindUnit(Combatant unit) => _unit = unit;
-
-  // Direct-caller entry point (standalone debug bring-up): binds and rebuilds in one step.
-  public void Present(Combatant unit)
-  {
-    _unit = unit;
-    Rebuild();
-  }
-
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
-    if (_unit is null)
-      throw new InvalidOperationException(
-        "SkillProgressionView requires a bound combatant; the unit view binds it before requesting the view.");
+    ArgumentNullException.ThrowIfNull(Unit);
     Rebuild();
   }
 
   private void Rebuild()
   {
-    if (_unit is null)
+    if (Unit is null)
       return;
 
-    GetNode<RichTextLabel>("%Title").Text = $"{_unit.Name} — Skill Paths";
-    GetNode<RichTextLabel>("%CurrencyLabel").Text = $"Points: {_unit.Progression.CurrencyPoints}";
+    GetNode<RichTextLabel>("%Title").Text = $"{Unit.Name} — Skill Paths";
+    GetNode<RichTextLabel>("%CurrencyLabel").Text = $"Points: {Unit.Progression.CurrencyPoints}";
     RebuildCommitted();
     RebuildAvailable();
   }
@@ -60,9 +44,9 @@ public sealed partial class SkillProgressionView : GeoscapeView
     var list = GetNode<VBoxContainer>("%CommittedList");
     list.QueueFreeAllChildren();
 
-    foreach (SkillPathData path in _unit!.Progression.CommittedPaths)
+    foreach (SkillPathData path in Unit!.Progression.CommittedPaths)
     {
-      UnitProgression progression = _unit.Progression;
+      UnitProgression progression = Unit.Progression;
       int unlocked = progression.StepsUnlockedFor(path);
 
       AddLabel(list, $"{path.Name} — {unlocked}/{path.Steps.Count} unlocked", 22);
@@ -77,7 +61,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
       progression.NextStep(path).IfSome(next =>
       {
         var button = new Button { Text = $"Unlock next  ({next.Cost} pts)" };
-        button.Disabled = _unit.Progression.CurrencyPoints < next.Cost;
+        button.Disabled = Unit.Progression.CurrencyPoints < next.Cost;
         button.Pressed += () =>
         {
           progression.TryUnlockNext(path);
@@ -98,7 +82,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
     var list = GetNode<VBoxContainer>("%AvailableList");
     list.QueueFreeAllChildren();
 
-    UnitProgression progression = _unit!.Progression;
+    UnitProgression progression = Unit!.Progression;
     bool slotsFree = progression.CommittedPaths.Count < UnitProgression.MaxCommittedPaths;
     foreach (SkillPathData path in SkillPathCatalog.Paths)
     {
