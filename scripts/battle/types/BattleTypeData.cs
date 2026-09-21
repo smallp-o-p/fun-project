@@ -7,7 +7,7 @@ namespace FunProject.Battle;
 [GlobalClass]
 public partial class BattleTypeData : NamedEntityData
 {
-  [Export] public Godot.Collections.Array<BattleMapData> MapPool { get; set; } = [];
+  [Export] public Godot.Collections.Array<PackedScene> MapPool { get; set; } = [];
 
   [Export] public Godot.Collections.Array<FactionDeploymentData> Factions { get; set; } = [];
 

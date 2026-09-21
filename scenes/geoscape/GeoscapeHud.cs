@@ -108,7 +108,7 @@ public sealed partial class GeoscapeHud : Control
       string countdown = active.ExpiresAtTick.Match(
         expiresAt => $" ({Math.Max(0L, expiresAt - currentTick) * GeoscapeSession.TickGameSeconds / 60} min)",
         () => "");
-      button.Text = $"[{active.Definition.Kind}] {active.Definition.Title}{countdown}" ;
+      button.Text = $"[{active.Definition.Kind}] {active.Definition.Title}{countdown}";
     }
   }
 }

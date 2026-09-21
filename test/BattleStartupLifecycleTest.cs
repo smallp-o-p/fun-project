@@ -274,9 +274,9 @@ public class BattleStartupLifecycleTest
   public void SeedDrivesIdenticalCombatRolls()
   {
     var type = TestData.MakeDuelBattleType();
-    type.MapPool.Add(TestData.MakeMapData(new Vector3I(2, 1, 1),
+    type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(2, 1, 1),
       (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
-      (new Vector3I(1, 0, 0), TestData.SpawnTile(1))));
+      (new Vector3I(1, 0, 0), TestData.SpawnTile(1)))));
     BattleSetup resolved = BattleSetupResolver.Resolve(type, seed: 7).RequireRight();
 
     using BattleRuntime fromType = BattleFactory.Start(type, seed: 7).RequireRight();

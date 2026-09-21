@@ -2,6 +2,7 @@ using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Weapons;
+using Godot;
 using System;
 using System.Collections.Generic;
 
@@ -28,7 +29,31 @@ public static class BattleSetupResolver
         $"PlayerFactionIndex {type.PlayerFactionIndex} is out of range for {type.Factions.Count} factions."));
 
     int resolvedSeed = seed ?? Random.Shared.Next();
-    BattleMapData map = type.MapPool[new Random(resolvedSeed).Next(type.MapPool.Count)];
+    int chosenIndex = new Random(resolvedSeed).Next(type.MapPool.Count);
+    PackedScene chosenScene = type.MapPool[chosenIndex];
+
+    // The pool stores BattleMap-rooted scenes; a throwaway probe instance donates its MapData.
+    // `required` is compile-time only, so MapData still needs a runtime null check.
+    if (chosenScene is null)
+      return Left<BattleSetupFailure, BattleSetup>(new BattleSetupFailure(
+        BattleSetupFailureReason.MapSceneInvalid,
+        $"{type.Name} map pool entry {chosenIndex} is null."));
+
+    Node probe = chosenScene.Instantiate();
+    if (probe is not BattleMap battleMap)
+    {
+      probe?.Free();
+      return Left<BattleSetupFailure, BattleSetup>(new BattleSetupFailure(
+        BattleSetupFailureReason.MapSceneInvalid,
+        $"{type.Name} map pool entry '{chosenScene.ResourcePath}' roots {probe?.GetType().Name ?? "nothing"}, not a BattleMap."));
+    }
+
+    BattleMapData map = battleMap.MapData;
+    probe.Free();
+    if (map is null)
+      return Left<BattleSetupFailure, BattleSetup>(new BattleSetupFailure(
+        BattleSetupFailureReason.MapSceneInvalid,
+        $"{type.Name} map pool entry '{chosenScene.ResourcePath}' roots a BattleMap without MapData."));
 
     var sides = new List<BattleSideSetup>();
     for (int slot = 0; slot < type.Factions.Count; slot++)
@@ -87,6 +112,7 @@ public static class BattleSetupResolver
     {
       Objects = objects,
       Systems = [.. type.Systems],
+      MapScene = Some(chosenScene),
     });
   }
 

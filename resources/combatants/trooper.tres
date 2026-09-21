@@ -1,24 +1,25 @@
-[gd_resource type="Resource" script_class="CombatantData" format=3]
+[gd_resource type="Resource" script_class="CombatantData" format=3 uid="uid://dl13u6s3ooj02"]
 
-[ext_resource type="Script" path="res://scripts/combatants/CombatantData.cs" id="1_data"]
-[ext_resource type="Script" path="res://scripts/stats/concrete_stats/HealthStat.cs" id="2_health"]
-[ext_resource type="Script" path="res://scripts/stats/concrete_stats/ActionPointsStat.cs" id="3_ap"]
-[ext_resource type="Script" path="res://scripts/stats/concrete_stats/WillStat.cs" id="4_will"]
-[ext_resource type="Script" path="res://scripts/stats/concrete_stats/MovementStat.cs" id="5_move"]
-[ext_resource type="Script" path="res://scripts/stats/concrete_stats/VisionStat.cs" id="6_vision"]
-[ext_resource type="Script" path="res://scripts/stats/concrete_stats/AimStat.cs" id="7_aim"]
-
-[sub_resource type="Resource" id="Resource_health"]
-script = ExtResource("2_health")
-BaseValue = 20
+[ext_resource type="Script" uid="uid://xdfawnbqt73s" path="res://scripts/combatants/CombatantData.cs" id="1_data"]
+[ext_resource type="Script" uid="uid://djms6r3rwidsu" path="res://scripts/stats/concrete_stats/HealthStat.cs" id="2_health"]
+[ext_resource type="Script" uid="uid://d0nhbkwq5b2ff" path="res://scripts/stats/concrete_stats/ActionPointsStat.cs" id="3_ap"]
+[ext_resource type="Script" uid="uid://cbr88gbdxcn8e" path="res://scripts/buffs/Buff.cs" id="4_ftwyr"]
+[ext_resource type="Script" uid="uid://cpiulbynpxwny" path="res://scripts/stats/concrete_stats/WillStat.cs" id="4_will"]
+[ext_resource type="Script" uid="uid://bwe2ox33jt5x6" path="res://scripts/stats/concrete_stats/MovementStat.cs" id="5_move"]
+[ext_resource type="Script" uid="uid://d61fbki8h385" path="res://scripts/stats/concrete_stats/VisionStat.cs" id="6_vision"]
+[ext_resource type="Script" uid="uid://b6vm38tmwnuwf" path="res://scripts/stats/concrete_stats/AimStat.cs" id="7_aim"]
 
 [sub_resource type="Resource" id="Resource_ap"]
 script = ExtResource("3_ap")
 BaseValue = 6
 
-[sub_resource type="Resource" id="Resource_will"]
-script = ExtResource("4_will")
-BaseValue = 50
+[sub_resource type="Resource" id="Resource_aim"]
+script = ExtResource("7_aim")
+BaseValue = 65
+
+[sub_resource type="Resource" id="Resource_health"]
+script = ExtResource("2_health")
+BaseValue = 20
 
 [sub_resource type="Resource" id="Resource_move"]
 script = ExtResource("5_move")
@@ -28,9 +29,9 @@ BaseValue = 12
 script = ExtResource("6_vision")
 BaseValue = 20
 
-[sub_resource type="Resource" id="Resource_aim"]
-script = ExtResource("7_aim")
-BaseValue = 65
+[sub_resource type="Resource" id="Resource_will"]
+script = ExtResource("4_will")
+BaseValue = 50
 
 [resource]
 script = ExtResource("1_data")
@@ -40,6 +41,5 @@ WillStat = SubResource("Resource_will")
 MovementStat = SubResource("Resource_move")
 VisionStat = SubResource("Resource_vision")
 AimStat = SubResource("Resource_aim")
-ModSlotCount = 0
 Name = "Trooper"
 Description = "Player trooper"

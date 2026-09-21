@@ -1,9 +1,12 @@
-[gd_resource type="Resource" script_class="BattleSpecialObjectData" format=3]
+[gd_resource type="Resource" format=3 uid="uid://65ekcmcl2al8"]
 
-[ext_resource type="Script" path="res://scripts/battle/objects/BattleSpecialObjectData.cs" id="1_data"]
-[ext_resource type="Script" path="res://scripts/battle/objects/InteractiveCapabilityData.cs" id="2_interactive"]
-[ext_resource type="Script" path="res://scripts/battle/objects/TimedEffectCapabilityData.cs" id="3_timed"]
-[ext_resource type="Script" path="res://scripts/items/effects/DamageEffectData.cs" id="4_damage"]
+[ext_resource type="Script" uid="uid://c8dfb2o24n6ue" path="res://scripts/battle/objects/BattleSpecialObjectData.cs" id="1_data"]
+[ext_resource type="Script" uid="uid://sfasq524grpw" path="res://scripts/battle/objects/InteractiveCapabilityData.cs" id="2_interactive"]
+[ext_resource type="Script" uid="uid://bjddbaoog3yht" path="res://scripts/items/effects/BattleEffectData.cs" id="2_snmtt"]
+[ext_resource type="Script" uid="uid://t6d1v2kkfje4" path="res://scripts/battle/objects/TimedEffectCapabilityData.cs" id="3_timed"]
+[ext_resource type="Script" uid="uid://dag1dcqmvtcvs" path="res://scripts/items/effects/DamageEffectData.cs" id="4_damage"]
+
+[sub_resource type="CSharpScript" id="CSharpScript_snmtt"]
 
 [sub_resource type="Resource" id="Resource_interactive"]
 script = ExtResource("2_interactive")
@@ -17,10 +20,10 @@ BaseDamage = 10
 script = ExtResource("3_timed")
 FireAfterTurns = 6
 EffectRadius = 2
-Effects = [SubResource("Resource_damage")]
+Effects = Array[ExtResource("2_snmtt")]([SubResource("Resource_damage")])
 
 [resource]
 script = ExtResource("1_data")
-Capabilities = [SubResource("Resource_interactive"), SubResource("Resource_elapsed")]
+Capabilities = Array[SubResource("CSharpScript_snmtt")]([SubResource("Resource_interactive"), SubResource("Resource_elapsed")])
 Name = "Alien Bomb"
 Description = "Defuse before the timer expires"

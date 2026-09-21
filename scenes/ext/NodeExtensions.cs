@@ -1,4 +1,5 @@
-﻿namespace FunProject.Scenes.Ext;
+namespace FunProject.Scenes.Ext;
+
 using Godot;
 
 public static class NodeExtensions
@@ -7,7 +8,8 @@ public static class NodeExtensions
   {
     public void QueueFreeAllChildren()
     {
-      foreach(Node child in node.GetChildren()){
+      foreach (Node child in node.GetChildren())
+      {
         node.RemoveChild(child);
         child.QueueFree();
       }

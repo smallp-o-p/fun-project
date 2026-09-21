@@ -9,9 +9,8 @@ using FunProject.Scenes.Ext;
 // event playback. Deliberately throwaway — to be superseded by the real BattleScene/HUD later.
 public sealed partial class BattleScene : Node3D
 {
-  private static readonly Vector3I BoardDimensions = new(8, 1, 8);
-
   private BattleRuntime _runtime = null!;
+  private BattleSetup _setup = null!;
   private BattleUiController _ui = null!;
   private EventPlaybackDirector _director = null!;
   private MovementLine _movementLine = null!;
@@ -73,7 +72,10 @@ public sealed partial class BattleScene : Node3D
   {
     BattleTypeData type = ResourceLoader.Load<BattleTypeData>("res://resources/battle_types/bomb_defusal.tres")
       ?? throw new System.InvalidOperationException("Could not load the bomb defusal battle type.");
-    BattleRuntime runtime = BattleFactory.Start(type).Match(
+    _setup = BattleSetupResolver.Resolve(type).Match(
+      Right: resolved => resolved,
+      Left: failure => throw new System.InvalidOperationException($"Battle setup failed: {failure.Message}"));
+    BattleRuntime runtime = BattleFactory.Start(_setup).Match(
       Right: started => started,
       Left: failure => throw new System.InvalidOperationException($"Battle setup failed: {failure.Message}"));
 
@@ -93,8 +95,21 @@ public sealed partial class BattleScene : Node3D
     var light = new DirectionalLight3D { Name = "Sun", RotationDegrees = new Vector3(-60f, -45f, 0f) };
     AddChild(light);
 
-    float width = BoardDimensions.X;
-    float depth = BoardDimensions.Z;
+    // The pool stores BattleMap scenes; when one was resolved, the visual board is that scene.
+    _setup.MapScene.Match(
+      Some: scene =>
+      {
+        var map = scene.Instantiate<BattleMap>();
+        map.Name = "Map";
+        AddChild(map);
+      },
+      None: BuildGround);
+  }
+
+  private void BuildGround()
+  {
+    float width = _setup.Map.Dimensions.X;
+    float depth = _setup.Map.Dimensions.Z;
 
     var ground = new StaticBody3D { Name = "Ground" };
     AddChild(ground);
@@ -115,7 +130,7 @@ public sealed partial class BattleScene : Node3D
   private Camera3D BuildCamera()
   {
     var camera = new Camera3D { Name = "Camera" };
-    var center = new Vector3(BoardDimensions.X / 2f, 0f, BoardDimensions.Z / 2f);
+    var center = new Vector3(_setup.Map.Dimensions.X / 2f, 0f, _setup.Map.Dimensions.Z / 2f);
     camera.Position = center + new Vector3(0f, 14f, 12f);
     AddChild(camera);
     camera.LookAt(center, Vector3.Up);

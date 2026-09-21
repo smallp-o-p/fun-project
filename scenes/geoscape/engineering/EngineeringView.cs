@@ -73,7 +73,7 @@ public sealed partial class EngineeringView : GeoscapeView
   private void RebuildItems()
   {
     var list = GetNode<VBoxContainer>("%ManufacturableItems");
-    
+
     list.QueueFreeAllChildren();
     foreach (var option in _options)
     {

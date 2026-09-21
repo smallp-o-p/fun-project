@@ -373,14 +373,28 @@ internal static class TestData
     return MakeMapData(new Vector3I(width, 1, depth), [.. tiles]);
   }
 
+  // Packs the map into a BattleMap-rooted scene, the authored pool's storage shape; the
+  // prototype node is freed after packing so only the scene survives. Runs under the Godot
+  // runtime covered by the RequireGodotRuntime suites.
+  public static PackedScene MakeMapScene(BattleMapData map)
+  {
+    var battleMap = new BattleMap { MapData = map, UsedPalette = new BattleTilePalette { MeshLibrary = null } };
+    var scene = new PackedScene();
+    Error error = scene.Pack(battleMap);
+    battleMap.Free();
+    if (error != Error.Ok)
+      throw new System.InvalidOperationException($"Test map scene packing failed: {error}");
+    return scene;
+  }
+
   // Two-faction duel on a 2x1x1 map: one spawn cell per side, one unit per side (health 20,
   // aim 65, damage-1 range-10 weapon), one inert objective each.
   public static BattleTypeData MakeDuelBattleType()
   {
     var type = new BattleTypeData { Name = "Setup duel" };
-    type.MapPool.Add(MakeMapData(new Vector3I(2, 1, 1),
+    type.MapPool.Add(MakeMapScene(MakeMapData(new Vector3I(2, 1, 1),
       (new Vector3I(0, 0, 0), SpawnTile(0)),
-      (new Vector3I(1, 0, 0), SpawnTile(1))));
+      (new Vector3I(1, 0, 0), SpawnTile(1)))));
     string[] names = ["Player", "Enemy"];
     foreach (string name in names)
     {

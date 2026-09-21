@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://e5sdmq8l4a3a" path="res://scripts/strategic/RegionData.cs" id="2"]
 [ext_resource type="Script" uid="uid://wteelogkx2oj" path="res://scripts/strategic/GeoscapeEventDefinition.cs" id="3"]
 [ext_resource type="Script" uid="uid://cvsrysjc061la" path="res://scripts/strategic/ScheduledEventData.cs" id="4"]
-[ext_resource type="Resource" path="res://resources/dialogue/council-broadcast.tres" id="5_dialogue"]
+[ext_resource type="Resource" uid="uid://dumptnjetenvx" path="res://resources/dialogue/council-broadcast.tres" id="5_dialogue"]
 
 [sub_resource type="Resource" id="Region_northmark"]
 script = ExtResource("2")

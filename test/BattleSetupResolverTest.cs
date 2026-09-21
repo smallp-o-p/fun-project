@@ -80,14 +80,77 @@ public class BattleSetupResolverTest
   public void SeedAndMapChoice()
   {
     var type = TestData.MakeDuelBattleType();
-    type.MapPool.Add(TestData.MakeMapData(new Vector3I(2, 1, 1),
+    type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(2, 1, 1),
       (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
-      (new Vector3I(1, 0, 0), TestData.SpawnTile(1))));
+      (new Vector3I(1, 0, 0), TestData.SpawnTile(1)))));
 
     BattleSetup setup = BattleSetupResolver.Resolve(type, seed: 7).RequireRight();
 
     Assert.Equal(7, setup.Seed);
-    Assert.True(ReferenceEquals(type.MapPool[new Random(7).Next(type.MapPool.Count)], setup.Map));
+    PackedScene chosen = type.MapPool[new Random(7).Next(type.MapPool.Count)];
+    Assert.True(ReferenceEquals(chosen, setup.MapScene.RequireSome()));
+  }
+
+  [TestCase(TestName = "A pooled BattleMap scene contributes its MapData and records the chosen scene")]
+  public void SingleScenePoolResolvesMapDataAndScene()
+  {
+    var type = TestData.MakeDuelBattleType();
+    PackedScene scene = TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(4, 1, 1),
+      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(3, 0, 0), TestData.SpawnTile(1))));
+    type.MapPool.Clear();
+    type.MapPool.Add(scene);
+
+    BattleSetup setup = BattleSetupResolver.Resolve(type, seed: 7).RequireRight();
+
+    Assert.True(ReferenceEquals(scene, setup.MapScene.RequireSome()));
+    Assert.Equal(new Godot.Vector3I(4, 1, 1), setup.Map.Dimensions);
+    Assert.Equal(2, setup.Map.Tiles.Count);
+  }
+
+  [TestCase(TestName = "A pooled scene whose root is not a BattleMap fails with MapSceneInvalid")]
+  public void NonBattleMapSceneRootFails()
+  {
+    var type = TestData.MakeDuelBattleType();
+    type.MapPool.Clear();
+    type.MapPool.Add(PackRoot(new Node3D()));
+
+    BattleSetupFailure failure = BattleSetupResolver.Resolve(type, seed: 7).RequireLeft();
+
+    Assert.Equal(BattleSetupFailureReason.MapSceneInvalid, failure.Reason);
+  }
+
+  [TestCase(TestName = "A null pool entry fails with MapSceneInvalid")]
+  public void NullPoolEntryFails()
+  {
+    var type = TestData.MakeDuelBattleType();
+    type.MapPool.Clear();
+    type.MapPool.Add(null!);
+
+    BattleSetupFailure failure = BattleSetupResolver.Resolve(type, seed: 7).RequireLeft();
+
+    Assert.Equal(BattleSetupFailureReason.MapSceneInvalid, failure.Reason);
+  }
+
+  [TestCase(TestName = "An empty pool still fails with EmptyMapPool")]
+  public void EmptyPoolFailsWithEmptyMapPool()
+  {
+    var type = TestData.MakeDuelBattleType();
+    type.MapPool.Clear();
+
+    BattleSetupFailure failure = BattleSetupResolver.Resolve(type, seed: 7).RequireLeft();
+
+    Assert.Equal(BattleSetupFailureReason.EmptyMapPool, failure.Reason);
+  }
+
+  private static PackedScene PackRoot(Node prototype)
+  {
+    var scene = new PackedScene();
+    Error error = scene.Pack(prototype);
+    prototype.Free();
+    if (error != Error.Ok)
+      throw new InvalidOperationException($"Test scene packing failed: {error}");
+    return scene;
   }
 
   [TestCase(TestName = "Resolving without a seed returns the integer that reproduces the layout")]
@@ -217,11 +280,11 @@ public class BattleSetupResolverTest
       Armor = TestData.MakeArmorData("Vest", armor: 4),
     });
     type.MapPool.Clear();
-    type.MapPool.Add(TestData.MakeMapData(new Vector3I(4, 1, 1),
+    type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(4, 1, 1),
       (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
       (new Vector3I(1, 0, 0), TestData.SpawnTile(0)),
       (new Vector3I(2, 0, 0), TestData.SpawnTile(0)),
-      (new Vector3I(3, 0, 0), TestData.SpawnTile(1))));
+      (new Vector3I(3, 0, 0), TestData.SpawnTile(1)))));
 
     BattleSetup setup = BattleSetupResolver.Resolve(type, seed: 7).RequireRight();
     BattleSideSetup playerSide = setup.Sides[0];

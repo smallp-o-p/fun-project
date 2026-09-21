@@ -1,31 +1,33 @@
-[gd_resource type="Resource" script_class="BattleTypeData" format=3]
+[gd_resource type="Resource" script_class="BattleTypeData" format=3 uid="uid://cxqf2lxomvqpn"]
 
-[ext_resource type="Resource" path="res://resources/maps/defusal_map.tres" id="1_map"]
-[ext_resource type="Script" path="res://scripts/battle/types/BattleTypeData.cs" id="2_type"]
-[ext_resource type="Script" path="res://scripts/battle/types/FactionDeploymentData.cs" id="3_faction"]
-[ext_resource type="Script" path="res://scripts/battle/types/RosterEntryData.cs" id="4_roster"]
-[ext_resource type="Script" path="res://scripts/battle/objectives/EliminateAllOpposingForcesObjectiveData.cs" id="5_eliminate"]
-[ext_resource type="Script" path="res://scripts/battle/objectives/directives/EndBattleDirectiveData.cs" id="6_end"]
-[ext_resource type="Resource" path="res://resources/combatants/trooper.tres" id="7_trooper"]
-[ext_resource type="Resource" path="res://resources/combatants/grunt.tres" id="8_grunt"]
-[ext_resource type="Resource" path="res://resources/weapons/service_pistol.tres" id="9_pistol"]
-[ext_resource type="Script" path="res://scripts/combatants/FactionData.cs" id="10_faction_data"]
+[ext_resource type="PackedScene" uid="uid://drqx7j7mdambi" path="res://resources/maps/defusal_map.tscn" id="1_map"]
+[ext_resource type="Script" uid="uid://dxbsnjol3eabv" path="res://scripts/battle/types/BattleTypeData.cs" id="2_type"]
+[ext_resource type="Script" uid="uid://3lu4rcfn8i8f" path="res://scripts/stats/Stat.cs" id="3_06dm6"]
+[ext_resource type="Script" uid="uid://dghwsss7cd1c6" path="res://scripts/battle/types/FactionDeploymentData.cs" id="3_faction"]
+[ext_resource type="Script" uid="uid://b7ovuyuv6u21g" path="res://scripts/battle/types/RosterEntryData.cs" id="4_roster"]
+[ext_resource type="Script" uid="uid://cl5bjj507pl44" path="res://scripts/stats/StatMod.cs" id="4_ycenq"]
+[ext_resource type="Script" uid="uid://dx7b7que8em7h" path="res://scripts/battle/objectives/EliminateAllOpposingForcesObjectiveData.cs" id="5_eliminate"]
+[ext_resource type="Script" uid="uid://xdfawnbqt73s" path="res://scripts/combatants/CombatantData.cs" id="5_mpx6x"]
+[ext_resource type="Script" uid="uid://bagkq1hoy4sxk" path="res://scripts/battle/objectives/ObjectiveData.cs" id="6_5fqis"]
+[ext_resource type="Script" uid="uid://8mbfe7e67df0" path="res://scripts/battle/objectives/directives/EndBattleDirectiveData.cs" id="6_end"]
+[ext_resource type="Resource" uid="uid://dl13u6s3ooj02" path="res://resources/combatants/trooper.tres" id="7_trooper"]
+[ext_resource type="Resource" uid="uid://bcwpute5bjeiv" path="res://resources/combatants/grunt.tres" id="8_grunt"]
+[ext_resource type="Resource" uid="uid://c8fmm66ofct66" path="res://resources/weapons/service_pistol.tres" id="9_pistol"]
+[ext_resource type="Script" uid="uid://bace8m8tw5wcn" path="res://scripts/combatants/FactionData.cs" id="10_faction_data"]
+[ext_resource type="Script" uid="uid://b4l4d4rc7pmef" path="res://scripts/battle/types/ObjectPlacementData.cs" id="15_pjrh5"]
+[ext_resource type="Script" uid="uid://nmkf8wn0ice" path="res://scripts/battle/types/BattleTypeSystemData.cs" id="16_pqhio"]
+
+[sub_resource type="Resource" id="Resource_player_faction"]
+script = ExtResource("10_faction_data")
+Name = "Xenonauts"
+Description = "Skirmish squad"
 
 [sub_resource type="Resource" id="Resource_end_victory"]
 script = ExtResource("6_end")
-Outcome = 1
-
-[sub_resource type="Resource" id="Resource_end_defeat"]
-script = ExtResource("6_end")
-Outcome = 2
 
 [sub_resource type="Resource" id="Resource_player_objective"]
 script = ExtResource("5_eliminate")
 OnComplete = SubResource("Resource_end_victory")
-
-[sub_resource type="Resource" id="Resource_enemy_objective"]
-script = ExtResource("5_eliminate")
-OnComplete = SubResource("Resource_end_defeat")
 
 [sub_resource type="Resource" id="Resource_trooper_entry"]
 script = ExtResource("4_roster")
@@ -33,37 +35,39 @@ Combatant = ExtResource("7_trooper")
 Quantity = 3
 Weapon = ExtResource("9_pistol")
 
-[sub_resource type="Resource" id="Resource_grunt_entry"]
-script = ExtResource("4_roster")
-Combatant = ExtResource("8_grunt")
-Quantity = 3
-
-[sub_resource type="Resource" id="Resource_player_faction"]
-script = ExtResource("10_faction_data")
-Name = "Xenonauts"
-Description = "Skirmish squad"
+[sub_resource type="Resource" id="Resource_player_deployment"]
+script = ExtResource("3_faction")
+Faction = SubResource("Resource_player_faction")
+Roster = Array[ExtResource("4_roster")]([SubResource("Resource_trooper_entry")])
+Objectives = Array[ExtResource("6_5fqis")]([SubResource("Resource_player_objective")])
 
 [sub_resource type="Resource" id="Resource_enemy_faction"]
 script = ExtResource("10_faction_data")
 Name = "Aliens"
 Description = "Skirmish raiders"
 
-[sub_resource type="Resource" id="Resource_player_deployment"]
-script = ExtResource("3_faction")
-Faction = SubResource("Resource_player_faction")
-Roster = Array[ExtResource("4_roster")]([SubResource("Resource_trooper_entry")])
-Objectives = Array[ExtResource("5_eliminate")]([SubResource("Resource_player_objective")])
+[sub_resource type="Resource" id="Resource_end_defeat"]
+script = ExtResource("6_end")
+Outcome = 2
+
+[sub_resource type="Resource" id="Resource_enemy_objective"]
+script = ExtResource("5_eliminate")
+OnComplete = SubResource("Resource_end_defeat")
+
+[sub_resource type="Resource" id="Resource_grunt_entry"]
+script = ExtResource("4_roster")
+Combatant = ExtResource("8_grunt")
+Quantity = 3
 
 [sub_resource type="Resource" id="Resource_enemy_deployment"]
 script = ExtResource("3_faction")
 Faction = SubResource("Resource_enemy_faction")
 Roster = Array[ExtResource("4_roster")]([SubResource("Resource_grunt_entry")])
-Objectives = Array[ExtResource("5_eliminate")]([SubResource("Resource_enemy_objective")])
+Objectives = Array[ExtResource("6_5fqis")]([SubResource("Resource_enemy_objective")])
 
 [resource]
 script = ExtResource("2_type")
-MapPool = Array[ExtResource("1_map")]([ExtResource("1_map")])
+MapPool = Array[PackedScene]([ExtResource("1_map")])
 Factions = Array[ExtResource("3_faction")]([SubResource("Resource_player_deployment"), SubResource("Resource_enemy_deployment")])
-PlayerFactionIndex = 0
 Name = "Skirmish"
 Description = "Straight firefight on the defusal map"

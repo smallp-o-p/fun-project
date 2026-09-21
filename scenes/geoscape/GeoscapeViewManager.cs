@@ -25,7 +25,7 @@ public sealed partial class GeoscapeViewManager : Control
 
   public override void _ExitTree()
   {
-    if(_views.Count > 0)
+    if (_views.Count > 0)
       UnsubscribeNavigation(Current);
   }
 
@@ -64,7 +64,7 @@ public sealed partial class GeoscapeViewManager : Control
     Current.ProcessMode = ProcessModeEnum.Inherit;
     EmitSignal(SignalName.ViewChanged, Current);
   }
-  
+
   private void SubscribeNavigation(GeoscapeView view)
   {
     view.ViewRequested += OnViewRequested;

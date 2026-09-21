@@ -1,118 +1,143 @@
 using FunProject.Battle;
 using Godot;
 using System;
-using System.Collections.Generic;
+using Godot.Collections;
 
-// Editor-only GridMap authoring tool. You paint terrain directly on this GridMap; the
-// MeshLibrary item at each painted cell is mapped (by item NAME) to a BattleMapTileData gameplay
-// brush via the Brushes palette, and Bake writes a BattleMapData .tres. A GridMap cell
-// Vector3I is already board space (X=width, Y=elevation/level, Z=depth), so no remapping is
-// needed. The pure bake transform lives in the static BuildMap (kept unit-testable); the
-// instance Bake() just wires the GridMap read + save to the button.
+/// <summary>
+/// A tool to create maps to be used in a tactical battle via the Godot editor.
+/// All tiles should have X, Y, Z >= 0.
+/// </summary>
 [Tool]
 public partial class BattleMapAuthoring : GridMap
 {
-  [Export] public Godot.Collections.Dictionary<StringName, BattleMapTileData> Brushes { get; set; } = [];
-  [Export] public string TargetPath { get; set; } = "res://resources/maps/untitled_map.tres";
-  [Export] public Resource? AssociatedData = null;
+  private BattleTilePalette? _palette;
+  [Export]
+  public BattleTilePalette? Palette
+  {
+    get => _palette;
+    set
+    {
+      _palette = value;
+      NotifyPropertyListChanged();
+    }
+  }
 
-  [ExportToolButton("Bake to BattleMapData")]
-  public Callable BakeButton => Callable.From(Bake);
+  [Export] public string TargetPath { get; set; } = "res://resources/maps/untitled_map.tres";
+
+  [ExportToolButton("Export BattleMap")]
+  private Callable BakeButton => Callable.From(Bake);
+
+  public override void _ValidateProperty(Dictionary property)
+  {
+    if (property["name"].AsStringName() == PropertyName.Palette)
+    {
+      MeshLibrary = Palette?.MeshLibrary;
+    }
+  }
 
   private void Bake()
   {
-    var painted = ReadPaintedCells();
-    if (painted.Count == 0)
+    if (Palette is null)
+    {
+      GD.PushError("Palette is not set!");
+      return;
+    }
+
+    if (MeshLibrary is null)
+    {
+      GD.PushError("Mesh Library is required!");
+      return;
+    }
+
+    var cells = GetPaintedCells();
+
+    if (cells.Count == 0)
     {
       GD.PushError("BattleMapAuthoring: no painted cells found on the GridMap.");
       return;
     }
 
-    BattleMapData map = BuildMap(painted);
-    Error error = ResourceSaver.Save(map, TargetPath);
-    if (error != Error.Ok)
+    BattleMapData data = BuildMap(cells);
+
+    var map = new BattleMap
     {
-      GD.PushError($"BattleMapAuthoring: failed to save '{TargetPath}' ({error}).");
-      return;
+      MeshLibrary = MeshLibrary,
+      MapData = data,
+      UsedPalette = Palette!,
+      CellOctantSize = CellOctantSize,
+      CellSize = CellSize,
+      CellCenterX = CellCenterX,
+      CellCenterY = CellCenterY,
+      CellCenterZ = CellCenterZ,
+      Scale = Scale,
+      Name = "Map"
+    };
+
+    foreach (var c in GetUsedCells())
+    {
+      var item = GetCellItem(c);
+      var orientation = GetCellItemOrientation(c);
+      map.SetCellItem(c, item, orientation);
     }
 
-    // ResourceSaver.Save writes to disk, but the editor keeps its own filesystem/resource
-    // cache and won't notice. Tell it the file changed so the FileSystem dock shows the bake
-    // and any open/loaded copy reloads from disk — otherwise a stale cached copy can clobber
-    // the saved data on the next project save.
-    if (Engine.IsEditorHint())
-      EditorInterface.Singleton.GetResourceFilesystem().UpdateFile(TargetPath);
+    var scene = new PackedScene();
+    var res = scene.Pack(map);
 
-    GD.Print($"BattleMapAuthoring: baked {painted.Count} cells -> {TargetPath}");
+    if (res != Error.Ok)
+      throw new InvalidOperationException("Failed to pack map");
 
-    AssociatedData = GD.Load<Resource>(TargetPath);
+    var saveRes = ResourceSaver.Save(scene, TargetPath);
+
+    if (saveRes != Error.Ok)
+      throw new InvalidOperationException($"Failed to save map at {TargetPath}");
+
+    GD.Print($"Successfully saved map to {TargetPath}");
   }
 
-  private List<(Godot.Vector3I Coordinates, BattleMapTileData Brush)> ReadPaintedCells()
+  private Dictionary<Godot.Vector3I, BattleMapTileData> GetPaintedCells()
   {
-    var painted = new List<(Godot.Vector3I Coordinates, BattleMapTileData Brush)>();
+    var painted = new Dictionary<Godot.Vector3I, BattleMapTileData>();
 
     foreach (Godot.Vector3I cell in GetUsedCells())
     {
-      int itemId = GetCellItem(cell);
+      if (cell.X < 0 || cell.Y < 0 || cell.Z < 0)
+        throw new InvalidOperationException("Map has cells that have negative dimensions.");
+
+      var itemId = GetCellItem(cell);
       if (itemId == InvalidCellItem)
         continue;
 
-      if (MeshLibrary is null)
-      {
-        GD.PrintErr("No meshlib associated!");
-        return [];
-      }
       StringName itemName = MeshLibrary.GetItemName(itemId);
 
-      if (Brushes.TryGetValue(itemName, out var brush))
-      {
-        GD.Print($"Painting tile {cell}, {brush}");
-        painted.Add((cell, brush));
-      }
+      if (Palette!.Brushes.TryGetValue(itemName, out var value))
+        painted[cell] = value;
       else
-      {
-        GD.PrintErr($"Couldn't find associated brush for {itemName}!");
-      }
+        throw new InvalidOperationException($"There is no data associated with tile {itemName}");
     }
 
     return painted;
   }
 
-  // Pure transform: painted cells -> BattleMapData. Normalizes the painted extent to a (0,0,0)
-  // origin and keys each cell to its brush (the same brush instance is reused across cells of
-  // the same type). Static and free of GridMap/scene state, so it stays unit-testable without a
-  // live GridMap.
-  public static BattleMapData BuildMap(IReadOnlyList<(Godot.Vector3I Coordinates, BattleMapTileData Brush)> cells)
+  private static BattleMapData BuildMap(Dictionary<Godot.Vector3I, BattleMapTileData> cells)
   {
-    if (cells is null || cells.Count == 0)
-      throw new InvalidOperationException("Cannot bake a BattleMapData from zero painted cells.");
-
     int minX = int.MaxValue, minZ = int.MaxValue;
     int maxX = int.MinValue, maxZ = int.MinValue, maxLevel = int.MinValue;
-    foreach (var cell in cells)
+
+    foreach (var (cell, _) in cells)
     {
-      Godot.Vector3I c = cell.Coordinates;
-      minX = Math.Min(minX, c.X);
-      maxX = Math.Max(maxX, c.X);
-      minZ = Math.Min(minZ, c.Z);
-      maxZ = Math.Max(maxZ, c.Z);
-      maxLevel = Math.Max(maxLevel, c.Y);
+      minX = Math.Min(minX, cell.X);
+      maxX = Math.Max(maxX, cell.X);
+      minZ = Math.Min(minZ, cell.Z);
+      maxZ = Math.Max(maxZ, cell.Z);
+      maxLevel = Math.Max(maxLevel, cell.Y);
     }
 
     var dimensions = new Godot.Vector3I(maxX - minX + 1, maxLevel + 1, maxZ - minZ + 1);
-    var tiles = new Godot.Collections.Dictionary<Godot.Vector3I, BattleMapTileData>();
-
-    foreach (var cell in cells)
-    {
-      var normalized = new Godot.Vector3I(cell.Coordinates.X - minX, cell.Coordinates.Y, cell.Coordinates.Z - minZ);
-      tiles[normalized] = cell.Brush;
-    }
 
     return new BattleMapData
     {
       Dimensions = dimensions,
-      Tiles = tiles,
+      Tiles = cells,
     };
   }
 }

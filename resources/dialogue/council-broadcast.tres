@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="DialogueSequenceData" format=3]
+[gd_resource type="Resource" script_class="DialogueSequenceData" format=3 uid="uid://dumptnjetenvx"]
 
-[ext_resource type="Script" path="res://scripts/dialogue/DialogueSequenceData.cs" id="1"]
-[ext_resource type="Script" path="res://scripts/dialogue/DialogueLineData.cs" id="2"]
+[ext_resource type="Script" uid="uid://c1lj5gea0wf14" path="res://scripts/dialogue/DialogueSequenceData.cs" id="1"]
+[ext_resource type="Script" uid="uid://dvek5ts3qmnl0" path="res://scripts/dialogue/DialogueLineData.cs" id="2"]
 [ext_resource type="Resource" path="res://resources/dialogue/speakers/council-spokesman.tres" id="3"]
 
 [sub_resource type="Resource" id="DialogueLineData_line1"]

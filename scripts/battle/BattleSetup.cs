@@ -48,6 +48,10 @@ public sealed record BattleSetup(
   public IReadOnlyList<ObjectPlacement> Objects { get; init; } = [];
 
   public IReadOnlyList<BattleTypeSystemData> Systems { get; init; } = [];
+
+  /// <summary>The pooled scene the map was extracted from, when this setup was resolved from
+  /// a battle type. Hand-built setups carry None; the runtime itself stays scene-independent.</summary>
+  public Option<Godot.PackedScene> MapScene { get; init; } = default;
 }
 
 /// <summary>Typed reasons a battle request/setup can fail before the session starts.</summary>
@@ -59,6 +63,8 @@ public enum BattleSetupFailureReason
   UnknownFaction,
   /// <summary>The authored battle type had no candidate maps to choose from.</summary>
   EmptyMapPool,
+  /// <summary>A pooled map scene did not root a BattleMap carrying map data.</summary>
+  MapSceneInvalid,
   /// <summary>A unit spawn cell was out of bounds or not occupiable.</summary>
   SpawnCellUnavailable,
   /// <summary>Two units were assigned to the same spawn cell.</summary>

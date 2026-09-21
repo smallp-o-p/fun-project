@@ -92,7 +92,7 @@ public partial class MapDeploymentTest
     Assert.Equal(new Vector3I(9, 0, 0), placements[0].Position);
 
     var type = new BattleTypeData { Name = "Bounds probe" };
-    type.MapPool.Add(map);
+    type.MapPool.Add(TestData.MakeMapScene(map));
     var side = new FactionDeploymentData { Faction = new FactionData { Name = "Player" } };
     side.Roster.Add(new FunProject.Battle.RosterEntryData
     {

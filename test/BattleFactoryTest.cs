@@ -426,17 +426,17 @@ public class BattleFactoryTest
     };
 
     var type = new BattleTypeData { Name = "Bomb Defusal" };
-    type.MapPool.Add(TestData.MakeMapData(
+    type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(
       new Vector3I(4, 1, 4),
       (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
       (new Vector3I(1, 0, 0), TestData.SpawnTile(0)),
       (new Vector3I(2, 0, 3), TestData.SpawnTile(1)),
-      (new Vector3I(3, 0, 3), TestData.FloorTile())));
-    type.MapPool.Add(TestData.MakeMapData(
+      (new Vector3I(3, 0, 3), TestData.FloorTile()))));
+    type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(
       new Vector3I(4, 1, 4),
       (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
       (new Vector3I(1, 0, 0), TestData.SpawnTile(0)),
-      (new Vector3I(0, 0, 1), TestData.SpawnTile(1))));
+      (new Vector3I(0, 0, 1), TestData.SpawnTile(1)))));
 
     var playerDeployment = new FactionDeploymentData { Faction = playerFaction };
     playerDeployment.Roster.Add(new RosterEntryData { Combatant = trooper, Quantity = 2 });
@@ -488,9 +488,9 @@ public class BattleFactoryTest
   public void StartTypeBlockedSpawnCell()
   {
     var type = new BattleTypeData { Name = "Blocked" };
-    type.MapPool.Add(TestData.MakeMapData(new Vector3I(4, 1, 4),
+    type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(0, 0, 0), new BattleMapTileData { SpawnFactionSlot = 0, Walkable = false }),
-      (new Vector3I(3, 0, 3), TestData.SpawnTile(1))));
+      (new Vector3I(3, 0, 3), TestData.SpawnTile(1)))));
     var playerDeployment = new FactionDeploymentData { Faction = new FactionData { Name = "Player" } };
     playerDeployment.Roster.Add(new FunProject.Battle.RosterEntryData
     {
