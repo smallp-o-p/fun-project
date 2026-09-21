@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://dq0712mfxlyak"]
+
+[ext_resource type="Script" uid="uid://bames24eplytf" path="res://scenes/battle/BattleUI.cs" id="1_h6rtp"]
+[ext_resource type="PackedScene" uid="uid://b7molqvminjhi" path="res://scenes/battle/BattleHud.tscn" id="2_v1sni"]
+[ext_resource type="PackedScene" uid="uid://ci645kcvsfqif" path="res://scenes/MovementLine.tscn" id="3_trk6y"]
+[ext_resource type="Script" uid="uid://7mnyg45hw5h7" path="res://scenes/battle/ReachableTileHighlighter.cs" id="4_5ti8r"]
+
+[node name="BattleUI" type="Node" unique_id=2138654786]
+script = ExtResource("1_h6rtp")
+
+[node name="BattleHud" parent="." unique_id=390974309 instance=ExtResource("2_v1sni")]
+unique_name_in_owner = true
+
+[node name="MovementLine" parent="." unique_id=770337484 instance=ExtResource("3_trk6y")]
+unique_name_in_owner = true
+
+[node name="ReachableTileHighlighter" type="Node3D" parent="." unique_id=754665915]
+unique_name_in_owner = true
+script = ExtResource("4_5ti8r")

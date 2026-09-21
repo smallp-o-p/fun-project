@@ -1,4 +1,4 @@
-[gd_resource type="Resource" format=3 uid="uid://65ekcmcl2al8"]
+[gd_resource type="Resource" script_class="BattleSpecialObjectData" format=3 uid="uid://65ekcmcl2al8"]
 
 [ext_resource type="Script" uid="uid://c8dfb2o24n6ue" path="res://scripts/battle/objects/BattleSpecialObjectData.cs" id="1_data"]
 [ext_resource type="Script" uid="uid://sfasq524grpw" path="res://scripts/battle/objects/InteractiveCapabilityData.cs" id="2_interactive"]

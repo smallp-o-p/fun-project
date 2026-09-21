@@ -1,0 +1,45 @@
+[gd_scene format=3 uid="uid://b7molqvminjhi"]
+
+[ext_resource type="Script" uid="uid://dw8ybb4c0mcww" path="res://scenes/battle/BattleHud.cs" id="1_70p07"]
+
+[node name="BattleHud" type="CanvasLayer" unique_id=390974309]
+script = ExtResource("1_70p07")
+
+[node name="VBox" type="VBoxContainer" parent="." unique_id=996430011]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 20.0
+offset_bottom = 20.0
+
+[node name="VerbButtons" type="VBoxContainer" parent="VBox" unique_id=1791367627]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ConfirmButton" type="Button" parent="VBox" unique_id=1366882203]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Confirm"
+
+[node name="CancelButton" type="Button" parent="VBox" unique_id=1366130992]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Cancel"
+
+[node name="UnitStatus" type="Label" parent="VBox" unique_id=832064974]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="HitChance" type="Label" parent="VBox" unique_id=825648800]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="BattleOverBanner" type="Label" parent="." unique_id=727671454]
+unique_name_in_owner = true
+visible = false
+offset_left = 300.0
+offset_top = 200.0
+offset_right = 700.0
+offset_bottom = 260.0
+horizontal_alignment = 1
+vertical_alignment = 1

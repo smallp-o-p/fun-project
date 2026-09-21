@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://y0uddluo5pq4"]
+
+[ext_resource type="Script" uid="uid://c0bej67ecihvr" path="res://scenes/battle/BattleLauncher.cs" id="1_4s71a"]
+[ext_resource type="Resource" uid="uid://lh00iegkdqww" path="res://resources/battle_types/bomb_defusal.tres" id="2_fh2dq"]
+
+[node name="BattleLauncher" type="Node" unique_id=142706632]
+script = ExtResource("1_4s71a")
+BattleType = ExtResource("2_fh2dq")

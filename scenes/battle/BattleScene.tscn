@@ -1,6 +1,24 @@
 [gd_scene format=3 uid="uid://c6xooggmjjd16"]
 
 [ext_resource type="Script" uid="uid://b2fd6q1lo4kcv" path="res://scenes/battle/BattleScene.cs" id="1_battlescene"]
+[ext_resource type="PackedScene" uid="uid://dq0712mfxlyak" path="res://scenes/battle/BattleUI.tscn" id="3_t3o3d"]
+[ext_resource type="PackedScene" uid="uid://bgq3pi6pcjd0y" path="res://scenes/GameCamera.tscn" id="3_vd1me"]
+
+[sub_resource type="Environment" id="Environment_vd1me"]
 
 [node name="BattleScene" type="Node3D" unique_id=1036918003]
 script = ExtResource("1_battlescene")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=794445579]
+environment = SubResource("Environment_vd1me")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1221893214]
+transform = Transform3D(0.70710677, 0.61237246, -0.35355335, 0, 0.49999997, 0.86602545, 0.70710677, -0.61237246, 0.35355335, 0, 0, 0)
+
+[node name="GameCamera" parent="." unique_id=1404942062 instance=ExtResource("3_vd1me")]
+unique_name_in_owner = true
+PathRadius = 12.0
+CenterLookAngleDegrees = -40.0
+
+[node name="BattleUI" parent="." unique_id=2138654786 instance=ExtResource("3_t3o3d")]
+unique_name_in_owner = true
