@@ -105,26 +105,26 @@ public partial class AttackUnitTest
     }
 
     AssertInfeasible(
-      () => BattleAction.AttackUnit(battle.Alive(unarmedAttacker), battle.Alive(target)),
+      () => BattleAction.AttackEntity(battle.Alive(unarmedAttacker), battle.Target(target)),
       unarmedAttacker);                            // no equipped weapon
     AssertInfeasible(
-      () => BattleAction.AttackUnit(battle.Alive(armedAttacker), battle.Alive(armedAttacker)),
+      () => BattleAction.AttackEntity(battle.Alive(armedAttacker), battle.Target(armedAttacker)),
       armedAttacker);                              // self-target
     AssertInfeasible(
-      () => BattleAction.AttackUnit(battle.Alive(armedAttacker), battle.Alive(ally)),
+      () => BattleAction.AttackEntity(battle.Alive(armedAttacker), battle.Target(ally)),
       armedAttacker);                              // allied target
     AssertInfeasible(
-      () => BattleAction.AttackUnit(battle.Alive(shortSightedAttacker), battle.Alive(target)),
+      () => BattleAction.AttackEntity(battle.Alive(shortSightedAttacker), battle.Target(target)),
       shortSightedAttacker);                       // not visible (vision 1, distance 3)
     AssertInfeasible(
-      () => BattleAction.AttackUnit(battle.Alive(shortRangedAttacker), battle.Alive(target)),
+      () => BattleAction.AttackEntity(battle.Alive(shortRangedAttacker), battle.Target(target)),
       shortRangedAttacker);                        // out of weapon range (range 1, distance > 1)
 
     battle.ApplyDamage(target, 999);
-    // The dead-target case dies at the proof mint itself: TryGetAlive refuses to mint for a
-    // dead unit, so constructing the action (not executing it) throws.
+    // The dead-target case dies at the proof mint itself: TryGetAttackTarget refuses to mint
+    // for a dead unit, so constructing the action (not executing it) throws.
     Assert.Throws<InvalidOperationException>(()
-      => BattleAction.AttackUnit(battle.Alive(armedAttacker), battle.Session.TryGetAlive(target).RequireSome()));
+      => BattleAction.AttackEntity(battle.Alive(armedAttacker), battle.Session.TryGetAttackTarget(new BattleEntity.Unit(target)).RequireSome()));
   }
 
   [TestCase(TestName = "A stale attack whose target died to an earlier interrupt interrupts silently")]
@@ -142,12 +142,12 @@ public partial class AttackUnitTest
     // still alive; the first kill invalidates the second action's target proof.
     battle.RegisterHook<UnitMovedBattleEvent>(new BuildInterruptsHook(context =>
     [
-      BattleAction.AttackUnit(
+      BattleAction.AttackEntity(
         context.Session.TryGetAlive(shooter).RequireSome(),
-        context.Session.TryGetAlive(mover).RequireSome()),
-      BattleAction.AttackUnit(
+        context.Session.TryGetAttackTarget(new BattleEntity.Unit(mover)).RequireSome()),
+      BattleAction.AttackEntity(
         context.Session.TryGetAlive(shooter).RequireSome(),
-        context.Session.TryGetAlive(mover).RequireSome()),
+        context.Session.TryGetAttackTarget(new BattleEntity.Unit(mover)).RequireSome()),
     ]));
     battle.ClearEvents();
 

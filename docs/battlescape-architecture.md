@@ -289,7 +289,7 @@ The current built-in authoritative actions are:
 - `StartBattle`
 - `SpawnUnit`
 - `MoveUnit`
-- `AttackUnit`
+- `AttackEntity`
 - `ReloadWeapon`
 - `ThrowItem`
 - `UseItem`

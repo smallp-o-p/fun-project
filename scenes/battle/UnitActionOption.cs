@@ -33,20 +33,11 @@ public sealed class MoveActionOption(UnitAction action) : UnitActionOption(actio
   }
 }
 
-public sealed class AttackActionOption : UnitActionOption, NeedsTargeting
+public sealed class AttackActionOption(UnitAction action) : UnitActionOption(action), NeedsTargeting
 {
-  public Weapon Weapon { get; }
-
-  public AttackActionOption(UnitAction action, Weapon weapon)
-    : base(action)
-  {
-    ArgumentNullException.ThrowIfNull(weapon);
-    Weapon = weapon;
-  }
-
   public IActionTargeting Targeting(BattleRuntime runtime)
   {
-    return new AttackTargeting(runtime, Unit, Weapon);
+    return new AttackTargeting(runtime, Unit);
   }
 }
 

@@ -17,7 +17,7 @@ public partial class BattleCombatQueriesTest
       player: new("Alpha", Weapon: TestData.MakeWeapon("Rifle")));
 
     var breakdown = battle.Query(new GetHitChanceForAttack(
-      battle.Alive(battle.PlayerUnit), battle.Alive(battle.EnemyUnit))).RequireRight();
+      battle.Alive(battle.PlayerUnit), battle.Target(battle.EnemyUnit))).RequireRight();
 
     Assert.Equal(65, breakdown.BaseChance);
     Assert.Equal(-40, breakdown.Modifiers.AsValueEnumerable().Single().Amount);
@@ -37,7 +37,7 @@ public partial class BattleCombatQueriesTest
 
     // Player faction is active; the enemy attacker can still preview its odds.
     var breakdown = battle.Query(new GetHitChanceForAttack(
-      battle.Alive(enemyAttacker), battle.Alive(playerTarget))).RequireRight();
+      battle.Alive(enemyAttacker), battle.Target(playerTarget))).RequireRight();
 
     Assert.Equal(70, breakdown.FinalChance);
   }
@@ -53,7 +53,7 @@ public partial class BattleCombatQueriesTest
       player: new("Alpha", Weapon: TestData.MakeWeapon("Rifle")));
 
     var previewed = battle.Query(new GetHitChanceForAttack(
-      battle.Alive(battle.PlayerUnit), battle.Alive(battle.EnemyUnit))).RequireRight();
+      battle.Alive(battle.PlayerUnit), battle.Target(battle.EnemyUnit))).RequireRight();
 
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
@@ -77,17 +77,17 @@ public partial class BattleCombatQueriesTest
     var target = battle.Spawn(TestData.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
     battle.Start();
 
-    void AssertFails(AliveUnit attacker, AliveUnit attackTarget, BattleQueryFailureReason expectedReason)
+    void AssertFails(AliveUnit attacker, AttackTarget attackTarget, BattleQueryFailureReason expectedReason)
     {
       var failure = battle.Query(new GetHitChanceForAttack(attacker, attackTarget)).RequireLeft();
       Assert.Equal(expectedReason, failure.Reason);
     }
 
-    AssertFails(battle.Alive(unarmedAttacker), battle.Alive(target), BattleQueryFailureReason.InvalidBattleState);   // no weapon
-    AssertFails(battle.Alive(armedAttacker), battle.Alive(armedAttacker), BattleQueryFailureReason.InvalidBattleState); // self-target
-    AssertFails(battle.Alive(armedAttacker), battle.Alive(unarmedAttacker), BattleQueryFailureReason.InvalidBattleState); // allied target
-    AssertFails(battle.Alive(shortSightedAttacker), battle.Alive(target), BattleQueryFailureReason.InvalidBattleState); // not visible
-    AssertFails(battle.Alive(shortRangedAttacker), battle.Alive(target), BattleQueryFailureReason.InvalidBattleState);  // out of range
+    AssertFails(battle.Alive(unarmedAttacker), battle.Target(target), BattleQueryFailureReason.InvalidBattleState);   // no weapon
+    AssertFails(battle.Alive(armedAttacker), battle.Target(armedAttacker), BattleQueryFailureReason.InvalidBattleState); // self-target
+    AssertFails(battle.Alive(armedAttacker), battle.Target(unarmedAttacker), BattleQueryFailureReason.InvalidBattleState); // allied target
+    AssertFails(battle.Alive(shortSightedAttacker), battle.Target(target), BattleQueryFailureReason.InvalidBattleState); // not visible
+    AssertFails(battle.Alive(shortRangedAttacker), battle.Target(target), BattleQueryFailureReason.InvalidBattleState);  // out of range
   }
 
   [TestCase(TestName = "Unconscious targets still allow hit chance previews")]
@@ -98,7 +98,7 @@ public partial class BattleCombatQueriesTest
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
 
     Assert.True(battle.Query(new GetHitChanceForAttack(
-      battle.Alive(battle.PlayerUnit), battle.Alive(battle.EnemyUnit))).IsRight);
+      battle.Alive(battle.PlayerUnit), battle.Target(battle.EnemyUnit))).IsRight);
   }
 
   [TestCase(TestName = "Hit chance preview ignores action points and phase availability")]
@@ -107,7 +107,7 @@ public partial class BattleCombatQueriesTest
     using var battle = BattleFixture.Duel(
       player: new("Alpha", Weapon: TestData.MakeAmmoWeapon("Rifle")));
     var attacker = battle.Alive(battle.PlayerUnit);
-    var target = battle.Alive(battle.EnemyUnit);
+    var target = battle.Target(battle.EnemyUnit);
     battle.PlayerUnit.SpendActionPoints(battle.PlayerUnit.CurrentActionPoints);
     Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight);
 

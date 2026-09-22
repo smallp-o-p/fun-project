@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Items.Effects;
 using GdUnit4;
 using Godot;
 using System;
@@ -129,5 +130,54 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAliveObject(crate).RequireSome()));
 
     Assert.Equal(BattlePhase.InProgress, runtime.Query(new GetBattlePhaseQuery()));
+  }
+
+  [TestCase]
+  public void DestroyingTimedObjectsFailsButDestroyingCratesDoesNot()
+  {
+    using var battle = BattleFixture.Duel(start: false, playerControlled: true,
+      player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 5)));
+    battle.Session.AddObjective(battle.PlayerFaction, new DefuseAllBombsObjectiveData
+    {
+      OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
+    }.Instantiate());
+    var bomb = battle.PlaceObject(TestData.MakeObject("Bomb", 5,
+      new TimedEffectCapabilityData { FireAfterTurns = 5 }), new Vector3I(3, 0, 2));
+    var crate = battle.PlaceObject(TestData.MakeObject("Crate", 5), new Vector3I(2, 0, 2));
+    battle.Start();
+    battle.Attack(battle.PlayerUnit, crate);
+    Assert.Equal(BattlePhase.InProgress, battle.Query(new GetBattlePhaseQuery()));
+    battle.ClearEvents();
+    battle.Attack(battle.PlayerUnit, bomb);
+    Assert.Equal(BattlePhase.Ended, battle.Query(new GetBattlePhaseQuery()));
+    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+    Assert.Equal(1, battle.Events.EventsOf<ObjectiveFailedBattleEvent>().Length);
+    Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().Length);
+    Assert.Equal(0, battle.Events.EventsOf<ObjectExpiredBattleEvent>().Length);
+  }
+
+  [TestCase]
+  public void GrenadeDestructionFailsTheObjectiveAndFinishesResolution()
+  {
+    using var battle = BattleFixture.Duel(start: false, playerControlled: true);
+    battle.Session.AddObjective(battle.PlayerFaction, new DefuseAllBombsObjectiveData
+    {
+      OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
+    }.Instantiate());
+    var cell = new Vector3I(3, 0, 2);
+    var bomb = battle.PlaceObject(TestData.MakeObject("Bomb", 5,
+      new TimedEffectCapabilityData { FireAfterTurns = 5 }), cell);
+    battle.Start();
+    var grenade = TestData.MakeGrenade("Frag", throwRange: 10, blastRadius: 0,
+      effects: [new DamageEffectData { BaseDamage = 5 }]);
+    battle.PlayerUnit.AddInventoryItem(grenade.Item);
+    battle.ClearEvents();
+    battle.Throw(battle.PlayerUnit, grenade, cell);
+    Assert.Equal(Some(ObjectStatus.Destroyed), bomb.Status);
+    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+    Assert.Equal(1, battle.Events.EventsOf<ObjectiveFailedBattleEvent>().Length);
+    Assert.Equal(1, battle.Events.EventsOf<CapabilityResolvedBattleEvent>().Length);
+    Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().Length);
+    Assert.Equal(0, battle.Events.EventsOf<ObjectExpiredBattleEvent>().Length);
   }
 }

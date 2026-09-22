@@ -58,9 +58,9 @@ public abstract class BattleAction
     return new InteractWithObject(unit, obj);
   }
 
-  public static AttackUnit AttackUnit(AliveUnit attacker, AliveUnit target)
+  public static AttackEntity AttackEntity(AliveUnit attacker, AttackTarget target)
   {
-    return new AttackUnit(attacker, target);
+    return new AttackEntity(attacker, target);
   }
 
   public static ThrowItem ThrowItem(AliveUnit unit, ItemWith<ThrowableCapability> throwable, BattleBoardState.ValidatedPoint targetCell)

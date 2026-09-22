@@ -7,6 +7,7 @@ public enum ObjectStatus
 {
   Interacted,
   Expired,
+  Destroyed,
 }
 
 /// <summary>Mutable runtime state for one special board object.</summary>
@@ -20,7 +21,8 @@ public sealed class BattleObjectState
   public BattleSpecialObjectData Data { get; }
   /// <summary>The object's terminal status, if any: <c>None</c> while it is live on the
   /// board — presence on the board already says "placed" — and
-  /// <see cref="ObjectStatus.Interacted"/> or <see cref="ObjectStatus.Expired"/> after.</summary>
+  /// <see cref="ObjectStatus.Interacted"/>, <see cref="ObjectStatus.Expired"/>, or
+  /// <see cref="ObjectStatus.Destroyed"/> after.</summary>
   public Option<ObjectStatus> Status { get; internal set; }
   /// <summary>The object's board position; special objects never move.</summary>
   public Vector3I Position { get; }

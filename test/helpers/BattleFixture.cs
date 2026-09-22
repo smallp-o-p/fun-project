@@ -71,6 +71,12 @@ public sealed class BattleFixture : IDisposable
 
   public LiveObject Live(BattleObjectState obj) => Runtime.TryGetAliveObject(obj).RequireSome();
 
+  public AttackTarget Target(BattleUnitState unit) =>
+    Runtime.TryGetAttackTarget(new BattleEntity.Unit(unit)).RequireSome();
+
+  public AttackTarget Target(BattleObjectState obj) =>
+    Runtime.TryGetAttackTarget(new BattleEntity.Object(obj)).RequireSome();
+
   public BattleBoardState.ValidatedPoint At(Vector3I position) => Runtime.TryGetTile(position).RequireSome();
 
   public BattleBoardState.ValidatedPoint At(int x, int y, int z) => At(new Vector3I(x, y, z));
@@ -87,6 +93,11 @@ public sealed class BattleFixture : IDisposable
     Submit(new SpawnUnit(combatant, At(position), weapon, armor, statMods));
     return UnitAt(position);
   }
+
+  // Valid during setup only, preserving the existing placement contract.
+  public BattleObjectState PlaceObject(BattleSpecialObjectData data, Vector3I position) =>
+    Submit(BattleAction.PlaceObject(data, At(position)))
+      .EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
 
   // Progression integration setup: awards the first step's cost, commits the path, and
   // unlocks that step on the supplied combatant's own progression object. Call before
@@ -240,7 +251,10 @@ public sealed class BattleFixture : IDisposable
     Submit(BattleAction.MoveUnit(Alive(unit), destinations.AsValueEnumerable().Select(position => At(position)).ToArray(), actionPointCost));
 
   public BattleActionExecResult Attack(BattleUnitState attacker, BattleUnitState target) =>
-    Submit(BattleAction.AttackUnit(Alive(attacker), Alive(target)));
+    Submit(BattleAction.AttackEntity(Alive(attacker), Target(target)));
+
+  public BattleActionExecResult Attack(BattleUnitState attacker, BattleObjectState target) =>
+    Submit(BattleAction.AttackEntity(Alive(attacker), Target(target)));
 
   public BattleActionExecResult ApplyDamage(BattleUnitState unit, int amount, DamageKind kind = DamageKind.Health) =>
     Submit(BattleAction.ApplyDamage(Alive(unit), amount, kind));

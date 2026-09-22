@@ -91,6 +91,23 @@ public sealed class BattleSession
       : None;
   }
 
+  // Mint door for attack-target proofs: Some iff the entity is currently a targetable member
+  // of THIS session — a live unit, or a live object carrying health. The proof is a snapshot
+  // (membership + position at mint) that may go stale across an executor commit.
+  public Option<AttackTarget> TryGetAttackTarget(BattleEntity entity)
+  {
+    ArgumentNullException.ThrowIfNull(entity);
+    return entity switch
+    {
+      BattleEntity.Unit unit => TryGetAlive(unit.State)
+        .Map(alive => new AttackTarget(entity, alive.Position)),
+      BattleEntity.Object obj => TryGetAliveObject(obj.State)
+        .Bind(live => obj.State.FindCapability<ObjectHealthCapability>()
+          .Map(_ => new AttackTarget(entity, live.Position))),
+      _ => throw new InvalidOperationException("Unknown battle entity."),
+    };
+  }
+
   // Single mint point: snapshots the unit's board position into the one-shot proof. An alive
   // session unit is always board-indexed (visibility Refresh invariant), so a miss here is a
   // session bug, not a caller error. Callers must pass a unit already known alive-in-session.
@@ -284,6 +301,31 @@ public sealed class BattleSession
 
   internal void ApplyDamageTo(BattleUnitState unit, int amount, DamageKind kind = DamageKind.Health)
     => ApplyDamageTo(unit, [new Damage(amount, Element.Kinetic, Kind: kind)], None);
+
+  // Object-side damage: health packets reduce the health capability, stun/status payloads are
+  // ignored, and reaching zero is the terminal Destroyed transition (occupancy cleared before
+  // the destruction event broadcasts). Damage is a trusted-core mutation like the unit path.
+  internal void ApplyDamageTo(BattleObjectState obj, IReadOnlyList<Damage> bundle,
+    Option<BattleUnitState> cause)
+  {
+    ArgumentNullException.ThrowIfNull(obj);
+    ArgumentNullException.ThrowIfNull(bundle);
+    if (TryGetAliveObject(obj).IsNone)
+      throw new InvalidOperationException($"Object {obj.Id} is not live in this session.");
+    var health = obj.FindCapability<ObjectHealthCapability>().Match(
+      Some: value => value,
+      None: () => throw new InvalidOperationException($"Object {obj.Id} has no health."));
+    int amount = DamageResolver.Resolve(bundle, None).HealthDamage;
+    if (amount == 0) return;
+    health.Reduce(amount);
+    if (health.CurrentHealth == 0)
+    {
+      var position = MarkObjectTerminal(obj, ObjectStatus.Destroyed);
+      RaiseEvents(new ObjectDestroyedBattleEvent(obj, position, cause));
+      return;
+    }
+    RaiseEvents(new ObjectDamagedBattleEvent(obj, bundle, amount, cause));
+  }
 
   internal void ApplyDamageTo(BattleUnitState unit, IReadOnlyList<Damage> bundle, Option<BattleUnitState> cause)
   {
@@ -503,14 +545,6 @@ public sealed class BattleSession
     return Board.FindOccupantPosition(unit.Id);
   }
 
-  // Total for alive units: an alive session unit is always board-indexed (see UnitProofs).
-  // Callers holding a liveness fact use this instead of handling an impossible None; a
-  // None here means the trusted core is broken, so it throws.
-  internal BattleBoardState.ValidatedPoint RequireUnitPosition(BattleUnitState unit)
-    => GetUnitPosition(unit).Match(
-      point => point,
-      () => throw new InvalidOperationException($"Unit {unit.Id} is not indexed on the board."));
-
   internal Option<BattleUnitState> GetUnitAt(BattleBoardState.ValidatedPoint point)
   {
     return Board.GetOccupant(point).Bind(id =>
@@ -519,18 +553,20 @@ public sealed class BattleSession
 
   internal void MarkObjectInteracted(BattleObjectState obj)
   {
-    if (obj.Status.IsSome)
-      throw new InvalidOperationException($"Object {obj.Id} is not live on the board.");
-    BattleBoardState.ValidatedPoint position = Board.FindObjectPosition(obj.Id).Match(
-      Some: point => point,
-      None: () => throw new InvalidOperationException($"Object {obj.Id} is placed but not board-indexed."));
-    if (!Board.TryClearObjectOccupant(position, obj.Id))
-      throw new InvalidOperationException($"Could not clear occupancy for object {obj.Id}.");
-    obj.Status = Some(ObjectStatus.Interacted);
+    MarkObjectTerminal(obj, ObjectStatus.Interacted);
   }
 
   internal (BattleObjectState Object, BattleBoardState.ValidatedPoint Position) MarkObjectExpired(
     BattleObjectState obj)
+  {
+    BattleBoardState.ValidatedPoint position = MarkObjectTerminal(obj, ObjectStatus.Expired);
+    return (obj, position);
+  }
+
+  // Shared mark-and-clear for every terminal object transition: rejects already-terminal
+  // objects, requires a board position, clears occupancy, then flips the status. The
+  // captured position is what terminal events carry.
+  private BattleBoardState.ValidatedPoint MarkObjectTerminal(BattleObjectState obj, ObjectStatus status)
   {
     if (obj.Status.IsSome)
       throw new InvalidOperationException($"Object {obj.Id} is not live on the board.");
@@ -539,8 +575,8 @@ public sealed class BattleSession
       None: () => throw new InvalidOperationException($"Object {obj.Id} is placed but not board-indexed."));
     if (!Board.TryClearObjectOccupant(position, obj.Id))
       throw new InvalidOperationException($"Could not clear occupancy for object {obj.Id}.");
-    obj.Status = Some(ObjectStatus.Expired);
-    return (obj, position);
+    obj.Status = Some(status);
+    return position;
   }
 
   internal void MoveUnit(BattleUnitState unit, BattleBoardState.ValidatedPoint source,

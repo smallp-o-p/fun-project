@@ -42,7 +42,7 @@ public partial class BuffBattleTest
     battle.ClearEvents();
 
     HitChanceBreakdown Preview() => battle.Query(new GetHitChanceForAttack(
-      battle.Alive(battle.PlayerUnit), battle.Alive(battle.EnemyUnit))).RequireRight();
+      battle.Alive(battle.PlayerUnit), battle.Target(battle.EnemyUnit))).RequireRight();
 
     battle.ApplyDamage(player, 11); // 9/20: condition now holds
     Assert.Equal(0, player.ActiveBuffs.AsValueEnumerable().Count());  // poll model: nothing until a turn boundary

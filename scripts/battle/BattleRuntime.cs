@@ -45,6 +45,16 @@ public sealed class BattleRuntime : IDisposable
     return _session.TryGetAliveObject(obj);
   }
 
+  // The attack-target mint door for scene code holding a raw identity: Some iff the entity is
+  // currently targetable in this session. The proof is a snapshot that may go stale across a
+  // commit, like every other mint here.
+  public Option<AttackTarget> TryGetAttackTarget(BattleEntity entity)
+  {
+    ThrowIfDisposed();
+    ArgumentNullException.ThrowIfNull(entity);
+    return _session.TryGetAttackTarget(entity);
+  }
+
   // The tile mint door for scene code holding a raw coordinate (Some iff the tile is on this
   // session's board). In-bounds is a stable fact, so this proof cannot go stale.
   public Option<BattleBoardState.ValidatedPoint> TryGetTile(Vector3I coordinates)

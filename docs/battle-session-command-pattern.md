@@ -58,7 +58,7 @@ The current built-in actions are:
 - `StartBattle`
 - `SpawnUnit`
 - `MoveUnit`
-- `AttackUnit`
+- `AttackEntity`
 - `ReloadWeapon`
 - `ThrowItem`
 - `UseItem`

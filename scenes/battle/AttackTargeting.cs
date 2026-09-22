@@ -1,28 +1,26 @@
 using FunProject.Battle;
-using FunProject.Weapons;
 using Godot;
 using System;
 using System.Collections.Generic;
 
-// Enemy-target targeting: candidate tiles are visible enemies within weapon range; preview is the
-// hit-chance breakdown for the enemy under the cursor; commit attacks that enemy. The candidate
-// set may be empty — Attack availability is independent of target discovery, so an otherwise
-// usable Attack option stays enabled while targeting finds nothing to hit.
+// Unit- and object-target attack targeting: candidate tiles are attackable enemies and
+// destructible objects under the attacker's current visibility and weapon range, resolved
+// through the shared hit-chance query so discovery and preview can never drift; preview is
+// the hit-chance breakdown for the entity under the cursor; commit attacks that entity.
+// The candidate set may be empty — Attack availability is independent of target discovery,
+// so an otherwise usable Attack option stays enabled while targeting finds nothing to hit.
 public sealed class AttackTargeting : IActionTargeting
 {
   private readonly BattleRuntime _runtime;
   private readonly BattleUnitState _unit;
-  private readonly Weapon _weapon;
-  private readonly Dictionary<Vector3I, BattleUnitState> _targetsByTile = [];
+  private readonly Dictionary<Vector3I, BattleEntity> _targetsByTile = [];
 
-  public AttackTargeting(BattleRuntime runtime, BattleUnitState unit, Weapon weapon)
+  public AttackTargeting(BattleRuntime runtime, BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(runtime);
     ArgumentNullException.ThrowIfNull(unit);
-    ArgumentNullException.ThrowIfNull(weapon);
     _runtime = runtime;
     _unit = unit;
-    _weapon = weapon;
   }
 
   public ConfirmMode Confirm => ConfirmMode.Immediate;
@@ -36,16 +34,18 @@ public sealed class AttackTargeting : IActionTargeting
     return _runtime.TryGetAlive(_unit).Match(
       Some: attacker =>
       {
-        Vector3I from = attacker.Position.Raw;
-        int range = _weapon.EffectiveRange;
-        IReadOnlyCollection<AliveUnit> enemies = _runtime.Query(new GetVisibleEnemiesForUnit(attacker));
-
-        foreach (AliveUnit enemy in enemies)
+        void AddCandidate(AliveUnit attacker, BattleEntity entity)
         {
-          Vector3I tp = enemy.Position.Raw;
-          if (BattleBoardState.GetGridDistance(from, tp) <= range)
-            _targetsByTile[tp] = enemy.State;
+          if (_runtime.TryGetAttackTarget(entity).Case is not AttackTarget target) return;
+          if (_runtime.Query(new GetHitChanceForAttack(attacker, target)).IsRight)
+            _targetsByTile[target.Position.Raw] = entity;
         }
+
+        foreach (AliveUnit enemy in _runtime.Query(new GetVisibleEnemiesForUnit(attacker)))
+          AddCandidate(attacker, new BattleEntity.Unit(enemy.State));
+
+        foreach (BattleObjectState obj in _runtime.Query(new GetBattleSpecialObjectsQuery()))
+          AddCandidate(attacker, new BattleEntity.Object(obj));
 
         return (IReadOnlyCollection<Vector3I>)_targetsByTile.Keys;
       },
@@ -54,30 +54,31 @@ public sealed class AttackTargeting : IActionTargeting
 
   public Either<BattleQueryFailure, ActionPreview> Preview(Vector3I target)
   {
-    if (!_targetsByTile.TryGetValue(target, out BattleUnitState? enemy))
+    if (!_targetsByTile.TryGetValue(target, out BattleEntity? entity))
       return Left<BattleQueryFailure, ActionPreview>(
         new BattleQueryFailure(BattleQueryFailureReason.InvalidTile, $"No attackable target at {target}."));
 
     return _runtime.TryGetAlive(_unit).Match(
-      Some: attacker => _runtime.TryGetAlive(enemy).Match(
-        Some: enemyProof => _runtime.Query(new GetHitChanceForAttack(attacker, enemyProof)).Match(
-          Right: hc => Right<BattleQueryFailure, ActionPreview>(new AttackPreview(hc)),
+      Some: attacker => _runtime.TryGetAttackTarget(entity).Match(
+        Some: targetProof => _runtime.Query(new GetHitChanceForAttack(attacker, targetProof)).Match(
+          Right: hit => Right<BattleQueryFailure, ActionPreview>(new AttackPreview(hit)),
           Left: Left<BattleQueryFailure, ActionPreview>),
-        None: () => Left<BattleQueryFailure, ActionPreview>(
-          new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState, $"Target at {target} is no longer alive."))),
-      None: () => Left<BattleQueryFailure, ActionPreview>(
-        new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState, "Attacking unit is no longer alive.")));
+        None: () => Left<BattleQueryFailure, ActionPreview>(new BattleQueryFailure(
+          BattleQueryFailureReason.InvalidBattleState, $"Target at {target} is no longer attackable."))),
+      None: () => Left<BattleQueryFailure, ActionPreview>(new BattleQueryFailure(
+        BattleQueryFailureReason.InvalidBattleState, "Attacking unit is no longer alive.")));
   }
 
   public bool CanCommit(Vector3I target) => _targetsByTile.ContainsKey(target);
 
   public BattleAction Build(Vector3I target)
   {
-    // Fresh proofs at the write boundary: the unit may have moved or died since Begin().
+    // Fresh proofs at the write boundary: the unit may have moved or died, or the object
+    // been destroyed, since Begin().
     return _runtime.TryGetAlive(_unit).Match(
-      attacker => _runtime.TryGetAlive(_targetsByTile[target]).Match(
-        enemy => BattleAction.AttackUnit(attacker, enemy),
-        () => throw new InvalidOperationException("Target is no longer alive.")),
+      attacker => _runtime.TryGetAttackTarget(_targetsByTile[target]).Match(
+        proof => BattleAction.AttackEntity(attacker, proof),
+        () => throw new InvalidOperationException("Target is no longer attackable.")),
       () => throw new InvalidOperationException("Attacking unit is no longer alive."));
   }
 }

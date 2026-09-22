@@ -162,6 +162,43 @@ public sealed record ObjectExpiredBattleEvent : BattleEvent<ObjectExpiredBattleE
   }
 }
 
+public sealed record ObjectDamagedBattleEvent : BattleEvent<ObjectDamagedBattleEvent>, ICausedByUnit
+{
+  public BattleObjectState Object { get; }
+  public IReadOnlyList<Damage> Bundle { get; }
+  public int HealthDamage { get; }
+  public Option<BattleUnitState> MaybeCause { get; }
+
+  public ObjectDamagedBattleEvent(BattleObjectState obj, IReadOnlyList<Damage> bundle,
+    int healthDamage, Option<BattleUnitState> cause)
+  {
+    ArgumentNullException.ThrowIfNull(obj);
+    ArgumentNullException.ThrowIfNull(bundle);
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(healthDamage);
+    Object = obj;
+    Bundle = bundle;
+    HealthDamage = healthDamage;
+    MaybeCause = cause;
+  }
+}
+
+public sealed record ObjectDestroyedBattleEvent : BattleEvent<ObjectDestroyedBattleEvent>,
+  IPositionedBattleEvent, ICausedByUnit
+{
+  public BattleObjectState Object { get; }
+  public BattleBoardState.ValidatedPoint Position { get; }
+  public Option<BattleUnitState> MaybeCause { get; }
+
+  public ObjectDestroyedBattleEvent(BattleObjectState obj,
+    BattleBoardState.ValidatedPoint position, Option<BattleUnitState> cause)
+  {
+    ArgumentNullException.ThrowIfNull(obj);
+    Object = obj;
+    Position = position;
+    MaybeCause = cause;
+  }
+}
+
 public sealed record UnitActivationEndedBattleEvent : BattleEvent<UnitActivationEndedBattleEvent>, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
@@ -358,7 +395,7 @@ public sealed record CapabilityResolvedBattleEvent : BattleEvent<CapabilityResol
 public sealed record UnitAttackedBattleEvent : BattleEvent<UnitAttackedBattleEvent>, IUnitBattleEvent, IPositionedBattleEvent
 {
   public BattleUnitState Unit { get; }
-  public BattleUnitState Target { get; }
+  public BattleEntity Target { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
   public Weapon Weapon { get; }
   public HitChanceBreakdown Breakdown { get; }
@@ -367,7 +404,7 @@ public sealed record UnitAttackedBattleEvent : BattleEvent<UnitAttackedBattleEve
 
   public UnitAttackedBattleEvent(
     BattleUnitState unit,
-    BattleUnitState target,
+    BattleEntity target,
     BattleBoardState.ValidatedPoint position,
     Weapon weapon,
     HitChanceBreakdown breakdown,

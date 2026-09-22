@@ -1,6 +1,5 @@
 using FunProject.Battle;
 using FunProject.Combatants;
-using FunProject.Weapons;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -298,16 +297,12 @@ public sealed class BattleUiController : IDisposable
   private static UnitActionOption MakeOption(UnitAction action) => action.Action switch
   {
     MoveActionDefinition => new MoveActionOption(action),
-    AttackActionDefinition => new AttackActionOption(action, RequireWeapon(action.Unit)),
+    AttackActionDefinition => new AttackActionOption(action),
     ReloadActionDefinition => new ReloadActionOption(action),
     PassActionDefinition => new PassActionOption(action),
     EndTurnActionDefinition => new EndTurnActionOption(action),
     _ => throw new InvalidOperationException($"No presentation option for {action.Action.GetType().Name}."),
   };
-
-  private static Weapon RequireWeapon(BattleUnitState unit) => unit.EquippedWeapon.Match(
-    Some: weapon => weapon,
-    None: () => throw new InvalidOperationException("Attack option requires an equipped weapon."));
 
   private void ResetTargeting()
   {

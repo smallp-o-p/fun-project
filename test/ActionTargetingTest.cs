@@ -1,6 +1,6 @@
 using FunProject.Battle;
-using FunProject.Weapons;
 using GdUnit4;
+using System;
 using System.Collections.Generic;
 
 [TestSuite]
@@ -49,8 +49,7 @@ public class ActionTargetingTest
   {
     using var battle = MakeArmedBattle();
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
-    Weapon rifle = hero.State.EquippedWeapon.RequireSome();
-    var attack = new AttackTargeting(battle.Runtime, hero.State, rifle);
+    var attack = new AttackTargeting(battle.Runtime, hero.State);
 
     IReadOnlyCollection<Vector3I> candidates = attack.Begin();
     Assert.True(candidates.AsValueEnumerable().Contains(new Vector3I(3, 0, 0)));   // the enemy's tile, in range + visible
@@ -92,9 +91,47 @@ public class ActionTargetingTest
 
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
     Assert.True(Row<AttackActionDefinition>(actions).IsAvailable);
-    var targeting = new AttackTargeting(battle.Runtime, battle.PlayerUnit,
-      battle.PlayerUnit.EquippedWeapon.RequireSome());
+    var targeting = new AttackTargeting(battle.Runtime, battle.PlayerUnit);
     Assert.Equal(0, targeting.Begin().Count);
     Assert.False(targeting.CanCommit(new Vector3I(7, 0, 7)));
+  }
+
+  [TestCase]
+  public void ObjectTargetingPreviewsBuildsAndRefreshesAfterDestruction()
+  {
+    var weapon = TestData.MakeWeapon("Rifle", damage: 5);
+    using var battle = BattleFixture.Duel(start: false, player: new("Shooter", Aim: 0, Weapon: weapon));
+    var cell = new Vector3I(3, 0, 2);
+    var obj = battle.PlaceObject(TestData.MakeObject("Crate", 5), cell);
+    var scenery = battle.PlaceObject(TestData.MakeObject(), new Vector3I(2, 0, 2));
+    battle.Start();
+    var targeting = new AttackTargeting(battle.Runtime, battle.PlayerUnit);
+    Assert.True(targeting.Begin().AsValueEnumerable().Contains(cell));
+    Assert.False(targeting.Candidates.AsValueEnumerable().Contains(scenery.Position));
+    var preview = (AttackPreview)targeting.Preview(cell).RequireRight();
+    Assert.Equal(100, preview.HitChance.FinalChance);
+    Assert.True(targeting.CanCommit(cell));
+    battle.Submit(targeting.Build(cell));
+    Assert.Equal(Some(ObjectStatus.Destroyed), obj.Status);
+    Assert.True(targeting.Preview(cell).IsLeft);
+    Assert.Throws<InvalidOperationException>(() => targeting.Build(cell));
+    Assert.False(targeting.Begin().AsValueEnumerable().Contains(cell));
+  }
+
+  [TestCase]
+  public void ObjectCandidatesUseCurrentAttackerFeasibility()
+  {
+    using var battle = BattleFixture.Duel(start: false);
+    var weapon = TestData.MakeWeapon("Rifle");
+    var blind = battle.Spawn(TestData.MakeCombatant("Blind", battle.PlayerFaction, vision: 1),
+      new Vector3I(0, 0, 0), weapon);
+    var shortWeapon = TestData.MakeWeapon("Knife", range: 1);
+    var shortRange = battle.Spawn(TestData.MakeCombatant("Short", battle.PlayerFaction),
+      new Vector3I(0, 0, 1), shortWeapon);
+    var obj = battle.PlaceObject(TestData.MakeObject("Crate", 10), new Vector3I(3, 0, 1));
+    battle.Start();
+    Assert.True(battle.Query(new GetFactionVisibleObjectsQuery(battle.PlayerFaction)).AsValueEnumerable().Contains(obj));
+    Assert.False(new AttackTargeting(battle.Runtime, blind).Begin().AsValueEnumerable().Contains(obj.Position));
+    Assert.False(new AttackTargeting(battle.Runtime, shortRange).Begin().AsValueEnumerable().Contains(obj.Position));
   }
 }

@@ -106,12 +106,13 @@ public sealed class InteractWithObject(AliveUnit unit, LiveObject obj) : BattleA
 
 // Target feasibility (weapon/self/ally/liveness/visibility/range) resolves once through
 // AttackContext.Resolve — the gate shared with GetHitChanceForAttack — so the write side
-// can never drift from the preview.
+// can never drift from the preview. The target proof may name a unit or a destructible
+// object; object hits bypass the calculator and object damage dispatches to the object path.
 // A feasibility miss interrupts the action silently rather than rejecting: interrupts
 // interleave inside one submission, so a target can die, move out of range/sight, or the
 // magazine can be spent by an earlier interrupt after this action was constructed — a
 // quiet drop is preferred to unwinding the whole submission over a normal reaction chain.
-public sealed class AttackUnit(AliveUnit attacker, AliveUnit target) : BattleAction
+public sealed class AttackEntity(AliveUnit attacker, AttackTarget target) : BattleAction
 {
   public override Result Execute(BattleSession session)
   {
@@ -121,12 +122,12 @@ public sealed class AttackUnit(AliveUnit attacker, AliveUnit target) : BattleAct
     if (session.TryGetAlive(attacker.State).IsNone || attacker.State.IsIncapacitated)
       return Result.Interrupted;
 
-    return AttackContext.Resolve(session, attacker.State, target.State).Match(
+    return AttackContext.Resolve(session, attacker.State, target).Match(
       _ => Result.Interrupted,
       context => Fire(session, attacker, target, context));
   }
 
-  private static Result Fire(BattleSession session, AliveUnit attacker, AliveUnit target, AttackContext context)
+  private static Result Fire(BattleSession session, AliveUnit attacker, AttackTarget target, AttackContext context)
   {
     // Ammo is mutable state between construction and commit: another interrupt in this
     // submission may have fired the same weapon. An empty magazine interrupts quietly
@@ -141,13 +142,13 @@ public sealed class AttackUnit(AliveUnit attacker, AliveUnit target) : BattleAct
       None: () => throw new InvalidOperationException(
         $"{context.Weapon.ItemName} could not spend a shot."));
 
-    HitChanceBreakdown breakdown = session.HitChanceCalculator.Calculate(context);
+    HitChanceBreakdown breakdown = context.CalculateHitChance(target, session.HitChanceCalculator);
     int roll = session.RollPercent();
     bool isHit = roll < breakdown.FinalChance;
 
     session.RaiseEvents(new UnitAttackedBattleEvent(
       attacker.State,
-      target.State,
+      target.Entity,
       context.DefenderPosition,
       context.Weapon,
       breakdown,
@@ -155,7 +156,17 @@ public sealed class AttackUnit(AliveUnit attacker, AliveUnit target) : BattleAct
       isHit));
 
     if (isHit)
-      session.ApplyDamageTo(target.State, bundle, Some(attacker.State));
+    {
+      switch (target.Entity)
+      {
+        case BattleEntity.Unit unit:
+          session.ApplyDamageTo(unit.State, bundle, Some(attacker.State));
+          break;
+        case BattleEntity.Object obj when session.TryGetAttackTarget(target.Entity).IsSome:
+          session.ApplyDamageTo(obj.State, bundle, Some(attacker.State));
+          break;
+      }
+    }
 
     return Result.Completed;
   }

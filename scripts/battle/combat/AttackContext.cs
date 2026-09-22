@@ -1,4 +1,5 @@
 using FunProject.Weapons;
+using System;
 
 namespace FunProject.Battle;
 
@@ -14,33 +15,52 @@ public sealed record AttackContext(
   BattleBoardState Board)
 {
   // Single source of truth for attack target-feasibility, shared by the write side
-  // (AttackUnit) and the read side (GetHitChanceForAttack) so the two can never drift.
+  // (AttackEntity) and the read side (GetHitChanceForAttack) so the two can never drift.
   // Covers only target feasibility — attacker liveness/incapacitation/AP/phase/turn
   // gating is the caller's job (the action checks mutable actor state; AliveUnit proofs
   // guard the query). Conditions are checked in one fixed order so a shot rejected for
   // multiple reasons surfaces a single, stable failure message.
   internal static Either<string, AttackContext> Resolve(
-    BattleSession session, BattleUnitState attacker, BattleUnitState target)
+    BattleSession session, BattleUnitState attacker, AttackTarget target)
   {
     if (attacker.EquippedWeapon.IsNone)
       return $"{attacker.Combatant.Name} has no equipped weapon.";
     Weapon weapon = attacker.RequireEquippedWeapon();
+    if (session.TryGetAlive(attacker).Case is not AliveUnit freshAttacker)
+      return $"{attacker.Combatant.Name} is not alive in this session.";
 
-    if (target == attacker)
-      return $"{attacker.Combatant.Name} cannot attack itself.";
-    if (target.Side == attacker.Side)
-      return $"{attacker.Combatant.Name} cannot attack allied unit {target.Combatant.Name}.";
-    if (!target.IsAlive)
-      return $"{target.Combatant.Name} is not alive.";
-    if (!attacker.VisibleUnits.Contains(target))
-      return $"{attacker.Combatant.Name} cannot see {target.Combatant.Name}.";
+    string name;
+    switch (target.Entity)
+    {
+      case BattleEntity.Unit unit:
+        name = unit.State.Combatant.Name;
+        if (unit.State == attacker) return $"{name} cannot attack itself.";
+        if (unit.State.Side == attacker.Side)
+          return $"{attacker.Combatant.Name} cannot attack allied unit {name}.";
+        break;
+      case BattleEntity.Object obj:
+        name = obj.State.Name;
+        break;
+      default:
+        throw new InvalidOperationException("An attack requires a typed target.");
+    }
+    if (session.TryGetAttackTarget(target.Entity).Case is not AttackTarget freshTarget)
+      return $"{name} is not alive or attackable in this session.";
 
-    BattleBoardState.ValidatedPoint attackerPoint = session.RequireUnitPosition(attacker);
-    BattleBoardState.ValidatedPoint targetPoint = session.RequireUnitPosition(target);
-
-    if (BattleSession.GetGridDistance(attackerPoint.Raw, targetPoint.Raw) > weapon.EffectiveRange)
-      return $"{target.Combatant.Name} is out of range for {weapon.ItemName}.";
-
-    return new AttackContext(attacker, weapon, attackerPoint, targetPoint, session.Board);
+    bool visible = target.Entity switch
+    {
+      BattleEntity.Unit unit => attacker.VisibleUnits.Contains(unit.State),
+      BattleEntity.Object => attacker.VisibleTiles.Contains(freshTarget.Position),
+      _ => throw new InvalidOperationException("Unknown battle entity."),
+    };
+    if (!visible) return $"{attacker.Combatant.Name} cannot see {name}.";
+    if (BattleSession.GetGridDistance(freshAttacker.Position.Raw, freshTarget.Position.Raw) > weapon.EffectiveRange)
+      return $"{name} is out of range for {weapon.ItemName}.";
+    return new AttackContext(attacker, weapon, freshAttacker.Position, freshTarget.Position, session.Board);
   }
+
+  // Object shots bypass the unit calculator entirely: a destructible object has no aim,
+  // cover, or dodge profile, so a feasible shot always connects.
+  internal HitChanceBreakdown CalculateHitChance(AttackTarget target, IHitChanceCalculator calculator) =>
+    target.Entity is BattleEntity.Object ? new HitChanceBreakdown(100, []) : calculator.Calculate(this);
 }

@@ -144,4 +144,41 @@ public class BombExpiryTest
       return [];
     }
   }
+
+  [TestCase]
+  public void ExpiryPayloadDamagesObjectsThroughTheSharedResolver()
+  {
+    using var battle = BattleFixture.Duel(start: false);
+    var timer = new TimedEffectCapabilityData { FireAfterTurns = 1, EffectRadius = 1 };
+    timer.Effects.Add(new DamageEffectData { BaseDamage = 8 });
+    var bomb = battle.PlaceObject(TestData.MakeObject("Bomb", 20, timer), new Vector3I(1, 0, 1));
+    var crate = battle.PlaceObject(TestData.MakeObject("Crate", 20), new Vector3I(2, 0, 1));
+    battle.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
+    battle.Start();
+    battle.ClearEvents();
+    battle.AdvanceTurn();
+    Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
+    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(bomb)).IsNone);
+    Assert.Equal(12, crate.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
+    battle.Events.EventBefore<ObjectDamagedBattleEvent, ObjectExpiredBattleEvent>();
+  }
+
+  [TestCase]
+  public void DestroyedBombNeverFiresItsPayloadOrExpiresLater()
+  {
+    using var battle = BattleFixture.Duel(start: false,
+      player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 5)));
+    var timer = new TimedEffectCapabilityData { FireAfterTurns = 1, EffectRadius = 1 };
+    timer.Effects.Add(new DamageEffectData { BaseDamage = 99 });
+    var bomb = battle.PlaceObject(TestData.MakeObject("Bomb", 5, timer), new Vector3I(4, 0, 2));
+    battle.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
+    battle.Start();
+    battle.ClearEvents();
+    battle.Attack(battle.PlayerUnit, bomb);
+    battle.AdvanceTurn();
+    Assert.Equal(Some(ObjectStatus.Destroyed), bomb.Status);
+    Assert.Equal(battle.PlayerUnit.MaxHealth, battle.PlayerUnit.CurrentHealth);
+    Assert.Equal(0, battle.Events.EventsOf<ObjectExpiredBattleEvent>().Length);
+    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(bomb)).IsNone);
+  }
 }

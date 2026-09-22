@@ -387,6 +387,21 @@ internal static class TestData
     return scene;
   }
 
+  public static BattleSpecialObjectData MakeObject(
+    string name = "Crate", int? health = null,
+    params SpecialObjectCapabilityData[] capabilities)
+  {
+    var data = new BattleSpecialObjectData { Name = name };
+    if (health is int value)
+      data.Capabilities.Add(new ObjectHealthCapabilityData
+      {
+        HealthStat = new HealthStat { BaseValue = value },
+      });
+    foreach (SpecialObjectCapabilityData capability in capabilities)
+      data.Capabilities.Add(capability);
+    return data;
+  }
+
   // Two-faction duel on a 2x1x1 map: one spawn cell per side, one unit per side (health 20,
   // aim 65, damage-1 range-10 weapon), one inert objective each.
   public static BattleTypeData MakeDuelBattleType()

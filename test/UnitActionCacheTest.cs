@@ -467,7 +467,7 @@ public class UnitActionCacheTest
         new Vector3I(3, 0, 0)));
     BattleUnitState observer = battle.UnitAt(new Vector3I(1, 0, 0));
     BattleUnitState target = battle.UnitAt(new Vector3I(3, 0, 0));
-    var targeting = new AttackTargeting(battle.Runtime, observer, weapon);
+    var targeting = new AttackTargeting(battle.Runtime, observer);
 
     Assert.True(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(3, 0, 0)));
     Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable()

@@ -302,8 +302,9 @@ public class BattleStartupLifecycleTest
       runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
     var target = runtime.Query(new GetUnitAtTile(
       runtime.TryGetTile(new Vector3I(1, 0, 0)).RequireSome())).RequireSome();
-    var result = runtime.ExecuteAction(BattleAction.AttackUnit(
-      runtime.TryGetAlive(attacker).RequireSome(), runtime.TryGetAlive(target).RequireSome()));
+    var result = runtime.ExecuteAction(BattleAction.AttackEntity(
+      runtime.TryGetAlive(attacker).RequireSome(),
+      runtime.TryGetAttackTarget(new BattleEntity.Unit(target)).RequireSome()));
     foreach (BattleEvent battleEvent in result.EventsThatOccurred)
       if (battleEvent is UnitAttackedBattleEvent attacked)
         return attacked;

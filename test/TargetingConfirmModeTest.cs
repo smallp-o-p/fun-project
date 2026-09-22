@@ -1,5 +1,4 @@
 using FunProject.Battle;
-using FunProject.Weapons;
 using GdUnit4;
 
 [TestSuite]
@@ -15,8 +14,7 @@ public sealed partial class TargetingConfirmModeTest
       new Vector3I(1, 0, 1), TestData.MakeWeapon("Rifle", range: 10));
 
     var move = new MoveTargeting(battle.Runtime, unit);
-    Weapon weapon = unit.EquippedWeapon.RequireSome();
-    var attack = new AttackTargeting(battle.Runtime, unit, weapon);
+    var attack = new AttackTargeting(battle.Runtime, unit);
 
     Assert.Equal(ConfirmMode.Confirm, move.Confirm);
     Assert.Equal(ConfirmMode.Immediate, attack.Confirm);

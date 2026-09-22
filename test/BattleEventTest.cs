@@ -1,4 +1,6 @@
 using FunProject.Battle;
+using FunProject.Core;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System;
@@ -118,5 +120,29 @@ public class BattleEventTest
           && baseType.GenericTypeArguments[0] == eventType)
         return true;
     return false;
+  }
+
+  [TestCase]
+  public void ObjectOutcomeEventsHaveTypedIdentityAndGuardTheirPayloads()
+  {
+    using var battle = BattleFixture.Duel(start: false,
+      player: new("Shooter", Aim: 100, Weapon: TestData.MakeWeapon("Rifle")));
+    var obj = battle.PlaceObject(TestData.MakeObject("Crate", 10), new Vector3I(3, 0, 2));
+    Assert.Throws<ArgumentNullException>(() => new ObjectDamagedBattleEvent(null!, [], 1, None));
+    Assert.Throws<ArgumentNullException>(() => new ObjectDamagedBattleEvent(obj, null!, 1, None));
+    foreach (int amount in new[] { 0, -1 })
+      Assert.Throws<ArgumentOutOfRangeException>(() => new ObjectDamagedBattleEvent(obj, [], amount, None));
+    Assert.Throws<ArgumentNullException>(() => new ObjectDestroyedBattleEvent(null!, battle.At(3, 0, 2), None));
+    BattleEvent damaged = new ObjectDamagedBattleEvent(obj, [new Damage(1, Element.Kinetic)], 1, None);
+    BattleEvent destroyed = new ObjectDestroyedBattleEvent(obj, battle.At(3, 0, 2), None);
+    Assert.True(damaged is ICausedByUnit);
+    Assert.True(destroyed is IPositionedBattleEvent and ICausedByUnit);
+    Assert.False(damaged is IUnitBattleEvent);
+    Assert.False(destroyed is IUnitBattleEvent);
+    battle.Start();
+    battle.ClearEvents();
+    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
+    Assert.True(ReferenceEquals(battle.EnemyUnit,
+      ((BattleEntity.Unit)battle.Events.SingleEvent<UnitAttackedBattleEvent>().Target).State));
   }
 }

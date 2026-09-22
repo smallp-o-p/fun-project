@@ -72,7 +72,7 @@ public class EffectiveStatTest
     var target = battle.Spawn(TestData.MakeCombatant("Hostile", enemyFaction), new Vector3I(0, 0, 8));
     battle.Start();
 
-    var result = battle.Query(new GetHitChanceForAttack(battle.Alive(attacker), battle.Alive(target)));
+    var result = battle.Query(new GetHitChanceForAttack(battle.Alive(attacker), battle.Target(target)));
     Assert.True(result.IsRight); // would be Left (out of range) without the four production edits
   }
 

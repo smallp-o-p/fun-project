@@ -44,6 +44,26 @@ public readonly struct LiveObject
   public int Id => State.Id;
 }
 
+/// <summary>
+/// Receipt that an entity (unit or board object) was a targetable member of this session at
+/// mint: alive/live and standing at <see cref="Position"/>, a snapshot just like
+/// <see cref="AliveUnit.Position"/>. It holds no reference back into the session and
+/// guarantees nothing past the mint: held across an executor commit its snapshot may be
+/// stale. Mint fresh per interaction; use within one synchronous scope that submits nothing.
+/// </summary>
+public readonly struct AttackTarget
+{
+  public BattleEntity Entity { get; }
+  public BattleBoardState.ValidatedPoint Position { get; }
+
+  internal AttackTarget(BattleEntity entity, BattleBoardState.ValidatedPoint position)
+  {
+    ArgumentNullException.ThrowIfNull(entity);
+    Entity = entity;
+    Position = position;
+  }
+}
+
 // Dead is monotone-true (no resurrection): this receipt cannot even go stale.
 public readonly struct DeadUnit
 {
