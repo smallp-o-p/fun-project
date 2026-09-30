@@ -1,0 +1,132 @@
+using System;
+using FunProject.Models;
+using GdUnit4;
+using Godot;
+
+[TestSuite]
+[RequireGodotRuntime]
+public class CharacterModelAppearanceAttachmentTest
+{
+  // ------------------------------------------------------------------
+  // Per-instance material isolation
+  // ------------------------------------------------------------------
+
+  // Isolation serves per-instance copies and feeds the face axes: only the
+  // per-instance copies carry the runtime face axes while the authored material
+  // keeps its default axes and its own outline pass untouched.
+  [TestCase]
+  public void IsolationCarriesFaceAxesAndLeavesAuthoredMaterialsUntouched()
+  {
+    using var fixture = ModelFixture.WithAppearance();
+    fixture.Model.Rotation = new Vector3(0, MathF.PI / 2, 0);
+    fixture.Model.UpdateFaceAxes();
+
+    Assert.Equal(1.0, ((ShaderMaterial)fixture.SharedMaterial!.NextPass!)
+      .GetShaderParameter("width_scale").AsDouble());
+    Assert.True(fixture.SharedMaterial.GetShaderParameter("head_forward_world").AsVector3()
+      .DistanceTo(Vector3.Back) < 1e-6);
+    var face = (ShaderMaterial)fixture.Body.GetSurfaceOverrideMaterial(0)!;
+    Assert.False(ModelFixture.SameNative(face, fixture.SharedMaterial));
+    Assert.False(ModelFixture.SameNative(fixture.Outline, fixture.SharedMaterial.NextPass));
+    Assert.True(face.GetShaderParameter("head_forward_world").AsVector3()
+      .DistanceTo(new Vector3(1, 0, 0)) < 1e-4);
+    Assert.True(face.GetShaderParameter("head_right_world").AsVector3()
+      .DistanceTo(new Vector3(0, 0, -1)) < 1e-4);
+
+    fixture.FaceSkeleton!.SetBonePoseRotation(0, Quaternion.FromEuler(new Vector3(0, MathF.PI, 0)));
+    fixture.Model.UpdateFaceAxes();
+    Assert.True(face.GetShaderParameter("head_forward_world").AsVector3()
+      .DistanceTo(new Vector3(-1, 0, 0)) < 1e-4);
+  }
+
+  // Isolation carries authored outline settings per instance: a non-default
+  // width, a disabled pass, and a surface authored without any pass survive
+  // as authored.
+  [TestCase]
+  public void IsolationCarriesAuthoredOutlineSettings()
+  {
+    using var widthFixture = ModelFixture.WithAppearance(start: false);
+    ((ShaderMaterial)widthFixture.SharedMaterial!.NextPass!)
+      .SetShaderParameter("width_scale", 2.5);
+    widthFixture.Start();
+    Assert.Equal(2.5, widthFixture.Outline.GetShaderParameter("width_scale").AsDouble());
+    Assert.Equal(2.5, ((ShaderMaterial)widthFixture.SharedMaterial.NextPass!)
+      .GetShaderParameter("width_scale").AsDouble());
+
+    using var disabledFixture = ModelFixture.WithAppearance(start: false);
+    ((ShaderMaterial)disabledFixture.SharedMaterial!.NextPass!)
+      .SetShaderParameter("enabled", false);
+    disabledFixture.Start();
+    Assert.False(disabledFixture.Outline.GetShaderParameter("enabled").AsBool());
+    Assert.False(((ShaderMaterial)disabledFixture.SharedMaterial.NextPass!)
+      .GetShaderParameter("enabled").AsBool());
+
+    using var passlessFixture = ModelFixture.WithAppearance(start: false);
+    passlessFixture.SharedMaterial!.NextPass = null;
+    passlessFixture.Start();
+    Assert.That(passlessFixture.Body.GetSurfaceOverrideMaterial(0)!.NextPass is null,
+      "A surface authored without an outline pass must stay without one after isolation.");
+    Assert.That(passlessFixture.SharedMaterial.NextPass is null);
+  }
+
+  [TestCase]
+  public void InitializeRetryReusesIsolatedMaterials()
+  {
+    // The failed-initialization retry door (a MaskSetups assignment on a ready,
+    // still-uninitialized model) re-runs InitializeAppearance after _EnterTree
+    // already isolated: the isolated materials must be reused, not duplicated.
+    using var fixture = ModelFixture.WithAppearance(withMask: true, start: false);
+    ModelMeshMaskSetup setup = fixture.Model.MaskSetups[0];
+    NodePath meshPath = setup.MeshPath;
+    setup.MeshPath = "MissingBody";
+    fixture.Start();
+    ulong surfaceId = fixture.Body.GetSurfaceOverrideMaterial(0)!.GetInstanceId();
+    ulong outlineId = fixture.Outline.GetInstanceId();
+
+    setup.MeshPath = meshPath;
+    fixture.Model.MaskSetups = new Godot.Collections.Array<ModelMeshMaskSetup> { setup };
+    Assert.Equal(surfaceId, fixture.Body.GetSurfaceOverrideMaterial(0)!.GetInstanceId());
+    Assert.Equal(outlineId, fixture.Outline.GetInstanceId());
+  }
+
+  // ------------------------------------------------------------------
+  // Mask rendering against isolated materials
+  // ------------------------------------------------------------------
+
+  [TestCase]
+  public void MaskRenderUsesIsolatedOutlineWeights()
+  {
+    // The masked body lives inside the mesh wrapper, yet the root isolates in
+    // its _EnterTree — before the _Ready that first renders a mask — so the
+    // first mask render must still see isolated overrides.
+    using var fixture = ModelFixture.WithAppearance(withMask: true);
+    TestData.SelectMaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
+    Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
+    Assert.Equal(1, TestData.VisibleTriangles(fixture.Model.MaskRenderMesh(fixture.MaskPath)));
+    Assert.True(fixture.Outline.GetShaderParameter("vertex_weights").VariantType
+      == Variant.Type.Object);
+    Assert.False(((ShaderMaterial)fixture.SharedMaterial!.NextPass!)
+      .GetShaderParameter("vertex_weights").VariantType == Variant.Type.Object);
+  }
+
+  // ------------------------------------------------------------------
+  // Attachment path authoring errors (empty paths stay valid — covered on
+  // the real Trigger scene).
+  // ------------------------------------------------------------------
+
+  // Nonempty attachment paths are authoring-checked at initialization: a path
+  // that misses rejects, as does one resolving to a non-container. (Empty paths
+  // stay valid — covered on the real Trigger scene.)
+  [TestCase]
+  public void AttachmentsPathAuthoringErrors()
+  {
+    using var missing = new ModelFixture(start: false);
+    missing.Model.AttachmentsPath = "../Missing";
+    Assert.Throws<InvalidOperationException>(() => missing.Model.Initialize());
+
+    using var wrongType = new ModelFixture(start: false);
+    wrongType.Model.AddChild(new Node { Name = "NotAContainer" });
+    wrongType.Model.AttachmentsPath = "NotAContainer";
+    Assert.Throws<InvalidOperationException>(() => wrongType.Model.Initialize());
+  }
+}

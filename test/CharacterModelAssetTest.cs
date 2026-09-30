@@ -1,0 +1,526 @@
+#nullable disable warnings
+using System;
+using FunProject.Models;
+using GdUnit4;
+using Godot;
+
+[TestSuite]
+[RequireGodotRuntime]
+public class CharacterModelAssetTest
+{
+  private const string ZhuYuanScene = "res://scenes/models/ZhuYuan/ZhuYuan.scn";
+  private const string TriggerScene = "res://scenes/models/Trigger/Trigger.scn";
+  private const double TriangleEpsilon = 1e-4;
+
+  // The authored body-shape adjustments stored as mesh blend values (capture
+  // evidence in the task workspace). They are asset data; there is no runtime
+  // body-shape API.
+  private const string ZhuYuanBodyMesh = "Model/rig_D/GeneralSkeleton/Pantyhose00";
+  private const string TriggerBodyMesh = "Model/rig_D/GeneralSkeleton/Pantyhose";
+  private const string SharedBodyMesh = "Model/rig_D/GeneralSkeleton/ZZZ_Size02_C";
+  private static readonly (string Shape, double Value)[] ZhuYuanBodyShape =
+  [("BreastsSize", 0.3920629024505615), ("GlutesSize", 0.3333333134651184), ("BodyTone", 0.4166666865348816)];
+  private static readonly (string Shape, double Value)[] TriggerBodyShape =
+  [("BreastsSize", 0.31954002380371094), ("ThighsSize", -0.3999999761581421), ("BodyTone", 0.4166666865348816)];
+
+  // The hidden Zhu Yuan alternate meshes and the valid -1 garments of the four
+  // clothing components they belong to.
+  private static readonly string[] ZhuYuanAlternateMeshes =
+  [
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_Gloves_001",
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_Gloves_002",
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_Down_001",
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_Down_002",
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_Down_003",
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_UP_OUT_001",
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_UP_OUT_002",
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_UP_001",
+  ];
+  private static readonly string[] ZhuYuanValidGarments =
+  [
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_Gloves",
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_Down",
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_UP_OUT",
+    "Model/rig_D/GeneralSkeleton/ZhuYuan_UP",
+  ];
+
+  // ------------------------------------------------------------------
+  // Final contract: every shipped scene instantiates the native model root
+  // (FromScene's fixture.Model getter rejects any other root type), authors
+  // the fixed animation tree child, the root resolves it to its actual scene
+  // node, the native tree starts active with its staged zero amounts, and the
+  // root's wardrobe discovers the authored clothing data.
+  // ------------------------------------------------------------------
+
+  [TestCase(ZhuYuanScene)]
+  [TestCase(TriggerScene)]
+  public void NativeComponentsResolveAndTheTreeStartsActive(string scene)
+  {
+    using var fixture = ModelFixture.FromScene(scene);
+
+    AnimationTree tree = fixture.Model.AnimationTree;
+    CharacterModel wardrobe = fixture.Model;
+    Assert.True(tree.Name == "ModelAnimationTree",
+      $"The '{scene}' animation tree resolved to '{tree.Name}' instead of 'ModelAnimationTree'.");
+
+    Assert.True(tree.Active,
+      $"The '{scene}' native animation tree must be active by default after the cutover.");
+    Assert.True(tree.TreeRoot is not null,
+      $"The '{scene}' animation tree carries no graph.");
+    Assert.True(tree.AnimPlayer == "../ModelAnimationPlayer",
+      $"The '{scene}' animation tree drives '{tree.AnimPlayer}' instead of the native player.");
+
+    Assert.Equal(0.0, tree.Get("parameters/Movement/blend_amount").AsDouble(),
+      $"The '{scene}' Movement blend does not start at zero.");
+    Assert.Equal(0.0, tree.Get("parameters/HeadTurn/blend_amount").AsDouble(),
+      $"The '{scene}' HeadTurn blend does not start at zero.");
+
+    Assert.True(wardrobe.ClothingEnabled,
+      $"The '{scene}' wardrobe initializes with clothing disabled.");
+    Assert.True(wardrobe.Pieces.Count > 0, $"The '{scene}' wardrobe discovered no pieces.");
+    Assert.True(wardrobe.Outfits.Count > 0, $"The '{scene}' wardrobe discovered no outfits.");
+  }
+
+  // ------------------------------------------------------------------
+  // Fixed-child authoring errors on a minimal synthetic root: a
+  // ModelAnimationTree child of the wrong type rejects initialization,
+  // while a root without that named child stays valid and simply leaves
+  // the component unconfigured.
+  // ------------------------------------------------------------------
+
+  // Fixed-child authoring on a minimal synthetic root: a ModelAnimationTree
+  // child of the wrong type rejects initialization, a root without the named
+  // child stays valid with the component unconfigured, and a valid child does
+  // not rescue a failed initialization — the tree field resolves before the
+  // mask/wardrobe stages, so the getter keeps rejecting until a retry succeeds.
+  [TestCase]
+  public void FixedAnimationTreeChildAuthoringContract()
+  {
+    using var wrongType = new ModelFixture(start: false);
+    wrongType.Model.AddChild(new Node3D { Name = "ModelAnimationTree" });
+    Assert.Throws<InvalidOperationException>(() => wrongType.Model.Initialize());
+
+    using var missing = new ModelFixture();
+    Assert.Throws<InvalidOperationException>(() => _ = missing.Model.AnimationTree);
+    Assert.Equal(0, missing.Model.Pieces.Count);
+
+    using var failedInit = ModelFixture.WithAnimations(start: false);
+    failedInit.Model.MaskSetups = new Godot.Collections.Array<ModelMeshMaskSetup>
+    {
+      new() { MeshPath = new NodePath("Face"), Configuration = null },
+    };
+    Assert.Throws<InvalidOperationException>(() => failedInit.Model.Initialize());
+    Assert.Throws<InvalidOperationException>(() => _ = failedInit.Model.AnimationTree);
+  }
+
+  // ------------------------------------------------------------------
+  // Static materials: the authored outline settings (enabled, width 1)
+  // and NextPass wiring survive per-instance isolation without any
+  // runtime outline writer, and the face materials keep their SDF flag.
+  // ------------------------------------------------------------------
+
+  [TestCase(ZhuYuanScene)]
+  [TestCase(TriggerScene)]
+  public void AuthoredOutlineSettingsSurviveIsolationWithoutRuntimeWrites(string scene)
+  {
+    using var fixture = ModelFixture.FromScene(scene);
+    Assert.True(FindNamedDescendant(fixture.Root, "Appearance") is null,
+      $"The '{scene}' still carries a leftover appearance node; the appearance lives on the model root.");
+    Assert.True(FindNamedDescendant(fixture.Root, "Wardrobe") is null,
+      $"The '{scene}' still carries a leftover wardrobe node; the wardrobe lives on the model root.");
+    var meshes = new SysColGeneric.List<MeshInstance3D>();
+    CollectDescendants(fixture.Root, meshes);
+    int outlinedSurfaces = 0;
+    int faceSurfaces = 0;
+    foreach (MeshInstance3D mesh in meshes)
+    {
+      if (mesh.Mesh is null)
+        continue;
+      for (int surface = 0; surface < mesh.Mesh.GetSurfaceCount(); surface++)
+      {
+        if (mesh.GetSurfaceOverrideMaterial(surface) is not ShaderMaterial baseMaterial)
+          continue;
+        if (baseMaterial.GetShaderParameter(CharacterModel.UseFaceSdfParameter).AsBool())
+          faceSurfaces++;
+        if (baseMaterial.NextPass is not ShaderMaterial outline)
+          continue;
+        outlinedSurfaces++;
+        Assert.True(outline.GetShaderParameter("enabled").AsBool(),
+          $"{scene} '{fixture.Root.GetPathTo(mesh)}' surface {surface} authored outline is disabled.");
+        Assert.True(Math.Abs(1.0 - outline.GetShaderParameter("width_scale").AsDouble()) <= 1e-6,
+          $"{scene} '{fixture.Root.GetPathTo(mesh)}' surface {surface} authored outline width drifted from 1.");
+      }
+    }
+    Assert.True(outlinedSurfaces > 0,
+      $"The '{scene}' surfaces carry no outline passes; the authored outlines were lost.");
+    Assert.True(faceSurfaces > 0,
+      $"The '{scene}' surfaces carry no face SDF materials; the face lighting setup was lost.");
+  }
+
+  // ------------------------------------------------------------------
+  // Authored body-shape adjustments live as stored mesh blend values on
+  // both body meshes of each model.
+  // ------------------------------------------------------------------
+
+  [TestCase(ZhuYuanScene)]
+  [TestCase(TriggerScene)]
+  public void AuthoredBodyShapeValuesAreStored(string scene)
+  {
+    using var fixture = ModelFixture.FromScene(scene);
+    (string mesh, (string Shape, double Value)[] shapes)[] meshes = scene == ZhuYuanScene
+      ? [(ZhuYuanBodyMesh, ZhuYuanBodyShape), (SharedBodyMesh, ZhuYuanBodyShape)]
+      : [(TriggerBodyMesh, TriggerBodyShape), (SharedBodyMesh, TriggerBodyShape)];
+    foreach ((string mesh, (string Shape, double Value)[] shapes) in meshes)
+      AssertBodyShape(fixture.Root, mesh, shapes);
+  }
+
+  // ------------------------------------------------------------------
+  // Authored mask defaults must still select the captured renderer state:
+  // Zhu Yuan's stored default mesh (with its degenerate sentinel),
+  // Trigger's full pantyhose source mesh, and Trigger's generated body
+  // variant.
+  // ------------------------------------------------------------------
+
+  [TestCase]
+  public void AuthoredMaskDefaultsRenderTheCapturedVariants()
+  {
+    using var zhu = ModelFixture.FromScene(ZhuYuanScene);
+    ArrayMesh? authoredDefault = MaskSetupOf(zhu.Model, SharedBodyMesh).Configuration?.DefaultMesh;
+    Assert.True(authoredDefault is not null,
+      "Zhu Yuan's body mask configuration carries no stored default mesh.");
+    foreach (CharacterModel.MaskRuntime.Region region in zhu.Model.ResolveMask(SharedBodyMesh).Regions)
+      Assert.True(region.Enabled,
+        $"Zhu Yuan's authored body default left region '{region.Name}' disabled.");
+    Assert.True(ModelFixture.SameNative(zhu.Model.MaskRenderMesh(SharedBodyMesh), authoredDefault),
+      "Zhu Yuan's body mask does not render its stored default mesh.");
+    Assert.Equal(1566, TestData.VisibleTriangles(zhu.Model.MaskRenderMesh(SharedBodyMesh)),
+      "Zhu Yuan's body mask must render the stored default mesh's 1566 visible triangles.");
+
+    using var trigger = ModelFixture.FromScene(TriggerScene);
+    foreach (CharacterModel.MaskRuntime.Region region in trigger.Model.ResolveMask(TriggerBodyMesh).Regions)
+      Assert.False(region.Enabled,
+        $"Trigger's authored pantyhose default left region '{region.Name}' enabled.");
+    Assert.True(ModelFixture.SameNative(
+      trigger.Model.MaskRenderMesh(TriggerBodyMesh), SourceMeshOf(trigger.Model, TriggerBodyMesh)),
+      "Trigger's pantyhose mask does not render its full source mesh.");
+    Assert.Equal(8404, TestData.VisibleTriangles(trigger.Model.MaskRenderMesh(TriggerBodyMesh)),
+      "Trigger's pantyhose mask must render the full source mesh's 8404 triangles.");
+
+    int enabledBodyRegions = 0;
+    foreach (CharacterModel.MaskRuntime.Region region in trigger.Model.ResolveMask(SharedBodyMesh).Regions)
+    {
+      if (region.Enabled)
+        enabledBodyRegions++;
+    }
+    Assert.True(enabledBodyRegions == 3,
+      $"Trigger's authored body default enables {enabledBodyRegions} regions, not the captured 3.");
+    Assert.True(!ModelFixture.SameNative(
+      trigger.Model.MaskRenderMesh(SharedBodyMesh), SourceMeshOf(trigger.Model, SharedBodyMesh))
+      && !ModelFixture.SameNative(trigger.Model.MaskRenderMesh(SharedBodyMesh),
+        MaskSetupOf(trigger.Model, SharedBodyMesh).Configuration?.DefaultMesh),
+      "Trigger's body mask must render a generated variant, not its source or default mesh.");
+    Assert.Equal(6054, TestData.VisibleTriangles(trigger.Model.MaskRenderMesh(SharedBodyMesh)),
+      "Trigger's body mask must render the generated variant's 6054 triangles.");
+  }
+
+  // ------------------------------------------------------------------
+  // Real-scene wardrobe operations: the outfit switch reworks the
+  // Trigger UpperBody piece and the body mask together, a direct mask
+  // override is re-derived away by the next clothing write, and the
+  // authored defaults reappear afterwards.
+  // ------------------------------------------------------------------
+
+  [TestCase]
+  public void TriggerOutfitSwitchReworksPiecesAndBodyMask()
+  {
+    using var fixture = ModelFixture.FromScene(TriggerScene);
+    CharacterModel wardrobe = fixture.Model;
+    Assert.Equal(0, wardrobe.OutfitIndex,
+      $"Expected Trigger's authored outfit index 0, got {wardrobe.OutfitIndex}.");
+    long authoredTriangles = TestData.VisibleTriangles(wardrobe.MaskRenderMesh(SharedBodyMesh));
+    (Node originalPiece, Node switchedPiece) = TriggerUpperBodyPieces(fixture.Root, wardrobe);
+    Assert.True(IsVisible(originalPiece) && !IsVisible(switchedPiece),
+      "Expected Trigger's original-outfit UpperBody piece visible and the "
+      + "clothing_voluptuous piece hidden before the switch.");
+
+    wardrobe.SelectOutfit(wardrobe.Outfits[2]);
+    Assert.Equal(2, wardrobe.OutfitIndex,
+      $"The outfit switch left the wardrobe on variant {wardrobe.OutfitIndex} instead of 2.");
+    Assert.True(!IsVisible(originalPiece) && IsVisible(switchedPiece),
+      "The outfit switch did not swap the Trigger UpperBody piece visibility.");
+    long switchedTriangles = TestData.VisibleTriangles(wardrobe.MaskRenderMesh(SharedBodyMesh));
+    Assert.True(switchedTriangles != authoredTriangles,
+      $"The outfit switch left the body mask at {switchedTriangles} visible triangles, "
+      + $"unchanged from the authored {authoredTriangles}.");
+
+    wardrobe.SelectOutfit(wardrobe.Outfits[0]);
+    Assert.Equal(0, wardrobe.OutfitIndex,
+      $"Restoring the outfit left the wardrobe on variant {wardrobe.OutfitIndex} instead of 0.");
+    Assert.True(IsVisible(originalPiece) && !IsVisible(switchedPiece),
+      "Restoring the outfit did not swap the Trigger UpperBody piece visibility back.");
+    Assert.True(TestData.VisibleTriangles(wardrobe.MaskRenderMesh(SharedBodyMesh)) == authoredTriangles,
+      $"Restoring the outfit left the body mask at "
+      + $"{TestData.VisibleTriangles(wardrobe.MaskRenderMesh(SharedBodyMesh))} visible triangles "
+      + $"instead of the authored {authoredTriangles}.");
+
+    // A direct region override diverges from the authored clothing state; the
+    // next clothing derivation re-applies the authored rules.
+    TestData.SelectMaskRegions(wardrobe, SharedBodyMesh);
+    Assert.True(TestData.VisibleTriangles(wardrobe.MaskRenderMesh(SharedBodyMesh)) != authoredTriangles,
+      "The direct region override did not change the rendered body mask.");
+    wardrobe.ClothingEnabled = false;
+    wardrobe.ClothingEnabled = true;
+    Assert.True(TestData.VisibleTriangles(wardrobe.MaskRenderMesh(SharedBodyMesh)) == authoredTriangles,
+      $"The clothing derivation left the body mask at "
+      + $"{TestData.VisibleTriangles(wardrobe.MaskRenderMesh(SharedBodyMesh))} visible triangles "
+      + $"instead of the authored {authoredTriangles}.");
+  }
+
+  // The eight alternates never join an outfit, so every clothing derivation
+  // must leave them hidden while the valid -1 garments keep driving visibility.
+  [TestCase]
+  public void ZhuYuanAlternateGarmentsStayHiddenThroughClothingToggles()
+  {
+    using var fixture = ModelFixture.FromScene(ZhuYuanScene);
+    CharacterModel wardrobe = fixture.Model;
+    Assert.True(wardrobe.ClothingEnabled,
+      $"The migrated '{ZhuYuanScene}' initializes with clothing disabled.");
+
+    AssertGarmentVisibility(fixture.Model, ZhuYuanAlternateMeshes, false, "after initialization");
+    AssertGarmentVisibility(fixture.Model, ZhuYuanValidGarments, true, "after initialization");
+
+    wardrobe.ClothingEnabled = false;
+    AssertGarmentVisibility(fixture.Model, ZhuYuanAlternateMeshes, false, "with clothing disabled");
+    AssertGarmentVisibility(fixture.Model, ZhuYuanValidGarments, false, "with clothing disabled");
+
+    wardrobe.ClothingEnabled = true;
+    AssertGarmentVisibility(fixture.Model, ZhuYuanAlternateMeshes, false, "after clothing was restored");
+    AssertGarmentVisibility(fixture.Model, ZhuYuanValidGarments, true, "after clothing was restored");
+  }
+
+  // ------------------------------------------------------------------
+  // Instance independence: clothing derivations and preset weight writes
+  // on one instance never reach another instance of the same scene.
+  // ------------------------------------------------------------------
+
+  [TestCase(ZhuYuanScene)]
+  [TestCase(TriggerScene)]
+  public void ClothingAndPresetWeightChangesStayIndependentAcrossInstances(string scene)
+  {
+    using var first = ModelFixture.FromScene(scene);
+    using var second = ModelFixture.FromScene(scene);
+    NodePath bodyMaskPath = second.Model.MaskSetups[0].MeshPath;
+    long secondTriangles = TestData.VisibleTriangles(second.Model.MaskRenderMesh(bodyMaskPath));
+    bool secondGlovesVisible = second.Piece("Gloves").IsVisible;
+    string presetParameter = ModelAnimationGraph.SortedPresetParameters(
+      (AnimationNodeBlendTree)first.Model.AnimationTree.TreeRoot)[0];
+    double secondWeightBefore = second.Model.AnimationTree.Get(presetParameter).AsDouble();
+    Assert.Equal(0.0, secondWeightBefore,
+      $"The '{scene}' preset parameter '{presetParameter}' does not start at zero.");
+
+    first.Model.ClothingEnabled = false;
+    first.Model.AnimationTree.Set(presetParameter, 0.5);
+
+    Assert.False(first.Piece("Gloves").IsVisible,
+      $"Disabling clothing on the first '{scene}' instance did not hide its Gloves piece.");
+    Assert.True(second.Piece("Gloves").IsVisible == secondGlovesVisible,
+      $"The first '{scene}' instance's clothing change reached the second instance's Gloves piece.");
+    Assert.True(TestData.VisibleTriangles(second.Model.MaskRenderMesh(bodyMaskPath)) == secondTriangles,
+      $"The first '{scene}' instance's clothing change reached the second instance's body mask.");
+    Assert.Equal(secondWeightBefore, second.Model.AnimationTree.Get(presetParameter).AsDouble(),
+      $"The first '{scene}' instance's preset weight write reached the second instance.");
+  }
+
+  // ------------------------------------------------------------------
+  // Attachment visibility on the real scenes: Zhu Yuan explicitly
+  // configures her (default-hidden) Weapons container through the root
+  // flag/path; Trigger keeps an empty path and tolerates the flag.
+  // ------------------------------------------------------------------
+
+  [TestCase]
+  public void ZhuYuanAttachmentsStartHiddenAndToggleThroughTheRoot()
+  {
+    using var fixture = ModelFixture.FromScene(ZhuYuanScene);
+    CharacterModel model = fixture.Model;
+    Assert.False(model.AttachmentsPath.IsEmpty,
+      $"The '{ZhuYuanScene}' root does not configure its attachments path.");
+    var weapons = model.GetNode<Node3D>(model.AttachmentsPath);
+    Assert.True(weapons.Name == "Weapons",
+      $"The '{ZhuYuanScene}' attachments path resolves to '{weapons.Name}' instead of 'Weapons'.");
+    Assert.True(weapons.GetScript().AsGodotObject() is null,
+      $"The '{ZhuYuanScene}' Weapons container must be a plain Node3D, not a scripted group.");
+    Assert.False(model.AttachmentsVisible,
+      $"The '{ZhuYuanScene}' root must ship with attachments hidden.");
+    Assert.False(weapons.Visible,
+      $"The '{ZhuYuanScene}' Weapons container must be hidden in the saved scene.");
+
+    var parts = new SysColGeneric.List<Node>();
+    foreach (Node child in weapons.GetChildren())
+      parts.Add(child);
+    Assert.True(parts.Count > 0,
+      $"The '{ZhuYuanScene}' Weapons container carries no children.");
+    var authoredFlags = new SysColGeneric.List<bool>();
+    foreach (Node part in parts)
+    {
+      Assert.False(IsEffectivelyVisible(part),
+        $"The '{ZhuYuanScene}' child '{part.Name}' is effectively visible while its container is hidden.");
+      authoredFlags.Add(IsVisible(part));
+    }
+
+    model.AttachmentsVisible = true;
+    Assert.True(weapons.Visible,
+      "Toggling the root flag must show the whole container.");
+    for (int i = 0; i < parts.Count; i++)
+    {
+      Assert.True(IsVisible(parts[i]) == authoredFlags[i],
+        $"Toggling visibility rewrote the authored flag of '{parts[i].Name}'.");
+      Assert.True(IsEffectivelyVisible(parts[i]) == authoredFlags[i],
+        $"The effective visibility of '{parts[i].Name}' must follow the container when shown.");
+    }
+
+    model.AttachmentsVisible = false;
+    Assert.False(weapons.Visible);
+    foreach (Node part in parts)
+      Assert.False(IsEffectivelyVisible(part),
+        $"Re-hiding left '{part.Name}' effectively visible.");
+  }
+
+  [TestCase]
+  public void AttachmentVisibilityStaysIndependentAcrossInstances()
+  {
+    using var first = ModelFixture.FromScene(ZhuYuanScene);
+    using var second = ModelFixture.FromScene(ZhuYuanScene);
+
+    first.Model.AttachmentsVisible = true;
+    Assert.True(first.Model.GetNode<Node3D>(first.Model.AttachmentsPath).Visible,
+      "Toggling the first instance must show its container.");
+    Assert.False(second.Model.AttachmentsVisible,
+      "The first instance's toggle reached the second instance's flag.");
+    Assert.False(second.Model.GetNode<Node3D>(second.Model.AttachmentsPath).Visible,
+      "The first instance's toggle reached the second instance's container.");
+  }
+
+  [TestCase]
+  public void TriggerToleratesUnconfiguredAttachments()
+  {
+    using var fixture = ModelFixture.FromScene(TriggerScene);
+    Assert.True(fixture.Model.AttachmentsPath.IsEmpty,
+      $"The '{TriggerScene}' root must keep its attachments path empty.");
+    Assert.True(fixture.Model.AttachmentsVisible,
+      $"The '{TriggerScene}' root keeps the general visible default.");
+    fixture.Model.AttachmentsVisible = false;
+    fixture.Model.AttachmentsVisible = true;
+  }
+
+  // ------------------------------------------------------------------
+
+  private static string DescribeRoot(Node root)
+  {
+    string script = (root.GetScript().AsGodotObject() as Script)?.ResourcePath ?? "";
+    return script.Length > 0 ? $"{root.GetClass()} with script '{script}'" : root.GetClass();
+  }
+
+  private static void AssertBodyShape(Node root, string meshPath, (string Shape, double Value)[] expected)
+  {
+    var mesh = root.GetNode<MeshInstance3D>(meshPath);
+    foreach ((string shape, double value) in expected)
+    {
+      int index = mesh.FindBlendShapeByName(shape);
+      Assert.True(index >= 0, $"The authored body mesh '{meshPath}' has no blend shape '{shape}'.");
+      float actual = mesh.GetBlendShapeValue(index);
+      Assert.True(Math.Abs(actual - value) <= TriangleEpsilon,
+        $"The authored body shape '{shape}' on '{meshPath}' reads {actual} instead of {value}.");
+    }
+  }
+
+  // Pieces resolve as plain Node in the wardrobe; visibility goes through the
+  // generic property.
+  private static bool IsVisible(Node node) => node.Get("visible").AsBool();
+
+  // Effective visibility for generically collected nodes: a false authored
+  // "visible" anywhere up the ancestor chain hides the node; ancestors
+  // without the property (plain Node) are skipped.
+  private static bool IsEffectivelyVisible(Node node)
+  {
+    for (Node current = node; current is not null; current = current.GetParentOrNull<Node>())
+    {
+      Variant visible = current.Get("visible");
+      if (visible.VariantType != Variant.Type.Nil && !visible.AsBool())
+        return false;
+    }
+    return true;
+  }
+
+  private static void AssertGarmentVisibility(Node root, string[] paths, bool expected, string when)
+  {
+    foreach (string path in paths)
+    {
+      Node node = root.GetNode(path);
+      Assert.True(IsVisible(node) == expected,
+        $"The Zhu Yuan garment '{path}' was {(IsVisible(node) ? "visible" : "hidden")} {when}.");
+    }
+  }
+
+  private static (Node originalPiece, Node switchedPiece) TriggerUpperBodyPieces(
+    Node root, CharacterModel wardrobe)
+  {
+    var components = (Godot.Collections.Dictionary)wardrobe.WardrobeConfiguration["components"];
+    var upperBody = (Godot.Collections.Dictionary)components["UpperBody"];
+    var pieces = (Godot.Collections.Array)upperBody["pieces"];
+    Node variant0 = null;
+    Node variant2 = null;
+    foreach (Variant pieceVariant in pieces)
+    {
+      var piece = (Godot.Collections.Dictionary)pieceVariant;
+      switch (piece["variant"].AsInt32())
+      {
+        case 0:
+          variant0 = root.GetNode<Node>(piece["path"].AsString());
+          break;
+        case 2:
+          variant2 = root.GetNode<Node>(piece["path"].AsString());
+          break;
+      }
+    }
+    Assert.True(variant0 is not null && variant2 is not null,
+      $"Trigger's authored UpperBody pieces must cover variants 0 and 2, found {pieces.Count} pieces.");
+    return (variant0, variant2);
+  }
+
+  private static Node? FindNamedDescendant(Node root, string name)
+  {
+    foreach (Node child in root.GetChildren())
+    {
+      if (child.Name == name)
+        return child;
+      Node? descendant = FindNamedDescendant(child, name);
+      if (descendant is not null)
+        return descendant;
+    }
+    return null;
+  }
+
+  private static void CollectDescendants<T>(Node root, SysColGeneric.List<T> results) where T : Node
+  {
+    foreach (Node child in root.GetChildren())
+    {
+      if (child is T match)
+        results.Add(match);
+      CollectDescendants(child, results);
+    }
+  }
+
+  private static ModelMeshMaskSetup MaskSetupOf(CharacterModel model, NodePath meshPath)
+  {
+    foreach (ModelMeshMaskSetup setup in model.MaskSetups)
+    {
+      if (setup.MeshPath == meshPath)
+        return setup;
+    }
+
+    throw new InvalidOperationException($"The model '{model.Name}' has no mask setup for '{meshPath}'.");
+  }
+
+  private static ArrayMesh? SourceMeshOf(CharacterModel model, NodePath meshPath)
+    => model.GetNode<MeshInstance3D>(meshPath).Mesh as ArrayMesh;
+}
