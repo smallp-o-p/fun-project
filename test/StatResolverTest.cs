@@ -1,4 +1,5 @@
 using FunProject.Stats;
+using FunProject.Weapons;
 using GdUnit4;
 
 [TestSuite]
@@ -34,6 +35,11 @@ public class StatResolverTest
     StatMod[] sources = [new CriticalChanceStatMod { Modifiers = [StatModifier.Add(99)] }];
     Assert.Equal(10f, TestData.MakeWeapon("Rifle").Resolve<RangeStat>(sources));
   }
+
+  [TestCase(TestName = "Concrete stat mods target stats by class without enum metadata")]
+  public void ConcreteStatModsTargetStatsByClass() =>
+    Assert.Equal(6f, new MeleeWeapon(TestData.MakeWeaponData())
+      .Resolve<RangeStat>([new RangeStatMod { Modifiers = [StatModifier.Add(4)] }]));
 
   [TestCase(TestName = "TryResolve returns None when the owner lacks the stat")]
   public void TryResolveNoneWhenMissing() =>

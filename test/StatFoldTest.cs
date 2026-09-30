@@ -43,4 +43,20 @@ public class StatFoldTest
   [TestCase(TestName = "CapMin clamps the final value even when an Add precedes it")]
   public void CapMinIsFinalClamp() =>
     Assert.Equal(0f, HasStats.Fold(5f, [StatModifier.Add(-50), StatModifier.CapMin(0)]));
+
+  [TestCase(TestName = "StatModifier Add applies flat bonus")]
+  public void StatModifierAddAppliesFlatBonus() =>
+    Assert.Equal(20f, HasStats.Fold(10f, [StatModifier.Add(10)]));
+
+  [TestCase(TestName = "StatModifier Multiply applies multiplier")]
+  public void StatModifierMultiplyAppliesMultiplier() =>
+    Assert.Equal(15f, HasStats.Fold(10f, [StatModifier.Multiply(1.5f)]));
+
+  [TestCase(TestName = "StatModifier CapMin prevents value below floor")]
+  public void StatModifierCapMinPreventsValueBelowFloor() =>
+    Assert.Equal(0f, HasStats.Fold(-10f, [StatModifier.CapMin(0)]));
+
+  [TestCase(TestName = "StatModifier CapMax prevents value above ceiling")]
+  public void StatModifierCapMaxPreventsValueAboveCeiling() =>
+    Assert.Equal(100f, HasStats.Fold(150f, [StatModifier.CapMax(100)]));
 }

@@ -1,4 +1,6 @@
+using System;
 using FunProject.Battle;
+using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
@@ -7,52 +9,93 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class EffectiveStatTest
 {
-  [TestCase(TestName = "Weapon EffectiveStat with no mods returns the base range")]
-  public void WeaponEffectiveStatBase()
+  private static FirearmWeaponData FirearmData(int range, int slots, Ammunition? ammo = null) =>
+    TestData.MakeFirearmWeaponData(range: range, modSlots: slots, ammo: ammo ?? new Ammunition());
+
+  private static FirearmWeapon Firearm(int range, int slots, Ammunition? ammo = null) =>
+    new(FirearmData(range, slots, ammo));
+
+  private static FirearmWeapon WithSlotMod(FirearmWeapon weapon, MultiStatMod mod)
   {
-    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(range: 10, modSlots: 1, ammo: new Ammunition()));
-    Assert.Equal(10f, weapon.EffectiveStat<RangeStat>());
+    weapon.GetModSlots()[0].Equip(mod);
+    return weapon;
   }
 
-  [TestCase(TestName = "Equipped MultiStatMod raises the weapon's effective range")]
-  public void WeaponEffectiveStatWithSlotMod()
+  private static MultiStatMod SlotMod(string name = "", params StatMod[] statMods) =>
+    new() { Name = name, StatMods = [.. statMods] };
+
+  [TestCase(TestName = "Slot and ammunition contributions compute the weapon's effective range")]
+  public void WeaponRangeContributionTable()
   {
-    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(range: 10, modSlots: 1, ammo: new Ammunition()));
-    weapon.GetModSlots()[0].Equip(new MultiStatMod { StatMods = [new RangeStatMod { Modifiers = [StatModifier.Add(6)] }] });
-    Assert.Equal(16f, weapon.EffectiveStat<RangeStat>());
+    (string Name, Func<FirearmWeapon> Make, float Expected)[] rows =
+    [
+      ("base range with empty slots and ammunition", () => Firearm(10, 1), 10f),
+      ("a slot Range Add6 raises it to 16",
+        () => WithSlotMod(Firearm(10, 1), SlotMod(statMods: [new RangeStatMod { Modifiers = [StatModifier.Add(6)] }])), 16f),
+      ("ammunition Range Add3 raises it to 13",
+        () => Firearm(10, 1, new Ammunition { Modifiers = [new RangeStatMod { Modifiers = [StatModifier.Add(3)] }] }), 13f),
+      // Separate mods: (10 + 5) * 1.5 = 22.5.
+      ("separate Add and PercentAdd mods stack to 22.5",
+        () =>
+        {
+          var data = FirearmData(1, 1);
+          data.RangeStat.BaseValue = 10;
+          return WithSlotMod(new FirearmWeapon(data), SlotMod(statMods:
+            [new RangeStatMod { Modifiers = [StatModifier.Add(5)] },
+              new RangeStatMod { Modifiers = [StatModifier.PercentAdd(0.5f)] }]));
+        }, 22.5f),
+      // One mod's own ops are bucketed: (10 + 5) * 1.2 = 18.
+      ("one mod's PercentAdd then Add bucket to 18",
+        () =>
+        {
+          var data = FirearmData(1, 1);
+          data.RangeStat.BaseValue = 10;
+          return WithSlotMod(new FirearmWeapon(data),
+            SlotMod("+20% Range", [new RangeStatMod { Modifiers = [StatModifier.PercentAdd(0.2f), StatModifier.Add(5)] }]));
+        }, 18f),
+    ];
+
+    foreach (var row in rows)
+      Assert.Equal(row.Expected, row.Make().EffectiveStat<RangeStat>(), row.Name);
   }
 
-  [TestCase(TestName = "Ammunition modifiers contribute to the weapon's effective stat")]
-  public void AmmunitionModsContribute()
+  [TestCase(TestName = "Multi-stat mods and separate slots each apply their own stat targets")]
+  public void WeaponMultiStatContributionTable()
   {
-    var data = TestData.MakeFirearmWeaponData(range: 10, modSlots: 1, ammo: new Ammunition());
-    data.DefaultAmmoData = new Ammunition { Modifiers = [new RangeStatMod { Modifiers = [StatModifier.Add(3)] }] };
-    var weapon = new FirearmWeapon(data);
-    Assert.Equal(13f, weapon.EffectiveStat<RangeStat>());
+    var tacticalData = FirearmData(1, 1);
+    var tactical = WithSlotMod(new FirearmWeapon(tacticalData), SlotMod("Tactical Overhaul",
+      [new CriticalChanceStatMod { Modifiers = [StatModifier.Add(2)] },
+        new RangeStatMod { Modifiers = [StatModifier.Add(6)] }]));
+    Assert.Equal(tacticalData.CriticalChanceStat.BaseValue + 2, tactical.EffectiveStat<CriticalChanceStat>());
+    Assert.Equal(tacticalData.RangeStat.BaseValue + 6, tactical.EffectiveStat<RangeStat>());
+
+    var splitData = FirearmData(1, 1);
+    splitData.Capabilities = [new ModSlotsCapabilityData { SlotCount = 2 }];
+    var split = new FirearmWeapon(splitData);
+    split.GetModSlots()[0].Equip(SlotMod(statMods: [new RangeStatMod { Modifiers = [StatModifier.Add(10)] }]));
+    split.GetModSlots()[1].Equip(SlotMod(statMods: [new CriticalChanceStatMod { Modifiers = [StatModifier.PercentAdd(0.5f)] }]));
+    Assert.Equal(splitData.RangeStat.BaseValue + 10, split.EffectiveStat<RangeStat>());
+    Assert.Equal(splitData.CriticalChanceStat.BaseValue * 1.5f, split.EffectiveStat<CriticalChanceStat>());
   }
 
-  [TestCase(TestName = "A combatant-slot Health mod raises MaxHealth")]
-  public void CombatantSlotModRaisesMaxHealth()
+  [TestCase(TestName = "Combatant slot and faction Health contributions raise MaxHealth")]
+  public void CombatantHealthContributionTable()
   {
     var faction = TestData.MakeFaction("Player");
-    var combatant = TestData.MakeCombatant("Alpha", faction, health: 20, modSlotCount: 1);
-    combatant.GetModSlots()[0].Equip(new MultiStatMod { StatMods = [new HealthStatMod { Modifiers = [StatModifier.Add(10)] }] });
-    var unit = new FunProject.Battle.BattleUnitState(1, combatant, None, None);
+    var slotted = TestData.MakeCombatant("Alpha", faction, health: 20, modSlotCount: 1);
+    slotted.GetModSlots()[0].Equip(SlotMod(statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(10)] }]));
+    var unit = new FunProject.Battle.BattleUnitState(1, slotted, None, None);
     Assert.Equal(30, unit.MaxHealth);
-  }
 
-  [TestCase(TestName = "Faction bonus and combatant slot stack on the same stat")]
-  public void FactionAndSlotStack()
-  {
-    var faction = new FunProject.Combatants.Faction(new FunProject.Combatants.FactionData
+    var bonusFaction = new FunProject.Combatants.Faction(new FunProject.Combatants.FactionData
     {
       Name = "Player",
       FactionBonuses = [new HealthStatMod { Modifiers = [StatModifier.Add(5)] }],
     });
-    var combatant = TestData.MakeCombatant("Alpha", faction, health: 20, modSlotCount: 1);
-    combatant.GetModSlots()[0].Equip(new MultiStatMod { StatMods = [new HealthStatMod { Modifiers = [StatModifier.Add(10)] }] });
-    var unit = new FunProject.Battle.BattleUnitState(1, combatant, None, None);
-    Assert.Equal(35, unit.MaxHealth);
+    var stacked = TestData.MakeCombatant("Alpha", bonusFaction, health: 20, modSlotCount: 1);
+    stacked.GetModSlots()[0].Equip(SlotMod(statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(10)] }]));
+    var stackedUnit = new FunProject.Battle.BattleUnitState(1, stacked, None, None);
+    Assert.Equal(35, stackedUnit.MaxHealth);
   }
 
   [TestCase(TestName = "BattleCombatQueries: a range mod brings a distant target into range")]

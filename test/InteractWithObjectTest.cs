@@ -23,8 +23,7 @@ public class InteractWithObjectTest
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
     var unit = battle.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
-    var placement = battle.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(), point));
-    var bomb = placement.EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
+    var bomb = battle.PlaceObject(MakeInteractiveObjectData(), point.Raw);
     battle.ClearEvents();
 
     int apBefore = unit.CurrentActionPoints;
@@ -51,10 +50,7 @@ public class InteractWithObjectTest
       enemy: new("Hostile"),
       start: false);
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(5, 0, 1));
-    BattleActionExecResult placement = battle.Submit(
-      BattleAction.PlaceObject(MakeInteractiveObjectData(actionPointCost: 2), point));
-    BattleObjectState bomb = placement.EventsThatOccurred.ToArray()
-      .SingleEvent<ObjectPlacedBattleEvent>().Object;
+    BattleObjectState bomb = battle.PlaceObject(MakeInteractiveObjectData(actionPointCost: 2), point.Raw);
     battle.Start();
 
     IReadOnlyList<UnitAction> playerActions = battle.Query(
@@ -96,8 +92,7 @@ public class InteractWithObjectTest
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
     var unit = battle.Spawn(TestData.MakeCombatant("A", player, actionPoints: 1), new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
-    var placement = battle.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(actionPointCost: 2), point));
-    var bomb = placement.EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
+    var bomb = battle.PlaceObject(MakeInteractiveObjectData(actionPointCost: 2), point.Raw);
     battle.ClearEvents();
 
     Assert.Throws<InvalidOperationException>(() => battle.Submit(
@@ -118,14 +113,12 @@ public class InteractWithObjectTest
     using var local = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
     var localUnit = local.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint localPoint = local.At(new Vector3I(2, 0, 1));
-    var localPlacement = local.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(), localPoint));
-    var localBomb = localPlacement.EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
+    var localBomb = local.PlaceObject(MakeInteractiveObjectData(), localPoint.Raw);
 
     using var foreign = new BattleFixture(new Vector3I(4, 1, 4), [TestData.MakeFaction("P"), TestData.MakeFaction("E")]);
     foreign.Spawn(TestData.MakeCombatant("A", foreign.PlayerFaction), new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint foreignPoint = foreign.At(new Vector3I(2, 0, 1));
-    var foreignPlacement = foreign.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(), foreignPoint));
-    var foreignBomb = foreignPlacement.EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
+    var foreignBomb = foreign.PlaceObject(MakeInteractiveObjectData(), foreignPoint.Raw);
 
     LiveObject foreignProof = foreign.Live(foreignBomb);
 
@@ -148,8 +141,7 @@ public class InteractWithObjectTest
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
     var unit = battle.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
-    var placement = battle.Submit(BattleAction.PlaceObject(MakeInteractiveObjectData(), point));
-    var bomb = placement.EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
+    var bomb = battle.PlaceObject(MakeInteractiveObjectData(), point.Raw);
 
     AliveUnit unitProof = battle.Alive(unit);
     LiveObject objectProof = battle.Live(bomb);

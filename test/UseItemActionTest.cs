@@ -6,36 +6,24 @@ using Godot;
 [RequireGodotRuntime]
 public class UseItemActionTest
 {
-  [TestCase(TestName = "UseItem spends one charge and default AP while charges remain")]
-  public void UseItemSpendsOneChargeAndDefaultApWhileChargesRemain()
+  [TestCase("Medkit", 2, true, 1, TestName = "a Medkit with two charges keeps one after use")]
+  [TestCase("Stim", 1, false, 0, TestName = "a one-charge Stim is removed with its last charge")]
+  public void SuccessfulUse(string item, int maxCharges, bool remainsInInventory, int expectedCurrent)
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(1, 0, 1), actionPoints: 4);
     var unit = battle.Unit;
-    var usable = TestData.MakeUsableItem("Medkit", maxCharges: 2);
+    var usable = TestData.MakeUsableItem(item, maxCharges: maxCharges);
     unit.AddInventoryItem(usable.Item);
     battle.ClearEvents();
 
-    var result = battle.Use(unit, usable);
+    battle.Use(unit, usable);
 
-    Assert.True(unit.HasInventoryItem(usable.Item));
-    Assert.Equal(1, usable.Capability.Current);
+    Assert.Equal(remainsInInventory, unit.HasInventoryItem(usable.Item));
+    Assert.Equal(expectedCurrent, usable.Capability.Current);
     Assert.Equal(4 - BattleSession.DefaultUseItemActionPointCost, unit.CurrentActionPoints);
     var usedEvent = battle.Events.SingleEvent<ItemUsedBattleEvent>();
     Assert.True(ReferenceEquals(unit, usedEvent.Unit));
     Assert.True(ReferenceEquals(usable.Item, usedEvent.Item));
-  }
-
-  [TestCase(TestName = "UseItem removes the item when the last charge is spent")]
-  public void UseItemRemovesTheItemWhenTheLastChargeIsSpent()
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(1, 0, 1));
-    var unit = battle.Unit;
-    var usable = TestData.MakeUsableItem("Stim", maxCharges: 1);
-    unit.AddInventoryItem(usable.Item);
-
-    battle.Use(unit, usable);
-
-    Assert.False(unit.HasInventoryItem(usable.Item));
   }
 
   [TestCase(TestName = "Using a depleted item is interrupted without spending AP or raising the event")]

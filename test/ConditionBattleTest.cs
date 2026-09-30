@@ -140,12 +140,7 @@ public class ConditionBattleTest
       roster: [TestData.MakeEntry("Alpha", TestData.MakeCombatantData(health: 100, aim: 60))]));
     var alpha = campaign.State.Roster[0];
 
-    using var firstBattle = new BattleFixture(new Vector3I(5, 1, 5), [campaign.State.PlayerFaction]);
-    var wounded = firstBattle.Spawn(alpha, Vector3I.Zero);
-    firstBattle.ApplyDamage(wounded, 25);
-    firstBattle.Session.EndBattle(BattleOutcome.Victory);
-    campaign.Session.ApplyMissionReturn(
-      firstBattle.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight());
+    campaign.ReturnFromMission((alpha, 25, 0));
     Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier); // Injured
     Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier); // Tired
 

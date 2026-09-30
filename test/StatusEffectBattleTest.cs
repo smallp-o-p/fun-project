@@ -1,5 +1,7 @@
+using System;
 using FunProject.Battle;
 using FunProject.Core;
+using FunProject.Items.Effects;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
@@ -8,25 +10,49 @@ using Godot;
 [RequireGodotRuntime]
 public partial class StatusEffectBattleTest
 {
-  [TestCase(TestName = "A hit applies the packet's status after the damage event")]
-  public void HitAppliesPacketStatus()
+  [TestCase(TestName = "Attack-borne statuses: applied after damage, single instance on reapply, nothing on a kill")]
+  public void StatusAttackRows()
   {
-    var burn = TestData.MakeBurn();
-    using var battle = BattleFixture.Duel(
-      hitChanceCalculator: new AlwaysHitCalculator(),
-      player: new("Alpha", Weapon: TestData.MakeStatusWeapon(burn)),
-      enemy: new("Hostile", Weapon: TestData.MakeWeapon("Enemy Rifle")));
-    var target = battle.EnemyUnit;
-    battle.ClearEvents();
+    (string Name, int EnemyHealth, int WeaponDamage, int Shots,
+      Action<BattleFixture, BattleUnitState, DamageOverTimeStatusSpecData, string> Verify)[] rows =
+    [
+      ("a hit applies the packet's status after the damage event", 20, 3, 1, (battle, target, burn, name) =>
+      {
+        var active = target.ActiveStatusEffects.AsValueEnumerable().Single();
+        Assert.Equal(burn, active.Spec, name);
+        Assert.Equal(2, active.RemainingTurns, name);
+        var appliedEvent = battle.Events.SingleEvent<UnitStatusEffectAppliedBattleEvent>();
+        Assert.Equal(2, appliedEvent.RemainingTurns, name);
+        battle.Events.EventBefore<UnitDamagedBattleEvent, UnitStatusEffectAppliedBattleEvent>();
+      }),
+      ("re-applying a status keeps a single instance", 20, 3, 2, (battle, target, burn, name) =>
+      {
+        Assert.Equal(1, target.ActiveStatusEffects.Count, name);
+        Assert.Equal(2, battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Count(), name);
+      }),
+      ("a killing blow does not apply statuses", 4, 5, 1, (battle, target, burn, name) =>
+      {
+        Assert.True(target.IsDead, name);
+        Assert.False(battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Any(), name);
+        Assert.Equal(0, target.ActiveStatusEffects.Count, name);
+      }),
+    ];
 
-    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
+    foreach (var row in rows)
+    {
+      var burn = TestData.MakeBurn();
+      using var battle = BattleFixture.Duel(
+        hitChanceCalculator: new AlwaysHitCalculator(),
+        player: new("Alpha", Weapon: TestData.MakeStatusWeapon(burn, damage: row.WeaponDamage)),
+        enemy: new("Hostile", Health: row.EnemyHealth, Weapon: TestData.MakeWeapon("Enemy Rifle")));
+      var target = battle.EnemyUnit;
+      battle.ClearEvents();
 
-    var active = target.ActiveStatusEffects.AsValueEnumerable().Single();
-    Assert.Equal(burn, active.Spec);
-    Assert.Equal(2, active.RemainingTurns);
-    var appliedEvent = battle.Events.SingleEvent<UnitStatusEffectAppliedBattleEvent>();
-    Assert.Equal(2, appliedEvent.RemainingTurns);
-    battle.Events.EventBefore<UnitDamagedBattleEvent, UnitStatusEffectAppliedBattleEvent>();
+      for (int i = 0; i < row.Shots; i++)
+        battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
+
+      row.Verify(battle, target, burn, row.Name);
+    }
   }
 
   [TestCase(TestName = "RequiresHealthDamage is blocked by absorbing armor and passes once damage spills")]
@@ -97,42 +123,6 @@ public partial class StatusEffectBattleTest
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
     Assert.Equal(shouldApply, target.ActiveStatusEffects.AsValueEnumerable().Any());
-  }
-
-  [TestCase(TestName = "Re-applying a status keeps a single instance")]
-  public void ReapplyingKeepsSingleInstance()
-  {
-    var burn = TestData.MakeBurn();
-    using var battle = BattleFixture.Duel(
-      hitChanceCalculator: new AlwaysHitCalculator(),
-      player: new("Alpha", Weapon: TestData.MakeStatusWeapon(burn)),
-      enemy: new("Hostile", Weapon: TestData.MakeWeapon("Enemy Rifle")));
-    var target = battle.EnemyUnit;
-    battle.ClearEvents();
-
-    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
-    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
-
-    Assert.Equal(1, target.ActiveStatusEffects.Count);
-    Assert.Equal(2, battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Count());
-  }
-
-  [TestCase(TestName = "A killing blow does not apply statuses")]
-  public void KillingBlowDoesNotApplyStatuses()
-  {
-    var burn = TestData.MakeBurn();
-    using var battle = BattleFixture.Duel(
-      hitChanceCalculator: new AlwaysHitCalculator(),
-      player: new("Alpha", Weapon: TestData.MakeStatusWeapon(burn, damage: 5)),
-      enemy: new("Hostile", Health: 4, Weapon: TestData.MakeWeapon("Enemy Rifle")));
-    var target = battle.EnemyUnit;
-    battle.ClearEvents();
-
-    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
-
-    Assert.True(target.IsDead);
-    Assert.False(battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Any());
-    Assert.Equal(0, target.ActiveStatusEffects.Count);
   }
 
   [TestCase(TestName = "Faction turn auto-ends when remaining units are immobilized")]

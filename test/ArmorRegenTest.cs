@@ -55,33 +55,36 @@ public partial class ArmorRegenTest
     Assert.Equal(1, armor.Capability.RegenDelayRemaining);
   }
 
-  [TestCase(TestName = "Damage mid-countdown re-arms the delay")]
-  public void DamageMidCountdownReArmsDelay()
+  [TestCase(TestName = "Damage re-arms the regen delay: mid-countdown, stun-only, and health-only over depleted armor")]
+  public void DamageRearmRows()
   {
-    var armor = TestData.MakeArmor("Recharger", armor: 10, element: Element.Thermal, regenDelayTurns: 2, regenPerTurn: 3);
-    using var battle = BattleFixture.Duel(
-      player: new("Alpha", Health: 30, Weapon: TestData.MakeWeapon("Rifle"), Armor: armor));
-    battle.ApplyDamage(battle.PlayerUnit, 3);
-    battle.EndFactionTurn(battle.PlayerFaction);   // delay 2 -> 1
+    (string Name, int ArmorMax, int InitialDamage, int? CurrentAfterInitial, int? DelayAfterTurn,
+      int NextDamage, DamageKind NextKind, int FinalDelay)[] rows =
+    [
+      ("damage mid-countdown re-arms the delay", 10, 3, null, null, 1, DamageKind.Health, 2),
+      ("stun-only damage preserves the existing regen delay", 10, 3, null, 1, 8, DamageKind.Stun, 1),
+      // Armor is depleted: this damage is health-only, and must still reset the countdown.
+      ("health-only damage with depleted armor re-arms the delay", 4, 4, 0, 1, 2, DamageKind.Health, 2),
+    ];
 
-    battle.ApplyDamage(battle.PlayerUnit, 1);
+    foreach (var row in rows)
+    {
+      var armor = TestData.MakeArmor("Recharger", armor: row.ArmorMax, element: Element.Thermal,
+        regenDelayTurns: 2, regenPerTurn: 3);
+      using var battle = BattleFixture.Duel(
+        player: new("Alpha", Health: 30, Weapon: TestData.MakeWeapon("Rifle"), Armor: armor));
+      battle.ApplyDamage(battle.PlayerUnit, row.InitialDamage);
+      if (row.CurrentAfterInitial is int current)
+        Assert.Equal(current, armor.Capability.Current, row.Name);
 
-    Assert.Equal(2, armor.Capability.RegenDelayRemaining);
-  }
+      battle.EndFactionTurn(battle.PlayerFaction);   // delay 2 -> 1
+      if (row.DelayAfterTurn is int delay)
+        Assert.Equal(delay, armor.Capability.RegenDelayRemaining, row.Name);
 
-  [TestCase]
-  public void StunOnlyDamagePreservesTheExistingRegenDelay()
-  {
-    var armor = TestData.MakeArmor("Recharger", armor: 10, element: Element.Thermal, regenDelayTurns: 2, regenPerTurn: 3);
-    using var battle = BattleFixture.Duel(
-      player: new("Alpha", Health: 30, Weapon: TestData.MakeWeapon("Rifle"), Armor: armor));
-    battle.ApplyDamage(battle.PlayerUnit, 3);
-    battle.EndFactionTurn(battle.PlayerFaction);   // delay 2 -> 1
-    Assert.Equal(1, armor.Capability.RegenDelayRemaining);
+      battle.ApplyDamage(battle.PlayerUnit, row.NextDamage, row.NextKind);
 
-    battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
-
-    Assert.Equal(1, armor.Capability.RegenDelayRemaining);
+      Assert.Equal(row.FinalDelay, armor.Capability.RegenDelayRemaining, row.Name);
+    }
   }
 
   [TestCase(TestName = "Armor without a regen rate never regenerates")]
@@ -134,24 +137,6 @@ public partial class ArmorRegenTest
     Assert.Equal(7, regenEvent.CurrentArmor);
     battle.Events.EventBefore<TurnEndedBattleEvent, UnitArmorRegeneratedBattleEvent>();
     battle.Events.EventBefore<UnitArmorRegeneratedBattleEvent, TurnStartedBattleEvent>();
-  }
-
-  [TestCase(TestName = "Health-only damage with depleted armor still re-arms the delay")]
-  public void HealthOnlyDamageWithDepletedArmorReArmsDelay()
-  {
-    var armor = TestData.MakeArmor("Recharger", armor: 4, element: Element.Thermal, regenDelayTurns: 2, regenPerTurn: 3);
-    using var battle = BattleFixture.Duel(
-      player: new("Alpha", Health: 30, Weapon: TestData.MakeWeapon("Rifle"), Armor: armor));
-    battle.ApplyDamage(battle.PlayerUnit, 4);
-    Assert.Equal(0, armor.Capability.Current);
-
-    battle.EndFactionTurn(battle.PlayerFaction);   // delay 2 -> 1
-    Assert.Equal(1, armor.Capability.RegenDelayRemaining);
-
-    // Armor is depleted: this damage is health-only, and must still reset the countdown.
-    battle.ApplyDamage(battle.PlayerUnit, 2);
-
-    Assert.Equal(2, armor.Capability.RegenDelayRemaining);
   }
 
   [TestCase(TestName = "A turn-end DoT tick re-arms the delay and suppresses that turn's regen")]

@@ -6,40 +6,17 @@ using Godot;
 [RequireGodotRuntime]
 public partial class CoverRulesTest
 {
-  [TestCase(TestName = "GetApproach maps cardinal deltas to compass flags")]
-  public void GetApproachMapsCardinalDeltasToCompassFlags()
-  {
-    Vector3I defender = new(4, 0, 4);
-
-    Assert.Equal(CoverDirections.North, CoverRules.GetApproach(new Vector3I(4, 0, 1), defender));
-    Assert.Equal(CoverDirections.South, CoverRules.GetApproach(new Vector3I(4, 0, 7), defender));
-    Assert.Equal(CoverDirections.East, CoverRules.GetApproach(new Vector3I(7, 0, 4), defender));
-    Assert.Equal(CoverDirections.West, CoverRules.GetApproach(new Vector3I(1, 0, 4), defender));
-  }
-
-  [TestCase(TestName = "GetApproach combines components for diagonal attackers")]
-  public void GetApproachCombinesComponentsForDiagonalAttackers()
-  {
-    Vector3I defender = new(4, 0, 4);
-
-    Assert.Equal(CoverDirections.North | CoverDirections.East, CoverRules.GetApproach(new Vector3I(6, 0, 1), defender));
-    Assert.Equal(CoverDirections.South | CoverDirections.West, CoverRules.GetApproach(new Vector3I(2, 0, 6), defender));
-  }
-
-  [TestCase(TestName = "GetApproach returns none for the same tile")]
-  public void GetApproachReturnsNoneForTheSameTile()
-  {
-    Vector3I defender = new(4, 0, 4);
-
-    Assert.Equal(CoverDirections.None, CoverRules.GetApproach(defender, defender));
-  }
-
-  [TestCase(TestName = "GetApproach ignores vertical difference")]
-  public void GetApproachIgnoresVerticalDifference()
-  {
-    Assert.Equal(CoverDirections.North, CoverRules.GetApproach(new Vector3I(4, 3, 1), new Vector3I(4, 0, 4)));
-    Assert.Equal(CoverDirections.None, CoverRules.GetApproach(new Vector3I(4, 3, 4), new Vector3I(4, 0, 4)));
-  }
+  [TestCase(4, 0, 1, CoverDirections.North, TestName = "North approach")]
+  [TestCase(4, 0, 7, CoverDirections.South, TestName = "South approach")]
+  [TestCase(7, 0, 4, CoverDirections.East, TestName = "East approach")]
+  [TestCase(1, 0, 4, CoverDirections.West, TestName = "West approach")]
+  [TestCase(6, 0, 1, CoverDirections.North | CoverDirections.East, TestName = "North-east approach")]
+  [TestCase(2, 0, 6, CoverDirections.South | CoverDirections.West, TestName = "South-west approach")]
+  [TestCase(4, 0, 4, CoverDirections.None, TestName = "Same tile yields no approach")]
+  [TestCase(4, 3, 1, CoverDirections.North, TestName = "Vertical difference ignored, north approach")]
+  [TestCase(4, 3, 4, CoverDirections.None, TestName = "Vertical difference ignored, same column")]
+  public void GetApproach(int x, int y, int z, CoverDirections expected) =>
+    Assert.Equal(expected, CoverRules.GetApproach(new(x, y, z), new(4, 0, 4)));
 
   [TestCase(TestName = "Applies requires an overlapping direction and a positive amount")]
   public void AppliesRequiresOverlappingDirectionAndPositiveAmount()

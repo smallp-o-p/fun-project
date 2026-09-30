@@ -139,83 +139,77 @@ public class DamagePipelineTest
     Assert.False(mod.StatContributions.AsValueEnumerable().Any());
   }
 
-  [TestCase(TestName = "EmitDamage derives the frame's packets from base damage")]
-  public void EmitDamageDerivesFramePackets()
+  private static FirearmWeapon EmissionWeapon(int damage, WeaponFrameData frame = null, Ammunition ammo = null,
+    EquippableMod slotMod = null)
   {
-    var frame = TestData.MakeFrame((Element.Thermal, 0.7f), (Element.Electrical, 0.3f));
-    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 6, frame: frame));
-
-    var bundle = weapon.EmitDamage();
-
-    Assert.Equal(2, bundle.Count);
-    Assert.Equal(new Damage(4, Element.Thermal), bundle[0]);
-    Assert.Equal(new Damage(2, Element.Electrical), bundle[1]);
+    var weapon = new FirearmWeapon(
+      TestData.MakeFirearmWeaponData(damage: damage, frame: frame ?? TestData.MakeFrame(), ammo: ammo, modSlots: 1));
+    if (slotMod != null)
+      weapon.GetModSlots()[0].Equip(slotMod);
+    return weapon;
   }
 
-  [TestCase(TestName = "EmitDamage applies slot bundle mods in slot order then array order")]
-  public void EmitDamageAppliesSlotModsInOrder()
+  private static DamageBundleMod BundleMod(params StatModifier[] ops) =>
+    new() { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [.. ops] }] };
+
+  [TestCase(TestName = "Emission pipeline: frame derivation, slot/ammo ordering, emission-only filtering, stat isolation")]
+  public void EmissionTable()
   {
-    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: TestData.MakeFrame(), modSlots: 1));
-    weapon.GetModSlots()[0].Equip(new DamageBundleEquippableMod
+    (string Name, Func<FirearmWeapon> Make, Damage[] Expected, bool Whole)[] rows =
+    [
+      ("frame derivation with rounding",
+        () => new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 6,
+          frame: TestData.MakeFrame((Element.Thermal, 0.7f), (Element.Electrical, 0.3f)))),
+        [new(4, Element.Thermal), new(2, Element.Electrical)], true),
+      // (4 + 2) * 2 = 12; reversed order would give 4 * 2 + 2 = 10.
+      ("slot bundle mods apply Add then Multiply in order",
+        () => EmissionWeapon(4, slotMod: new DamageBundleEquippableMod
+        {
+          BundleMods = [BundleMod([StatModifier.Add(2)]), BundleMod([StatModifier.Multiply(2f)])],
+        }),
+        [new(12, Element.Kinetic)], false),
+      // Slots first: 4 * 2 = 8, then ammo: 8 + 1 = 9. Ammo-first would give (4 + 1) * 2 = 10.
+      ("ammunition bundle mods apply after slot mods",
+        () => EmissionWeapon(4,
+          ammo: new Ammunition { DamageMods = [BundleMod([StatModifier.Add(1)])] },
+          slotMod: new DamageBundleEquippableMod { BundleMods = [BundleMod([StatModifier.Multiply(2f)])] }),
+        [new(9, Element.Kinetic)], false),
+      // 4 -> -6 mid-pipeline, then -6 -> 14: the intermediate dip must survive, not merely positive final input.
+      ("non-positive mid-pipeline packets still filter only at emission",
+        () => EmissionWeapon(4, slotMod: new DamageBundleEquippableMod
+        {
+          BundleMods = [BundleMod([StatModifier.Add(-10)]), BundleMod([StatModifier.Add(20)])],
+        }),
+        [new(14, Element.Kinetic)], false),
+      ("a packet zeroed at the end of the pipeline is dropped",
+        () => EmissionWeapon(4, frame: TestData.MakeFrame((Element.Kinetic, 1f), (Element.Thermal, 1f)),
+          slotMod: new DamageBundleEquippableMod
+          {
+            BundleMods = [new DamageBundleMod
+            {
+              PacketModifiers = [new PacketModifier { Element = Element.Kinetic, Ops = [StatModifier.Multiply(0f)] }],
+            }],
+          }),
+        [new(4, Element.Thermal)], true),
+      ("stat mods on other stats leave the bundle untouched",
+        () => EmissionWeapon(4, slotMod: new MultiStatMod
+        {
+          StatMods = [new RangeStatMod { Modifiers = [StatModifier.Add(10)] }],
+        }),
+        [new(4, Element.Kinetic)], false),
+    ];
+
+    foreach (var row in rows)
     {
-      BundleMods =
-      [
-        new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(2)] }] },
-        new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Multiply(2f)] }] },
-      ],
-    });
-
-    // (4 + 2) * 2 = 12; reversed order would give 4 * 2 + 2 = 10.
-    Assert.Equal(new Damage(12, Element.Kinetic), weapon.EmitDamage()[0]);
-  }
-
-  [TestCase(TestName = "EmitDamage applies ammunition bundle mods after slot mods")]
-  public void EmitDamageAppliesAmmoModsAfterSlotMods()
-  {
-    var ammo = new Ammunition
-    {
-      DamageMods = [new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(1)] }] }],
-    };
-    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: TestData.MakeFrame(), ammo: ammo, modSlots: 1));
-    weapon.GetModSlots()[0].Equip(new DamageBundleEquippableMod
-    {
-      BundleMods = [new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Multiply(2f)] }] }],
-    });
-
-    // slots first: 4 * 2 = 8, then ammo: 8 + 1 = 9. Ammo-first would give (4 + 1) * 2 = 10.
-    Assert.Equal(new Damage(9, Element.Kinetic), weapon.EmitDamage()[0]);
-  }
-
-  [TestCase(TestName = "EmitDamage drops packets at or below zero only at emission")]
-  public void EmitDamageDropsNonPositivePacketsAtEmissionOnly()
-  {
-    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: TestData.MakeFrame(), modSlots: 1));
-    weapon.GetModSlots()[0].Equip(new DamageBundleEquippableMod
-    {
-      BundleMods =
-      [
-        new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(-10)] }] },  // 4 -> -6 mid-pipeline
-        new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(20)] }] },   // -6 -> 14: restored
-      ],
-    });
-
-    Assert.Equal(new Damage(14, Element.Kinetic), weapon.EmitDamage()[0]);
-  }
-
-  [TestCase(TestName = "EmitDamage drops a packet zeroed at the end of the pipeline")]
-  public void EmitDamageDropsZeroedPacket()
-  {
-    var frame = TestData.MakeFrame((Element.Kinetic, 1f), (Element.Thermal, 1f));
-    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: frame, modSlots: 1));
-    weapon.GetModSlots()[0].Equip(new DamageBundleEquippableMod
-    {
-      BundleMods = [new DamageBundleMod { PacketModifiers = [new PacketModifier { Element = Element.Kinetic, Ops = [StatModifier.Multiply(0f)] }] }],
-    });
-
-    var bundle = weapon.EmitDamage();
-
-    Assert.Equal(1, bundle.Count);
-    Assert.Equal(new Damage(4, Element.Thermal), bundle[0]);
+      Damage[] bundle = [.. row.Make().EmitDamage()];
+      if (row.Whole)
+      {
+        Assert.Equal(row.Expected.Length, bundle.Length, row.Name);
+        Assert.True(bundle.AsValueEnumerable().SequenceEqual(row.Expected), row.Name);
+      }
+      else
+        Assert.Equal(row.Expected[0], bundle[0], row.Name);
+    }
   }
 
   [TestCase(TestName = "Weapon construction rejects a missing or empty frame")]
@@ -226,14 +220,5 @@ public class DamagePipelineTest
     Assert.Throws<InvalidOperationException>(() => new FirearmWeapon(missingFrame));
     Assert.Throws<InvalidOperationException>(
       () => new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: new WeaponFrameData { Packets = [] })));
-  }
-
-  [TestCase(TestName = "Stat mods on other stats leave the emitted bundle untouched")]
-  public void StatModsOnOtherStatsLeaveBundleUntouched()
-  {
-    var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: TestData.MakeFrame(), modSlots: 1));
-    weapon.GetModSlots()[0].Equip(new MultiStatMod { StatMods = [new RangeStatMod { Modifiers = [StatModifier.Add(10)] }] });
-
-    Assert.Equal(new Damage(4, Element.Kinetic), weapon.EmitDamage()[0]);
   }
 }

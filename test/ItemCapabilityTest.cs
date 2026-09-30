@@ -33,14 +33,6 @@ public class ItemCapabilityTest
     Assert.True(capability.IsDepleted);
   }
 
-  [TestCase(TestName = "Mod slots capability creates slot instances")]
-  public void ModSlotsCapabilityCreatesSlotInstances()
-  {
-    var capability = (ModSlotsCapability)new ModSlotsCapabilityData { SlotCount = 2 }.CreateRuntime();
-
-    Assert.Equal(2, capability.Slots.Count);
-  }
-
   [TestCase(TestName = "FindCapability returns Some for attached and None for absent")]
   public void FindCapabilityReturnsSomeForAttachedAndNoneForAbsent()
   {

@@ -24,64 +24,31 @@ public partial class StandardHitChanceCalculatorTest
     return new AttackContext(attacker, weapon, attackerPoint, defenderPoint, board);
   }
 
-  [TestCase(TestName = "Base chance is the attacker's aim when no cover applies")]
-  public void BaseChanceIsAttackerAimWhenNoCoverApplies()
+  [TestCase(65, CoverDirections.None, 0, 4, 1, 65, 0, TestName = "BaseChanceIsAttackerAimWhenNoCoverApplies")]
+  [TestCase(65, CoverDirections.North, 40, 4, 1, 25, 1, TestName = "ApplicableCoverSubtractsItsAmountAsNamedModifier")]
+  [TestCase(65, CoverDirections.North, 40, 6, 1, 25, 1, TestName = "DiagonalAttackerIsBlockedWhenEitherComponentIsCovered")]
+  [TestCase(65, CoverDirections.North, 40, 4, 7, 65, 0, TestName = "FlankingAttackerIgnoresCover")]
+  [TestCase(30, CoverDirections.North, 50, 4, 1, 0, 1, TestName = "FinalChanceClampsToZero")]
+  [TestCase(120, CoverDirections.None, 0, 4, 1, 100, 0, TestName = "FinalChanceClampsToOneHundred")]
+  public void HitChance(
+    int aim,
+    CoverDirections coverDirections,
+    int coverAmount,
+    int attackX,
+    int attackZ,
+    int expectedFinal,
+    int expectedModifiers)
   {
     var breakdown = new StandardHitChanceCalculator().Calculate(
-      MakeContext(65, TileCover.None, new Vector3I(4, 0, 1), new Vector3I(4, 0, 4)));
+      MakeContext(aim, new TileCover(coverDirections, coverAmount), new Vector3I(attackX, 0, attackZ), new Vector3I(4, 0, 4)));
 
-    Assert.Equal(65, breakdown.BaseChance);
-    Assert.Equal(0, breakdown.Modifiers.Count);
-    Assert.Equal(65, breakdown.FinalChance);
-  }
-
-  [TestCase(TestName = "Applicable cover subtracts its amount as a named modifier")]
-  public void ApplicableCoverSubtractsItsAmountAsNamedModifier()
-  {
-    var breakdown = new StandardHitChanceCalculator().Calculate(
-      MakeContext(65, new TileCover(CoverDirections.North, 40), new Vector3I(4, 0, 1), new Vector3I(4, 0, 4)));
-
-    Assert.Equal(65, breakdown.BaseChance);
-    Assert.Equal(1, breakdown.Modifiers.Count);
-    Assert.Equal(StandardHitChanceCalculator.CoverModifierLabel, breakdown.Modifiers[0].Label);
-    Assert.Equal(-40, breakdown.Modifiers[0].Amount);
-    Assert.Equal(25, breakdown.FinalChance);
-  }
-
-  [TestCase(TestName = "Diagonal attacker is blocked when either component is covered")]
-  public void DiagonalAttackerIsBlockedWhenEitherComponentIsCovered()
-  {
-    var breakdown = new StandardHitChanceCalculator().Calculate(
-      MakeContext(65, new TileCover(CoverDirections.North, 40), new Vector3I(6, 0, 1), new Vector3I(4, 0, 4)));
-
-    Assert.Equal(25, breakdown.FinalChance);
-  }
-
-  [TestCase(TestName = "Flanking attacker ignores cover")]
-  public void FlankingAttackerIgnoresCover()
-  {
-    var breakdown = new StandardHitChanceCalculator().Calculate(
-      MakeContext(65, new TileCover(CoverDirections.North, 40), new Vector3I(4, 0, 7), new Vector3I(4, 0, 4)));
-
-    Assert.Equal(0, breakdown.Modifiers.Count);
-    Assert.Equal(65, breakdown.FinalChance);
-  }
-
-  [TestCase(TestName = "Final chance clamps to zero")]
-  public void FinalChanceClampsToZero()
-  {
-    var breakdown = new StandardHitChanceCalculator().Calculate(
-      MakeContext(30, new TileCover(CoverDirections.North, 50), new Vector3I(4, 0, 1), new Vector3I(4, 0, 4)));
-
-    Assert.Equal(0, breakdown.FinalChance);
-  }
-
-  [TestCase(TestName = "Final chance clamps to one hundred")]
-  public void FinalChanceClampsToOneHundred()
-  {
-    var breakdown = new StandardHitChanceCalculator().Calculate(
-      MakeContext(120, TileCover.None, new Vector3I(4, 0, 1), new Vector3I(4, 0, 4)));
-
-    Assert.Equal(100, breakdown.FinalChance);
+    Assert.Equal(aim, breakdown.BaseChance);
+    Assert.Equal(expectedModifiers, breakdown.Modifiers.Count);
+    if (expectedModifiers == 1)
+    {
+      Assert.Equal(StandardHitChanceCalculator.CoverModifierLabel, breakdown.Modifiers[0].Label);
+      Assert.Equal(-coverAmount, breakdown.Modifiers[0].Amount);
+    }
+    Assert.Equal(expectedFinal, breakdown.FinalChance);
   }
 }

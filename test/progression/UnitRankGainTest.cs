@@ -6,84 +6,66 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class UnitRankGainTest
 {
-  [TestCase(TestName = "A gain at full factor accrues unchanged")]
-  public void GainAtFullFactorAccrues()
+  [TestCase(TestName = "Rank gain: scaling, per-rank factor, floor at one, overflow recut, chaining, max remainder")]
+  public void GainTable()
   {
-    var rank = new UnitRank(TestData.MakeRankTable(
-      new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
-      new RankLevelData { Name = "Squaddie", GainFactorPercent = 85 }));
-    rank.Gain(40);
-    Assert.Equal(1, rank.Level);
-    Assert.Equal(40, rank.Xp);
-    Assert.Equal("Rookie", rank.RankName);
-  }
+    (string Name, (string Level, int Factor)[] Levels, int Gain, bool MaxBefore, Action<UnitRank, string> Verify)[] rows =
+    [
+      ("a gain at full factor accrues unchanged",
+        [("Rookie", 100), ("Squaddie", 85)], 40, false, (rank, name) =>
+        {
+          Assert.Equal(1, rank.Level, name);
+          Assert.Equal(40, rank.Xp, name);
+          Assert.Equal("Rookie", rank.RankName, name);
+        }),
+      ("a gain scales by the current rank's factor",
+        [("Rookie", 50), ("Squaddie", 50)], 40, false, (rank, name) => Assert.Equal(20, rank.Xp, name)),
+      // 0.5 floored would be 0 — must accrue 1.
+      ("a scaled gain below one accrues one",
+        [("Rookie", 10), ("Squaddie", 10)], 5, false, (rank, name) => Assert.Equal(1, rank.Xp, name)),
+      // 120 - 100 = 20 carried, cut by Squaddie's 50% -> 10.
+      ("a level-up carries overflow cut by the new rank's factor",
+        [("Rookie", 100), ("Squaddie", 50), ("Corporal", 50)], 120, false, (rank, name) =>
+        {
+          Assert.Equal(2, rank.Level, name);
+          Assert.Equal(10, rank.Xp, name);
+          Assert.Equal("Squaddie", rank.RankName, name);
+        }),
+      // -> level 3 with 50 carried.
+      ("a large gain chains level-ups",
+        [("Rookie", 100), ("Squaddie", 100), ("Corporal", 100), ("Sergeant", 100)], 250, false, (rank, name) =>
+        {
+          Assert.Equal(3, rank.Level, name);
+          Assert.Equal(50, rank.Xp, name);
+        }),
+      ("a single-entry table is max at level 1 and gains are ignored",
+        [("Rookie", 100)], 500, true, (rank, name) =>
+        {
+          Assert.Equal(1, rank.Level, name);
+          Assert.Equal(0, rank.Xp, name);
+        }),
+      // Level 2 (max) — the 50 remainder is discarded, not carried.
+      ("landing on the max rank discards the remainder",
+        [("Rookie", 100), ("Colonel", 25)], 150, false, (rank, name) =>
+        {
+          Assert.Equal(2, rank.Level, name);
+          Assert.True(rank.IsMaxLevel, name);
+          Assert.Equal(0, rank.Xp, name);
+        }),
+    ];
 
-  [TestCase(TestName = "A gain scales by the current rank's factor")]
-  public void GainScalesByFactor()
-  {
-    var rank = new UnitRank(TestData.MakeRankTable(
-      new RankLevelData { Name = "Rookie", GainFactorPercent = 50 },
-      new RankLevelData { Name = "Squaddie", GainFactorPercent = 50 }));
-    rank.Gain(40);
-    Assert.Equal(20, rank.Xp);
-  }
+    foreach (var row in rows)
+    {
+      var levels = new RankLevelData[row.Levels.Length];
+      for (int i = 0; i < row.Levels.Length; i++)
+        levels[i] = new RankLevelData { Name = row.Levels[i].Level, GainFactorPercent = row.Levels[i].Factor };
+      var rank = new UnitRank(TestData.MakeRankTable(levels));
 
-  [TestCase(TestName = "A scaled gain below one accrues one (slow, never zero)")]
-  public void ScaledGainFloorsAtOne()
-  {
-    var rank = new UnitRank(TestData.MakeRankTable(
-      new RankLevelData { Name = "Rookie", GainFactorPercent = 10 },
-      new RankLevelData { Name = "Squaddie", GainFactorPercent = 10 }));
-    rank.Gain(5); // 0.5 floored would be 0 — must accrue 1
-    Assert.Equal(1, rank.Xp);
-  }
-
-  [TestCase(TestName = "A level-up carries overflow cut by the new rank's factor")]
-  public void LevelUpCarriesOverflowCutByNewFactor()
-  {
-    var rank = new UnitRank(TestData.MakeRankTable(
-      new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
-      new RankLevelData { Name = "Squaddie", GainFactorPercent = 50 },
-      new RankLevelData { Name = "Corporal", GainFactorPercent = 50 }));
-    rank.Gain(120); // 120 - 100 = 20 carried, cut by Squaddie's 50% -> 10
-    Assert.Equal(2, rank.Level);
-    Assert.Equal(10, rank.Xp);
-    Assert.Equal("Squaddie", rank.RankName);
-  }
-
-  [TestCase(TestName = "A large gain chains level-ups")]
-  public void LargeGainChainsLevelUps()
-  {
-    var rank = new UnitRank(TestData.MakeRankTable(
-      new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
-      new RankLevelData { Name = "Squaddie", GainFactorPercent = 100 },
-      new RankLevelData { Name = "Corporal", GainFactorPercent = 100 },
-      new RankLevelData { Name = "Sergeant", GainFactorPercent = 100 }));
-    rank.Gain(250); // -> level 3 with 50 carried
-    Assert.Equal(3, rank.Level);
-    Assert.Equal(50, rank.Xp);
-  }
-
-  [TestCase(TestName = "A single-entry table is max at level 1 and gains are ignored")]
-  public void SingleEntryTableIgnoresGains()
-  {
-    var rank = new UnitRank(TestData.MakeRankTable(new RankLevelData { Name = "Rookie", GainFactorPercent = 100 }));
-    Assert.True(rank.IsMaxLevel);
-    rank.Gain(500);
-    Assert.Equal(1, rank.Level);
-    Assert.Equal(0, rank.Xp);
-  }
-
-  [TestCase(TestName = "Landing on the max rank discards the remainder")]
-  public void LandingOnMaxDiscardsRemainder()
-  {
-    var rank = new UnitRank(TestData.MakeRankTable(
-      new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
-      new RankLevelData { Name = "Colonel", GainFactorPercent = 25 }));
-    rank.Gain(150); // level 2 (max) — the 50 remainder is discarded, not carried
-    Assert.Equal(2, rank.Level);
-    Assert.True(rank.IsMaxLevel);
-    Assert.Equal(0, rank.Xp);
+      if (row.MaxBefore)
+        Assert.True(rank.IsMaxLevel, row.Name);
+      rank.Gain(row.Gain);
+      row.Verify(rank, row.Name);
+    }
   }
 
   [TestCase(TestName = "Non-positive awards and malformed tables throw")]

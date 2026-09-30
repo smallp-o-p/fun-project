@@ -15,6 +15,10 @@ public partial class UnitProgressionCommitTest
     var third = TestData.MakePath("Gamma", TestData.MakeStep(1));
 
     Assert.True(progression.TryCommit(first));
+    // A duplicate is rejected at the one-path state, before the second slot fills.
+    Assert.False(progression.TryCommit(first));
+    Assert.Equal(1, progression.CommittedPaths.Count);
+
     Assert.True(progression.TryCommit(second));
     Assert.Equal(0, progression.CurrencyPoints);
     Assert.Equal(2, progression.CommittedPaths.Count);
@@ -23,17 +27,6 @@ public partial class UnitProgressionCommitTest
 
     Assert.False(progression.TryCommit(third));
     Assert.Equal(2, progression.CommittedPaths.Count);
-  }
-
-  [TestCase(TestName = "Committing the same path twice is rejected without consuming a slot")]
-  public void DuplicateCommitRejected()
-  {
-    var progression = new UnitProgression();
-    var path = TestData.MakePath("Alpha", TestData.MakeStep(1));
-
-    Assert.True(progression.TryCommit(path));
-    Assert.False(progression.TryCommit(path));
-    Assert.Equal(1, progression.CommittedPaths.Count);
   }
 
   [TestCase(TestName = "Committing a path with no steps throws (authoring mistake)")]
