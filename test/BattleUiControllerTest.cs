@@ -107,18 +107,33 @@ public sealed partial class BattleUiControllerTest
     Assert.Equal(2, changes);
   }
 
-  [TestCase(TestName = "A foreign submission that kills the selected unit deselects")]
-  public void ForeignKillDeselects()
+  [TestCase(UiState.UnitSelected, 20, DamageKind.Stun, TestName = "A foreign stun of the selected unit deselects")]
+  [TestCase(UiState.Targeting, 20, DamageKind.Stun, TestName = "A foreign stun during targeting deselects and clears actions")]
+  [TestCase(UiState.TargetingLocked, 20, DamageKind.Stun, TestName = "A foreign stun during locked targeting deselects and clears actions")]
+  [TestCase(UiState.UnitSelected, 999, DamageKind.Health, TestName = "A foreign kill of the selected unit deselects")]
+  public void ForeignIncapacitationDeselectsAndClearsActions(UiState initialState, int amount, DamageKind kind)
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
+    if (initialState is UiState.Targeting or UiState.TargetingLocked)
+    {
+      battle.Ui.BeginAction(battle.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
+      battle.Ui.PreviewAt(new Vector3I(4, 0, 2));
+      if (initialState == UiState.TargetingLocked)
+        battle.Ui.ClickTile(new Vector3I(4, 0, 2));
+    }
+    Assert.Equal(initialState, battle.Ui.State);
 
-    battle.Runtime.ExecuteAction(BattleAction.ApplyDamage(
-      battle.Runtime.TryGetAlive(battle.PlayerUnit).RequireSome(), 999));
+    // Genuine runtime submission path; the surviving Support keeps this short of BattleOver.
+    battle.ApplyDamage(battle.PlayerUnit, amount, kind);
 
     Assert.Equal(UiState.Unselected, battle.Ui.State);
     Assert.True(battle.Ui.SelectedUnit.IsNone);
     Assert.Equal(0, battle.Ui.ActionOptions.Count);
+    Assert.Equal(0, battle.Ui.CandidateCells.Count);
+    Assert.True(battle.Ui.PendingTarget.IsNone);
+    Assert.True(battle.Ui.LastPreview.IsNone);
+    Assert.False(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));
   }
 
   [TestCase(TestName = "A submission that ends the battle enters terminal BattleOver")]
@@ -157,43 +172,31 @@ public sealed partial class BattleUiControllerTest
     Assert.Equal(UiState.Targeting, battle.Ui.State);
   }
 
-  [TestCase(TestName = "A disabled retained option starts neither targeting nor a submission")]
-  public void DisabledRetainedOptionDoesNothing()
+  [TestCase(false, TestName = "A disabled retained option starts neither targeting nor a submission")]
+  [TestCase(true, TestName = "An option retained from another selection cannot act")]
+  public void RetainedPassOptionCannotAct(bool foreign)
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
     PassActionOption pass = battle.Ui.ActionOptions.AsValueEnumerable().OfType<PassActionOption>().Single();
-    battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2)], actionPointCost: 4);
+    if (foreign)
+      battle.Ui.TrySelectAt(new Vector3I(7, 0, 7)); // retained from the player Hero
+    else
+      battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2)], actionPointCost: 4); // pass costs all remaining AP
     int submissions = 0;
     battle.Runtime.ActionCompleted += _ => submissions++;
     battle.ClearEvents();
 
-    Assert.False(pass.IsAvailable);
+    if (!foreign)
+      Assert.False(pass.IsAvailable);
     battle.Ui.BeginAction(pass);
 
     Assert.Equal(UiState.UnitSelected, battle.Ui.State);
     Assert.Equal(0, battle.Ui.CandidateCells.Count);
     Assert.Equal(0, submissions);
     Assert.Equal(0, battle.Events.Count);
-  }
-
-  [TestCase(TestName = "An option retained from another selection cannot act")]
-  public void ForeignRetainedOptionDoesNothing()
-  {
-    using var battle = BattleFixture.UiBattle();
-    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    PassActionOption playerPass = battle.Ui.ActionOptions.AsValueEnumerable().OfType<PassActionOption>().Single();
-    battle.Ui.TrySelectAt(new Vector3I(7, 0, 7));
-    int submissions = 0;
-    battle.Runtime.ActionCompleted += _ => submissions++;
-    battle.ClearEvents();
-
-    battle.Ui.BeginAction(playerPass);
-
-    Assert.Equal(UiState.UnitSelected, battle.Ui.State);
-    Assert.Equal(battle.SupportUnit, battle.Ui.SelectedUnit.RequireSome());
-    Assert.Equal(0, submissions);
-    Assert.Equal(0, battle.Events.Count);
+    if (foreign)
+      Assert.Equal(battle.SupportUnit, battle.Ui.SelectedUnit.RequireSome());
   }
 
   [TestCase(TestName = "A boxed-in available move can enter empty targeting and cancel")]
@@ -388,45 +391,6 @@ public sealed partial class BattleUiControllerTest
 
     Assert.Equal(InputGate.Open, battle.Ui.Gate);
     Assert.Equal(UiState.UnitSelected, battle.Ui.State);
-  }
-
-  [TestCase(TestName = "Enemy action that kills the selected unit deselects via the signal")]
-  public void EnemyKillDeselectsViaSignal()
-  {
-    using var battle = BattleFixture.UiBattle();
-    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-
-    battle.Runtime.ExecuteAction(BattleAction.ApplyDamage(
-      battle.Runtime.TryGetAlive(battle.PlayerUnit).RequireSome(), 999));
-
-    Assert.Equal(UiState.Unselected, battle.Ui.State);
-  }
-
-  [TestCase(UiState.UnitSelected)]
-  [TestCase(UiState.Targeting)]
-  [TestCase(UiState.TargetingLocked)]
-  public void ForeignKnockoutDeselectsAndClearsActions(UiState initialState)
-  {
-    using var battle = BattleFixture.UiBattle();
-    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    if (initialState is UiState.Targeting or UiState.TargetingLocked)
-    {
-      battle.Ui.BeginAction(battle.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
-      battle.Ui.PreviewAt(new Vector3I(4, 0, 2));
-      if (initialState == UiState.TargetingLocked)
-        battle.Ui.ClickTile(new Vector3I(4, 0, 2));
-    }
-    Assert.Equal(initialState, battle.Ui.State);
-
-    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
-
-    Assert.Equal(UiState.Unselected, battle.Ui.State);
-    Assert.True(battle.Ui.SelectedUnit.IsNone);
-    Assert.Equal(0, battle.Ui.ActionOptions.Count);
-    Assert.Equal(0, battle.Ui.CandidateCells.Count);
-    Assert.True(battle.Ui.PendingTarget.IsNone);
-    Assert.True(battle.Ui.LastPreview.IsNone);
-    Assert.False(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));
   }
 
   [TestCase]

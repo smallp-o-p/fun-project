@@ -14,18 +14,6 @@ public partial class GeoscapeHudTest
 
   private static GeoscapeHud BuildHud() => AddToTree(CreateHud());
 
-  // Synthetic packing stays local to this suite: polymorphic navigation (an ordinary
-  // button bound to a non-HUD-authored view) and invalid RequestView roots.
-  private static PackedScene Pack(Node prototype)
-  {
-    var packed = new PackedScene();
-    Error error = packed.Pack(prototype);
-    prototype.Free();
-    if (error != Error.Ok)
-      throw new InvalidOperationException($"Test scene packing failed: {error}");
-    return packed;
-  }
-
   [TestCase]
   public void ManufacturingCountdownRendersFromPushedTick()
   {

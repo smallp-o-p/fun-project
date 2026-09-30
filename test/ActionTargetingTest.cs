@@ -28,6 +28,7 @@ public class ActionTargetingTest
     using var battle = MakeArmedBattle();
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
     var move = new MoveTargeting(battle.Runtime, hero.State);
+    Assert.Equal(ConfirmMode.Confirm, move.Confirm); // assigned per verb, before any Begin
 
     IReadOnlyCollection<Vector3I> reachable = move.Begin();
     Assert.True(reachable.AsValueEnumerable().Contains(new Vector3I(2, 0, 1)));
@@ -50,6 +51,7 @@ public class ActionTargetingTest
     using var battle = MakeArmedBattle();
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
     var attack = new AttackTargeting(battle.Runtime, hero.State);
+    Assert.Equal(ConfirmMode.Immediate, attack.Confirm); // assigned per verb, before any Begin
 
     IReadOnlyCollection<Vector3I> candidates = attack.Begin();
     Assert.True(candidates.AsValueEnumerable().Contains(new Vector3I(3, 0, 0)));   // the enemy's tile, in range + visible

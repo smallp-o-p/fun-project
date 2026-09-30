@@ -488,6 +488,12 @@ internal static class TestData
     };
   }
 
+  // Explicit condition baselines (100 health keeps damage percentages on whole tiers) so
+  // condition labels, countdowns, and penalized stats have hand-checkable values.
+  public static RosterEntryData MakeConditionEntry(string name)
+    => MakeEntry(name, MakeCombatantData(name, health: 100, actionPoints: 8,
+      movement: 14, vision: 22, aim: 60, modSlotCount: 2, will: 50));
+
   public static CaptiveEntryData MakeCaptiveEntry(
     string displayName = "",
     CombatantData unit = null,

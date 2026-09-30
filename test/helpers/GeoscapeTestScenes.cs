@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using FunProject.GameState;
 using FunProject.Geoscape;
@@ -50,6 +51,54 @@ internal static class GeoscapeTestScenes
   // Base background shell for generic view-manager background/lifetime contracts.
   public static GeoscapeView CreateBaseView()
     => GD.Load<PackedScene>("res://scenes/geoscape/GeoscapeView.tscn").Instantiate<GeoscapeView>();
+
+  // Checked synthetic packing: the prototype is freed and a non-Ok error fails loud
+  // instead of returning a broken scene. Root types/names stay at the callers.
+  public static PackedScene Pack(Node prototype)
+  {
+    var packed = new PackedScene();
+    Error error = packed.Pack(prototype);
+    prototype.Free();
+    if (error != Error.Ok)
+      throw new InvalidOperationException($"Test scene packing failed: {error}");
+    return packed;
+  }
+
+  public static Control SquadSlot(SquadLoadoutView view, int slot)
+    => view.GetNode<VBoxContainer>("%Slots").GetChild<Control>(slot);
+
+  public static Button SquadChoice(SquadLoadoutView view, string unitName)
+    => view.GetNode<VBoxContainer>("%RosterChoices").GetChildren()
+      .AsValueEnumerable().OfType<Button>()
+      .Single(button => button.Text.Contains(unitName));
+
+  // Sequential by necessity: pressing Choose rebuilds the roster controls, so the choice
+  // button must be reacquired AFTER that press, not captured beside it as an argument.
+  public static void ChooseSquadUnit(SquadLoadoutView view, int slot, string unitName)
+  {
+    SquadSlot(view, slot).GetNode<Button>("%ChooseUnit")
+      .EmitSignal(Button.SignalName.Pressed);
+    SquadChoice(view, unitName).EmitSignal(Button.SignalName.Pressed);
+  }
+
+  public static Button ArmoryButton(UnitView editor, string itemName)
+    => editor.GetNode<VBoxContainer>("%ArmoryList").GetChildren()
+      .AsValueEnumerable().OfType<Button>()
+      .Single(button => button.Text.Contains(itemName));
+
+  // Integration shell for manager suites: an authored root under a manager whose
+  // ViewChanged presents every pushed/popped view. It never Configures, Pushes, Pops, or
+  // clears selection itself; callers drive the stack and own its assertions.
+  public static GeoscapeViewManager CreatePresentedManager(GeoscapeFixture fixture)
+  {
+    var manager = new GeoscapeViewManager { Name = "Manager" };
+    var root = CreateBaseView();
+    manager.RootView = root;
+    manager.AddChild(root);
+    AddToTree(manager);
+    manager.ViewChanged += view => view.Present(fixture.State, fixture.Session);
+    return manager;
+  }
 
   public static Button SpeedButton(GeoscapeScene scene)
     => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Button>("%SpeedButton");

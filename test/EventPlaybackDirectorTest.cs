@@ -15,20 +15,20 @@ public sealed partial class EventPlaybackDirectorTest
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
     int idleCount = 0;
-    var immediate = battle.AttachDirector(new ImmediateDirector()); // bound before the spawn
-    immediate.PlaybackIdle += () => idleCount++;
+    var director = battle.AttachDirector(new CaptureDirector()); // bound before the spawn
+    director.PlaybackIdle += () => idleCount++;
 
-    Assert.False(immediate.Busy);
+    Assert.False(director.Busy);
 
     battle.Spawn(TestData.MakeCombatant("Alpha", battle.PlayerFaction), new Vector3I(1, 0, 1));
 
-    Assert.True(immediate.Busy); // queued but not yet ticked
-    immediate.Tick();
-    Assert.False(immediate.Busy);
-    Assert.Equal(1, immediate.Played.Count);
-    Assert.True(immediate.Played[0] is UnitAddedBattleEvent);
+    Assert.True(director.Busy); // queued but not yet ticked
+    director.Tick();
+    Assert.False(director.Busy);
+    Assert.Equal(1, director.Played.Count);
+    Assert.True(director.Played[0] is UnitAddedBattleEvent);
     Assert.Equal(1, idleCount);
-    immediate.Tick(); // idle fires only once
+    director.Tick(); // idle fires only once
     Assert.Equal(1, idleCount);
   }
 
@@ -164,17 +164,6 @@ public sealed partial class EventPlaybackDirectorTest
   {
     protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitMovedBattleEvent evt)
       => evt.Position.Raw == triggerPosition ? [build()] : [];
-  }
-
-  private sealed partial class ImmediateDirector : EventPlaybackDirector
-  {
-    public List<BattleEvent> Played { get; } = [];
-
-    protected override void PlayStep(BattleEvent battleEvent, Action done)
-    {
-      Played.Add(battleEvent);
-      done();
-    }
   }
 
   // Captures both single events and coalesced move runs; every step completes immediately.

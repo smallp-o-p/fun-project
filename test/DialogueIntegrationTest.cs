@@ -13,27 +13,19 @@ public class DialogueIntegrationTest
 {
   private static DialogueSequenceData CouncilDialogue() => new()
   {
-    Lines =
-    [
-      new DialogueLineData
-      {
-        Speaker = new SpeakerData
-        {
-          DisplayName = "Spokesman",
-          Portrait = GD.Load<PackedScene>("res://scenes/dialogue/PlaceholderPortrait.tscn"),
-        },
-        Text = "First.",
-      },
-      new DialogueLineData
-      {
-        Speaker = new SpeakerData
-        {
-          DisplayName = "Spokesman",
-          Portrait = GD.Load<PackedScene>("res://scenes/dialogue/PlaceholderPortrait.tscn"),
-        },
-        Text = "Second.",
-      },
-    ]
+    Lines = [CouncilLine("First."), CouncilLine("Second.")],
+  };
+
+  // A fresh SpeakerData per line: DialogueView.SetPortrait caches by speaker identity, so
+  // the baseline's two distinct speaker references must not alias.
+  private static DialogueLineData CouncilLine(string text) => new()
+  {
+    Speaker = new SpeakerData
+    {
+      DisplayName = "Spokesman",
+      Portrait = GD.Load<PackedScene>("res://scenes/dialogue/PlaceholderPortrait.tscn"),
+    },
+    Text = text,
   };
 
   private static (GeoscapeScene Scene, GeoscapeViewManager Manager) SceneWithEvent(

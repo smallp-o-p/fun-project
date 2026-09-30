@@ -37,12 +37,6 @@ public class GeoscapeSquadLoadoutTest
     return (fixture, fixture.Session.PendingResolution.RequireSome("Expected pending mission."));
   }
 
-  // A roster entry with explicit baselines (100 health keeps damage percentages on whole
-  // tiers) so condition labels, countdowns, and penalized stats have hand-checkable values.
-  private static RosterEntryData ConditionEntry(string name)
-    => MakeEntry(name, MakeCombatantData(name, health: 100, actionPoints: 8,
-      movement: 14, vision: 22, aim: 60, modSlotCount: 2, will: 50));
-
   private static SquadLoadoutView PresentedSquadView(PendingResolution pending,
     CampaignGameState state, GeoscapeSession session)
   {
@@ -55,28 +49,11 @@ public class GeoscapeSquadLoadoutTest
     return view;
   }
 
-  private static Button ChoiceButton(SquadLoadoutView view, string unitName)
-    => view.GetNode<VBoxContainer>("%RosterChoices").GetChildren()
-      .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text.Contains(unitName));
-
-  // Sequential by necessity: pressing Choose rebuilds the roster controls, so the choice
-  // button must be reacquired AFTER that press, not captured beside it as an argument.
-  private static void ChooseIntoSlot(SquadLoadoutView view, int slot, string unitName)
-  {
-    SlotCard(view, slot).GetNode<Button>("%ChooseUnit")
-      .EmitSignal(Button.SignalName.Pressed);
-    ChoiceButton(view, unitName).EmitSignal(Button.SignalName.Pressed);
-  }
-
   private static void Press(params BaseButton[] buttons)
   {
     foreach (BaseButton button in buttons)
       button.EmitSignal(BaseButton.SignalName.Pressed);
   }
-
-  private static Control SlotCard(SquadLoadoutView view, int slot)
-    => view.GetNode<VBoxContainer>("%Slots").GetChild<Control>(slot);
 
   private static string CardText(Control card)
     => $"{card.GetNode<Label>("%CardTitle").Text}\n"
@@ -90,7 +67,7 @@ public class GeoscapeSquadLoadoutTest
     var (fixture, pending) = Mission([MakeEntry("Alpha"), MakeEntry("Bravo")]);
     using var _ = fixture;
     var view = PresentedSquadView(pending, fixture.State, fixture.Session);
-    ChooseIntoSlot(view, 0, "Alpha");
+    ChooseSquadUnit(view, 0, "Alpha");
 
     view.Configure("Interrogation prep", 2, allowEquipmentEditing: true);
     view.Present(fixture.State, fixture.Session);
@@ -101,8 +78,8 @@ public class GeoscapeSquadLoadoutTest
     Assert.Equal("Interrogation prep", view.GetNode<Label>("%Title").Text);
     Assert.Equal("Interrogation prep", view.GetNode<Label>("%Title").TooltipText);
 
-    ChooseIntoSlot(view, 0, "Alpha");
-    ChooseIntoSlot(view, 1, "Bravo");
+    ChooseSquadUnit(view, 0, "Alpha");
+    ChooseSquadUnit(view, 1, "Bravo");
     var selected = view.GetSelectedCombatants();
     Assert.Equal(2, selected.Count);
     Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
@@ -119,9 +96,9 @@ public class GeoscapeSquadLoadoutTest
     var view = AddToTree(CreateSquadLoadoutView());
     view.Configure("Interrogation — Alpha (Cult)", 2, allowEquipmentEditing: false);
     view.Present(fixture.State, fixture.Session);
-    ChooseIntoSlot(view, 0, "Alpha");
+    ChooseSquadUnit(view, 0, "Alpha");
 
-    Control card = SlotCard(view, 0);
+    Control card = SquadSlot(view, 0);
     Assert.False(card.GetNode<Button>("%EditUnit").Visible); // hidden on an occupied card
     Assert.True(card.GetNode<Button>("%RemoveUnit").Visible); // squad picks still work
     Assert.Equal(1, view.GetSelectedCombatants().Count);
@@ -187,26 +164,26 @@ public class GeoscapeSquadLoadoutTest
     using var _ = fixture;
     var view = PresentedSquadView(pending, fixture.State, fixture.Session);
 
-    Assert.True(ChoiceButton(view, "Alpha").Disabled); // no destination yet
-    Assert.True(ChoiceButton(view, "Bravo").Disabled);
+    Assert.True(SquadChoice(view, "Alpha").Disabled); // no destination yet
+    Assert.True(SquadChoice(view, "Bravo").Disabled);
 
-    ChooseIntoSlot(view, 1, "Alpha");
+    ChooseSquadUnit(view, 1, "Alpha");
 
     var selected = view.GetSelectedCombatants();
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
-    Assert.True(CardText(SlotCard(view, 1)).Contains("Alpha"));
-    Assert.True(CardText(SlotCard(view, 0)).Contains("empty"));
+    Assert.True(CardText(SquadSlot(view, 1)).Contains("Alpha"));
+    Assert.True(CardText(SquadSlot(view, 0)).Contains("empty"));
     Assert.Equal("Squad: 1/3", view.GetNode<Label>("%SquadCount").Text);
 
-    Assert.True(ChoiceButton(view, "Alpha").Disabled); // destination consumed again
-    Assert.True(ChoiceButton(view, "Bravo").Disabled);
+    Assert.True(SquadChoice(view, "Alpha").Disabled); // destination consumed again
+    Assert.True(SquadChoice(view, "Bravo").Disabled);
 
-    SlotCard(view, 0).GetNode<Button>("%ChooseUnit")
+    SquadSlot(view, 0).GetNode<Button>("%ChooseUnit")
       .EmitSignal(Button.SignalName.Pressed); // marking a destination re-enables choices
-    Assert.True(ChoiceButton(view, "Alpha").Disabled); // still occupies slot 1
-    Assert.False(ChoiceButton(view, "Bravo").Disabled);
-    Assert.False(ChoiceButton(view, "Charlie").Disabled);
+    Assert.True(SquadChoice(view, "Alpha").Disabled); // still occupies slot 1
+    Assert.False(SquadChoice(view, "Bravo").Disabled);
+    Assert.False(SquadChoice(view, "Charlie").Disabled);
   }
 
   [TestCase(TestName = "Replace and remove keep other slots and leave holes")]
@@ -218,23 +195,23 @@ public class GeoscapeSquadLoadoutTest
     using var _ = fixture;
     var view = PresentedSquadView(pending, fixture.State, fixture.Session);
 
-    ChooseIntoSlot(view, 0, "Alpha");
-    ChooseIntoSlot(view, 1, "Bravo");
-    ChooseIntoSlot(view, 0, "Charlie"); // replace: displaced Alpha becomes available
-    Press(SlotCard(view, 1).GetNode<Button>("%RemoveUnit")); // clear: leaves a hole
+    ChooseSquadUnit(view, 0, "Alpha");
+    ChooseSquadUnit(view, 1, "Bravo");
+    ChooseSquadUnit(view, 0, "Charlie"); // replace: displaced Alpha becomes available
+    Press(SquadSlot(view, 1).GetNode<Button>("%RemoveUnit")); // clear: leaves a hole
 
     var selected = view.GetSelectedCombatants();
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(fixture.State.Roster[2], selected[0]));
-    Assert.True(CardText(SlotCard(view, 0)).Contains("Charlie"));
-    Assert.True(CardText(SlotCard(view, 1)).Contains("empty"));
+    Assert.True(CardText(SquadSlot(view, 0)).Contains("Charlie"));
+    Assert.True(CardText(SquadSlot(view, 1)).Contains("empty"));
     Assert.Equal("Squad: 1/3", view.GetNode<Label>("%SquadCount").Text);
 
-    SlotCard(view, 2).GetNode<Button>("%ChooseUnit")
+    SquadSlot(view, 2).GetNode<Button>("%ChooseUnit")
       .EmitSignal(Button.SignalName.Pressed); // mark a destination to see availability
-    Assert.True(ChoiceButton(view, "Charlie").Disabled); // the occupied unit stays unavailable
-    Assert.False(ChoiceButton(view, "Alpha").Disabled); // cleared units become available again
-    Assert.False(ChoiceButton(view, "Bravo").Disabled);
+    Assert.True(SquadChoice(view, "Charlie").Disabled); // the occupied unit stays unavailable
+    Assert.False(SquadChoice(view, "Alpha").Disabled); // cleared units become available again
+    Assert.False(SquadChoice(view, "Bravo").Disabled);
   }
 
   [TestCase(TestName = "Occupied cards summarize equipment, mods, and effective stats")]
@@ -254,9 +231,9 @@ public class GeoscapeSquadLoadoutTest
     alpha.GetModSlots()[0].Equip(new MultiStatMod { Name = "Nerves", StatMods = [] });
 
     var view = PresentedSquadView(pending, fixture.State, fixture.Session);
-    ChooseIntoSlot(view, 0, "Alpha");
+    ChooseSquadUnit(view, 0, "Alpha");
 
-    string card = CardText(SlotCard(view, 0));
+    string card = CardText(SquadSlot(view, 0));
     Assert.True(card.Contains("Rifle"), $"Weapon missing from '{card}'.");
     Assert.True(card.Contains("Vest"), $"Armor missing from '{card}'.");
     Assert.True(card.Contains("Medkit"), $"Utility item missing from '{card}'.");
@@ -277,9 +254,9 @@ public class GeoscapeSquadLoadoutTest
     var (fixture, pending) = Mission([MakeEntry("Alpha")]);
     using var _ = fixture;
     var view = PresentedSquadView(pending, fixture.State, fixture.Session);
-    ChooseIntoSlot(view, 0, "Alpha");
+    ChooseSquadUnit(view, 0, "Alpha");
 
-    string card = CardText(SlotCard(view, 0));
+    string card = CardText(SquadSlot(view, 0));
     Assert.True(card.Contains("Weapon:"), card);
     Assert.True(card.Contains("empty"), card);
     Assert.True(card.Contains("Armor:"), card);
@@ -293,21 +270,16 @@ public class GeoscapeSquadLoadoutTest
       [MakeEntry("Alpha")],
       armory: [MakeFirearmWeaponData("Rifle"), MakeArmorData("Vest"), MakeItemData("Medkit")]);
     using var _ = fixture;
-    var manager = new GeoscapeViewManager { Name = "Manager" };
-    var root = CreateBaseView();
-    manager.RootView = root;
-    manager.AddChild(root);
-    AddToTree(manager);
-    manager.ViewChanged += view => view.Present(fixture.State, fixture.Session);
+    var manager = CreatePresentedManager(fixture);
 
     var view = CreateSquadLoadoutView();
     view.Configure(pending.Event.Definition.Title, 3, allowEquipmentEditing: true,
       mission: pending.Event.Definition);
     manager.Push(view); // ViewChanged presents the configured view
-    ChooseIntoSlot(view, 0, "Alpha");
+    ChooseSquadUnit(view, 0, "Alpha");
 
     // Open the nested editor through the real button and drive its armory browser.
-    Press(SlotCard(view, 0).GetNode<Button>("%EditUnit"));
+    Press(SquadSlot(view, 0).GetNode<Button>("%EditUnit"));
     var editor = (UnitView)manager.Current;
     Assert.False(view.IsVisibleInTree());
 
@@ -329,86 +301,47 @@ public class GeoscapeSquadLoadoutTest
     Assert.True(selected[0].EquippedArmor.RequireSome().Item.ItemName == "Vest");
     Assert.Equal("Medkit", selected[0].Inventory[0].ItemName);
 
-    string card = CardText(SlotCard(view, 0)); // summaries refreshed on return
+    string card = CardText(SquadSlot(view, 0)); // summaries refreshed on return
     Assert.True(card.Contains("Rifle"), card);
     Assert.True(card.Contains("Vest"), card);
     Assert.True(card.Contains("Medkit"), card);
   }
 
-  [TestCase(TestName = "Missing UnitViewScene export is an authoring error")]
-  public async Task MissingUnitViewSceneThrows()
+  [TestCase(false, TestName = "Missing UnitViewScene export is an authoring error")]
+  [TestCase(true, TestName = "A wrong-root UnitViewScene frees its instance and throws")]
+  public async Task InvalidUnitViewScenePreservesSelection(bool wrongRoot)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeEntry("Alpha")]);
     using var _ = fixture;
     var view = PresentedSquadView(pending, fixture.State, fixture.Session);
-    view.UnitViewScene = null;
-    ChooseIntoSlot(view, 0, "Alpha");
+    view.UnitViewScene = wrongRoot ? Pack(new Label { Name = "NotAUnitView" }) : null;
+    ChooseSquadUnit(view, 0, "Alpha");
 
-    // Direct call: exceptions inside pressed-signal handlers are logged by Godot, not
-    // raised through EmitSignal, so the authoring guard is invoked directly.
-    Assert.Throws<InvalidOperationException>(() => view.EditUnit(0));
-    Assert.Equal(1, view.GetSelectedCombatants().Count); // selection untouched
-  }
-
-  [TestCase(TestName = "A wrong-root UnitViewScene frees its instance and throws")]
-  public async Task WrongRootUnitViewSceneThrows()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var (fixture, pending) = Mission([MakeEntry("Alpha")]);
-    using var _ = fixture;
-    var view = PresentedSquadView(pending, fixture.State, fixture.Session);
-    var probe = new Label { Name = "NotAUnitView" };
-    var packed = new PackedScene();
-    Error error = packed.Pack(probe);
-    probe.Free();
-    if (error != Error.Ok)
-      throw new InvalidOperationException($"Test scene packing failed: {error}");
-    view.UnitViewScene = packed;
-    ChooseIntoSlot(view, 0, "Alpha");
-
-    // Free (not QueueFree) leaves no orphan behind the synchronous throw.
+    // Free (not QueueFree) leaves no orphan behind the synchronous throw. Direct call:
+    // exceptions inside pressed-signal handlers are logged by Godot, not raised through
+    // EmitSignal, so the authoring guard is invoked directly.
     long orphansBefore = (long)Performance.Singleton.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);
     Assert.Throws<InvalidOperationException>(() => view.EditUnit(0));
     Assert.Equal(orphansBefore,
       (long)Performance.Singleton.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount));
+    Assert.Equal(1, view.GetSelectedCombatants().Count); // selection untouched
   }
 
-  [TestCase(TestName = "Missing SquadSlotCardScene export is an authoring error")]
-  public async Task MissingSquadSlotCardSceneThrows()
+  [TestCase(false, TestName = "Missing SquadSlotCardScene export is an authoring error")]
+  [TestCase(true, TestName = "A wrong-root SquadSlotCardScene frees its instance and throws")]
+  public async Task InvalidSlotCardScenePreservesEmptySelection(bool wrongRoot)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, _) = Mission([MakeEntry("Alpha")]);
     using var __ = fixture;
     var view = AddToTree(CreateSquadLoadoutView());
     view.Configure("Operation Iron", 3, allowEquipmentEditing: true);
-    view.SquadSlotCardScene = null;
+    view.SquadSlotCardScene = wrongRoot ? Pack(new Label { Name = "NotASquadSlotCard" }) : null;
 
-    // Direct call: Present builds every card, and exceptions inside signal handlers are
-    // logged by Godot, not raised through EmitSignal, so the authoring guard is invoked
-    // directly.
-    Assert.Throws<InvalidOperationException>(() =>
-      view.Present(fixture.State, fixture.Session));
-    Assert.Equal(0, view.GetSelectedCombatants().Count); // selection untouched
-  }
-
-  [TestCase(TestName = "A wrong-root SquadSlotCardScene frees its instance and throws")]
-  public async Task WrongRootSquadSlotCardSceneThrows()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var (fixture, _) = Mission([MakeEntry("Alpha")]);
-    using var __ = fixture;
-    var view = AddToTree(CreateSquadLoadoutView());
-    view.Configure("Operation Iron", 3, allowEquipmentEditing: true);
-    var probe = new Label { Name = "NotASquadSlotCard" };
-    var packed = new PackedScene();
-    Error error = packed.Pack(probe);
-    probe.Free();
-    if (error != Error.Ok)
-      throw new InvalidOperationException($"Test scene packing failed: {error}");
-    view.SquadSlotCardScene = packed;
-
-    // Free (not QueueFree) leaves no orphan behind the synchronous throw.
+    // Free (not QueueFree) leaves no orphan behind the synchronous throw. Direct call:
+    // Present builds every card, and exceptions inside signal handlers are logged by
+    // Godot, not raised through EmitSignal, so the authoring guard is invoked directly.
     long orphansBefore = (long)Performance.Singleton.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);
     Assert.Throws<InvalidOperationException>(() =>
       view.Present(fixture.State, fixture.Session));
@@ -421,21 +354,21 @@ public class GeoscapeSquadLoadoutTest
   public async Task InjuredUnitsAreBlockedFromMissionDeployment()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (fixture, pending) = Mission([ConditionEntry("Alpha")]);
+    var (fixture, pending) = Mission([MakeConditionEntry("Alpha")]);
     using var _ = fixture;
     Combatant alpha = fixture.State.Roster[0];
     fixture.ReturnFromMission((alpha, 25, 0)); // 25% damage: Injured (6d) plus Tired (1d)
 
     var view = PresentedSquadView(pending, fixture.State, fixture.Session);
 
-    string choice = ChoiceButton(view, "Alpha").Text;
+    string choice = SquadChoice(view, "Alpha").Text;
     Assert.True(choice.Contains("Injured (6d)"), $"Expected the injury label with countdown, got '{choice}'.");
     Assert.True(choice.Contains("Tired (1d)"), $"Expected the fatigue label with countdown, got '{choice}'.");
     Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"),
       "A normal mission shows no exceptional-deployment notice.");
 
-    SlotCard(view, 0).GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
-    Assert.True(ChoiceButton(view, "Alpha").Disabled);
+    SquadSlot(view, 0).GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
+    Assert.True(SquadChoice(view, "Alpha").Disabled);
     Assert.Equal(0, view.GetSelectedCombatants().Count);
   }
 
@@ -444,7 +377,7 @@ public class GeoscapeSquadLoadoutTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission(
-      [ConditionEntry("Alpha"), ConditionEntry("Bravo"), ConditionEntry("Charlie")]);
+      [MakeConditionEntry("Alpha"), MakeConditionEntry("Bravo"), MakeConditionEntry("Charlie")]);
     using var _ = fixture;
     Combatant alpha = fixture.State.Roster[0];
     Combatant bravo = fixture.State.Roster[1];
@@ -457,13 +390,13 @@ public class GeoscapeSquadLoadoutTest
     fixture.ReturnFromMission((charlie, 0, 0)); // Weary
 
     var view = PresentedSquadView(pending, fixture.State, fixture.Session);
-    SlotCard(view, 0).GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
+    SquadSlot(view, 0).GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
 
-    Assert.True(ChoiceButton(view, "Alpha").Disabled);
-    Assert.False(ChoiceButton(view, "Bravo").Disabled);
-    Assert.False(ChoiceButton(view, "Charlie").Disabled);
+    Assert.True(SquadChoice(view, "Alpha").Disabled);
+    Assert.False(SquadChoice(view, "Bravo").Disabled);
+    Assert.False(SquadChoice(view, "Charlie").Disabled);
 
-    ChoiceButton(view, "Bravo").EmitSignal(BaseButton.SignalName.Pressed); // Tired stays deployable
+    SquadChoice(view, "Bravo").EmitSignal(BaseButton.SignalName.Pressed); // Tired stays deployable
     var selected = view.GetSelectedCombatants();
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(bravo, selected[0]));
@@ -473,7 +406,7 @@ public class GeoscapeSquadLoadoutTest
   public async Task OverrideEnablesUnfitUnitsOnceEach()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (fixture, pending) = Mission([ConditionEntry("Alpha"), ConditionEntry("Bravo")],
+    var (fixture, pending) = Mission([MakeConditionEntry("Alpha"), MakeConditionEntry("Bravo")],
       mission: MakeEvent("Last Stand", GeoscapeEventKind.TacticalBattle, allowUnfitDeployment: true));
     using var _ = fixture;
     Combatant alpha = fixture.State.Roster[0];
@@ -487,18 +420,18 @@ public class GeoscapeSquadLoadoutTest
 
     Assert.True(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional deployment"));
 
-    SlotCard(view, 0).GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
-    Assert.False(ChoiceButton(view, "Alpha").Disabled);
-    Assert.False(ChoiceButton(view, "Bravo").Disabled);
-    ChoiceButton(view, "Alpha").EmitSignal(BaseButton.SignalName.Pressed);
+    SquadSlot(view, 0).GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
+    Assert.False(SquadChoice(view, "Alpha").Disabled);
+    Assert.False(SquadChoice(view, "Bravo").Disabled);
+    SquadChoice(view, "Alpha").EmitSignal(BaseButton.SignalName.Pressed);
 
     var selected = view.GetSelectedCombatants();
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(alpha, selected[0]));
 
-    SlotCard(view, 1).GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
-    Assert.True(ChoiceButton(view, "Alpha").Disabled); // duplicates stay blocked under the override
-    Assert.False(ChoiceButton(view, "Bravo").Disabled);
+    SquadSlot(view, 1).GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
+    Assert.True(SquadChoice(view, "Alpha").Disabled); // duplicates stay blocked under the override
+    Assert.False(SquadChoice(view, "Bravo").Disabled);
     var after = view.GetSelectedCombatants();
     Assert.Equal(1, after.Count);
     Assert.True(ReferenceEquals(alpha, after[0]));
@@ -508,16 +441,16 @@ public class GeoscapeSquadLoadoutTest
   public async Task OverrideCardsShowCountdownsAndPenalizedStats()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (fixture, pending) = Mission([ConditionEntry("Alpha")],
+    var (fixture, pending) = Mission([MakeConditionEntry("Alpha")],
       mission: MakeEvent("Last Stand", GeoscapeEventKind.TacticalBattle, allowUnfitDeployment: true));
     using var _ = fixture;
     Combatant alpha = fixture.State.Roster[0];
     fixture.ReturnFromMission((alpha, 25, 0)); // Injured multipliers on top of Tired's
 
     var view = PresentedSquadView(pending, fixture.State, fixture.Session);
-    ChooseIntoSlot(view, 0, "Alpha");
+    ChooseSquadUnit(view, 0, "Alpha");
 
-    string card = CardText(SlotCard(view, 0));
+    string card = CardText(SquadSlot(view, 0));
     Assert.True(card.Contains("Injured (6d)"), $"Injury countdown missing from '{card}'.");
     Assert.True(card.Contains("Tired (1d)"), $"Fatigue countdown missing from '{card}'.");
     // Hand-derived: health 100x0.75, aim 60x0.90x0.90, movement 14x0.90, will 50x0.90.
@@ -532,7 +465,7 @@ public class GeoscapeSquadLoadoutTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var fixture = new GeoscapeFixture(MakeStart(
-      roster: [ConditionEntry("Alpha")],
+      roster: [MakeConditionEntry("Alpha")],
       timeline: [MakeScheduled(1439, MakeEvent("Operation Iron", GeoscapeEventKind.TacticalBattle))]));
     using var _ = fixture;
     Combatant alpha = fixture.State.Roster[0];
@@ -543,7 +476,7 @@ public class GeoscapeSquadLoadoutTest
       fixture.Session.PendingResolution.RequireSome("Expected pending mission."),
       fixture.State, fixture.Session);
 
-    string choice = ChoiceButton(view, "Alpha").Text;
+    string choice = SquadChoice(view, "Alpha").Text;
     Assert.True(choice.Contains("Tired (1d)"), $"Expected a one-day countdown, got '{choice}'.");
   }
 
@@ -551,7 +484,7 @@ public class GeoscapeSquadLoadoutTest
   public async Task OverrideRetainsSelectedExhaustedUnitsAcrossNavigation()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (fixture, pending) = Mission([ConditionEntry("Alpha")],
+    var (fixture, pending) = Mission([MakeConditionEntry("Alpha")],
       armory: [MakeFirearmWeaponData("Rifle")],
       mission: MakeEvent("Last Stand", GeoscapeEventKind.TacticalBattle, allowUnfitDeployment: true));
     using var _ = fixture;
@@ -560,20 +493,15 @@ public class GeoscapeSquadLoadoutTest
     fixture.ReturnFromMission((alpha, 0, 0));
     fixture.ReturnFromMission((alpha, 0, 0)); // Exhausted: eligible only through the override
 
-    var manager = new GeoscapeViewManager { Name = "Manager" };
-    var root = CreateBaseView();
-    manager.RootView = root;
-    manager.AddChild(root);
-    AddToTree(manager);
-    manager.ViewChanged += view => view.Present(fixture.State, fixture.Session);
+    var manager = CreatePresentedManager(fixture);
 
     var view = CreateSquadLoadoutView();
     view.Configure(pending.Event.Definition.Title, 3, allowEquipmentEditing: true,
       mission: pending.Event.Definition);
     manager.Push(view); // ViewChanged presents the configured mission context
-    ChooseIntoSlot(view, 0, "Alpha");
+    ChooseSquadUnit(view, 0, "Alpha");
 
-    Press(SlotCard(view, 0).GetNode<Button>("%EditUnit"));
+    Press(SquadSlot(view, 0).GetNode<Button>("%EditUnit"));
     var editor = (UnitView)manager.Current;
     editor.SelectSlot(UnitViewSlot.Weapon);
     Press(ArmoryButton(editor, "Rifle"));
@@ -584,7 +512,7 @@ public class GeoscapeSquadLoadoutTest
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(alpha, selected[0]));
     Assert.Equal("Rifle", selected[0].EquippedWeapon.RequireSome().ItemName);
-    string card = CardText(SlotCard(view, 0));
+    string card = CardText(SquadSlot(view, 0));
     Assert.True(card.Contains("Rifle"), card);
     Assert.True(card.Contains("Exhausted"), card);
   }
@@ -593,7 +521,7 @@ public class GeoscapeSquadLoadoutTest
   public async Task GenericInterrogationAllowsInjuredUnitsWithoutAPendingMission()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var fixture = new GeoscapeFixture(MakeStart(roster: [ConditionEntry("Alpha")]));
+    var fixture = new GeoscapeFixture(MakeStart(roster: [MakeConditionEntry("Alpha")]));
     using var _ = fixture;
     Combatant alpha = fixture.State.Roster[0];
     fixture.ReturnFromMission((alpha, 25, 0)); // Injured + Tired
@@ -605,21 +533,21 @@ public class GeoscapeSquadLoadoutTest
     Assert.False(fixture.Session.PendingResolution.IsSome); // no mission anywhere to infer from
     Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"),
       "A generic configuration carries no exceptional-deployment notice.");
-    string choice = ChoiceButton(view, "Alpha").Text;
+    string choice = SquadChoice(view, "Alpha").Text;
     Assert.True(choice.Contains("Injured (6d)"), $"Expected the condition label, got '{choice}'.");
 
-    ChooseIntoSlot(view, 0, "Alpha"); // deployment rules do not restrict interrogation
+    ChooseSquadUnit(view, 0, "Alpha"); // deployment rules do not restrict interrogation
     var selected = view.GetSelectedCombatants();
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(alpha, selected[0]));
-    Assert.False(SlotCard(view, 0).GetNode<Button>("%EditUnit").Visible); // editing stays disabled
+    Assert.False(SquadSlot(view, 0).GetNode<Button>("%EditUnit").Visible); // editing stays disabled
   }
 
   [TestCase(TestName = "Reconfiguring to generic clears mission policy and picks despite a pending override")]
   public async Task ReconfiguringToGenericClearsMissionPolicyAndPicks()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (fixture, pending) = Mission([ConditionEntry("Alpha"), ConditionEntry("Bravo")],
+    var (fixture, pending) = Mission([MakeConditionEntry("Alpha"), MakeConditionEntry("Bravo")],
       mission: MakeEvent("Last Stand", GeoscapeEventKind.TacticalBattle, allowUnfitDeployment: true));
     using var _ = fixture;
     Combatant alpha = fixture.State.Roster[0];
@@ -630,8 +558,8 @@ public class GeoscapeSquadLoadoutTest
       mission: pending.Event.Definition);
     view.Present(fixture.State, fixture.Session);
     Assert.True(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional deployment"));
-    ChooseIntoSlot(view, 0, "Alpha"); // the override authorizes the unfit unit in mission prep
-    ChooseIntoSlot(view, 1, "Bravo"); // two picks exist to prove the reset below
+    ChooseSquadUnit(view, 0, "Alpha"); // the override authorizes the unfit unit in mission prep
+    ChooseSquadUnit(view, 1, "Bravo"); // two picks exist to prove the reset below
 
     view.Configure("Interrogation", 2, allowEquipmentEditing: false); // generic: context cleared
     view.Present(fixture.State, fixture.Session);
@@ -639,14 +567,9 @@ public class GeoscapeSquadLoadoutTest
     Assert.True(fixture.Session.PendingResolution.IsSome); // the unrelated override is still pending
     Assert.Equal("Squad: 0/2", view.GetNode<Label>("%SquadCount").Text); // picks were reset
     Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"));
-    ChooseIntoSlot(view, 0, "Alpha"); // injured unit selectable for interrogation
+    ChooseSquadUnit(view, 0, "Alpha"); // injured unit selectable for interrogation
     var selected = view.GetSelectedCombatants();
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(alpha, selected[0]));
   }
-
-  private static Button ArmoryButton(UnitView editor, string itemName)
-    => editor.GetNode<VBoxContainer>("%ArmoryList").GetChildren()
-      .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text.Contains(itemName));
 }

@@ -1,5 +1,4 @@
 #nullable disable warnings
-using System;
 using System.Threading.Tasks;
 using FunProject.Combatants;
 using FunProject.Geoscape;
@@ -31,9 +30,6 @@ public class GeoscapeSquadNavigationTest
     return (scene, manager);
   }
 
-  private static Button SpeedButton(GeoscapeScene scene)
-    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Button>("%SpeedButton");
-
   private static Label Clock(GeoscapeScene scene)
     => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Label>("%ClockLabel");
 
@@ -42,10 +38,6 @@ public class GeoscapeSquadNavigationTest
       .AsValueEnumerable().OfType<Button>()
       .Single(button => button.Text == text);
 
-  private static void OpenMissionViaAlert(GeoscapeScene scene)
-    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<VBoxContainer>("%Alerts")
-      .GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
-
   private static void OpenMissionViaMarker(GeoscapeScene scene)
   {
     var map = scene.GetNode<GeoscapeMapControl>("%Map");
@@ -53,28 +45,8 @@ public class GeoscapeSquadNavigationTest
       .EmitSignal(BaseButton.SignalName.Pressed);
   }
 
-  private static void ChooseIntoSlot(SquadLoadoutView view, int slot, string unitName)
-  {
-    view.GetNode<VBoxContainer>("%Slots").GetChild<Control>(slot)
-      .GetNode<Button>("VBox/Header/ChooseUnit").EmitSignal(Button.SignalName.Pressed);
-    view.GetNode<VBoxContainer>("%RosterChoices").GetChildren()
-      .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text.Contains(unitName)).EmitSignal(Button.SignalName.Pressed);
-  }
-
   private static int AlertCount(GeoscapeScene scene)
     => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<VBoxContainer>("%Alerts").GetChildCount();
-
-  // A roster entry with explicit baselines (100 health keeps damage percentages on whole
-  // tiers) so condition labels and deployment gates have hand-checkable values.
-  private static RosterEntryData ConditionEntry(string name)
-    => MakeEntry(name, MakeCombatantData(name, health: 100, actionPoints: 8,
-      movement: 14, vision: 22, aim: 60, modSlotCount: 2, will: 50));
-
-  private static Button RosterChoice(SquadLoadoutView view, string unitName)
-    => view.GetNode<VBoxContainer>("%RosterChoices").GetChildren()
-      .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text.Contains(unitName));
 
   // Drives the real dialog's Engage handover and returns the presented squad view it
   // produced, so a test can assert the opener forwarded the pending mission's policy.
@@ -90,12 +62,13 @@ public class GeoscapeSquadNavigationTest
     return squad;
   }
 
-  [TestCase(TestName = "Engage produces a squad view without resolving the mission")]
-  public async Task EngageProducesTheSquadViewWithoutResolving()
+  [TestCase("Operation", TestName = "Engage produces a squad view without resolving the mission")]
+  [TestCase("Operation Iron", TestName = "Engage produces a squad view configured with the mission title")]
+  public async Task EngageProducesConfiguredSquadWithoutResolving(string title)
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var fixture = GeoscapeFixture.WithFiredEvent(
-      MakeEvent("Operation", GeoscapeEventKind.TacticalBattle));
+      MakeEvent(title, GeoscapeEventKind.TacticalBattle));
     fixture.OpenResolution(fixture.ActiveEvent);
     var dialog = AddToTree(CreateResolutionView());
     dialog.Present(fixture.State, fixture.Session);
@@ -109,120 +82,87 @@ public class GeoscapeSquadNavigationTest
     Assert.True(produced!.GetParent() is null); // emitted live and unparented, not pushed
     Assert.True(fixture.Session.PendingResolution.IsSome);
     Assert.Equal(0, fixture.Events.Count); // no resolution lifecycle was committed
-    produced.Free(); // the standalone dialog never pushed it; free directly
-  }
 
-  [TestCase(TestName = "Engage produces a squad view configured with the mission title")]
-  public async Task EngageProducesAConfiguredSquadView()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    using var fixture = GeoscapeFixture.WithFiredEvent(
-      MakeEvent("Operation Iron", GeoscapeEventKind.TacticalBattle));
-    fixture.OpenResolution(fixture.ActiveEvent);
-    var dialog = AddToTree(CreateResolutionView());
-    dialog.Present(fixture.State, fixture.Session);
-    fixture.ClearEvents();
-
-    GeoscapeView? produced = null;
-    dialog.ViewRequested += view => produced = view;
-    DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
-
-    var squad = AddToTree((SquadLoadoutView)produced!);
+    var squad = AddToTree((SquadLoadoutView)produced);
     squad.Present(fixture.State, fixture.Session); // materializes the handed-over configuration
-    Assert.Equal("Operation Iron", squad.GetNode<Label>("%Title").Text);
+    Assert.Equal(title, squad.GetNode<Label>("%Title").Text);
     Assert.Equal("Squad: 0/3", squad.GetNode<Label>("%SquadCount").Text); // default three slots
     Assert.Equal(0, squad.GetSelectedCombatants().Count);
     Assert.Equal(0, fixture.Events.Count); // still no resolution lifecycle
   }
 
-  [TestCase(TestName = "Engage forwards the mission's policy: injured units stay blocked")]
-  public async Task EngageForwardsTheOrdinaryMissionPolicy()
+  [TestCase(false, "Operation Iron", TestName = "Engage forwards the mission's policy: injured units stay blocked")]
+  [TestCase(true, "Last Stand", TestName = "Engage forwards an override mission: unfit units deploy with notice")]
+  public async Task EngageForwardsMissionPolicy(bool allowUnfitDeployment, string title)
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var fixture = new GeoscapeFixture(MakeStart(
-      roster: [ConditionEntry("Alpha")],
-      timeline: [MakeScheduled(1, MakeEvent("Operation Iron", GeoscapeEventKind.TacticalBattle))]));
-    fixture.AdvanceTicks(1);
-    fixture.OpenResolution(fixture.ActiveEvent);
-    Combatant alpha = fixture.State.Roster[0];
-    fixture.ReturnFromMission((alpha, 25, 0)); // Injured + Tired: barred from the mission
-
-    var squad = EngagedSquadView(fixture);
-
-    Assert.False(squad.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"),
-      "An ordinary mission shows no exceptional-deployment notice.");
-    squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(0)
-      .GetNode<Button>("VBox/Header/ChooseUnit").EmitSignal(Button.SignalName.Pressed);
-    Assert.True(RosterChoice(squad, "Alpha").Disabled); // the opener's mission context blocks Alpha
-  }
-
-  [TestCase(TestName = "Engage forwards an override mission: unfit units deploy with notice")]
-  public async Task EngageForwardsTheOverrideMissionPolicy()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    using var fixture = new GeoscapeFixture(MakeStart(
-      roster: [ConditionEntry("Alpha")],
+      roster: [MakeConditionEntry("Alpha")],
       timeline: [MakeScheduled(1,
-        MakeEvent("Last Stand", GeoscapeEventKind.TacticalBattle, allowUnfitDeployment: true))]));
+        MakeEvent(title, GeoscapeEventKind.TacticalBattle, allowUnfitDeployment: allowUnfitDeployment))]));
     fixture.AdvanceTicks(1);
     fixture.OpenResolution(fixture.ActiveEvent);
     Combatant alpha = fixture.State.Roster[0];
-    fixture.ReturnFromMission((alpha, 25, 0)); // Injured + Tired: deployable only via the override
+    fixture.ReturnFromMission((alpha, 25, 0)); // Injured + Tired: barred from the mission itself
 
     var squad = EngagedSquadView(fixture);
 
-    Assert.True(squad.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional deployment"));
+    string prompt = squad.GetNode<Label>("%SelectionPrompt").Text;
+    Assert.True(allowUnfitDeployment
+      ? prompt.Contains("Exceptional deployment")
+      : !prompt.Contains("Exceptional"));
     squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(0)
-      .GetNode<Button>("VBox/Header/ChooseUnit").EmitSignal(Button.SignalName.Pressed);
-    Assert.False(RosterChoice(squad, "Alpha").Disabled); // the override authorized the unfit unit
-    RosterChoice(squad, "Alpha").EmitSignal(BaseButton.SignalName.Pressed);
+      .GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
+    Assert.Equal(!allowUnfitDeployment, SquadChoice(squad, "Alpha").Disabled); // the opener's mission context
+    if (!allowUnfitDeployment)
+      return;
+
+    SquadChoice(squad, "Alpha").EmitSignal(BaseButton.SignalName.Pressed); // the override authorized the unfit unit
     var selected = squad.GetSelectedCombatants();
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(alpha, selected[0]));
   }
 
-  [TestCase(TestName = "Marker route: Engage covers the dialog with squad preparation")]
-  public async Task MarkerEngageOpensSquadPreparation()
+  [TestCase(false, true, 0, false,
+    TestName = "Full round trip keeps the mission and Decline still resolves")]
+  [TestCase(false, false, 1, true,
+    TestName = "Re-engaging starts empty while equipment edits persist")]
+  [TestCase(true, false, 0, false,
+    TestName = "Marker route: Engage covers the dialog with squad preparation")]
+  public async Task PreparationRoundTrip(bool viaMarker, bool bravoInRoster, int selectedSlot, bool reEngage)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager) = TacticalScene([MakeEntry("Alpha")]);
-    OpenMissionViaMarker(scene);
+    var roster = bravoInRoster
+      ? new[] { MakeEntry("Alpha"), MakeEntry("Bravo") }
+      : new[] { MakeEntry("Alpha") };
+    var (scene, manager) = viaMarker
+      ? TacticalScene(roster)
+      : TacticalScene(roster, armory: [MakeFirearmWeaponData("Rifle")]);
+    if (viaMarker)
+      OpenMissionViaMarker(scene);
+    else
+      OpenResolutionViaAlert(scene);
     var dialog = (GeoscapeEventResolution)manager.Current;
 
     DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
-
     var squad = (SquadLoadoutView)manager.Current;
     Assert.Equal("Operation Iron", squad.GetNode<Label>("%Title").Text);
     Assert.False(dialog.IsVisibleInTree()); // squad preparation covers the dialog
     Assert.True(squad.IsVisibleInTree());
-
     string clock = Clock(scene).Text;
     scene._PhysicsProcess(1.0); // covered views freeze the clock at the composition root
     Assert.Equal(clock, Clock(scene).Text);
     Assert.Equal(1, AlertCount(scene)); // the mission stays active: alert remains
-  }
+    if (viaMarker)
+      return;
 
-  [TestCase(TestName = "Full round trip keeps the mission and Decline still resolves")]
-  public async Task FullRoundTripKeepsMissionAndDeclineResolves()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager) = TacticalScene(
-      [MakeEntry("Alpha"), MakeEntry("Bravo")],
-      armory: [MakeFirearmWeaponData("Rifle")]);
-    OpenMissionViaAlert(scene);
-    var dialog = (GeoscapeEventResolution)manager.Current;
-    DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
-    var squad = (SquadLoadoutView)manager.Current;
-
-    ChooseIntoSlot(squad, 0, "Alpha");
-    squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(0)
+    ChooseSquadUnit(squad, selectedSlot, "Alpha");
+    squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(selectedSlot)
       .GetNode<Button>("%EditUnit").EmitSignal(Button.SignalName.Pressed);
     var editor = (UnitView)manager.Current;
     Assert.False(squad.IsVisibleInTree()); // the nested editor covers preparation
     editor.SelectSlot(UnitViewSlot.Weapon);
-    editor.GetNode<VBoxContainer>("%ArmoryList").GetChildren()
-      .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text.Contains("Rifle")).EmitSignal(Button.SignalName.Pressed);
+    ArmoryButton(editor, "Rifle").EmitSignal(Button.SignalName.Pressed);
     editor.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
 
     Assert.True(ReferenceEquals(squad, manager.Current)); // editor pops back to the squad
@@ -236,10 +176,28 @@ public class GeoscapeSquadNavigationTest
     Assert.True(ReferenceEquals(dialog, manager.Current));
     Assert.True(dialog.IsVisibleInTree());
     Assert.Equal(2, dialog.GetNode<HBoxContainer>("%Buttons").GetChildCount());
-
     string clockWhilePending = Clock(scene).Text;
     scene._PhysicsProcess(1.0); // the pending-resolution gate keeps root time frozen
     Assert.Equal(clockWhilePending, Clock(scene).Text);
+
+    if (reEngage)
+    {
+      DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed); // re-engage
+
+      var second = (SquadLoadoutView)manager.Current;
+      Assert.False(ReferenceEquals(squad, second)); // a fresh view each Engage
+      Assert.Equal(0, second.GetSelectedCombatants().Count); // slots start empty
+      Assert.Equal(3, second.GetNode<VBoxContainer>("%Slots").GetChildCount());
+      Assert.Equal(2, dialog.GetNode<HBoxContainer>("%Buttons").GetChildCount()); // no growth
+
+      // Choices start inert (no destination); Alpha is available again and keeps the rifle.
+      Assert.True(SquadChoice(second, "Alpha").Disabled);
+      ChooseSquadUnit(second, 0, "Alpha");
+      Assert.True(second.GetSelectedCombatants()[0].EquippedWeapon.IsSome);
+
+      second.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
+      Assert.True(ReferenceEquals(dialog, manager.Current)); // popped back to the dialog
+    }
 
     DialogButton(dialog, "Decline").EmitSignal(Button.SignalName.Pressed);
 
@@ -248,45 +206,6 @@ public class GeoscapeSquadNavigationTest
     Assert.Equal(0, AlertCount(scene));
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
     Assert.False(GodotObject.IsInstanceValid(dialog));
-  }
-
-  [TestCase(TestName = "Re-engaging starts empty while equipment edits persist")]
-  public async Task ReEngageStartsEmptyWithPersistedEquipment()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager) = TacticalScene(
-      [MakeEntry("Alpha")],
-      armory: [MakeFirearmWeaponData("Rifle")]);
-    OpenMissionViaAlert(scene);
-    var dialog = (GeoscapeEventResolution)manager.Current;
-
-    DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
-    var first = (SquadLoadoutView)manager.Current;
-    ChooseIntoSlot(first, 1, "Alpha");
-    first.GetNode<VBoxContainer>("%Slots").GetChild<Control>(1)
-      .GetNode<Button>("%EditUnit").EmitSignal(Button.SignalName.Pressed);
-    var editor = (UnitView)manager.Current;
-    editor.SelectSlot(UnitViewSlot.Weapon);
-    editor.GetNode<VBoxContainer>("%ArmoryList").GetChildren()
-      .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text.Contains("Rifle")).EmitSignal(Button.SignalName.Pressed);
-    editor.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
-    first.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
-    Assert.True(ReferenceEquals(dialog, manager.Current)); // back landed on the dialog
-
-    DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed); // re-engage
-
-    var second = (SquadLoadoutView)manager.Current;
-    Assert.False(ReferenceEquals(first, second)); // a fresh view each Engage
-    Assert.Equal(0, second.GetSelectedCombatants().Count); // slots start empty
-    Assert.Equal(3, second.GetNode<VBoxContainer>("%Slots").GetChildCount());
-    Assert.Equal(2, dialog.GetNode<HBoxContainer>("%Buttons").GetChildCount()); // no growth
-
-    // Choices start inert (no destination); Alpha is available again and keeps the rifle.
-    Assert.True(second.GetNode<VBoxContainer>("%RosterChoices").GetChildren()
-      .AsValueEnumerable().OfType<Button>().Single(button => button.Text.Contains("Alpha")).Disabled);
-    ChooseIntoSlot(second, 0, "Alpha");
-    Assert.True(second.GetSelectedCombatants()[0].EquippedWeapon.IsSome);
   }
 
   [TestCase(GeoscapeEventKind.Plot, "Continue",
@@ -301,7 +220,7 @@ public class GeoscapeSquadNavigationTest
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     SpeedButton(scene).EmitSignal(Button.SignalName.Pressed);
     scene._PhysicsProcess(0.1);
-    OpenMissionViaAlert(scene);
+    OpenResolutionViaAlert(scene);
     var dialog = (GeoscapeEventResolution)manager.Current;
 
     DialogButton(dialog, buttonText).EmitSignal(Button.SignalName.Pressed);
@@ -325,13 +244,7 @@ public class GeoscapeSquadNavigationTest
     DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
     Assert.True(ReferenceEquals(dialog, manager.Current));
 
-    var probe = new Label { Name = "NotASquadLoadoutView" };
-    var packed = new PackedScene();
-    Error error = packed.Pack(probe);
-    probe.Free();
-    if (error != Error.Ok)
-      throw new InvalidOperationException($"Test scene packing failed: {error}");
-    dialog.SquadViewScene = packed;
+    dialog.SquadViewScene = Pack(new Label { Name = "NotASquadLoadoutView" });
     DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
     Assert.True(ReferenceEquals(dialog, manager.Current));
     Assert.True(dialog.IsVisibleInTree());

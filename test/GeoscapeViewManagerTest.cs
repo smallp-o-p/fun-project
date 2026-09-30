@@ -12,14 +12,10 @@ using static FunProject.Tests.GeoscapeTestScenes;
 [RequireGodotRuntime]
 public partial class GeoscapeViewManagerTest
 {
-  // Minimal stack member with retained local state and a Present counter.
+  // Minimal stack member with retained local state.
   private sealed partial class FakeView : GeoscapeView
   {
     public string Marker = "";
-    public int Presents;
-
-    public override void Present(CampaignGameState state, GeoscapeSession session)
-      => Presents++;
   }
 
   private static GeoscapeViewManager BuildManager()
@@ -68,8 +64,15 @@ public partial class GeoscapeViewManagerTest
     await using var cleanup = new DeferredNodeCleanup();
     var manager = BuildManager();
     var root = manager.RootView;
-    var a = new FakeView { Name = "A" };
+    var a = new FakeView { Name = "A", Marker = "kept" };
     var b = new FakeView { Name = "B" };
+    var seen = new System.Collections.Generic.List<GeoscapeView>();
+    var states = new System.Collections.Generic.List<bool>();
+    manager.ViewChanged += view =>
+    {
+      seen.Add(view);
+      states.Add(view.IsInsideTree() && view.Visible && ReferenceEquals(view, manager.Current));
+    };
 
     manager.Push(a);
     manager.Push(b);
@@ -83,7 +86,8 @@ public partial class GeoscapeViewManagerTest
     Assert.Equal(Node.ProcessModeEnum.Disabled, root.ProcessMode);
 
     manager.Pop();
-    Assert.True(ReferenceEquals(a, manager.Current));
+    Assert.True(ReferenceEquals(a, manager.Current)); // Back returns to the same covered instance
+    Assert.Equal("kept", a.Marker); // with its state retained
     Assert.True(a.IsVisibleInTree());
     Assert.Equal(Node.ProcessModeEnum.Inherit, a.ProcessMode);
     Assert.True(b.GetParent() is null && b.IsQueuedForDeletion());
@@ -91,6 +95,14 @@ public partial class GeoscapeViewManagerTest
     manager.Pop();
     Assert.True(ReferenceEquals(root, manager.Current));
     Assert.True(root.IsVisibleInTree());
+
+    Assert.Equal(4, seen.Count); // every push/pop notified, after the stack and tree settled
+    Assert.True(ReferenceEquals(a, seen[0]));
+    Assert.True(ReferenceEquals(b, seen[1]));
+    Assert.True(ReferenceEquals(a, seen[2]));
+    Assert.True(ReferenceEquals(manager.RootView, seen[3]));
+    foreach (bool correct in states)
+      Assert.True(correct, "ViewChanged must fire after stack and tree state are correct.");
   }
 
   [TestCase]
@@ -120,22 +132,6 @@ public partial class GeoscapeViewManagerTest
     Assert.Equal(13f, view.OffsetTop);
     Assert.Equal(-17f, view.OffsetRight);
     Assert.Equal(-19f, view.OffsetBottom);
-  }
-
-  [TestCase]
-  public async Task BackReturnsToTheSameCoveredInstanceWithRetainedState()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var manager = BuildManager();
-    var a = new FakeView { Name = "A", Marker = "kept" };
-    manager.Push(a);
-    manager.Push(new FakeView { Name = "B" });
-
-    manager.Pop();
-
-    var restored = (FakeView)manager.Current;
-    Assert.True(ReferenceEquals(a, restored));
-    Assert.Equal("kept", restored.Marker);
   }
 
   [TestCase]
@@ -302,35 +298,6 @@ public partial class GeoscapeViewManagerTest
     Assert.False(GodotObject.IsInstanceValid(backgrounded));
     Assert.False(GodotObject.IsInstanceValid(root));
     Assert.False(GodotObject.IsInstanceValid(layer));
-  }
-
-  [TestCase]
-  public async Task ViewChangedFiresAfterStackAndTreeStateIsCorrect()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var manager = BuildManager();
-    var a = new FakeView { Name = "A" };
-    var b = new FakeView { Name = "B" };
-    var seen = new System.Collections.Generic.List<GeoscapeView>();
-    var states = new System.Collections.Generic.List<bool>();
-    manager.ViewChanged += view =>
-    {
-      seen.Add(view);
-      states.Add(view.IsInsideTree() && view.Visible && ReferenceEquals(view, manager.Current));
-    };
-
-    manager.Push(a);
-    manager.Push(b);
-    manager.Pop();
-    manager.Pop(); // reactivates the root
-
-    Assert.Equal(4, seen.Count);
-    Assert.True(ReferenceEquals(a, seen[0]));
-    Assert.True(ReferenceEquals(b, seen[1]));
-    Assert.True(ReferenceEquals(a, seen[2]));
-    Assert.True(ReferenceEquals(manager.RootView, seen[3]));
-    foreach (bool correct in states)
-      Assert.True(correct, "ViewChanged must fire after stack and tree state are correct.");
   }
 
   [TestCase]

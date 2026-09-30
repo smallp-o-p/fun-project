@@ -5,6 +5,7 @@ using FunProject.Scenes.Ext;
 using Godot;
 using GdUnit4;
 using static GdUnit4.Assertions;
+using static FunProject.Tests.GeoscapeTestScenes;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -12,18 +13,6 @@ using static GdUnit4.Assertions;
 public partial class PackedSceneExtensionsTest
 {
   internal sealed partial class ProbeView : Control;
-
-  // Synthetic packing stays local to this suite, HUD-style: the shared helper's
-  // success/missing/wrong-root contracts need no authored scenes.
-  private static PackedScene Pack(Node prototype)
-  {
-    var packed = new PackedScene();
-    Error error = packed.Pack(prototype);
-    prototype.Free();
-    if (error != Error.Ok)
-      throw new InvalidOperationException($"Test scene packing failed: {error}");
-    return packed;
-  }
 
   [TestCase(TestName = "A typed root instantiates once, live and unparented")]
   public async Task TypedRootIsReturnedLiveAndUnparented()

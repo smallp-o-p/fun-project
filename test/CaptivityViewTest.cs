@@ -36,18 +36,6 @@ public class CaptivityViewTest
   private static void ToggleRow(CaptivityView view, int index, bool pressed)
     => Row(view, index).ButtonPressed = pressed;
 
-  private static Button ChoiceButton(SquadLoadoutView squad, string unitName)
-    => squad.GetNode<VBoxContainer>("%RosterChoices").GetChildren()
-      .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text.Contains(unitName));
-
-  private static void ChooseUnit(SquadLoadoutView squad, int slot, string unitName)
-  {
-    squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(slot)
-      .GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
-    ChoiceButton(squad, unitName).EmitSignal(Button.SignalName.Pressed);
-  }
-
   [TestCase(TestName = "An empty captivity shows the empty state and keeps preparation inert")]
   public async Task EmptyCaptivityShowsEmptyStateAndKeepsPreparationInert()
   {
@@ -226,13 +214,16 @@ public class CaptivityViewTest
     Assert.Equal("Squad: 0/2", squad.GetNode<Label>("%SquadCount").Text);
   }
 
-  [TestCase(TestName = "Interrogation squad enforces two distinct roster units")]
-  public async Task InterrogationSquadEnforcesTwoDistinctRosterUnits()
+  [TestCase(false, TestName = "Interrogation preparation leaves campaign truth untouched")]
+  [TestCase(true, TestName = "Interrogation squad enforces two distinct roster units")]
+  public async Task InterrogationPreparationSelectsDistinctRosterWithoutCampaignEffects(bool secondInterrogator)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var captive = MakeCombatant("Alpha", MakeFaction("Cult"));
-    using var fixture = CaptiveCampaign([captive],
-      [MakeEntry("Scout"), MakeEntry("Medic")]);
+    var roster = secondInterrogator
+      ? new RosterEntryData[] { MakeEntry("Scout"), MakeEntry("Medic") }
+      : new RosterEntryData[] { MakeEntry("Scout") };
+    using var fixture = CaptiveCampaign([captive], roster);
     var view = AddToTree(CreateCaptivityView());
     view.Present(fixture.State, fixture.Session);
     ToggleRow(view, 0, true);
@@ -242,42 +233,12 @@ public class CaptivityViewTest
     view.PrepareInterrogation();
     var squad = AddToTree((SquadLoadoutView)produced!);
     squad.Present(fixture.State, fixture.Session);
+    ChooseSquadUnit(squad, 0, "Scout");
 
-    ChooseUnit(squad, 0, "Scout");
-    squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(1)
-      .GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed); // mark slot 2
-    Assert.True(ChoiceButton(squad, "Scout").Disabled); // occupied units stay unavailable
-    Assert.False(ChoiceButton(squad, "Medic").Disabled);
-
-    ChooseUnit(squad, 1, "Medic"); // the open destination takes the second distinct unit
-
-    var selected = squad.GetSelectedCombatants();
-    Assert.Equal(2, selected.Count);
-    Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
-    Assert.True(ReferenceEquals(fixture.State.Roster[1], selected[1]));
-  }
-
-  [TestCase(TestName = "Interrogation preparation leaves campaign truth untouched")]
-  public async Task InterrogationPreparationLeavesCampaignTruthUntouched()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var captive = MakeCombatant("Alpha", MakeFaction("Cult"));
-    using var fixture = CaptiveCampaign([captive], [MakeEntry("Scout")]);
-    var view = AddToTree(CreateCaptivityView());
-    view.Present(fixture.State, fixture.Session);
-    ToggleRow(view, 0, true);
-
-    GeoscapeView? produced = null;
-    view.ViewRequested += requested => produced = requested;
-    view.PrepareInterrogation();
-    var squad = AddToTree((SquadLoadoutView)produced!);
-    squad.Present(fixture.State, fixture.Session);
-    ChooseUnit(squad, 0, "Scout");
-
-    Control card = squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(0);
+    Control card = SquadSlot(squad, 0);
     Assert.False(card.GetNode<Button>("%EditUnit").Visible); // editing hidden while occupied
 
-    Assert.True(Row(view, 0).ButtonPressed); // selection untouched
+    Assert.True(Row(view, 0).ButtonPressed); // captive selection untouched
     Assert.Equal("Selected: 1", view.GetNode<Label>("%SelectionCount").Text);
 
     // Captivity, faction, roster, and session truth survive preparation untouched.
@@ -286,6 +247,26 @@ public class CaptivityViewTest
     Assert.Equal("Cult", fixture.State.Captivity.Combatants[0].OwningFaction.Name);
     Assert.True(fixture.State.Roster[0].EquippedWeapon.IsNone); // nothing moved to the Armory
     Assert.Equal(0, fixture.Events.Count); // no session lifecycle was committed
+
+    if (secondInterrogator)
+    {
+      squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(1)
+        .GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed); // mark slot 2
+      Assert.True(SquadChoice(squad, "Scout").Disabled); // occupied units stay unavailable
+      Assert.False(SquadChoice(squad, "Medic").Disabled);
+
+      ChooseSquadUnit(squad, 1, "Medic"); // the open destination takes the second distinct unit
+      var selected = squad.GetSelectedCombatants();
+      Assert.Equal(2, selected.Count);
+      Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
+      Assert.True(ReferenceEquals(fixture.State.Roster[1], selected[1]));
+    }
+    else
+    {
+      var selected = squad.GetSelectedCombatants();
+      Assert.Equal(1, selected.Count);
+      Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
+    }
   }
 
   [TestCase(TestName = "Back from interrogation returns to the retained captivity selection")]
@@ -295,12 +276,7 @@ public class CaptivityViewTest
     var first = MakeCombatant("Alpha", MakeFaction("Cult"));
     var second = MakeCombatant("Bravo", MakeFaction("Cult"));
     using var fixture = CaptiveCampaign([first, second], [MakeEntry("Scout")]);
-    var manager = new GeoscapeViewManager { Name = "Manager" };
-    var root = CreateBaseView();
-    manager.RootView = root;
-    manager.AddChild(root);
-    AddToTree(manager);
-    manager.ViewChanged += view => view.Present(fixture.State, fixture.Session);
+    var manager = CreatePresentedManager(fixture);
 
     var captivity = CreateCaptivityView();
     manager.Push(captivity); // ViewChanged presents
@@ -352,13 +328,7 @@ public class CaptivityViewTest
     SysColGeneric.List<GeoscapeView> requested = [];
     view.ViewRequested += requested.Add;
 
-    var probe = new Label { Name = "NotASquadLoadoutView" };
-    var packed = new PackedScene();
-    Error error = packed.Pack(probe);
-    probe.Free();
-    if (error != Error.Ok)
-      throw new InvalidOperationException($"Test scene packing failed: {error}");
-    view.SquadViewScene = packed;
+    view.SquadViewScene = Pack(new Label { Name = "NotASquadLoadoutView" });
 
     // Free (not QueueFree) leaves no orphan behind the synchronous throw.
     long orphansBefore = (long)Performance.Singleton.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);
