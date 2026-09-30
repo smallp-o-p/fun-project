@@ -18,6 +18,7 @@ public class BattleResultTest
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)));
 
     Assert.True(battle.Query(new GetBattleResultQuery()).IsLeft);
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
   }
 
   [TestCase(TestName = "Ended battle reports outcome, counts, and object tallies")]
@@ -56,5 +57,14 @@ public class BattleResultTest
     Assert.Equal(0, battleResult.Factions[player].Killed);
     Assert.Equal(1, battleResult.Factions[enemy].Spawned);
     Assert.Equal(0, battleResult.Factions[enemy].Killed);
+
+    // The result query reads the session's stored completion; both report the same snapshot.
+    CompletedBattle completed = runtime.Query(new GetCompletedBattleQuery()).RequireSome();
+    Assert.Equal(battleResult.Outcome, completed.Outcome);
+    Assert.Equal(battleResult.TurnCount, completed.TurnCount);
+    Assert.Equal(battleResult.Factions[player], completed.Factions[player]);
+    Assert.Equal(battleResult.Factions[enemy], completed.Factions[enemy]);
+    Assert.Equal(battleResult.ObjectsInteracted, completed.ObjectsInteracted);
+    Assert.Equal(battleResult.ObjectsExpired, completed.ObjectsExpired);
   }
 }

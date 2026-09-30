@@ -28,7 +28,6 @@ public sealed class BattleSession
   private readonly TurnScheduler _scheduler;
   private readonly Queue<BattleEvent> _eventDispatchQueue = [];
   private bool _isDispatchingEvents;
-  private IReadOnlyList<Combatant> _capturedEnemies = [];
 
   // Phase-independent tactical storage; the session layers scheduling, phase/outcome, and
   // event dispatch on top of it.
@@ -41,6 +40,11 @@ public sealed class BattleSession
   public Faction ActiveSide => _scheduler.ActiveSide;
   public Option<Faction> PlayerFaction => State.PlayerFaction;
   public Option<BattleOutcome> Outcome { get; private set; }
+
+  // The one frozen completion report, captured at the terminal boundary (EndBattle for this
+  // checkpoint; Task 3 moves the call to post-primitive settlement). Every completion read
+  // serves this stored value.
+  internal Option<CompletedBattle> Completed { get; private set; }
   public IEnumerable<BattleUnitState> AliveUnits => State.AliveUnits;
   public IEnumerable<BattleUnitState> DeadUnits => State.DeadUnits;
   public IEnumerable<BattleObjectState> Objects => State.Objects;
@@ -422,16 +426,10 @@ public sealed class BattleSession
     if (Phase == BattlePhase.Ended)
       return;
 
-    var captured = new SysColGeneric.HashSet<Combatant>(
-      System.Collections.Generic.ReferenceEqualityComparer.Instance);
-    if (outcome == BattleOutcome.Victory)
-      PlayerFaction.IfSome(player =>
-      {
-        foreach (var unit in AliveUnits)
-          if (unit.Side != player && unit.IsUnconscious)
-            captured.Add(unit.Combatant);
-      });
-    _capturedEnemies = System.Array.AsReadOnly(captured.AsValueEnumerable().ToArray());
+    // The one frozen report, captured before the end-event broadcast so event observers
+    // already read the final settlement. Task 3 relocates this call to post-primitive
+    // settlement; repeated reads keep serving this stored value.
+    Completed = CompletedBattle.Capture(State, outcome, TurnNumber);
 
     _scheduler.ClearActiveFactionAvailability();
     _scheduler.ClearTurnQueue();
@@ -659,50 +657,5 @@ public sealed class BattleSession
 
     foreach (var unit in GetFactionAliveUnits(nextSide))
       unit.RefreshForNewTurn();
-  }
-
-  internal FactionBattleSummary GetFactionSummary(Faction faction)
-  {
-    return new FactionBattleSummary()
-    {
-      Faction = faction,
-      Outcome = Outcome.Value(),
-      CapturedEnemies = Outcome == Some(BattleOutcome.Victory) && PlayerFaction == Some(faction)
-        ? _capturedEnemies
-        : [],
-      CombatantsPresent = (SysColGeneric.HashSet<Combatant>)
-      [
-        .. AliveUnits.AsValueEnumerable().Where(unit => unit.Side == faction).Select(unit => unit.Combatant).ToArray(),
-        .. DeadUnits.AsValueEnumerable().Where(unit => unit.Side == faction).Select(unit => unit.Combatant).ToArray(),
-      ],
-      CombatantsDead = (SysColGeneric.HashSet<Combatant>)
-        [.. DeadUnits.AsValueEnumerable().Where(unit => unit.Side == faction).Select(unit => unit.Combatant).ToArray()],
-      CombatantsWounded = (SysColGeneric.HashSet<Combatant>)
-      [
-        ..AliveUnits.AsValueEnumerable().Where(unit => unit.Side == faction).Where(unit => unit.MaxHealth > unit.CurrentHealth)
-          .Select(unit => unit.Combatant).ToArray()
-      ],
-      DefeatedPerCombatant = State.KillsByUnit.AsValueEnumerable().Where(unitKilled => unitKilled.Key.Side == faction)
-        .Select(unitKilled =>
-          (unitKilled.Key.Combatant, unitKilled.Value.AsValueEnumerable().Select(killed => killed.Combatant).ToList()))
-        .ToDictionary(entry => entry.Item1, entry => entry.Item2),
-      TurnCount = TurnNumber,
-      HealthByCombatant = BuildHealthByCombatant(faction),
-    };
-  }
-
-  // Health reports for the faction's living participants — unconscious included. Dead
-  // participants stay represented by the present/dead sets and the campaign skips them
-  // when consuming returns.
-  private Dictionary<Combatant, BattleHealthSummary> BuildHealthByCombatant(Faction faction)
-  {
-    var health = new Dictionary<Combatant, BattleHealthSummary>();
-
-    foreach (BattleUnitState unit in GetFactionAliveUnits(faction))
-    {
-      health[unit.Combatant] = new BattleHealthSummary(unit.MaxHealth, unit.TotalHealthDamageTaken);
-    }
-
-    return health;
   }
 }

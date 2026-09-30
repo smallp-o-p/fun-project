@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Combatants;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
@@ -44,7 +45,7 @@ public class EndOfBattleSummaryTest
     Assert.True(ReferenceEquals(captured, after.CapturedEnemies[0]));
   }
 
-  [TestCase]
+  [TestCase(TestName = "Only the designated player summary receives victory captures")]
   public void OnlyTheDesignatedPlayerSummaryReceivesVictoryCaptures()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
@@ -54,8 +55,8 @@ public class EndOfBattleSummaryTest
       new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count);
     Assert.Equal(0, battle.Query(
       new GetFactionEndOfBattleSummary(battle.EnemyFaction)).RequireRight().CapturedEnemies.Count);
-    Assert.Equal(0, battle.Query(
-      new GetFactionEndOfBattleSummary(TestData.MakeFaction("Player"))).RequireRight().CapturedEnemies.Count);
+    CompletedBattle completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+    Assert.False(completed.FactionSummaries.ContainsKey(TestData.MakeFaction("Player")));
   }
 
   [TestCase]
@@ -94,6 +95,44 @@ public class EndOfBattleSummaryTest
     // Issued summaries are copies: raw post-battle mutation never rewrites them.
     battle.PlayerUnit.ReceiveDamage(5);
     Assert.Equal(3L, first.HealthByCombatant[battle.PlayerUnit.Combatant].HealthDamageTaken);
+
+    // The stored completion is frozen too: a fresh read reports the captured numbers.
+    var again = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
+    Assert.Equal(20, again.HealthByCombatant[battle.PlayerUnit.Combatant].MaxHealth);
+    Assert.Equal(3L, again.HealthByCombatant[battle.PlayerUnit.Combatant].HealthDamageTaken);
+  }
+
+  [TestCase]
+  public void RepeatedCompletionReadsKeepFrozenHealthAndMembership()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    battle.ApplyDamage(battle.PlayerUnit, 3);
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+    battle.Query(new GetCompletedBattleQuery()).RequireSome();
+
+    // Deliberate campaign-side mutation probes frozen membership; not a supported gameplay action.
+    battle.PlayerUnit.ReceiveDamage(5);
+    battle.PlayerUnit.Combatant.OwningFaction = battle.EnemyFaction;
+
+    var completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+    Assert.Equal(BattleOutcome.Victory, completed.Outcome);
+    Assert.Equal(1, completed.TurnCount);
+    Assert.Equal(1, completed.Factions[battle.PlayerFaction].Spawned);
+    Assert.Equal(0, completed.Factions[battle.PlayerFaction].Killed);
+    Assert.Equal(1, completed.Factions[battle.EnemyFaction].Spawned);
+    Assert.Equal(0, completed.Factions[battle.EnemyFaction].Killed);
+    Assert.Equal(20, completed.FactionSummaries[battle.PlayerFaction]
+      .HealthByCombatant[battle.PlayerUnit.Combatant].MaxHealth);
+    Assert.Equal(3L, completed.FactionSummaries[battle.PlayerFaction]
+      .HealthByCombatant[battle.PlayerUnit.Combatant].HealthDamageTaken);
+    Assert.True(completed.FactionSummaries[battle.PlayerFaction]
+      .CombatantsPresent.Contains(battle.PlayerUnit.Combatant));
+    Assert.True(completed.FactionSummaries[battle.PlayerFaction]
+      .CombatantsWounded.Contains(battle.PlayerUnit.Combatant));
+    Assert.Equal(0, completed.FactionSummaries[battle.PlayerFaction].CombatantsDead.Count);
+    Assert.Equal(0, completed.FactionSummaries[battle.PlayerFaction].DefeatedPerCombatant.Count);
+    Assert.True(ReferenceEquals(battle.EnemyUnit.Combatant,
+      completed.FactionSummaries[battle.PlayerFaction].CapturedEnemies[0]));
   }
 
   [TestCase(TestName = "The summary query fails while the battle has not ended")]
@@ -141,6 +180,47 @@ public class EndOfBattleSummaryTest
       "Present should hold every faction combatant — dead, wounded, and untouched alike.");
     Assert.Equal(1, summary.DefeatedPerCombatant.Count);
     Assert.True(summary.DefeatedPerCombatant[battle.PlayerUnit.Combatant].AsValueEnumerable().SequenceEqual([battle.EnemyUnit.Combatant, bandit2.Combatant]));
+
+    CompletedReportsDoNotExposeWritableCollections(
+      battle.Query(new GetCompletedBattleQuery()).RequireSome());
+  }
+
+  // Frozen completed reports must not expose writable collection interfaces — outer
+  // dictionaries, roster sets, and the kill ledger's nested defeated lists included. An
+  // implemented mutable interface must at least report IsReadOnly; a missing cast is fine.
+  private static void CompletedReportsDoNotExposeWritableCollections(CompletedBattle completed)
+  {
+    AssertReadOnly(completed.Factions);
+    AssertReadOnly(completed.FactionSummaries);
+    foreach (FactionBattleSummary summary in completed.FactionSummaries.Values)
+    {
+      AssertReadOnly(summary.CombatantsPresent);
+      AssertReadOnly(summary.CombatantsDead);
+      AssertReadOnly(summary.CombatantsWounded);
+      AssertReadOnly(summary.DefeatedPerCombatant);
+      AssertReadOnly(summary.HealthByCombatant);
+      AssertReadOnly(summary.CapturedEnemies);
+      foreach (SysColGeneric.IReadOnlyList<Combatant> defeated in summary.DefeatedPerCombatant.Values)
+        AssertReadOnly(defeated);
+    }
+  }
+
+  private static void AssertReadOnly<K, V>(SysColGeneric.IReadOnlyDictionary<K, V> collection)
+  {
+    if (collection is SysColGeneric.IDictionary<K, V> mutable)
+      Assert.True(mutable.IsReadOnly);
+  }
+
+  private static void AssertReadOnly<T>(SysColGeneric.IReadOnlySet<T> collection)
+  {
+    if (collection is SysColGeneric.ISet<T> mutable)
+      Assert.True(mutable.IsReadOnly);
+  }
+
+  private static void AssertReadOnly<T>(SysColGeneric.IReadOnlyList<T> collection)
+  {
+    if (collection is SysColGeneric.IList<T> mutable)
+      Assert.True(mutable.IsReadOnly);
   }
 
   [TestCase(TestName = "A defeat summary excludes enemy wounded and the enemy summary attributes its kill")]

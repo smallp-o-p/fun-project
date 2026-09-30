@@ -27,7 +27,7 @@ public class CaptureBattleTest
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Health);
 
-    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count);
   }
 
@@ -44,7 +44,7 @@ public class CaptureBattleTest
     battle.Session.AddObjective(battle.PlayerFaction, objective);
     battle.EndFactionTurn(battle.PlayerFaction);
 
-    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count);
   }
 
@@ -69,7 +69,7 @@ public class CaptureBattleTest
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
 
-    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count);
   }
 

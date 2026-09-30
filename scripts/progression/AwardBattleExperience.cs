@@ -30,7 +30,7 @@ public static class AwardBattleExperience
       totals[combatant] = table.ParticipationXp;
     }
 
-    foreach ((Combatant killer, List<Combatant> defeated) in summary.DefeatedPerCombatant)
+    foreach ((Combatant killer, IReadOnlyList<Combatant> defeated) in summary.DefeatedPerCombatant)
     {
       if (summary.CombatantsDead.Contains(killer))
         continue;

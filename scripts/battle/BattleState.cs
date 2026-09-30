@@ -78,6 +78,10 @@ internal sealed class BattleState
   internal IEnumerable<BattleUnitState> DeadUnits => _units.AsValueEnumerable().Where(unit => unit.IsDead).ToArray();
   internal IEnumerable<BattleObjectState> Objects => _objects.AsValueEnumerable().ToArray();
 
+  // Read-only view over the same pool: completion capture needs the whole participant set in
+  // one grouped pass, which the separate Alive/Dead snapshots cannot give. No second storage.
+  internal SysColGeneric.IReadOnlyList<BattleUnitState> Units => _units;
+
   // Adds the faction to the ordered list unless already present; returns true iff newly added.
   internal bool RegisterFaction(Faction side)
   {

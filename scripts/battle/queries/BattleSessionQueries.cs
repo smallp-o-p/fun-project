@@ -10,12 +10,13 @@ namespace FunProject.Battle;
 public sealed record BattleHealthSummary(int MaxHealth, long HealthDamageTaken);
 
 // End-of-battle summary for one faction: outcome, per-combatant kill attribution, and the
-// faction's present/dead/wounded roster. Immutable snapshot built from final session state.
+// faction's present/dead/wounded roster. Served from the session's stored completion;
+// outer dictionaries, roster sets, and nested defeated lists are all frozen.
 public sealed record FactionBattleSummary
 {
   public required Faction Faction { get; init; }
   public required IReadOnlySet<Combatant> CombatantsPresent { get; init; }
-  public required IReadOnlyDictionary<Combatant, List<Combatant>> DefeatedPerCombatant { get; init; }
+  public required IReadOnlyDictionary<Combatant, IReadOnlyList<Combatant>> DefeatedPerCombatant { get; init; }
   public required BattleOutcome Outcome { get; init; }
   public required IReadOnlySet<Combatant> CombatantsDead { get; init; }
   public required IReadOnlySet<Combatant> CombatantsWounded { get; init; }
@@ -36,7 +37,14 @@ public sealed class GetFactionEndOfBattleSummary(Faction faction)
     if (session.Phase != BattlePhase.Ended)
       return Left(new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState, "Battle session isn't over."));
 
-    return Right(session.GetFactionSummary(faction));
+    return session.Completed.Match(
+      completed => completed.FactionSummaries.TryGetValue(faction, out FactionBattleSummary? summary)
+        ? Right<BattleQueryFailure, FactionBattleSummary>(summary)
+        : Left<BattleQueryFailure, FactionBattleSummary>(new BattleQueryFailure(
+          BattleQueryFailureReason.InvalidBattleState,
+          $"Faction {faction.Name} did not participate in this battle.")),
+      () => Left<BattleQueryFailure, FactionBattleSummary>(new BattleQueryFailure(
+        BattleQueryFailureReason.InvalidBattleState, "Battle session isn't over.")));
   }
 }
 

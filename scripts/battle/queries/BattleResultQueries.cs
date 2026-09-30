@@ -14,7 +14,8 @@ public sealed record BattleResult(
   int ObjectsInteracted,
   int ObjectsExpired);
 
-/// <summary>Builds the final battle-result snapshot once the session has ended.</summary>
+/// <summary>Battle outcome snapshot for results/presentation code; reads the session's
+/// stored completion.</summary>
 public sealed class GetBattleResultQuery : IBattleSessionQuery<Either<BattleQueryFailure, BattleResult>>
 {
   public Either<BattleQueryFailure, BattleResult> Execute(BattleSession session)
@@ -22,47 +23,20 @@ public sealed class GetBattleResultQuery : IBattleSessionQuery<Either<BattleQuer
     if (session.Phase != BattlePhase.Ended)
       return Left(new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState, "Battle session isn't over."));
 
-    var factions = new SysColGeneric.Dictionary<Faction, FactionResultCounts>();
-    foreach (Faction faction in session.GlobalFactionTurnOrder)
-    {
-      int spawned = 0;
-      int killed = 0;
-
-      foreach (BattleUnitState unit in session.AliveUnits.AsValueEnumerable())
-      {
-        if (unit.Side == faction)
-          spawned++;
-      }
-
-      foreach (BattleUnitState unit in session.DeadUnits.AsValueEnumerable())
-      {
-        if (unit.Side != faction)
-          continue;
-
-        spawned++;
-        killed++;
-      }
-
-      factions[faction] = new FactionResultCounts(spawned, killed);
-    }
-
-    int objectsInteracted = 0;
-    int objectsExpired = 0;
-    foreach (BattleObjectState obj in session.Objects.AsValueEnumerable())
-    {
-      if (obj.Status == Some(ObjectStatus.Interacted))
-        objectsInteracted++;
-      else if (obj.Status == Some(ObjectStatus.Expired))
-        objectsExpired++;
-    }
-
-    return Right(new BattleResult(
-      session.Outcome.Match(
-        value => value,
-        () => throw new InvalidOperationException("Battle session ended without an outcome.")),
-      session.TurnNumber,
-      factions,
-      objectsInteracted,
-      objectsExpired));
+    return session.Completed.Match(
+      completed => Right<BattleQueryFailure, BattleResult>(new BattleResult(
+        completed.Outcome,
+        completed.TurnCount,
+        completed.Factions,
+        completed.ObjectsInteracted,
+        completed.ObjectsExpired)),
+      () => Left<BattleQueryFailure, BattleResult>(new BattleQueryFailure(
+        BattleQueryFailureReason.InvalidBattleState, "Battle session ended without a completed report.")));
   }
+}
+
+// None while the battle runs; Some once the terminal boundary has captured the frozen report.
+public sealed class GetCompletedBattleQuery : IBattleSessionQuery<Option<CompletedBattle>>
+{
+  public Option<CompletedBattle> Execute(BattleSession session) => session.Completed;
 }
