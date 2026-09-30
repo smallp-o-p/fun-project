@@ -20,75 +20,41 @@ public enum BattlePhase
 
 public sealed class BattleSession
 {
-  internal readonly record struct SpawnedBattleUnit(BattleUnitState Unit);
-
   public const int DefaultMovementStepActionPointCost = 1;
   public const int DefaultAttackActionPointCost = 1;
   public const int DefaultReloadActionPointCost = 1;
   public const int DefaultUseItemActionPointCost = 1;
-  private readonly IHitChanceCalculator _hitChanceCalculator;
-  private readonly Random _random;
-  private readonly List<BattleUnitState> _units = [];
-  private IReadOnlyList<Combatant> _capturedEnemies = [];
-  private readonly SysColGeneric.List<BattleObjectState> _objects = [];
-  private readonly VisibilityService _visibility = new();
-  private readonly Dictionary<Faction, List<Objective>> _objectives = [];
+
   private readonly TurnScheduler _scheduler;
   private readonly Queue<BattleEvent> _eventDispatchQueue = [];
-
-
   private bool _isDispatchingEvents;
+  private IReadOnlyList<Combatant> _capturedEnemies = [];
 
-  // Visible sets depend on board occupancy and consciousness: a unit's vision range resolves from
-  // stat contributions that are fixed for the battle (combatant + equipped weapon; no
-  // action swaps weapons, equips mods, or applies a vision-affecting effect mid-battle),
-  // and tile BlocksLineOfSight is set during setup. So visibility only needs recomputing
-  // after an occupancy or consciousness mutation, at two granularities:
-  //   - _visibilityFullRefreshPending forces a clear-and-recompute-everyone pass. Used on
-  //     battle start, where tile BlocksLineOfSight authoring may have changed without any
-  //     occupancy event (so no affected-unit set could capture it). Starts true so the first
-  //     dispatch performs the initial compute.
-  //   - _visibilityAffectedUnits accumulates the units whose own cell changed (move/spawn/
-  //     death) or who became unconscious since the last refresh. The incremental pass
-  //     recomputes those units and their visibility to others, matching a full recompute:
-  //     an unaffected observer's visible tiles cannot change when another unit changes.
-  // Mark affected units at Board.Try* occupancy chokepoints and unconscious transitions;
-  // battle start requests a full refresh. If a runtime effect changes a unit's vision, force
-  // a full refresh (or mark that unit affected) there too. Likewise, any runtime mutation to
-  // a tile's BlocksLineOfSight or BlocksVerticalLineOfSight (e.g. destructible terrain) must
-  // call InvalidateVisibility() — tile flag changes are NOT occupancy events and are not
-  // otherwise caught by the refresh machinery.
-  private bool _visibilityFullRefreshPending = true;
-  private readonly SysColGeneric.HashSet<BattleUnitState> _visibilityAffectedUnits = [];
+  // Phase-independent tactical storage; the session layers scheduling, phase/outcome, and
+  // event dispatch on top of it.
+  internal BattleState State { get; }
 
-  public BattleBoardState Board { get; }
+  public BattleBoardState Board => State.Board;
   internal UnitActionCache ActionOptions { get; }
   public BattlePhase Phase { get; private set; } = BattlePhase.Setup;
   public int TurnNumber { get; private set; } = 1;
   public Faction ActiveSide => _scheduler.ActiveSide;
-  public Option<Faction> PlayerFaction { get; }
+  public Option<Faction> PlayerFaction => State.PlayerFaction;
   public Option<BattleOutcome> Outcome { get; private set; }
-  // Raw views: the session holds and exposes plain unit state; proofs exist only as return
-  // values (TryGetAlive, read-query results), never as session-held collections.
-  public IEnumerable<BattleUnitState> AliveUnits => _units.AsValueEnumerable().Where(unit => unit.IsAlive).ToArray();
-  public IEnumerable<BattleUnitState> DeadUnits => _units.AsValueEnumerable().Where(unit => unit.IsDead).ToArray();
-  // Raw view, snapshot like AliveUnits: plain object state; proofs only as return values.
-  public IEnumerable<BattleObjectState> Objects => _objects.AsValueEnumerable().ToArray();
+  public IEnumerable<BattleUnitState> AliveUnits => State.AliveUnits;
+  public IEnumerable<BattleUnitState> DeadUnits => State.DeadUnits;
+  public IEnumerable<BattleObjectState> Objects => State.Objects;
 
-  // Mints a proof iff the unit instance belongs to THIS session's alive storage (provenance +
-  // aliveness in one check). The single door for callers holding a raw BattleUnitState.
   public Option<AliveUnit> TryGetAlive(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
-    return _units.Contains(unit) && unit.IsAlive ? Some(MintAlive(unit)) : None;
+    return State.TryGetAlive(unit);
   }
 
   public Option<LiveObject> TryGetAliveObject(BattleObjectState obj)
   {
     ArgumentNullException.ThrowIfNull(obj);
-    return _objects.Contains(obj) && obj.Status.IsNone
-      ? Some(MintAliveObject(obj))
-      : None;
+    return State.TryGetAliveObject(obj);
   }
 
   // Mint door for attack-target proofs: Some iff the entity is currently a targetable member
@@ -108,28 +74,14 @@ public sealed class BattleSession
     };
   }
 
-  // Single mint point: snapshots the unit's board position into the one-shot proof. An alive
-  // session unit is always board-indexed (visibility Refresh invariant), so a miss here is a
-  // session bug, not a caller error. Callers must pass a unit already known alive-in-session.
-  internal AliveUnit MintAlive(BattleUnitState unit)
-  {
-    return GetUnitPosition(unit).Match(
-      Some: position => new AliveUnit(unit, position),
-      None: () => throw new InvalidOperationException($"Unit {unit.Id} is alive but not board-indexed."));
-  }
+  internal AliveUnit MintAlive(BattleUnitState unit) => State.MintAlive(unit);
 
-  internal LiveObject MintAliveObject(BattleObjectState obj)
-    => Board.FindObjectPosition(obj.Id).Match(
-      Some: position => new LiveObject(obj, position),
-      None: () => throw new InvalidOperationException($"Object {obj.Id} is placed but not board-indexed."));
+  internal LiveObject MintAliveObject(BattleObjectState obj) => State.MintAliveObject(obj);
 
-  internal DeadUnit MintDead(BattleUnitState unit)
-  {
-    return new DeadUnit(unit);
-  }
+  internal DeadUnit MintDead(BattleUnitState unit) => State.MintDead(unit);
+
   public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _scheduler.GlobalFactionTurnOrder;
   public IReadOnlyCollection<Faction> TurnQueue => _scheduler.TurnQueue;
-  private readonly Dictionary<BattleUnitState, List<BattleUnitState>> _killsByUnit = [];
 
   public event Action<BattleEvent> BattleEventCommitted = delegate { };
 
@@ -143,20 +95,11 @@ public sealed class BattleSession
     ArgumentNullException.ThrowIfNull(board);
     ArgumentNullException.ThrowIfNull(globalFactionOrder);
 
-    _hitChanceCalculator = hitChanceCalculator ?? new StandardHitChanceCalculator();
-    _random = randomSeed is null ? new Random() : new Random(randomSeed.Value);
-
-    Board = board;
-    PlayerFaction = playerFaction;
-    _scheduler = new TurnScheduler(HasConsciousUnits, GetFactionConsciousUnits);
+    State = new BattleState(board, globalFactionOrder, hitChanceCalculator, randomSeed, playerFaction);
+    _scheduler = new TurnScheduler(State, State.HasConsciousUnits, State.GetFactionConsciousUnits);
     ActionOptions = new UnitActionCache(this);
 
-    foreach (var faction in globalFactionOrder)
-    {
-      EnqueueFactionInGlobalOrder(faction);
-    }
-
-    if (_scheduler.GlobalFactionTurnOrder.Count == 0)
+    if (GlobalFactionTurnOrder.Count == 0)
       throw new ArgumentException("Battle session requires at least one faction in the global order.");
 
     PlayerFaction.IfSome(EnqueueFactionInGlobalOrder);
@@ -164,50 +107,23 @@ public sealed class BattleSession
     _scheduler.InitializeQueueFromGlobalOrder();
   }
 
-  internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
-  {
-    ArgumentNullException.ThrowIfNull(side);
-    return AliveUnits.AsValueEnumerable().Where(unit => unit.Side == side).ToArray();
-  }
+  internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side) => State.GetFactionAliveUnits(side);
 
-  internal IEnumerable<BattleUnitState> GetFactionConsciousUnits(Faction side)
-    => GetFactionAliveUnits(side).AsValueEnumerable()
-      .Where(unit => !unit.IsUnconscious).ToArray();
+  internal IEnumerable<BattleUnitState> GetFactionConsciousUnits(Faction side) => State.GetFactionConsciousUnits(side);
 
-  internal bool HasConsciousUnits(Faction side)
-    => GetFactionConsciousUnits(side).AsValueEnumerable().Any();
+  internal bool HasConsciousUnits(Faction side) => State.HasConsciousUnits(side);
 
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetFactionVisibleTiles(Faction side)
-  {
-    ArgumentNullException.ThrowIfNull(side);
-    return GetFactionAliveUnits(side).AsValueEnumerable()
-      .SelectMany(unit => unit.VisibleTiles)
-      .ToHashSet();
-  }
+    => State.GetFactionVisibleTiles(side);
 
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetFactionExploredTiles(Faction side)
-  {
-    ArgumentNullException.ThrowIfNull(side);
-    return _visibility.GetExploredTiles(side);
-  }
+    => State.GetFactionExploredTiles(side);
 
   internal bool IsUnitVisibleToFaction(Faction side, BattleUnitState target)
-  {
-    ArgumentNullException.ThrowIfNull(side);
-    ArgumentNullException.ThrowIfNull(target);
-
-    if (target.Side == side)
-      return true;
-
-    return GetFactionAliveUnits(side)
-      .AsValueEnumerable().Any(unit => unit.VisibleUnits.Contains(target));
-  }
+    => State.IsUnitVisibleToFaction(side, target);
 
   internal bool IsTileVisibleToFaction(Faction side, BattleBoardState.ValidatedPoint tile)
-  {
-    ArgumentNullException.ThrowIfNull(side);
-    return GetFactionAliveUnits(side).AsValueEnumerable().Any(unit => unit.VisibleTiles.Contains(tile));
-  }
+    => State.IsTileVisibleToFaction(side, tile);
 
   internal bool IsUnitStillAvailableThisTurn(BattleUnitState unit)
   {
@@ -241,7 +157,7 @@ public sealed class BattleSession
     // authoring that affects line of sight (tile BlocksLineOfSight) is finalized during
     // setup, possibly after the last spawn's refresh, and is not an occupancy change, so
     // only a full pass is guaranteed to pick it up.
-    _visibilityFullRefreshPending = true;
+    State.InvalidateVisibility();
 
     // Turn-start hooks (buffs) fire inside this dispatch, BEFORE the AP refresh below reads
     // buffed MaxActionPoints. Mid-dispatch observers see pre-refresh action points.
@@ -258,7 +174,7 @@ public sealed class BattleSession
       unit.RefreshForNewTurn();
   }
 
-  internal SpawnedBattleUnit AddUnit(
+  internal BattleUnitState AddUnit(
     Combatant combatant,
     BattleBoardState.ValidatedPoint position,
     Option<Weapon> equippedWeapon,
@@ -269,13 +185,7 @@ public sealed class BattleSession
     if (Phase == BattlePhase.Ended)
       throw new InvalidOperationException("Cannot add units after the battle has ended.");
 
-    var unit = new BattleUnitState(_units.Count, combatant, equippedWeapon, equippedArmor, statMods);
-    bool occupantSet = Board.TryPlaceOccupant(position, unit.Id);
-    if (!occupantSet)
-      throw new InvalidOperationException($"Could not place unit {unit.Id} at {position.Raw}.");
-    MarkVisibilityAffected(unit);
-
-    _units.Add(unit);
+    var unit = State.AddUnit(combatant, position, equippedWeapon, equippedArmor, statMods);
     EnqueueFactionInGlobalOrder(unit.Side);
 
     if (Phase == BattlePhase.Setup)
@@ -285,17 +195,13 @@ public sealed class BattleSession
 
     RaiseEvents(new UnitAddedBattleEvent(unit, position));
 
-    return new SpawnedBattleUnit(unit);
+    return unit;
   }
 
   // Trusted core: the factory pre-validates occupancy; a miss here is a caller bug.
   internal void AddObject(BattleSpecialObjectData data, BattleBoardState.ValidatedPoint position)
   {
-    ArgumentNullException.ThrowIfNull(data);
-    var state = new BattleObjectState(-_objects.Count - 1, data, position.Raw);
-    if (!Board.TryPlaceObjectOccupant(position, state.Id))
-      throw new InvalidOperationException($"Object cell {position.Raw} is not occupiable.");
-    _objects.Add(state);
+    var state = State.AddObject(data, position);
     RaiseEvents(new ObjectPlacedBattleEvent(state, position));
   }
 
@@ -361,7 +267,7 @@ public sealed class BattleSession
     if (unit.IsUnconscious && !wasUnconscious)
     {
       var unitSide = unit.Side;
-      MarkVisibilityAffected(unit);
+      State.MarkVisibilityAffected(unit);
       _scheduler.TryConsumeAvailableUnit(unit);
       RaiseEvents(new UnitUnconsciousBattleEvent(unit, unitPoint.Value(), cause));
       HandleFactionLoss(unitSide);
@@ -435,14 +341,10 @@ public sealed class BattleSession
     bool occupantCleared = Board.TryClearOccupant(unitPoint, unit.Id);
     if (!occupantCleared)
       throw new InvalidOperationException($"Could not clear unit {unit.Id} from {unitPoint.Raw}.");
-    MarkVisibilityAffected(unit);
+    State.MarkVisibilityAffected(unit);
 
     _scheduler.TryConsumeAvailableUnit(unit);
-    killedBy.IfSome(killer =>
-    {
-      _killsByUnit.TryAdd(killer, []);
-      _killsByUnit[killer].Add(unit);
-    });
+    killedBy.IfSome(killer => State.RecordKill(killer, unit));
 
     RaiseEvents(new UnitKilledBattleEvent(unit, unitPoint, killedBy));
 
@@ -540,16 +442,10 @@ public sealed class BattleSession
   }
 
   internal Option<BattleBoardState.ValidatedPoint> GetUnitPosition(BattleUnitState unit)
-  {
-    ArgumentNullException.ThrowIfNull(unit);
-    return Board.FindOccupantPosition(unit.Id);
-  }
+    => State.GetUnitPosition(unit);
 
   internal Option<BattleUnitState> GetUnitAt(BattleBoardState.ValidatedPoint point)
-  {
-    return Board.GetOccupant(point).Bind(id =>
-      id < _units.Count && _units[id].IsAlive ? Some(_units[id]) : None);
-  }
+    => State.GetUnitAt(point);
 
   internal void MarkObjectInteracted(BattleObjectState obj)
   {
@@ -593,7 +489,7 @@ public sealed class BattleSession
         $"Unit {unit.Id} is indexed at {boardPosition.Value().Raw}, not {source.Raw}.");
     if (!Board.TryMoveOccupant(source, destination, unit.Id))
       throw new InvalidOperationException($"Could not move unit {unit.Id} from {source.Raw} to {destination.Raw}.");
-    MarkVisibilityAffected(unit);
+    State.MarkVisibilityAffected(unit);
 
     RaiseEvents(
       new UnitMovedBattleEvent(unit, destination, source),
@@ -613,35 +509,17 @@ public sealed class BattleSession
     return BattleBoardState.GetGridDistance(source, destination);
   }
 
-  internal IHitChanceCalculator HitChanceCalculator => _hitChanceCalculator;
+  internal IHitChanceCalculator HitChanceCalculator => State.HitChanceCalculator;
 
-  internal int RollPercent()
-  {
-    return _random.Next(100);
-  }
+  internal int RollPercent() => State.RollPercent();
 
-  internal bool HasLivingUnits(Faction side)
-  {
-    return GetFactionAliveUnits(side).AsValueEnumerable().Any();
-  }
-
-  // Records a unit whose board cell or consciousness changed so the next dispatch
-  // can scope its visibility recompute to the affected units instead of the whole pool. A
-  // pending full refresh (battle start) still takes priority and clears this set.
-  private void MarkVisibilityAffected(BattleUnitState unit)
-  {
-    ArgumentNullException.ThrowIfNull(unit);
-    _visibilityAffectedUnits.Add(unit);
-  }
+  internal bool HasLivingUnits(Faction side) => State.HasLivingUnits(side);
 
   // Forces a full clear-and-recompute of all faction visibility on the next event dispatch.
   // Call this after any runtime mutation to a tile's BlocksLineOfSight or
   // BlocksVerticalLineOfSight (e.g. destructible terrain) — those flag changes are NOT
   // occupancy events and are not otherwise caught by the incremental refresh machinery.
-  internal void InvalidateVisibility()
-  {
-    _visibilityFullRefreshPending = true;
-  }
+  internal void InvalidateVisibility() => State.InvalidateVisibility();
 
   // TODO: It may be nicer if this event raising is entirely handled by BattleSession
   internal void RaiseEvents(params BattleEvent[] events)
@@ -687,24 +565,7 @@ public sealed class BattleSession
 
   private void RefreshVisibilityAndQueueSpottings()
   {
-    IReadOnlyList<(BattleUnitState Observer, BattleUnitState Target)> firstSpottings;
-    if (_visibilityFullRefreshPending)
-    {
-      firstSpottings = _visibility.RefreshAllUnits(Board, _units, AliveUnits);
-      _visibilityFullRefreshPending = false;
-      _visibilityAffectedUnits.Clear();
-    }
-    else if (_visibilityAffectedUnits.Count > 0)
-    {
-      firstSpottings = _visibility.RefreshAffected(Board, _units, _visibilityAffectedUnits);
-      _visibilityAffectedUnits.Clear();
-    }
-    else
-    {
-      firstSpottings = [];
-    }
-
-    foreach (var (observer, target) in firstSpottings)
+    foreach (var (observer, target) in State.RefreshVisibility())
       _eventDispatchQueue.Enqueue(new UnitSpottedBattleEvent(observer, target));
   }
 
@@ -726,16 +587,9 @@ public sealed class BattleSession
 
   internal void AddObjective(Faction faction, Objective objective)
   {
-    ArgumentNullException.ThrowIfNull(faction);
-    ArgumentNullException.ThrowIfNull(objective);
+    if (State.AddObjective(faction, objective))
+      EnqueueFactionInGlobalOrder(faction);
 
-    if (!_objectives.TryGetValue(faction, out var list))
-    {
-      _objectives[faction] = list = [];
-      _scheduler.RegisterFaction(faction);
-    }
-
-    list.Add(objective);
     RaiseEvents(new ObjectiveAddedBattleEvent(faction, objective));
   }
 
@@ -763,11 +617,7 @@ public sealed class BattleSession
     RaiseEvents(new ObjectiveFailedBattleEvent(faction, objective));
   }
 
-  internal IReadOnlyList<Objective> GetObjectives(Faction faction)
-  {
-    ArgumentNullException.ThrowIfNull(faction);
-    return _objectives.TryGetValue(faction, out var list) ? list : [];
-  }
+  internal IReadOnlyList<Objective> GetObjectives(Faction faction) => State.GetObjectives(faction);
 
   private void StartNextRound()
   {
@@ -832,7 +682,7 @@ public sealed class BattleSession
         ..AliveUnits.AsValueEnumerable().Where(unit => unit.Side == faction).Where(unit => unit.MaxHealth > unit.CurrentHealth)
           .Select(unit => unit.Combatant).ToArray()
       ],
-      DefeatedPerCombatant = _killsByUnit.AsValueEnumerable().Where(unitKilled => unitKilled.Key.Side == faction)
+      DefeatedPerCombatant = State.KillsByUnit.AsValueEnumerable().Where(unitKilled => unitKilled.Key.Side == faction)
         .Select(unitKilled =>
           (unitKilled.Key.Combatant, unitKilled.Value.AsValueEnumerable().Select(killed => killed.Combatant).ToList()))
         .ToDictionary(entry => entry.Item1, entry => entry.Item2),

@@ -4,50 +4,50 @@ using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
-// Owns the turn/round scheduling state extracted from BattleSession: the global faction
-// order, the live round queue, the set of sides that have already acted this round, the
-// availability set for the active faction, and the ActiveSide pointer. It deliberately
-// knows nothing about events, outcome, the battle phase, or death/loss side-effects — the
-// session keeps that orchestration and calls into these pure queue/availability operations.
-// Operations that depend on the live unit pool (session state) are injected as delegates.
+// Owns the turn/round scheduling state extracted from BattleSession: the live round queue,
+// the set of sides that have already acted this round, the availability set for the active
+// faction, and the ActiveSide pointer. The global faction order is BattleState's ordered
+// faction list — the scheduler registers into and reads it through the state rather than
+// keeping a second copy. It deliberately knows nothing about events, outcome, the battle
+// phase, or death/loss side-effects — the session keeps that orchestration and calls into
+// these pure queue/availability operations. Operations that depend on the live unit pool
+// (session state) are injected as delegates.
 internal sealed class TurnScheduler
 {
+  private readonly BattleState _state;
   private readonly Func<Faction, bool> _hasConsciousUnits;
   private readonly Func<Faction, IEnumerable<BattleUnitState>> _eligibleUnitsOf;
 
-  private readonly Queue<Faction> _globalFactionOrder = [];
   private Queue<Faction> _turnQueue = [];
   private readonly SysColGeneric.HashSet<Faction> _sidesActedThisRound = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _activeFactionUnitsAvailable = [];
 
   public TurnScheduler(
+    BattleState state,
     Func<Faction, bool> hasConsciousUnits,
     Func<Faction, IEnumerable<BattleUnitState>> eligibleUnitsOf)
   {
+    _state = state ?? throw new ArgumentNullException(nameof(state));
     _hasConsciousUnits = hasConsciousUnits ?? throw new ArgumentNullException(nameof(hasConsciousUnits));
     _eligibleUnitsOf = eligibleUnitsOf ?? throw new ArgumentNullException(nameof(eligibleUnitsOf));
   }
 
   public Faction ActiveSide { get; private set; } = null!;
-  public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _globalFactionOrder;
+  public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _state.Factions;
   public IReadOnlyCollection<Faction> TurnQueue => _turnQueue;
   public int RoundQueueCount => _turnQueue.Count;
 
-  // Registers a faction in the global turn order. Returns true iff it was newly added.
+  // Registers a faction in BattleState's global turn order. Returns true iff newly added.
   public bool RegisterFaction(Faction side)
   {
-    if (_globalFactionOrder.Contains(side))
-      return false;
-
-    _globalFactionOrder.Enqueue(side);
-    return true;
+    return _state.RegisterFaction(side);
   }
 
   // Setup-time round queue seed (constructor): build the queue from the full global order
   // and point ActiveSide at its head, before any conscious-force filtering applies.
   public void InitializeQueueFromGlobalOrder()
   {
-    _turnQueue = new Queue<Faction>(_globalFactionOrder);
+    _turnQueue = new Queue<Faction>(_state.Factions);
     ActiveSide = _turnQueue.Peek();
   }
 
@@ -55,7 +55,7 @@ internal sealed class TurnScheduler
   {
     _turnQueue.Clear();
 
-    foreach (var side in _globalFactionOrder)
+    foreach (var side in _state.Factions)
     {
       if (_hasConsciousUnits(side))
         _turnQueue.Enqueue(side);

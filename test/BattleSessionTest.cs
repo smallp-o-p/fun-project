@@ -450,7 +450,7 @@ public class BattleSessionTest
     using var battle = BattleFixture.Duel();
     var kind = killed ? DamageKind.Health : DamageKind.Stun;
     battle.ApplyDamage(battle.PlayerUnit, 20, kind);
-    var scheduler = new TurnScheduler(battle.Session.HasConsciousUnits, battle.Session.GetFactionConsciousUnits);
+    var scheduler = new TurnScheduler(battle.Session.State, battle.Session.HasConsciousUnits, battle.Session.GetFactionConsciousUnits);
     scheduler.RegisterFaction(battle.PlayerFaction);
     scheduler.InitializeQueueFromGlobalOrder();
 
@@ -559,7 +559,7 @@ public class BattleSessionTest
     var faction = TestData.MakeFaction("Player");
     var session = new BattleSession(new BattleBoardState(new Vector3I(4, 1, 4)), [faction]);
     BattleBoardState.ValidatedPoint occupiedPoint = session.Board.At(1, 0, 1);
-    var occupiedUnit = session.AddUnit(TestData.MakeCombatant("Alpha", faction), occupiedPoint, None, None).Unit;
+    var occupiedUnit = session.AddUnit(TestData.MakeCombatant("Alpha", faction), occupiedPoint, None, None);
 
     Assert.Throws<InvalidOperationException>(() =>
       session.AddUnit(TestData.MakeCombatant("Bravo", faction), occupiedPoint, None, None));
