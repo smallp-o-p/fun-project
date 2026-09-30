@@ -17,23 +17,36 @@ public class GeoscapeConditionsTest
       [.. roster.AsValueEnumerable().Select(entry =>
         TestData.MakeEntry(entry.Name, TestData.MakeCombatantData(health: entry.Health)))]));
 
-  [TestCase(TestName = "A mission return earns injury tiers and one fatigue step")]
-  public void MissionReturnEarnsInjuryAndFatigue()
+  // 0 marks an absent injury record; the unconscious row targets the 20-health second
+  // roster member of a two-member campaign.
+  [TestCase(BattleOutcome.Victory, false, 25, 0, 2)]
+  [TestCase(BattleOutcome.Victory, false, 0, 30, 0)]
+  [TestCase(BattleOutcome.Defeat, false, 25, 0, 2)]
+  [TestCase(BattleOutcome.Victory, true, 0, 30, 0)]
+  public void SurvivorMissionReturnsApplyConditions(
+    BattleOutcome outcome, bool unconsciousCase, int damage, int stun, int expectedInjuryTier)
   {
-    using var campaign = NewCampaign(("Alpha", 100));
-    var alpha = campaign.State.Roster[0];
+    using var campaign = unconsciousCase
+      ? NewCampaign(("Alpha", 100), ("Beta", 20))
+      : NewCampaign(("Alpha", 100));
+    var target = campaign.State.Roster[unconsciousCase ? 1 : 0];
 
     campaign.ClearEvents();
-    campaign.ReturnFromMission((alpha, 25, 0));
+    campaign.Session.ApplyMissionReturn(campaign.PlayMission(outcome, (target, damage, stun)));
 
-    Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier); // Injured
-    Assert.Equal(8640L, campaign.State.Conditions.GetInjury(alpha).RequireSome().RecoveryTick);
-    Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier); // Tired
-    Assert.Equal(1440L, campaign.State.Conditions.GetFatigue(alpha).RequireSome().RecoveryTick);
-    Assert.Equal(0, alpha.Rank.Xp, "Returns never award experience.");
+    if (expectedInjuryTier == 0)
+      Assert.True(campaign.State.Conditions.GetInjury(target).IsNone);
+    else
+    {
+      Assert.Equal(expectedInjuryTier, campaign.State.Conditions.GetInjury(target).RequireSome().Tier); // Injured
+      Assert.Equal(8640L, campaign.State.Conditions.GetInjury(target).RequireSome().RecoveryTick);
+    }
+    Assert.Equal(1, campaign.State.Conditions.GetFatigue(target).RequireSome().Tier); // Tired
+    Assert.Equal(1440L, campaign.State.Conditions.GetFatigue(target).RequireSome().RecoveryTick);
+    Assert.Equal(0, target.Rank.Xp, "Returns never award experience.");
     var events = campaign.Events.EventsOf<CombatantConditionsChanged>();
     Assert.Equal(1, events.Length);
-    Assert.True(ReferenceEquals(alpha, events[0].Combatant));
+    Assert.True(ReferenceEquals(target, events[0].Combatant));
   }
 
   [TestCase(TestName = "Armor-absorbed returns earn fatigue but no injury")]
@@ -54,37 +67,13 @@ public class GeoscapeConditionsTest
     Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier);
   }
 
-  [TestCase(TestName = "Stun-only returns earn fatigue but no injury")]
-  public void StunOnlyReturnsEarnFatigueWithoutInjury()
-  {
-    using var campaign = NewCampaign(("Alpha", 100));
-    var alpha = campaign.State.Roster[0];
-
-    campaign.ReturnFromMission((alpha, 0, 30));
-
-    Assert.True(campaign.State.Conditions.GetInjury(alpha).IsNone);
-    Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier);
-  }
-
-  [TestCase(TestName = "Any outcome processes the return")]
-  public void DefeatReturnsStillProcess()
-  {
-    using var campaign = NewCampaign(("Alpha", 100));
-    var alpha = campaign.State.Roster[0];
-
-    campaign.Session.ApplyMissionReturn(
-      campaign.PlayMission(BattleOutcome.Defeat, (alpha, 25, 0)));
-
-    Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier);
-    Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier);
-  }
-
   [TestCase(TestName = "Dead participants are skipped, overkill or not")]
   public void DeadParticipantsAreSkipped()
   {
-    using var campaign = NewCampaign(("Alpha", 100), ("Beta", 20));
+    using var campaign = NewCampaign(("Alpha", 100), ("Beta", 20), ("Charlie", 100));
     var alpha = campaign.State.Roster[0];
     var beta = campaign.State.Roster[1];
+    var charlie = campaign.State.Roster[2];
 
     campaign.ClearEvents();
     campaign.ReturnFromMission((alpha, 25, 0), (beta, 999, 0));
@@ -92,34 +81,11 @@ public class GeoscapeConditionsTest
     Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier);
     Assert.True(campaign.State.Conditions.GetInjury(beta).IsNone);
     Assert.True(campaign.State.Conditions.GetFatigue(beta).IsNone);
+    Assert.True(campaign.State.Conditions.GetInjury(charlie).IsNone);
+    Assert.True(campaign.State.Conditions.GetFatigue(charlie).IsNone);
     var events = campaign.Events.EventsOf<CombatantConditionsChanged>();
     Assert.Equal(1, events.Length);
     Assert.True(ReferenceEquals(alpha, events[0].Combatant));
-  }
-
-  [TestCase(TestName = "Living unconscious survivors participate")]
-  public void UnconsciousSurvivorsParticipate()
-  {
-    using var campaign = NewCampaign(("Alpha", 100), ("Beta", 20));
-    var beta = campaign.State.Roster[1];
-
-    campaign.ReturnFromMission((beta, 0, 30));
-
-    Assert.Equal(1, campaign.State.Conditions.GetFatigue(beta).RequireSome().Tier);
-  }
-
-  [TestCase(TestName = "Non-participants keep their conditions")]
-  public void NonParticipantsAreUntouched()
-  {
-    using var campaign = NewCampaign(("Alpha", 100), ("Charlie", 100));
-    var alpha = campaign.State.Roster[0];
-    var charlie = campaign.State.Roster[1];
-
-    campaign.ClearEvents();
-    campaign.ReturnFromMission((alpha, 25, 0));
-
-    Assert.True(campaign.State.Conditions.GetInjury(charlie).IsNone);
-    Assert.True(campaign.State.Conditions.GetFatigue(charlie).IsNone);
     Assert.True(campaign.Events.EventsOf<CombatantConditionsChanged>()
       .AsValueEnumerable().All(changed => !ReferenceEquals(charlie, changed.Combatant)));
   }
@@ -185,33 +151,25 @@ public class GeoscapeConditionsTest
     Assert.True(campaign.State.Conditions.GetFatigue(alpha).IsNone);
   }
 
-  [TestCase(TestName = "Deployment gates on conditions and the mission's unfit flag")]
-  public void CanDeployGatesOnConditionsAndMissionFlag()
+  // The fatigue row (three real zero-damage returns) and the injury row (one 25% return)
+  // independently check the session's mission-flag plumbing.
+  [TestCase(25, 1, 1)]
+  [TestCase(0, 3, 3)]
+  public void MissionDeploymentRejectsUnfitCombatants(int damage, int returns, int expectedFatigueTier)
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
     var mission = TestData.MakeEvent("Patrol");
 
     Assert.True(campaign.Session.CanDeploy(alpha, mission));
-    campaign.ReturnFromMission((alpha, 25, 0));
-    Assert.False(campaign.Session.CanDeploy(alpha, mission), "Injured combatants cannot deploy.");
+    for (int i = 0; i < returns; i++)
+      campaign.ReturnFromMission((alpha, damage, 0));
+    Assert.Equal(expectedFatigueTier, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier);
+    Assert.False(campaign.Session.CanDeploy(alpha, mission),
+      "Unfit combatants cannot deploy on an ordinary mission.");
 
     var lastStand = TestData.MakeEvent("Last Stand", allowUnfitDeployment: true);
     Assert.True(campaign.Session.CanDeploy(alpha, lastStand));
-  }
-
-  [TestCase(TestName = "Exhausted combatants cannot deploy either")]
-  public void ExhaustedCombatantsCannotDeploy()
-  {
-    using var campaign = NewCampaign(("Alpha", 100));
-    var alpha = campaign.State.Roster[0];
-    var mission = TestData.MakeEvent("Patrol");
-
-    campaign.ReturnFromMission((alpha, 0, 0));
-    campaign.ReturnFromMission((alpha, 0, 0));
-    campaign.ReturnFromMission((alpha, 0, 0));
-    Assert.Equal(3, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier); // Exhausted
-    Assert.False(campaign.Session.CanDeploy(alpha, mission));
   }
 
   [TestCase(TestName = "Recovery lands exactly on the deadline, not before")]

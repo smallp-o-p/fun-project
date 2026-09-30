@@ -34,22 +34,16 @@ public class CombatantSummaryTest
     return campaign;
   }
 
-  [TestCase(TestName = "Campaign aggregation folds own mods and the equipped weapon's once")]
-  public void CampaignAggregationFoldsOwnAndWeaponContributionsOnce()
+  [TestCase(TestName = "Campaign aggregation counts equipment once and stays fresh per gather")]
+  public void CampaignAggregationIsFreshAndCountsEquipmentOnce()
   {
     using var campaign = EquippedSoldierCampaign();
     var combatant = campaign.State.Roster[0];
 
-    Assert.Equal(75, Mathf.RoundToInt(combatant.Resolve<AimStat>(campaign.State.CampaignStatContributions(combatant))));
     // Fresh materialization per call: repeated gathering never accumulates.
     Assert.Equal(75, Mathf.RoundToInt(combatant.Resolve<AimStat>(campaign.State.CampaignStatContributions(combatant))));
-  }
+    Assert.Equal(75, Mathf.RoundToInt(combatant.Resolve<AimStat>(campaign.State.CampaignStatContributions(combatant))));
 
-  [TestCase(TestName = "Without a weapon only fresh gathering drops its contributions")]
-  public void WithoutAWeaponOnlyFreshGatheringDropsItsContributions()
-  {
-    using var campaign = EquippedSoldierCampaign();
-    var combatant = campaign.State.Roster[0];
     var before = campaign.State.CampaignStatContributions(combatant); // gathered while equipped
     combatant.UnequipWeapon();
 
@@ -62,8 +56,8 @@ public class CombatantSummaryTest
   {
     using var campaign = EquippedSoldierCampaign();
     var combatant = campaign.State.Roster[0];
-    string text = CombatantSummary.StatsText(combatant, "Health",
-      campaign.State.CampaignStatContributions(combatant));
+    var contributions = campaign.State.CampaignStatContributions(combatant);
+    string text = CombatantSummary.StatsText(combatant, "Health", contributions);
 
     Assert.True(text.Contains("Health: 20"), text);
     Assert.True(text.Contains("Action Points: 4"), text);
@@ -71,17 +65,10 @@ public class CombatantSummaryTest
     Assert.True(text.Contains("Movement: 12"), text);
     Assert.True(text.Contains("Vision: 20"), text);
     Assert.True(text.Contains("Aim: 75"), text); // own +10 and weapon +5 folded once each
-  }
 
-  [TestCase(TestName = "Captivity and squad summaries differ only in the Health label")]
-  public void CaptivityAndSquadSummariesDifferOnlyInTheHealthLabel()
-  {
-    using var campaign = EquippedSoldierCampaign();
-    var combatant = campaign.State.Roster[0];
-    var contributions = campaign.State.CampaignStatContributions(combatant);
-
+    // Captivity and squad summaries differ only in the Health label.
     Assert.Equal(
-      CombatantSummary.StatsText(combatant, "Health", contributions).Replace("Health:", "Health (max):"),
+      text.Replace("Health:", "Health (max):"),
       CombatantSummary.StatsText(combatant, "Health (max)", contributions));
   }
 

@@ -22,24 +22,12 @@ public class CaptivityTest
     Assert.Equal(2, captivity.Combatants.Count);
     Assert.True(captivity.Combatants.AsValueEnumerable().Any(c => ReferenceEquals(c, first)));
     Assert.True(captivity.Combatants.AsValueEnumerable().Any(c => ReferenceEquals(c, second)));
-  }
 
-  [TestCase]
-  public void ReAddingADuplicateDoesNotChangeMembership()
-  {
-    var captivity = new Captivity();
-    var faction = TestData.MakeFaction("Enemy");
-    var first = TestData.MakeCombatant("First", faction);
-    var second = TestData.MakeCombatant("Second", faction);
-    captivity.Add(first);
-    captivity.Add(second);
+    captivity.Add(first); // late duplicate after another member exists
 
-    captivity.Add(first); // duplicate re-add
-
-    var combatants = captivity.Combatants;
-    Assert.Equal(2, combatants.Count);
-    Assert.True(combatants.AsValueEnumerable().Any(c => ReferenceEquals(c, first)));
-    Assert.True(combatants.AsValueEnumerable().Any(c => ReferenceEquals(c, second)));
+    Assert.Equal(2, captivity.Combatants.Count);
+    Assert.True(captivity.Combatants.AsValueEnumerable().Any(c => ReferenceEquals(c, first)));
+    Assert.True(captivity.Combatants.AsValueEnumerable().Any(c => ReferenceEquals(c, second)));
   }
 
   [TestCase]

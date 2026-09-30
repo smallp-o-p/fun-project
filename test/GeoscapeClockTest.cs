@@ -5,53 +5,36 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class GeoscapeClockTest
 {
-  [TestCase(TestName = "Sub-tick deltas do not advance the clock")]
-  public void SubTickDeltasDoNotAdvance()
+  [TestCase(0.009, false, 0L)]
+  [TestCase(0.05, true, 1L)]
+  public void AccumulatorPreservesSubTickRemainder(double secondDelta, bool thirdHalfTick, long expectedTick)
   {
     using var campaign = new GeoscapeFixture();
     campaign.ChangeSpeed(TimeSpeed.Normal); // 0.1 real seconds per tick
 
     campaign.Advance(0.05);
-    campaign.Advance(0.009);
+    campaign.Advance(secondDelta);
+    if (thirdHalfTick)
+      campaign.Advance(0.05); // 0.15s accrued: exactly one boundary (0.1) crossed, 0.05 carried
 
-    Assert.Equal(0, campaign.Session.Tick);
+    Assert.Equal(expectedTick, campaign.Session.Tick);
   }
 
-  [TestCase(TestName = "Accumulator crosses the boundary exactly once")]
-  public void AccumulatorCrossesBoundaryOnce()
+  // Seconds per tick: Normal 0.1, Fast 0.02, VeryFast 0.008 (12.5x), VeryVeryFast 0.004.
+  [TestCase(TimeSpeed.Normal, 10)]
+  [TestCase(TimeSpeed.Fast, 50)]
+  [TestCase(TimeSpeed.VeryFast, 125)]
+  [TestCase(TimeSpeed.VeryVeryFast, 250)]
+  public void FasterSpeedsTickMore(TimeSpeed speed, int expectedTicks)
   {
     using var campaign = new GeoscapeFixture();
-    campaign.ChangeSpeed(TimeSpeed.Normal);
 
-    campaign.Advance(0.05);
-    campaign.Advance(0.05);
-    campaign.Advance(0.05);
+    campaign.ChangeSpeed(speed);
+    // A speed change itself commits no events, before any advancement.
+    Assert.Equal(0, campaign.Events.Count);
+    campaign.Advance(1.0);
 
-    Assert.Equal(1, campaign.Session.Tick); // 0.15s accrued -> exactly one boundary (0.1) crossed, 0.05 carried
-  }
-
-  [TestCase(TestName = "Faster speeds tick more per real second")]
-  public void FasterSpeedsTickMore()
-  {
-    using var normal = new GeoscapeFixture();
-    normal.ChangeSpeed(TimeSpeed.Normal);
-    normal.Advance(1.0);
-    Assert.Equal(10, normal.Session.Tick);
-
-    using var fast = new GeoscapeFixture();
-    fast.ChangeSpeed(TimeSpeed.Fast); // 0.02s per tick
-    fast.Advance(1.0);
-    Assert.Equal(50, fast.Session.Tick);
-
-    using var veryFast = new GeoscapeFixture();
-    veryFast.ChangeSpeed(TimeSpeed.VeryFast); // 0.008s per tick (12.5x)
-    veryFast.Advance(1.0);
-    Assert.Equal(125, veryFast.Session.Tick);
-
-    using var veryVeryFast = new GeoscapeFixture();
-    veryVeryFast.ChangeSpeed(TimeSpeed.VeryVeryFast); // 0.004s per tick
-    veryVeryFast.Advance(1.0);
-    Assert.Equal(250, veryVeryFast.Session.Tick);
+    Assert.Equal(expectedTicks, campaign.Session.Tick);
   }
 
   [TestCase(TestName = "Paused speed freezes advancement until changed")]
@@ -70,16 +53,6 @@ public class GeoscapeClockTest
     Assert.Equal(1, campaign.Session.Tick);
   }
 
-  [TestCase(TestName = "Speed changes commit no events")]
-  public void SpeedChangeCommitsNothing()
-  {
-    using var campaign = new GeoscapeFixture();
-
-    campaign.ChangeSpeed(TimeSpeed.Fast);
-
-    Assert.Equal(0, campaign.Events.Count);
-  }
-
   [TestCase(TestName = "CurrentTime advances one game-minute per tick")]
   public void CurrentTimeAdvancesOneMinutePerTick()
   {
@@ -93,25 +66,15 @@ public class GeoscapeClockTest
     Assert.Equal(1, campaign.Session.CurrentDay);
   }
 
-  [TestCase(TestName = "The day counter starts at 1 and rolls on each 24 game-hours")]
-  public void DayCounterRollsEveryTwentyFourHours()
+  [TestCase(5.76, 2)] // 1440 ticks = 24 game-hours: the day rolls on elapsed hours
+  [TestCase(3.84, 1)] // 960 ticks = 16 game-hours: elapsed hours, not calendar midnight, roll the day
+  public void ElapsedTimeControlsDayCounter(double delta, int expectedDay)
   {
-    using var campaign = new GeoscapeFixture(); // starts 08:00
+    using var campaign = new GeoscapeFixture();
     campaign.ChangeSpeed(TimeSpeed.VeryVeryFast);
 
-    campaign.Advance(5.76); // 1440 ticks = 24 game-hours
+    campaign.Advance(delta);
 
-    Assert.Equal(2, campaign.Session.CurrentDay);
-  }
-
-  [TestCase(TestName = "Crossing midnight does not roll the day before 24 hours elapse")]
-  public void MidnightDoesNotRollTheDay()
-  {
-    using var campaign = new GeoscapeFixture(); // starts 08:00
-    campaign.ChangeSpeed(TimeSpeed.VeryVeryFast);
-
-    campaign.Advance(3.84); // 960 ticks = 16 game-hours → 00:00 next calendar day
-
-    Assert.Equal(1, campaign.Session.CurrentDay);
+    Assert.Equal(expectedDay, campaign.Session.CurrentDay);
   }
 }

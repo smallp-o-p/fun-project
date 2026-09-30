@@ -20,7 +20,7 @@ public class GameStateTest
     Assert.Equal(0, second.Captivity.Combatants.Count);
   }
 
-  [TestCase(TestName = "Roster is stamped: one Combatant per entry, override wins, empty falls back")]
+  [TestCase(TestName = "Roster is stamped: one Combatant per entry, override wins, empty falls back, all owned by the player faction")]
   public void RosterIsStamped()
   {
     var state = new GameState(TestData.MakeStart(roster:
@@ -34,13 +34,6 @@ public class GameStateTest
     Assert.Equal("Cpl. Ada Voss", state.Roster[0].Name);
     Assert.Equal("Mold", state.Roster[1].Name); // MakeEntry's default mold name
     Assert.Equal("Sgt. Bram Okafor", state.Roster[2].Name);
-  }
-
-  [TestCase(TestName = "Every roster combatant belongs to the player faction")]
-  public void RosterBelongsToPlayerFaction()
-  {
-    var state = new GameState(TestData.MakeStart(roster: [TestData.MakeEntry("A"), TestData.MakeEntry("B")]));
-
     foreach (var unit in state.Roster)
       Assert.Equal(state.PlayerFaction, unit.OwningFaction);
   }
@@ -55,23 +48,38 @@ public class GameStateTest
     Assert.Equal(-1, state.IndexOfRegion("Nowhere"));
   }
 
-  [TestCase(TestName = "Missing map or player faction throws at construction")]
-  public void RequiredFieldsThrow()
+  [TestCase(TestName = "Malformed campaign authoring fails GameState construction")]
+  public void MalformedCampaignAuthoringFailsConstruction()
   {
-    Assert.Throws<System.InvalidOperationException>(() => new GameState(
-      new CampaignStartData { Map = new FunProject.Strategic.GeoscapeMapData(), PlayerFaction = null! }));
-
-    Assert.Throws<System.InvalidOperationException>(() => new GameState(
-      new CampaignStartData { Map = null!, PlayerFaction = new FunProject.Combatants.FactionData() }));
-  }
-
-  [TestCase(TestName = "Roster entry without a unit throws at construction")]
-  public void EntryWithoutUnitThrows()
-  {
-    Assert.Throws<System.InvalidOperationException>(() => new GameState(TestData.MakeStart(roster:
+    EquippableItemData duplicate = new() { Name = "Duplicate" };
+    (string Case, CampaignStartData Start)[] malformed =
     [
-      new RosterEntryData { Unit = null!, DisplayName = "Broken" },
-    ])));
+      ("missing player faction", new CampaignStartData
+      {
+        Map = new FunProject.Strategic.GeoscapeMapData(),
+        PlayerFaction = null!,
+      }),
+      ("missing map", new CampaignStartData
+      {
+        Map = null!,
+        PlayerFaction = new FunProject.Combatants.FactionData(),
+      }),
+      ("roster entry without a unit", TestData.MakeStart(roster:
+      [
+        new RosterEntryData { Unit = null!, DisplayName = "Broken" },
+      ])),
+      ("captive without a unit", TestData.MakeStart(captives:
+      [
+        new CaptiveEntryData { Unit = null!, Faction = new FunProject.Combatants.FactionData() },
+      ])),
+      ("captive without a faction", TestData.MakeStart(captives:
+      [
+        new CaptiveEntryData { Unit = TestData.MakeCombatantData("Grunt"), Faction = null! },
+      ])),
+      ("armory with a duplicated item reference", TestData.MakeStart(armory: [duplicate, duplicate])),
+    ];
+    foreach ((string name, CampaignStartData start) in malformed)
+      Assert.Throws<InvalidOperationException>(() => new GameState(start), name);
   }
 
   [TestCase(TestName = "Captives are stamped with override and fallback names and leave the roster untouched")]
@@ -124,20 +132,6 @@ public class GameStateTest
     Assert.False(ReferenceEquals(firstCaptive.OwningFaction, secondCaptive.OwningFaction));
   }
 
-  [TestCase(TestName = "Captive entry without a unit or faction throws at construction")]
-  public void CaptiveWithoutUnitOrFactionThrows()
-  {
-    Assert.Throws<System.InvalidOperationException>(() => new GameState(TestData.MakeStart(captives:
-    [
-      new CaptiveEntryData { Unit = null!, Faction = new FunProject.Combatants.FactionData() },
-    ])));
-
-    Assert.Throws<System.InvalidOperationException>(() => new GameState(TestData.MakeStart(captives:
-    [
-      new CaptiveEntryData { Unit = TestData.MakeCombatantData("Grunt"), Faction = null! },
-    ])));
-  }
-
   [TestCase(TestName = "Armory is built from CampaignStartData with flag-driven stock policy")]
   public void ArmoryBuiltFromStart()
   {
@@ -150,14 +144,6 @@ public class GameStateTest
     Assert.Equal(1, state.Armory.ModStock().Count);
     Assert.True(state.Armory.TryWithdrawItem(pistol).IsSome);
     Assert.False(state.Armory.TryWithdrawItem(pistol).IsSome);
-  }
-
-  [TestCase(TestName = "Bad armory authoring fails GameState construction")]
-  public void BadArmoryFailsConstruction()
-  {
-    EquippableItemData dup = new() { Name = "Duplicate" };
-    Assert.Throws<InvalidOperationException>(() =>
-      new GameState(TestData.MakeStart(armory: [dup, dup])));
   }
 
   [TestCase(TestName = "TicksFromDays covers whole days at 1440 ticks per day")]

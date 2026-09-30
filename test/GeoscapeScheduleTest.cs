@@ -1,4 +1,5 @@
 using CampaignGameState = global::FunProject.GameState.GameState;
+using FunProject.GameState;
 using FunProject.Strategic;
 using GdUnit4;
 
@@ -6,33 +7,28 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class GeoscapeScheduleTest
 {
-  [TestCase(TestName = "Event fires exactly at its scheduled tick")]
-  public void EventFiresAtItsTick()
+  [TestCase(3, "Raid", GeoscapeEventKind.TacticalBattle, 2, 3L)]
+  [TestCase(0, "Immediate", GeoscapeEventKind.Plot, 0, 1L)]
+  public void ScheduledEventFiresAtFirstDueAdvancingTick(
+    int atTick, string title, GeoscapeEventKind kind, int beforeTicks, long expectedOccurredTick)
   {
     using var campaign = new GeoscapeFixture(timeline:
     [
-      TestData.MakeScheduled(3, TestData.MakeEvent("Raid", GeoscapeEventKind.TacticalBattle)),
+      TestData.MakeScheduled(atTick, TestData.MakeEvent(title, kind)),
     ]);
-    campaign.AdvanceTicks(2);
-    Assert.Equal(0, campaign.Session.ActiveEvents.Count);
+
+    if (beforeTicks > 0)
+    {
+      campaign.AdvanceTicks(beforeTicks);
+      Assert.Equal(0, campaign.Session.ActiveEvents.Count);
+    }
 
     campaign.AdvanceTicks(1);
     Assert.Equal(1, campaign.Session.ActiveEvents.Count);
     var active = campaign.Session.ActiveEvents[0];
-    Assert.Equal("Raid", active.Definition.Title);
-    Assert.Equal(3, active.OccurredTick);
-  }
-
-  [TestCase(TestName = "Entries scheduled in the past fire on the first tick")]
-  public void PastEntriesFireOnFirstTick()
-  {
-    using var campaign = new GeoscapeFixture(timeline:
-    [
-      TestData.MakeScheduled(0, TestData.MakeEvent("Immediate")),
-    ]);
-    campaign.AdvanceTicks(1);
-
-    Assert.Equal(1, campaign.Session.ActiveEvents.Count);
+    Assert.Equal(title, active.Definition.Title);
+    // The active record carries the actual firing tick, so the past row reads 1, not its authored 0.
+    Assert.Equal(expectedOccurredTick, active.OccurredTick);
   }
 
   [TestCase(TestName = "Multiple entries on the same tick all fire")]
@@ -48,31 +44,24 @@ public class GeoscapeScheduleTest
     Assert.Equal(2, campaign.Session.ActiveEvents.Count);
   }
 
-  [TestCase(TestName = "Expired events are removed at their expiry tick")]
-  public void ExpiredEventsAreRemoved()
+  [TestCase(2, "Fading", 3, 4, 1, 1, 0)]
+  [TestCase(1, "Everlasting", -1, 5000, 1, 0, 1)]
+  [TestCase(2, "Blink", 0, 2, 0, 0, 0)]
+  public void ScheduledEventLifetimeRespectsExpiry(
+    int atTick, string title, int expiry, int firstAdvance, int firstCount, int extraTicks, int finalCount)
   {
     using var campaign = new GeoscapeFixture(timeline:
     [
-      TestData.MakeScheduled(2, TestData.MakeEvent("Fading", expiresAfterTicks: 3)),
+      TestData.MakeScheduled(atTick, TestData.MakeEvent(title, expiresAfterTicks: expiry)),
     ]);
-    campaign.AdvanceTicks(4);
-    Assert.Equal(1, campaign.Session.ActiveEvents.Count);
 
-    campaign.AdvanceTicks(1); // tick 5 == occurred 2 + 3
-
-    Assert.Equal(0, campaign.Session.ActiveEvents.Count);
-  }
-
-  [TestCase(TestName = "Events without expiry stay active")]
-  public void EventsWithoutExpiryStay()
-  {
-    using var campaign = new GeoscapeFixture(timeline:
-    [
-      TestData.MakeScheduled(1, TestData.MakeEvent("Everlasting")),
-    ]);
-    campaign.AdvanceTicks(5000);
-
-    Assert.Equal(1, campaign.Session.ActiveEvents.Count);
+    campaign.AdvanceTicks(firstAdvance);
+    Assert.Equal(firstCount, campaign.Session.ActiveEvents.Count);
+    if (extraTicks > 0)
+    {
+      campaign.AdvanceTicks(extraTicks); // expiry is inclusive: e.g. tick 5 == occurred 2 + 3
+      Assert.Equal(finalCount, campaign.Session.ActiveEvents.Count);
+    }
   }
 
   [TestCase(TestName = "Firing and expiry are committed to the event stream in order")]
@@ -126,44 +115,25 @@ public class GeoscapeScheduleTest
     Assert.Equal(0, active.TargetRegionIndex.RequireSome());
   }
 
-  [TestCase(TestName = "A targeted event whose region name is unknown throws at construction")]
-  public void UnknownTargetRegionNameThrowsAtConstruction()
+  [TestCase(TestName = "Malformed schedule authoring fails campaign construction")]
+  public void MalformedScheduleAuthoringFailsConstruction()
   {
-    Assert.Throws<System.InvalidOperationException>(() => new CampaignGameState(TestData.MakeStart(
-      regions: [TestData.MakeRegion("Only")],
-      timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Broken", targetRegionName: "Nowhere"))])));
-  }
-
-  [TestCase(TestName = "Duplicate region names throw at construction")]
-  public void DuplicateRegionNamesThrowAtConstruction()
-  {
-    Assert.Throws<System.InvalidOperationException>(() => new CampaignGameState(TestData.MakeStart(
-      regions: [TestData.MakeRegion("Twin"), TestData.MakeRegion("Twin")])));
-  }
-
-  [TestCase(TestName = "Timeline entries without an event throw at construction")]
-  public void EntriesWithoutAnEventThrowAtConstruction()
-  {
-    Assert.Throws<System.InvalidOperationException>(() => new CampaignGameState(TestData.MakeStart(
-      timeline: [TestData.MakeScheduled(1, null!)])));
-  }
-
-  [TestCase(TestName = "Expiry below the -1 sentinel throws at construction")]
-  public void ExpiryBelowSentinelThrowsAtConstruction()
-  {
-    Assert.Throws<System.InvalidOperationException>(() => new CampaignGameState(TestData.MakeStart(
-      timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Bad", expiresAfterTicks: -2))])));
-  }
-
-  [TestCase(TestName = "Zero expiry removes the event on its fire tick")]
-  public void ZeroExpiryRemovesOnFireTick()
-  {
-    using var campaign = new GeoscapeFixture(timeline:
+    (string Case, CampaignStartData Start)[] malformed =
     [
-      TestData.MakeScheduled(2, TestData.MakeEvent("Blink", expiresAfterTicks: 0)),
-    ]);
-    campaign.AdvanceTicks(2);
-
-    Assert.Equal(0, campaign.Session.ActiveEvents.Count); // fired at tick 2, expired at 2 + 0
+      ("unknown target region", TestData.MakeStart(
+        regions: [TestData.MakeRegion("Only")],
+        timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Broken", targetRegionName: "Nowhere"))])),
+      ("duplicate region names", TestData.MakeStart(
+        regions: [TestData.MakeRegion("Twin"), TestData.MakeRegion("Twin")],
+        timeline: [])),
+      ("timeline entry without an event", TestData.MakeStart(
+        regions: [],
+        timeline: [TestData.MakeScheduled(1, null!)])),
+      ("expiry below the -1 sentinel", TestData.MakeStart(
+        regions: [],
+        timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Bad", expiresAfterTicks: -2))])),
+    ];
+    foreach ((string name, CampaignStartData start) in malformed)
+      Assert.Throws<System.InvalidOperationException>(() => new CampaignGameState(start), name);
   }
 }

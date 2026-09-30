@@ -22,15 +22,11 @@ public class ProjectCatalogTest
   }
 
   [TestCase]
-  public void NullCatalogEntriesFailCampaignConstruction()
+  public void NullCatalogAuthoringFailsCampaignConstruction()
   {
     Assert.Throws<ArgumentNullException>(() => new GameState(MakeStart(
       manufacturableItems: [null!])));
-  }
 
-  [TestCase]
-  public void NullCatalogArrayFailsCampaignConstruction()
-  {
     var start = MakeStart();
     start.ManufacturableItems = null!;
     Assert.Throws<ArgumentNullException>(() => new GameState(start));

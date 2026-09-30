@@ -49,15 +49,6 @@ public class GeoscapeProjectsIntegrationTest
   }
 
   [TestCase]
-  public void ReadyInitializesIdleProjectStatus()
-  {
-    var scene = AddToTree(CreateGeoscapeScene(MakeStart()));
-    var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
-    Assert.Equal("No active manufacturing.", hud.GetNode<Label>("%EngineeringProgress").Text);
-    Assert.Equal("", hud.GetNode<Label>("%EngineeringNotice").Text);
-  }
-
-  [TestCase]
   public async Task BrowsingFreezesManufacturingAndReturningToMapRefreshesCompletion()
   {
     await using var cleanup = new DeferredNodeCleanup();
@@ -200,6 +191,11 @@ public class GeoscapeProjectsIntegrationTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = AddToTree(CreateGeoscapeScene(MakeStart()));
+    // _Ready initializes the idle project status before any view action or foreign snapshot.
+    var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
+    Assert.Equal("No active manufacturing.", hud.GetNode<Label>("%EngineeringProgress").Text);
+    Assert.Equal("", hud.GetNode<Label>("%EngineeringNotice").Text);
+
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     PressEngineeringButton(scene);
     var view = (EngineeringView)manager.Current;
