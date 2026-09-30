@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
@@ -113,6 +114,8 @@ public class EndOfBattleSummaryTest
     // Deliberate campaign-side mutation probes frozen membership; not a supported gameplay action.
     battle.PlayerUnit.ReceiveDamage(5);
     battle.PlayerUnit.Combatant.OwningFaction = battle.EnemyFaction;
+    battle.PlayerUnit.Combatant.GetStat<HealthStat>().BaseValue = 40;
+    Assert.Equal(40, battle.PlayerUnit.MaxHealth);
 
     var completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
     Assert.Equal(BattleOutcome.Victory, completed.Outcome);
