@@ -6,31 +6,24 @@ using Godot;
 [RequireGodotRuntime]
 public class BattleCausalityTest
 {
-  [TestCase(TestName = "An attack hit carries the attacker as the damage event's cause")]
-  public void AttackHitCarriesAttackerAsDamageCause()
+  [TestCase(20, TestName = "An attack hit carries the attacker as the damage event's cause")]
+  [TestCase(5, TestName = "A killing blow carries the attacker on the kill event alone")]
+  public void AttackCarriesTheAttackerAsCause(int enemyHealth)
   {
     using var battle = BattleFixture.Duel(
       hitChanceCalculator: new AlwaysHitCalculator(),
       player: new("Alpha", Weapon: TestData.MakeWeapon("Rifle", damage: 5)),
-      enemy: new("Hostile"));
+      enemy: new("Hostile", Health: enemyHealth));
     battle.ClearEvents();
 
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
-    var damagedEvent = battle.Events.SingleEvent<UnitDamagedBattleEvent>();
-    Assert.Equal(battle.PlayerUnit, damagedEvent.MaybeCause.RequireSome());
-  }
-
-  [TestCase(TestName = "A killing blow carries the attacker on the kill event alone")]
-  public void KillingBlowCarriesAttackerOnTheKillEventAlone()
-  {
-    using var battle = BattleFixture.Duel(
-      hitChanceCalculator: new AlwaysHitCalculator(),
-      player: new("Alpha", Weapon: TestData.MakeWeapon("Rifle", damage: 5)),
-      enemy: new("Hostile", Health: 5));
-    battle.ClearEvents();
-
-    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
+    if (enemyHealth == 20)
+    {
+      var damagedEvent = battle.Events.SingleEvent<UnitDamagedBattleEvent>();
+      Assert.Equal(battle.PlayerUnit, damagedEvent.MaybeCause.RequireSome());
+      return;
+    }
 
     Assert.True(battle.EnemyUnit.IsDead);
     // A killing blow commits death only: no damage event accompanies the kill.

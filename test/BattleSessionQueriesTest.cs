@@ -16,46 +16,25 @@ public class BattleSessionQueriesTest
 
     BattleBoardState.ValidatedPoint[] path = battle.Query(new FindPathForUnit(battle.Alive(unit), battle.At(2, 0, 0)));
 
+    Assert.Equal(new Vector3I(0, 0, 0), battle.Alive(unit).Position.Raw);
     Assert.Equal(3, path.Length);
     Assert.Equal(new Vector3I(0, 0, 0), path[0].Raw);
     Assert.Equal(new Vector3I(2, 0, 0), path[^1].Raw);
   }
 
-  [TestCase(TestName = "Minted AliveUnit carries the board position for a spawned unit")]
-  public void MintedAliveUnitCarriesTheBoardPositionForASpawnedUnit()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 1), [faction]);
-    var unit = battle.Spawn(TestData.MakeCombatant("Runner", faction), new Vector3I(0, 0, 0));
-
-    BattleBoardState.ValidatedPoint position = battle.Alive(unit).Position;
-
-    Assert.Equal(new Vector3I(0, 0, 0), position.Raw);
-  }
-
-  [TestCase(TestName = "GetUnitAtTile returns the unit occupying a tile")]
-  public void GetUnitAtTileReturnsTheUnitOccupyingATile()
+  [TestCase(1, TestName = "GetUnitAtTile returns the unit occupying a tile")]
+  [TestCase(2, TestName = "GetUnitAtTile returns None for an empty tile")]
+  public void GetUnitAtTileReturnsOccupantOrNone(int x)
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(4, 1, 1), [faction]);
     var unit = battle.Spawn(TestData.MakeCombatant("Runner", faction), new Vector3I(1, 0, 0));
 
-    Option<BattleUnitState> occupant = battle.Query(new GetUnitAtTile(battle.At(1, 0, 0)));
+    Option<BattleUnitState> occupant = battle.Query(new GetUnitAtTile(battle.At(x, 0, 0)));
 
-    Assert.True(occupant.IsSome);
-    Assert.Equal(unit, occupant.RequireSome());
-  }
-
-  [TestCase(TestName = "GetUnitAtTile returns None for an empty tile")]
-  public void GetUnitAtTileReturnsNoneForAnEmptyTile()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 1), [faction]);
-    battle.Spawn(TestData.MakeCombatant("Runner", faction), new Vector3I(1, 0, 0));
-
-    Option<BattleUnitState> occupant = battle.Query(new GetUnitAtTile(battle.At(2, 0, 0)));
-
-    Assert.True(occupant.IsNone);
+    Assert.Equal(x == 1, occupant.IsSome);
+    if (x == 1)
+      Assert.Equal(unit, occupant.RequireSome());
   }
 
   [TestCase(TestName = "GetPossibleMoveTilesForUnit respects action points")]

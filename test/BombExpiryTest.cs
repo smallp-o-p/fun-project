@@ -29,18 +29,11 @@ public class BombExpiryTest
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
 
-    return new BattleSetup(
-      TestData.MakeOpenBattleMap(),
-      [
-        new BattleSideSetup(player, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0))]),
-        new BattleSideSetup(enemy, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
-      ],
-      Seed: 7)
-    {
-      Objects = [new ObjectPlacement(bombData, bombCell)],
-    };
+    return TestData.MakeBattleSetup(player, enemy,
+      new UnitLoadout(TestData.MakeCombatant("A", player)), new UnitLoadout(TestData.MakeCombatant("B", enemy)),
+      [new FakeObjectiveData()], [new FakeObjectiveData()])
+      with
+    { Objects = [new ObjectPlacement(bombData, bombCell)] };
   }
 
   [TestCase(TestName = "Turn end at the deadline expires: damage applied, event raised, defused bombs skipped")]
@@ -70,25 +63,19 @@ public class BombExpiryTest
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
 
-    using var runtime = BattleFactory.Start(new BattleSetup(
-      TestData.MakeOpenBattleMap(),
-      [
-        new BattleSideSetup(player,
-          [new DefuseAllBombsObjectiveData
-          {
-            OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
-          }],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player, health: 6)), new Vector3I(0, 0, 0))]),
-        new BattleSideSetup(enemy, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
-      ],
-      Seed: 7,
-      PlayerFaction: Some(player))
+    using var runtime = BattleFactory.Start(TestData.MakeBattleSetup(player, enemy,
+      new UnitLoadout(TestData.MakeCombatant("A", player, health: 6)), new UnitLoadout(TestData.MakeCombatant("B", enemy)),
+      [new DefuseAllBombsObjectiveData
+      {
+        OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
+      }],
+      [new FakeObjectiveData()], Some(player))
+      with
     {
       Objects =
-      [
-        new ObjectPlacement(MakeBomb(expireAfterTurns: 1, baseDamage: 8), new Vector3I(1, 0, 0)),
-      ],
+        [
+          new ObjectPlacement(MakeBomb(expireAfterTurns: 1, baseDamage: 8), new Vector3I(1, 0, 0)),
+        ],
     }).RequireRight();
     List<BattleEvent> events = [];
     runtime.BattleEventCommitted += events.Add;

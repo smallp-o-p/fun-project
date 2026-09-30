@@ -30,22 +30,15 @@ public class BattleResultTest
     bombData.Capabilities.Add(new InteractiveCapabilityData());
     bombData.Capabilities.Add(new TimedEffectCapabilityData { FireAfterTurns = 1 });
 
-    var setup = new BattleSetup(
-      TestData.MakeOpenBattleMap(),
-      [
-        new BattleSideSetup(player,
-          [new DefuseAllBombsObjectiveData
-          {
-            OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
-          }],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0))]),
-        new BattleSideSetup(enemy, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
-      ],
-      Seed: 7)
-    {
-      Objects = [new ObjectPlacement(bombData, new Vector3I(2, 0, 2))],
-    };
+    var setup = TestData.MakeBattleSetup(player, enemy,
+      new UnitLoadout(TestData.MakeCombatant("A", player)), new UnitLoadout(TestData.MakeCombatant("B", enemy)),
+      [new DefuseAllBombsObjectiveData
+      {
+        OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
+      }],
+      [new FakeObjectiveData()])
+      with
+    { Objects = [new ObjectPlacement(bombData, new Vector3I(2, 0, 2))] };
 
     using var runtime = BattleFactory.Start(setup).RequireRight();
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());

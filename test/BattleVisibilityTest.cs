@@ -8,50 +8,24 @@ using Godot;
 [RequireGodotRuntime]
 public class BattleVisibilityTest
 {
-  [TestCase(TestName = "Open space visibility succeeds between units")]
-  public void OpenSpaceVisibilitySucceedsBetweenUnits()
+  [TestCase(false, TestName = "Open space visibility succeeds between units and caches register them")]
+  [TestCase(true, TestName = "Blocking tiles break line of sight and drop the target from the caches")]
+  public void LineOfSightAndVisibilityCaches(bool blocked)
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
     using var battle = new BattleFixture(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
     var observer = battle.Spawn(TestData.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
     var target = battle.Spawn(TestData.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
+    if (blocked)
+      battle.Board.GetTile(battle.At(1, 0, 0)).BlocksLineOfSight = true;
 
     battle.Start();
 
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
-  }
-
-  [TestCase(TestName = "Unit state tracks currently visible units")]
-  public void UnitStateTracksCurrentlyVisibleUnits()
-  {
-    var playerFaction = TestData.MakeFaction("Player");
-    var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
-    var observer = battle.Spawn(TestData.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
-    var target = battle.Spawn(TestData.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
-
-    battle.Start();
-
-    Assert.True(observer.VisibleUnits.Contains(target));
-    Assert.True(observer.VisibleTiles.Contains(battle.At(new Vector3I(2, 0, 0))));
-  }
-
-  [TestCase(TestName = "Blocking tiles break line of sight")]
-  public void BlockingTilesBreakLineOfSight()
-  {
-    var playerFaction = TestData.MakeFaction("Player");
-    var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
-    var observer = battle.Spawn(TestData.MakeCombatant("Observer", playerFaction, vision: 4), new Vector3I(0, 0, 0));
-    var target = battle.Spawn(TestData.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
-
-    battle.Board.GetTile(battle.At(1, 0, 0)).BlocksLineOfSight = true;
-    battle.Start();
-
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+    Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+    Assert.Equal(!blocked, observer.VisibleUnits.Contains(target));
+    Assert.Equal(!blocked, observer.VisibleTiles.Contains(battle.At(new Vector3I(2, 0, 0))));
   }
 
   // Verifies that a blocking tile is visible (it IS the wall you look at) but the tile directly
@@ -146,98 +120,64 @@ public class BattleVisibilityTest
     Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, sealedCornerTile)));
   }
 
-  // With no vertical blocking flag, a unit can see down an open column to the level below.
-  [TestCase(TestName = "Sight passes through an open column below the observer")]
-  public void SightPassesThroughOpenColumnBelow()
+  // With no vertical blocking flag, a unit sees down an open column; BlocksVerticalLineOfSight
+  // set on the observer's own cell (the floor) seals downward sight.
+  [TestCase(false, TestName = "Sight passes through an open column below the observer")]
+  [TestCase(true, TestName = "BlocksVerticalLineOfSight prevents seeing below when set on observer cell")]
+  public void VerticalSightBelow(bool blocked)
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
     using var battle = new BattleFixture(new Vector3I(1, 2, 1), [playerFaction, enemyFaction]);
     var observer = battle.Spawn(TestData.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 1, 0));
     var target = battle.Spawn(TestData.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(0, 0, 0));
+    if (blocked)
+      battle.Board.GetTile(battle.At(new Vector3I(0, 1, 0))).BlocksVerticalLineOfSight = true;
 
     battle.Start();
 
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(0, 0, 0)))));
+    Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    Assert.Equal(!blocked, battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(0, 0, 0)))));
   }
 
-  // BlocksVerticalLineOfSight on the observer's own cell (the floor) seals downward sight.
-  [TestCase(TestName = "BlocksVerticalLineOfSight prevents seeing below when set on observer cell")]
-  public void BlocksVerticalLineOfSightPreventsSeeingBelow()
-  {
-    var playerFaction = TestData.MakeFaction("Player");
-    var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(1, 2, 1), [playerFaction, enemyFaction]);
-    var observer = battle.Spawn(TestData.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 1, 0));
-    var target = battle.Spawn(TestData.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(0, 0, 0));
-
-    battle.Board.GetTile(battle.At(new Vector3I(0, 1, 0))).BlocksVerticalLineOfSight = true;
-    battle.Start();
-
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(0, 0, 0)))));
-  }
-
-  // With no vertical blocking flag, a unit can see up an open column to the level above.
-  [TestCase(TestName = "Sight passes through an open column above the observer")]
-  public void SightPassesThroughOpenColumnAbove()
+  // With no vertical blocking flag, a unit sees up an open column; BlocksVerticalLineOfSight
+  // on an intermediate floor cell seals upward sight through it.
+  [TestCase(false, TestName = "Sight passes through an open column above the observer")]
+  [TestCase(true, TestName = "BlocksVerticalLineOfSight on intermediate floor prevents seeing above")]
+  public void VerticalSightAbove(bool blocked)
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
     using var battle = new BattleFixture(new Vector3I(1, 3, 1), [playerFaction, enemyFaction]);
     var observer = battle.Spawn(TestData.MakeCombatant("Observer", playerFaction, vision: 5), new Vector3I(0, 0, 0));
     var target = battle.Spawn(TestData.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(0, 2, 0));
+    if (blocked)
+      battle.Board.GetTile(battle.At(new Vector3I(0, 1, 0))).BlocksVerticalLineOfSight = true;
 
     battle.Start();
 
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(0, 2, 0)))));
-  }
-
-  // BlocksVerticalLineOfSight on an intermediate floor cell seals upward sight through it.
-  [TestCase(TestName = "BlocksVerticalLineOfSight on intermediate floor prevents seeing above")]
-  public void BlocksVerticalLineOfSightOnIntermediateFloorPreventsSeeingAbove()
-  {
-    var playerFaction = TestData.MakeFaction("Player");
-    var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(1, 3, 1), [playerFaction, enemyFaction]);
-    var observer = battle.Spawn(TestData.MakeCombatant("Observer", playerFaction, vision: 5), new Vector3I(0, 0, 0));
-    var target = battle.Spawn(TestData.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(0, 2, 0));
-
-    battle.Board.GetTile(battle.At(new Vector3I(0, 1, 0))).BlocksVerticalLineOfSight = true;
-    battle.Start();
-
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(0, 2, 0)))));
+    Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    Assert.Equal(!blocked, battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(0, 2, 0)))));
   }
 
   // A 3D-diagonal ray (X and Y both change, simultaneous crossing) is sealed when the mid cell
   // has BlocksVerticalLineOfSight — exercises the Rule 3 vertical check on a diagonal step.
-  [TestCase(TestName = "BlocksVerticalLineOfSight seals a diagonal ray on a simultaneous crossing")]
-  public void BlocksVerticalLineOfSightSealsDiagonalRay()
+  // Keep separate from the axial rows: simultaneous crossing is its own rule.
+  [TestCase(true, TestName = "BlocksVerticalLineOfSight seals a diagonal ray on a simultaneous crossing")]
+  [TestCase(false, TestName = "A diagonal ray through an open column is clear")]
+  public void DiagonalRaySealedByVerticalBlocker(bool blocked)
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
     using var battle = new BattleFixture(new Vector3I(3, 3, 1), [playerFaction, enemyFaction]);
     var observer = battle.Spawn(TestData.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 0, 0));
     var target = battle.Spawn(TestData.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 2, 0));
-    battle.Board.GetTile(battle.At(new Vector3I(1, 1, 0))).BlocksVerticalLineOfSight = true;
-    battle.Start();
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-  }
+    if (blocked)
+      battle.Board.GetTile(battle.At(new Vector3I(1, 1, 0))).BlocksVerticalLineOfSight = true;
 
-  // Mirror: with no vertical blocker on the crossing cell, the same diagonal ray is clear.
-  [TestCase(TestName = "A diagonal ray through an open column is clear")]
-  public void DiagonalRayThroughOpenColumnIsClear()
-  {
-    var playerFaction = TestData.MakeFaction("Player");
-    var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(3, 3, 1), [playerFaction, enemyFaction]);
-    var observer = battle.Spawn(TestData.MakeCombatant("Observer", playerFaction, vision: 3), new Vector3I(0, 0, 0));
-    var target = battle.Spawn(TestData.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 2, 0));
     battle.Start();
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+
+    Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
   }
 
   [TestCase(TestName = "Vision stat changes which targets are visible")]

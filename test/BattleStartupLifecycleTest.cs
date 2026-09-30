@@ -10,24 +10,16 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public class BattleStartupLifecycleTest
 {
-  // Two sides, one unit each, distinct objective resources (the player side carries two so
-  // objective-order assertions are meaningful), seed fixed for determinism.
   private static (BattleSetup Setup, Faction Player, Faction Enemy) GroupedSetup()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
-    var setup = new BattleSetup(
-      TestData.MakeOpenBattleMap(),
-      [
-        new BattleSideSetup(player,
-          [new FakeObjectiveData(), new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", player)), new Vector3I(0, 0, 0))]),
-        new BattleSideSetup(enemy,
-          [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)), new Vector3I(3, 0, 3))]),
-      ],
-      Seed: 7,
-      PlayerFaction: Some(player));
+    var setup = TestData.MakeBattleSetup(player, enemy,
+      new UnitLoadout(TestData.MakeCombatant("Alpha", player)),
+      new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)),
+      // The player side carries two distinct objective resources so objective-order
+      // assertions are meaningful.
+      [new FakeObjectiveData(), new FakeObjectiveData()], [new FakeObjectiveData()], Some(player));
     return (setup, player, enemy);
   }
 
@@ -82,62 +74,50 @@ public class BattleStartupLifecycleTest
     }
   }
 
+  // Starts the real factory inside a using so even a successful Start disposes its runtime.
+  // A capture must exist (a successful Start fails this helper), the system must have received
+  // the runtime, and that runtime must reject queries after disposal.
+  private static Exception AssertStartupFailureDisposes(BattleSetup setup, SetupSystemData system)
+  {
+    Exception? observed = null;
+    try
+    {
+      using var unexpected = BattleFactory.Start(setup with { Systems = [system] }).RequireRight();
+    }
+    catch (Exception error)
+    {
+      observed = error;
+    }
+    Assert.True(observed is not null);
+    Assert.True(system.RegisteredRuntime is not null);
+    Assert.Throws<ObjectDisposedException>(() =>
+      system.RegisteredRuntime!.Query(new GetBattlePhaseQuery()));
+    return observed!;
+  }
+
   [TestCase(TestName = "A throwing declared-system registration preserves the exception and disposes the runtime")]
   public void ThrowingRegistrationDisposesRuntime()
   {
     var (setup, _, _) = GroupedSetup();
     var expected = new InvalidOperationException("setup sentinel");
     var system = new SetupSystemData { OnRegister = _ => throw expected };
-    Exception? observed = null;
-    try
-    {
-      using var unexpected = BattleFactory.Start(setup with { Systems = [system] }).RequireRight();
-    }
-    catch (Exception error)
-    {
-      observed = error;
-    }
-    Assert.True(ReferenceEquals(expected, observed));
-    Assert.True(system.RegisteredRuntime is not null);
-    Assert.Throws<ObjectDisposedException>(() =>
-      system.RegisteredRuntime!.Query(new GetBattlePhaseQuery()));
+
+    Assert.True(ReferenceEquals(expected, AssertStartupFailureDisposes(setup, system)));
   }
 
-  [TestCase(TestName = "A unit-added hook fault preserves the exception and disposes the runtime")]
-  public void SpawnHookFaultDisposesRuntime()
+  [TestCase(typeof(UnitAddedBattleEvent), TestName = "A unit-added hook fault preserves the exception and disposes the runtime")]
+  [TestCase(typeof(SessionStartedBattleEvent), TestName = "A session-start hook fault preserves the exception and disposes the runtime")]
+  public void HookFaultDisposesRuntime(Type eventType)
   {
     var (setup, _, _) = GroupedSetup();
-    AssertStartupFaultDisposes(setup, typeof(UnitAddedBattleEvent));
-  }
-
-  [TestCase(TestName = "A session-start hook fault preserves the exception and disposes the runtime")]
-  public void StartHookFaultDisposesRuntime()
-  {
-    var (setup, _, _) = GroupedSetup();
-    AssertStartupFaultDisposes(setup, typeof(SessionStartedBattleEvent));
-  }
-
-  private static void AssertStartupFaultDisposes(BattleSetup setup, Type eventType)
-  {
     var expected = new InvalidOperationException("setup sentinel");
     var system = new SetupSystemData
     {
       OnRegister = runtime => runtime.RegisterHook<BattleEventTag>(
         new ThrowOnSetupEvent(eventType, expected)),
     };
-    Exception? observed = null;
-    try
-    {
-      using var unexpected = BattleFactory.Start(setup with { Systems = [system] }).RequireRight();
-    }
-    catch (Exception error)
-    {
-      observed = error;
-    }
-    Assert.True(ReferenceEquals(expected, observed));
-    Assert.True(system.RegisteredRuntime is not null);
-    Assert.Throws<ObjectDisposedException>(() =>
-      system.RegisteredRuntime!.Query(new GetBattlePhaseQuery()));
+
+    Assert.True(ReferenceEquals(expected, AssertStartupFailureDisposes(setup, system)));
   }
 
   [TestCase(TestName = "A malformed spawn buff throws, preserves the cause, and disposes the runtime")]
@@ -159,20 +139,9 @@ public class BattleStartupLifecycleTest
       ],
     };
     var system = new SetupSystemData();
-    Exception? observed = null;
-    try
-    {
-      using var unexpected = BattleFactory.Start(broken with { Systems = [system] }).RequireRight();
-    }
-    catch (Exception error)
-    {
-      observed = error;
-    }
+    Exception observed = AssertStartupFailureDisposes(broken, system);
     Assert.True(observed is InvalidOperationException);
-    Assert.True(observed!.Message.Contains("no activation condition"));
-    Assert.True(system.RegisteredRuntime is not null);
-    Assert.Throws<ObjectDisposedException>(() =>
-      system.RegisteredRuntime!.Query(new GetBattlePhaseQuery()));
+    Assert.True(observed.Message.Contains("no activation condition"));
   }
 
   [TestCase(TestName = "A battle with objectives but no units throws and disposes the runtime")]
@@ -188,19 +157,7 @@ public class BattleStartupLifecycleTest
       ],
     };
     var system = new SetupSystemData();
-    Exception? observed = null;
-    try
-    {
-      using var unexpected = BattleFactory.Start(empty with { Systems = [system] }).RequireRight();
-    }
-    catch (Exception error)
-    {
-      observed = error;
-    }
-    Assert.True(observed is not null);
-    Assert.True(system.RegisteredRuntime is not null);
-    Assert.Throws<ObjectDisposedException>(() =>
-      system.RegisteredRuntime!.Query(new GetBattlePhaseQuery()));
+    AssertStartupFailureDisposes(empty, system);
   }
 
   [TestCase(TestName = "Repeated starts from one setup get fresh board, objective, object, and hook state")]

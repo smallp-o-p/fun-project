@@ -135,13 +135,7 @@ public class BattleSessionTest
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
-    var weapon = new MeleeWeapon(new WeaponData
-    {
-      Frame = TestData.MakeFrame(),
-      DamageStat = new DamageStat { BaseValue = 10 },
-      CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
-      RangeStat = new RangeStat { BaseValue = 1 },
-    });
+    var weapon = new MeleeWeapon(TestData.MakeWeaponData(damage: 10, critChance: 5, range: 1));
 
     battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0), weapon);
 
@@ -304,11 +298,9 @@ public class BattleSessionTest
   [TestCase(TestName = "Move updates unit position occupancy and action points")]
   public void MoveUpdatesUnitPositionOccupancyAndActionPoints()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 2, 4), [faction]);
+    using var battle = BattleFixture.Solo(new Vector3I(4, 2, 4), new Vector3I(1, 0, 1), actionPoints: 5);
     var session = battle.Session;
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction, actionPoints: 5), new Vector3I(1, 0, 1));
-    battle.Start();
+    var unit = battle.Unit;
 
     battle.Move(unit, [new Vector3I(1, 1, 1)], 2);
 
@@ -321,11 +313,9 @@ public class BattleSessionTest
   [TestCase(TestName = "MoveUnit follows a multi-step route and spends AP per step")]
   public void MoveUnitFollowsAMultiStepRouteAndSpendsAPPerStep()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), actionPoints: 5);
     var session = battle.Session;
-    var unit = battle.Spawn(TestData.MakeCombatant("Runner", faction, actionPoints: 5), new Vector3I(0, 0, 0));
-    battle.Start();
+    var unit = battle.Unit;
 
     BattleBoardState.ValidatedPoint[] validatedPath = battle.Query(new FindPathForUnit(battle.Alive(unit), battle.At(2, 0, 0)));
     BattleBoardState.ValidatedPoint[] path = validatedPath.AsValueEnumerable().Skip(1).ToArray();
@@ -344,11 +334,9 @@ public class BattleSessionTest
   [TestCase(TestName = "Session-owned unit position follows movement")]
   public void SessionOwnedUnitPositionFollowsMovement()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), health: 10, actionPoints: 5);
     var session = battle.Session;
-    var unit = battle.Spawn(TestData.MakeCombatant("Runner", faction, health: 10, actionPoints: 5), new Vector3I(0, 0, 0));
-    battle.Start();
+    var unit = battle.Unit;
 
     Assert.Equal(new Vector3I(0, 0, 0), session.GetUnitPosition(unit).RequireSome().Raw);
 
@@ -363,38 +351,17 @@ public class BattleSessionTest
     Assert.True(session.GetUnitPosition(unit).IsNone);
     Assert.True(session.GetUnitAt(destination).IsNone);
 
-    var replacement = battle.Spawn(TestData.MakeCombatant("Replacement", faction, health: 10), new Vector3I(1, 0, 0));
+    var replacement = battle.Spawn(TestData.MakeCombatant("Replacement", battle.PlayerFaction, health: 10), new Vector3I(1, 0, 0));
     Assert.Equal(replacement, session.GetUnitAt(destination).RequireSome());
     Assert.Equal(new Vector3I(1, 0, 0), session.GetUnitPosition(replacement).RequireSome().Raw);
-  }
-
-  [TestCase(TestName = "MoveUnit rejects invalid composed steps")]
-  public void MoveUnitRejectsInvalidComposedSteps()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
-    var session = battle.Session;
-    var unit = battle.Spawn(TestData.MakeCombatant("Runner", faction, actionPoints: 5), new Vector3I(0, 0, 0));
-    battle.Start();
-
-    var action = BattleAction.MoveUnit(
-      battle.Alive(unit),
-      [battle.At(1, 0, 0), battle.At(3, 0, 0)]);
-
-    Assert.Throws<System.InvalidOperationException>(() => battle.Submit(action));
-    Assert.Equal(new Vector3I(0, 0, 0), session.GetUnitPosition(unit).RequireSome().Raw);
-    Assert.Equal(5, unit.CurrentActionPoints);
-    Assert.True(session.Board.IsOccupied(session.Board.At(0, 0, 0)));
   }
 
   [TestCase(TestName = "MoveUnit rejects routes that cost more AP than the unit has")]
   public void MoveUnitRejectsRoutesThatCostMoreApThanTheUnitHas()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), actionPoints: 1);
     var session = battle.Session;
-    var unit = battle.Spawn(TestData.MakeCombatant("Runner", faction, actionPoints: 1), new Vector3I(0, 0, 0));
-    battle.Start();
+    var unit = battle.Unit;
 
     BattleBoardState.ValidatedPoint[] validatedPath = battle.Query(new FindPathForUnit(battle.Alive(unit), battle.At(2, 0, 0)));
     BattleBoardState.ValidatedPoint[] path = validatedPath.AsValueEnumerable().Skip(1).ToArray();
@@ -571,9 +538,8 @@ public class BattleSessionTest
   [TestCase(TestName = "Unit can throw a grenade in battle session")]
   public void UnitCanThrowAGrenadeInBattleSession()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [faction]);
-    var unit = battle.Spawn(TestData.MakeCombatant("Thrower", faction, actionPoints: 4), new Vector3I(1, 0, 1));
+    using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1), actionPoints: 4, start: false);
+    var unit = battle.Unit;
     var grenade = TestData.MakeGrenade("Practice Grenade", throwRange: 4);
     unit.AddInventoryItem(grenade.Item);
 

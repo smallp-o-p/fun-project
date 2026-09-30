@@ -10,23 +10,45 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public partial class BattleActionExecutorTest
 {
-  [TestCase(TestName = "Submit resolves a hook's interrupt within the same submission")]
-  public void SubmitResolvesInterruptsWithinTheSameSubmission()
+  [TestCase(false, true, TestName = "Submit resolves a hook's interrupt within the same submission")]
+  [TestCase(true, true, TestName = "Submit reports the submitted action once and resolves interrupts between its steps")]
+  [TestCase(true, false, TestName = "MoveUnit submit reports only the submitted action")]
+  public void SubmitReportsMovementAndInterrupts(bool twoSteps, bool reaction)
   {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), health: 10, actionPoints: 5);
+    var start = new Vector3I(0, 0, 0);
+    var mid = new Vector3I(1, 0, 0);
+    var end = new Vector3I(2, 0, 0);
+    using var battle = BattleFixture.Solo(twoSteps ? new Vector3I(4, 1, 4) : new Vector3I(3, 1, 3), start,
+      health: reaction ? 10 : 20, actionPoints: 5);
     var unit = battle.Unit;
-    var targetPosition = new Vector3I(1, 0, 0);
-    battle.RegisterHook<TileOccupiedBattleEvent>(
-      new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(targetPosition, unit, 3, oneShot: true));
+    var reactionHook = new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(mid, unit, 3, oneShot: true);
+    if (reaction)
+      battle.RegisterHook<TileOccupiedBattleEvent>(reactionHook);
 
-    BattleAction submittedAction = BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)]);
+    BattleBoardState.ValidatedPoint[] route = twoSteps ? [battle.At(mid), battle.At(end)] : [battle.At(mid)];
+    BattleAction submittedAction = BattleAction.MoveUnit(battle.Alive(unit), route);
     BattleActionExecResult result = battle.Submit(submittedAction);
 
     Assert.True(ReferenceEquals(submittedAction, result.Action));
-    Assert.True(result.EventsThatOccurred.ToArray().EventsOf<UnitMovedBattleEvent>().Length > 0);
-    Assert.True(result.EventsThatOccurred.ToArray().EventsOf<UnitDamagedBattleEvent>().Length > 0);
-    Assert.Equal(targetPosition, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
+    Assert.Equal(twoSteps ? end : mid, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
+    if (!reaction)
+      return;
+
+    // The hook's interrupt lands inside the same submission: movement and damage commit as
+    // one result, the reaction observes the unit on the just-committed mid tile, and on a
+    // two-step route the interrupt resolves between the two committed step moves.
+    var events = result.EventsThatOccurred.ToArray();
+    Assert.True(events.EventsOf<UnitMovedBattleEvent>().Length > 0);
+    Assert.True(events.EventsOf<UnitDamagedBattleEvent>().Length > 0);
     Assert.Equal(7, unit.CurrentHealth);
+    Assert.Equal(mid, reactionHook.ObservedTargetPositionDuringEvaluation.RequireSome());
+    if (twoSteps)
+    {
+      int firstMove = events.EventIndex<UnitMovedBattleEvent>(moved => moved.Position.Raw == mid);
+      int damage = events.EventIndex<UnitDamagedBattleEvent>();
+      int secondMove = events.EventIndex<UnitMovedBattleEvent>(moved => moved.Position.Raw == end);
+      Assert.True(firstMove < damage && damage < secondMove);
+    }
   }
 
   [TestCase(TestName = "A stale interrupt on an already-dead target is interrupted, not thrown")]
@@ -91,33 +113,6 @@ public partial class BattleActionExecutorTest
     battle.Submit(BattleAction.EndFactionTurn(faction));
 
     Assert.Equal(2, battle.Session.TurnNumber);
-  }
-
-  [TestCase(TestName = "Submit reports the submitted action once and resolves interrupts between its steps")]
-  public void SubmitReportsSubmittedActionAndResolvesInterruptsBetweenSteps()
-  {
-    var start = new Vector3I(0, 0, 0);
-    var mid = new Vector3I(1, 0, 0);
-    var end = new Vector3I(2, 0, 0);
-    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), start, health: 10, actionPoints: 5);
-    var unit = battle.Unit;
-    battle.RegisterHook<TileOccupiedBattleEvent>(new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(mid, unit, 3, oneShot: true));
-
-    BattleAction submittedAction = new MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)]);
-    BattleActionExecResult result = battle.Submit(submittedAction);
-
-    Assert.True(ReferenceEquals(submittedAction, result.Action));
-    Assert.Equal(end, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
-    Assert.Equal(7, unit.CurrentHealth);
-
-    // The mid-route interrupt lands between the two committed step moves, and the whole
-    // interaction is one result: the composite's steps and the interrupt's events all
-    // belong to the single submission.
-    var events = result.EventsThatOccurred.ToArray();
-    int firstMove = events.EventIndex<UnitMovedBattleEvent>(moved => moved.Position.Raw == mid);
-    int damage = events.EventIndex<UnitDamagedBattleEvent>();
-    int secondMove = events.EventIndex<UnitMovedBattleEvent>(moved => moved.Position.Raw == end);
-    Assert.True(firstMove < damage && damage < secondMove);
   }
 
   [TestCase(TestName = "A stun reaction after the first movement step interrupts the remaining route")]
@@ -295,22 +290,6 @@ public partial class BattleActionExecutorTest
     Assert.True(damageAmounts.SequenceEqual([1, 2]));
   }
 
-  [TestCase(TestName = "Executor queues reaction response after committed tile occupation")]
-  public void ExecutorQueuesReactionResponseAfterCommittedTileOccupation()
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), health: 10, actionPoints: 5);
-    var unit = battle.Unit;
-    var targetPosition = new Vector3I(1, 0, 0);
-    var reaction = new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(targetPosition, unit, 3, oneShot: true);
-    battle.RegisterHook<TileOccupiedBattleEvent>(reaction);
-
-    battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)]));
-
-    Assert.Equal(targetPosition, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
-    Assert.Equal(targetPosition, reaction.ObservedTargetPositionDuringEvaluation.RequireSome());
-    Assert.Equal(7, unit.CurrentHealth);
-  }
-
   [TestCase(TestName = "A rejected submission throws without consuming one-shot hooks")]
   public void RejectedSubmissionThrowsWithoutConsumingOneShotHooks()
   {
@@ -349,22 +328,6 @@ public partial class BattleActionExecutorTest
 
     Assert.Equal(5, unit.CurrentHealth);
     Assert.Equal(secondTrap, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
-  }
-
-  [TestCase(TestName = "MoveUnit submit reports only the submitted action")]
-  public void MoveUnitSubmitReportsOnlyTheSubmittedAction()
-  {
-    var start = new Vector3I(0, 0, 0);
-    var mid = new Vector3I(1, 0, 0);
-    var end = new Vector3I(2, 0, 0);
-    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), start, actionPoints: 5);
-    var unit = battle.Unit;
-
-    var action = new MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)]);
-    BattleActionExecResult result = battle.Submit(action);
-
-    Assert.True(ReferenceEquals(action, result.Action));
-    Assert.Equal(end, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
   }
 
   [TestCase(TestName = "MoveUnit throws when an internal step becomes blocked")]
@@ -425,6 +388,7 @@ public partial class BattleActionExecutorTest
     Assert.Throws<InvalidOperationException>(() => battle.Submit(action));
     Assert.Equal(start, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
     Assert.Equal(5, unit.CurrentActionPoints);
+    Assert.True(battle.Session.Board.IsOccupied(battle.Session.Board.At(0, 0, 0)));
   }
 
   [TestCase(TestName = "MoveUnit fails empty destinations before moving")]
@@ -477,23 +441,6 @@ public partial class BattleActionExecutorTest
     Assert.True(first.Action is MoveUnit);
     Assert.True(second.Action is EndFactionTurn);
     Assert.Equal(factionB, battle.Session.ActiveSide);
-  }
-
-  [TestCase(TestName = "Executor resolves pass unit while keeping the next ally available")]
-  public void ExecutorResolvesPassUnitWhileKeepingTheNextAllyAvailable()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
-    var unitA = battle.Spawn(TestData.MakeCombatant("A1", faction), new Vector3I(0, 0, 0));
-    var unitB = battle.Spawn(TestData.MakeCombatant("A2", faction), new Vector3I(1, 0, 0));
-    battle.Start();
-
-    battle.Submit(BattleAction.PassUnit(battle.Alive(unitA)));
-
-    Assert.False(battle.Query(new IsUnitStillAvailableThisTurn(unitA)));
-    Assert.False(battle.Query(new CanUnitActNow(unitA)));
-    Assert.True(battle.Query(new IsUnitStillAvailableThisTurn(unitB)));
-    Assert.Equal(faction, battle.Session.ActiveSide);
   }
 
   [TestCase(TestName = "Executor submit returns one result per submitted action")]

@@ -128,7 +128,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void QueryRetainsListAndEntryIdentity()
+  public void RetainedQueryListAndEntriesSurviveApSpendAndRefresh()
   {
     using var battle = BattleFixture.Duel();
     var query = new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit));
@@ -140,21 +140,23 @@ public class UnitActionCacheTest
     Assert.True(ReferenceEquals(actions, repeated));
     Assert.True(ReferenceEquals(move, Row<MoveActionDefinition>(repeated)));
     Assert.True(ReferenceEquals(battle.PlayerUnit, move.Unit));
-  }
-
-  [TestCase]
-  public void RetainedEntryUpdatesAfterActionPointSpend()
-  {
-    using var battle = BattleFixture.Duel();
-    var query = new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit));
-    IReadOnlyList<UnitAction> actions = battle.Query(query);
-    UnitAction move = Row<MoveActionDefinition>(actions);
     Assert.True(move.IsAvailable);
 
     battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2)], actionPointCost: 4);
 
-    Assert.True(ReferenceEquals(actions, battle.Query(query)));
+    IReadOnlyList<UnitAction> afterSpend = battle.Query(query);
+    Assert.True(ReferenceEquals(actions, afterSpend));
+    Assert.True(ReferenceEquals(move, Row<MoveActionDefinition>(afterSpend)));
     Assert.False(move.IsAvailable);
+
+    battle.AdvanceTurn();
+    battle.AdvanceTurn();
+
+    IReadOnlyList<UnitAction> afterRefresh = battle.Query(query);
+    Assert.True(ReferenceEquals(actions, afterRefresh));
+    Assert.True(ReferenceEquals(move, Row<MoveActionDefinition>(afterRefresh)));
+    Assert.Equal(4, battle.PlayerUnit.CurrentActionPoints);
+    Assert.True(move.IsAvailable);
   }
 
   [TestCase]
@@ -227,24 +229,6 @@ public class UnitActionCacheTest
     Assert.False(Row<AttackActionDefinition>(actions).IsAvailable);
     Assert.False(Row<PassActionDefinition>(actions).IsAvailable);
     Assert.True(Row<EndTurnActionDefinition>(actions).IsAvailable);
-  }
-
-  [TestCase]
-  public void TurnCycleRefreshesRetainedActionPointOptions()
-  {
-    using var battle = BattleFixture.Duel();
-    IReadOnlyList<UnitAction> actions = battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    UnitAction move = Row<MoveActionDefinition>(actions);
-    Assert.True(move.IsAvailable);
-    battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2)], actionPointCost: 4);
-    Assert.False(move.IsAvailable);
-
-    battle.AdvanceTurn();
-    battle.AdvanceTurn();
-
-    Assert.Equal(4, battle.PlayerUnit.CurrentActionPoints);
-    Assert.True(move.IsAvailable);
   }
 
   [TestCase]

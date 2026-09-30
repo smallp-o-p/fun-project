@@ -252,33 +252,21 @@ public partial class BattleHookTest
     Assert.True(hook.ObservedSourceAction.RequireSome() is MoveUnit);
   }
 
-  [TestCase(TestName = "One-shot hook retires itself by signalling NeedsToUnregister")]
-  public void OneShotHookRetiresItselfThroughNeedsToUnregister()
+  [TestCase(false, TestName = "One-shot hook retires itself by signalling NeedsToUnregister")]
+  [TestCase(true, TestName = "A retired one-shot hook is removed from every key it was registered under")]
+  public void OneShotRetiresAcrossRegisteredKeys(bool multipleKeys)
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
 
     var hook = new SelfRetiringHook();
     battle.RegisterHook<TurnStartedBattleEvent>(hook);
-
-    battle.AdvanceTurn();
-    battle.AdvanceTurn();
-
-    Assert.Equal(1, hook.Evaluations);
-  }
-
-  [TestCase(TestName = "A retired one-shot hook is removed from every key it was registered under")]
-  public void RetiredOneShotHookIsRemovedFromEveryKey()
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
-    var unit = battle.Unit;
-
-    // Same instance under two keys: retiring after the UnitMoved firing must also clear
-    // the TurnStarted registration — the registry owns removal, not the hook.
-    var hook = new SelfRetiringHook();
-    battle.RegisterHook<UnitMovedBattleEvent>(hook);
-    battle.RegisterHook<TurnStartedBattleEvent>(hook);
-
-    battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)]));
+    if (multipleKeys)
+    {
+      // Same instance under two keys: retiring after the UnitMoved firing must also clear
+      // the TurnStarted registration — the registry owns removal, not the hook.
+      battle.RegisterHook<UnitMovedBattleEvent>(hook);
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(battle.Unit), [battle.At(1, 0, 0)]));
+    }
 
     battle.AdvanceTurn();
     battle.AdvanceTurn();

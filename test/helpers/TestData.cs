@@ -387,6 +387,26 @@ internal static class TestData
     return scene;
   }
 
+  // Concrete setup for direct factory tests: fresh open 4x1x4 board, one unit per side at
+  // (0,0,0)/(3,0,3), fixed seed 7, optional designated player faction. Pure: callers add
+  // objects/systems and keep every supplied reference.
+  public static BattleSetup MakeBattleSetup(Faction playerFaction, Faction enemyFaction,
+    UnitLoadout playerUnit, UnitLoadout enemyUnit,
+    IReadOnlyList<ObjectiveData> playerObjectives, IReadOnlyList<ObjectiveData> enemyObjectives,
+    Option<Faction> designatedPlayer = default)
+  {
+    return new BattleSetup(
+      MakeOpenBattleMap(),
+      [
+        new BattleSideSetup(playerFaction, playerObjectives,
+          [new UnitPlacement(playerUnit, new Vector3I(0, 0, 0))]),
+        new BattleSideSetup(enemyFaction, enemyObjectives,
+          [new UnitPlacement(enemyUnit, new Vector3I(3, 0, 3))]),
+      ],
+      Seed: 7,
+      PlayerFaction: designatedPlayer);
+  }
+
   public static BattleSpecialObjectData MakeObject(
     string name = "Crate", int? health = null,
     params SpecialObjectCapabilityData[] capabilities)

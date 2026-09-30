@@ -21,13 +21,8 @@ public class BattleFactoryTest
     var enemy = TestData.MakeFaction("Enemy");
     var alpha = TestData.MakeCombatant("Alpha", player);
     var bandit = TestData.MakeCombatant("Bandit", enemy);
-    var setup = new BattleSetup(TestData.MakeOpenBattleMap(),
-    [
-      new BattleSideSetup(player, [new FakeObjectiveData()],
-        [new UnitPlacement(new UnitLoadout(alpha), new Vector3I(0, 0, 0))]),
-      new BattleSideSetup(enemy, [new FakeObjectiveData()],
-        [new UnitPlacement(new UnitLoadout(bandit), new Vector3I(3, 0, 3))]),
-    ], Seed: 7, PlayerFaction: Some(player));
+    var setup = TestData.MakeBattleSetup(player, enemy, new UnitLoadout(alpha), new UnitLoadout(bandit),
+      [new FakeObjectiveData()], [new FakeObjectiveData()], Some(player));
     return (setup, player, enemy, alpha, bandit);
   }
 
@@ -60,6 +55,7 @@ public class BattleFactoryTest
 
     Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw);
     Assert.Equal(new Vector3I(3, 0, 3), enemyUnit.Position.Raw);
+    Assert.Equal(player, runtime.Query(new GetPlayerFactionQuery()).RequireSome());
 
     // InProgress + player (Sides[0]) is the active side: it can act, enemy cannot yet.
     Assert.True(runtime.Query(new CanUnitActNow(playerUnit.State)));
@@ -99,10 +95,14 @@ public class BattleFactoryTest
     StartExpectingFailure(withStrangerPlayer, BattleSetupFailureReason.UnknownFaction);
   }
 
-  [TestCase(TestName = "Start fails when a unit belongs to another side")]
-  public void StartUnitFactionMismatch()
+  [TestCase(false, TestName = "Start fails when a unit belongs to another side")]
+  [TestCase(true, TestName = "Start fails when a unit's faction is entirely foreign")]
+  public void StartUnitOnWrongSide(bool foreign)
   {
     var (setup, player, _, alpha, _) = MinimalSetup();
+    var added = foreign
+      ? TestData.MakeCombatant("Ghost", TestData.MakeFaction("Foreign"))
+      : TestData.MakeCombatant("Bandit", setup.Sides[1].Faction);
     var crossed = setup with
     {
       Sides =
@@ -112,7 +112,7 @@ public class BattleFactoryTest
           Units =
           [
             new UnitPlacement(new UnitLoadout(alpha), new Vector3I(0, 0, 0)),
-            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Bandit", setup.Sides[1].Faction)), new Vector3I(1, 0, 1)),
+            new UnitPlacement(new UnitLoadout(added), new Vector3I(1, 0, 1)),
           ],
         },
         setup.Sides[1],
@@ -123,60 +123,20 @@ public class BattleFactoryTest
     Assert.True(ReferenceEquals(player, alpha.OwningFaction));
   }
 
-  [TestCase(TestName = "Start fails when a unit's faction is entirely foreign")]
-  public void StartUnitForeignFactionMismatch()
-  {
-    var (setup, player, _, alpha, _) = MinimalSetup();
-    var foreign = TestData.MakeFaction("Foreign");
-    var crossed = setup with
-    {
-      Sides =
-      [
-        setup.Sides[0] with
-        {
-          Units =
-          [
-            new UnitPlacement(new UnitLoadout(alpha), new Vector3I(0, 0, 0)),
-            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Ghost", foreign)), new Vector3I(1, 0, 1)),
-          ],
-        },
-        setup.Sides[1],
-      ],
-    };
-
-    StartExpectingFailure(crossed, BattleSetupFailureReason.FactionMismatch);
-    Assert.True(ReferenceEquals(player, alpha.OwningFaction));
-  }
-
-  [TestCase(TestName = "Start fails when a spawn cell is out of bounds")]
-  public void StartSpawnCellOutOfBounds()
+  [TestCase(false, TestName = "Start fails when a spawn cell is out of bounds")]
+  [TestCase(true, TestName = "Start fails when a spawn cell's tile is a wall")]
+  public void StartUnavailableUnitCell(bool blocked)
   {
     var (setup, player, _, _, _) = MinimalSetup();
+    if (blocked)
+      setup.Map.Tiles[new Godot.Vector3I(1, 0, 0)] = TestData.WallTile();
     var alpha = TestData.MakeCombatant("Alpha", player);
+    var cell = blocked ? new Vector3I(1, 0, 0) : new Vector3I(99, 0, 0);
     var broken = setup with
     {
       Sides =
       [
-        setup.Sides[0] with { Units = [new UnitPlacement(new UnitLoadout(alpha), new Vector3I(99, 0, 0))] },
-        setup.Sides[1],
-      ],
-    };
-
-    StartExpectingFailure(broken, BattleSetupFailureReason.SpawnCellUnavailable);
-    Assert.True(ReferenceEquals(player, alpha.OwningFaction));
-  }
-
-  [TestCase(TestName = "Start fails when a spawn cell's tile is a wall")]
-  public void StartSpawnCellBlocked()
-  {
-    var (setup, player, _, _, _) = MinimalSetup();
-    setup.Map.Tiles[new Godot.Vector3I(1, 0, 0)] = TestData.WallTile();
-    var alpha = TestData.MakeCombatant("Alpha", player);
-    var broken = setup with
-    {
-      Sides =
-      [
-        setup.Sides[0] with { Units = [new UnitPlacement(new UnitLoadout(alpha), new Vector3I(1, 0, 0))] },
+        setup.Sides[0] with { Units = [new UnitPlacement(new UnitLoadout(alpha), cell)] },
         setup.Sides[1],
       ],
     };
@@ -208,55 +168,64 @@ public class BattleFactoryTest
     StartExpectingFailure(broken, BattleSetupFailureReason.DuplicateSpawnCell);
   }
 
-  [TestCase(TestName = "Start fails when an object cell is out of bounds")]
-  public void StartObjectCellOutOfBounds()
+  [TestCase(false, false, TestName = "Start fails when an object cell is out of bounds")]
+  [TestCase(true, false, TestName = "Start fails when an object's tile is a wall")]
+  [TestCase(false, true, TestName = "Start fails when a bomb object cell is out of bounds")]
+  public void StartUnavailableObjectCell(bool blocked, bool bomb)
   {
     var (setup, _, _, _, _) = MinimalSetup();
-    var broken = setup with
-    {
-      Objects = [new ObjectPlacement(new BattleSpecialObjectData { Name = "Marker" }, new Vector3I(99, 0, 0))],
-    };
+    if (blocked)
+      setup.Map.Tiles[new Godot.Vector3I(1, 0, 0)] = TestData.WallTile();
+    var cell = bomb ? new Vector3I(9, 0, 9)
+      : blocked ? new Vector3I(1, 0, 0)
+      : new Vector3I(99, 0, 0);
+    var data = bomb
+      ? TestData.MakeObject("Bomb", capabilities: new InteractiveCapabilityData { ActionPointCost = 1 })
+      : new BattleSpecialObjectData { Name = "Marker" };
+    // The migrated baseline bomb case had no designated player; keep that failure input.
+    if (bomb)
+      setup = setup with { PlayerFaction = default };
+    var broken = setup with { Objects = [new ObjectPlacement(data, cell)] };
 
     StartExpectingFailure(broken, BattleSetupFailureReason.ObjectCellUnavailable);
   }
 
-  [TestCase(TestName = "Start fails when an object's tile is a wall")]
-  public void StartObjectCellBlocked()
+  [TestCase(false, TestName = "Start fails when two objects share a cell")]
+  [TestCase(true, TestName = "Start fails when two bomb objects share a cell")]
+  public void StartDuplicateObjectCell(bool bombs)
   {
     var (setup, _, _, _, _) = MinimalSetup();
-    setup.Map.Tiles[new Godot.Vector3I(1, 0, 0)] = TestData.WallTile();
-    var broken = setup with
-    {
-      Objects = [new ObjectPlacement(new BattleSpecialObjectData { Name = "Marker" }, new Vector3I(1, 0, 0))],
-    };
-
-    StartExpectingFailure(broken, BattleSetupFailureReason.ObjectCellUnavailable);
-  }
-
-  [TestCase(TestName = "Start fails when two objects share a cell")]
-  public void StartDuplicateObjectCell()
-  {
-    var (setup, _, _, _, _) = MinimalSetup();
-    var broken = setup with
-    {
-      Objects =
-      [
-        new ObjectPlacement(new BattleSpecialObjectData { Name = "Marker" }, new Vector3I(1, 0, 0)),
-        new ObjectPlacement(new BattleSpecialObjectData { Name = "Twin" }, new Vector3I(1, 0, 0)),
-      ],
-    };
+    ObjectPlacement Bomb(Vector3I cell) => new(
+      TestData.MakeObject("Bomb", capabilities: new InteractiveCapabilityData { ActionPointCost = 1 }), cell);
+    // The migrated baseline two-bomb case had no designated player; keep that failure input.
+    if (bombs)
+      setup = setup with { PlayerFaction = default };
+    var broken = bombs
+      ? setup with { Objects = [Bomb(new Vector3I(1, 0, 1)), Bomb(new Vector3I(1, 0, 1))] }
+      : setup with
+      {
+        Objects =
+        [
+          new ObjectPlacement(new BattleSpecialObjectData { Name = "Marker" }, new Vector3I(1, 0, 0)),
+          new ObjectPlacement(new BattleSpecialObjectData { Name = "Twin" }, new Vector3I(1, 0, 0)),
+        ],
+      };
 
     StartExpectingFailure(broken, BattleSetupFailureReason.DuplicateObjectCell);
   }
 
-  [TestCase(TestName = "Start fails when an object sits on a unit's spawn cell")]
-  public void StartObjectOnUnitCell()
+  [TestCase(false, TestName = "Start fails when an object sits on a unit's spawn cell")]
+  [TestCase(true, TestName = "Start fails when a bomb object sits on a unit's spawn cell")]
+  public void StartObjectOnUnitCell(bool bomb)
   {
     var (setup, _, _, _, _) = MinimalSetup();
-    var broken = setup with
-    {
-      Objects = [new ObjectPlacement(new BattleSpecialObjectData { Name = "Marker" }, new Vector3I(0, 0, 0))],
-    };
+    var data = bomb
+      ? TestData.MakeObject("Bomb", capabilities: new InteractiveCapabilityData { ActionPointCost = 1 })
+      : new BattleSpecialObjectData { Name = "Marker" };
+    // The migrated baseline bomb-overlap case had no designated player; keep that failure input.
+    if (bomb)
+      setup = setup with { PlayerFaction = default };
+    var broken = setup with { Objects = [new ObjectPlacement(data, new Vector3I(0, 0, 0))] };
 
     StartExpectingFailure(broken, BattleSetupFailureReason.ObjectCellUnavailable);
   }
@@ -269,89 +238,40 @@ public class BattleFactoryTest
     Assert.Throws<ArgumentNullException>(() => BattleFactory.Start((BattleSetup)null!));
   }
 
-  [TestCase(TestName = "Start throws on a null map")]
-  public void StartThrowsOnNullMap()
+  [TestCase("map", TestName = "Start throws on a null map")]
+  [TestCase("sides", TestName = "Start throws on null sides")]
+  [TestCase("sideFaction", TestName = "Start throws on a null side faction")]
+  [TestCase("sideObjectives", TestName = "Start throws on null side objectives")]
+  [TestCase("sideUnits", TestName = "Start throws on null side units")]
+  [TestCase("loadout", TestName = "Start throws on a null loadout")]
+  [TestCase("combatant", TestName = "Start throws on a null combatant")]
+  [TestCase("objectData", TestName = "Start throws on null object data")]
+  [TestCase("objects", TestName = "Start throws on explicit null objects")]
+  [TestCase("systems", TestName = "Start throws on explicit null systems")]
+  public void StartRejectsNullSetupMember(string member)
   {
     var (setup, _, _, _, _) = MinimalSetup();
-    Assert.Throws<ArgumentNullException>(() => BattleFactory.Start(setup with { Map = null! }));
-  }
-
-  [TestCase(TestName = "Start throws on null sides")]
-  public void StartThrowsOnNullSides()
-  {
-    var (setup, _, _, _, _) = MinimalSetup();
-    Assert.Throws<ArgumentNullException>(() => BattleFactory.Start(setup with { Sides = null! }));
-  }
-
-  [TestCase(TestName = "Start throws on a null side faction")]
-  public void StartThrowsOnNullSideFaction()
-  {
-    var (setup, _, _, _, _) = MinimalSetup();
-    var broken = setup with { Sides = [setup.Sides[0] with { Faction = null! }, setup.Sides[1]] };
-    Assert.Throws<ArgumentNullException>(() => BattleFactory.Start(broken));
-  }
-
-  [TestCase(TestName = "Start throws on null side objectives")]
-  public void StartThrowsOnNullSideObjectives()
-  {
-    var (setup, _, _, _, _) = MinimalSetup();
-    var broken = setup with { Sides = [setup.Sides[0] with { Objectives = null! }, setup.Sides[1]] };
-    Assert.Throws<ArgumentNullException>(() => BattleFactory.Start(broken));
-  }
-
-  [TestCase(TestName = "Start throws on null side units")]
-  public void StartThrowsOnNullSideUnits()
-  {
-    var (setup, _, _, _, _) = MinimalSetup();
-    var broken = setup with { Sides = [setup.Sides[0] with { Units = null! }, setup.Sides[1]] };
-    Assert.Throws<ArgumentNullException>(() => BattleFactory.Start(broken));
-  }
-
-  [TestCase(TestName = "Start throws on a null loadout")]
-  public void StartThrowsOnNullLoadout()
-  {
-    var (setup, _, _, _, _) = MinimalSetup();
-    var broken = setup with
+    BattleSetup broken = member switch
     {
-      Sides = [setup.Sides[0] with { Units = [new UnitPlacement(null!, new Vector3I(0, 0, 0))] }, setup.Sides[1]],
+      "map" => setup with { Map = null! },
+      "sides" => setup with { Sides = null! },
+      "sideFaction" => setup with { Sides = [setup.Sides[0] with { Faction = null! }, setup.Sides[1]] },
+      "sideObjectives" => setup with { Sides = [setup.Sides[0] with { Objectives = null! }, setup.Sides[1]] },
+      "sideUnits" => setup with { Sides = [setup.Sides[0] with { Units = null! }, setup.Sides[1]] },
+      "loadout" => setup with
+      {
+        Sides = [setup.Sides[0] with { Units = [new UnitPlacement(null!, new Vector3I(0, 0, 0))] }, setup.Sides[1]],
+      },
+      "combatant" => setup with
+      {
+        Sides = [setup.Sides[0] with { Units = [new UnitPlacement(new UnitLoadout(null!), new Vector3I(0, 0, 0))] }, setup.Sides[1]],
+      },
+      "objectData" => setup with { Objects = [new ObjectPlacement(null!, new Vector3I(1, 0, 0))] },
+      "objects" => setup with { Objects = null! },
+      "systems" => setup with { Systems = null! },
+      _ => throw new ArgumentException($"Unknown member: {member}"),
     };
     Assert.Throws<ArgumentNullException>(() => BattleFactory.Start(broken));
-  }
-
-  [TestCase(TestName = "Start throws on a null combatant")]
-  public void StartThrowsOnNullCombatant()
-  {
-    var (setup, _, _, _, _) = MinimalSetup();
-    var broken = setup with
-    {
-      Sides = [setup.Sides[0] with { Units = [new UnitPlacement(new UnitLoadout(null!), new Vector3I(0, 0, 0))] }, setup.Sides[1]],
-    };
-    Assert.Throws<ArgumentNullException>(() => BattleFactory.Start(broken));
-  }
-
-  [TestCase(TestName = "Start throws on null object data")]
-  public void StartThrowsOnNullObjectData()
-  {
-    var (setup, _, _, _, _) = MinimalSetup();
-    var broken = setup with
-    {
-      Objects = [new ObjectPlacement(null!, new Vector3I(1, 0, 0))],
-    };
-    Assert.Throws<ArgumentNullException>(() => BattleFactory.Start(broken));
-  }
-
-  [TestCase(TestName = "Start throws on explicit null objects")]
-  public void StartThrowsOnNullObjects()
-  {
-    var (setup, _, _, _, _) = MinimalSetup();
-    Assert.Throws<ArgumentNullException>(() => BattleFactory.Start(setup with { Objects = null! }));
-  }
-
-  [TestCase(TestName = "Start throws on explicit null systems")]
-  public void StartThrowsOnNullSystems()
-  {
-    var (setup, _, _, _, _) = MinimalSetup();
-    Assert.Throws<ArgumentNullException>(() => BattleFactory.Start(setup with { Systems = null! }));
   }
 
   [TestCase(TestName = "Start throws on an empty side list")]

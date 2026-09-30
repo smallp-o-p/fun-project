@@ -55,16 +55,10 @@ public class BattleSetupResolverTest
     {
       new HealthStatMod { Modifiers = [StatModifier.Add(12)] },
     };
-    var setup = new BattleSetup(
-      TestData.MakeOpenBattleMap(),
-      [
-        new BattleSideSetup(player, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(alpha) { StatMods = mods }, new Vector3I(0, 0, 0))]),
-        new BattleSideSetup(enemy, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)), new Vector3I(3, 0, 3))]),
-      ],
-      Seed: 7,
-      PlayerFaction: Some(player));
+    var setup = TestData.MakeBattleSetup(player, enemy,
+      new UnitLoadout(alpha) { StatMods = mods },
+      new UnitLoadout(TestData.MakeCombatant("Bandit", enemy)),
+      [new FakeObjectiveData()], [new FakeObjectiveData()], Some(player));
 
     using var runtime = BattleFactory.Start(setup).RequireRight();
     var unit = runtime.Query(new GetFactionAliveUnits(player))

@@ -22,18 +22,31 @@ public class BattleOutcomeTest
     battle.Events.EventBefore<UnitUnconsciousBattleEvent, SessionEndedBattleEvent>();
   }
 
-  [TestCase]
-  public void NoPlayerTotalKnockoutDrawsOnlyAfterEndingTheCurrentSide()
+  [TestCase(DamageKind.Stun, 20, TestName = "Without a player faction total knockout draws only after the current side ends")]
+  [TestCase(DamageKind.Health, 999, TestName = "Without a player faction total annihilation resolves to Draw at the end of the turn")]
+  public void NoPlayerTotalLossResolvesToDraw(DamageKind kind, int amount)
   {
-    using var battle = BattleFixture.Duel();
+    using var battle = kind == DamageKind.Stun
+      ? BattleFixture.Duel()
+      : BattleFixture.Duel(
+        dimensions: new Vector3I(5, 1, 5),
+        player: new("A1", Position: new Vector3I(0, 0, 0)),
+        enemy: new("B1", Position: new Vector3I(2, 0, 0)));
+    battle.ClearEvents();
 
-    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
-    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+    battle.ApplyDamage(battle.EnemyUnit, amount, kind);
+    battle.ApplyDamage(battle.PlayerUnit, amount, kind);
     Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
 
-    battle.EndFactionTurn(battle.PlayerFaction);
+    if (kind == DamageKind.Stun)
+      battle.EndFactionTurn(battle.PlayerFaction);
+    else
+      battle.AdvanceTurn();
 
+    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Draw, battle.Session.Outcome.RequireSome());
+    var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
+    Assert.Equal(BattleOutcome.Draw, ended.Outcome);
   }
 
   [TestCase(TestName = "A session exposes its declared player faction and no outcome until it ends")]
@@ -47,8 +60,9 @@ public class BattleOutcomeTest
     Assert.True(session.Outcome.IsNone);
   }
 
-  [TestCase(TestName = "A wiped player loses immediately")]
-  public void PlayerWipeLosesImmediately()
+  [TestCase(true, BattleOutcome.Defeat, TestName = "A wiped player loses immediately")]
+  [TestCase(false, BattleOutcome.Victory, TestName = "Player becoming the sole surviving side resolves to Victory the instant the last enemy dies")]
+  public void PlayerWipeResolvesOutcomeInstantly(bool playerWiped, BattleOutcome expected)
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5),
@@ -57,30 +71,12 @@ public class BattleOutcomeTest
       enemy: new("Bandit", Position: new Vector3I(2, 0, 0)));
     battle.ClearEvents();
 
-    battle.ApplyDamage(battle.PlayerUnit, 999);
+    battle.ApplyDamage(playerWiped ? battle.PlayerUnit : battle.EnemyUnit, 999);
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
-    Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
+    Assert.Equal(expected, battle.Session.Outcome.RequireSome());
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
-    Assert.Equal(BattleOutcome.Defeat, ended.Outcome);
-  }
-
-  [TestCase(TestName = "Player becoming the sole surviving side resolves to Victory the instant the last enemy dies")]
-  public void PlayerSoleSurvivorResolvesToVictoryInstantly()
-  {
-    using var battle = BattleFixture.Duel(
-      dimensions: new Vector3I(5, 1, 5),
-      playerControlled: true,
-      player: new("Alpha", Position: new Vector3I(0, 0, 0)),
-      enemy: new("Bandit", Position: new Vector3I(2, 0, 0)));
-    battle.ClearEvents();
-
-    battle.ApplyDamage(battle.EnemyUnit, 999);
-
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
-    Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
-    var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
-    Assert.Equal(BattleOutcome.Victory, ended.Outcome);
+    Assert.Equal(expected, ended.Outcome);
   }
 
   [TestCase(TestName = "Without a player faction a sole survivor keeps playing and the battle does not end")]
@@ -107,27 +103,6 @@ public class BattleOutcomeTest
     Assert.Equal(3, battle.Session.TurnNumber);
     Assert.True(battle.Session.Outcome.IsNone);
     Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
-  }
-
-  [TestCase(TestName = "Without a player faction total annihilation resolves to Draw at the end of the turn")]
-  public void NoPlayerTotalAnnihilationResolvesToDraw()
-  {
-    using var battle = BattleFixture.Duel(
-      dimensions: new Vector3I(5, 1, 5),
-      player: new("A1", Position: new Vector3I(0, 0, 0)),
-      enemy: new("B1", Position: new Vector3I(2, 0, 0)));
-    battle.ClearEvents();
-
-    battle.ApplyDamage(battle.EnemyUnit, 999);
-    battle.ApplyDamage(battle.PlayerUnit, 999);
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
-
-    battle.AdvanceTurn();
-
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
-    Assert.Equal(BattleOutcome.Draw, battle.Session.Outcome.RequireSome());
-    var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
-    Assert.Equal(BattleOutcome.Draw, ended.Outcome);
   }
 
   [TestCase(TestName = "An end-of-turn DoT kill that wipes the player resolves to Defeat without throwing")]

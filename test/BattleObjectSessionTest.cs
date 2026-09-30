@@ -61,69 +61,24 @@ public class BattleObjectSessionTest
     Assert.Equal(0, battle.Query(new GetBattleSpecialObjectsQuery()).Count);
   }
 
-  [TestCase(TestName = "Player faction query returns the started faction")]
-  public void PlayerFactionQueryReturnsStartedFaction()
+  [TestCase(TestName = "Start(setup) places objects")]
+  public void StartPlacesObjects()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
 
-    using BattleRuntime runtime = BattleFactory.Start(new BattleSetup(
-      TestData.MakeOpenBattleMap(),
-      [
-        new BattleSideSetup(player, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0))]),
-        new BattleSideSetup(enemy, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
-      ],
-      Seed: 7,
-      PlayerFaction: Some(player))).RequireRight();
-
-    Assert.Equal(player, runtime.Query(new GetPlayerFactionQuery()).RequireSome());
-  }
-
-  [TestCase(TestName = "Start(setup) places objects and reports typed failures")]
-  public void StartPlacesObjectsAndValidates()
-  {
-    var player = TestData.MakeFaction("P");
-    var enemy = TestData.MakeFaction("E");
-
-    // Start mutates nothing on the setup, but each case gets a FRESH setup description so a
-    // failed Start cannot be confounded by a prior case.
-    BattleSetup SetupWith(IReadOnlyList<ObjectPlacement> objects) => new(
-      TestData.MakeOpenBattleMap(),
-      [
-        new BattleSideSetup(player, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0))]),
-        new BattleSideSetup(enemy, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
-      ],
-      Seed: 7)
+    // Fresh A/B combatants and object resources per Start; the two-object success case and
+    // its typed-failure matrix live at the factory boundary (BattleFactoryTest).
+    using BattleRuntime runtime = BattleFactory.Start(TestData.MakeBattleSetup(player, enemy,
+      new UnitLoadout(TestData.MakeCombatant("A", player)), new UnitLoadout(TestData.MakeCombatant("B", enemy)),
+      [new FakeObjectiveData()], [new FakeObjectiveData()]) with
     {
-      Objects = objects,
-    };
-
-    // Happy path: two objects placed.
-    using BattleRuntime runtime = BattleFactory.Start(SetupWith(
-    [
-      new ObjectPlacement(MakeBombData(), new Vector3I(1, 0, 1)),
-      new ObjectPlacement(MakeBombData(), new Vector3I(2, 0, 2)),
-    ])).RequireRight();
+      Objects =
+      [
+        new ObjectPlacement(MakeBombData(), new Vector3I(1, 0, 1)),
+        new ObjectPlacement(MakeBombData(), new Vector3I(2, 0, 2)),
+      ],
+    }).RequireRight();
     Assert.Equal(2, runtime.Query(new GetBattleSpecialObjectsQuery()).Count);
-
-    BattleSetupFailure FailureOf(IReadOnlyList<ObjectPlacement> objects) =>
-      BattleFactory.Start(SetupWith(objects)).RequireLeft();
-
-    // Duplicate cell → DuplicateObjectCell.
-    Assert.Equal(BattleSetupFailureReason.DuplicateObjectCell,
-      FailureOf([new ObjectPlacement(MakeBombData(), new Vector3I(1, 0, 1)),
-                 new ObjectPlacement(MakeBombData(), new Vector3I(1, 0, 1))]).Reason);
-
-    // Out of bounds → ObjectCellUnavailable.
-    Assert.Equal(BattleSetupFailureReason.ObjectCellUnavailable,
-      FailureOf([new ObjectPlacement(MakeBombData(), new Vector3I(9, 0, 9))]).Reason);
-
-    // Onto a unit's spawn cell → ObjectCellUnavailable (not occupiable).
-    Assert.Equal(BattleSetupFailureReason.ObjectCellUnavailable,
-      FailureOf([new ObjectPlacement(MakeBombData(), new Vector3I(0, 0, 0))]).Reason);
   }
 }

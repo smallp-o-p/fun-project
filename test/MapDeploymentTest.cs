@@ -49,32 +49,18 @@ public partial class MapDeploymentTest
     Assert.Equal(0, placements.Count);
   }
 
-  [TestCase(TestName = "AssignSpawns fails when the slot has no tagged cells")]
-  public void AssignSpawnsFailsWhenSlotHasNoCells()
+  [TestCase(1, 1, TestName = "AssignSpawns fails when the slot has no tagged cells")]
+  [TestCase(0, 2, TestName = "AssignSpawns fails when there are too few spawn cells")]
+  public void AssignSpawnsFailsWhenTheSlotIsShort(int slot, int count)
   {
     Faction faction = TestData.MakeFaction("Player");
     BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(0, 0, 0), TestData.SpawnTile(0)));
-    var loadouts = new[] { new UnitLoadout(TestData.MakeCombatant("A", faction)) };
+    var loadouts = new UnitLoadout[count];
+    for (int i = 0; i < count; i++)
+      loadouts[i] = new UnitLoadout(TestData.MakeCombatant(i == 0 ? "A" : "B", faction));
 
-    var failure = MapDeployment.AssignSpawns(map, 1, loadouts).RequireLeft();
-
-    Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall, failure.Reason);
-  }
-
-  [TestCase(TestName = "AssignSpawns fails when there are too few spawn cells")]
-  public void AssignSpawnsFailsWhenTooFewSpawnCells()
-  {
-    Faction faction = TestData.MakeFaction("Player");
-    BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4),
-      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)));
-    var loadouts = new[]
-    {
-      new UnitLoadout(TestData.MakeCombatant("A", faction)),
-      new UnitLoadout(TestData.MakeCombatant("B", faction)),
-    };
-
-    var failure = MapDeployment.AssignSpawns(map, 0, loadouts).RequireLeft();
+    var failure = MapDeployment.AssignSpawns(map, slot, loadouts).RequireLeft();
 
     Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall, failure.Reason);
   }

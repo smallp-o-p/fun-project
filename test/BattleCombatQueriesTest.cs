@@ -7,21 +7,36 @@ using Godot;
 [RequireGodotRuntime]
 public partial class BattleCombatQueriesTest
 {
-  [TestCase(TestName = "GetHitChanceForAttack returns the cover-modified breakdown")]
-  public void GetHitChanceForAttackReturnsTheCoverModifiedBreakdown()
+  [TestCase(false, TestName = "Hit chance preview returns the literal cover-modified breakdown")]
+  [TestCase(true, TestName = "Hit chance preview matches the breakdown the attack resolves with")]
+  public void HitChancePreviewMatchesResolution(bool execute)
   {
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
     board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(CoverDirections.North, 40);
     using var battle = BattleFixture.Duel(
       board: board,
+      randomSeed: execute ? 99 : null,
       player: new("Alpha", Weapon: TestData.MakeWeapon("Rifle")));
 
-    var breakdown = battle.Query(new GetHitChanceForAttack(
+    var previewed = battle.Query(new GetHitChanceForAttack(
       battle.Alive(battle.PlayerUnit), battle.Target(battle.EnemyUnit))).RequireRight();
 
-    Assert.Equal(65, breakdown.BaseChance);
-    Assert.Equal(-40, breakdown.Modifiers.AsValueEnumerable().Single().Amount);
-    Assert.Equal(25, breakdown.FinalChance);
+    Assert.Equal(65, previewed.BaseChance);
+    Assert.Equal(-40, previewed.Modifiers.AsValueEnumerable().Single().Amount);
+    Assert.Equal(25, previewed.FinalChance);
+
+    if (!execute)
+    {
+      return;
+    }
+
+    battle.ClearEvents();
+    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
+
+    var resolved = battle.Events.SingleEvent<UnitAttackedBattleEvent>().Breakdown;
+    Assert.Equal(previewed.BaseChance, resolved.BaseChance);
+    Assert.Equal(previewed.FinalChance, resolved.FinalChance);
+    Assert.Equal(previewed.Modifiers.Count, resolved.Modifiers.Count);
   }
 
   [TestCase(TestName = "GetHitChanceForAttack ignores turn order")]
@@ -40,28 +55,6 @@ public partial class BattleCombatQueriesTest
       battle.Alive(enemyAttacker), battle.Target(playerTarget))).RequireRight();
 
     Assert.Equal(70, breakdown.FinalChance);
-  }
-
-  [TestCase(TestName = "GetHitChanceForAttack matches the breakdown the attack resolves with")]
-  public void GetHitChanceForAttackMatchesTheBreakdownTheAttackResolvesWith()
-  {
-    var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(CoverDirections.North, 40);
-    using var battle = BattleFixture.Duel(
-      board: board,
-      randomSeed: 99,
-      player: new("Alpha", Weapon: TestData.MakeWeapon("Rifle")));
-
-    var previewed = battle.Query(new GetHitChanceForAttack(
-      battle.Alive(battle.PlayerUnit), battle.Target(battle.EnemyUnit))).RequireRight();
-
-    battle.ClearEvents();
-    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
-
-    var resolved = battle.Events.SingleEvent<UnitAttackedBattleEvent>().Breakdown;
-    Assert.Equal(previewed.BaseChance, resolved.BaseChance);
-    Assert.Equal(previewed.FinalChance, resolved.FinalChance);
-    Assert.Equal(previewed.Modifiers.Count, resolved.Modifiers.Count);
   }
 
   [TestCase(TestName = "GetHitChanceForAttack fails when the odds are undefined")]

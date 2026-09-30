@@ -8,81 +8,48 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public sealed partial class BattleRuntimeTest
 {
-  [TestCase(TestName = "Query executes query against session")]
-  public void QueryExecutesQueryAgainstSession()
+  [TestCase(0, TestName = "Query executes against the session")]
+  [TestCase(1, TestName = "ExecuteAction delegates to the executor and the runtime republishes session events")]
+  public void RuntimeForwardsQueriesActionsAndEvents(int z)
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
     var runtime = battle.Runtime;
+    battle.ClearEvents();
+    var cell = new Vector3I(1, 0, z);
     // Runtime-only driving (no conveniences): the fixture's runtime owns this session's
     // only executor.
     runtime.ExecuteAction(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Alpha", faction), battle.Board.At(1, 0, 0)));
+      TestData.MakeCombatant("Alpha", faction), battle.Board.At(cell)));
 
-    Option<BattleUnitState> result = runtime.Query(new GetUnitAtTile(battle.Board.At(1, 0, 0)));
+    Option<BattleUnitState> queried = runtime.Query(new GetUnitAtTile(battle.Board.At(cell)));
 
-    Assert.Equal(battle.Session.GetUnitAt(battle.Board.At(1, 0, 0)).RequireSome(), result.RequireSome());
-  }
-
-  [TestCase(TestName = "ExecuteAction delegates to action executor")]
-  public void ExecuteActionDelegatesToActionExecutor()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
-    var runtime = battle.Runtime;
-
-    runtime.ExecuteAction(BattleAction.SpawnUnit(TestData.MakeCombatant("Alpha", faction), battle.Board.At(1, 0, 1)));
-
-    BattleUnitState unit = battle.Session.GetUnitAt(battle.Board.At(1, 0, 1)).RequireSome();
-    Assert.True(battle.Session.GetUnitPosition(unit).IsSome);
-  }
-
-  [TestCase(TestName = "Runtime republishes session events")]
-  public void RuntimeRepublishesSessionEvents()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
-    var runtime = battle.Runtime;
-
-    battle.ClearEvents();
-    runtime.ExecuteAction(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Alpha", faction),
-      battle.Board.At(1, 0, 1)));
-
+    Assert.Equal(battle.Session.GetUnitAt(battle.Board.At(cell)).RequireSome(), queried.RequireSome());
+    Assert.True(battle.Session.GetUnitPosition(
+      battle.Session.GetUnitAt(battle.Board.At(cell)).RequireSome()).IsSome);
     Assert.True(battle.Events.EventsOf<UnitAddedBattleEvent>().Length > 0);
   }
 
-  [TestCase(TestName = "RegisterHook affects runtime action execution")]
-  public void RegisterHookAffectsRuntimeActionExecution()
+  [TestCase(false, TestName = "RegisterHook affects runtime action execution")]
+  [TestCase(true, TestName = "RegisterHook event shape affects runtime action execution")]
+  public void RuntimeRegistrationShapesExecution(bool eventShape)
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), actionPoints: 5);
     var runtime = battle.Runtime;
     var unit = battle.Unit;
     var log = new List<string>();
     var targetPosition = new Vector3I(1, 0, 0);
-    runtime.RegisterHook<UnitMovedBattleEvent>(new RuntimeRecordingHook("runtime_reaction", targetPosition, log));
+    string label = eventShape ? "runtime_shape_reaction" : "runtime_reaction";
+    var hook = new RuntimeRecordingHook(label, targetPosition, log);
+    if (eventShape)
+      runtime.RegisterHook<IPositionedBattleEvent>(hook);
+    else
+      runtime.RegisterHook<UnitMovedBattleEvent>(hook);
 
     runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [battle.Board.At(targetPosition)]));
 
     Assert.Equal(1, log.Count);
-    Assert.Equal("runtime_reaction", log[0]);
-  }
-
-  [TestCase(TestName = "RegisterHook event shape affects runtime action execution")]
-  public void RegisterHookEventShapeAffectsRuntimeActionExecution()
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), actionPoints: 5);
-    var runtime = battle.Runtime;
-    var unit = battle.Unit;
-    var log = new List<string>();
-    var targetPosition = new Vector3I(1, 0, 0);
-    runtime.RegisterHook<IPositionedBattleEvent>(
-      new RuntimeRecordingHook("runtime_shape_reaction", targetPosition, log));
-
-    runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [battle.Board.At(targetPosition)]));
-
-    Assert.Equal(1, log.Count);
-    Assert.Equal("runtime_shape_reaction", log[0]);
+    Assert.Equal(label, log[0]);
   }
 
   [TestCase(TestName = "Disposed runtime no longer republishes session events")]
@@ -124,16 +91,9 @@ public sealed partial class BattleRuntimeTest
     Assert.Throws<ObjectDisposedException>(() => runtime.RegisterHook<IPositionedBattleEvent>(
       new RuntimeRecordingHook("runtime_shape_reaction", new Vector3I(1, 0, 0), [])));
     Assert.Throws<ObjectDisposedException>(() => runtime.UnregisterHook<UnitMovedBattleEvent>(hook));
-  }
 
-  [TestCase(TestName = "Dispose is idempotent")]
-  public void DisposeIsIdempotent()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
-
-    battle.Runtime.Dispose();
-    battle.Runtime.Dispose();
+    // Disposal is idempotent; the second call must not mask a broken first cleanup above.
+    runtime.Dispose();
   }
 
   // The runtime's re-raise fires before its executor's hook reactions, so scene subscribers
@@ -169,17 +129,6 @@ public sealed partial class BattleRuntimeTest
     var from = battle.Session.GetUnitPosition(unit).RequireSome();
     var to = battle.Board.At(new Vector3I(1, 0, 0));
     Assert.Throws<InvalidOperationException>(() => battle.Session.MoveUnit(unit, from, to));
-  }
-
-  [TestCase(TestName = "Disposing the runtime disposes its executor")]
-  public void DisposingRuntimeDisposesExecutor()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
-    battle.Runtime.Dispose();
-    Assert.Throws<ObjectDisposedException>(() =>
-      battle.Runtime.ExecuteAction(BattleAction.SpawnUnit(
-        TestData.MakeCombatant("Alpha", faction), battle.Board.At(0, 0, 0))));
   }
 
   private sealed partial class RuntimeRecordingHook : BattleHook

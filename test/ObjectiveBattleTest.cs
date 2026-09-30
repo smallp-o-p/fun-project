@@ -9,26 +9,34 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public class ObjectiveBattleTest
 {
-  [TestCase(TestName = "A completed Victory-directive objective ends the battle the moment its trigger commits")]
-  public void VictoryDirectiveEndsBattleOnTheTriggeringEvent()
+  [TestCase(true, TestName = "A completed Victory-directive objective ends the battle the moment its trigger commits")]
+  [TestCase(false, TestName = "A failed Defeat-directive objective loses the battle the moment its trigger commits")]
+  public void DirectiveEndsBattleOnTheTriggeringEvent(bool complete)
   {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
-    battle.Spawn(TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    var data = new FakeObjectiveData
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5), playerControlled: true, start: false,
+      player: new("P1", Position: new Vector3I(0, 0, 0)), enemy: new("E1", Position: new Vector3I(2, 0, 0)));
+    battle.Session.AddObjective(battle.PlayerFaction, new FakeObjective(new FakeObjectiveData
     {
-      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
-    };
-    battle.Session.AddObjective(player, new FakeObjective(data) { Complete = true });
-    battle.ClearEvents();
+      OnComplete = complete ? new EndBattleDirectiveData { Outcome = BattleOutcome.Victory } : null,
+      OnFail = complete ? null : new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
+    })
+    {
+      Complete = complete,
+      Failed = !complete,
+    });
+    if (complete)
+      battle.ClearEvents(); // the victory row pins the stream order from a clean window
     battle.Start();
 
-    battle.ApplyDamage(battle.UnitAt(new Vector3I(2, 0, 0)), 999);
+    battle.ApplyDamage(battle.EnemyUnit, 999); // ANY observed kill trips either directive
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
-    Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
+    Assert.Equal(complete ? BattleOutcome.Victory : BattleOutcome.Defeat,
+      battle.Session.Outcome.RequireSome());
+    if (!complete)
+      return;
+
     // Stream order: kill, then the flip, then the session end.
     var events = battle.Events.AsValueEnumerable().ToList();
     Assert.True(events.FindIndex(e => e is UnitKilledBattleEvent)
@@ -37,47 +45,29 @@ public class ObjectiveBattleTest
       < events.FindIndex(e => e is SessionEndedBattleEvent));
   }
 
-  [TestCase(TestName = "A SurviveUntilTurn objective wins when its target turn starts")]
-  public void SurviveUntilTurnObjectiveWins()
+  [TestCase(2, TestName = "A SurviveUntilTurn objective wins when its target turn starts")]
+  [TestCase(1, TestName = "SurviveUntilTurn target turn one wins during the opening dispatch")]
+  public void SurviveUntilTurnObjectiveWinsAtTargetTurn(int targetTurn)
   {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
-    battle.Spawn(TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    battle.Session.AddObjective(player, new SurviveUntilTurnObjective(new SurviveUntilTurnObjectiveData
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5), playerControlled: true, start: false,
+      player: new("P1", Position: new Vector3I(0, 0, 0)), enemy: new("E1", Position: new Vector3I(2, 0, 0)));
+    battle.Session.AddObjective(battle.PlayerFaction, new SurviveUntilTurnObjectiveData
     {
-      TargetTurn = 2,
+      TargetTurn = targetTurn,
       OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
-    }));
+    }.Instantiate());
     battle.Start();
 
-    battle.AdvanceTurn(); // player turn 1 ends -> enemy turn 1 starts
-    battle.AdvanceTurn(); // enemy turn 1 ends -> round rolls -> TurnStarted(player, 2) -> Victory mid-submission
+    if (targetTurn == 2)
+    {
+      battle.AdvanceTurn(); // player turn 1 ends -> enemy turn 1 starts
+      battle.AdvanceTurn(); // enemy turn 1 ends -> round rolls -> TurnStarted(player, 2) -> Victory mid-submission
+    }
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
-  }
-
-  [TestCase(TestName = "A failed Defeat-directive objective loses the battle the moment its trigger commits")]
-  public void DefeatDirectiveEndsBattleOnTheTriggeringEvent()
-  {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
-    battle.Spawn(TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    var enemyUnit = battle.Spawn(TestData.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    var data = new FakeObjectiveData
-    {
-      OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
-    };
-    battle.Session.AddObjective(player, new FakeObjective(data) { Failed = true });
-    battle.Start();
-
-    battle.ApplyDamage(enemyUnit, 999); // ANY observed kill trips the failed objective
-
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
-    Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
+    Assert.Equal(targetTurn, battle.Session.TurnNumber);
   }
 
   [TestCase(TestName = "A failed objective can queue a follow-up whose own outcome decides the battle")]
@@ -181,27 +171,6 @@ public class ObjectiveBattleTest
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
   }
 
-  [TestCase(TestName = "SurviveUntilTurn target turn one wins during the opening dispatch")]
-  public void SurviveUntilTurnTargetTurnOneWinsDuringOpeningDispatch()
-  {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
-    battle.Spawn(TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    battle.Session.AddObjective(player, new SurviveUntilTurnObjectiveData
-    {
-      TargetTurn = 1,
-      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
-    }.Instantiate());
-
-    battle.Start();
-
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
-    Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
-    Assert.Equal(1, battle.Session.TurnNumber);
-  }
-
   [TestCase]
   public void MixedKillAndStunCompletesEliminationOnlyOnceEvenWhenTheBodyLaterDies()
   {
@@ -297,12 +266,10 @@ public class ObjectiveBattleTest
   [TestCase(TestName = "The player's eliminate-all completes the instant a reaction kills the last enemy during the enemy's turn")]
   public void CrossFactionCompletionResolvesInTheKillingDispatch()
   {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
-    battle.Spawn(TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    var enemyUnit = battle.Spawn(TestData.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    battle.Session.AddObjective(player, new EliminateAllOpposingForcesObjective(
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5), playerControlled: true, start: false,
+      player: new("P1", Position: new Vector3I(0, 0, 0)), enemy: new("E1", Position: new Vector3I(2, 0, 0)));
+    battle.Session.AddObjective(battle.PlayerFaction, new EliminateAllOpposingForcesObjective(
       new EliminateAllOpposingForcesObjectiveData
       {
         OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
@@ -311,28 +278,26 @@ public class ObjectiveBattleTest
     battle.Start();
 
     battle.AdvanceTurn(); // now the enemy's turn
-    Assert.Equal(enemy, battle.Session.ActiveSide);
+    Assert.Equal(battle.EnemyFaction, battle.Session.ActiveSide);
 
-    battle.ApplyDamage(enemyUnit, 999); // a reaction kill during the enemy's own turn
+    battle.ApplyDamage(battle.EnemyUnit, 999); // a reaction kill during the enemy's own turn
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase); // resolved NOW, not at turn end
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
-    Assert.Equal(1, battle.Events.EventsOf<ObjectiveCompletedBattleEvent>().AsValueEnumerable().Count(e => e.Faction == player));
+    Assert.Equal(1, battle.Events.EventsOf<ObjectiveCompletedBattleEvent>().AsValueEnumerable().Count(e => e.Faction == battle.PlayerFaction));
     Assert.Equal(BattleOutcome.Victory, battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single().Outcome);
   }
 
   [TestCase(TestName = "A wiped player loses instantly even with silent directives")]
   public void WipedPlayerLosesWithSilentDirectives()
   {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
-    var playerUnit = battle.Spawn(TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    battle.Session.AddObjective(player, new FakeObjective(new FakeObjectiveData())); // no directives
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5), playerControlled: true, start: false,
+      player: new("P1", Position: new Vector3I(0, 0, 0)), enemy: new("E1", Position: new Vector3I(2, 0, 0)));
+    battle.Session.AddObjective(battle.PlayerFaction, new FakeObjective(new FakeObjectiveData())); // no directives
     battle.Start();
 
-    battle.ApplyDamage(playerUnit, 999);
+    battle.ApplyDamage(battle.PlayerUnit, 999);
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome()); // the backstop, not a directive
@@ -342,12 +307,10 @@ public class ObjectiveBattleTest
   [TestCase(DamageKind.Stun, TestName = "Directives cannot rescue an unconscious player")]
   public void DirectivesCannotRescueAWipedPlayer(DamageKind kind)
   {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
-    var playerUnit = battle.Spawn(TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    battle.Session.AddObjective(player, new EliminateAllOpposingForcesObjective(
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5), playerControlled: true, start: false,
+      player: new("P1", Position: new Vector3I(0, 0, 0)), enemy: new("E1", Position: new Vector3I(2, 0, 0)));
+    battle.Session.AddObjective(battle.PlayerFaction, new EliminateAllOpposingForcesObjective(
       new EliminateAllOpposingForcesObjectiveData
       {
         OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
@@ -355,7 +318,7 @@ public class ObjectiveBattleTest
     battle.ClearEvents();
     battle.Start();
 
-    battle.ApplyDamage(playerUnit, 999, kind); // owner wiped -> backstop Defeat, not the authored rescue directive
+    battle.ApplyDamage(battle.PlayerUnit, 999, kind); // owner wiped -> backstop Defeat, not the authored rescue directive
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
@@ -379,12 +342,10 @@ public class ObjectiveBattleTest
   [TestCase(TestName = "A queued interrupt never runs after the battle ends mid-submission")]
   public void MidSubmissionEndDropsQueuedInterrupts()
   {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
-    var playerUnit = battle.Spawn(TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    var enemyUnit = battle.Spawn(TestData.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    battle.Session.AddObjective(player, new EliminateAllOpposingForcesObjective(
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5), playerControlled: true, start: false,
+      player: new("P1", Position: new Vector3I(0, 0, 0)), enemy: new("E1", Position: new Vector3I(2, 0, 0)));
+    battle.Session.AddObjective(battle.PlayerFaction, new EliminateAllOpposingForcesObjective(
       new EliminateAllOpposingForcesObjectiveData
       {
         OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
@@ -392,10 +353,10 @@ public class ObjectiveBattleTest
     // Priority 0 fires BEFORE ObjectiveSystem (priority 100): the interrupt is queued,
     // then the objective ends the battle — the guard must drop the queued interrupt.
     battle.RegisterHook<UnitKilledBattleEvent>(new QueueInterruptOnKill(
-      BattleAction.PassUnit(battle.Session.TryGetAlive(playerUnit).RequireSome())), 0);
+      BattleAction.PassUnit(battle.Session.TryGetAlive(battle.PlayerUnit).RequireSome())), 0);
     battle.Start();
 
-    battle.ApplyDamage(enemyUnit, 999); // without the guard this throws (PassUnit requires InProgress)
+    battle.ApplyDamage(battle.EnemyUnit, 999); // without the guard this throws (PassUnit requires InProgress)
 
     Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());

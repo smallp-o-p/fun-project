@@ -119,46 +119,24 @@ public class ObjectiveSystemBattleTest
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
   }
 
-  [TestCase(TestName = "Flips resolve in add order and the first EndBattle wins")]
-  public void FirstEndBattleWins()
+  [TestCase(false, TestName = "Flips resolve in add order and the first EndBattle wins")]
+  [TestCase(true, TestName = "Add order wins across concrete and interface observed keys")]
+  public void AddOrderWinsAcrossObservedKeyBuckets(bool interfaceKey)
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
     battle.Spawn(TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
     var enemyUnit = battle.Spawn(TestData.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
-    battle.Session.AddObjective(player, new FakeObjective(new FakeObjectiveData
-    {
-      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
-    })
-    { Complete = true });
-    battle.Session.AddObjective(player, new FakeObjective(new FakeObjectiveData
-    {
-      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
-    })
-    { Complete = true });
-    battle.Start();
-
-    battle.ApplyDamage(enemyUnit, 999); // both flip on the same kill; add order wins
-
-    Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
-  }
-
-  [TestCase(TestName = "Add order wins across concrete and interface observed keys")]
-  public void AddOrderWinsAcrossObservedKeyBuckets()
-  {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
-    battle.Spawn(TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
-    var enemyUnit = battle.Spawn(TestData.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
+    // The interface-key row proves cross-bucket matching and add-order traversal; the null
+    // Observe falls back to FakeObjective's concrete UnitKilled key.
     var first = new FakeObjective(new FakeObjectiveData
     {
       OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
     })
     {
       Complete = true,
-      Observe = typeof(IUnitBattleEvent),
+      Observe = interfaceKey ? typeof(IUnitBattleEvent) : null,
     };
     var second = new FakeObjective(new FakeObjectiveData
     {
@@ -172,7 +150,7 @@ public class ObjectiveSystemBattleTest
     battle.Session.AddObjective(player, second);
     battle.Start();
 
-    battle.ApplyDamage(enemyUnit, 999);
+    battle.ApplyDamage(enemyUnit, 999); // both flip on the same kill; add order wins
 
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
   }
