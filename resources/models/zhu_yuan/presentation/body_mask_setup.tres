@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ModelMeshMaskSetup" format=3]
+
+[ext_resource type="Resource" path="res://resources/models/zhu_yuan/presentation/body_mask.res" id="1_f8sj3"]
+[ext_resource type="Script" path="res://scenes/models/ModelMeshMaskSetup.cs" id="2_ecn5b"]
+
+[resource]
+script = ExtResource("2_ecn5b")
+MeshPath = NodePath("Model/rig_D/GeneralSkeleton/ZZZ_Size02_C")
+Configuration = ExtResource("1_f8sj3")
