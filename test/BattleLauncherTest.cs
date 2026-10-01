@@ -31,6 +31,21 @@ public partial class BattleLauncherTest
     Assert.True(status.Text.Contains("HP"));
   }
 
+  [TestCase(TestName = "A failing standalone startup leaves no host and a disposed runtime")]
+  public void FailingStartupLeavesNoHostAndDisposedRuntime()
+  {
+    var capture = new RuntimeCaptureSystemData();
+    var type = TestData.MakeDuelBattleType();
+    type.Systems.Add(capture);
+    type.Systems.Add(new ThrowingSystemData());
+    var launcher = new BattleLauncher { BattleType = type };
+    AddToTree(launcher); // the bridge logs the _Ready failure; nothing may remain half-built
+
+    Assert.Equal(0, launcher.GetChildCount());
+    Assert.Throws<ObjectDisposedException>(() =>
+      capture.Captured!.Query(new GetBattlePhaseQuery()));
+  }
+
   [TestCase(TestName = "Standalone launch does not expose Return")]
   public void StandaloneLaunchDoesNotExposeReturn()
   {

@@ -17,19 +17,11 @@ using static FunProject.Tests.GeoscapeTestScenes;
 // and the terminal Return applies the campaign return exactly once before restoring the root.
 // Battles run on genuinely launched runtimes captured through the production registration
 // door; no test-only runtime/state exports exist.
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class GeoscapeBattleHandoffTest
 {
-  // Captures the launched runtime via BattleFactory's system registration callback, so
-  // scene-boundary tests can prove ownership transfer and disposal without new seams.
-  private sealed partial class RuntimeCaptureSystemData : BattleTypeSystemData
-  {
-    public BattleRuntime? Captured { get; private set; }
-
-    public override void Register(BattleRuntime runtime) => Captured = runtime;
-  }
-
   // One fired tactical mission with the player-side elimination objective and both terminal
   // directives, so a lethal strike ends the battle. Two player cells fit the squad; one
   // ordinary Grunt spawns at x=2.
@@ -179,7 +171,11 @@ public partial class GeoscapeBattleHandoffTest
     Assert.False(GodotObject.IsInstanceValid(dialog));
     Assert.False(GodotObject.IsInstanceValid(battle)); // host freed after teardown
 
-    // BISECT: clock-resume step removed
+    // Resumed at the prior speed: the active root ticks the campaign clock again.
+    string clockResumed = Clock(scene).Text;
+    scene._PhysicsProcess(1.0);
+    Assert.That(Clock(scene).Text != clockResumed,
+      "The campaign clock must advance again after the return.");
   }
 
   [TestCase(TestName = "A mission ended at startup offers Return at presentation")]
@@ -229,6 +225,74 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(manager.Visible);
   }
 
+  [TestCase(true, TestName = "A missing %GameCamera in a correctly typed battle export aborts the installation")]
+  [TestCase(false, TestName = "A missing %BattleUI in a correctly typed battle export aborts the installation")]
+  public async Task CorrectlyTypedInstallFailureAbortsInstallationAndRestoresPreparation(bool dropCamera)
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (scene, manager, squad, _) = PreparedScene(null, out var capture);
+    CampaignGameState campaign = scene.Campaign!;
+    var session = new GeoscapeSession(campaign);
+    PendingResolution pending = session.PendingResolution.Match(
+      value => value,
+      () => throw new InvalidOperationException("The mission must stay pending."));
+    Option<int> seedBefore = pending.Event.BattleSeed;
+
+    BattleScene prototype = CreateBattleScene();
+    Node authored = prototype.GetNode<Node>(dropCamera ? "GameCamera" : "BattleUI");
+    prototype.RemoveChild(authored);
+    authored.Free();
+    scene.BattleScene = Pack(prototype); // correctly typed root, missing a fallible node
+
+    // Godot's signal dispatch only logs handler exceptions, so the aborted installation is
+    // proven by the restored state, not by an escaping exception.
+    SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
+
+    BattleRuntime runtime = capture.Captured!;
+    Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(session.ActiveMission.IsNone); // association aborted
+    Assert.True(session.PendingResolution.IsSome);
+    Assert.True(ReferenceEquals(pending,
+      session.PendingResolution.Match(value => value, () => null!)));
+    Assert.Equal(seedBefore, session.PendingResolution.Match(
+      value => value.Event.BattleSeed, () => Option<int>.None)); // seed preserved for a retry
+    Assert.Equal(1, squad.GetSelectedCombatants().Count); // selection preserved
+    Assert.True(manager.Visible); // the stack is restored
+    Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
+
+    await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
+    Assert.Equal(0, scene.GetChildren().AsValueEnumerable().OfType<BattleScene>().Count());
+  }
+
+  [TestCase(TestName = "A throwing startup system leaves no detached host and no association")]
+  public async Task StartupHookThrowLeavesNoDetachedHost()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    TacticalMissionData mission = EliminationMission();
+    mission.BattleType.Systems.Add(new ThrowingSystemData());
+    var (scene, manager, squad, _) = PreparedScene(mission, out _);
+    var session = new GeoscapeSession(scene.Campaign!);
+    Option<int> seedBefore = session.PendingResolution.Match(
+      value => value.Event.BattleSeed,
+      () => throw new InvalidOperationException("The mission must stay pending."));
+
+    // The bridge logs the signal-dispatched failure. A probe behind the geoscape handler
+    // proves the launch fault aborted the deployment path; the restored state proves the
+    // recovery, and the detached host's deferred free keeps the run orphan-free.
+    int intents = 0;
+    squad.DeployRequested += (_, _) => intents++; // runs only if the geoscape handler completed
+    SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Equal(0, intents);
+    Assert.True(session.ActiveMission.IsNone); // no launch association was established
+    Assert.True(session.PendingResolution.IsSome);
+    Assert.Equal(seedBefore, session.PendingResolution.Match(
+      value => value.Event.BattleSeed, () => Option<int>.None));
+    Assert.Equal(1, squad.GetSelectedCombatants().Count);
+    Assert.True(manager.Visible);
+    Assert.Equal(0, scene.GetChildren().AsValueEnumerable().OfType<BattleScene>().Count());
+  }
+
   [TestCase(TestName = "Return intent at the host boundary waits for the director queue to idle")]
   public async Task HostBoundaryReturnWaitsForPlaybackIdle()
   {
@@ -238,6 +302,7 @@ public partial class GeoscapeBattleHandoffTest
     var scene = CreateBattleScene();
     scene.Present(battle.Runtime, battle.Setup, allowReturn: true);
     AddToTree(scene);
+    scene.InitializePresentation(); // the installing caller initializes after attachment
 
     var returnButton = ReturnButton(scene);
     Assert.False(returnButton.Visible); // battle in progress at presentation

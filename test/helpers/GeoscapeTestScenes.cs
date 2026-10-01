@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using FunProject.Battle;
 using FunProject.GameState;
 using FunProject.Geoscape;
 using Godot;
@@ -13,8 +14,23 @@ namespace FunProject.Tests;
 // suite packs small synthetic scenes locally for polymorphic/invalid-root contracts only.
 // Cleanup stays with the callers and shared conventions: AddToTree marks the instance for
 // AutoFree; layout/deletion waits and screen-space queries live here too.
-internal static class GeoscapeTestScenes
+internal static partial class GeoscapeTestScenes
 {
+  // Battle-system doubles exercising the production registration door: one captures the
+  // launched runtime for ownership/disposal proofs, one fails startup, so scene-boundary
+  // tests need no production test seams.
+  public sealed partial class RuntimeCaptureSystemData : BattleTypeSystemData
+  {
+    public BattleRuntime? Captured { get; private set; }
+
+    public override void Register(BattleRuntime runtime) => Captured = runtime;
+  }
+
+  public sealed partial class ThrowingSystemData : BattleTypeSystemData
+  {
+    public override void Register(BattleRuntime runtime)
+      => throw new InvalidOperationException("The startup system registration failed.");
+  }
   public static GeoscapeHud CreateHud()
     => GD.Load<PackedScene>("res://scenes/geoscape/GeoscapeHud.tscn").Instantiate<GeoscapeHud>();
 

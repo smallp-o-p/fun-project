@@ -218,44 +218,36 @@ public partial class GeoscapeScene : Control
     PackedScene battleSceneExport = BattleScene ?? throw new InvalidOperationException(
       "GeoscapeScene requires a BattleScene export; assign one in the inspector.");
     BattleScene battle = InstantiateRoot<BattleScene>(battleSceneExport, "BattleScene");
-    var launch = _session.LaunchMission(mission, squad);
-    if (launch.IsLeft)
-    {
-      battle.Free(); // no runtime exists; the preparation stays for a corrected retry
-      MissionLaunchFailure failure = launch.Match(
-        Right: _ => throw new InvalidOperationException("Expected a launch failure."),
-        Left: value => value);
-      (_deploySquad ?? throw new InvalidOperationException(
-          "Deploy intent arrived with no active preparation."))
-        .ShowDeploymentFailure(failure);
-      return;
-    }
-    MissionBattle handle = launch.Match(
-      Right: value => value,
-      Left: _ => throw new InvalidOperationException("Expected a launched mission battle."));
-
-    // Recorded for return cleanup: the mission's preparation and its resolution dialog.
-    _missionSquad = _deploySquad;
-    _missionDialog = _activeResolution;
+    MissionBattle? handle = null;
+    bool presented = false;
     try
     {
-      // Prebinding: the runtime still belongs to this scene.
+      var launch = _session.LaunchMission(mission, squad);
+      if (launch.IsLeft)
+      {
+        battle.Free(); // no runtime exists; the preparation stays for a corrected retry
+        MissionLaunchFailure failure = launch.Match(
+          Right: _ => throw new InvalidOperationException("Expected a launch failure."),
+          Left: value => value);
+        (_deploySquad ?? throw new InvalidOperationException(
+            "Deploy intent arrived with no active preparation."))
+          .ShowDeploymentFailure(failure);
+        return;
+      }
+      handle = launch.Match(
+        Right: value => value,
+        Left: _ => throw new InvalidOperationException("Expected a launched mission battle."));
+
+      // Recorded for return cleanup: the mission's preparation and its resolution dialog.
+      _missionSquad = _deploySquad;
+      _missionDialog = _activeResolution;
+
       battle.Present(handle.Runtime, handle.Setup, allowReturn: true);
-    }
-    catch
-    {
-      battle.Free();
-      _session.AbortMissionPresentation(handle);
-      _missionSquad = null;
-      _missionDialog = null;
-      throw;
-    }
-
-    // The host owns the runtime from here on.
-    battle.ReturnRequested += HandleBattleReturn;
-    try
-    {
+      presented = true; // the host owns the runtime from here on
+      battle.ReturnRequested += HandleBattleReturn;
       AddChild(battle); // sibling of the view manager: hiding that never disables the battle
+      battle.InitializePresentation();
+
       _battleHost = battle;
       _activeBattle = handle;
       _viewManager.Hide();
@@ -264,36 +256,46 @@ public partial class GeoscapeScene : Control
     catch
     {
       battle.ReturnRequested -= HandleBattleReturn;
+      if (presented)
+        battle.Dispose(); // host-owned runtime; idempotent across the removal below
+      else if (handle is not null)
+        handle.Runtime.Dispose(); // prebinding: the runtime still belongs to this scene
       if (battle.IsInsideTree())
-        RemoveChild(battle); // synchronous tree exit disposes the host-owned runtime
-      battle.QueueFree();
-      _session.AbortMissionPresentation(handle);
-      _battleHost = null;
-      _missionSquad = null;
-      _missionDialog = null;
+        RemoveChild(battle); // synchronous tree exit, then deferred free
+      battle.QueueFree(); // a failed installation leaves no instantiated host behind
+      if (handle is not null)
+      {
+        _session.AbortMissionPresentation(handle);
+        _battleHost = null;
+        _activeBattle = null;
+        _missionSquad = null;
+        _missionDialog = null;
+      }
+      _viewManager.Show();
+      _viewManager.ProcessMode = ProcessModeEnum.Inherit;
       throw;
     }
   }
 
-  // The presented battle's return intent. CompleteMission consumes the association and
-  // clears it before its first broadcast, so consumption — not a normal return — decides
-  // the teardown: a subscriber failure after that commit still restores the geoscape (the
-  // exception keeps propagating), while an earlier failure (no terminal return, wrong
-  // handle) leaves the host live for a retry.
+  // The presented battle's return intent. Teardown needs the association to have been
+  // established before CompleteMission AND consumed by it: a stale or foreign handle, or a
+  // pre-consumption failure, keeps the host live for a retry, while a post-consumption
+  // subscriber failure still restores the geoscape (the exception keeps propagating).
   private void HandleBattleReturn()
   {
     MissionBattle battle = _activeBattle
       ?? throw new InvalidOperationException("Return intent arrived with no active mission battle.");
+    bool associated = _session.ActiveMission.Match(
+      active => ReferenceEquals(active, battle.Deployment), () => false);
     try
     {
       _session.CompleteMission(battle);
     }
     finally
     {
-      bool stillAssociated = _session.ActiveMission.Match(
-        active => ReferenceEquals(active, battle.Deployment),
-        () => false);
-      if (!stillAssociated)
+      bool consumed = _session.ActiveMission.Match(
+        active => ReferenceEquals(active, battle.Deployment), () => false);
+      if (associated && !consumed)
         RestoreAfterReturn();
     }
   }

@@ -51,11 +51,16 @@ public sealed partial class BattleScene : Node3D
     _runtime?.Dispose();
   }
 
-  public override void _Ready()
+  // Fallible presentation construction, run by the installing host inside its failure
+  // recovery after tree attachment: Godot's C# callback bridge only logs _Ready exceptions,
+  // so autonomous tree-entry work could never trigger an installer's catch.
+  public void InitializePresentation()
   {
     if (_runtime is null || _setup is null)
       throw new System.InvalidOperationException(
-        "BattleScene requires Present(runtime, setup) before entering the tree.");
+        "BattleScene requires Present(runtime, setup) before initialization.");
+    if (_ui is not null)
+      throw new System.InvalidOperationException("BattleScene was already initialized.");
 
     _playerFaction = _runtime.Query(new GetPlayerFactionQuery()).Match(
       Some: faction => faction,

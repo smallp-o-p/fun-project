@@ -20,7 +20,8 @@ public sealed partial class BattleLauncher : Node
     BattleRuntime runtime = BattleFactory.Start(setup).Match(
       Right: started => started,
       Left: failure => throw new System.InvalidOperationException($"Battle start failed: {failure.Message}"));
-    BattleScene battle;
+    BattleScene? battle = null;
+    bool presented = false;
     try
     {
       PackedScene scene = ResourceLoader.Load<PackedScene>("res://scenes/battle/BattleScene.tscn")
@@ -35,12 +36,23 @@ public sealed partial class BattleLauncher : Node
       }
       battle = battleRoot;
       battle.Present(runtime, setup); // allowReturn stays false: standalone battles end here
+      presented = true; // the host owns the runtime once Present succeeds
+      AddChild(battle);
+      battle.InitializePresentation();
     }
     catch
     {
-      runtime.Dispose(); // never bound to a host
+      if (presented)
+        battle!.Dispose(); // host-owned runtime; idempotent across the removal below
+      else
+        runtime.Dispose(); // never bound to a host
+      if (battle is not null)
+      {
+        if (battle.IsInsideTree())
+          RemoveChild(battle);
+        battle.QueueFree(); // a failed installation leaves no instantiated host behind
+      }
       throw;
     }
-    AddChild(battle);
   }
 }
