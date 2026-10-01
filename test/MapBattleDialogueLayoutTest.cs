@@ -45,8 +45,18 @@ public class MapBattleDialogueLayoutTest
     Assert.True(progress.ClipText);
     Assert.Equal(item.Name, progress.TooltipText);
     Assert.Equal(Control.MouseFilterEnum.Pass, progress.MouseFilter);
-    Assert.Equal("2d remaining", hud.GetNode<Label>("%EngineeringRemaining").Text);
+    var remaining = hud.GetNode<Label>("%EngineeringRemaining");
+    Assert.Equal("2d remaining", remaining.Text);
+    Assert.True(ScreenRect(remaining).End.X > width - 40, "Manufacturing stays at the right edge.");
+    Assert.True(ScreenRect(remaining).End.X - ScreenRect(progress).Position.X <= 340,
+      "Manufacturing remains compact instead of taking all spare row width.");
+    Assert.Equal(HorizontalAlignment.Right, progress.HorizontalAlignment);
     Assert.False(hud.HasNode("AlertsPanel"));
+
+    hud.UpdateManufacturing(None, 3000);
+    await WaitForLayout(viewport);
+    Assert.True(ScreenRect(progress).End.X > width - 40, "The idle summary stays at the right edge.");
+    Assert.True(progress.Size.X <= 220, "The idle summary remains compact.");
   }
 
   [TestCase(800, 600)]
