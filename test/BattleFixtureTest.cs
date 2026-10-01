@@ -16,9 +16,9 @@ public partial class BattleFixtureTest
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
     var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
+    battle.Start();
     Assert.True(ReferenceEquals(unit, battle.UnitAt(new Vector3I(0, 0, 0))));
     Assert.Equal(1, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
-    battle.Start();
     Assert.Equal(1, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
     battle.ClearEvents();
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)]));
@@ -66,12 +66,16 @@ public partial class BattleFixtureTest
     using var uiBattle = BattleFixture.UiBattle();
     Assert.True(ReferenceEquals(uiBattle.Ui, uiBattle.Ui));
     using var battle = new BattleFixture(new Vector3I(3, 1, 3), [TestData.MakeFaction("Player")]);
+    battle.Spawn(TestData.MakeCombatant("Seed", battle.PlayerFaction), new Vector3I(2, 0, 2));
+    battle.Start();
     var mesh = battle.OwnNode(new Godot.Node3D());
     var director = battle.AttachDirector(new EventPlaybackDirector());
     Assert.True(ReferenceEquals(director, battle.AttachDirector(director)));
     battle.Spawn(TestData.MakeCombatant("Extra", battle.PlayerFaction), new Vector3I(0, 0, 0));
-    director.Tick();
-    Assert.False(director.Busy); // one subscription queued one spawn event
+    // Drain the reinforcement's committed events (add plus first-time spottings).
+    for (int i = 0; i < 8 && director.Busy; i++)
+      director.Tick();
+    Assert.False(director.Busy);
     battle.Dispose();
     battle.Dispose();
     Assert.False(Godot.GodotObject.IsInstanceValid(mesh));
@@ -87,11 +91,9 @@ public partial class BattleFixtureTest
     var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
     battle.Dispose();
     battle.Dispose();
-    using var replacement = new BattleActionExecutor(battle.Session);
-    replacement.Submit(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Later", faction), battle.Board.At(0, 0, 0)));
     Assert.Equal(0, battle.Events.Count);
-    Assert.Throws<ObjectDisposedException>(() => battle.Query(new GetBattlePhaseQuery()));
+    Assert.Throws<InvalidOperationException>(() => _ = battle.Session);
+    Assert.Throws<ObjectDisposedException>(() => battle.Query(new GetCurrentTurnQuery()));
     Assert.Throws<ObjectDisposedException>(() => battle.ClearEvents());
   }
 }

@@ -7,11 +7,11 @@ namespace FunProject.Buffs;
 [GlobalClass]
 public partial class AdjacentEnemyCondition : BuffCondition
 {
-  internal override bool IsMet(BattleSession session, BattleUnitState unit)
-    => session.GetUnitPosition(unit).Match(
-         position => session.AliveUnits
+  internal override bool IsMet(BattleReadContext context, BattleUnitState unit)
+    => context.State.GetUnitPosition(unit).Match(
+         position => context.State.AliveUnits
            .AsValueEnumerable().Where(other => other.Side != unit.Side)
-           .Any(other => session.GetUnitPosition(other).Match(
+           .Any(other => context.State.GetUnitPosition(other).Match(
              otherPosition => BattleBoardState.AreAdjacent(position, otherPosition),
              () => false)),
          () => false);

@@ -143,15 +143,15 @@ public partial class AttackUnitTest
     battle.RegisterHook<UnitMovedBattleEvent>(new BuildInterruptsHook(context =>
     [
       BattleAction.AttackEntity(
-        context.Session.TryGetAlive(shooter).RequireSome(),
-        context.Session.TryGetAttackTarget(new BattleEntity.Unit(mover)).RequireSome()),
+        context.Read.State.TryGetAlive(shooter).RequireSome(),
+        context.Read.State.TryGetAttackTarget(new BattleEntity.Unit(mover)).RequireSome()),
       BattleAction.AttackEntity(
-        context.Session.TryGetAlive(shooter).RequireSome(),
-        context.Session.TryGetAttackTarget(new BattleEntity.Unit(mover)).RequireSome()),
+        context.Read.State.TryGetAlive(shooter).RequireSome(),
+        context.Read.State.TryGetAttackTarget(new BattleEntity.Unit(mover)).RequireSome()),
     ]));
     battle.ClearEvents();
 
-    Vector3I from = battle.Session.GetUnitPosition(mover).RequireSome().Raw;
+    Vector3I from = battle.PositionOf(mover).RequireSome().Raw;
     battle.Move(mover, [from + new Vector3I(0, 0, 1)]);
 
     Assert.True(mover.IsDead);

@@ -17,48 +17,39 @@ namespace FunProject.Battle;
 /// visible from the next event, not retroactively in the event that queued them. On a flip
 /// the outcome is recorded FIRST (state + events, so observers see the flip before anything
 /// it causes), then the directive runs: end the battle, queue instance-bound follow-ups, or
-/// nothing (null). Never returns interrupts; if the battle has already ended, directives rely
-/// on <see cref="BattleSession.EndBattle"/> being idempotent so late flips can still be recorded.
+/// nothing (null). Flip recording and follow-up queueing are history operations that work
+/// against the retained state after settlement; ending the battle delegates to the running
+/// receiver for the current step, so a directive observed by a completed event context can
+/// never reopen combat.
 /// </summary>
 public sealed class ObjectiveSystem : BattleHook
 {
-  private readonly BattleSession _session;
-
-  public ObjectiveSystem(BattleSession session)
-  {
-    _session = session;
-  }
-
   public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
   {
+    BattleReadContext read = context.Read;
+
     // The player-wipe backstop owns this ending; already-flipped objectives stay in
     // history, but the final disabling does not double-resolve through authored directives.
-    if (battleEvent is (UnitKilledBattleEvent or UnitUnconsciousBattleEvent) and IUnitBattleEvent unitEvent
-        && context.Session.PlayerFaction.Match(
-          Some: player => unitEvent.Unit.Side == player && !context.Session.HasConsciousUnits(player),
+    if (read.RunningSession.Match(
+          Some: session => battleEvent is (UnitKilledBattleEvent or UnitUnconsciousBattleEvent) and IUnitBattleEvent unitEvent
+            && session.PlayerFaction.Match(
+              Some: player => unitEvent.Unit.Side == player && !session.State.HasConsciousUnits(player),
+              None: () => false),
           None: () => false))
       return [];
 
-    foreach (var (owner, objective) in InterestedIn(battleEvent))
+    foreach (var (owner, objective) in SnapshotCandidates(read.State, battleEvent))
     {
-      ObjectiveResult result = objective.Check(owner, battleEvent, _session);
+      ObjectiveResult result = objective.Check(owner, battleEvent, read);
       if (result == ObjectiveResult.Ongoing)
         continue;
 
-      ObjectiveDirectiveData? directive;
-      if (result == ObjectiveResult.Passed)
-      {
-        _session.RecordObjectiveCompleted(owner, objective);
-        directive = objective.Data.OnComplete;
-      }
-      else
-      {
-        _session.RecordObjectiveFailed(owner, objective);
-        directive = objective.Data.OnFail;
-      }
+      RecordFlip(read.State, owner, objective, result == ObjectiveResult.Passed);
+      ObjectiveDirectiveData? directive = result == ObjectiveResult.Passed
+        ? objective.Data.OnComplete
+        : objective.Data.OnFail;
 
-      ApplyDirective(owner, directive);
-      if (_session.Phase == BattlePhase.Ended)
+      if (ApplyDirective(read, owner, directive))
         break;
     }
 
@@ -68,13 +59,13 @@ public sealed class ObjectiveSystem : BattleHook
   // Snapshot before iterating: a directive may add objectives mid-dispatch, and a
   // follow-up must be evaluated from the next event, never the one that queued it.
   // The faction-order × objective-add-order traversal is the determinism contract.
-  private (Faction Owner, Objective Objective)[] InterestedIn(BattleEvent battleEvent)
+  internal static (Faction Owner, Objective Objective)[] SnapshotCandidates(BattleState state, BattleEvent battleEvent)
   {
     FrozenSet<Type> eventKeys = battleEvent.EventKeys;
     List<(Faction Owner, Objective Objective)> candidates = [];
 
-    foreach (Faction faction in _session.GlobalFactionTurnOrder)
-      foreach (Objective objective in _session.GetObjectives(faction))
+    foreach (Faction faction in state.Factions)
+      foreach (Objective objective in state.GetObjectives(faction))
         if (objective.State == ObjectiveResult.Ongoing
             && objective.ObservedEventKeys.AsValueEnumerable().Any(eventKeys.Contains))
           candidates.Add((faction, objective));
@@ -82,31 +73,55 @@ public sealed class ObjectiveSystem : BattleHook
     return [.. candidates];
   }
 
-  private void ApplyDirective(Faction owner, ObjectiveDirectiveData? directive)
+  private static void RecordFlip(BattleState state, Faction owner, Objective objective, bool passed)
+  {
+    if (objective.State != ObjectiveResult.Ongoing)
+      throw new InvalidOperationException($"Objective {objective.Data.Name} is already {objective.State}.");
+
+    objective.State = passed ? ObjectiveResult.Passed : ObjectiveResult.Failed;
+    state.RaiseEvents(passed
+      ? new ObjectiveCompletedBattleEvent(owner, objective)
+      : new ObjectiveFailedBattleEvent(owner, objective));
+  }
+
+  // Returns true when the directive was terminal (the battle is ending or already ended),
+  // which stops the event's candidate traversal even before settlement.
+  private static bool ApplyDirective(BattleReadContext read, Faction owner, ObjectiveDirectiveData? directive)
   {
     switch (directive)
     {
       case null:
-        return;
+        return false;
       case EndBattleDirectiveData endBattle:
         // Causal and parent events still update objective history, but the player-wipe
         // backstop owns the outcome once no conscious player forces remain.
-        if (_session.PlayerFaction.Match(
-              Some: player => !_session.HasConsciousUnits(player),
-              None: () => false))
-          return;
-        _session.EndBattle(endBattle.Outcome);
-        return;
+        bool playerWiped = read.RunningSession.Match(
+          Some: session => session.PlayerFaction.Match(
+            Some: player => !session.State.HasConsciousUnits(player),
+            None: () => false),
+          None: () => false);
+        if (playerWiped)
+          return false;
+        // A completed event context carries no receiver: history records, combat stays closed.
+        read.RunningSession.IfSome(session => session.RequestEnd(endBattle.Outcome));
+        return true;
       case QueueDirectiveData queue:
         foreach (ObjectiveData followUp in queue.FollowUps)
-        {
-          Objective followUpRuntime = followUp.Instantiate();
-          _session.AddObjective(owner, followUpRuntime);
-        }
-        return;
+          AddFollowUp(read, owner, followUp.Instantiate());
+        return false;
       default:
         throw new InvalidOperationException(
           $"Unknown objective directive type {directive.GetType().Name}.");
     }
+  }
+
+  // History operation: valid while running and after settlement alike. While running the
+  // objective routes through the receiver; after settlement only history grows.
+  private static void AddFollowUp(BattleReadContext read, Faction faction, Objective objective)
+  {
+    if (read.State.AddObjective(faction, objective))
+      read.State.RegisterFaction(faction);
+
+    read.State.RaiseEvents(new ObjectiveAddedBattleEvent(faction, objective));
   }
 }

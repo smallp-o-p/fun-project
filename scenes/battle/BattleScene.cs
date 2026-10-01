@@ -139,19 +139,23 @@ public sealed partial class BattleScene : Node3D
 
   private void ShowBattleOverBanner()
   {
-    string text = _runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
-      Right: summary => summary.Outcome == BattleOutcome.Victory ? "VICTORY" : "DEFEAT",
-      Left: _ => "BATTLE OVER");
+    // The banner reads the frozen completion; a runtime that completed during factory
+    // startup reports the same frozen result here as a battle that just ended.
+    string text = _runtime.Query(new GetCompletedBattleQuery()).Match(
+      Some: completed => completed.FactionSummaries.TryGetValue(_playerFaction, out FactionBattleSummary? summary)
+        && summary.Outcome == BattleOutcome.Victory ? "VICTORY" : "DEFEAT",
+      None: () => "BATTLE OVER");
     _view.ShowBattleOver(text);
   }
 
   private void OnPlaybackIdle()
   {
     RefreshView();
-    if (_runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
+    var turn = _runtime.Query(new GetCurrentTurnQuery());
+    if (turn.IsNone)
       return;
 
-    Faction activeSide = _runtime.Query(new GetActiveSideQuery());
+    Faction activeSide = turn.RequireSome().ActiveFaction;
     if (ReferenceEquals(activeSide, _playerFaction))
       return;
 

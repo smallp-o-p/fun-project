@@ -27,10 +27,10 @@ public partial class BattleActionExecutorTest
 
     BattleBoardState.ValidatedPoint[] route = twoSteps ? [battle.At(mid), battle.At(end)] : [battle.At(mid)];
     BattleAction submittedAction = BattleAction.MoveUnit(battle.Alive(unit), route);
-    BattleActionExecResult result = battle.Submit(submittedAction);
+    BattleActionExecResult result = battle.Submit(submittedAction).RequireSome();
 
     Assert.True(ReferenceEquals(submittedAction, result.Action));
-    Assert.Equal(twoSteps ? end : mid, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
+    Assert.Equal(twoSteps ? end : mid, battle.PositionOf(unit).RequireSome().Raw);
     if (!reaction)
       return;
 
@@ -63,8 +63,8 @@ public partial class BattleActionExecutorTest
     battle.RegisterHook<UnitMovedBattleEvent>(new InterruptActionsHook(
       context =>
       [
-        BattleAction.ApplyDamage(context.Session.TryGetAlive(victim).RequireSome(), 10),
-        BattleAction.ApplyDamage(context.Session.TryGetAlive(victim).RequireSome(), 5),
+        BattleAction.ApplyDamage(context.Read.State.TryGetAlive(victim).RequireSome(), 10),
+        BattleAction.ApplyDamage(context.Read.State.TryGetAlive(victim).RequireSome(), 5),
       ]));
 
     // The first interrupt kills the victim; the second was constructed against a proof
@@ -85,8 +85,8 @@ public partial class BattleActionExecutorTest
     battle.RegisterHook<UnitMovedBattleEvent>(new InterruptActionsHook(
       context =>
       [
-        BattleAction.ApplyDamage(context.Session.TryGetAlive(unit).RequireSome(), 10),
-        BattleAction.UseItem(context.Session.TryGetAlive(unit).RequireSome(), usable),
+        BattleAction.ApplyDamage(context.Read.State.TryGetAlive(unit).RequireSome(), 10),
+        BattleAction.UseItem(context.Read.State.TryGetAlive(unit).RequireSome(), usable),
       ]));
 
     // The first interrupt kills the mover; its own queued UseItem must interrupt without
@@ -112,7 +112,7 @@ public partial class BattleActionExecutorTest
     // round exactly once (a stale queued EndFactionTurn would advance it twice).
     battle.Submit(BattleAction.EndFactionTurn(faction));
 
-    Assert.Equal(2, battle.Session.TurnNumber);
+    Assert.Equal(2, battle.Query(new GetCurrentTurnQuery()).RequireSome().RoundNumber);
   }
 
   [TestCase(TestName = "A stun reaction after the first movement step interrupts the remaining route")]
@@ -127,10 +127,10 @@ public partial class BattleActionExecutorTest
       new DamageOnTileOccupiedHook<UnitMovedBattleEvent>(mid, unit, 10, oneShot: true, kind: DamageKind.Stun));
 
     BattleAction action = BattleAction.MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)]);
-    BattleActionExecResult result = battle.Submit(action);
+    BattleActionExecResult result = battle.Submit(action).RequireSome();
 
     Assert.Equal(1, result.EventsThatOccurred.ToArray().EventsOf<UnitMovedBattleEvent>().Length);
-    Assert.Equal(mid, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
+    Assert.Equal(mid, battle.PositionOf(unit).RequireSome().Raw);
     Assert.Equal(4, unit.CurrentActionPoints);
     Assert.True(unit.IsUnconscious);
   }
@@ -163,7 +163,7 @@ public partial class BattleActionExecutorTest
     session.BattleEventCommitted += battleEvent =>
     {
       if (battleEvent is UnitMovedBattleEvent)
-        observedPositionDuringEvent = session.GetUnitPosition(unit).Map(point => point.Raw);
+        observedPositionDuringEvent = battle.PositionOf(unit).Map(point => point.Raw);
     };
 
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(destination)], 2));
@@ -234,9 +234,9 @@ public partial class BattleActionExecutorTest
 
     BattleActionExecResult[] results =
     [
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)])),
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(start)])),
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)])),
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)])).RequireSome(),
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(start)])).RequireSome(),
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)])).RequireSome(),
     ];
 
     Assert.Equal(3, results.Length);
@@ -302,7 +302,7 @@ public partial class BattleActionExecutorTest
     // executor surfaces as an invariant-break throw.
     Assert.Throws<InvalidOperationException>(
       () => battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)])));
-    Assert.Equal(new Vector3I(0, 0, 0), battle.Session.GetUnitPosition(unit).RequireSome().Raw);
+    Assert.Equal(new Vector3I(0, 0, 0), battle.PositionOf(unit).RequireSome().Raw);
     Assert.Equal(10, unit.CurrentHealth);
 
     // The one-shot hook survived the rejected submission and still fires.
@@ -327,7 +327,7 @@ public partial class BattleActionExecutorTest
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(firstTrap), battle.At(secondTrap)]));
 
     Assert.Equal(5, unit.CurrentHealth);
-    Assert.Equal(secondTrap, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
+    Assert.Equal(secondTrap, battle.PositionOf(unit).RequireSome().Raw);
   }
 
   [TestCase(TestName = "MoveUnit throws when an internal step becomes blocked")]
@@ -340,6 +340,7 @@ public partial class BattleActionExecutorTest
     var mid = new Vector3I(1, 0, 0);
     var end = new Vector3I(2, 0, 0);
     var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction, actionPoints: 5), start);
+    battle.Spawn(TestData.MakeCombatant("Bystander", enemyFaction, actionPoints: 5), new Vector3I(3, 0, 0));
     battle.Start();
 
     var action = new MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)]);
@@ -350,8 +351,8 @@ public partial class BattleActionExecutorTest
     // blocked step rejects and the executor surfaces the invariant break. The first step
     // stays committed.
     Assert.Throws<InvalidOperationException>(() => battle.Submit(action));
-    Assert.Equal(mid, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
-    Assert.True(battle.Session.GetUnitAt(battle.Board.At(end)).IsSome);
+    Assert.Equal(mid, battle.PositionOf(unit).RequireSome().Raw);
+    Assert.True(battle.UnitAt(end) is not null);
   }
 
   [TestCase(TestName = "MoveUnit stops quietly when a reaction kills the mover mid route")]
@@ -366,7 +367,7 @@ public partial class BattleActionExecutorTest
     var action = new MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)]);
     battle.RegisterHook<TileOccupiedBattleEvent>(new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(mid, unit, 3, oneShot: true));
 
-    BattleActionExecResult result = battle.Submit(action);
+    BattleActionExecResult result = battle.Submit(action).RequireSome();
 
     // Death interrupts the remainder of the route without failing the submission.
     Assert.True(ReferenceEquals(action, result.Action));
@@ -386,9 +387,9 @@ public partial class BattleActionExecutorTest
     var action = new MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(nonAdjacent)]);
 
     Assert.Throws<InvalidOperationException>(() => battle.Submit(action));
-    Assert.Equal(start, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
+    Assert.Equal(start, battle.PositionOf(unit).RequireSome().Raw);
     Assert.Equal(5, unit.CurrentActionPoints);
-    Assert.True(battle.Session.Board.IsOccupied(battle.Session.Board.At(0, 0, 0)));
+    Assert.True(battle.Board.IsOccupied(battle.Board.At(0, 0, 0)));
   }
 
   [TestCase(TestName = "MoveUnit fails empty destinations before moving")]
@@ -401,7 +402,7 @@ public partial class BattleActionExecutorTest
     var action = new MoveUnit(battle.Alive(unit), []);
 
     Assert.Throws<InvalidOperationException>(() => battle.Submit(action));
-    Assert.Equal(start, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
+    Assert.Equal(start, battle.PositionOf(unit).RequireSome().Raw);
   }
 
   [TestCase(TestName = "EndFactionTurn emits turn transition events after commit")]
@@ -435,12 +436,12 @@ public partial class BattleActionExecutorTest
     battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
     battle.Start();
 
-    BattleActionExecResult first = battle.Submit(BattleAction.MoveUnit(battle.Alive(unitA), [battle.At(0, 0, 1)]));
-    BattleActionExecResult second = battle.Submit(BattleAction.EndFactionTurn(factionA));
+    BattleActionExecResult first = battle.Submit(BattleAction.MoveUnit(battle.Alive(unitA), [battle.At(0, 0, 1)])).RequireSome();
+    BattleActionExecResult second = battle.Submit(BattleAction.EndFactionTurn(factionA)).RequireSome();
 
     Assert.True(first.Action is MoveUnit);
     Assert.True(second.Action is EndFactionTurn);
-    Assert.Equal(factionB, battle.Session.ActiveSide);
+    Assert.Equal(factionB, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
   }
 
   [TestCase(TestName = "Executor submit returns one result per submitted action")]
@@ -457,13 +458,13 @@ public partial class BattleActionExecutorTest
 
     BattleActionExecResult[] results =
     [
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unitA), [battle.At(0, 0, 1)])),
-      battle.Submit(BattleAction.ThrowItem(battle.Alive(unitA), grenade, battle.At(2, 0, 1))),
-      battle.Submit(BattleAction.EndFactionTurn(factionA)),
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unitA), [battle.At(0, 0, 1)])).RequireSome(),
+      battle.Submit(BattleAction.ThrowItem(battle.Alive(unitA), grenade, battle.At(2, 0, 1))).RequireSome(),
+      battle.Submit(BattleAction.EndFactionTurn(factionA)).RequireSome(),
     ];
 
     Assert.Equal(3, results.Length);
-    Assert.Equal(factionB, battle.Session.ActiveSide);
+    Assert.Equal(factionB, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
     Assert.False(unitA.HasInventoryItem(grenade.Item));
   }
 
@@ -491,12 +492,12 @@ public partial class BattleActionExecutorTest
     battle.Start();
 
     battle.Submit(BattleAction.PassUnit(battle.Alive(unitA)));
-    Assert.Equal(factionB, battle.Session.ActiveSide);
+    Assert.Equal(factionB, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
 
     // Faction A's turn already auto-advanced; the stale submission is an invariant break.
     Assert.Throws<InvalidOperationException>(
       () => battle.Submit(BattleAction.EndFactionTurn(factionA)));
-    Assert.Equal(factionB, battle.Session.ActiveSide);
+    Assert.Equal(factionB, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
   }
 
   private sealed partial class DamageOnTileOccupiedHook<TEventKey> : BattleHook
@@ -532,14 +533,14 @@ public partial class BattleActionExecutorTest
       if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
         return [];
 
-      ObservedTargetPositionDuringEvaluation = context.Session.GetUnitPosition(_targetUnit)
+      ObservedTargetPositionDuringEvaluation = context.Read.State.GetUnitPosition(_targetUnit)
         .Match(point => Some(point.Raw), () => None);
 
       if (_oneShot)
         _spent = true;
 
       System.Collections.Generic.List<BattleAction> interrupts = [];
-      context.Session.TryGetAlive(_targetUnit)
+      context.Read.State.TryGetAlive(_targetUnit)
         .IfSome(alive => interrupts.Add(BattleAction.ApplyDamage(alive, _damage, _kind)));
       return interrupts;
     }
@@ -567,7 +568,7 @@ public partial class BattleActionExecutorTest
         return [];
 
       _spent = true;
-      return [BattleAction.SpawnUnit(TestData.MakeCombatant("Blocker", _faction), context.Session.Board.At(_spawnPosition))];
+      return [BattleAction.SpawnUnit(TestData.MakeCombatant("Blocker", _faction), context.Read.State.Board.At(_spawnPosition))];
     }
   }
 

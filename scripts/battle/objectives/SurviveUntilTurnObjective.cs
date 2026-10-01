@@ -15,6 +15,8 @@ public sealed class SurviveUntilTurnObjective : Objective
 
   public override IReadOnlyCollection<Type> ObservedEventKeys { get; } = [typeof(TurnStartedBattleEvent)];
 
-  public override ObjectiveResult Check(Faction _, BattleEvent battleEvent, BattleSession session) =>
-    session.TurnNumber >= _targetTurn ? ObjectiveResult.Passed : ObjectiveResult.Ongoing;
+  public override ObjectiveResult Check(Faction _, BattleEvent battleEvent, BattleReadContext context) =>
+    context.CurrentTurn.Match(turn => turn.RoundNumber >= _targetTurn, () => false)
+      ? ObjectiveResult.Passed
+      : ObjectiveResult.Ongoing;
 }

@@ -15,10 +15,17 @@ internal sealed class TurnStartBuffHook : BattleHook<TurnStartedBattleEvent>
 {
   protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TurnStartedBattleEvent evt)
   {
-    // No snapshot of AliveUnits: conditions are read-only over session state and a flip
+    // No snapshot of AliveUnits: conditions are read-only over battle state and a flip
     // cannot kill (ClampCurrentHealthToMax floors at 1), so the set cannot change mid-pass.
-    foreach (BattleUnitState unit in context.Session.AliveUnits)
-      unit.EvaluateBuffs(context.Session);
+    return context.Read.RunningSession.Match(
+      Some: session => EvaluateAll(context.Read),
+      None: () => []);
+  }
+
+  private static IReadOnlyList<BattleAction> EvaluateAll(BattleReadContext read)
+  {
+    foreach (BattleUnitState unit in read.State.AliveUnits)
+      unit.EvaluateBuffs(read);
     return [];
   }
 }
@@ -27,7 +34,9 @@ internal sealed class UnitSpawnedBuffHook : BattleHook<UnitAddedBattleEvent>
 {
   protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitAddedBattleEvent evt)
   {
-    evt.Unit.EvaluateBuffs(context.Session);
+    // Spawn buff evaluation is synchronous bookkeeping of the reinforcement step;
+    // preparation performs the same evaluation for initial units through its own context.
+    context.Read.RunningSession.IfSome(_ => evt.Unit.EvaluateBuffs(context.Read));
     return [];
   }
 }

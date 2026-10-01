@@ -208,14 +208,16 @@ public class BattleSetupResolverTest
     var campaign = TestData.MakeFaction("Campaign");
     var deployment = new PlayerDeployment(campaign, []);
 
-    using var runtime = BattleFactory.Start(type, seed: 7,
+    // Resolver-level contract: an empty deployment keeps its faction side (and its
+    // authored objective) without restoring the authored roster. A side with no units can
+    // no longer complete preparation, so the resolved setup is the assertion surface.
+    BattleSetup resolved = BattleSetupResolver.Resolve(type, seed: 7,
       playerDeployment: Some(deployment)).RequireRight();
 
-    Assert.True(ReferenceEquals(campaign, runtime.Query(new GetPlayerFactionQuery()).RequireSome()));
-    Assert.Equal(0, runtime.Query(new GetFactionAliveUnits(campaign)).Count);
-    Faction enemy = runtime.Query(new GetGlobalFactionTurnOrderQuery())
-      .AsValueEnumerable().Single(f => !ReferenceEquals(f, campaign));
-    Assert.Equal(1, runtime.Query(new GetFactionAliveUnits(enemy)).Count);
+    BattleSideSetup side = resolved.Sides.AsValueEnumerable()
+      .Single(s => ReferenceEquals(s.Faction, campaign));
+    Assert.Equal(0, side.Units.Count);
+    Assert.Equal(1, side.Objectives.Count);
   }
 
   [TestCase(TestName = "Without a deployment the authored player faction bonuses apply")]

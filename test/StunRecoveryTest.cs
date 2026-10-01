@@ -121,13 +121,19 @@ public class StunRecoveryTest
   [TestCase]
   public void EndedSessionIgnoresRecoveryHook()
   {
-    using var battle = BattleFixture.Duel();
-    battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
-    battle.Session.EndBattle(BattleOutcome.Draw);
+    using var battle = BattleFixture.Duel(playerControlled: true, start: false);
+    battle.AddObjective(battle.PlayerFaction, new SurviveUntilTurnObjectiveData
+    {
+      TargetTurn = 1,
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    }.Instantiate());
+    battle.Damage(battle.PlayerUnit, 8, DamageKind.Stun);
+    battle.Start();   // the terminal opening objective completes before any turn-end upkeep runs
     BattleHook hook = new StunRecoverySystem();
 
-    hook.OnEvent(new HookContext(battle.Session, None),
-      new TurnEndedBattleEvent(battle.PlayerFaction, battle.Session.TurnNumber));
+    // A completed event context carries no running receiver, so upkeep skips recovery.
+    hook.OnEvent(new HookContext(battle.Read, None),
+      new TurnEndedBattleEvent(battle.PlayerFaction, 1));
 
     Assert.Equal(8, battle.PlayerUnit.CurrentStun);
   }

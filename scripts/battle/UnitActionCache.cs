@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace FunProject.Battle;
@@ -24,22 +25,28 @@ public sealed class UnitAction
     get
     {
       if (_owner.IsExecuting)
-        return Evaluate();
+        return Evaluate(_owner.ReadContext());
       if (_isDirty)
       {
-        bool available = Evaluate();
-        _isAvailable = available;
+        _isAvailable = Evaluate(_owner.ReadContext());
         _isDirty = false;
       }
       return _isAvailable;
     }
   }
 
-  private bool Evaluate() => _owner.Session.TryGetAlive(Unit).Match(
-    alive => !Unit.IsIncapacitated
-      && Action.Conditions.AsValueEnumerable()
-        .All(condition => condition.IsMet(_owner.Session, alive)),
-    () => false);
+  // Every evaluation reads a fresh runtime context: completion disables the option, and
+  // running evaluations see the current turn facts rather than a retained receiver.
+  private bool Evaluate(BattleReadContext context)
+  {
+    if (context.Completed.IsSome)
+      return false;
+    return context.State.TryGetAlive(Unit).Match(
+      alive => !Unit.IsIncapacitated
+        && Action.Conditions.AsValueEnumerable()
+          .All(condition => condition.IsMet(context, alive)),
+      () => false);
+  }
 
   internal void Invalidate(BattleEvent battleEvent)
   {
@@ -54,12 +61,25 @@ public sealed class UnitAction
   internal void MarkDirty() => _isDirty = true;
 }
 
-internal sealed class UnitActionCache(BattleSession session)
+// Per-unit action-option storage living on the shared tactical state; the runtime installs
+// the fresh-context provider at construction, so cached options always evaluate against the
+// runtime's current running-or-completed representation.
+internal sealed class UnitActionCache
 {
   private readonly Dictionary<BattleUnitState, IReadOnlyList<UnitAction>> _entries = [];
+  private Func<BattleReadContext> _contextProvider = static () => throw new InvalidOperationException(
+    "No runtime read context is installed for action-option evaluation.");
 
-  internal BattleSession Session { get; } = session;
   internal bool IsExecuting { get; private set; }
+
+  internal BattleReadContext ReadContext() => _contextProvider();
+
+  // Engine-owned wiring: the runtime hands the cache its fresh-context provider once.
+  internal void InstallContextProvider(Func<BattleReadContext> provider)
+  {
+    ArgumentNullException.ThrowIfNull(provider);
+    _contextProvider = provider;
+  }
 
   internal IReadOnlyList<UnitAction> GetFor(AliveUnit unit)
   {

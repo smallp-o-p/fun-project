@@ -52,10 +52,10 @@ public class ObjectHealthTest
       new InteractiveCapabilityData()), new Vector3I(3, 0, 1));
     var scenery = battle.PlaceObject(TestData.MakeObject(), new Vector3I(2, 0, 2));
     var identity = new BattleEntity.Object(crate);
-    Assert.True(ReferenceEquals(identity, battle.Runtime.TryGetAttackTarget(identity).RequireSome().Entity));
-    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(scenery)).IsNone);
-    Assert.True(foreign.Runtime.TryGetAttackTarget(identity).IsNone);
-    Assert.True(foreign.Runtime.TryGetAttackTarget(new BattleEntity.Unit(battle.PlayerUnit)).IsNone);
+    Assert.True(ReferenceEquals(identity, battle.Read.State.TryGetAttackTarget(identity).RequireSome().Entity));
+    Assert.True(battle.Read.State.TryGetAttackTarget(new BattleEntity.Object(scenery)).IsNone);
+    Assert.True(foreign.Read.State.TryGetAttackTarget(identity).IsNone);
+    Assert.True(foreign.Read.State.TryGetAttackTarget(new BattleEntity.Unit(battle.PlayerUnit)).IsNone);
     Assert.Equal(battle.Alive(battle.EnemyUnit).Position, battle.Target(battle.EnemyUnit).Position);
     battle.Start();
     battle.Interact(battle.PlayerUnit, crate);

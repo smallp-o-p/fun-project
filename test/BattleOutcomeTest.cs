@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Core;
+using System.Collections.Generic;
 using FunProject.Items.Effects;
 using FunProject.Weapons;
 using GdUnit4;
@@ -18,7 +19,7 @@ public class BattleOutcomeTest
 
     battle.ApplyDamage(playerWiped ? battle.PlayerUnit : battle.EnemyUnit, 20, DamageKind.Stun);
 
-    Assert.Equal(expected, battle.Session.Outcome.RequireSome());
+    Assert.Equal(expected, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     battle.Events.EventBefore<UnitUnconsciousBattleEvent, SessionEndedBattleEvent>();
   }
 
@@ -34,30 +35,40 @@ public class BattleOutcomeTest
         enemy: new("B1", Position: new Vector3I(2, 0, 0)));
     battle.ClearEvents();
 
+    // Retained options stay materialized across the boundary; completion disables them.
+    IReadOnlyList<UnitAction> retained = battle.Query(
+      new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
+    Assert.True(retained.AsValueEnumerable().All(action => action.IsAvailable));
+
     battle.ApplyDamage(battle.EnemyUnit, amount, kind);
     battle.ApplyDamage(battle.PlayerUnit, amount, kind);
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsSome);
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
 
     if (kind == DamageKind.Stun)
       battle.EndFactionTurn(battle.PlayerFaction);
     else
       battle.AdvanceTurn();
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
-    Assert.Equal(BattleOutcome.Draw, battle.Session.Outcome.RequireSome());
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
+    Assert.Equal(BattleOutcome.Draw, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Draw, ended.Outcome);
+    Assert.True(retained.AsValueEnumerable().All(action => !action.IsAvailable));
   }
 
-  [TestCase(TestName = "A session exposes its declared player faction and no outcome until it ends")]
+  [TestCase(TestName = "A prepared battle exposes its declared player faction and no completion until it ends")]
   public void SessionExposesPlayerFactionAndNoOutcomeUntilEnded()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
-    var session = new BattleSession(new BattleBoardState(new Vector3I(5, 1, 5)), [player, enemy], playerFaction: Some(player));
+    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
+    battle.Spawn(TestData.MakeCombatant("A1", player), new Vector3I(0, 0, 0));
+    battle.Spawn(TestData.MakeCombatant("B1", enemy), new Vector3I(2, 0, 0));
+    battle.Start();
 
-    Assert.Equal(player, session.PlayerFaction.RequireSome());
-    Assert.True(session.Outcome.IsNone);
+    Assert.Equal(player, battle.Query(new GetPlayerFactionQuery()).RequireSome());
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
   }
 
   [TestCase(true, BattleOutcome.Defeat, TestName = "A wiped player loses immediately")]
@@ -73,8 +84,8 @@ public class BattleOutcomeTest
 
     battle.ApplyDamage(playerWiped ? battle.PlayerUnit : battle.EnemyUnit, 999);
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
-    Assert.Equal(expected, battle.Session.Outcome.RequireSome());
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
+    Assert.Equal(expected, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(expected, ended.Outcome);
   }
@@ -91,17 +102,17 @@ public class BattleOutcomeTest
     battle.ApplyDamage(battle.EnemyUnit, 999);
     battle.AdvanceTurn();
 
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
-    Assert.True(battle.Session.Outcome.IsNone);
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsSome);
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
     Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
 
     // A lone survivor keeps taking turns across the round boundary — the path
-    // adjacent to StartNextRound's impossible-state guard — without ending.
+    // adjacent to the empty-round guard — without ending.
     battle.AdvanceTurn();
 
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
-    Assert.Equal(3, battle.Session.TurnNumber);
-    Assert.True(battle.Session.Outcome.IsNone);
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsSome);
+    Assert.Equal(3, battle.Query(new GetCurrentTurnQuery()).RequireSome().RoundNumber);
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
     Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
   }
 
@@ -125,8 +136,8 @@ public class BattleOutcomeTest
 
     battle.AdvanceTurn();
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
-    Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
+    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Defeat, ended.Outcome);
   }

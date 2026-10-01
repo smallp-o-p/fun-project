@@ -5,15 +5,15 @@ namespace FunProject.Battle;
 
 public sealed class FindPathForUnit(AliveUnit unit, BattleBoardState.ValidatedPoint destination) : IBattleSessionQuery<BattleBoardState.ValidatedPoint[]>
 {
-  public BattleBoardState.ValidatedPoint[] Execute(BattleSession session)
+  public BattleBoardState.ValidatedPoint[] Execute(BattleReadContext context)
   {
-    return session.Board.FindPath(unit.Position, destination);
+    return context.State.Board.FindPath(unit.Position, destination);
   }
 }
 
 public sealed class GetPossibleMoveTilesForUnit(AliveUnit unit, int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost) : IBattleSessionQuery<IReadOnlyCollection<BattleBoardState.ValidatedPoint>>
 {
-  public IReadOnlyCollection<BattleBoardState.ValidatedPoint> Execute(BattleSession session)
+  public IReadOnlyCollection<BattleBoardState.ValidatedPoint> Execute(BattleReadContext context)
   {
     ArgumentOutOfRangeException.ThrowIfLessThan(actionPointCostPerStep, 0);
 
@@ -24,6 +24,6 @@ public sealed class GetPossibleMoveTilesForUnit(AliveUnit unit, int actionPointC
       ? int.MaxValue
       : unit.State.CurrentActionPoints / actionPointCostPerStep;
 
-    return session.Board.GetReachableTiles(unit.Position, maxSteps);
+    return context.State.Board.GetReachableTiles(unit.Position, maxSteps);
   }
 }

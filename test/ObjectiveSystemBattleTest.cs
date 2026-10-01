@@ -7,47 +7,22 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public class ObjectiveSystemBattleTest
 {
-  [TestCase(TestName = "Objectives added after executor construction are read from session state")]
+  [TestCase(TestName = "Objectives added during preparation are read from battle state")]
   public void PostExecutorObjectivesAreReadFromSessionState()
   {
     var a = TestData.MakeFaction("A");
     var b = TestData.MakeFaction("B");
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [a, b]);
-    battle.Spawn(TestData.MakeCombatant("A1", a), new Vector3I(0, 0, 0)); // the fixture's executor exists from construction
+    battle.Spawn(TestData.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     var bUnit = battle.Spawn(TestData.MakeCombatant("B1", b), new Vector3I(2, 0, 0));
-    // The fixture already constructed the executor (and its ObjectiveSystem); the objective
-    // is read from session state when the later kill event is routed.
-    battle.Session.AddObjective(a, new FakeObjective { Complete = true });
+    // The objective is read from battle state when the later kill event is routed.
+    battle.AddObjective(a, new FakeObjective { Complete = true });
     battle.Start();
 
     battle.ApplyDamage(bUnit, 999);
 
-    Assert.Equal(1, battle.Session.GetObjectives(a).AsValueEnumerable().Count(o => o.State == ObjectiveResult.Passed));
-  }
-
-  [TestCase(TestName = "Objectives present before executor construction are read from session state")]
-  public void PreExecutorObjectivesAreReadFromSessionState()
-  {
-    var a = TestData.MakeFaction("A");
-    var b = TestData.MakeFaction("B");
-    var session = new BattleSession(new BattleBoardState(new Vector3I(5, 1, 5)), [a, b]);
-    // No executor yet. The objective remains in session state and is visible to the
-    // catch-all router once the executor is constructed.
-    session.AddObjective(a, new FakeObjective { Complete = true });
-
-    using var executor = new BattleActionExecutor(session);
-    executor.Submit(BattleAction.SpawnUnit(TestData.MakeCombatant("A1", a), session.Board.At(new Vector3I(0, 0, 0))));
-    executor.Submit(BattleAction.SpawnUnit(TestData.MakeCombatant("B1", b), session.Board.At(new Vector3I(2, 0, 0))));
-    var bUnit = session.GetUnitAt(session.Board.At(new Vector3I(2, 0, 0))).RequireSome();
-    // The old setup helper's missing-objective policy, spelled out: faction B has no
-    // authored objective, so it gets the silent eliminate-all default (no player faction
-    // means no Victory directive) before the battle can start.
-    session.AddObjective(b, new EliminateAllOpposingForcesObjectiveData().Instantiate());
-    executor.Submit(BattleAction.StartBattle());
-
-    executor.Submit(BattleAction.ApplyDamage(session.TryGetAlive(bUnit).RequireSome(), 999));
-
-    Assert.Equal(1, session.GetObjectives(a).AsValueEnumerable().Count(o => o.State == ObjectiveResult.Passed));
+    Assert.Equal(1, battle.Query(new GetObjectivesForFaction(a)).RequireSome()
+      .AsValueEnumerable().Count(o => o.State == ObjectiveResult.Passed));
   }
 
   [TestCase(TestName = "AddObjective raises an ObjectiveAdded event")]
@@ -58,7 +33,7 @@ public class ObjectiveSystemBattleTest
     battle.Spawn(TestData.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     battle.ClearEvents();
 
-    battle.Session.AddObjective(a, new FakeObjective());
+    battle.AddObjective(a, new FakeObjective());
 
     Assert.Equal(1, battle.Events.EventsOf<ObjectiveAddedBattleEvent>().AsValueEnumerable().Count());
   }
@@ -70,7 +45,7 @@ public class ObjectiveSystemBattleTest
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [a]);
     var unit = battle.Spawn(TestData.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
     var objective = new FakeObjective { Observe = typeof(UnitKilledBattleEvent) };
-    battle.Session.AddObjective(a, objective);
+    battle.AddObjective(a, objective);
     battle.Start();
 
     battle.ApplyDamage(unit, 1); // UnitDamaged — not observed
@@ -103,7 +78,7 @@ public class ObjectiveSystemBattleTest
         ],
       },
     };
-    battle.Session.AddObjective(player, new FakeObjective(main) { Failed = true });
+    battle.AddObjective(player, new FakeObjective(main) { Failed = true });
     battle.Start();
 
     battle.ApplyDamage(enemyUnit, 999); // main fails on the kill; follow-up queued on the SAME dispatch
@@ -111,12 +86,12 @@ public class ObjectiveSystemBattleTest
     // The follow-up must NOT have been checked against the killing event: candidates were
     // snapshotted before the directive added it. Its target is TurnStarted anyway, so the
     // battle continues...
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
 
     battle.AdvanceTurn(); // enemy turn 1 ends -> round rolls -> TurnStarted(player, 2) -> follow-up completes -> Defeat
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
-    Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsSome);
+    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
   }
 
   [TestCase(false, TestName = "Flips resolve in add order and the first EndBattle wins")]
@@ -146,13 +121,13 @@ public class ObjectiveSystemBattleTest
       Complete = true,
       Observe = typeof(UnitKilledBattleEvent),
     };
-    battle.Session.AddObjective(player, first);
-    battle.Session.AddObjective(player, second);
+    battle.AddObjective(player, first);
+    battle.AddObjective(player, second);
     battle.Start();
 
     battle.ApplyDamage(enemyUnit, 999); // both flip on the same kill; add order wins
 
-    Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
   }
 
   [TestCase(TestName = "GetObjectivesForFaction returns the faction's objectives")]
@@ -161,7 +136,7 @@ public class ObjectiveSystemBattleTest
     var a = TestData.MakeFaction("A");
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [a]);
     battle.Spawn(TestData.MakeCombatant("A1", a), new Vector3I(0, 0, 0));
-    battle.Session.AddObjective(a, new FakeObjective());
+    battle.AddObjective(a, new FakeObjective());
     battle.Start();
 
     Option<IReadOnlyList<Objective>> result = battle.Query(new GetObjectivesForFaction(a));

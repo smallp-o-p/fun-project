@@ -24,7 +24,7 @@ public class UnitActionCacheTest
   {
     public int Calls { get; private set; }
 
-    internal override bool IsMet(BattleSession session, AliveUnit unit)
+    internal override bool IsMet(BattleReadContext context, AliveUnit unit)
     {
       Calls++;
       return true;
@@ -39,7 +39,7 @@ public class UnitActionCacheTest
     public int Calls { get; private set; }
     public bool ShouldThrow { get; set; } = true;
 
-    internal override bool IsMet(BattleSession session, AliveUnit unit)
+    internal override bool IsMet(BattleReadContext context, AliveUnit unit)
     {
       Calls++;
       if (ShouldThrow)
@@ -103,7 +103,7 @@ public class UnitActionCacheTest
     public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
     {
       _spent = true;
-      return context.Session.TryGetAlive(target).Match(
+      return context.Read.State.TryGetAlive(target).Match(
         alive => (IReadOnlyList<BattleAction>)[BattleAction.ApplyDamage(alive, amount, kind)],
         () => []);
     }
@@ -570,17 +570,23 @@ public class UnitActionCacheTest
     BattleUnitState player = battle.Spawn(TestData.MakeCombatant("Player", playerFaction), new Vector3I(1, 0, 1));
     BattleUnitState support = battle.Spawn(TestData.MakeCombatant("Support", playerFaction), new Vector3I(2, 0, 1));
     battle.Spawn(TestData.MakeCombatant("Enemy", enemyFaction), new Vector3I(1, 0, 5));
-    player.TrySpendActionPoints(player.CurrentActionPoints);
-    support.TrySpendActionPoints(support.CurrentActionPoints);
-    IReadOnlyList<UnitAction> existing = battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(player)));
-    UnitAction existingMove = Row<MoveActionDefinition>(existing);
-    Assert.False(existingMove.IsAvailable);
+    // A session-start hook drains the two player units' AP before the turn-start dispatch,
+    // standing in for pre-refresh state the turn-start reads must observe without caching.
+    battle.RegisterHook<SessionStartedBattleEvent>(new SpendActionPointsHook([player, support]));
     IReadOnlyList<UnitAction> createdDuringCallback = null;
     bool existingDuringCallback = true;
     bool createdDuringCallbackValue = true;
-    battle.Session.BattleEventCommitted += battleEvent =>
+    UnitAction existingMove = null;
+    battle.OnCommitted(battleEvent =>
     {
+      if (battleEvent is SessionStartedBattleEvent)
+      {
+        IReadOnlyList<UnitAction> existing = battle.Query(
+          new GetAvailableActionsForUnit(battle.Alive(player)));
+        existingMove = Row<MoveActionDefinition>(existing);
+        Assert.False(existingMove.IsAvailable);
+        return;
+      }
       if (battleEvent is not TurnStartedBattleEvent)
         return;
       existingDuringCallback = existingMove.IsAvailable;
@@ -589,7 +595,7 @@ public class UnitActionCacheTest
       createdDuringCallbackValue = Row<MoveActionDefinition>(createdDuringCallback).IsAvailable;
       Assert.True(existingMove.IsDirty);
       Assert.True(Row<MoveActionDefinition>(createdDuringCallback).IsDirty);
-    };
+    });
 
     battle.Start();
 
@@ -599,6 +605,16 @@ public class UnitActionCacheTest
     Assert.True(Row<MoveActionDefinition>(createdDuringCallback).IsAvailable);
     Assert.False(existingMove.IsDirty);
     Assert.False(Row<MoveActionDefinition>(createdDuringCallback).IsDirty);
+  }
+
+  private sealed class SpendActionPointsHook(IReadOnlyList<BattleUnitState> units) : BattleHook<SessionStartedBattleEvent>
+  {
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, SessionStartedBattleEvent evt)
+    {
+      foreach (BattleUnitState unit in units)
+        unit.TrySpendActionPoints(unit.CurrentActionPoints);
+      return [];
+    }
   }
 
   [TestCase]
@@ -635,7 +651,7 @@ public class UnitActionCacheTest
     Assert.Throws<InvalidOperationException>(() =>
       battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2), new Vector3I(4, 0, 3)]));
 
-    Assert.Equal(new Vector3I(4, 0, 2), battle.Session.GetUnitPosition(battle.PlayerUnit).RequireSome().Raw);
+    Assert.Equal(new Vector3I(4, 0, 2), battle.PositionOf(battle.PlayerUnit).RequireSome().Raw);
     Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
     Assert.Equal(1, battle.Events.EventsOf<UnitMovedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(1, battle.Events.EventsOf<TileOccupiedBattleEvent>().AsValueEnumerable().Count());
@@ -649,7 +665,7 @@ public class UnitActionCacheTest
 
     battle.Pass(battle.PlayerUnit);
 
-    Assert.Equal(new Vector3I(4, 0, 2), battle.Session.GetUnitPosition(battle.PlayerUnit).RequireSome().Raw);
+    Assert.Equal(new Vector3I(4, 0, 2), battle.PositionOf(battle.PlayerUnit).RequireSome().Raw);
     Assert.Equal(1, battle.Events.EventsOf<UnitMovedBattleEvent>().AsValueEnumerable().Count());
   }
 
@@ -674,12 +690,12 @@ public class UnitActionCacheTest
     }
 
     Assert.True(ReferenceEquals(failure, caught));
-    Assert.Equal(new Vector3I(4, 0, 2), battle.Session.GetUnitPosition(battle.PlayerUnit).RequireSome().Raw);
+    Assert.Equal(new Vector3I(4, 0, 2), battle.PositionOf(battle.PlayerUnit).RequireSome().Raw);
     Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
     Assert.False(Row<MoveActionDefinition>(actions).IsAvailable);
 
     battle.Submit(BattleAction.PassUnit(battle.Alive(battle.PlayerUnit)));
-    Assert.Equal(new Vector3I(4, 0, 2), battle.Session.GetUnitPosition(battle.PlayerUnit).RequireSome().Raw);
+    Assert.Equal(new Vector3I(4, 0, 2), battle.PositionOf(battle.PlayerUnit).RequireSome().Raw);
   }
 
   [TestCase]
@@ -710,20 +726,6 @@ public class UnitActionCacheTest
     Assert.False(Row<MoveActionDefinition>(playerActions).IsAvailable);
     Assert.False(Row<PassActionDefinition>(playerActions).IsAvailable);
     Assert.True(Row<EndTurnActionDefinition>(playerActions).IsAvailable);
-  }
-
-  [TestCase]
-  public void ExecutorReplacementInvalidatesExistingEntries()
-  {
-    using var battle = BattleFixture.Duel();
-    IReadOnlyList<UnitAction> actions = battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    EvaluateAll(actions);
-    battle.Runtime.Dispose();
-
-    using var replacement = new BattleActionExecutor(battle.Session);
-
-    Assert.True(actions.AsValueEnumerable().All(action => action.IsDirty));
   }
 
   [TestCase]

@@ -15,7 +15,6 @@ public class BattleEventTest
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [faction]);
-    var runtime = battle.Runtime;
 
     var start = battle.At(1, 0, 1);
     var destination = battle.At(1, 0, 2);
@@ -24,6 +23,7 @@ public class BattleEventTest
     var grenade = TestData.MakeGrenade("Frag Grenade", throwRange: 4, actionPointCost: 1);
     unit.AddInventoryItem(grenade.Item);
     battle.Start();
+    var runtime = battle.Runtime;
 
     runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [destination]));
     runtime.ExecuteAction(BattleAction.ThrowItem(battle.Alive(unit), grenade, target));

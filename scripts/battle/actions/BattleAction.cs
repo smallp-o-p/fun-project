@@ -24,11 +24,6 @@ public abstract class BattleAction
   /// <param name="session"></param>
   public abstract Result Execute(BattleSession session);
 
-  public static StartBattle StartBattle()
-  {
-    return new StartBattle();
-  }
-
   public static SpawnUnit SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position)
   {
     return new SpawnUnit(combatant, position);
@@ -37,11 +32,6 @@ public abstract class BattleAction
   public static SpawnUnit SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position, Weapon equippedWeapon)
   {
     return new SpawnUnit(combatant, position, equippedWeapon);
-  }
-
-  public static PlaceObject PlaceObject(BattleSpecialObjectData data, BattleBoardState.ValidatedPoint position)
-  {
-    return new PlaceObject(data, position);
   }
 
   public static MoveUnit MoveUnit(
@@ -132,7 +122,7 @@ public sealed class MoveUnit : BattleAction
       .Match(
         unit =>
         {
-          if (!session.Board.CanOccupy(route.Peek()))
+          if (!session.State.Board.CanOccupy(route.Peek()))
             return Result.Rejected;
 
           Unit.SpendActionPoints(StepApCost);
@@ -157,14 +147,14 @@ public sealed class MoveUnit : BattleAction
     if (Unit.CurrentActionPoints < apCost)
       return null;
 
-    BattleBoardState.ValidatedPoint previousPoint = session.GetUnitPosition(Unit).ValueUnsafe();
+    BattleBoardState.ValidatedPoint previousPoint = session.State.GetUnitPosition(Unit).ValueUnsafe();
     Queue<BattleBoardState.ValidatedPoint> validatedSteps = [];
 
     // Steps arrive as ValidatedPoints (in-bounds is proven at the caller's mint door); only
     // the mutable facts — adjacency to the evolving position and occupancy — are checked here.
     foreach (BattleBoardState.ValidatedPoint stepPoint in _requestedDestinations)
     {
-      if (!BattleBoardState.AreAdjacent(previousPoint, stepPoint) || !session.Board.CanOccupy(stepPoint))
+      if (!BattleBoardState.AreAdjacent(previousPoint, stepPoint) || !session.State.Board.CanOccupy(stepPoint))
         return null;
 
       validatedSteps.Enqueue(stepPoint);

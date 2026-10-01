@@ -1,6 +1,7 @@
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Items.Effects;
+using FunProject.Stats;
 using GdUnit4;
 using Godot;
 using System;
@@ -36,14 +37,21 @@ public class BattleStartupLifecycleTest
     Assert.Equal(1, hook.Received.EventsOf<TurnStartedBattleEvent>().Length);
   }
 
-  [TestCase(TestName = "Declared systems observe spawns, object placement, session start, and the first turn")]
+  [TestCase(TestName = "Declared systems register after preparation: they see the full roster, no placement replay, and start events in order")]
   public void DeclaredSystemObservesStartupEvents()
   {
     var (setup, _, _) = GroupedSetup();
     var hook = new RecordingHook();
     var system = new SetupSystemData
     {
-      OnRegister = runtime => runtime.RegisterHook<BattleEventTag>(hook),
+      OnRegister = runtime =>
+      {
+        // Registration happens after complete placement: the declared system can already
+        // read every initial unit and object through the runtime.
+        Assert.Equal(2, runtime.Query(new GetGlobalFactionTurnOrderQuery()).Count);
+        Assert.Equal(1, runtime.Query(new GetBattleSpecialObjectsQuery()).Count);
+        runtime.RegisterHook<BattleEventTag>(hook);
+      },
     };
     using var runtime = BattleFactory.Start(setup with
     {
@@ -52,16 +60,23 @@ public class BattleStartupLifecycleTest
       Systems = [system],
     }).RequireRight();
 
-    var added = hook.Received.EventsOf<UnitAddedBattleEvent>();
-    Assert.Equal(2, added.Length);
-    Assert.True(ReferenceEquals(setup.Sides[0].Faction, added[0].Unit.Side));
-    Assert.True(ReferenceEquals(setup.Sides[1].Faction, added[1].Unit.Side));
-    Assert.Equal(1, hook.Received.EventsOf<ObjectPlacedBattleEvent>().Length);
-    hook.Received.EventBefore<UnitAddedBattleEvent, ObjectPlacedBattleEvent>();
-    hook.Received.EventBefore<ObjectPlacedBattleEvent, SessionStartedBattleEvent>();
+    // Initial placement is preparation-owned: no replay reaches registered systems.
+    Assert.Equal(0, hook.Received.EventsOf<UnitAddedBattleEvent>().Length);
+    Assert.Equal(0, hook.Received.EventsOf<ObjectPlacedBattleEvent>().Length);
+    Assert.Equal(1, hook.Received.EventsOf<SessionStartedBattleEvent>().Length);
+    var started = hook.Received.EventsOf<TurnStartedBattleEvent>();
+    Assert.Equal(1, started.Length);
     hook.Received.EventBefore<SessionStartedBattleEvent, TurnStartedBattleEvent>();
-    Assert.True(ReferenceEquals(setup.Sides[0].Faction,
-      hook.Received.SingleEvent<TurnStartedBattleEvent>().Faction));
+    Assert.True(ReferenceEquals(setup.Sides[0].Faction, started[0].Faction));
+
+    // Runtime reinforcement commits UnitAdded through the same registration door.
+    var reinforcement = TestData.MakeCombatant("Late", setup.Sides[0].Faction);
+    runtime.ExecuteAction(BattleAction.SpawnUnit(reinforcement,
+      runtime.TryGetTile(new Vector3I(2, 0, 2)).RequireSome()));
+    Assert.Equal(1, hook.Received.EventsOf<UnitAddedBattleEvent>().Length);
+    Assert.True(ReferenceEquals(reinforcement,
+      hook.Received.EventsOf<UnitAddedBattleEvent>()[0].Unit.Combatant));
+
     var order = runtime.Query(new GetGlobalFactionTurnOrderQuery());
     for (int sideIndex = 0; sideIndex < setup.Sides.Count; sideIndex++)
     {
@@ -91,7 +106,24 @@ public class BattleStartupLifecycleTest
     Assert.True(observed is not null);
     Assert.True(system.RegisteredRuntime is not null);
     Assert.Throws<ObjectDisposedException>(() =>
-      system.RegisteredRuntime!.Query(new GetBattlePhaseQuery()));
+      system.RegisteredRuntime!.Query(new GetCurrentTurnQuery()));
+    return observed!;
+  }
+
+  // Preparation faults happen before any runtime exists: declared systems never register.
+  private static Exception AssertPreparationFailureBeforeRegistration(BattleSetup setup, SetupSystemData system)
+  {
+    Exception? observed = null;
+    try
+    {
+      using var unexpected = BattleFactory.Start(setup with { Systems = [system] }).RequireRight();
+    }
+    catch (Exception error)
+    {
+      observed = error;
+    }
+    Assert.True(observed is not null);
+    Assert.True(system.RegisteredRuntime is null);
     return observed!;
   }
 
@@ -105,8 +137,8 @@ public class BattleStartupLifecycleTest
     Assert.True(ReferenceEquals(expected, AssertStartupFailureDisposes(setup, system)));
   }
 
-  [TestCase(typeof(UnitAddedBattleEvent), TestName = "A unit-added hook fault preserves the exception and disposes the runtime")]
   [TestCase(typeof(SessionStartedBattleEvent), TestName = "A session-start hook fault preserves the exception and disposes the runtime")]
+  [TestCase(typeof(TurnStartedBattleEvent), TestName = "A turn-start hook fault preserves the exception and disposes the runtime")]
   public void HookFaultDisposesRuntime(Type eventType)
   {
     var (setup, _, _) = GroupedSetup();
@@ -120,7 +152,7 @@ public class BattleStartupLifecycleTest
     Assert.True(ReferenceEquals(expected, AssertStartupFailureDisposes(setup, system)));
   }
 
-  [TestCase(TestName = "A malformed spawn buff throws, preserves the cause, and disposes the runtime")]
+  [TestCase(TestName = "A malformed spawn buff throws during preparation, before systems receive a runtime")]
   public void MalformedSpawnBuffDisposesRuntime()
   {
     var (setup, player, _) = GroupedSetup();
@@ -139,25 +171,27 @@ public class BattleStartupLifecycleTest
       ],
     };
     var system = new SetupSystemData();
-    Exception observed = AssertStartupFailureDisposes(broken, system);
+    Exception observed = AssertPreparationFailureBeforeRegistration(broken, system);
     Assert.True(observed is InvalidOperationException);
     Assert.True(observed.Message.Contains("no activation condition"));
   }
 
-  [TestCase(TestName = "A battle with objectives but no units throws and disposes the runtime")]
-  public void EmptyRostersThrowAndDispose()
+  [TestCase(TestName = "An empty side is a typed NoConsciousUnits failure naming the faction, before systems register")]
+  public void EmptyRosterFailsTyped()
   {
     var (setup, _, _) = GroupedSetup();
     var empty = setup with
     {
       Sides =
       [
-        setup.Sides[0] with { Units = [] },
+        setup.Sides[0],
         setup.Sides[1] with { Units = [] },
       ],
     };
     var system = new SetupSystemData();
-    AssertStartupFailureDisposes(empty, system);
+    Exception observed = AssertPreparationFailureBeforeRegistration(empty, system);
+    Assert.True(observed is InvalidOperationException);
+    Assert.True(observed.Message.Contains("Enemy"));
   }
 
   [TestCase(TestName = "Repeated starts from one setup get fresh board, objective, object, and hook state")]
@@ -203,10 +237,10 @@ public class BattleStartupLifecycleTest
     Assert.Equal(secondEventCount, hooks[1].Received.Count);
   }
 
-  [TestCase(TestName = "A terminal first-turn objective ends the battle during startup")]
+  [TestCase(TestName = "A terminal opening-turn objective finishes buff/AP work and freezes results before the end event")]
   public void TerminalObjectiveEndsBattleDuringStartup()
   {
-    var (setup, _, _) = GroupedSetup();
+    var (setup, player, _) = GroupedSetup();
     var terminal = setup with
     {
       Sides =
@@ -223,8 +257,41 @@ public class BattleStartupLifecycleTest
       ],
     };
     using var runtime = BattleFactory.Start(terminal).RequireRight();
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
-    Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+    Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsSome);
+    Assert.True(runtime.Query(new GetCurrentTurnQuery()).IsNone);
+  }
+
+  [TestCase(TestName = "Initial units start at full effective maximum AP on every side")]
+  public void InitialApIncludesPreparationAndOpeningBuffs()
+  {
+    var (setup, player, enemy) = GroupedSetup();
+    var boost = TestData.MakeBuff("Roused", new AlwaysMetBuffCondition(),
+      statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
+    var buffed = setup with
+    {
+      Sides =
+      [
+        setup.Sides[0] with
+        {
+          Units = [new UnitPlacement(
+            new UnitLoadout(TestData.MakeCombatant("Alpha", player, actionPoints: 4, buffs: [boost])),
+            new Vector3I(0, 0, 0))],
+        },
+        setup.Sides[1] with
+        {
+          Units = [new UnitPlacement(
+            new UnitLoadout(TestData.MakeCombatant("Bandit", enemy, actionPoints: 4, buffs: [boost])),
+            new Vector3I(3, 0, 3))],
+        },
+      ],
+    };
+    using var runtime = BattleFactory.Start(buffed).RequireRight();
+    foreach (Faction faction in runtime.Query(new GetGlobalFactionTurnOrderQuery()))
+      foreach (AliveUnit unit in runtime.Query(new GetFactionAliveUnits(faction)))
+      {
+        Assert.Equal(6, unit.State.MaxActionPoints);
+        Assert.Equal(6, unit.State.CurrentActionPoints);
+      }
   }
 
   [TestCase(TestName = "Seed 7 produces the same combat rolls from the type and resolved setups")]
@@ -261,7 +328,7 @@ public class BattleStartupLifecycleTest
       runtime.TryGetTile(new Vector3I(1, 0, 0)).RequireSome())).RequireSome();
     var result = runtime.ExecuteAction(BattleAction.AttackEntity(
       runtime.TryGetAlive(attacker).RequireSome(),
-      runtime.TryGetAttackTarget(new BattleEntity.Unit(target)).RequireSome()));
+      runtime.TryGetAttackTarget(new BattleEntity.Unit(target)).RequireSome())).RequireSome();
     foreach (BattleEvent battleEvent in result.EventsThatOccurred)
       if (battleEvent is UnitAttackedBattleEvent attacked)
         return attacked;

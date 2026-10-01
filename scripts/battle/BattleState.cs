@@ -8,11 +8,12 @@ using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
-// Phase-independent tactical storage shared by scheduling, combat orchestration, and (in
-// later tasks) preparation and completion capture: the ordered faction list, unit/object
-// pools, per-faction objectives, the kill ledger, board occupancy, visibility memory, and
-// the battle RNG/hit calculation. It deliberately holds no scheduler, phase, turn number,
-// or outcome — the session owns those and wraps this state for its existing API surface.
+// Lifecycle-independent tactical storage shared by preparation, running combat, completion
+// capture, and cross-lifecycle reads: the ordered faction list, unit/object pools,
+// per-faction objectives, the kill ledger, board occupancy, visibility memory, the battle
+// RNG/hit calculation, the shared event dispatcher, and per-unit action-option storage.
+// It deliberately holds no scheduler, turn number, or outcome — preparation and the running
+// receiver layer those on around it.
 internal sealed class BattleState
 {
   private readonly List<Faction> _factions = [];
@@ -46,6 +47,12 @@ internal sealed class BattleState
   // otherwise caught by the refresh machinery.
   private bool _visibilityFullRefreshPending = true;
 
+  // The one shared event dispatcher: every preparation placement, gameplay event, and
+  // completion event queues through here, and each committed event is broadcast once to
+  // Committed subscribers after pending visibility work resolves.
+  private readonly Queue<BattleEvent> _eventDispatchQueue = [];
+  private bool _isDispatchingEvents;
+
   internal BattleState(
     BattleBoardState board,
     IEnumerable<Faction> factions,
@@ -69,8 +76,9 @@ internal sealed class BattleState
 
   internal BattleBoardState Board { get; }
   internal Option<Faction> PlayerFaction { get; }
-  internal IReadOnlyList<Faction> Factions => _factions;
+  internal IList<Faction> Factions => _factions;
   internal IHitChanceCalculator HitChanceCalculator => _hitChanceCalculator;
+  internal UnitActionCache ActionOptions { get; } = new();
 
   // Raw views: snapshot enumerables of plain unit/object state; proofs exist only as return
   // values (TryGetAlive, read-query results), never as stored collections.
@@ -81,6 +89,57 @@ internal sealed class BattleState
   // Read-only view over the same pool: completion capture needs the whole participant set in
   // one grouped pass, which the separate Alive/Dead snapshots cannot give. No second storage.
   internal SysColGeneric.IReadOnlyList<BattleUnitState> Units => _units;
+
+  /// <summary>One committed battle event: pending visibility work resolves first (queueing
+  /// first-time spottings), then the event broadcasts to Committed subscribers. The stream
+  /// stays linear: events raised while dispatching run after the current one.</summary>
+  internal void RaiseEvents(params BattleEvent[] events)
+  {
+    foreach (var battleEvent in events)
+    {
+      ArgumentNullException.ThrowIfNull(battleEvent);
+      _eventDispatchQueue.Enqueue(battleEvent);
+    }
+
+    DispatchQueuedEvents();
+  }
+
+  internal event Action<BattleEvent> Committed = delegate { };
+
+  private void DispatchQueuedEvents()
+  {
+    if (_isDispatchingEvents)
+      return;
+
+    _isDispatchingEvents = true;
+    try
+    {
+      while (_eventDispatchQueue.Count > 0)
+      {
+        BattleEvent battleEvent = _eventDispatchQueue.Dequeue();
+        // Recompute visibility from any occupancy/tile change since the last dispatch and queue
+        // first-time spottings, before this event is broadcast (preserves the mid-move guarantee).
+        RefreshVisibilityAndQueueSpottings();
+
+        Committed.Invoke(battleEvent);
+      }
+    }
+    catch
+    {
+      _eventDispatchQueue.Clear();
+      throw;
+    }
+    finally
+    {
+      _isDispatchingEvents = false;
+    }
+  }
+
+  private void RefreshVisibilityAndQueueSpottings()
+  {
+    foreach (var (observer, target) in RefreshVisibility())
+      _eventDispatchQueue.Enqueue(new UnitSpottedBattleEvent(observer, target));
+  }
 
   // Adds the faction to the ordered list unless already present; returns true iff newly added.
   internal bool RegisterFaction(Faction side)
@@ -110,7 +169,7 @@ internal sealed class BattleState
     return unit;
   }
 
-  // Trusted core: the factory pre-validates occupancy; a miss here is a caller bug.
+  // Trusted core: the caller pre-validates occupancy; a miss here is a caller bug.
   internal BattleObjectState AddObject(BattleSpecialObjectData data, BattleBoardState.ValidatedPoint position)
   {
     ArgumentNullException.ThrowIfNull(data);
@@ -173,6 +232,23 @@ internal sealed class BattleState
     return new DeadUnit(unit);
   }
 
+  // Attack-target mint door: Some iff the entity is currently a targetable member of this
+  // battle — a live unit, or a live object carrying health. The proof is a snapshot
+  // (membership + position at mint) that may go stale across an executor commit.
+  internal Option<AttackTarget> TryGetAttackTarget(BattleEntity entity)
+  {
+    ArgumentNullException.ThrowIfNull(entity);
+    return entity switch
+    {
+      BattleEntity.Unit unit => TryGetAlive(unit.State)
+        .Map(alive => new AttackTarget(entity, alive.Position)),
+      BattleEntity.Object obj => TryGetAliveObject(obj.State)
+        .Bind(live => obj.State.FindCapability<ObjectHealthCapability>()
+          .Map(_ => new AttackTarget(entity, live.Position))),
+      _ => throw new InvalidOperationException("Unknown battle entity."),
+    };
+  }
+
   internal Option<BattleBoardState.ValidatedPoint> GetUnitPosition(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
@@ -229,7 +305,7 @@ internal sealed class BattleState
   // Forces a full clear-and-recompute of all faction visibility on the next event dispatch.
   // Call this after any runtime mutation to a tile's BlocksLineOfSight or
   // BlocksVerticalLineOfSight (e.g. destructible terrain) — those flag changes are NOT
-  // occupancy events and are not otherwise caught by the incremental refresh machinery.
+  // occupancy events and are not otherwise caught by the refresh machinery.
   internal void InvalidateVisibility()
   {
     _visibilityFullRefreshPending = true;

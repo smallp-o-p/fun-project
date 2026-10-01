@@ -138,7 +138,7 @@ public partial class StatusEffectBattleTest
 
     battle.Pass(attacker);
 
-    Assert.Equal(battle.EnemyFaction, battle.Session.ActiveSide);
+    Assert.Equal(battle.EnemyFaction, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
   }
 
   [TestCase(TestName = "DoT ticks at the owner's turn end and expires after its duration")]
@@ -256,8 +256,8 @@ public partial class StatusEffectBattleTest
 
     Assert.True(target.IsDead);
     Assert.True(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Any());
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
-    Assert.Equal(battle.PlayerFaction, battle.Session.ActiveSide);
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
   }
 
   [TestCase(TestName = "A stunned unit loses its turn and recovers after its own turn end")]
@@ -273,7 +273,7 @@ public partial class StatusEffectBattleTest
     Assert.True(target.IsImmobilized);
 
     battle.EndFactionTurn(battle.PlayerFaction);          // enemy turn: stunned target cannot act
-    Assert.False(battle.Session.CanUnitActNow(target));
+    Assert.False(battle.Query(new CanUnitActNow(target)));
 
     battle.ClearEvents();
     battle.EndFactionTurn(battle.EnemyFaction);           // stun ticks 1 -> 0 and expires
@@ -307,8 +307,8 @@ public partial class StatusEffectBattleTest
     Assert.Equal(2, target.ActiveStatusEffects.Count);
     Assert.Equal(1, target.ActiveStatusEffects.AsValueEnumerable().Count(effect => effect.RemainingTurns == 1));
     Assert.Equal(1, target.ActiveStatusEffects.AsValueEnumerable().Count(effect => effect.RemainingTurns == 2));
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
-    Assert.Equal(battle.PlayerFaction, battle.Session.ActiveSide);
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
   }
 
   [TestCase(TestName = "Multiple statuses on one unit each tick at the owner's turn end")]

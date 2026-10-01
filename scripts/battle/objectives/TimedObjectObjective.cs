@@ -27,7 +27,7 @@ public abstract class TimedObjectObjective(ObjectiveData data) : Objective(data)
     typeof(ObjectDestroyedBattleEvent),
   ];
 
-  public sealed override ObjectiveResult Check(Faction owner, BattleEvent battleEvent, BattleSession session)
+  public sealed override ObjectiveResult Check(Faction owner, BattleEvent battleEvent, BattleReadContext context)
   {
     switch (battleEvent)
     {

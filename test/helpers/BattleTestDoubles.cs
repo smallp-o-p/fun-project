@@ -105,7 +105,7 @@ public sealed class FakeObjective : Objective
   public override IReadOnlyCollection<Type> ObservedEventKeys =>
     Observe is null ? [typeof(UnitKilledBattleEvent)] : [Observe];
 
-  public override ObjectiveResult Check(Faction _, BattleEvent battleEvent, BattleSession session)
+  public override ObjectiveResult Check(Faction _, BattleEvent battleEvent, BattleReadContext context)
   {
     CheckCount++;
     if (Failed)

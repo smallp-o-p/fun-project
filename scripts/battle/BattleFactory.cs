@@ -6,9 +6,10 @@ using System.Collections.Generic;
 namespace FunProject.Battle;
 
 // The production "front door": turns authored battle types or concrete setups into a started,
-// observable BattleRuntime. Lives in the assembly so it can drive the internal session/action
-// primitives. Start(BattleTypeData, ...) composes resolution with the single startup routine;
-// Start(BattleSetup, ...) is that routine.
+// observable BattleRuntime. Lives in the assembly so it can drive the internal preparation
+// and runtime doors. Start(BattleTypeData, ...) composes resolution with the single startup
+// routine; Start(BattleSetup, ...) is that routine: parse the whole layout, prepare, then
+// construct the runtime, register declared systems, and dispatch the opening turn.
 public static class BattleFactory
 {
   public static Either<BattleSetupFailure, BattleRuntime> Start(
@@ -55,8 +56,9 @@ public static class BattleFactory
     // runtime instead of handing partial placements back to the caller.
     BattleBoardState board = new(setup.Map);
 
-    // Parse the entire layout before any objective instantiation or runtime construction:
-    // known layout failures return typed results before systems register or units spawn.
+    // Parse the entire layout before any objective instantiation or placement: known layout
+    // failures return typed results before systems register or units spawn. An empty side is
+    // a parse-time rejection — no side may enter preparation without units to field.
     List<(UnitLoadout Loadout, BattleBoardState.ValidatedPoint Point)> units = [];
     List<(BattleSpecialObjectData Data, BattleBoardState.ValidatedPoint Point)> objects = [];
     SysColGeneric.HashSet<Vector3I> unitCells = [];
@@ -68,6 +70,10 @@ public static class BattleFactory
         return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
           BattleSetupFailureReason.MissingObjective,
           $"Faction {side.Faction.Name} has no objective."));
+      if (side.Units.Count == 0)
+        return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
+          BattleSetupFailureReason.NoConsciousUnits,
+          $"Faction {side.Faction.Name} has no living, conscious units."));
 
       foreach (UnitPlacement placement in side.Units)
       {
@@ -111,32 +117,38 @@ public static class BattleFactory
       objects.Add((placement.Data, point.Value()));
     }
 
-    var session = new BattleSession(board,
+    // Preparation owns objective instantiation, placement, and the spawn bookkeeping; no
+    // runtime exists until it completes, so a failure leaves nothing to dispose.
+    var preparation = new BattlePreparation(board,
       setup.Sides.AsValueEnumerable().Select(side => side.Faction).ToArray(),
       hitChance, setup.Seed, setup.PlayerFaction);
     foreach (BattleSideSetup side in setup.Sides)
       foreach (ObjectiveData objective in side.Objectives)
-        session.AddObjective(side.Faction, objective.Instantiate());
+        preparation.AddObjective(side.Faction, objective.Instantiate());
+    foreach (var (loadout, point) in units)
+      preparation.AddUnit(loadout.Combatant, point, loadout.Weapon, loadout.Armor, loadout.StatMods);
+    foreach (var (data, point) in objects)
+      preparation.AddObject(data, point);
 
-    var runtime = new BattleRuntime(session);
-    try
+    return preparation.Complete().Bind(state =>
     {
-      foreach (BattleTypeSystemData system in setup.Systems)
-        system.Register(runtime);
-      foreach (var (loadout, point) in units)
-        runtime.ExecuteAction(new SpawnUnit(loadout.Combatant, point,
-          loadout.Weapon, loadout.Armor, loadout.StatMods));
-      foreach (var (data, point) in objects)
-        runtime.ExecuteAction(BattleAction.PlaceObject(data, point));
-      runtime.ExecuteAction(BattleAction.StartBattle());
-      return Right<BattleSetupFailure, BattleRuntime>(runtime);
-    }
-    catch
-    {
-      // Arbitrary hook/objective/action faults dispose the runtime and propagate unchanged;
-      // they are not translated into typed cell failures, and nothing is rolled back.
-      runtime.Dispose();
-      throw;
-    }
+      var runtime = BattleRuntime.Create(state);
+      try
+      {
+        // Declared systems register only after complete placement and preparation, so they
+        // observe session start and the opening turn — never initial placement.
+        foreach (BattleTypeSystemData system in setup.Systems)
+          system.Register(runtime);
+        runtime.DispatchOpeningTurn();
+        return Right<BattleSetupFailure, BattleRuntime>(runtime);
+      }
+      catch
+      {
+        // Arbitrary hook/objective/action faults dispose the runtime and propagate unchanged;
+        // they are not translated into typed cell failures, and nothing is rolled back.
+        runtime.Dispose();
+        throw;
+      }
+    });
   }
 }

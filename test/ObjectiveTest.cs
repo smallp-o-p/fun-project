@@ -18,11 +18,11 @@ public class ObjectiveTest
     var objective = new EliminateAllOpposingForcesObjective(new EliminateAllOpposingForcesObjectiveData());
     var anyEvent = new TurnEndedBattleEvent(battle.PlayerFaction, 1);
 
-    Assert.Equal(ObjectiveResult.Ongoing, objective.Check(battle.PlayerFaction, anyEvent, battle.Session));
+    Assert.Equal(ObjectiveResult.Ongoing, objective.Check(battle.PlayerFaction, anyEvent, battle.Read));
 
     battle.ApplyDamage(battle.EnemyUnit, 999);
 
-    Assert.Equal(ObjectiveResult.Passed, objective.Check(battle.PlayerFaction, anyEvent, battle.Session));
+    Assert.Equal(ObjectiveResult.Passed, objective.Check(battle.PlayerFaction, anyEvent, battle.Read));
   }
 
   [TestCase(TestName = "EliminateAll fails when the owner is wiped")]
@@ -38,7 +38,7 @@ public class ObjectiveTest
 
     battle.ApplyDamage(battle.PlayerUnit, 999);
 
-    Assert.Equal(ObjectiveResult.Failed, objective.Check(battle.PlayerFaction, anyEvent, battle.Session));
+    Assert.Equal(ObjectiveResult.Failed, objective.Check(battle.PlayerFaction, anyEvent, battle.Read));
   }
 
   [TestCase]
@@ -50,8 +50,8 @@ public class ObjectiveTest
     battle.PlayerUnit.ApplyStatusEffect(MakeStun());
     battle.EnemyUnit.SpendActionPoints(battle.EnemyUnit.CurrentActionPoints);
 
-    Assert.Equal(ObjectiveResult.Ongoing, objective.Check(battle.PlayerFaction, turnEnd, battle.Session));
-    Assert.Equal(ObjectiveResult.Ongoing, objective.Check(battle.EnemyFaction, turnEnd, battle.Session));
+    Assert.Equal(ObjectiveResult.Ongoing, objective.Check(battle.PlayerFaction, turnEnd, battle.Read));
+    Assert.Equal(ObjectiveResult.Ongoing, objective.Check(battle.EnemyFaction, turnEnd, battle.Read));
   }
 
   [TestCase]
@@ -62,7 +62,7 @@ public class ObjectiveTest
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
 
     Assert.Equal(ObjectiveResult.Passed, objective.Check(battle.PlayerFaction,
-      new TurnStartedBattleEvent(battle.PlayerFaction, 1), battle.Session));
+      new TurnStartedBattleEvent(battle.PlayerFaction, 1), battle.Read));
   }
 
   [TestCase(TestName = "SurviveUntilTurn passes once the target turn is reached")]
@@ -72,12 +72,13 @@ public class ObjectiveTest
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player]);
     battle.Spawn(TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
     battle.Start();
-    var turnStart = new TurnStartedBattleEvent(player, battle.Session.TurnNumber);
+    int roundNumber = battle.Query(new GetCurrentTurnQuery()).RequireSome().RoundNumber;
+    var turnStart = new TurnStartedBattleEvent(player, roundNumber);
 
     var objective = new SurviveUntilTurnObjective(new SurviveUntilTurnObjectiveData { TargetTurn = 1 });
-    Assert.Equal(ObjectiveResult.Passed, objective.Check(player, turnStart, battle.Session)); // TurnNumber starts at 1
+    Assert.Equal(ObjectiveResult.Passed, objective.Check(player, turnStart, battle.Read)); // round 1 is installed
 
     var later = new SurviveUntilTurnObjective(new SurviveUntilTurnObjectiveData { TargetTurn = 5 });
-    Assert.Equal(ObjectiveResult.Ongoing, later.Check(player, turnStart, battle.Session));
+    Assert.Equal(ObjectiveResult.Ongoing, later.Check(player, turnStart, battle.Read));
   }
 }

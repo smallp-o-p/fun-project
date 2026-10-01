@@ -22,8 +22,10 @@ public class InteractWithObjectTest
     var enemy = TestData.MakeFaction("E");
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
     var unit = battle.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("B", enemy), new Vector3I(3, 0, 3));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
     var bomb = battle.PlaceObject(MakeInteractiveObjectData(), point.Raw);
+    battle.Start();
     battle.ClearEvents();
 
     int apBefore = unit.CurrentActionPoints;
@@ -32,7 +34,7 @@ public class InteractWithObjectTest
     Assert.Equal(Some(ObjectStatus.Interacted), bomb.Status);
     Assert.Equal(apBefore - 2, unit.CurrentActionPoints);
     Assert.True(battle.Session.TryGetAliveObject(bomb).IsNone);
-    Assert.False(battle.Session.Board.IsBlockedByObject(point));
+    Assert.False(battle.Board.IsBlockedByObject(point));
     Assert.Equal(point.Raw, bomb.Position);
 
     ObjectInteractedBattleEvent @event = battle.Events.SingleEvent<ObjectInteractedBattleEvent>();
@@ -61,14 +63,14 @@ public class InteractWithObjectTest
       _ = action.IsAvailable;
     foreach (UnitAction action in enemyActions)
       _ = action.IsAvailable;
-    int turnNumber = battle.Session.TurnNumber;
+    int roundNumber = battle.Query(new GetCurrentTurnQuery()).RequireSome().RoundNumber;
 
     battle.Interact(battle.PlayerUnit, bomb);
 
     Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
-    Assert.Equal(BattlePhase.InProgress, battle.Query(new GetBattlePhaseQuery()));
-    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
-    Assert.Equal(turnNumber, battle.Session.TurnNumber);
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
+    Assert.Equal(roundNumber, battle.Query(new GetCurrentTurnQuery()).RequireSome().RoundNumber);
     Assert.False(playerActions.AsValueEnumerable()
       .Single(action => action.Action is MoveActionDefinition).IsAvailable);
     Assert.False(playerActions.AsValueEnumerable()
@@ -91,8 +93,10 @@ public class InteractWithObjectTest
     var enemy = TestData.MakeFaction("E");
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
     var unit = battle.Spawn(TestData.MakeCombatant("A", player, actionPoints: 1), new Vector3I(1, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("B", enemy), new Vector3I(3, 0, 3));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
     var bomb = battle.PlaceObject(MakeInteractiveObjectData(actionPointCost: 2), point.Raw);
+    battle.Start();
     battle.ClearEvents();
 
     Assert.Throws<InvalidOperationException>(() => battle.Submit(
@@ -100,7 +104,7 @@ public class InteractWithObjectTest
 
     Assert.True(bomb.Status.IsNone);
     Assert.True(battle.Session.TryGetAliveObject(bomb).IsSome);
-    Assert.True(battle.Session.Board.IsBlockedByObject(point));
+    Assert.True(battle.Board.IsBlockedByObject(point));
     Assert.Equal(point.Raw, bomb.Position);
     Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().AsValueEnumerable().Count());
   }
@@ -112,13 +116,17 @@ public class InteractWithObjectTest
     var enemy = TestData.MakeFaction("E");
     using var local = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
     var localUnit = local.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
+    local.Spawn(TestData.MakeCombatant("B", enemy), new Vector3I(3, 0, 3));
     BattleBoardState.ValidatedPoint localPoint = local.At(new Vector3I(2, 0, 1));
     var localBomb = local.PlaceObject(MakeInteractiveObjectData(), localPoint.Raw);
 
     using var foreign = new BattleFixture(new Vector3I(4, 1, 4), [TestData.MakeFaction("P"), TestData.MakeFaction("E")]);
     foreign.Spawn(TestData.MakeCombatant("A", foreign.PlayerFaction), new Vector3I(1, 0, 1));
+    foreign.Spawn(TestData.MakeCombatant("B", foreign.EnemyFaction), new Vector3I(3, 0, 3));
     BattleBoardState.ValidatedPoint foreignPoint = foreign.At(new Vector3I(2, 0, 1));
     var foreignBomb = foreign.PlaceObject(MakeInteractiveObjectData(), foreignPoint.Raw);
+    local.Start();
+    foreign.Start();
 
     LiveObject foreignProof = foreign.Live(foreignBomb);
 
@@ -128,7 +136,7 @@ public class InteractWithObjectTest
 
     Assert.True(localBomb.Status.IsNone);
     Assert.True(local.Session.TryGetAliveObject(localBomb).IsSome);
-    Assert.True(local.Session.Board.IsBlockedByObject(localPoint));
+    Assert.True(local.Board.IsBlockedByObject(localPoint));
     Assert.Equal(localPoint.Raw, localBomb.Position);
     Assert.True(foreignBomb.Status.IsNone);
   }
@@ -140,8 +148,10 @@ public class InteractWithObjectTest
     var enemy = TestData.MakeFaction("E");
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
     var unit = battle.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("B", enemy), new Vector3I(3, 0, 3));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
     var bomb = battle.PlaceObject(MakeInteractiveObjectData(), point.Raw);
+    battle.Start();
 
     AliveUnit unitProof = battle.Alive(unit);
     LiveObject objectProof = battle.Live(bomb);

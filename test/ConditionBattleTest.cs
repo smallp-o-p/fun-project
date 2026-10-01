@@ -64,13 +64,15 @@ public class ConditionBattleTest
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 20);
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [faction]);
     var unit = battle.Spawn(alpha, Vector3I.Zero);
+    battle.AddObjective(faction, SurviveToTurnTwo().Instantiate());
+    battle.Start();
 
     battle.ApplyDamage(unit, 999);
 
     Assert.True(unit.IsDead);
     Assert.Equal(20L, unit.TotalHealthDamageTaken);
-    battle.Session.EndBattle(BattleOutcome.Victory);
-    var summary = battle.Query(new GetFactionEndOfBattleSummary(faction)).RequireRight();
+    battle.EndFactionTurn(faction);   // no conscious forces anywhere: draws at the turn end
+    var summary = battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[faction];
     Assert.False(summary.HealthByCombatant.ContainsKey(alpha),
       "Dead participants are not part of the health report.");
   }
@@ -82,13 +84,15 @@ public class ConditionBattleTest
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 20);
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [faction]);
     var unit = battle.Spawn(alpha, Vector3I.Zero);
+    battle.AddObjective(faction, SurviveToTurnTwo().Instantiate());
+    battle.Start();
 
     battle.ApplyDamage(unit, 15, DamageKind.Stun);
 
     Assert.Equal(20, unit.CurrentHealth);
     Assert.Equal(0L, unit.TotalHealthDamageTaken);
-    battle.Session.EndBattle(BattleOutcome.Victory);
-    var summary = battle.Query(new GetFactionEndOfBattleSummary(faction)).RequireRight();
+    battle.EndFactionTurn(faction);   // the unit is unconscious: draws at the turn end
+    var summary = battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[faction];
     Assert.Equal(0L, summary.HealthByCombatant[alpha].HealthDamageTaken);
   }
 
@@ -99,6 +103,7 @@ public class ConditionBattleTest
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 100);
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [faction]);
     var unit = battle.Spawn(alpha, Vector3I.Zero, armor: TestData.MakeArmor("Vest", armor: 10));
+    battle.Start();
 
     battle.ApplyDamage(unit, 5);
 
@@ -117,16 +122,16 @@ public class ConditionBattleTest
       statMods: [new HealthStatMod { Modifiers = [StatModifier.Multiply(0.4f)] }]);
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 100, buffs: [intimidation]);
 
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [faction, enemy]);
+    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [faction, enemy], playerFaction: Some(faction));
     var unit = battle.Spawn(alpha, Vector3I.Zero);
     Assert.Equal(100, unit.CurrentHealth); // no adjacent enemy yet
-    battle.Spawn(TestData.MakeCombatant("Enemy", enemy), new Vector3I(1, 0, 0));
+    var enemyUnit = battle.Spawn(TestData.MakeCombatant("Enemy", enemy), new Vector3I(1, 0, 0));
     battle.Start(); // turn-start hook evaluates Alpha's now-satisfied condition
 
     Assert.Equal(40, unit.CurrentHealth);
     Assert.Equal(0L, unit.TotalHealthDamageTaken);
-    battle.Session.EndBattle(BattleOutcome.Victory);
-    var summary = battle.Query(new GetFactionEndOfBattleSummary(faction)).RequireRight();
+    battle.ApplyDamage(enemyUnit, 999);   // the designated player's eliminate-all completes instantly
+    var summary = battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[faction];
     Assert.Equal(40, summary.HealthByCombatant[alpha].MaxHealth,
       "The report reads the current effective max health, not a spawn snapshot.");
     Assert.Equal(0L, summary.HealthByCombatant[alpha].HealthDamageTaken,
@@ -186,15 +191,19 @@ public class ConditionBattleTest
       roster: [TestData.MakeEntry("Alpha", TestData.MakeCombatantData(health: 100))]));
     var alpha = campaign.State.Roster[0];
 
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [campaign.State.PlayerFaction]);
+    using var battle = new BattleFixture(new Vector3I(5, 1, 5),
+      [campaign.State.PlayerFaction]);
     var unit = battle.Spawn(alpha, Vector3I.Zero);
+    battle.AddObjective(campaign.State.PlayerFaction, SurviveToTurnTwo().Instantiate());
+    battle.Start();
+
     // Two separate normal-pipeline hits on the same unit must sum to 30 — a last-hit
     // overwrite would report 10 and under-award the return's injury tiers.
     battle.ApplyDamage(unit, 20);
     battle.ApplyDamage(unit, 10);
-    battle.Session.EndBattle(BattleOutcome.Victory);
+    battle.EndFactionTurn(campaign.State.PlayerFaction);   // turn two's start completes
 
-    var summary = battle.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
+    var summary = battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[campaign.State.PlayerFaction];
     Assert.Equal(100, summary.HealthByCombatant[alpha].MaxHealth);
     Assert.Equal(30L, summary.HealthByCombatant[alpha].HealthDamageTaken);
 
@@ -213,4 +222,13 @@ public class ConditionBattleTest
     });
     return weapon;
   }
+
+  // A real terminal for single-side report arrangements: the second round's start completes
+  // the battle through the ordinary pipeline, after the report's damage has been dealt.
+  private static SurviveUntilTurnObjectiveData SurviveToTurnTwo() => new()
+  {
+    TargetTurn = 2,
+    OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+  };
+
 }

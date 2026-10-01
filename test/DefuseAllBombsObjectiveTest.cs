@@ -58,8 +58,8 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(bomb).RequireSome()));
 
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
-    Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome);
+    Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsSome);
+    Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[player].Outcome);
   }
 
   [TestCase(TestName = "A expiry fails the objective and ends the battle in defeat")]
@@ -70,12 +70,12 @@ public class DefuseAllBombsObjectiveTest
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
     BattleObjectState bomb = runtime.Query(new GetBattleSpecialObjectsQuery())[0];
 
-    for (int turn = 0; turn < 6 && runtime.Query(new GetBattlePhaseQuery()) == BattlePhase.InProgress; turn++)
-      runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    for (int turn = 0; turn < 6 && runtime.Query(new GetCompletedBattleQuery()).IsNone; turn++)
+      runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction));
 
     Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
-    Assert.Equal(BattleOutcome.Defeat, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome);
+    Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsSome);
+    Assert.Equal(BattleOutcome.Defeat, runtime.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[player].Outcome);
   }
 
   // The counting implementation's distinguishing cases: only the delivered stream counts,
@@ -98,7 +98,7 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(bombs[0]).RequireSome()));
 
-    Assert.Equal(BattlePhase.InProgress, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsNone);
     Assert.Equal(Some(ObjectStatus.Interacted), bombs[0].Status);
     Assert.True(bombs[1].Status.IsNone);
   }
@@ -121,7 +121,7 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(crate).RequireSome()));
 
-    Assert.Equal(BattlePhase.InProgress, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsNone);
   }
 
   [TestCase]
@@ -129,7 +129,7 @@ public class DefuseAllBombsObjectiveTest
   {
     using var battle = BattleFixture.Duel(start: false, playerControlled: true,
       player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 5)));
-    battle.Session.AddObjective(battle.PlayerFaction, new DefuseAllBombsObjectiveData
+    battle.AddObjective(battle.PlayerFaction, new DefuseAllBombsObjectiveData
     {
       OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
     }.Instantiate());
@@ -138,11 +138,11 @@ public class DefuseAllBombsObjectiveTest
     var crate = battle.PlaceObject(TestData.MakeObject("Crate", 5), new Vector3I(2, 0, 2));
     battle.Start();
     battle.Attack(battle.PlayerUnit, crate);
-    Assert.Equal(BattlePhase.InProgress, battle.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, bomb);
-    Assert.Equal(BattlePhase.Ended, battle.Query(new GetBattlePhaseQuery()));
-    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsSome);
+    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     Assert.Equal(1, battle.Events.EventsOf<ObjectiveFailedBattleEvent>().Length);
     Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().Length);
     Assert.Equal(0, battle.Events.EventsOf<ObjectExpiredBattleEvent>().Length);
@@ -152,7 +152,7 @@ public class DefuseAllBombsObjectiveTest
   public void GrenadeDestructionFailsTheObjectiveAndFinishesResolution()
   {
     using var battle = BattleFixture.Duel(start: false, playerControlled: true);
-    battle.Session.AddObjective(battle.PlayerFaction, new DefuseAllBombsObjectiveData
+    battle.AddObjective(battle.PlayerFaction, new DefuseAllBombsObjectiveData
     {
       OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
     }.Instantiate());
@@ -166,7 +166,7 @@ public class DefuseAllBombsObjectiveTest
     battle.ClearEvents();
     battle.Throw(battle.PlayerUnit, grenade, cell);
     Assert.Equal(Some(ObjectStatus.Destroyed), bomb.Status);
-    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     Assert.Equal(1, battle.Events.EventsOf<ObjectiveFailedBattleEvent>().Length);
     Assert.Equal(1, battle.Events.EventsOf<CapabilityResolvedBattleEvent>().Length);
     Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().Length);

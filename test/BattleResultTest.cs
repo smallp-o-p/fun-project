@@ -8,7 +8,7 @@ using System;
 [RequireGodotRuntime]
 public class BattleResultTest
 {
-  [TestCase(TestName = "Result query rejects an in-progress battle")]
+  [TestCase(TestName = "The completion query answers None for a running battle")]
   public void RejectsInProgress()
   {
     var player = TestData.MakeFaction("P");
@@ -17,11 +17,11 @@ public class BattleResultTest
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)));
 
-    Assert.True(battle.Query(new GetBattleResultQuery()).IsLeft);
     Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsSome);
   }
 
-  [TestCase(TestName = "Ended battle reports outcome, counts, and object tallies")]
+  [TestCase(TestName = "The frozen completion reports outcome, counts, and object tallies")]
   public void EndedBattleCounts()
   {
     var player = TestData.MakeFaction("P");
@@ -45,26 +45,21 @@ public class BattleResultTest
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
 
     // End the player's turn: the bomb expires (deadline 1), the objective fails → Defeat.
-    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    runtime.ExecuteAction(BattleAction.EndFactionTurn(
+      runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction));
 
-    BattleResult battleResult = runtime.Query(new GetBattleResultQuery()).RequireRight();
-    Assert.Equal(BattleOutcome.Defeat, battleResult.Outcome);
-    Assert.Equal(1, battleResult.TurnCount);
-    Assert.Equal(2, battleResult.Factions.Count);
-    Assert.Equal(1, battleResult.ObjectsExpired);
-    Assert.Equal(0, battleResult.ObjectsInteracted);
-    Assert.Equal(1, battleResult.Factions[player].Spawned);
-    Assert.Equal(0, battleResult.Factions[player].Killed);
-    Assert.Equal(1, battleResult.Factions[enemy].Spawned);
-    Assert.Equal(0, battleResult.Factions[enemy].Killed);
-
-    // The result query reads the session's stored completion; both report the same snapshot.
     CompletedBattle completed = runtime.Query(new GetCompletedBattleQuery()).RequireSome();
-    Assert.Equal(battleResult.Outcome, completed.Outcome);
-    Assert.Equal(battleResult.TurnCount, completed.TurnCount);
-    Assert.Equal(battleResult.Factions[player], completed.Factions[player]);
-    Assert.Equal(battleResult.Factions[enemy], completed.Factions[enemy]);
-    Assert.Equal(battleResult.ObjectsInteracted, completed.ObjectsInteracted);
-    Assert.Equal(battleResult.ObjectsExpired, completed.ObjectsExpired);
+    Assert.Equal(BattleOutcome.Defeat, completed.Outcome);
+    Assert.Equal(1, completed.TurnCount);
+    Assert.Equal(2, completed.Factions.Count);
+    Assert.Equal(1, completed.ObjectsExpired);
+    Assert.Equal(0, completed.ObjectsInteracted);
+    Assert.Equal(1, completed.Factions[player].Spawned);
+    Assert.Equal(0, completed.Factions[player].Killed);
+    Assert.Equal(1, completed.Factions[enemy].Spawned);
+    Assert.Equal(0, completed.Factions[enemy].Killed);
+
+    // Repeated reads serve the same stored report.
+    Assert.True(ReferenceEquals(completed, runtime.Query(new GetCompletedBattleQuery()).RequireSome()));
   }
 }

@@ -18,6 +18,7 @@ public readonly struct BattleActionExecResult(BattleAction action, List<BattleEv
 /// </summary>
 public sealed class BattleActionExecutor : IDisposable
 {
+  private readonly BattleRuntime _runtime;
   private readonly BattleSession _session;
   private readonly BattleHookRegistry _hooks = new();
 
@@ -34,12 +35,15 @@ public sealed class BattleActionExecutor : IDisposable
 
   private readonly List<BattleAction> _capturedInterrupts = [];
   private Option<BattleAction> _inFlightAction = None;
+  private bool _settling;
   private bool _disposed;
 
-  public BattleActionExecutor(BattleSession session)
+  // Engine-owned construction: the runtime mints its executor; there is one per runtime.
+  internal BattleActionExecutor(BattleRuntime runtime)
   {
-    ArgumentNullException.ThrowIfNull(session);
-    _session = session;
+    ArgumentNullException.ThrowIfNull(runtime);
+    _runtime = runtime;
+    _session = runtime.Session;
     _session.ActionOptions.InvalidateAll();
     _session.BattleEventCommitted += OnEventCommitted;
 
@@ -54,17 +58,19 @@ public sealed class BattleActionExecutor : IDisposable
 
     // Objectives are an ordinary default system, receiving every event through the
     // BattleEventTag catch-all key and filtering their declared observed keys internally.
-    RegisterHook<BattleEventTag>(new ObjectiveSystem(_session), priority: 100);
+    RegisterHook<BattleEventTag>(new ObjectiveSystem(), priority: 100);
   }
 
   private void OnEventCommitted(BattleEvent battleEvent)
   {
     _eventLog.Add(battleEvent);
 
-    var interrupts = _hooks.Fire(battleEvent, new HookContext(_session, _inFlightAction));
+    // The receiver and read context come from the runtime per firing, so an event committed
+    // at or after settlement observes the completed representation with no running receiver.
+    var interrupts = _hooks.Fire(battleEvent, new HookContext(_runtime.GetReadContext(), _inFlightAction));
     if (interrupts.Count == 0)
       return;
-    if (_inFlightAction.IsNone)
+    if (_inFlightAction.IsNone && !_settling)
       throw new InvalidOperationException(
         "A hook returned interrupt actions while no executor action was in flight.");
     _capturedInterrupts.AddRange(interrupts);
@@ -84,24 +90,20 @@ public sealed class BattleActionExecutor : IDisposable
     return _hooks.Unregister<TEventKey>(hook);
   }
 
-  public BattleActionExecResult Submit(BattleAction action)
-  {
-    ThrowIfDisposed();
-    return DoAction(action);
-  }
-
-  private BattleActionExecResult DoAction(BattleAction action)
+  internal BattleActionExecResult Execute(BattleAction action)
   {
     int logStart = _eventLog.Count;
+    var step = new BattleStep();
+    _session.BeginStep(step);
     _pendingActions.Push(action);
     _session.ActionOptions.BeginExecution();
 
     try
     {
-      // A mid-dispatch battle end (objective directive, player-wipe backstop) drops all
-      // remaining work: queued interrupts and un-executed composite steps must never run
-      // against an ended session (their primitives require InProgress).
-      while (_pendingActions.Count > 0 && _session.Phase != BattlePhase.Ended)
+      // A pending terminal decision finishes the current primitive's synchronous work and
+      // then stops the loop: queued interrupts and un-executed composite steps are separate
+      // actions, not synchronous effects belonging to the settled step.
+      while (_pendingActions.Count > 0 && !step.HasPendingOutcome && _runtime.IsRunning)
       {
         var currentAction = _pendingActions.Peek();
 
@@ -114,8 +116,7 @@ public sealed class BattleActionExecutor : IDisposable
           case BattleAction.Result.Completed:
             {
               _pendingActions.Pop();
-              foreach (var reaction in _capturedInterrupts.AsValueEnumerable().Reverse())
-                _pendingActions.Push(reaction);
+              PushCapturedInterrupts(step);
               break;
             }
           case BattleAction.Result.Interrupted:
@@ -125,8 +126,7 @@ public sealed class BattleActionExecutor : IDisposable
             }
           case BattleAction.Result.Incomplete:
             {
-              foreach (var reaction in _capturedInterrupts.AsValueEnumerable().Reverse())
-                _pendingActions.Push(reaction);
+              PushCapturedInterrupts(step);
               break;
             }
           case BattleAction.Result.Rejected:
@@ -137,8 +137,10 @@ public sealed class BattleActionExecutor : IDisposable
         }
       }
 
-      if (_session.Phase == BattlePhase.Ended)
-        _pendingActions.Clear();
+      // Successful settlement happens only after the primitive returned and the synchronous
+      // event queue drained: capture once, install Completed, broadcast exactly one end event.
+      if (step.TryTakeOutcome(out BattleOutcome outcome))
+        Settle(outcome);
     }
     catch
     {
@@ -153,9 +155,43 @@ public sealed class BattleActionExecutor : IDisposable
       _inFlightAction = None;
       _capturedInterrupts.Clear();
       _session.ActionOptions.EndExecution();
+      _session.EndStep();
     }
 
     return new BattleActionExecResult(action, _eventLog, logStart, _eventLog.Count - logStart);
+  }
+
+  private void PushCapturedInterrupts(BattleStep step)
+  {
+    if (step.HasPendingOutcome)
+      return;
+
+    foreach (var reaction in _capturedInterrupts.AsValueEnumerable().Reverse())
+      _pendingActions.Push(reaction);
+  }
+
+  private void Settle(BattleOutcome outcome)
+  {
+    _settling = true;
+    try
+    {
+      _pendingActions.Clear();
+      _capturedInterrupts.Clear();
+      _inFlightAction = None;
+
+      CompletedBattle completed = CompletedBattle.Capture(_session.State, outcome, _session.RoundNumber);
+      _runtime.InstallCompleted(completed);
+
+      // End-event subscribers read frozen results and may record objective history; hook
+      // follow-ups dispatch linearly, and any interrupts they return are discarded here.
+      _session.State.RaiseEvents(new SessionEndedBattleEvent(outcome));
+    }
+    finally
+    {
+      _settling = false;
+      _pendingActions.Clear();
+      _capturedInterrupts.Clear();
+    }
   }
 
   public void Dispose()
@@ -170,5 +206,28 @@ public sealed class BattleActionExecutor : IDisposable
   private void ThrowIfDisposed()
   {
     ObjectDisposedException.ThrowIf(_disposed, this);
+  }
+}
+
+// One execution scope per executor submission. The first accepted outcome wins and stays
+// pending until settlement; a later effect in the same step cannot override it.
+internal sealed class BattleStep
+{
+  private BattleOutcome? _outcome;
+
+  internal bool HasPendingOutcome => _outcome is not null;
+
+  internal void RequestEnd(BattleOutcome outcome) => _outcome ??= outcome;
+
+  internal bool TryTakeOutcome(out BattleOutcome outcome)
+  {
+    if (_outcome is not BattleOutcome pending)
+    {
+      outcome = default;
+      return false;
+    }
+
+    outcome = pending;
+    return true;
   }
 }

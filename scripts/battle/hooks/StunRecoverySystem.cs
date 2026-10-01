@@ -9,14 +9,16 @@ public sealed class StunRecoverySystem : BattleHook<TurnEndedBattleEvent>
 
   protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TurnEndedBattleEvent evt)
   {
-    foreach (var unit in context.Session.GetFactionAliveUnits(evt.Faction))
+    foreach (var unit in context.Read.State.GetFactionAliveUnits(evt.Faction))
     {
-      if (context.Session.Phase != BattlePhase.InProgress)
+      // Turn-end upkeep belongs to the current running step: once its terminal decision is
+      // pending (or the completion is installed), remaining units skip recovery.
+      if (!context.Read.RunningSession.Match(session => !session.HasPendingOutcome, () => false))
         break;
 
       uint recovered = unit.RecoverStun(RecoveryPerTurn);
       if (recovered > 0)
-        context.Session.RaiseEvents(new UnitStunRecoveredBattleEvent(unit, recovered, unit.CurrentStun));
+        context.Read.State.RaiseEvents(new UnitStunRecoveredBattleEvent(unit, recovered, unit.CurrentStun));
     }
     return [];
   }

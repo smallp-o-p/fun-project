@@ -49,7 +49,7 @@ public class BombExpiryTest
       runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
     int hpBefore = victim.CurrentHealth;
 
-    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction));
 
     Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
     Assert.Equal(new Vector3I(1, 0, 0), bomb.Position);
@@ -81,12 +81,12 @@ public class BombExpiryTest
     runtime.BattleEventCommitted += events.Add;
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
 
-    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction));
 
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsSome);
     Assert.Equal(
       BattleOutcome.Defeat,
-      runtime.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+      runtime.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     Assert.Equal(1, events.AsValueEnumerable().OfType<SessionEndedBattleEvent>().Count());
     Assert.True(events.AsValueEnumerable().OfType<ObjectExpiredBattleEvent>().Any());
     Assert.True(events.AsValueEnumerable().OfType<ObjectiveFailedBattleEvent>().Any());
@@ -104,7 +104,7 @@ public class BombExpiryTest
     runtime.ExecuteAction(BattleAction.InteractWithObject(
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(bomb).RequireSome()));
-    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction));
 
     Assert.Equal(Some(ObjectStatus.Interacted), bomb.Status);
   }
@@ -117,7 +117,7 @@ public class BombExpiryTest
     runtime.RegisterHook<TurnEndedBattleEvent>(new MarkerHook(() => order.Add("upkeep")), -100);
     runtime.RegisterHook<TurnEndedBattleEvent>(new MarkerHook(() => order.Add("expiry")), 0);
 
-    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction));
 
     Assert.Equal("upkeep,expiry", string.Join(",", order));
   }

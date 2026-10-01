@@ -31,7 +31,7 @@ public class BattleFactoryTest
   {
     var (setup, _, _, _, _) = MinimalSetup();
     using var runtime = BattleFactory.Start(setup).RequireRight();
-    var faction = runtime.Query(new GetActiveSideQuery());
+    var faction = runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction;
     var unit = runtime.Query(new GetFactionAliveUnits(faction)).AsValueEnumerable().First();
     runtime.ExecuteAction(BattleAction.ApplyDamage(runtime.TryGetAlive(unit.State).RequireSome(), 8, DamageKind.Stun));
     List<BattleEvent> committed = [];
@@ -324,8 +324,8 @@ public class BattleFactoryTest
     Assert.Equal(1, objects.Count);
     Assert.True(objects[0].Status.IsNone);
 
-    for (int turn = 0; turn < 6 && runtime.Query(new GetBattlePhaseQuery()) == BattlePhase.InProgress; turn++)
-      runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    for (int turn = 0; turn < 6 && runtime.Query(new GetCompletedBattleQuery()).IsNone; turn++)
+      runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction));
     Assert.Equal(Some(ObjectStatus.Expired), runtime.Query(new GetBattleSpecialObjectsQuery())[0].Status);
   }
 

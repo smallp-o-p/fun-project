@@ -238,18 +238,18 @@ public sealed class BattleUnitState
     CurrentHealth = Math.Min(CurrentHealth, Math.Max(MaxHealth, 1));
   }
 
-  internal void EvaluateBuffs(BattleSession session)
+  internal void EvaluateBuffs(BattleReadContext context)
   {
     for (int i = 0; i < _buffs.Count; i++)
     {
       (Buff buff, bool wasActive) = _buffs[i];
-      bool isActive = buff.Condition.IsMet(session, this);
+      bool isActive = buff.Condition.IsMet(context, this);
       if (isActive == wasActive)
         continue;
 
       _buffs[i] = (buff, isActive);
       ClampCurrentHealthToMax();
-      session.RaiseEvents(isActive
+      context.State.RaiseEvents(isActive
         ? new UnitBuffActivatedBattleEvent(this, buff)
         : new UnitBuffDeactivatedBattleEvent(this, buff));
     }

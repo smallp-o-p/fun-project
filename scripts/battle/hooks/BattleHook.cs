@@ -3,19 +3,20 @@ using System.Collections.Generic;
 namespace FunProject.Battle;
 
 /// <summary>
-/// Everything a firing hook needs to do its job: the session (mutate it or don't) and the
-/// in-flight executor action when the event was committed inside one (what the old trigger
-/// signature carried as sourceAction; None for setup/turn-transition dispatches that no
-/// action produced). Minted by the executor's BattleEventCommitted handler per firing.
+/// Everything a firing hook needs to do its job: the read context for its scope (runtime
+/// contexts derive from the one running-or-completed representation; trusted default systems
+/// obtain the running receiver through it) and the in-flight executor action when the event
+/// was committed inside one (None for dispatches no action produced, completion included).
+/// Minted by the executor's BattleEventCommitted handler per firing.
 /// </summary>
 public readonly struct HookContext
 {
-  public BattleSession Session { get; }
+  public BattleReadContext Read { get; }
   public Option<BattleAction> SourceAction { get; }
 
-  internal HookContext(BattleSession session, Option<BattleAction> sourceAction)
+  internal HookContext(BattleReadContext read, Option<BattleAction> sourceAction)
   {
-    Session = session;
+    Read = read;
     SourceAction = sourceAction;
   }
 }

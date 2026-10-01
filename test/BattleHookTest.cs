@@ -1,5 +1,6 @@
 #nullable disable warnings
 using FunProject.Battle;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System;
@@ -16,7 +17,7 @@ public partial class BattleHookTest
     public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
     {
       if (battleEvent is TurnEndedBattleEvent)
-        context.Session.RaiseEvents(new ProbeBattleEvent());
+        context.Read.RunningSession.IfSome(session => session.RaiseEvents(new ProbeBattleEvent()));
 
       return [];
     }
@@ -79,10 +80,12 @@ public partial class BattleHookTest
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
     var unitEventsListener = new RecordingHook();
     battle.RegisterHook<IUnitBattleEvent>(unitEventsListener);
+    battle.Start();
 
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("Bravo", faction), new Vector3I(2, 0, 2));
 
     Assert.True(unitEventsListener.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
   }
@@ -92,14 +95,20 @@ public partial class BattleHookTest
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
     var catchAll = new RecordingHook();
     battle.RegisterHook<BattleEventTag>(catchAll);
 
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
     battle.Start();
 
-    Assert.True(catchAll.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
+    // Registration binds after complete preparation: the opening events arrive, the
+    // preparation placement stream does not replay.
+    Assert.True(catchAll.Received.AsValueEnumerable().OfType<SessionStartedBattleEvent>().Any());
     Assert.True(catchAll.Received.AsValueEnumerable().OfType<TurnStartedBattleEvent>().Any());
+    Assert.Equal(0, catchAll.Received.EventsOf<UnitAddedBattleEvent>().Length);
+
+    battle.Spawn(TestData.MakeCombatant("Late", faction), new Vector3I(2, 0, 2));
+    Assert.True(catchAll.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
 
     battle.ClearEvents();
     battle.Submit(BattleAction.EndFactionTurn(faction));
@@ -112,12 +121,14 @@ public partial class BattleHookTest
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
     var log = new List<string>();
     battle.RegisterHook<IUnitBattleEvent>(new OrderedHook("unit-default", log));
     battle.RegisterHook<IPositionedBattleEvent>(new OrderedHook("positioned-low-priority", log), -5);
     battle.RegisterHook<UnitAddedBattleEvent>(new OrderedHook("concrete-default", log));
+    battle.Start();
 
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("Bravo", faction), new Vector3I(2, 0, 2));
 
     Assert.Equal("positioned-low-priority|unit-default|concrete-default", string.Join("|", log));
   }
@@ -128,6 +139,7 @@ public partial class BattleHookTest
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
     var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.Start();
     var hook = new RecordingHook();
     battle.RegisterHook<UnitKilledBattleEvent>(hook);
     battle.RegisterHook<IUnitBattleEvent>(hook);
@@ -166,7 +178,7 @@ public partial class BattleHookTest
         return [];
 
       _hasThrown = true;
-      context.Session.RaiseEvents(new ProbeBattleEvent());
+      context.Read.RunningSession.IfSome(session => session.RaiseEvents(new ProbeBattleEvent()));
       throw new InvalidOperationException("Hook failure.");
     }
   }
@@ -206,33 +218,21 @@ public partial class BattleHookTest
     }
   }
 
-  [TestCase(TestName = "A hook returning interrupts outside an executor action throws")]
-  public void InterruptsOutsideExecutorActionThrow()
+  [TestCase(TestName = "Interrupts returned during the settlement end event are collected and discarded")]
+  public void EndEventInterruptsAreDiscarded()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
-    battle.RegisterHook<TurnStartedBattleEvent>(
-      new InterruptingHook(context => BattleAction.EndFactionTurn(context.Session.ActiveSide)));
+    using var battle = BattleFixture.Duel();
+    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+    battle.RegisterHook<SessionEndedBattleEvent>(new InterruptingHook(context =>
+      BattleAction.PassUnit(context.Read.State.TryGetAlive(battle.EnemyUnit).RequireSome())));
 
-    // session.StartBattle raises TurnStarted with no executor action in flight. Pre-assign
-    // the faction's objective exactly as the started path would — or the no-objective guard
-    // throws the same exception type and the test false-passes; then assert on the message
-    // to pin the right throw.
-    battle.Session.AddObjective(faction, new EliminateAllOpposingForcesObjectiveData().Instantiate());
+    // The second knockout leaves no conscious forces; the turn-end settlement broadcasts
+    // SessionEnded with no in-flight action, and the hook's interrupt is dropped, not run.
+    battle.EndFactionTurn(battle.PlayerFaction);
 
-    InvalidOperationException thrown = null;
-    try
-    {
-      battle.Session.StartBattle();
-    }
-    catch (InvalidOperationException exception)
-    {
-      thrown = exception;
-    }
-
-    Assert.True(thrown is not null, "Expected StartBattle to throw when a hook returns interrupts outside an executor action.");
-    Assert.True(thrown.Message.Contains("interrupt"));
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome == BattleOutcome.Draw);
+    Assert.Equal(0, battle.Events.EventsOf<UnitActivationEndedBattleEvent>().AsValueEnumerable().Count());
   }
 
   [TestCase(TestName = "Hooks receive the in-flight action as SourceAction during executor dispatches")]
@@ -243,7 +243,7 @@ public partial class BattleHookTest
     var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
     battle.Start();
     var hook = new InterruptingHook(context => BattleAction.PassUnit(
-      context.Session.TryGetAlive(context.Session.GetFactionAliveUnits(faction).AsValueEnumerable().First()).RequireSome()));
+      context.Read.State.TryGetAlive(context.Read.State.GetFactionAliveUnits(faction).AsValueEnumerable().First()).RequireSome()));
     battle.RegisterHook<UnitMovedBattleEvent>(hook);
 
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 2)]));

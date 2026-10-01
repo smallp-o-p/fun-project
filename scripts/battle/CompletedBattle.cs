@@ -3,6 +3,34 @@ using System.Collections.Frozen;
 
 namespace FunProject.Battle;
 
+/// <summary>Per-combatant mission health metrics: the combatant's effective max health at
+/// summary creation (including active condition/equipment/buff effects) and the actual
+/// health damage taken during the battle. Numeric values are snapshots.</summary>
+public sealed record BattleHealthSummary(int MaxHealth, long HealthDamageTaken);
+
+// End-of-battle summary for one faction: outcome, per-combatant kill attribution, and the
+// faction's present/dead/wounded roster. Served from the frozen completion; outer
+// dictionaries, roster sets, and nested defeated lists are all frozen.
+public sealed record FactionBattleSummary
+{
+  public required Faction Faction { get; init; }
+  public required SysColGeneric.IReadOnlySet<Combatant> CombatantsPresent { get; init; }
+  public required SysColGeneric.IReadOnlyDictionary<Combatant, SysColGeneric.IReadOnlyList<Combatant>> DefeatedPerCombatant { get; init; }
+  public required BattleOutcome Outcome { get; init; }
+  public required SysColGeneric.IReadOnlySet<Combatant> CombatantsDead { get; init; }
+  public required SysColGeneric.IReadOnlySet<Combatant> CombatantsWounded { get; init; }
+  public required int TurnCount { get; init; }
+  public SysColGeneric.IReadOnlyList<Combatant> CapturedEnemies { get; init; } = [];
+
+  /// <summary>
+  /// Health report to calculate Combatants' injuries
+  /// </summary>
+  public SysColGeneric.IReadOnlyDictionary<Combatant, BattleHealthSummary> HealthByCombatant { get; init; } = new SysColGeneric.Dictionary<Combatant, BattleHealthSummary>();
+}
+
+/// <summary>Per-faction unit counts captured in an end-of-battle result.</summary>
+public sealed record FactionResultCounts(int Spawned, int Killed);
+
 /// <summary>One grouped end-of-battle report: outcome, per-faction result counts and
 /// summaries, and the object tallies. Completion reads serve this single stored report.</summary>
 public sealed class CompletedBattle

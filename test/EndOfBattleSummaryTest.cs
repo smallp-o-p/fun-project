@@ -19,7 +19,8 @@ public class EndOfBattleSummaryTest
       if (evt is not SessionEndedBattleEvent)
         return;
       endedEvents++;
-      var summary = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
+      var summary = battle.Query(new GetCompletedBattleQuery()).RequireSome()
+        .FactionSummaries[battle.PlayerFaction];
       Assert.Equal(1, summary.CapturedEnemies.Count);
       Assert.True(ReferenceEquals(battle.EnemyUnit.Combatant, summary.CapturedEnemies[0]));
     };
@@ -29,21 +30,25 @@ public class EndOfBattleSummaryTest
     Assert.Equal(1, endedEvents);
   }
 
-  [TestCase]
+  [TestCase(TestName = "Captured membership and numbers stay frozen after completion")]
   public void CapturedMembershipIsFrozenAtTheFirstEndBattle()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+    var completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
     var captured = battle.EnemyUnit.Combatant;
 
-    // Deliberate internal mutation probes frozen membership; this is not a supported gameplay action.
+    // Deliberate campaign-side mutation probes frozen membership; this is not a supported
+    // gameplay action. The installed completion is never recomputed, and a fresh submission
+    // cannot reopen combat to capture again.
     battle.EnemyUnit.ReceiveDamage(20);
     captured.OwningFaction = battle.PlayerFaction;
-    battle.Session.EndBattle(BattleOutcome.Defeat);
-    var after = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
 
-    Assert.Equal(1, after.CapturedEnemies.Count);
-    Assert.True(ReferenceEquals(captured, after.CapturedEnemies[0]));
+    var after = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+    Assert.True(ReferenceEquals(completed, after));
+    Assert.Equal(1, after.FactionSummaries[battle.PlayerFaction].CapturedEnemies.Count);
+    Assert.True(ReferenceEquals(captured, after.FactionSummaries[battle.PlayerFaction].CapturedEnemies[0]));
+    Assert.True(battle.Submit(BattleAction.PassUnit(battle.Alive(battle.PlayerUnit))).IsNone);
   }
 
   [TestCase(TestName = "Only the designated player summary receives victory captures")]
@@ -51,12 +56,10 @@ public class EndOfBattleSummaryTest
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
-
-    Assert.Equal(1, battle.Query(
-      new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count);
-    Assert.Equal(0, battle.Query(
-      new GetFactionEndOfBattleSummary(battle.EnemyFaction)).RequireRight().CapturedEnemies.Count);
     CompletedBattle completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+
+    Assert.Equal(1, completed.FactionSummaries[battle.PlayerFaction].CapturedEnemies.Count);
+    Assert.Equal(0, completed.FactionSummaries[battle.EnemyFaction].CapturedEnemies.Count);
     Assert.False(completed.FactionSummaries.ContainsKey(TestData.MakeFaction("Player")));
   }
 
@@ -68,8 +71,9 @@ public class EndOfBattleSummaryTest
     battle.ApplyDamage(battle.PlayerUnit, 1);
     battle.ApplyDamage(battle.PlayerUnit, 19, DamageKind.Stun);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
-    var player = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
-    var enemy = battle.Query(new GetFactionEndOfBattleSummary(battle.EnemyFaction)).RequireRight();
+    CompletedBattle completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+    var player = completed.FactionSummaries[battle.PlayerFaction];
+    var enemy = completed.FactionSummaries[battle.EnemyFaction];
 
     Assert.True(player.CombatantsPresent.SetEquals([battle.PlayerUnit.Combatant, support.Combatant]));
     Assert.True(player.CombatantsWounded.SetEquals([battle.PlayerUnit.Combatant]));
@@ -88,7 +92,7 @@ public class EndOfBattleSummaryTest
     battle.ApplyDamage(battle.PlayerUnit, 3);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
 
-    var first = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
+    var first = battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[battle.PlayerFaction];
     var report = first.HealthByCombatant[battle.PlayerUnit.Combatant];
     Assert.Equal(20, report.MaxHealth);
     Assert.Equal(3L, report.HealthDamageTaken);
@@ -98,7 +102,7 @@ public class EndOfBattleSummaryTest
     Assert.Equal(3L, first.HealthByCombatant[battle.PlayerUnit.Combatant].HealthDamageTaken);
 
     // The stored completion is frozen too: a fresh read reports the captured numbers.
-    var again = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
+    var again = battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[battle.PlayerFaction];
     Assert.Equal(20, again.HealthByCombatant[battle.PlayerUnit.Combatant].MaxHealth);
     Assert.Equal(3L, again.HealthByCombatant[battle.PlayerUnit.Combatant].HealthDamageTaken);
   }
@@ -138,7 +142,7 @@ public class EndOfBattleSummaryTest
       completed.FactionSummaries[battle.PlayerFaction].CapturedEnemies[0]));
   }
 
-  [TestCase(TestName = "The summary query fails while the battle has not ended")]
+  [TestCase(TestName = "The completion query answers None while the battle has not ended")]
   public void SummaryQueryFailsWhileBattleInProgress()
   {
     using var battle = BattleFixture.Duel(
@@ -147,8 +151,8 @@ public class EndOfBattleSummaryTest
       player: new("Alpha", Position: new Vector3I(0, 0, 0)),
       enemy: new("Bandit", Position: new Vector3I(2, 0, 0)));
 
-    var failure = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireLeft();
-    Assert.Equal(BattleQueryFailureReason.InvalidBattleState, failure.Reason);
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsSome);
   }
 
   [TestCase(TestName = "A victory summary tallies kills per combatant and faction-filtered dead and wounded")]
@@ -167,15 +171,13 @@ public class EndOfBattleSummaryTest
     battle.ApplyDamage(bravo, 999);
     battle.ApplyDamage(charlie, 1);
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
-    battle.Attack(battle.PlayerUnit, bandit2);
-    battle.EndFactionTurn(battle.PlayerFaction);
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    battle.Attack(battle.PlayerUnit, bandit2);   // the last kill completes the battle instantly
+    CompletedBattle completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
 
-    var summary = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
-
+    var summary = completed.FactionSummaries[battle.PlayerFaction];
     Assert.Equal(battle.PlayerFaction, summary.Faction);
     Assert.Equal(BattleOutcome.Victory, summary.Outcome);
-    Assert.Equal(battle.Session.TurnNumber, summary.TurnCount);
+    Assert.Equal(completed.TurnCount, summary.TurnCount);
     Assert.True(summary.CombatantsDead.SetEquals([bravo.Combatant]), "Dead should hold only the fallen player combatant, not enemy dead.");
     Assert.True(summary.CombatantsWounded.SetEquals([charlie.Combatant]), "Wounded should hold only the hurt-but-alive player combatant.");
     Assert.True(summary.CombatantsPresent.SetEquals(
@@ -184,8 +186,7 @@ public class EndOfBattleSummaryTest
     Assert.Equal(1, summary.DefeatedPerCombatant.Count);
     Assert.True(summary.DefeatedPerCombatant[battle.PlayerUnit.Combatant].AsValueEnumerable().SequenceEqual([battle.EnemyUnit.Combatant, bandit2.Combatant]));
 
-    CompletedReportsDoNotExposeWritableCollections(
-      battle.Query(new GetCompletedBattleQuery()).RequireSome());
+    CompletedReportsDoNotExposeWritableCollections(completed);
   }
 
   // Frozen completed reports must not expose writable collection interfaces — outer
@@ -239,15 +240,15 @@ public class EndOfBattleSummaryTest
     battle.ApplyDamage(battle.EnemyUnit, 1);
     battle.EndFactionTurn(battle.PlayerFaction);
     battle.Attack(battle.EnemyUnit, battle.PlayerUnit);
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    CompletedBattle completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
 
-    var playerSummary = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
+    var playerSummary = completed.FactionSummaries[battle.PlayerFaction];
     Assert.Equal(BattleOutcome.Defeat, playerSummary.Outcome);
     Assert.True(playerSummary.CombatantsDead.SetEquals([battle.PlayerUnit.Combatant]));
     Assert.Equal(0, playerSummary.CombatantsWounded.Count, "The wounded enemy must not appear in the player's summary.");
     Assert.Equal(0, playerSummary.DefeatedPerCombatant.Count);
 
-    var enemySummary = battle.Query(new GetFactionEndOfBattleSummary(battle.EnemyFaction)).RequireRight();
+    var enemySummary = completed.FactionSummaries[battle.EnemyFaction];
     Assert.Equal(0, enemySummary.CombatantsDead.Count);
     Assert.True(enemySummary.CombatantsWounded.SetEquals([battle.EnemyUnit.Combatant]));
     Assert.Equal(1, enemySummary.DefeatedPerCombatant.Count);

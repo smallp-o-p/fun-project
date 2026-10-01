@@ -245,7 +245,7 @@ public class BattleVisibilityTest
     var support = battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction, vision: 1), Vector3I.Zero);
     battle.ApplyDamage(observer, 20, DamageKind.Stun);
     if (forceFullRebuild)
-      battle.Session.InvalidateVisibility();
+      battle.Session.State.InvalidateVisibility();
 
     battle.Move(support, [new Vector3I(0, 0, 1)]);
 
@@ -314,10 +314,8 @@ public class BattleVisibilityTest
     var farData = new BattleSpecialObjectData { Name = "Far Bomb" };
     farData.Capabilities.Add(new InteractiveCapabilityData { ActionPointCost = 1 });
 
-    battle.Submit(BattleAction.PlaceObject(nearData, nearPoint));
-    battle.Submit(BattleAction.PlaceObject(farData, farPoint));
-    BattleObjectState[] objects = [.. battle.Session.Objects];
-    BattleObjectState nearObject = objects[0];
+    var nearObject = battle.PlaceObject(nearData, nearPoint.Raw);
+    battle.PlaceObject(farData, farPoint.Raw);
 
     battle.Start();
 
@@ -433,7 +431,7 @@ public class BattleVisibilityTest
     battle.Board.GetTile(battle.At(new Vector3I(1, 0, 0))).BlocksLineOfSight = true;
     battle.Board.GetTile(battle.At(new Vector3I(1, 0, 1))).BlocksLineOfSight = true;
     battle.Board.GetTile(battle.At(new Vector3I(1, 0, 2))).BlocksLineOfSight = true;
-    battle.Session.InvalidateVisibility();
+    battle.Session.State.InvalidateVisibility();
 
     battle.Move(mover, [new Vector3I(0, 0, 1)]);
 

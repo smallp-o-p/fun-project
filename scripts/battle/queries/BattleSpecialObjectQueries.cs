@@ -5,45 +5,55 @@ namespace FunProject.Battle;
 
 public sealed class GetUnitAtTile(BattleBoardState.ValidatedPoint tile) : IBattleSessionQuery<Option<BattleUnitState>>
 {
-  public Option<BattleUnitState> Execute(BattleSession session)
+  public Option<BattleUnitState> Execute(BattleReadContext context)
   {
-    return session.GetUnitAt(tile);
+    return context.State.GetUnitAt(tile);
   }
 }
 
 public sealed class GetFactionAliveUnits(Faction side) : IBattleSessionQuery<IReadOnlyCollection<AliveUnit>>
 {
-  public IReadOnlyCollection<AliveUnit> Execute(BattleSession session)
+  public IReadOnlyCollection<AliveUnit> Execute(BattleReadContext context)
   {
-    return session.AliveUnits.AsValueEnumerable().Where(unit => unit.Side == side).Select(session.MintAlive).ToArray();
+    return context.State.GetFactionAliveUnits(side).AsValueEnumerable().Select(context.State.MintAlive).ToArray();
   }
 }
 
 public sealed class GetFactionDeadUnits(Faction side) : IBattleSessionQuery<IReadOnlyCollection<DeadUnit>>
 {
-  public IReadOnlyCollection<DeadUnit> Execute(BattleSession session)
+  public IReadOnlyCollection<DeadUnit> Execute(BattleReadContext context)
   {
-    return session.DeadUnits.AsValueEnumerable().Where(unit => unit.Side == side).Select(session.MintDead).ToArray();
+    return context.State.DeadUnits.AsValueEnumerable().Where(unit => unit.Side == side).Select(context.State.MintDead).ToArray();
   }
 }
 
+// Total across the runtime lifetime: false after completion and for dead or foreign units.
 public sealed class CanUnitActNow(BattleUnitState unit) : IBattleSessionQuery<bool>
 {
-  public bool Execute(BattleSession session)
+  public bool Execute(BattleReadContext context)
   {
-    return session.CanUnitActNow(unit);
+    return context.RunningSession.Match(session => session.CanUnitActNow(unit), () => false);
   }
 }
 
 public sealed class IsUnitStillAvailableThisTurn(BattleUnitState unit) : IBattleSessionQuery<bool>
 {
-  public bool Execute(BattleSession session)
+  public bool Execute(BattleReadContext context)
   {
-    return session.IsUnitStillAvailableThisTurn(unit);
+    return context.RunningSession.Match(session => session.IsUnitStillAvailableThisTurn(unit), () => false);
   }
 }
 
 public sealed class GetPlayerFactionQuery : IBattleSessionQuery<Option<Faction>>
 {
-  public Option<Faction> Execute(BattleSession session) => session.PlayerFaction;
+  public Option<Faction> Execute(BattleReadContext context) => context.State.PlayerFaction;
+}
+
+// Where a pooled unit currently stands: None once it is dead and off the board.
+public sealed class GetUnitPosition(BattleUnitState unit) : IBattleSessionQuery<Option<BattleBoardState.ValidatedPoint>>
+{
+  public Option<BattleBoardState.ValidatedPoint> Execute(BattleReadContext context)
+  {
+    return context.State.GetUnitPosition(unit);
+  }
 }
