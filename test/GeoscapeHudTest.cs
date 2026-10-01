@@ -14,50 +14,52 @@ public partial class GeoscapeHudTest
 
   private static GeoscapeHud BuildHud() => AddToTree(CreateHud());
 
-  [TestCase]
-  public void ManufacturingCountdownRendersFromPushedTick()
+  [TestCase(0L, "2d remaining")]
+  [TestCase(60L, "2d remaining")]
+  [TestCase(1440L, "1d remaining")]
+  [TestCase(2879L, "1d remaining")]
+  [TestCase(2880L, "0d remaining")]
+  [TestCase(3000L, "0d remaining")]
+  public void ManufacturingSummaryShowsOnlyCurrentJobAndRoundedUpDays(long tick, string expected)
   {
     var item = MakeItemData("Field kit", manufacturingDays: 2);
     using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
-    var session = campaign.Session;
-    Assert.True(session.StartManufacturing(item).IsRight);
-    var hud = AddToTree(CreateHud());
+    Assert.True(campaign.Session.StartManufacturing(item).IsRight);
+    var hud = BuildHud();
 
-    hud.UpdateManufacturing(session.ActiveManufacturing, 60);
+    hud.UpdateManufacturing(campaign.Session.ActiveManufacturing, tick);
 
-    string engineering = hud.GetNode<Label>("%EngineeringProgress").Text;
-    Assert.True(engineering.Contains("Field kit"));
-    Assert.True(engineering.Contains("1d 23h 0m"));
-
-    hud.UpdateManufacturing(None, 60);
-    Assert.Equal("No active manufacturing.", hud.GetNode<Label>("%EngineeringProgress").Text);
+    Assert.Equal("Field kit", hud.GetNode<Label>("%EngineeringProgress").Text);
+    Assert.Equal(expected, hud.GetNode<Label>("%EngineeringRemaining").Text);
+    Assert.True(hud.GetNode<Label>("%EngineeringRemaining").Visible);
   }
 
   [TestCase]
-  public void ManufacturingCompletionNoticeSurvivesProjectRefreshes()
+  public void IdleManufacturingClearsPreviousJobAndRemainingDays()
   {
-    var item = MakeItemData("Field kit");
+    var item = MakeItemData("Field kit", manufacturingDays: 2);
     using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
-    var session = campaign.Session;
-    Assert.True(session.StartManufacturing(item).IsRight);
-    var hud = AddToTree(CreateHud());
+    Assert.True(campaign.Session.StartManufacturing(item).IsRight);
+    var hud = BuildHud();
+    hud.UpdateManufacturing(campaign.Session.ActiveManufacturing, 60);
 
-    session.ActiveManufacturing.IfSome(hud.ShowManufacturingCompleted);
-    string notice = hud.GetNode<Label>("%EngineeringNotice").Text;
-    Assert.True(notice.Contains("Field kit"));
-
-    hud.UpdateManufacturing(session.ActiveManufacturing, 60);
     hud.UpdateManufacturing(None, 3000);
-    Assert.Equal(notice, hud.GetNode<Label>("%EngineeringNotice").Text);
+
+    Assert.Equal("No active manufacturing.", hud.GetNode<Label>("%EngineeringProgress").Text);
+    Assert.Equal("", hud.GetNode<Label>("%EngineeringProgress").TooltipText);
+    Assert.True(hud.HasNode("%EngineeringRemaining"), "The compact HUD needs a separate remaining-days label.");
+    Assert.False(hud.GetNode<Label>("%EngineeringRemaining").Visible);
+    Assert.Equal("", hud.GetNode<Label>("%EngineeringRemaining").Text);
+    Assert.False(hud.HasNode("%EngineeringNotice"));
   }
 
-  private static GeoscapeEvent MakeActive(long? expiresAtTick = null)
+  [TestCase]
+  public void HudDoesNotContainAnActiveEventsPanel()
   {
-    return new GeoscapeEvent(
-      TestData.MakeEvent("Raid"),
-      Option<int>.None,
-      OccurredTick: 0,
-      expiresAtTick.HasValue ? Some(expiresAtTick.Value) : Option<long>.None);
+    var hud = BuildHud();
+    Assert.False(hud.HasNode("AlertsPanel"));
+    Assert.False(hud.HasNode("%Alerts"));
+    Assert.False(hud.HasNode("%AlertScroll"));
   }
 
   [TestCase(TestName = "Ordinary bound buttons forward fresh authored views through the signal")]
@@ -128,50 +130,6 @@ public partial class GeoscapeHudTest
     hud.UpdateClock(3, new DateTime(2087, 3, 1, 8, 0, 0));
 
     Assert.Equal("Day 3 08:00", hud.GetNode<Label>("%ClockLabel").Text);
-  }
-
-  [TestCase(TestName = "RefreshAlerts lists active events with tick countdowns")]
-  public void RefreshAlertsListsWithCountdowns()
-  {
-    var hud = BuildHud();
-
-    hud.RefreshAlerts([MakeActive(expiresAtTick: 30), MakeActive()]);
-    hud.UpdateCountdowns(12);
-
-    var alerts = hud.GetNode<VBoxContainer>("%Alerts");
-    Assert.Equal(2, alerts.GetChildCount());
-    Assert.True(((Button)alerts.GetChild(0)).Text.Contains("Raid"));
-    Assert.True(((Button)alerts.GetChild(0)).Text.Contains("18")); // 30 - 12 ticks remaining
-    Assert.True(((Button)alerts.GetChild(0)).Text.Contains("min")); // one tick = one in-game minute
-    Assert.False(((Button)alerts.GetChild(1)).Text.Contains("min")); // no expiry shown
-  }
-
-  [TestCase(TestName = "RefreshAlerts replaces the previous list")]
-  public async Task RefreshAlertsReplacesList()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var hud = BuildHud();
-    hud.RefreshAlerts([MakeActive(1), MakeActive(2)]);
-
-    hud.RefreshAlerts([MakeActive(3)]);
-
-    Assert.Equal(1, hud.GetNode<VBoxContainer>("%Alerts").GetChildCount());
-  }
-
-  [TestCase(TestName = "Pressing an alert requests that event's resolution")]
-  public void AlertPressRequestsResolution()
-  {
-    var hud = BuildHud();
-    var active = MakeActive(1);
-    hud.RefreshAlerts([active]);
-    hud.UpdateCountdowns(0);
-
-    GeoscapeEvent? requested = null;
-    hud.ResolutionRequested += geoscapeEvent => requested = geoscapeEvent;
-    ((Button)hud.GetNode<VBoxContainer>("%Alerts").GetChild(0)).EmitSignal(BaseButton.SignalName.Pressed);
-
-    Assert.That(requested != null);
-    Assert.Equal(active, requested);
   }
 
   [TestCase(TestName = "Speed button cycles Normal → Fast → VeryFast → VeryVeryFast → Normal")]

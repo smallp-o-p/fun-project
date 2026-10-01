@@ -103,10 +103,18 @@ internal static class GeoscapeTestScenes
   public static Button SpeedButton(GeoscapeScene scene)
     => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Button>("%SpeedButton");
 
-  // Opens the newest alert's resolution dialog, as a player click would.
-  public static void OpenResolutionViaAlert(GeoscapeScene scene)
-    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<VBoxContainer>("%Alerts")
-      .GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
+  // Region buttons share the marker's type; identify active markers by their authored
+  // scene instead of counting region geometry or relying on generated node names.
+  public static RegionButton[] MapEventMarkers(GeoscapeScene scene)
+  {
+    var map = scene.GetNode<GeoscapeMapControl>("%Map");
+    return map.GetChildren().AsValueEnumerable().OfType<RegionButton>()
+      .Where(button => button.SceneFilePath == map.EventMarkerScene!.ResourcePath).ToArray();
+  }
+
+  // Press the actual marker so its EventClicked signal reaches the composition root.
+  public static void OpenResolutionViaMapEvent(GeoscapeScene scene, int eventIndex = 0)
+    => MapEventMarkers(scene)[eventIndex].EmitSignal(BaseButton.SignalName.Pressed);
 
   public static Node3D AddBackdrop(GeoscapeView view, Node3D backdrop)
   {

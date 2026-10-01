@@ -14,31 +14,39 @@ public class MapBattleDialogueLayoutTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task GeoscapeKeepsNavigationAtBottomAndAlertsScrollable(int width, int height)
+  public async Task GeoscapeUsesOneCompactBottomRowAndTopRightTime(int width, int height)
   {
     var hud = CreateHud();
     var viewport = CreateUiViewport(hud, new Vector2I(width, height));
-    SysColGeneric.List<FunProject.Strategic.GeoscapeEvent> events = [];
-    for (int i = 0; i < 24; i++)
-      events.Add(new(TestData.MakeEvent($"A long field report from the northern frontier {i}"), None, 0, None));
-    hud.RefreshAlerts(events);
-    hud.UpdateCountdowns(0);
+    var item = TestData.MakeItemData(new string('W', 160), manufacturingDays: 2);
+    using var campaign = new GeoscapeFixture(TestData.MakeStart(manufacturableItems: [item]));
+    Assert.True(campaign.Session.StartManufacturing(item).IsRight);
+    hud.UpdateManufacturing(campaign.Session.ActiveManufacturing, 1);
     await WaitForLayout(viewport);
 
-    foreach (string name in new[] { "UnitsButton", "EngineeringButton", "CaptivityButton", "PauseButton", "SpeedButton" })
+    var bottom = hud.GetNode<Control>("BottomBar");
+    AssertInside(bottom, width, height);
+    Assert.True(bottom.Size.Y <= 64, "The bottom HUD must remain one compact row.");
+    foreach (string name in new[] { "UnitsButton", "EngineeringButton", "CaptivityButton", "EngineeringProgress", "EngineeringRemaining" })
     {
-      var button = hud.GetNode<Button>($"%{name}");
-      AssertInside(button, width, height);
-      Assert.True(ScreenRect(button).Position.Y > height * 0.65f);
-      Assert.Equal(Control.FocusModeEnum.All, button.FocusMode);
+      var control = hud.GetNode<Control>($"%{name}");
+      AssertInside(control, width, height);
+      Assert.True(ScreenRect(control).Position.Y > height * 0.85f);
+      Assert.True(Mathf.Abs(ScreenRect(control).GetCenter().Y - ScreenRect(bottom).GetCenter().Y) < 1);
     }
-    var scroll = hud.GetNode<ScrollContainer>("%AlertScroll");
-    AssertInside(scroll, width, height);
-    Assert.True(scroll.GetVScrollBar().MaxValue > scroll.GetVScrollBar().Page);
-    var last = hud.GetNode<VBoxContainer>("%Alerts").GetChild<Button>(23);
-    last.GrabFocus();
-    await WaitForLayout(viewport);
-    Assert.True(ScreenRect(scroll).Intersects(ScreenRect(last)));
+    foreach (string name in new[] { "PauseButton", "SpeedButton", "ClockLabel" })
+    {
+      var control = hud.GetNode<Control>($"%{name}");
+      AssertInside(control, width, height);
+      Assert.True(ScreenRect(control).Position.Y < 80);
+      Assert.True(ScreenRect(control).Position.X > width * 0.5f);
+    }
+    var progress = hud.GetNode<Label>("%EngineeringProgress");
+    Assert.True(progress.ClipText);
+    Assert.Equal(item.Name, progress.TooltipText);
+    Assert.Equal(Control.MouseFilterEnum.Pass, progress.MouseFilter);
+    Assert.Equal("2d remaining", hud.GetNode<Label>("%EngineeringRemaining").Text);
+    Assert.False(hud.HasNode("AlertsPanel"));
   }
 
   [TestCase(800, 600)]

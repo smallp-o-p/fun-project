@@ -66,10 +66,10 @@ size_flags_stretch_ratio = 0.9
 unique_name_in_owner = true
 layout_mode = 2
 ModelScene = ExtResource("5_model")
-FramingHeight = 0.64
-FocusHeight = 0.68
+FramingHeight = 1.05
+FocusHeight = 0.5
 ModelYawDegrees = -8.0
-FitWidth = false
+FitWidth = true
 
 [node name="PresentationCaption" type="Label" parent="Content/Margin/Layout/Body/PresentationColumn"]
 layout_mode = 2

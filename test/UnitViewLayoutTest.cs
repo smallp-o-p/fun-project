@@ -167,4 +167,56 @@ public class UnitViewLayoutTest
     Assert.True(view.GetNode<Control>("%UnitPresentation").Size.X >= width * 0.3f);
     Assert.Equal(6, view.GetNode<Container>("%StatsList").GetChildCount());
   }
+
+  [TestCase(800, 600)]
+  [TestCase(1066, 600)] // Logical canvas for 16:9, including 4K with native UI scaling.
+  [TestCase(1433, 600)] // Logical canvas for 3440x1440 ultrawide.
+  [TestCase(1280, 720)]
+  [TestCase(1920, 1080)]
+  [TestCase(3440, 1440)]
+  [TestCase(3840, 2160)]
+  public async Task EntireUnitBodyKeepsPaddingThroughViewportResizes(int width, int height)
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    using var campaign = new GeoscapeFixture(MakeStart(roster: [MakeEntry()]));
+    var view = CreateUnitView();
+    var viewport = CreateUiViewport(view, new Vector2I(width, height));
+    view.Present(campaign.State, campaign.State.Roster[0]);
+
+    foreach (var size in new[] { new Vector2I(width, height), new Vector2I(800, 600), new Vector2I(width, height) })
+    {
+      viewport.Size = size;
+      await WaitForLayout(view);
+      AssertFullBodyHasPadding(view.GetNode<SubViewportContainer>("%UnitPresentation"));
+    }
+  }
+
+  private static void AssertFullBodyHasPadding(SubViewportContainer presentation)
+  {
+    var modelViewport = presentation.GetNode<SubViewport>("%ModelViewport");
+    var camera = presentation.GetNode<Camera3D>("%ModelCamera");
+    var meshes = presentation.GetNode<Node3D>("%ModelRoot")
+      .FindChildren("*", "MeshInstance3D", true, false)
+      .AsValueEnumerable().Cast<MeshInstance3D>()
+      .Where(mesh => mesh.Mesh is not null && mesh.IsVisibleInTree()).ToArray();
+    Assert.True(meshes.Length > 0, "The authored unit must have visible model geometry.");
+    var size = (Vector2)modelViewport.Size;
+    var paddedFrame = new Rect2(size * 0.02f, size * 0.96f);
+
+    // Check projected geometry rather than exported framing values: head, feet, and
+    // wide limbs must all remain inside the actual render viewport after every resize.
+    foreach (var mesh in meshes)
+    {
+      Aabb bounds = mesh.GetAabb();
+      for (int corner = 0; corner < 8; corner++)
+      {
+        Vector3 worldPoint = mesh.GlobalTransform * bounds.GetEndpoint(corner);
+        Vector2 screenPoint = camera.UnprojectPosition(worldPoint);
+        Assert.True(camera.IsPositionInFrustum(worldPoint),
+          $"{mesh.Name} corner {corner} must remain inside the camera frustum at {size}.");
+        Assert.True(paddedFrame.HasPoint(screenPoint),
+          $"{mesh.Name} corner {corner} at {screenPoint} must have 2% padding inside {size}.");
+      }
+    }
+  }
 }

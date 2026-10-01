@@ -23,6 +23,7 @@ public partial class GeoscapeScene : Control
   private Viewport _mapViewport = null!;
   private SubViewportContainer _mapViewportContainer = null!;
   private Control _bottomHud = null!;
+  private Control _topHud = null!;
   private GeoscapeHud _hud = null!;
   private PackedScene _resolutionViewScene = null!;
   private PackedScene _dialogueViewScene = null!;
@@ -43,9 +44,10 @@ public partial class GeoscapeScene : Control
     _map.Setup(_session, start.Map.Size);
 
     // The camera stays in the full map SubViewport so it never transforms other
-    // screens. Its framing excludes the actual bottom HUD bounds in viewport space.
+    // screens. Its framing keeps map markers between both HUD rows in viewport space.
     _hud = GetNode<GeoscapeHud>("%GeoscapeHud");
     _bottomHud = _hud.GetNode<Control>("BottomBar");
+    _topHud = _hud.GetNode<Control>("TimePanel");
     _mapViewport = _map.GetViewport();
     _mapViewportContainer = (SubViewportContainer)_mapViewport.GetParent();
     _camera = new GeoscapeCameraRig { Name = "Camera" };
@@ -53,6 +55,7 @@ public partial class GeoscapeScene : Control
     _camera.Setup(start.Map.Size); // authored map bounds are a presentation concern
     _mapViewport.SizeChanged += ReframeMapCamera;
     _bottomHud.ItemRectChanged += ReframeMapCamera;
+    _topHud.ItemRectChanged += ReframeMapCamera;
     ReframeMapCamera();
 
     _map.RegionClicked += region => GD.Print(region.FlavorText);
@@ -60,7 +63,6 @@ public partial class GeoscapeScene : Control
     _session.EventCommitted += HandleSessionEvent;
 
     _hud.ChangeSpeed += _session.ChangeSpeed;
-    _hud.ResolutionRequested += OpenResolution;
     _map.EventClicked += adapter => OpenResolution(adapter.Event);
     _hud.UpdateClock(_session.CurrentDay, _session.CurrentTime); // the session starts paused: no TimeAdvanced yet
     _hud.UpdateManufacturing(_session.ActiveManufacturing, _session.Tick);
@@ -81,6 +83,8 @@ public partial class GeoscapeScene : Control
       _mapViewport.SizeChanged -= ReframeMapCamera;
     if (IsInstanceValid(_bottomHud))
       _bottomHud.ItemRectChanged -= ReframeMapCamera;
+    if (IsInstanceValid(_topHud))
+      _topHud.ItemRectChanged -= ReframeMapCamera;
   }
 
   private void ReframeMapCamera()
@@ -91,12 +95,15 @@ public partial class GeoscapeScene : Control
     // Both HUD and container are in the outer canvas; convert to container-local
     // coordinates before accounting for the inner viewport's render size. This keeps
     // root content scaling and SubViewport stretch out of the camera's world math.
-    Vector2 hudTop = _mapViewportContainer.GetGlobalTransformWithCanvas().AffineInverse()
-      * _bottomHud.GetGlobalTransformWithCanvas().Origin;
+    Transform2D toContainer = _mapViewportContainer.GetGlobalTransformWithCanvas().AffineInverse();
+    Vector2 bottomHudTop = toContainer * _bottomHud.GetGlobalTransformWithCanvas().Origin;
+    Vector2 topHudBottom = toContainer
+      * (_topHud.GetGlobalTransformWithCanvas() * new Vector2(0, _topHud.Size.Y));
     Vector2 viewportSize = _mapViewport.GetVisibleRect().Size;
-    float usableHeight = Mathf.Clamp(
-      hudTop.Y * viewportSize.Y / _mapViewportContainer.Size.Y, 0, viewportSize.Y);
-    _camera.FitToArea(new Rect2(Vector2.Zero, new Vector2(viewportSize.X, usableHeight)));
+    float ratio = viewportSize.Y / _mapViewportContainer.Size.Y;
+    float top = Mathf.Clamp(topHudBottom.Y * ratio, 0, viewportSize.Y);
+    float bottom = Mathf.Clamp(bottomHudTop.Y * ratio, top, viewportSize.Y);
+    _camera.FitToArea(new Rect2(new Vector2(0, top), new Vector2(viewportSize.X, bottom - top)));
   }
 
   // Construction hook for derived scenes (debug playtests): the state exists before the
@@ -125,21 +132,15 @@ public partial class GeoscapeScene : Control
     {
       case TimeAdvanced timeAdvanced:
         _hud.UpdateClock(_session.CurrentDay, timeAdvanced.CurrentTime);
-        _hud.UpdateCountdowns(_session.Tick); // countdowns tick down, list not rebuilt
-        break;
-      case ManufacturingCompleted manufacturing:
-        _hud.ShowManufacturingCompleted(manufacturing.Job);
         break;
       case ScheduledEventFired or EventExpired:
         _map.RefreshEvents();
-        _hud.RefreshAlerts(_session.ActiveEvents);
         break;
       case ResolutionEventOpened opened:
         var resolution = InstantiateResolutionView();
         resolution.Resolved += _session.CompleteResolution;
         _viewManager.Push(resolution); // ViewChanged presents from the now-pending session state
         PushEventDialogue(opened.Pending);
-        _hud.RefreshAlerts(_session.ActiveEvents);
         break;
       case ResolutionEventClosed:
         // The dialog's buttons are the only close path, so it is the stack top here; the
@@ -147,7 +148,6 @@ public partial class GeoscapeScene : Control
         if (_viewManager.Current is GeoscapeEventResolution)
           _viewManager.Pop();
         _map.RefreshEvents();
-        _hud.RefreshAlerts(_session.ActiveEvents);
         break;
     }
   }

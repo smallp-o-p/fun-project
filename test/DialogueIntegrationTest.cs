@@ -46,7 +46,7 @@ public class DialogueIntegrationTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (scene, manager) = SceneWithEvent(MakeEvent("Council Broadcast", dialogue: CouncilDialogue()));
-    OpenResolutionViaAlert(scene);
+    OpenResolutionViaMapEvent(scene);
 
     Assert.True(manager.Current is DialogueView);
     Assert.Equal("Spokesman", manager.Current.GetNode<Label>("%SpeakerName").Text);
@@ -74,7 +74,7 @@ public class DialogueIntegrationTest
     await using var cleanup = new DeferredNodeCleanup();
     var (scene, manager) = SceneWithEvent(MakeEvent("Quiet plot"));
 
-    OpenResolutionViaAlert(scene);
+    OpenResolutionViaMapEvent(scene);
 
     Assert.True(manager.Current is GeoscapeEventResolution);
   }

@@ -68,20 +68,121 @@ public sealed partial class GeoscapeMapControl : Control
     }
     _markerNodes.Clear();
 
+    List<Vector2> anchors = [];
     foreach (GeoscapeEvent active in _session.ActiveEvents)
     {
-      Vector2 position = active.TargetRegionIndex.Match(
+      anchors.Add(active.TargetRegionIndex.Match(
         index => _markerAnchors[index]!.Value,
-        () => (Vector2)_mapSize / 2f); // map-wide marker: map center
+        () => (Vector2)_mapSize / 2f)); // map-wide marker: map center
 
-      // Stamped from the authored scene: the marker owns its visual and extent (Size);
-      // the map only centers it on the anchor. Added after the authored regions → drawn
-      // on top → wins overlap.
+      // Keep the authored visual, hit shape, and signal for every event. Placement uses
+      // the full extent, so no later sibling can intercept another marker's clicks.
       var marker = (RegionButton)EventMarkerScene.Instantiate();
-      marker.Position = position - marker.Size / 2f;
       AddChild(marker);
       _markerNodes.Add(marker);
       marker.Pressed += () => EmitSignal(SignalName.EventClicked, new GeoscapeEventAdapter { Event = active });
+    }
+
+    if (_markerNodes.Count > 0 && !TryPlaceMarkersNearAnchors(anchors))
+      PackMarkers();
+  }
+
+  private bool TryPlaceMarkersNearAnchors(List<Vector2> anchors)
+  {
+    List<Rect2> placed = [];
+    for (int index = 0; index < _markerNodes.Count; index++)
+    {
+      RegionButton marker = _markerNodes[index];
+      Vector2 limit = (Vector2)_mapSize - marker.Size;
+      if (limit.X < 0 || limit.Y < 0)
+        return false;
+
+      Vector2 desired = anchors[index] - marker.Size / 2f;
+      Vector2 preferred = desired.Clamp(Vector2.Zero, limit);
+      var rect = new Rect2(preferred, marker.Size);
+      if (IsFree(rect, placed))
+      {
+        marker.Position = preferred;
+        placed.Add(rect);
+        continue;
+      }
+
+      // The closest free rectangle touches an obstacle edge on each displaced axis.
+      // Test those coordinates together, preserving insertion order to break ties.
+      // Bound the search for unusually large event sets; the grid below always fits.
+      if (placed.Count >= 64)
+        return false;
+      List<float> xs = [preferred.X, 0, limit.X];
+      List<float> ys = [preferred.Y, 0, limit.Y];
+      foreach (Rect2 occupied in placed)
+      {
+        xs.Add(Mathf.Clamp(occupied.Position.X - marker.Size.X, 0, limit.X));
+        xs.Add(Mathf.Clamp(occupied.End.X, 0, limit.X));
+        ys.Add(Mathf.Clamp(occupied.Position.Y - marker.Size.Y, 0, limit.Y));
+        ys.Add(Mathf.Clamp(occupied.End.Y, 0, limit.Y));
+      }
+
+      float nearestDistance = float.PositiveInfinity;
+      foreach (float x in xs)
+        foreach (float y in ys)
+        {
+          var candidate = new Rect2(new Vector2(x, y), marker.Size);
+          float distance = candidate.Position.DistanceSquaredTo(desired);
+          if (distance < nearestDistance && IsFree(candidate, placed))
+          {
+            rect = candidate;
+            nearestDistance = distance;
+          }
+        }
+      if (float.IsPositiveInfinity(nearestDistance))
+        return false;
+
+      marker.Position = rect.Position;
+      placed.Add(rect);
+    }
+    return true;
+  }
+
+  private static bool IsFree(Rect2 candidate, List<Rect2> placed)
+  {
+    foreach (Rect2 occupied in placed)
+      if (candidate.Intersects(occupied))
+        return false;
+    return true;
+  }
+
+  private void PackMarkers()
+  {
+    // Greedy anchor placement can exhaust the available space. Retry in uniform cells,
+    // choosing the grid with the largest shared scale; every event keeps its own button.
+    Vector2 largest = Vector2.Zero;
+    foreach (RegionButton marker in _markerNodes)
+      largest = new Vector2(Mathf.Max(largest.X, marker.Size.X), Mathf.Max(largest.Y, marker.Size.Y));
+
+    int columns = 1;
+    float scale = 0;
+    for (int candidate = 1; candidate <= _markerNodes.Count; candidate++)
+    {
+      int rows = (_markerNodes.Count + candidate - 1) / candidate;
+      float fit = Mathf.Min(1f, Mathf.Min(_mapSize.X / (candidate * largest.X), _mapSize.Y / (rows * largest.Y)));
+      if (fit > scale)
+      {
+        columns = candidate;
+        scale = fit;
+      }
+    }
+
+    // A small inset prevents floating-point contact at scaled cell boundaries.
+    if (scale < 1f)
+      scale *= 0.98f;
+    int rowCount = (_markerNodes.Count + columns - 1) / columns;
+    var cellSize = new Vector2((float)_mapSize.X / columns, (float)_mapSize.Y / rowCount);
+    for (int index = 0; index < _markerNodes.Count; index++)
+    {
+      RegionButton marker = _markerNodes[index];
+      marker.Scale = Vector2.One * scale;
+      marker.Position = new Vector2(index % columns, index / columns) * cellSize
+        + (cellSize - marker.Size * scale) / 2f;
     }
   }
 }
