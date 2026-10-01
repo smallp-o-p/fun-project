@@ -502,6 +502,28 @@ public partial class BattleSessionTest
     Assert.True(battle.Board.IsOccupied(battle.Board.At(3, 0, 0)));
   }
 
+  // Spawn buffs can genuinely extend vision after the placement dispatch: the observer's
+  // base-vision placement stream cannot reach the target, so the first spot is discovered
+  // only after buff evaluation — and must notify exactly once, through the opening stream.
+  [TestCase(TestName = "A conscious spawn's buff-discovered first spot notifies exactly once")]
+  public void SpawnBuffVisionDiscoveryNotifiesExactlyOnce()
+  {
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    // The blind target's only role is being seen, so the stream holds exactly one spotting.
+    using var battle = new BattleFixture(new Vector3I(4, 1, 1), [playerFaction, enemyFaction]);
+    var buff = TestData.MakeBuff("EagleEye", new AlwaysMetBuffCondition(),
+      statMods: [new VisionStatMod { Modifiers = [StatModifier.Add(3)] }]);
+    var target = battle.Spawn(TestData.MakeCombatant("Target", enemyFaction, vision: 0), new Vector3I(3, 0, 0));
+    var observer = battle.Spawn(TestData.MakeCombatant("Observer", playerFaction, vision: 1, buffs: [buff]), new Vector3I(0, 0, 0));
+
+    battle.Start();
+
+    Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable()
+      .Count(e => ReferenceEquals(e.Unit, observer) && ReferenceEquals(e.Target, target)));
+    Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable().Count());
+  }
+
   [TestCase(TestName = "Preparation rejects a wholly dead side with the typed NoConsciousUnits reason")]
   public void PreparationRejectsWhollyDeadSidesWithTypedReason()
   {

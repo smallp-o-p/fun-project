@@ -76,9 +76,10 @@ internal sealed class BattlePreparation
   // Shared initialization reconciliation, used by AddUnit and the fixture's preset path:
   // a dead participant leaves the board so its tile is reusable (already absent is valid
   // after prior initialization), an unconscious body stays occupied, and every identity
-  // remains in the pool. Visibility work completes here — clearing the unit's own caches
-  // at once instead of waiting for a later event or opening dispatch — without fabricating
-  // gameplay events; the placement stream's own first-spots stay on their dispatches.
+  // remains in the pool. Only disabled participants need the immediate visibility pass —
+  // clearing their stale caches without fabricating gameplay events. A conscious spawn
+  // returns before it: its placement stream's first-spots stay on their dispatches, and
+  // a later buff-discovered spot must not be consumed here ahead of the opening refresh.
   internal void ReconcileParticipant(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
@@ -90,6 +91,8 @@ internal sealed class BattlePreparation
             throw new InvalidOperationException($"Could not clear unit {unit.Id} from {point.Raw}.");
         },
         None: () => { });
+    if (unit.IsAlive && !unit.IsUnconscious)
+      return;
     State.MarkVisibilityAffected(unit);
     State.RefreshVisibility();
   }
