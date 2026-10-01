@@ -1,5 +1,6 @@
 #nullable disable warnings
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using FunProject.Combatants;
 using FunProject.Geoscape;
@@ -45,6 +46,17 @@ public class GeoscapeSquadLoadoutTest
     // pending mission itself as explicit deployment context.
     view.Configure(pending.Event.Definition.Title, 3, allowEquipmentEditing: true,
       mission: pending.Event.Definition);
+    view.Present(state, session);
+    return view;
+  }
+
+  // Mission preparation as the resolution opener now performs it: the entire active event
+  // handed to ConfigureMission, which derives title, gate, and capacity from it.
+  private static SquadLoadoutView PresentedMissionView(PendingResolution pending,
+    CampaignGameState state, GeoscapeSession session)
+  {
+    var view = AddToTree(CreateSquadLoadoutView());
+    view.ConfigureMission(pending.Event);
     view.Present(state, session);
     return view;
   }
@@ -153,6 +165,101 @@ public class GeoscapeSquadLoadoutTest
     {
       view.Free(); // never entered the tree; keep the orphan monitor clean
     }
+  }
+
+  [TestCase(TestName = "Mission size controls preparation capacity and Deploy readiness")]
+  public async Task MissionSizeControlsPreparationCapacity()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (fixture, pending) = Mission([MakeEntry("Alpha")],
+      mission: MakeEvent("Operation Iron", GeoscapeEventKind.TacticalBattle,
+        tacticalMission: MakeTacticalMission(maxPlayerUnits: 1)));
+    using var _ = fixture;
+    var squad = PresentedMissionView(pending, fixture.State, fixture.Session);
+
+    Assert.Equal(1, squad.GetNode<VBoxContainer>("%Slots").GetChildCount());
+    Assert.Equal("Squad: 0/1", squad.GetNode<Label>("%SquadCount").Text);
+    Assert.True(SquadDeployButton(squad).Visible); // configured tactical mission
+    Assert.True(SquadDeployButton(squad).Disabled); // empty selection
+    ChooseSquadUnit(squad, 0, "Alpha");
+    Assert.False(SquadDeployButton(squad).Disabled);
+  }
+
+  [TestCase(TestName = "Deploy carries the configured mission and selected identities across reopen")]
+  public async Task DeployCarriesMissionAndSelectedIdentities()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (fixture, pending) = Mission([MakeEntry("Alpha"), MakeEntry("Bravo")]);
+    using var _ = fixture;
+    int seed = pending.Event.BattleSeed.RequireSome();
+    var squad = PresentedMissionView(pending, fixture.State, fixture.Session);
+    ChooseSquadUnit(squad, 0, "Alpha");
+    ChooseSquadUnit(squad, 1, "Bravo");
+
+    var requested = new SysColGeneric.List<(GeoscapeEvent Mission, IReadOnlyList<Combatant> Units)>();
+    squad.DeployRequested += (mission, units) => requested.Add((mission, units));
+    SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Equal(1, requested.Count);
+    Assert.True(ReferenceEquals(pending.Event, requested[0].Mission),
+      "Deploy carries the exact retained event, not a stale copy.");
+    Assert.Equal(seed, requested[0].Mission.BattleSeed.RequireSome());
+    Assert.Equal(2, requested[0].Units.Count);
+    Assert.True(ReferenceEquals(fixture.State.Roster[0], requested[0].Units[0]));
+    Assert.True(ReferenceEquals(fixture.State.Roster[1], requested[0].Units[1]));
+
+    // Back/reopen re-prepares from the same retained event with the same seed.
+    squad.ConfigureMission(pending.Event);
+    squad.Present(fixture.State, fixture.Session);
+    ChooseSquadUnit(squad, 0, "Alpha");
+    var reopened = new SysColGeneric.List<(GeoscapeEvent Mission, IReadOnlyList<Combatant> Units)>();
+    squad.DeployRequested += (mission, units) => reopened.Add((mission, units));
+    SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Equal(1, reopened.Count);
+    Assert.True(ReferenceEquals(pending.Event, reopened[0].Mission));
+    Assert.Equal(seed, reopened[0].Mission.BattleSeed.RequireSome());
+  }
+
+  [TestCase(TestName = "Deployment failures render without dropping the selection")]
+  public async Task DeploymentFailuresRenderWithoutDroppingSelection()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (fixture, pending) = Mission([MakeEntry("Alpha")]);
+    using var _ = fixture;
+    var squad = PresentedMissionView(pending, fixture.State, fixture.Session);
+    ChooseSquadUnit(squad, 0, "Alpha");
+
+    var failure = new MissionLaunchFailure(
+      MissionLaunchFailureReason.UnitUnavailable, "Alpha is not fit to deploy on this mission.");
+    squad.ShowDeploymentFailure(failure);
+
+    var label = SquadDeploymentFailure(squad);
+    Assert.True(label.Visible);
+    Assert.Equal("Alpha is not fit to deploy on this mission.", label.Text);
+    var selected = squad.GetSelectedCombatants();
+    Assert.Equal(1, selected.Count);
+    Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
+    Assert.False(SquadDeployButton(squad).Disabled); // the squad stays launchable
+  }
+
+  [TestCase(TestName = "Generic configuration clears the deploy context")]
+  public async Task GenericConfigurationClearsDeployContext()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (fixture, pending) = Mission([MakeEntry("Alpha")]);
+    using var _ = fixture;
+    var squad = PresentedMissionView(pending, fixture.State, fixture.Session);
+    Assert.True(SquadDeployButton(squad).Visible); // mission prep offers Deploy
+
+    squad.Configure("Interrogation", 2, allowEquipmentEditing: false);
+    squad.Present(fixture.State, fixture.Session);
+
+    Assert.False(SquadDeployButton(squad).Visible);
+    int requested = 0;
+    squad.DeployRequested += (_, _) => requested++;
+    SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed); // hidden stays inert
+    Assert.Equal(0, requested);
   }
 
   [TestCase(TestName = "Choices are inert without a destination and occupied units stay unavailable")]

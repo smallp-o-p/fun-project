@@ -2,8 +2,9 @@ using FunProject.Battle;
 using Godot;
 
 /// <summary>
-/// Standalone host that resolves the exported battle type and presents BattleScene; the future
-/// geoscape handoff presents the same way.
+/// Standalone host that resolves the exported battle type and presents BattleScene; the geoscape
+/// handoff presents with allowReturn true instead. The runtime is caller-owned until Present
+/// succeeds, so load/instantiation/binding failures free it here; afterwards the host owns it.
 /// </summary>
 public sealed partial class BattleLauncher : Node
 {
@@ -19,10 +20,27 @@ public sealed partial class BattleLauncher : Node
     BattleRuntime runtime = BattleFactory.Start(setup).Match(
       Right: started => started,
       Left: failure => throw new System.InvalidOperationException($"Battle start failed: {failure.Message}"));
-    PackedScene scene = ResourceLoader.Load<PackedScene>("res://scenes/battle/BattleScene.tscn")
-      ?? throw new System.InvalidOperationException("Could not load the battle scene.");
-    var battle = scene.Instantiate<BattleScene>();
-    battle.Present(runtime, setup);
+    BattleScene battle;
+    try
+    {
+      PackedScene scene = ResourceLoader.Load<PackedScene>("res://scenes/battle/BattleScene.tscn")
+        ?? throw new System.InvalidOperationException("Could not load the battle scene.");
+      Node instance = scene.Instantiate();
+      if (instance is not BattleScene battleRoot)
+      {
+        string kind = instance.GetClass();
+        instance.Free();
+        throw new System.InvalidOperationException(
+          $"The battle scene root must be a BattleScene; got {kind}.");
+      }
+      battle = battleRoot;
+      battle.Present(runtime, setup); // allowReturn stays false: standalone battles end here
+    }
+    catch
+    {
+      runtime.Dispose(); // never bound to a host
+      throw;
+    }
     AddChild(battle);
   }
 }

@@ -45,6 +45,9 @@ internal static class GeoscapeTestScenes
     => GD.Load<PackedScene>("res://scenes/geoscape/resolutions/GeoscapeEventResolution.tscn")
       .Instantiate<GeoscapeEventResolution>();
 
+  public static BattleScene CreateBattleScene()
+    => GD.Load<PackedScene>("res://scenes/battle/BattleScene.tscn").Instantiate<BattleScene>();
+
   public static DialogueView CreateDialogueView()
     => GD.Load<PackedScene>("res://scenes/dialogue/DialogueView.tscn").Instantiate<DialogueView>();
 
@@ -86,6 +89,29 @@ internal static class GeoscapeTestScenes
       .AsValueEnumerable().OfType<Button>()
       .Single(button => button.Text.Contains(itemName));
 
+  public static Button SquadDeployButton(SquadLoadoutView view)
+    => view.GetNode<Button>("%DeployButton");
+
+  public static Label SquadDeploymentFailure(SquadLoadoutView view)
+    => view.GetNode<Label>("%DeploymentFailure");
+
+  public static Button DialogButton(GeoscapeEventResolution dialog, string text)
+    => dialog.GetNode<HBoxContainer>("%Buttons").GetChildren()
+      .AsValueEnumerable().OfType<Button>()
+      .Single(button => button.Text == text);
+
+  public static Button ReturnButton(BattleScene battle)
+    => battle.GetNode<Button>("BattleUI/BattleHud/VBox/ReturnButton");
+
+  public static EventPlaybackDirector Director(BattleScene battle)
+    => battle.GetNode<EventPlaybackDirector>("EventPlaybackDirector");
+
+  public static Label Clock(GeoscapeScene scene)
+    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Label>("%ClockLabel");
+
+  public static int AlertCount(GeoscapeScene scene)
+    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<VBoxContainer>("%Alerts").GetChildCount();
+
   // Integration shell for manager suites: an authored root under a manager whose
   // ViewChanged presents every pushed/popped view. It never Configures, Pushes, Pops, or
   // clears selection itself; callers drive the stack and own its assertions.
@@ -115,6 +141,14 @@ internal static class GeoscapeTestScenes
   // Press the actual marker so its EventClicked signal reaches the composition root.
   public static void OpenResolutionViaMapEvent(GeoscapeScene scene, int eventIndex = 0)
     => MapEventMarkers(scene)[eventIndex].EmitSignal(BaseButton.SignalName.Pressed);
+
+  // Drains the director's playback queue synchronously (instant v1 visuals only).
+  public static void DrainDirector(BattleScene battle)
+  {
+    EventPlaybackDirector director = Director(battle);
+    while (director.Busy)
+      director.Tick();
+  }
 
   public static Node3D AddBackdrop(GeoscapeView view, Node3D backdrop)
   {

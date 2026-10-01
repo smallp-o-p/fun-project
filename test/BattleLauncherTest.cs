@@ -31,6 +31,16 @@ public partial class BattleLauncherTest
     Assert.True(status.Text.Contains("HP"));
   }
 
+  [TestCase(TestName = "Standalone launch does not expose Return")]
+  public void StandaloneLaunchDoesNotExposeReturn()
+  {
+    var launcher = new BattleLauncher { BattleType = TestData.MakeDuelBattleType() };
+    AddToTree(launcher);
+
+    var battle = (BattleScene)launcher.GetChild(0);
+    Assert.False(battle.GetNode<Button>("BattleUI/BattleHud/VBox/ReturnButton").Visible);
+  }
+
   [TestCase(TestName = "Present guards against nulls")]
   public void PresentGuardsAgainstNulls()
   {

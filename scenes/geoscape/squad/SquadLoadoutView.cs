@@ -4,34 +4,42 @@ using FunProject.Combatants.Conditions;
 using FunProject.Strategic;
 using Godot;
 using System;
+using System.Collections.Generic;
 using FunProject.Scenes.Ext;
 using LanguageExt.UnsafeValueAccess;
 
 namespace FunProject.Geoscape;
 
 // Shared squad selection screen behind openers that configure it: mission preparation
-// (three editable slots, the mission's title, mission-scoped deployment eligibility) and
-// interrogation preparation (two slots, equipment editing disabled, a captive-targets
-// heading, unrestricted roster selection). Presentation only — the screen owns nothing but
-// a temporary slot selection over the roster's live combatant references and re-presents
-// from campaign truth on every activation, so equipment edits made in the nested UnitView
-// show up on return without this view caching anything. Deployment gates apply only while
-// an explicit mission context was configured; a generic configuration never infers one.
+// (mission-sized editable slots, the mission's title, mission-scoped deployment eligibility, a
+// Deploy launch intent) and interrogation preparation (two slots, equipment editing disabled, a
+// captive-targets heading, unrestricted roster selection, no launch context). Presentation only
+// — the screen owns nothing but a temporary slot selection over the roster's live combatant
+// references and re-presents from campaign truth on every activation, so equipment edits made
+// in the nested UnitView show up on return without this view caching anything. Deployment
+// gates apply only while an explicit mission context was configured; a generic configuration
+// never infers one. Deploy only emits the intent — session validation stays authoritative.
 // Back discards the slot selection; it never mutates campaign state.
 public sealed partial class SquadLoadoutView : GeoscapeView
 {
   [Export] public PackedScene? UnitViewScene { get; set; }
   [Export] public PackedScene? SquadSlotCardScene { get; set; }
 
-  // Bound by Configure (heading/policy) and Present (state/session); render paths assume
-  // both ran.
+  // Bound by Configure/ConfigureMission (heading/policy) and Present (state/session); render
+  // paths assume both ran.
   private CampaignGameState _state = null!;
   private GeoscapeSession _session = null!;
   private string _heading = null!;
   private bool _allowEquipmentEditing;
   private Option<GeoscapeEventDefinition> _mission;
+  private Option<GeoscapeEvent> _launchMission;
   private int? _choosingSlot;
   private Option<Combatant>[] _slots = [];
+
+  /// <summary>Raised from the Deploy button with the configured tactical launch context and
+  /// the current selection in slot order. A C# event: the payloads are domain objects, not
+  /// Variant-compatible Godot values.</summary>
+  public event Action<GeoscapeEvent, IReadOnlyList<Combatant>>? DeployRequested;
 
   public void Configure(string heading, uint capacity, bool allowEquipmentEditing,
     Option<GeoscapeEventDefinition> mission = default)
@@ -39,8 +47,28 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     _heading = heading;
     _allowEquipmentEditing = allowEquipmentEditing;
     _mission = mission;
+    _launchMission = None; // generic configurations never infer a launch context
     _choosingSlot = null;
     _slots = new Option<Combatant>[capacity];
+  }
+
+  // Mission preparation entry: the whole active event supplies heading, deployment gate, and
+  // the authored size capacity, and becomes the tactical launch context Deploy emits.
+  public void ConfigureMission(GeoscapeEvent mission)
+  {
+    ArgumentNullException.ThrowIfNull(mission);
+    TacticalMissionData contract = mission.Definition.TacticalMission
+      ?? throw new InvalidOperationException(
+        $"Event '{mission.Definition.Title}' carries no tactical mission contract.");
+    Configure(mission.Definition.Title, (uint)contract.Size.MaxPlayerUnits,
+      allowEquipmentEditing: true, mission: mission.Definition);
+    _launchMission = Some(mission);
+  }
+
+  public override void _Ready()
+  {
+    base._Ready();
+    GetNode<Button>("%DeployButton").Pressed += Deploy;
   }
 
   // Every activation re-presents from campaign truth under the configured heading,
@@ -65,8 +93,34 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     if (_mission.Case is GeoscapeEventDefinition { AllowUnfitDeployment: true })
       prompt += "\nExceptional deployment authorized — injured or exhausted units may join this mission.";
     GetNode<Label>("%SelectionPrompt").Text = prompt;
+
+    // Deploy exists only for a configured tactical launch context; session validation stays
+    // authoritative, an empty selection merely cannot emit the intent. A rebuild also clears
+    // the previous failure: the next attempt starts from fresh presentation state.
+    var deploy = GetNode<Button>("%DeployButton");
+    deploy.Visible = _launchMission.IsSome;
+    deploy.Disabled = GetSelectedCombatants().Count == 0;
+    GetNode<Label>("%DeploymentFailure").Visible = false;
+
     RebuildSlots();
     RebuildChoices();
+  }
+
+  // Emits the configured mission with the current selection; the opener validates.
+  private void Deploy()
+  {
+    _launchMission.IfSome(mission =>
+      DeployRequested?.Invoke(mission, GetSelectedCombatants()));
+  }
+
+  // Renders a typed session failure without dropping the selection, so the player can fix
+  // the squad and retry.
+  public void ShowDeploymentFailure(MissionLaunchFailure failure)
+  {
+    ArgumentNullException.ThrowIfNull(failure);
+    var label = GetNode<Label>("%DeploymentFailure");
+    label.Text = failure.Message;
+    label.Visible = true;
   }
 
   // The preparation boundary output: the original campaign combatants in slot order.

@@ -135,6 +135,12 @@ layout_mode = 2
 text = "Assigned or ineligible units cannot be chosen for this slot."
 autowrap_mode = 3
 
+[node name="DeploymentFailure" type="Label" parent="Content/Margin/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+autowrap_mode = 3
+
 [node name="Footer" type="HBoxContainer" parent="Content/Margin/Layout"]
 layout_mode = 2
 theme_override_constants/separation = 16
@@ -144,6 +150,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 40)
 layout_mode = 2
 text = "Back"
+
+[node name="DeployButton" type="Button" parent="Content/Margin/Layout/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+text = "Deploy"
+visible = false
 
 [node name="FooterNote" type="Label" parent="Content/Margin/Layout/Footer"]
 layout_mode = 2

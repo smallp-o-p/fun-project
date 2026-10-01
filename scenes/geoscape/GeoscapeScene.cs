@@ -1,9 +1,12 @@
+using FunProject.Combatants;
 using FunProject.Dialogue;
 using FunProject.GameState;
+using FunProject.Geoscape;
 using FunProject.Strategic;
 using CampaignGameState = global::FunProject.GameState.GameState;
 using Godot;
 using System;
+using System.Collections.Generic;
 
 // Composition root for the geoscape: builds the campaign GameState from the authored
 // CampaignStartData and the session over it, wires the authored map control (region
@@ -15,6 +18,7 @@ public partial class GeoscapeScene : Control
   [Export] public CampaignStartData? Start;
   [Export] public PackedScene? ResolutionViewScene { get; set; }
   [Export] public PackedScene? DialogueViewScene { get; set; }
+  [Export] public PackedScene? BattleScene { get; set; }
 
   private CampaignGameState _state = null!;
   private GeoscapeSession _session = null!;
@@ -23,6 +27,16 @@ public partial class GeoscapeScene : Control
   private PackedScene _resolutionViewScene = null!;
   private PackedScene _dialogueViewScene = null!;
   private GeoscapeViewManager _viewManager = null!;
+
+  // Live mission presentation: the launched handle, its battle host node, and the recorded
+  // view identities (preparation plus resolution dialog) that return cleanup removes.
+  private MissionBattle? _activeBattle;
+  private BattleScene? _battleHost;
+  private SquadLoadoutView? _deploySquad;
+  private GeoscapeView? _missionSquad;
+  private GeoscapeView? _missionDialog;
+  private GeoscapeView? _activeResolution;
+  private bool _suppressPresent;
 
   public override void _Ready()
   {
@@ -54,11 +68,12 @@ public partial class GeoscapeScene : Control
 
     _viewManager = GetNode<GeoscapeViewManager>("%ViewManager");
     // HUD buttons produce their views; their requests route through the permanent root so
-    // the manager only ever hears from stack members. ViewChanged presents the active
-    // view; the root is presented once here because the manager's _Ready (and its
+    // the manager only ever hears from stack members. ViewChanged presents the active view
+    // (suppressed during mission-view teardown) and manages the active squad's deploy
+    // subscription; the root is presented once here because the manager's _Ready (and its
     // install) ran before this subscription existed.
     _hud.ViewRequested += _viewManager.RootView.RequestView;
-    _viewManager.ViewChanged += view => view.Present(_state, _session);
+    _viewManager.ViewChanged += HandleViewChanged;
     _viewManager.RootView.Present(_state, _session);
   }
 
@@ -80,6 +95,25 @@ public partial class GeoscapeScene : Control
     var camera = new GeoscapeCameraRig { Name = "Camera" };
     viewport.AddChild(camera);
     camera.Setup(mapSize, new Rect2(new Vector2(0, top), new Vector2(viewportSize.X, bottom - top)));
+  }
+
+  // Presents the newly active view and keeps exactly the stack top's deploy intent bound:
+  // subscribing when a squad becomes current and detaching when it is covered or popped.
+  private void HandleViewChanged(GeoscapeView view)
+  {
+    if (_deploySquad is { } bound && !ReferenceEquals(bound, view))
+    {
+      bound.DeployRequested -= DeployMission;
+      _deploySquad = null;
+    }
+    if (!_suppressPresent)
+      view.Present(_state, _session);
+    if (view is SquadLoadoutView squad && !ReferenceEquals(_deploySquad, squad))
+    {
+      squad.DeployRequested += DeployMission;
+      _deploySquad = squad;
+    }
+  }
   }
 
   // Construction hook for derived scenes (debug playtests): the state exists before the
@@ -115,12 +149,15 @@ public partial class GeoscapeScene : Control
       case ResolutionEventOpened opened:
         var resolution = InstantiateResolutionView();
         resolution.Resolved += _session.CompleteResolution;
+        _activeResolution = resolution;
         _viewManager.Push(resolution); // ViewChanged presents from the now-pending session state
         PushEventDialogue(opened.Pending);
         break;
       case ResolutionEventClosed:
         // The dialog's buttons are the only close path, so it is the stack top here; the
-        // type check keeps a stray close from popping an innocent view.
+        // type check keeps a stray close from popping an innocent view. Cleared before the
+        // refresh work so a throwing refresh cannot strand the stale identity.
+        _activeResolution = null;
         if (_viewManager.Current is GeoscapeEventResolution)
           _viewManager.Pop();
         _map.RefreshEvents();
@@ -161,5 +198,144 @@ public partial class GeoscapeScene : Control
   {
     if (_session.PendingResolution.IsNone)
       _session.OpenResolution(active);
+  }
+
+  // ---- Mission battle handoff ---------------------------------------------------------
+
+  // The active preparation's launch intent: instantiate and validate the battle root before
+  // the session launch so authoring faults never reach it, then hand the runtime to a live
+  // host and cover the geoscape stack. Failures restore preparation and propagate.
+  private void DeployMission(GeoscapeEvent mission, IReadOnlyList<Combatant> squad)
+  {
+    ArgumentNullException.ThrowIfNull(mission);
+    ArgumentNullException.ThrowIfNull(squad);
+    if (_activeBattle is not null)
+      throw new InvalidOperationException("A mission battle is already presented.");
+
+    // Read at deploy time (like the dialog's SquadViewScene): a substituted export must be
+    // honored, and the root is instantiated and validated before the session launch so
+    // authoring faults never reach it.
+    PackedScene battleSceneExport = BattleScene ?? throw new InvalidOperationException(
+      "GeoscapeScene requires a BattleScene export; assign one in the inspector.");
+    BattleScene battle = InstantiateRoot<BattleScene>(battleSceneExport, "BattleScene");
+    var launch = _session.LaunchMission(mission, squad);
+    if (launch.IsLeft)
+    {
+      battle.Free(); // no runtime exists; the preparation stays for a corrected retry
+      MissionLaunchFailure failure = launch.Match(
+        Right: _ => throw new InvalidOperationException("Expected a launch failure."),
+        Left: value => value);
+      (_deploySquad ?? throw new InvalidOperationException(
+          "Deploy intent arrived with no active preparation."))
+        .ShowDeploymentFailure(failure);
+      return;
+    }
+    MissionBattle handle = launch.Match(
+      Right: value => value,
+      Left: _ => throw new InvalidOperationException("Expected a launched mission battle."));
+
+    // Recorded for return cleanup: the mission's preparation and its resolution dialog.
+    _missionSquad = _deploySquad;
+    _missionDialog = _activeResolution;
+    try
+    {
+      // Prebinding: the runtime still belongs to this scene.
+      battle.Present(handle.Runtime, handle.Setup, allowReturn: true);
+    }
+    catch
+    {
+      battle.Free();
+      _session.AbortMissionPresentation(handle);
+      _missionSquad = null;
+      _missionDialog = null;
+      throw;
+    }
+
+    // The host owns the runtime from here on.
+    battle.ReturnRequested += HandleBattleReturn;
+    try
+    {
+      AddChild(battle); // sibling of the view manager: hiding that never disables the battle
+      _battleHost = battle;
+      _activeBattle = handle;
+      _viewManager.Hide();
+      _viewManager.ProcessMode = ProcessModeEnum.Disabled;
+    }
+    catch
+    {
+      battle.ReturnRequested -= HandleBattleReturn;
+      if (battle.IsInsideTree())
+        RemoveChild(battle); // synchronous tree exit disposes the host-owned runtime
+      battle.QueueFree();
+      _session.AbortMissionPresentation(handle);
+      _battleHost = null;
+      _missionSquad = null;
+      _missionDialog = null;
+      throw;
+    }
+  }
+
+  // The presented battle's return intent. CompleteMission consumes the association and
+  // clears it before its first broadcast, so consumption — not a normal return — decides
+  // the teardown: a subscriber failure after that commit still restores the geoscape (the
+  // exception keeps propagating), while an earlier failure (no terminal return, wrong
+  // handle) leaves the host live for a retry.
+  private void HandleBattleReturn()
+  {
+    MissionBattle battle = _activeBattle
+      ?? throw new InvalidOperationException("Return intent arrived with no active mission battle.");
+    try
+    {
+      _session.CompleteMission(battle);
+    }
+    finally
+    {
+      bool stillAssociated = _session.ActiveMission.Match(
+        active => ReferenceEquals(active, battle.Deployment),
+        () => false);
+      if (!stillAssociated)
+        RestoreAfterReturn();
+    }
+  }
+
+  private void RestoreAfterReturn()
+  {
+    _activeBattle = null;
+    BattleScene? host = _battleHost;
+    _battleHost = null;
+    if (host is null)
+      return;
+
+    host.ReturnRequested -= HandleBattleReturn;
+    if (host.IsInsideTree())
+      RemoveChild(host); // synchronous tree exit releases the owned runtime before any replay
+    host.QueueFree();
+
+    _viewManager.Show();
+    _viewManager.ProcessMode = ProcessModeEnum.Inherit;
+    PopMissionViews();
+  }
+
+  // Removes only the recorded mission views, top to bottom, without re-presenting any of
+  // them (the retained dialog cannot re-present once the pending mission was consumed);
+  // the root is presented exactly once after cleanup.
+  private void PopMissionViews()
+  {
+    _suppressPresent = true;
+    try
+    {
+      if (_missionSquad is not null && ReferenceEquals(_viewManager.Current, _missionSquad))
+        _viewManager.Pop();
+      if (_missionDialog is not null && ReferenceEquals(_viewManager.Current, _missionDialog))
+        _viewManager.Pop();
+    }
+    finally
+    {
+      _suppressPresent = false;
+    }
+    _missionSquad = null;
+    _missionDialog = null;
+    _activeResolution = null;
+    _viewManager.RootView.Present(_state, _session);
   }
 }

@@ -79,6 +79,24 @@ public partial class BattleUITest
     Assert.Equal("65%", hitChance.Text);
   }
 
+  [TestCase(TestName = "Return availability toggles the button and forwards the intent")]
+  public void ReturnAvailabilityForwardsIntent()
+  {
+    var view = BuildView();
+    int returns = 0;
+    view.ReturnRequested += () => returns++;
+    var button = view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ReturnButton");
+
+    Assert.False(button.Visible); // authored default hides the return intent
+    view.ShowReturn(true);
+    Assert.True(button.Visible);
+    button.EmitSignal(Button.SignalName.Pressed);
+    Assert.Equal(1, returns);
+
+    view.ShowReturn(false);
+    Assert.False(button.Visible);
+  }
+
   [TestCase(TestName = "HUD intents re-raise through the BattleUI root")]
   public void HudIntentsRaiseThroughRoot()
   {
