@@ -293,9 +293,9 @@ public partial class GeoscapeScene : Control
     }
     finally
     {
-      bool consumed = _session.ActiveMission.Match(
+      bool stillAssociated = _session.ActiveMission.Match(
         active => ReferenceEquals(active, battle.Deployment), () => false);
-      if (associated && !consumed)
+      if (associated && !stillAssociated)
         RestoreAfterReturn();
     }
   }

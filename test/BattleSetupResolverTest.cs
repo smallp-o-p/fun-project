@@ -479,7 +479,7 @@ public class BattleSetupResolverTest
     }
   }
 
-  [TestCase(TestName = "Generated ordinary draws span the pool and the count range across seeds 7 and -7")]
+  [TestCase(TestName = "Generated ordinary draws span the pool and the count range across seeds 1 through 32")]
   public void GeneratedOrdinaryDrawsSpanPoolAndCountAcrossSeeds()
   {
     var type = MissionStageType();
@@ -491,7 +491,7 @@ public class BattleSetupResolverTest
 
     var names = new SysColGeneric.HashSet<string>();
     var counts = new SysColGeneric.HashSet<int>();
-    foreach (int seed in new[] { 7, -7 })
+    for (int seed = 1; seed <= 32; seed++)
     {
       SideDeployment force = MissionEnemyResolver.Resolve(mission, seed);
       counts.Add(force.Loadouts.Count);
@@ -500,9 +500,9 @@ public class BattleSetupResolverTest
     }
 
     Assert.True(names.Contains("Grunt") && names.Contains("Heavy"),
-      $"Expected both pool entries across seeds 7/-7, saw [{string.Join(", ", names)}].");
+      $"Expected both pool entries across seeds 1..32, saw [{string.Join(", ", names)}].");
     Assert.True(counts.Count >= 2,
-      $"Expected divergent ordinary counts across seeds 7/-7, saw [{string.Join(", ", counts)}].");
+      $"Expected divergent ordinary counts across seeds 1..32, saw [{string.Join(", ", counts)}].");
     foreach (int count in counts)
       Assert.True(count >= 2 && count <= 4, $"Ordinary count {count} outside [2, 4].");
   }

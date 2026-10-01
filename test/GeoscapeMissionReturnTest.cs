@@ -96,9 +96,9 @@ public class GeoscapeMissionReturnTest
       Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier);
       Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier);
       Assert.True(campaign.State.Conditions.GetInjury(beta).IsNone,
-        "A stun-only return injures nobody.");
+        "An undamaged survivor is never injured.");
       Assert.Equal(1, campaign.State.Conditions.GetFatigue(beta).RequireSome().Tier,
-        "Unconscious survivors earn fatigue like any survivor.");
+        "Undamaged survivors earn fatigue like any survivor.");
       Assert.True(campaign.State.Conditions.GetInjury(gamma).IsNone);
       Assert.True(campaign.State.Conditions.GetFatigue(gamma).IsNone);
       Assert.Equal(3, campaign.State.Roster.Count, "Survivors and nonparticipants stay on the roster.");
@@ -137,7 +137,10 @@ public class GeoscapeMissionReturnTest
     var mission = campaign.ActiveEvent;
     var alpha = campaign.State.Roster[0];
     var gamma = campaign.State.Roster[2];
-    campaign.ReturnFromMission((alpha, 0, 0));
+    campaign.ReturnFromMission((alpha, 25, 0));
+    Assert.True(campaign.State.Conditions.GetInjury(alpha).IsSome,
+      "The seeding return left an active injury behind.");
+    mission.Definition.AllowUnfitDeployment = true;
     var weapon = MakeWeapon("Service Blade");
     alpha.EquipWeapon(weapon);
     campaign.OpenResolution(mission);
