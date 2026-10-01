@@ -285,9 +285,10 @@ public partial class UnitActionCacheTest
   [TestCase]
   public void BuffClampIncapacitatesUnselectedUnitAndUpdatesRetainedOptions()
   {
-    // Collapse halves max health (20 -> 10) while the support is stunned to 15: the flip
-    // itself pushes current health across the stun threshold, so the knockout is the
-    // clamp's reconciliation, not a damage outcome.
+    // Collapse halves max health (20 -> 10) while the support is stunned to 15: the stun
+    // lands after its faction's round-1 turn end, so no recovery precedes the flip, and the
+    // clamp itself pushes current health across the un-reduced stun threshold — the knockout
+    // is the clamp's reconciliation, not a damage outcome.
     var collapse = TestData.MakeBuff(
       "Collapse",
       new ActiveOnRound { Round = 2 },
@@ -306,6 +307,7 @@ public partial class UnitActionCacheTest
     Assert.True(move.IsAvailable);
     Assert.True(endTurn.IsAvailable);
 
+    battle.AdvanceTurn(); // round 1: enemy turn — the support's own faction turn end precedes its stun
     battle.ApplyDamage(support, 15, DamageKind.Stun);
     Assert.False(support.IsIncapacitated);
     BattleBoardState.ValidatedPoint exclusiveTile = battle.At(new Vector3I(4, 0, 1));
@@ -317,6 +319,7 @@ public partial class UnitActionCacheTest
       if (battleEvent is not UnitBuffActivatedBattleEvent activated || activated.Unit != support)
         return;
       clampedAtBuffEvent = true;
+      Assert.Equal(15, support.CurrentStun); // the un-reduced stun the scenario describes
       Assert.Equal(10, support.CurrentHealth);
       Assert.True(support.IsUnconscious);
       Assert.False(move.IsAvailable);
@@ -324,7 +327,6 @@ public partial class UnitActionCacheTest
       Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile)));
     });
 
-    battle.AdvanceTurn(); // round 1: enemy turn, buff still inactive
     battle.AdvanceTurn(); // round 2: the player's turn starts and Collapse activates
 
     Assert.True(clampedAtBuffEvent);

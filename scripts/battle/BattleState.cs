@@ -106,6 +106,21 @@ internal sealed class BattleState
 
   internal event Action<BattleEvent> Committed = delegate { };
 
+  // Buff flips evaluated by running hooks (turn start/spawn) raise through here: while an
+  // outer dispatch is already running, RaiseEvents would only enqueue, leaving the flip's
+  // pending visibility unresolved until the queue drains — the next grant's condition read
+  // in the same pass would see stale visible/explored sets. Enqueue first (the grant's event
+  // precedes any first spots it discovers), resolve pending visibility through the ordinary
+  // refresh-and-queue pass, then dispatch when allowed; while already dispatching this
+  // returns and the outer loop drains everything in FIFO order.
+  internal void RaiseBuffEvent(BattleEvent battleEvent)
+  {
+    ArgumentNullException.ThrowIfNull(battleEvent);
+    _eventDispatchQueue.Enqueue(battleEvent);
+    RefreshVisibilityAndQueueSpottings();
+    DispatchQueuedEvents();
+  }
+
   private void DispatchQueuedEvents()
   {
     if (_isDispatchingEvents)

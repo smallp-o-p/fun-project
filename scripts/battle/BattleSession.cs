@@ -360,11 +360,12 @@ public sealed class BattleSession
 
   // Per-grant buff reconciliation at the running mutation boundary, invoked before that
   // grant's buff event dispatches: a flip can change the unit's vision contribution or
-  // clamp its health across the stun threshold. The unit is marked so the next dispatch
-  // (the buff event's own one, or the unconscious event below) refreshes visibility and
-  // queues genuine first spots before broadcasting; a new knockout consumes scheduler
-  // availability, emits the genuine unconscious transition with no damage cause, and runs
-  // the shared loss/objective policy. No fabricated damage or kill credit.
+  // clamp its health across the stun threshold. The unit is marked and the flip's buff
+  // event resolves the mark through the state's buff-event path, so pending visibility and
+  // genuine first spots resolve even while broadcasts are deferred and the next grant's
+  // condition read is fresh; a new knockout consumes scheduler availability, emits the
+  // genuine unconscious transition with no damage cause, and runs the shared
+  // loss/objective policy. No fabricated damage or kill credit.
   internal void ReconcileBuffFlip(BattleUnitState unit, bool wasConscious)
   {
     ArgumentNullException.ThrowIfNull(unit);

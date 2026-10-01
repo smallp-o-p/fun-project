@@ -22,6 +22,16 @@ public partial class BuffBattleTest
       context.RunningSession.Match(session => session.RoundNumber == Round, () => false);
   }
 
+  // Supported-condition boundary: reads the ordinary visibility query for an authored tile.
+  private sealed partial class TileVisibleCondition : BuffCondition
+  {
+    public Vector3I Tile { get; set; }
+
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
+      context.Query(new IsTileVisibleToFaction(
+        unit.Side, context.State.Board.ValidatePoint(Tile).RequireSome()));
+  }
+
   [TestCase(TestName = "A buff whose condition already holds activates at spawn, after UnitAdded")]
   public void SpawnEvaluatesBuffs()
   {
@@ -173,6 +183,48 @@ public partial class BuffBattleTest
     Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, tile)));
     Assert.True(battle.Query(new HasFactionExploredTile(playerFaction, tile)));
     Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+    Assert.Equal(1, MatchingSpottings(battle, observer, target));
+  }
+
+  [TestCase(TestName = "A later grant's condition reads the visibility the first grant's flip refreshed, activating in the same turn-start pass")]
+  public void LaterGrantConditionSeesFirstGrantVisibility()
+  {
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    // Grant order matters: EagleEye activates first (+2 vision at round 2), then KeenEye's
+    // supported condition queries the tile two cells away — visible only once EagleEye's
+    // flip refreshed visibility — and gates its aim contribution on it.
+    var eagleEye = TestData.MakeBuff(
+      "EagleEye",
+      new ActiveOnRound { Round = 2 },
+      statMods: [new VisionStatMod { Modifiers = [StatModifier.Add(2)] }]);
+    var keenEye = TestData.MakeBuff(
+      "KeenEye",
+      new TileVisibleCondition { Tile = new Vector3I(2, 0, 2) },
+      statMods: [new AimStatMod { Modifiers = [StatModifier.Add(10)] }]);
+    using var battle = new BattleFixture(new Vector3I(6, 1, 3), [playerFaction, enemyFaction]);
+    // Lone player observer: no conscious teammate already covers the far tile.
+    var observer = battle.Spawn(
+      TestData.MakeCombatant("Scout", playerFaction, vision: 1, aim: 65, buffs: [eagleEye, keenEye]),
+      new Vector3I(2, 0, 0));
+    var target = battle.Spawn(TestData.MakeCombatant("Watcher", enemyFaction, vision: 1), new Vector3I(2, 0, 2));
+    battle.Start();
+    battle.ClearEvents();
+
+    battle.AdvanceTurn(); // round 1: enemy turn, both grants inactive
+    battle.AdvanceTurn(); // round 2: the scout's turn starts and both grants activate in one pass
+
+    Assert.Equal(2, battle.Events.EventsOf<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(2, observer.ActiveBuffs.AsValueEnumerable().Count());
+    Assert.Equal(75f, observer.EffectiveStat<AimStat>()); // the second grant's gated contribution is live
+
+    battle.AdvanceTurn(); // round 2: enemy turn, both grants stay active
+    battle.AdvanceTurn(); // round 3: the scout's turn starts and both grants deactivate in one pass
+
+    Assert.Equal(2, battle.Events.EventsOf<UnitBuffDeactivatedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(0, observer.ActiveBuffs.AsValueEnumerable().Count());
+    Assert.Equal(65f, observer.EffectiveStat<AimStat>());
+    battle.Events.EventBefore<UnitBuffActivatedBattleEvent, UnitSpottedBattleEvent>();
     Assert.Equal(1, MatchingSpottings(battle, observer, target));
   }
 

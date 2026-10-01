@@ -19,6 +19,18 @@ public partial class BattleOutcomeTest
       context.RunningSession.Match(session => session.RoundNumber == Round, () => false);
   }
 
+  // Turn-start evaluation runs for every unit at every turn start; this gate restricts a
+  // grant to the owning faction's own turn so a stun landed mid-round cannot be recovered
+  // before the flip at that faction's next turn start.
+  private sealed partial class ActiveOnFactionRound : FunProject.Buffs.BuffCondition
+  {
+    public int Round { get; set; }
+
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
+      context.RunningSession.Match(
+        session => session.RoundNumber == Round && session.ActiveFaction == unit.Side, () => false);
+  }
+
   [TestCase(false, BattleOutcome.Victory, TestName = "Knocking out the last enemy wins the battle")]
   [TestCase(true, BattleOutcome.Defeat, TestName = "Knocking out the last player unit loses the battle")]
   public void LastConsciousUnitKnockoutEndsTheBattle(bool playerWiped, BattleOutcome expected)
@@ -153,8 +165,9 @@ public partial class BattleOutcomeTest
   public void BuffClampKnockoutOfFinalConsciousPlayerResolvesDefeat()
   {
     // Collapse halves max health (20 -> 10) at the round-2 turn start while the player is
-    // stunned to 15: the flip itself knocks the last conscious player unit out, so the
-    // player-wipe backstop owns the defeat — no damage cause and no kill event exist.
+    // stunned to 15: the stun lands after the player's round-1 turn end, so no recovery
+    // precedes the flip, and the flip itself knocks the last conscious player unit out —
+    // the player-wipe backstop owns the defeat: no damage cause and no kill event exist.
     var collapse = TestData.MakeBuff(
       "Collapse",
       new ActiveOnRound { Round = 2 },
@@ -163,13 +176,20 @@ public partial class BattleOutcomeTest
       playerControlled: true,
       player: new("Alpha", Buffs: [collapse]));
     battle.ClearEvents();
-
-    battle.ApplyDamage(battle.PlayerUnit, 15, DamageKind.Stun);
-    Assert.False(battle.PlayerUnit.IsUnconscious);
+    int stunAtActivation = -1;
+    battle.OnCommitted(battleEvent =>
+    {
+      if (battleEvent is UnitBuffActivatedBattleEvent activated)
+        stunAtActivation = activated.Unit.CurrentStun;
+    });
 
     battle.AdvanceTurn(); // round 1: enemy turn, buff still inactive
+    battle.ApplyDamage(battle.PlayerUnit, 15, DamageKind.Stun); // after the player's round-1 turn end: recovery cannot precede the flip
+    Assert.False(battle.PlayerUnit.IsUnconscious);
+
     battle.AdvanceTurn(); // round 2: the player's turn starts and Collapse activates
 
+    Assert.Equal(15, stunAtActivation);
     Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
     battle.Events.EventBefore<UnitUnconsciousBattleEvent, SessionEndedBattleEvent>();
@@ -181,24 +201,34 @@ public partial class BattleOutcomeTest
   [TestCase(TestName = "A final conscious opponent knocked out by a buff clamp drives the elimination objective")]
   public void BuffClampKnockoutOfFinalConsciousOpponentResolvesVictory()
   {
-    // The enemy carries the clamp buff: its genuine UnitUnconscious notification at the
-    // round-2 turn start completes the player's elimination objective and ends the battle,
-    // instead of leaving combat running until an unrelated later event.
+    // The enemy carries the clamp buff gated to its own round-2 turn: its round-1 turn end
+    // runs first, the stun lands after it, and the round-2 turn-start clamp knocks the last
+    // conscious enemy out — its genuine UnitUnconscious notification completes the player's
+    // elimination objective and ends the battle, instead of leaving combat running until an
+    // unrelated later event.
     var collapse = TestData.MakeBuff(
       "Collapse",
-      new ActiveOnRound { Round = 2 },
+      new ActiveOnFactionRound { Round = 2 },
       statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-10)] }]);
     using var battle = BattleFixture.Duel(
       playerControlled: true,
       enemy: new("Hostile", Buffs: [collapse]));
     battle.ClearEvents();
+    int stunAtActivation = -1;
+    battle.OnCommitted(battleEvent =>
+    {
+      if (battleEvent is UnitBuffActivatedBattleEvent activated)
+        stunAtActivation = activated.Unit.CurrentStun;
+    });
 
-    battle.ApplyDamage(battle.EnemyUnit, 15, DamageKind.Stun);
+    battle.AdvanceTurn(); // round 1: the enemy's own turn starts with the buff inactive
+    battle.AdvanceTurn(); // the enemy's round-1 turn ends (recovery runs at stun 0); round 2: the player's turn starts — the own-turn gate keeps the buff inactive
+    battle.ApplyDamage(battle.EnemyUnit, 15, DamageKind.Stun); // after the enemy's round-1 turn end: recovery cannot precede the flip
     Assert.False(battle.EnemyUnit.IsUnconscious);
 
-    battle.AdvanceTurn(); // round 1: enemy turn, buff still inactive
-    battle.AdvanceTurn(); // round 2: the player's turn starts and Collapse activates
+    battle.AdvanceTurn(); // round 2: the enemy's own turn starts and Collapse activates
 
+    Assert.Equal(15, stunAtActivation);
     Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
     battle.Events.EventBefore<UnitUnconsciousBattleEvent, SessionEndedBattleEvent>();

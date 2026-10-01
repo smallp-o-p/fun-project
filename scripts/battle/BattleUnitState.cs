@@ -238,10 +238,11 @@ public sealed class BattleUnitState
     CurrentHealth = Math.Min(CurrentHealth, Math.Max(MaxHealth, 1));
   }
 
-  // Evaluates every grant in source order; each flip completes its flag update, health
-  // clamp, and event before the next grant is evaluated. The owning preparation/running
-  // path receives (unit, prior consciousness) after each flip+clamp so it can reconcile
-  // visibility and scheduling BEFORE that grant's buff event broadcasts.
+  // Evaluates every grant in source order; each grant completes its flag update, health
+  // clamp, owner reconciliation, and event enqueue before the next grant is evaluated —
+  // the buff-event path resolves pending visibility before returning, so the next grant's
+  // condition reads the reconciled world. Notification itself may remain deferred while an
+  // outer dispatch runs (the shared dispatcher broadcasts in FIFO order).
   internal void EvaluateBuffs(BattleReadContext context, Action<BattleUnitState, bool> onChanged)
   {
     ArgumentNullException.ThrowIfNull(onChanged);
@@ -257,7 +258,7 @@ public sealed class BattleUnitState
 
       ClampCurrentHealthToMax();
       onChanged(this, wasConscious);
-      context.State.RaiseEvents(isActive
+      context.State.RaiseBuffEvent(isActive
         ? new UnitBuffActivatedBattleEvent(this, buff)
         : new UnitBuffDeactivatedBattleEvent(this, buff));
     }

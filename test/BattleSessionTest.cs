@@ -524,28 +524,15 @@ public partial class BattleSessionTest
     Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable().Count());
   }
 
-  [TestCase(DamageKind.Health, TestName = "Preparation rejects a wholly dead side with the typed NoConsciousUnits reason")]
-  [TestCase(DamageKind.Stun, TestName = "Preparation rejects a wholly unconscious side with the typed NoConsciousUnits reason")]
-  public void PreparationRejectsSidesWithNoConsciousUnits(DamageKind kind)
+  [TestCase(TestName = "Preparation rejects a wholly dead side with the typed NoConsciousUnits reason")]
+  public void PreparationRejectsWhollyDeadSide()
   {
     var faction = TestData.MakeFaction("Player");
     var preparation = new BattlePreparation(new BattleBoardState(new Vector3I(3, 1, 1)), [faction]);
     var unit = preparation.AddUnit(
       TestData.MakeCombatant("Solo", faction, health: 20),
       preparation.State.Board.At(0, 0, 0), None, None);
-    switch (kind)
-    {
-      case DamageKind.Health:
-        unit.ReceiveDamage(999);
-        break;
-      case DamageKind.Stun:
-        // The fixture-owned preset path: an unconscious body stays occupied but leaves
-        // its side without conscious forces, so Complete must still reject it.
-        unit.ReceiveStun(20);
-        break;
-      default:
-        throw new ArgumentOutOfRangeException(nameof(kind));
-    }
+    unit.ReceiveDamage(999);
 
     Either<BattleSetupFailure, BattleState> outcome = preparation.Complete();
 
@@ -554,6 +541,46 @@ public partial class BattleSessionTest
     {
       Assert.Equal(BattleSetupFailureReason.NoConsciousUnits, failure.Reason);
       Assert.True(failure.Message.Contains("Player"));
+    });
+  }
+
+  [TestCase(TestName = "Preparation rejects a side its spawn-time max-health clamp knocked out, naming it and keeping the other side valid")]
+  public void PreparationRejectsClampKnockedOutSide()
+  {
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    var collapse = TestData.MakeBuff(
+      "Collapse",
+      new HealthBelowPercentCondition { Percent = 200f }, // current < 2*max: always true
+      statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-10)] }]);
+    var preparation = new BattlePreparation(new BattleBoardState(new Vector3I(3, 1, 1)),
+      [playerFaction, enemyFaction]);
+    var unit = preparation.AddUnit(
+      TestData.MakeCombatant("Solo", playerFaction, health: 20, buffs: [collapse]),
+      preparation.State.Board.At(0, 0, 0), None, None);
+    Assert.Equal(10, unit.MaxHealth); // the initially active grant clamped current health at spawn
+    Assert.Equal(10, unit.CurrentHealth);
+
+    // Fixture-owned preset shape: raw stun through the unit, then the shared participant
+    // reconciliation (occupancy retained, disabled visibility resolved) before Complete checks.
+    unit.ReceiveStun(15);
+    preparation.ReconcileParticipant(unit);
+    Assert.Equal(15, unit.CurrentStun);
+    Assert.True(unit.IsUnconscious);
+
+    var rival = preparation.AddUnit(
+      TestData.MakeCombatant("Rival", enemyFaction),
+      preparation.State.Board.At(2, 0, 0), None, None);
+    Assert.False(rival.IsUnconscious);
+
+    Either<BattleSetupFailure, BattleState> outcome = preparation.Complete();
+
+    Assert.True(outcome.IsLeft);
+    outcome.IfLeft(failure =>
+    {
+      Assert.Equal(BattleSetupFailureReason.NoConsciousUnits, failure.Reason);
+      Assert.True(failure.Message.Contains("Player"));
+      Assert.False(failure.Message.Contains("Enemy"));
     });
   }
 

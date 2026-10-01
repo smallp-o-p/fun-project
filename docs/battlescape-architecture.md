@@ -291,10 +291,12 @@ The current built-in authoritative actions are:
 - `PassUnit`
 - `EndFactionTurn`
 
-Actions execute through the runtime, which owns the session's single executor (runtime construction belongs to the factory owner; there is no public runtime or receiver constructor):
+Actions execute through the runtime, which owns the session's single executor (runtime construction belongs to the factory owner; there is no public runtime or receiver constructor). `BattleFactory.Start` returns `Either<BattleSetupFailure, BattleRuntime>`: unwrap it before submitting, and keep the actual runtime (it is `IDisposable`) for the battle's lifetime:
 
 ```csharp
-var runtime = BattleFactory.Start(battleType);
+using BattleRuntime runtime = BattleFactory.Start(battleType).Match(
+  Right: started => started,
+  Left: failure => throw new InvalidOperationException($"Battle start failed: {failure.Message}"));
 var result = runtime.ExecuteAction(BattleAction.MoveUnit(unit, [destination]));
 ```
 
