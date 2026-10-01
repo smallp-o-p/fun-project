@@ -20,6 +20,9 @@ public partial class GeoscapeScene : Control
   private GeoscapeSession _session = null!;
   private GeoscapeMapControl _map = null!;
   private GeoscapeCameraRig _camera = null!;
+  private Viewport _mapViewport = null!;
+  private SubViewportContainer _mapViewportContainer = null!;
+  private Control _bottomHud = null!;
   private GeoscapeHud _hud = null!;
   private PackedScene _resolutionViewScene = null!;
   private PackedScene _dialogueViewScene = null!;
@@ -39,18 +42,23 @@ public partial class GeoscapeScene : Control
     _map = GetNode<GeoscapeMapControl>("%Map");
     _map.Setup(_session, start.Map.Size);
 
-    // The camera lives inside the map's own SubViewport so its transform never reaches
-    // other screens. Setup runs now: the stretched viewport is sized on tree entry,
-    // before this (parent) _Ready.
+    // The camera stays in the full map SubViewport so it never transforms other
+    // screens. Its framing excludes the actual bottom HUD bounds in viewport space.
+    _hud = GetNode<GeoscapeHud>("%GeoscapeHud");
+    _bottomHud = _hud.GetNode<Control>("BottomBar");
+    _mapViewport = _map.GetViewport();
+    _mapViewportContainer = (SubViewportContainer)_mapViewport.GetParent();
     _camera = new GeoscapeCameraRig { Name = "Camera" };
-    _map.GetViewport().AddChild(_camera);
+    _mapViewport.AddChild(_camera);
     _camera.Setup(start.Map.Size); // authored map bounds are a presentation concern
+    _mapViewport.SizeChanged += ReframeMapCamera;
+    _bottomHud.ItemRectChanged += ReframeMapCamera;
+    ReframeMapCamera();
 
     _map.RegionClicked += region => GD.Print(region.FlavorText);
 
     _session.EventCommitted += HandleSessionEvent;
 
-    _hud = GetNode<GeoscapeHud>("%GeoscapeHud");
     _hud.ChangeSpeed += _session.ChangeSpeed;
     _hud.ResolutionRequested += OpenResolution;
     _map.EventClicked += adapter => OpenResolution(adapter.Event);
@@ -65,6 +73,30 @@ public partial class GeoscapeScene : Control
     _hud.ViewRequested += _viewManager.RootView.RequestView;
     _viewManager.ViewChanged += view => view.Present(_state, _session);
     _viewManager.RootView.Present(_state, _session);
+  }
+
+  public override void _ExitTree()
+  {
+    if (IsInstanceValid(_mapViewport))
+      _mapViewport.SizeChanged -= ReframeMapCamera;
+    if (IsInstanceValid(_bottomHud))
+      _bottomHud.ItemRectChanged -= ReframeMapCamera;
+  }
+
+  private void ReframeMapCamera()
+  {
+    if (!_camera.IsInsideTree() || _mapViewportContainer.Size.Y <= 0)
+      return;
+
+    // Both HUD and container are in the outer canvas; convert to container-local
+    // coordinates before accounting for the inner viewport's render size. This keeps
+    // root content scaling and SubViewport stretch out of the camera's world math.
+    Vector2 hudTop = _mapViewportContainer.GetGlobalTransformWithCanvas().AffineInverse()
+      * _bottomHud.GetGlobalTransformWithCanvas().Origin;
+    Vector2 viewportSize = _mapViewport.GetVisibleRect().Size;
+    float usableHeight = Mathf.Clamp(
+      hudTop.Y * viewportSize.Y / _mapViewportContainer.Size.Y, 0, viewportSize.Y);
+    _camera.FitToArea(new Rect2(Vector2.Zero, new Vector2(viewportSize.X, usableHeight)));
   }
 
   // Construction hook for derived scenes (debug playtests): the state exists before the
