@@ -238,8 +238,13 @@ public sealed class BattleUnitState
     CurrentHealth = Math.Min(CurrentHealth, Math.Max(MaxHealth, 1));
   }
 
-  internal void EvaluateBuffs(BattleReadContext context)
+  // Evaluates every grant in source order; each flip completes its flag update, health
+  // clamp, and event before the next grant is evaluated. The owning preparation/running
+  // path receives (unit, prior consciousness) after each flip+clamp so it can reconcile
+  // visibility and scheduling BEFORE that grant's buff event broadcasts.
+  internal void EvaluateBuffs(BattleReadContext context, Action<BattleUnitState, bool> onChanged)
   {
+    ArgumentNullException.ThrowIfNull(onChanged);
     for (int i = 0; i < _buffs.Count; i++)
     {
       (Buff buff, bool wasActive) = _buffs[i];
@@ -247,8 +252,11 @@ public sealed class BattleUnitState
       if (isActive == wasActive)
         continue;
 
+      bool wasConscious = !IsUnconscious;
       _buffs[i] = (buff, isActive);
+
       ClampCurrentHealthToMax();
+      onChanged(this, wasConscious);
       context.State.RaiseEvents(isActive
         ? new UnitBuffActivatedBattleEvent(this, buff)
         : new UnitBuffDeactivatedBattleEvent(this, buff));

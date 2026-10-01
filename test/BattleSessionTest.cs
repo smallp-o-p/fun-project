@@ -524,15 +524,28 @@ public partial class BattleSessionTest
     Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable().Count());
   }
 
-  [TestCase(TestName = "Preparation rejects a wholly dead side with the typed NoConsciousUnits reason")]
-  public void PreparationRejectsWhollyDeadSidesWithTypedReason()
+  [TestCase(DamageKind.Health, TestName = "Preparation rejects a wholly dead side with the typed NoConsciousUnits reason")]
+  [TestCase(DamageKind.Stun, TestName = "Preparation rejects a wholly unconscious side with the typed NoConsciousUnits reason")]
+  public void PreparationRejectsSidesWithNoConsciousUnits(DamageKind kind)
   {
     var faction = TestData.MakeFaction("Player");
     var preparation = new BattlePreparation(new BattleBoardState(new Vector3I(3, 1, 1)), [faction]);
     var unit = preparation.AddUnit(
       TestData.MakeCombatant("Solo", faction, health: 20),
       preparation.State.Board.At(0, 0, 0), None, None);
-    unit.ReceiveDamage(999);
+    switch (kind)
+    {
+      case DamageKind.Health:
+        unit.ReceiveDamage(999);
+        break;
+      case DamageKind.Stun:
+        // The fixture-owned preset path: an unconscious body stays occupied but leaves
+        // its side without conscious forces, so Complete must still reject it.
+        unit.ReceiveStun(20);
+        break;
+      default:
+        throw new ArgumentOutOfRangeException(nameof(kind));
+    }
 
     Either<BattleSetupFailure, BattleState> outcome = preparation.Complete();
 

@@ -14,6 +14,14 @@ public partial class BuffBattleTest
       new HealthBelowPercentCondition { Percent = 50f },
       statMods: [new AimStatMod { Modifiers = [StatModifier.Add(10)] }]);
 
+  private sealed partial class ActiveOnRound : BuffCondition
+  {
+    public int Round { get; set; }
+
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
+      context.RunningSession.Match(session => session.RoundNumber == Round, () => false);
+  }
+
   [TestCase(TestName = "A buff whose condition already holds activates at spawn, after UnitAdded")]
   public void SpawnEvaluatesBuffs()
   {
@@ -109,6 +117,69 @@ public partial class BuffBattleTest
     Assert.Equal(0, player.ActiveBuffs.AsValueEnumerable().Count());
     Assert.Equal(aura, battle.Events.SingleEvent<UnitBuffDeactivatedBattleEvent>().Buff);
   }
+
+  [TestCase(TestName = "Buff vision activation and deactivation refresh visibility before their events broadcast")]
+  public void VisionBuffRefreshesBeforeBroadcast()
+  {
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    // EagleEye raises vision 1 -> 3 for round 2 only: the tile (and the watcher on it) two
+    // cells away flips into and back out of sight at the round-2 and round-3 turn starts.
+    var eagleEye = TestData.MakeBuff(
+      "EagleEye",
+      new ActiveOnRound { Round = 2 },
+      statMods: [new VisionStatMod { Modifiers = [StatModifier.Add(2)] }]);
+    using var battle = new BattleFixture(new Vector3I(6, 1, 3), [playerFaction, enemyFaction]);
+    var observer = battle.Spawn(
+      TestData.MakeCombatant("Scout", playerFaction, vision: 1, buffs: [eagleEye]), new Vector3I(2, 0, 0));
+    var target = battle.Spawn(TestData.MakeCombatant("Watcher", enemyFaction, vision: 1), new Vector3I(2, 0, 2));
+    BattleBoardState.ValidatedPoint tile = battle.At(new Vector3I(2, 0, 2));
+
+    battle.Start();
+    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, tile)));
+    Assert.False(battle.Query(new HasFactionExploredTile(playerFaction, tile)));
+    battle.ClearEvents();
+
+    bool sawActivation = false;
+    bool sawDeactivation = false;
+    battle.OnCommitted(battleEvent =>
+    {
+      if (battleEvent is UnitBuffActivatedBattleEvent activated && ReferenceEquals(activated.Unit, observer))
+      {
+        sawActivation = true;
+        Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, tile)));
+        Assert.True(battle.Query(new HasFactionExploredTile(playerFaction, tile)));
+        Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+      }
+
+      if (battleEvent is UnitBuffDeactivatedBattleEvent deactivated && ReferenceEquals(deactivated.Unit, observer))
+      {
+        sawDeactivation = true;
+        Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, tile)));
+        Assert.True(battle.Query(new HasFactionExploredTile(playerFaction, tile)));
+      }
+    });
+
+    battle.AdvanceTurn(); // round 1: enemy turn, buff still inactive
+    battle.AdvanceTurn(); // round 2: the scout's turn starts and EagleEye activates
+
+    Assert.True(sawActivation);
+    battle.Events.EventBefore<UnitBuffActivatedBattleEvent, UnitSpottedBattleEvent>();
+
+    battle.AdvanceTurn(); // round 2: enemy turn, buff stays active
+    battle.AdvanceTurn(); // round 3: the scout's turn starts and EagleEye deactivates
+
+    Assert.True(sawDeactivation);
+    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, tile)));
+    Assert.True(battle.Query(new HasFactionExploredTile(playerFaction, tile)));
+    Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+    Assert.Equal(1, MatchingSpottings(battle, observer, target));
+  }
+
+  private static int MatchingSpottings(BattleFixture battle, BattleUnitState observer, BattleUnitState target) =>
+    battle.Events.EventsOf<UnitSpottedBattleEvent>()
+      .AsValueEnumerable()
+      .Count(e => ReferenceEquals(e.Unit, observer) && ReferenceEquals(e.Target, target));
 
   [TestCase(TestName = "A negative max-health buff activating at spawn clamps current health down")]
   public void HealthClampOnActivation()

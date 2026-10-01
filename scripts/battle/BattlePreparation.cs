@@ -60,7 +60,7 @@ internal sealed class BattlePreparation
     State.RaiseEvents(new UnitAddedBattleEvent(unit, position));
     // The runtime path evaluates spawn buffs inside the UnitAdded dispatch (executor
     // default hook); preparation owns that bookkeeping itself, committing the same order.
-    unit.EvaluateBuffs(_readContext);
+    unit.EvaluateBuffs(_readContext, ReconcileBuffFlip);
     ReconcileParticipant(unit);
     return unit;
   }
@@ -95,6 +95,17 @@ internal sealed class BattlePreparation
       return;
     State.MarkVisibilityAffected(unit);
     State.RefreshVisibility();
+  }
+
+  // Per-grant buff bookkeeping at the initial-placement mutation boundary: the running
+  // owner's visibility marking without scheduler or outcome work (a spawn's stun is zero,
+  // so the shared clamp cannot knock the unit out here). The buff event's own dispatch
+  // resolves the mark and queues genuine first spots before broadcasting — nothing is
+  // consumed silently.
+  private void ReconcileBuffFlip(BattleUnitState unit, bool wasConscious)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    State.MarkVisibilityAffected(unit);
   }
 
   internal void AddObjective(Faction faction, Objective objective)

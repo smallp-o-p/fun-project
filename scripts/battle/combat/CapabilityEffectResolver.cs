@@ -57,11 +57,6 @@ public static class CapabilityEffectResolver
           case StatusEffectSpecData status:
             session.ApplyStatusEffectTo(unit, status);
             break;
-          default:
-            // TODO: other BattleEffectData subclasses (e.g. SpawnHazardEffectData,
-            // TerrainEffectData, VisibilityEffectData) are not yet resolved. Add a
-            // dispatch case here when their behavior is implemented.
-            break;
         }
       }
     }

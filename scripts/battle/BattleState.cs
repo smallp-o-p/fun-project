@@ -27,23 +27,23 @@ internal sealed class BattleState
   private readonly Random _random;
 
   // Visible sets depend on board occupancy and consciousness: a unit's vision range resolves from
-  // stat contributions that are fixed for the battle (combatant + equipped weapon; no
-  // action swaps weapons, equips mods, or applies a vision-affecting effect mid-battle),
-  // and tile BlocksLineOfSight is set during setup. So visibility only needs recomputing
-  // after an occupancy or consciousness mutation, at two granularities:
+  // stat contributions (combatant + equipped weapon + active buffs; no action swaps weapons
+  // or equips mods mid-battle, and buff evaluation marks each flipped unit affected), and
+  // tile BlocksLineOfSight is set during setup. So visibility only needs recomputing after
+  // an occupancy, consciousness, or buff-flip mutation, at two granularities:
   //   - _visibilityFullRefreshPending forces a clear-and-recompute-everyone pass. Used on
   //     battle start, where tile BlocksLineOfSight authoring may have changed without any
   //     occupancy event (so no affected-unit set could capture it). Starts true so the first
   //     dispatch performs the initial compute.
   //   - _visibilityAffectedUnits accumulates the units whose own cell changed (move/spawn/
-  //     death) or who became unconscious since the last refresh. The incremental pass
-  //     recomputes those units and their visibility to others, matching a full recompute:
-  //     an unaffected observer's visible tiles cannot change when another unit changes.
+  //     death), who became unconscious, or whose buff evaluation flipped since the last
+  //     refresh. The incremental pass recomputes those units and their visibility to others,
+  //     matching a full recompute: an unaffected observer's visible tiles cannot change when
+  //     another unit changes.
   // Mark affected units at Board.Try* occupancy chokepoints and unconscious transitions;
-  // battle start requests a full refresh. If a runtime effect changes a unit's vision, force
-  // a full refresh (or mark that unit affected) there too. Likewise, any runtime mutation to
-  // a tile's BlocksLineOfSight or BlocksVerticalLineOfSight (e.g. destructible terrain) must
-  // call InvalidateVisibility() — tile flag changes are NOT occupancy events and are not
+  // battle start requests a full refresh. Likewise, any runtime mutation to a tile's
+  // BlocksLineOfSight or BlocksVerticalLineOfSight (e.g. destructible terrain) must call
+  // InvalidateVisibility() — tile flag changes are NOT occupancy events and are not
   // otherwise caught by the refresh machinery.
   private bool _visibilityFullRefreshPending = true;
 
@@ -193,9 +193,6 @@ internal sealed class BattleState
   internal bool HasConsciousUnits(Faction side)
     => GetFactionConsciousUnits(side).AsValueEnumerable().Any();
 
-  internal bool HasLivingUnits(Faction side)
-    => GetFactionAliveUnits(side).AsValueEnumerable().Any();
-
   // Mints a proof iff the unit instance belongs to this storage's alive pool (provenance +
   // aliveness in one check). The single door for callers holding a raw BattleUnitState.
   internal Option<AliveUnit> TryGetAlive(BattleUnitState unit)
@@ -259,14 +256,6 @@ internal sealed class BattleState
   {
     return Board.GetOccupant(point).Bind(id =>
       id < _units.Count && _units[id].IsAlive ? Some(_units[id]) : None);
-  }
-
-  internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetFactionVisibleTiles(Faction side)
-  {
-    ArgumentNullException.ThrowIfNull(side);
-    return GetFactionAliveUnits(side).AsValueEnumerable()
-      .SelectMany(unit => unit.VisibleTiles)
-      .ToHashSet();
   }
 
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetFactionExploredTiles(Faction side)

@@ -2,14 +2,23 @@ using FunProject.Battle;
 using FunProject.Core;
 using System.Collections.Generic;
 using FunProject.Items.Effects;
+using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
 [TestSuite]
 [RequireGodotRuntime]
-public class BattleOutcomeTest
+public partial class BattleOutcomeTest
 {
+  private sealed partial class ActiveOnRound : FunProject.Buffs.BuffCondition
+  {
+    public int Round { get; set; }
+
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
+      context.RunningSession.Match(session => session.RoundNumber == Round, () => false);
+  }
+
   [TestCase(false, BattleOutcome.Victory, TestName = "Knocking out the last enemy wins the battle")]
   [TestCase(true, BattleOutcome.Defeat, TestName = "Knocking out the last player unit loses the battle")]
   public void LastConsciousUnitKnockoutEndsTheBattle(bool playerWiped, BattleOutcome expected)
@@ -138,6 +147,64 @@ public class BattleOutcomeTest
     Assert.Equal(3, battle.Query(new GetCurrentTurnQuery()).RequireSome().RoundNumber);
     Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
     Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
+  }
+
+  [TestCase(TestName = "A final conscious player knocked out by a buff clamp requests Defeat with no fabricated damage")]
+  public void BuffClampKnockoutOfFinalConsciousPlayerResolvesDefeat()
+  {
+    // Collapse halves max health (20 -> 10) at the round-2 turn start while the player is
+    // stunned to 15: the flip itself knocks the last conscious player unit out, so the
+    // player-wipe backstop owns the defeat — no damage cause and no kill event exist.
+    var collapse = TestData.MakeBuff(
+      "Collapse",
+      new ActiveOnRound { Round = 2 },
+      statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-10)] }]);
+    using var battle = BattleFixture.Duel(
+      playerControlled: true,
+      player: new("Alpha", Buffs: [collapse]));
+    battle.ClearEvents();
+
+    battle.ApplyDamage(battle.PlayerUnit, 15, DamageKind.Stun);
+    Assert.False(battle.PlayerUnit.IsUnconscious);
+
+    battle.AdvanceTurn(); // round 1: enemy turn, buff still inactive
+    battle.AdvanceTurn(); // round 2: the player's turn starts and Collapse activates
+
+    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
+    battle.Events.EventBefore<UnitUnconsciousBattleEvent, SessionEndedBattleEvent>();
+    var unconscious = battle.Events.SingleEvent<UnitUnconsciousBattleEvent>();
+    Assert.True(unconscious.MaybeCause.IsNone);
+    Assert.False(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Any());
+  }
+
+  [TestCase(TestName = "A final conscious opponent knocked out by a buff clamp drives the elimination objective")]
+  public void BuffClampKnockoutOfFinalConsciousOpponentResolvesVictory()
+  {
+    // The enemy carries the clamp buff: its genuine UnitUnconscious notification at the
+    // round-2 turn start completes the player's elimination objective and ends the battle,
+    // instead of leaving combat running until an unrelated later event.
+    var collapse = TestData.MakeBuff(
+      "Collapse",
+      new ActiveOnRound { Round = 2 },
+      statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-10)] }]);
+    using var battle = BattleFixture.Duel(
+      playerControlled: true,
+      enemy: new("Hostile", Buffs: [collapse]));
+    battle.ClearEvents();
+
+    battle.ApplyDamage(battle.EnemyUnit, 15, DamageKind.Stun);
+    Assert.False(battle.EnemyUnit.IsUnconscious);
+
+    battle.AdvanceTurn(); // round 1: enemy turn, buff still inactive
+    battle.AdvanceTurn(); // round 2: the player's turn starts and Collapse activates
+
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
+    battle.Events.EventBefore<UnitUnconsciousBattleEvent, SessionEndedBattleEvent>();
+    var unconscious = battle.Events.SingleEvent<UnitUnconsciousBattleEvent>();
+    Assert.True(unconscious.MaybeCause.IsNone);
+    Assert.False(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Any());
   }
 
   [TestCase(TestName = "An end-of-turn DoT kill that wipes the player resolves to Defeat without throwing")]

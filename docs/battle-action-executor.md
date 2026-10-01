@@ -15,9 +15,10 @@ It is responsible for:
 
 - owning the pending action queue
 - owning the hook registry and registering the default systems (status effects, armor regen, stun recovery, capability effects, buff evaluation, and `ObjectiveSystem` — all registered directly in its constructor; `ObjectiveSystem` is registered once under the `BattleEventTag` catch-all at priority +100, receives every event, and filters objectives by their declared observed keys internally. It has no self-registration or executor back-reference. An objective flips mid-dispatch when a committed event makes its `Check` return Passed or Failed; the authored directive then responds to that flip)
-- accepting a submitted `BattleAction` intent and resolving the resulting action chain
+- executing the submitted `BattleAction` intent (submitted through `BattleRuntime.ExecuteAction`, which opens and closes the submission window around the internal `Execute`) and resolving the resulting action chain
 - executing one step of the queued action head at a time (a step that returns `Result.Incomplete` keeps its action at the queue head)
 - opening an executor-local action window around each step's execution so hooks firing during its event dispatch can return interrupt actions, collecting those interrupts once the step commits (discarding them if it fails), and throwing when a hook returns interrupts with no window open — the guard lives in the executor
+- settling a first accepted terminal outcome at the step boundary: after the primitive returns and its synchronous event queue drains, capture the frozen `CompletedBattle`, install it, and broadcast one `SessionEndedBattleEvent`; queued interrupts and unexecuted steps are dropped
 - returning one `BattleActionExecResult` per submission: the submitted action plus every `BattleEvent` committed while resolving it (including interrupt actions' events)
 - surfacing broken invariants: a step that returns `Result.Rejected` (or throws) fails the submission with an `InvalidOperationException` — parameters are trusted, so a rejection is always a caller bug
 
@@ -30,60 +31,61 @@ It is not responsible for:
 
 ## Authority Boundaries
 
-- `BattleSession` remains the only owner of authoritative tactical state.
+- `BattleState` owns the phase-independent tactical storage; `BattleSession` is the running receiver over it (turn flow, combat pipelines, terminal requests).
 - `BattleAction` is the command object. It owns action-specific legality checks and execution against the session. It may be primitive, or it may unfold into primitive child actions.
 - `BattleActionExecutor` invokes primitive actions produced by queued actions.
-- scene controllers, HUD code, and AI build actions and submit them to the executor.
-- visuals and HUD react to `BattleSession.BattleEventCommitted` after session state changes.
+- scene controllers, HUD code, and AI build actions and submit them through `BattleRuntime.ExecuteAction`.
+- visuals and HUD react to `BattleRuntime.BattleEventCommitted` after session state changes.
 
 The important split is:
 
 - `BattleAction` = queued tactical intent, which may be composite or primitive
 - `BattleActionExecutor` = hook registry owner, hook-interrupt mediator, queue, and invoker
-- `BattleSession` = source of truth
+- `BattleSession` = running receiver; `BattleState` = shared tactical storage
 - `BattleEvent` = notification that authoritative state already changed
 
-## Current Public Surface
+## Current Surface
 
-The current executor API is:
+The executor's construction, submission, and hook doors are owned: `BattleRuntime` mints the executor in its constructor path (the session's `AttachExecutor` rejects a duplicate), and its public doors are `BattleRuntime.ExecuteAction` (total: `Some` when the submission ran, `None` when combat was already completed — nothing mutates and neither `ActionStarted` nor `ActionCompleted` fires), plus `RegisterHook<TEventKey>`/`UnregisterHook<TEventKey>` facade doors. The internal `Execute` asserts an open execution step on the receiver. There are no executor-level lifecycle events and no `LastResult`: outcomes are observed through the returned `BattleActionExecResult` (carrying the committed `BattleEvent` stream) and through committed session state.
 
-- `Submit(BattleAction action)`
-- `RegisterHook<TEventKey>(BattleHook hook, int priority = 0)` and `UnregisterHook<TEventKey>(BattleHook hook)`
-- `Dispose()`
+The hook registry lives on the executor: its constructor registers the default systems — status effects, armor regen, stun recovery, capability effects, buff evaluation, and `ObjectiveSystem` — directly. `ObjectiveSystem` is registered once under the `BattleEventTag` catch-all at priority +100, receives every event, and filters objectives by their declared observed keys internally; it has no self-registration or executor back-reference. An objective flips mid-dispatch when a committed event makes its `Check` return Passed or Failed, and the authored directive then interprets the flip. The `RegisterHook`/`UnregisterHook` doors above are reached through `BattleRuntime` — the session no longer knows hooks exist; it only announces events. Disposing the executor detaches its `BattleEventCommitted` subscription from the shared state.
 
-There are no executor-level lifecycle events and no `LastResult`: outcomes are observed through the returned `BattleActionExecResult` (carrying the committed `BattleEvent` stream) and through committed session state.
+## One Executor Per Receiver
 
-The hook registry lives on the executor: its constructor registers the default systems — status effects, armor regen, stun recovery, capability effects, buff evaluation, and `ObjectiveSystem` — directly. `ObjectiveSystem` is registered once under the `BattleEventTag` catch-all at priority +100, receives every event, and filters objectives by their declared observed keys internally; it has no self-registration or executor back-reference. An objective flips mid-dispatch when a committed event makes its `Check` return Passed or Failed, and the authored directive then interprets the flip. The `RegisterHook`/`UnregisterHook` methods above are the registration surface. `BattleRuntime.RegisterHook` is the facade door delegating to the executor — the session no longer knows hooks exist; it only announces events. Disposing the executor detaches its `BattleEventCommitted` subscription from the session.
-
-## One Executor Per Session
-
-Only one executor may be live for a session at a time. The executor owns the hook registry and registers the default systems in its constructor, so a second executor attached to the same session would double-register them: statuses would tick twice per turn end, armor regen and stun recovery would run twice, and objective routing would run twice. Nothing at the language level prevents a second executor — two simultaneously live executors on one session must never be created, and the invariant is held by ownership. Production `BattleRuntime` owns its session's single executor, and its public constructor subscribes the `BattleEventCommitted` re-raise before constructing that executor, so scene subscribers observe a cause event before any hook-born follow-up events. Tests keep `using var battle = ...` and reuse `battle.Runtime`, whose executor is the sole one for that fixture session. Direct factory/constructor/lifecycle tests retain and dispose the production runtime or executor themselves; a lifecycle replacement is created only after the previous owner is disposed.
+Exactly one executor may be live for a running session, and the invariant is enforced in code: the runtime's construction path attaches its executor through `BattleSession.AttachExecutor`, which rejects a duplicate before it could subscribe to the committed stream or register the default systems (a second live executor would double-register them: statuses would tick twice per turn end, armor regen and stun recovery would run twice, and objective routing would run twice). Production `BattleRuntime` owns its session's single executor, and its constructor subscribes the `BattleEventCommitted` re-raise before constructing that executor, so scene subscribers observe a cause event before any hook-born follow-up events. The opening session/turn dispatch runs inside a submission window on that one executor (without public `ActionStarted`/`ActionCompleted`). Tests keep `using var battle = ...` and reuse `BattleFixture.Runtime`, whose executor is the sole one for that fixture session.
 
 ## Execution Flow
 
 The current happy-path flow is:
 
 1. controller or AI constructs a `BattleAction`
-2. the action is immediately submitted with `Submit(action)`, with no intervening battle-state changes
-3. the executor queues the submitted action internally
-4. while the queue has work, the executor executes the queue head's next step inside an open, executor-local action window
+2. the action is immediately submitted with `runtime.ExecuteAction(action)`, with no intervening battle-state changes; the runtime opens the submission window (nested submissions are rejected before touching either queue), fires `ActionStarted`, and invokes the executor
+3. the executor queues the submitted action internally and opens a per-receiver execution step (terminal requests are legal only inside it)
+4. while the queue has work and no outcome is pending, the executor executes the queue head's next step inside an open, executor-local action window
 5. the action validates itself against the current `BattleSession`
 6. the action applies its change through session and board helpers
-7. `BattleSession` raises each resulting `BattleEvent`: the session's dispatch loop broadcasts it through `BattleEventCommitted`, and the executor's `BattleEventCommitted` subscription fires that event's hooks after the broadcast — any hook firing inside the open window may return interrupt actions, which accumulate executor-locally in evaluation order
+7. `BattleSession` raises each resulting `BattleEvent`: the shared dispatch loop broadcasts it through `BattleEventCommitted`, and the executor's subscription fires that event's hooks after the broadcast — any hook firing inside the open window may return interrupt actions, which accumulate executor-locally in evaluation order
 8. the executor closes the action window once the step's execution path returns, whether it completed, failed, or threw
-9. a failed step's collected interrupts are discarded; nothing is enqueued (and a `Result.Rejected` throws out of `Submit`)
+9. a failed step's collected interrupts are discarded; nothing is enqueued (and a `Result.Rejected` throws out of `ExecuteAction`)
 10. on success, the executor aggregates the window's interrupt actions and reverses that combined list once (never per event), then inserts the result ahead of paused work — so an earlier-raised event's interrupts still run before a later event's
-11. if the battle ended during the step's dispatch, the executor clears remaining queued work instead: unexecuted composite steps and queued interrupts are dropped
+11. a first accepted terminal outcome stops the loop after the current primitive: the step's pending outcome is taken only once the primitive returned and its synchronous event queue drained; remaining queued work and interrupts are dropped, the executor captures the frozen `CompletedBattle` from the settled state (including captures), installs it, and broadcasts exactly one `SessionEndedBattleEvent` whose subscribers see the frozen results
 12. otherwise, the executor continues until the submitted action and its interrupts settle
-13. `Submit` returns exactly one `BattleActionExecResult`: the submitted action and every event committed during its resolution
+13. `ExecuteAction` returns exactly one `BattleActionExecResult`: the submitted action and every event committed during its resolution
 
-Actions should be executed through an explicit `BattleActionExecutor` by calling `Submit`. A normal submission leaves the queue empty when it returns; the queue is non-empty only while the executor is actively resolving submitted work.
+Actions are executed through `BattleRuntime.ExecuteAction`. A normal submission leaves the queue empty when it returns; the queue is non-empty only while the executor is actively resolving submitted work.
 
-Composite actions execute across several steps (for example, `MoveUnit` commits one tile per `Execute`, returning `Result.Incomplete` until the route drains). Those intermediate steps are commit checkpoints for validation, event emission, and hook evaluation; they are not separate public results. Interrupt actions returned by hooks still mutate state and raise committed `BattleEvent`s as they are resolved inside the same submission, and their events are part of the submission's result. If a step's dispatch ends the battle, remaining composite steps and any queued interrupts are discarded rather than run against an ended session. `Submit` does not expose `Tick`; it queues the provided action, resolves the action and its interrupts immediately, and returns.
+Composite actions execute across several steps (for example, `MoveUnit` commits one tile per `Execute`, returning `Result.Incomplete` until the route drains). Those intermediate steps are commit checkpoints for validation, event emission, and hook evaluation; they are not separate public results. Interrupt actions returned by hooks still mutate state and raise committed `BattleEvent`s as they are resolved inside the same submission, and their events are part of the submission's result. A first accepted terminal outcome drops remaining composite steps and queued interrupts rather than running them against a settled battle; those are separate actions, not synchronous effects belonging to the terminal step. `ExecuteAction` does not expose `Tick`; it resolves the provided action and its interrupts immediately and returns.
+
+## Fault contract
+
+- A failed submission preserves its committed mutations and events, clears queued work and undispatched events, dirties all action options, and propagates the original exception. It does not emit `ActionCompleted`.
+- If a terminal request was accepted before the fault, the executor closes combat from the actual retained state at the unwind boundary: it freezes `CompletedBattle` without executing further effects and without publishing a synthetic successful end event. Fresh gameplay is unavailable afterward. If no terminal request was accepted, the running state remains available for a later submission under the existing recovery contract.
+- A fault during `SessionEndedBattleEvent` notification leaves the already-installed completed snapshot intact; the submission's exception still surfaces.
+- Fatal secondary capture failure: if the settlement capture itself throws after a terminal request, the primary exception surfaces unchanged with the actual capture cause retained in `Exception.Data["FunProject.Battle.BattleCompletionCaptureFailure"]`, and the unusable runtime is disposed — fresh queries and submissions throw `ObjectDisposedException`. This exceptional outcome is not a successful frozen completion. Ordinary admissible repeated-identity completions (shared campaign `Combatant` killers) do not hit this path: `CompletedBattle.Capture` accumulates all victims per campaign identity in ledger order.
 
 ## Supported Validation Rules
 
-Actions are constructed with trusted parameters (proof types like `AliveUnit` and `ItemWith<TCap>` gate what can even be built), and they re-check only state-dependent facts at commit time: battle phase, active side, board occupancy, attack feasibility (shared through `AttackContext.Resolve`), path legality, and stale faction-turn requests. A failed check returns `Result.Rejected`, which the executor surfaces as an `InvalidOperationException` — a submission like that is always a caller bug, not a gameplay outcome. Availability gating (AP, turn order, incapacity) belongs to the read side (action conditions, `CanUnitActNow`) before an action is built; mutable incapacity is also checked during execution.
+Actions are constructed with trusted parameters (proof types like `AliveUnit` and `ItemWith<TCap>` gate what can even be built), and they re-check only state-dependent facts at commit time: completed combat (a submission racing settlement is dropped before execution), active side, board occupancy, attack feasibility (shared through `AttackContext.Resolve`), path legality, and stale faction-turn requests. A failed check returns `Result.Rejected`, which the executor surfaces as an `InvalidOperationException` — a submission like that is always a caller bug, not a gameplay outcome. Availability gating (AP, turn order, incapacity) belongs to the read side (action conditions, `CanUnitActNow`) before an action is built; mutable incapacity is also checked during execution.
 
 Callers construct actions for immediate submission and do not retain them across battle-state changes. Hooks construct and return interrupt actions during event handling. Once submitted, composite steps and queued interrupts can encounter state changes made by earlier interrupts in that same submission: liveness, incapacity, item possession, equipped weapon, remaining charges, target feasibility, or loaded magazine. Actions re-check those mutable facts at `Execute` and return `Result.Interrupted` to stop quietly. `AttackEntity` interrupts on `AttackContext.Resolve` misses or an empty magazine; `UseItem` checks depletion before spending AP. Interruption tests exercise this interleaving through an actual executor submission and its hooks.
 
@@ -95,7 +97,7 @@ The executor does not need to know which concrete action type it is running.
 
 ## Death, unconsciousness, and turn-end upkeep
 
-Death emits `UnitKilledBattleEvent`; a new unconscious transition emits `UnitUnconsciousBattleEvent`. Both carry the unit, position, and optional cause, and both drive elimination objectives. Death playback and kill-only hooks continue to consume `UnitKilledBattleEvent`; a historical unconscious event never becomes a kill event when its unit later dies. A hit that causes neither transition emits `UnitDamagedBattleEvent`. A lethal bundle emits only the kill event, including death after earlier unconsciousness. Kill credit is recorded only by death bookkeeping. Routing max-health debuff effects through the damage pipeline is deferred.
+Death emits `UnitKilledBattleEvent`; a new unconscious transition emits `UnitUnconsciousBattleEvent`. Both carry the unit, position, and optional cause, and both drive elimination objectives. Death playback and kill-only hooks continue to consume `UnitKilledBattleEvent`; a historical unconscious event never becomes a kill event when its unit later dies. A hit that causes neither transition emits `UnitDamagedBattleEvent`. A lethal bundle emits only the kill event, including death after earlier unconsciousness. Kill credit is recorded only by death bookkeeping. A buff clamp that pushes current health across the stun threshold is reconciled at the buff mutation boundary itself — genuine `UnitUnconsciousBattleEvent` with no damage cause, availability removal, and the shared loss policy — never routed through the damage pipeline as fabricated damage.
 
 The executor registers owner-turn upkeep on `TurnEndedBattleEvent` in this order:
 
@@ -105,7 +107,7 @@ The executor registers owner-turn upkeep on `TurnEndedBattleEvent` in this order
 
 The executor registers exactly one default `StunRecoverySystem`, which owns its fixed `uint` recovery rate of `5u`, phase checks, and recovery-event emission. Battle types, setup, and runtime constructors expose no recovery setting. `BattleSession` has no recovery-specific setting or method; the hook uses its existing unit-access and event-dispatch APIs. Recovery clamps to the unit's current stun before narrowing from `uint`. `UnitStunRecoveredBattleEvent.AmountRecovered` is `uint` and events require a positive reduction. Unconscious/dead units never recover, while conscious units with no AP or temporary immobilization still do. Status damage can cause unconsciousness before the recovery hook; ended sessions skip recovery. Faction elimination counts living conscious forces, independently of AP or immobilization.
 
-`ObjectiveSystem` suppresses objective routing for the player's final death or unconscious event when the player has no conscious forces. Other committed events, including `SessionEndedBattleEvent` and parent or queued events, still update objective history and can queue follow-ups, even after the battle ends. For every event, an end-battle directive is blocked while the designated player has no conscious forces, leaving the defeat backstop authoritative. The first `EndBattle` freezes victory capture membership before `SessionEndedBattleEvent` observers query it; executor queue clearing then drops remaining work. Campaign application of captured enemies is deferred; see [Battlescape Tactical Runtime Architecture](./battlescape-architecture.md#capture-summary-and-campaign-lifetime).
+`ObjectiveSystem` suppresses objective routing for the player's final death or unconscious event when the player has no conscious forces. Other committed events, including `SessionEndedBattleEvent` and parent or queued events, still update objective history and can queue follow-ups, even after the battle ends. For every event, an end-battle directive is blocked while the designated player has no conscious forces, leaving the defeat backstop authoritative. The first accepted outcome settles at the step boundary: the executor captures frozen results — including victory capture membership — after the primitive and its synchronous event queue finish, installs them, and only then broadcasts `SessionEndedBattleEvent`, so end-event subscribers read frozen results; executor queue clearing drops remaining work. Campaign application of captured enemies is deferred; see [Battlescape Tactical Runtime Architecture](./battlescape-architecture.md#capture-summary-and-campaign-lifetime).
 
 ## Single-Threaded Execution
 

@@ -10,8 +10,16 @@ using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
-public class UnitActionCacheTest
+public partial class UnitActionCacheTest
 {
+  private sealed partial class ActiveOnRound : BuffCondition
+  {
+    public int Round { get; set; }
+
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
+      context.RunningSession.Match(session => session.RoundNumber == Round, () => false);
+  }
+
   private sealed class TestActionDefinition(UnitActionCondition condition) : UnitActionDefinition
   {
     private readonly IReadOnlyList<UnitActionCondition> _conditions = [condition];
@@ -277,17 +285,20 @@ public class UnitActionCacheTest
   [TestCase]
   public void BuffClampIncapacitatesUnselectedUnitAndUpdatesRetainedOptions()
   {
+    // Collapse halves max health (20 -> 10) while the support is stunned to 15: the flip
+    // itself pushes current health across the stun threshold, so the knockout is the
+    // clamp's reconciliation, not a damage outcome.
     var collapse = TestData.MakeBuff(
       "Collapse",
-      new HealthBelowPercentCondition { Percent = 50f },
-      statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-15)] }]);
+      new ActiveOnRound { Round = 2 },
+      statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-10)] }]);
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
     using var battle = new BattleFixture(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    battle.Spawn(TestData.MakeCombatant("Lead", playerFaction), new Vector3I(1, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("Lead", playerFaction, vision: 1), new Vector3I(0, 0, 0));
     BattleUnitState support = battle.Spawn(
-      TestData.MakeCombatant("Support", playerFaction, buffs: [collapse]), new Vector3I(2, 0, 1));
-    battle.Spawn(TestData.MakeCombatant("Durable", enemyFaction, health: 100), new Vector3I(1, 0, 5));
+      TestData.MakeCombatant("Support", playerFaction, vision: 3, buffs: [collapse]), new Vector3I(2, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("Durable", enemyFaction, health: 100, vision: 0), new Vector3I(6, 0, 6));
     battle.Start();
     IReadOnlyList<UnitAction> actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(support)));
     UnitAction move = Row<MoveActionDefinition>(actions);
@@ -295,33 +306,37 @@ public class UnitActionCacheTest
     Assert.True(move.IsAvailable);
     Assert.True(endTurn.IsAvailable);
 
-    battle.EndFactionTurn(playerFaction);
-    battle.ApplyDamage(support, 11);
-    battle.ApplyDamage(support, 8, DamageKind.Stun);
+    battle.ApplyDamage(support, 15, DamageKind.Stun);
     Assert.False(support.IsIncapacitated);
-    Assert.False(move.IsAvailable);
-    Assert.False(endTurn.IsAvailable);
+    BattleBoardState.ValidatedPoint exclusiveTile = battle.At(new Vector3I(4, 0, 1));
+    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile)));
 
-    bool incapacitatedAtTurnStarted = true;
-    bool moveAtTurnStarted = false;
-    bool endTurnAtTurnStarted = false;
-    battle.Runtime.BattleEventCommitted += battleEvent =>
+    bool clampedAtBuffEvent = false;
+    battle.OnCommitted(battleEvent =>
     {
-      if (battleEvent is not TurnStartedBattleEvent started || started.Faction != playerFaction)
+      if (battleEvent is not UnitBuffActivatedBattleEvent activated || activated.Unit != support)
         return;
-      incapacitatedAtTurnStarted = support.IsIncapacitated;
-      moveAtTurnStarted = move.IsAvailable;
-      endTurnAtTurnStarted = endTurn.IsAvailable;
-    };
+      clampedAtBuffEvent = true;
+      Assert.Equal(10, support.CurrentHealth);
+      Assert.True(support.IsUnconscious);
+      Assert.False(move.IsAvailable);
+      Assert.False(endTurn.IsAvailable);
+      Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile)));
+    });
 
-    battle.EndFactionTurn(enemyFaction);
+    battle.AdvanceTurn(); // round 1: enemy turn, buff still inactive
+    battle.AdvanceTurn(); // round 2: the player's turn starts and Collapse activates
 
-    Assert.False(incapacitatedAtTurnStarted);
-    Assert.True(moveAtTurnStarted);
-    Assert.True(endTurnAtTurnStarted);
-    Assert.Equal(5, support.MaxHealth);
-    Assert.Equal(5, support.CurrentHealth);
+    Assert.True(clampedAtBuffEvent);
+    battle.Events.EventBefore<UnitUnconsciousBattleEvent, UnitBuffActivatedBattleEvent>();
+    var unconscious = battle.Events.SingleEvent<UnitUnconsciousBattleEvent>();
+    Assert.True(ReferenceEquals(unconscious.Unit, support));
+    Assert.True(unconscious.MaybeCause.IsNone);
+    Assert.False(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Any());
+    Assert.Equal(10, support.MaxHealth);
+    Assert.Equal(10, support.CurrentHealth);
     Assert.True(support.IsUnconscious);
+    Assert.False(battle.Query(new IsUnitStillAvailableThisTurn(support)));
     Assert.False(move.IsAvailable);
     Assert.False(endTurn.IsAvailable);
   }

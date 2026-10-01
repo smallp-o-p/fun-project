@@ -358,6 +358,29 @@ public sealed class BattleSession
       RequestEnd(BattleOutcome.Defeat);
   }
 
+  // Per-grant buff reconciliation at the running mutation boundary, invoked before that
+  // grant's buff event dispatches: a flip can change the unit's vision contribution or
+  // clamp its health across the stun threshold. The unit is marked so the next dispatch
+  // (the buff event's own one, or the unconscious event below) refreshes visibility and
+  // queues genuine first spots before broadcasting; a new knockout consumes scheduler
+  // availability, emits the genuine unconscious transition with no damage cause, and runs
+  // the shared loss/objective policy. No fabricated damage or kill credit.
+  internal void ReconcileBuffFlip(BattleUnitState unit, bool wasConscious)
+  {
+    ArgumentNullException.ThrowIfNull(unit);
+    State.MarkVisibilityAffected(unit);
+    if (!wasConscious || !unit.IsUnconscious)
+      return;
+
+    BattleBoardState.ValidatedPoint unitPoint = State.GetUnitPosition(unit).Match(
+      Some: point => point,
+      None: () => throw new InvalidOperationException(
+        $"Cannot knock out unit {unit.Id} because it is not on the board."));
+    _scheduler.ConsumeActivation(unit);
+    State.RaiseEvents(new UnitUnconsciousBattleEvent(unit, unitPoint, None));
+    HandleConsciousnessLoss(unit);
+  }
+
   internal (BattleObjectState Object, BattleBoardState.ValidatedPoint Position) MarkObjectExpired(
     BattleObjectState obj)
   {
