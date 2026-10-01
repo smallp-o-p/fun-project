@@ -34,8 +34,7 @@ public partial class CharacterModel
     internal required Skeleton3D Skeleton { get; init; }
     internal required int Head { get; init; }
     internal required Basis InverseGlobalRest { get; init; }
-    internal Basis Last { get; set; }
-    internal bool Initialized { get; set; }
+    internal Basis? Last { get; set; }
   }
 
   private readonly SysColGeneric.List<FaceLighting> _faces = new();
@@ -91,12 +90,11 @@ public partial class CharacterModel
       Basis axes = face.Skeleton.GlobalBasis
         * face.Skeleton.GetBoneGlobalPose(face.Head).Basis
         * face.InverseGlobalRest;
-      if (face.Initialized && axes == face.Last)
+      if (axes == face.Last)
         continue;
       face.Material.SetShaderParameter(HeadForwardParameter, (axes * Vector3.Back).Normalized());
       face.Material.SetShaderParameter(HeadRightParameter, (axes * Vector3.Right).Normalized());
       face.Last = axes;
-      face.Initialized = true;
     }
   }
 

@@ -617,6 +617,48 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
+  public void ForeignMaskRegionsRejectWithoutChangingStoredState()
+  {
+    using var first = ModelFixture.WithMask(TestData.MakeMaskedSourceMesh(2),
+      TestData.MakeModelMaskConfiguration(TestData.MakeMaskedSourceMesh(2)));
+    using var second = ModelFixture.WithMask(TestData.MakeMaskedSourceMesh(2),
+      TestData.MakeModelMaskConfiguration(TestData.MakeMaskedSourceMesh(2)));
+    var mask = first.Model.ResolveMask(first.MaskPath);
+    mask.SetRegions([mask.RegionOf("Mask0")]);
+    var foreign = second.Model.ResolveMask(second.MaskPath).RegionOf("Mask1");
+    Assert.Throws<InvalidOperationException>(() => mask.SetRegions([foreign]));
+    Assert.Throws<InvalidOperationException>(() => mask.PrepareSelection([], [foreign]));
+    Assert.Throws<InvalidOperationException>(() => mask.PrepareSelection([foreign], []));
+    Assert.MaskRegions(first.Model, first.MaskPath, "Mask0");
+  }
+
+  [TestCase]
+  public void FabricatedMaskRegionRejectsDespiteMatchingOwnerNameAndIndex()
+  {
+    using var fixture = ModelFixture.WithWardrobe();
+    var mask = fixture.Model.ResolveMask(fixture.MaskPath);
+    var fabricated = new CharacterModel.MaskRuntime.Region(mask, "Mask0", 0);
+    Assert.Throws<InvalidOperationException>(() => mask.SetRegions([fabricated]));
+    Assert.Throws<InvalidOperationException>(() => mask.PrepareSelection([fabricated], []));
+    Assert.Throws<InvalidOperationException>(() => mask.PrepareSelection([], [fabricated]));
+    Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
+  }
+
+  [TestCase]
+  public void PieceWriteLeavesAnUnaffectedMaskOwnerUntouched()
+  {
+    using var fixture = ModelFixture.WithWardrobe(
+      configuration: TestData.MakeWardrobeConfigurationWithComponentlessVariantRule(variant: 1),
+      accessoryMaskConfiguration: TestData.MakeModelMaskConfiguration(TestData.MakeMaskedSourceMesh(2)));
+    var accessoryPath = fixture.AccessoryMaskPath!;
+    TestData.SelectMaskRegions(fixture.Model, accessoryPath, "Mask1");
+    var render = fixture.Model.MaskRenderMesh(accessoryPath);
+    fixture.Model.SetPiece("Garment", false);
+    Assert.MaskRegions(fixture.Model, accessoryPath, "Mask1");
+    Assert.True(ModelFixture.SameNative(render, fixture.Model.MaskRenderMesh(accessoryPath)));
+  }
+
+  [TestCase]
   public void MaskStateIsIndependentAcrossInstances()
   {
     using var first = ModelFixture.WithWardrobe();

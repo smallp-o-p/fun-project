@@ -11,14 +11,12 @@ const MODELS: Dictionary = {
 	"res://scenes/models/ZhuYuan/ZhuYuan.blend": {
 		"key": "zhu_yuan",
 		"manifest": "res://resources/models/zhu_yuan/presentation/presentation.res",
-		"extras": ["char_grp_002"],
-		"weapons_path": "rig_D/GeneralSkeleton/Weapons",
+		"hidden_paths": ["char_grp_002", "rig_D/GeneralSkeleton/Weapons"],
 	},
 	"res://scenes/models/Trigger/Trigger4.2.blend": {
 		"key": "trigger",
 		"manifest": "res://resources/models/trigger/presentation/presentation.res",
-		"extras": ["char_grp", "Trigger_Weapon"],
-		"weapons_path": "",
+		"hidden_paths": ["char_grp", "Trigger_Weapon"],
 	},
 }
 # Legacy weapon role segments accepted in the saved manifests.
@@ -51,7 +49,7 @@ static func apply(scene: Node, source_file: String) -> String:
 	err = _hide_groups(scene, key, spec)
 	if not err.is_empty():
 		return err
-	print("Humanoid presentation %s: surfaces=%d defaults=%d hidden=%d" % [source_file, (manifest.get_meta("surfaces", []) as Array).size(), (manifest.get_meta("mesh_defaults", []) as Array).size(), (spec["extras"] as Array).size() + (1 if String(spec["weapons_path"]) != "" else 0)])
+	print("Humanoid presentation %s: surfaces=%d defaults=%d hidden=%d" % [source_file, (manifest.get_meta("surfaces", []) as Array).size(), (manifest.get_meta("mesh_defaults", []) as Array).size(), (spec["hidden_paths"] as Array).size()])
 	return ""
 
 # Maps the node paths saved in the committed manifests to paths in the
@@ -136,10 +134,7 @@ static func _apply_defaults(scene: Node, key: String, manifest: Resource) -> Str
 	return ""
 
 static func _hide_groups(scene: Node, key: String, spec: Dictionary) -> String:
-	var paths: Array = (spec["extras"] as Array).duplicate()
-	if String(spec["weapons_path"]) != "":
-		paths.append(spec["weapons_path"])
-	for raw_path: Variant in paths:
+	for raw_path: Variant in spec["hidden_paths"]:
 		var rel: String = str(raw_path)
 		var node: Node3D = scene.get_node_or_null(NodePath(rel)) as Node3D
 		if node == null:

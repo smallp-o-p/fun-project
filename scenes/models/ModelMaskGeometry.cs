@@ -105,10 +105,8 @@ internal static class ModelMaskGeometry
   internal static ImageTexture WeightTexture(float[] values)
   {
     int rows = (values.Length + WeightTextureWidth - 1) / WeightTextureWidth;
-    var padded = new float[rows * WeightTextureWidth];
-    System.Array.Copy(values, padded, values.Length);
-    var bytes = new byte[padded.Length * sizeof(float)];
-    Buffer.BlockCopy(padded, 0, bytes, 0, bytes.Length);
+    var bytes = new byte[rows * WeightTextureWidth * sizeof(float)];
+    Buffer.BlockCopy(values, 0, bytes, 0, values.Length * sizeof(float));
     return ImageTexture.CreateFromImage(
       Godot.Image.CreateFromData(WeightTextureWidth, rows, false, Godot.Image.Format.Rf, bytes));
   }

@@ -37,9 +37,6 @@ static func apply(scene: Node, source_file: String) -> String:
 	var err: String = _load_recipe(ctx, String(spec["recipe"]))
 	if not err.is_empty():
 		return err
-	err = _verify_recipe(ctx)
-	if not err.is_empty():
-		return err
 	err = _verify_structure_targets(ctx)
 	if not err.is_empty():
 		return err
@@ -63,12 +60,7 @@ static func _load_recipe(ctx: Dictionary, recipe_path: String) -> String:
 	var resource: Resource = ResourceLoader.load(recipe_path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as Resource
 	if resource == null:
 		return String(ctx["key"]) + "/recipe: failed to load " + recipe_path
-	ctx["recipe"] = resource
-	return ""
-
-static func _verify_recipe(ctx: Dictionary) -> String:
 	var key: String = String(ctx["key"])
-	var resource: Resource = ctx["recipe"] as Resource
 	var tongue_variant: Variant = resource.get_meta("tongue", null)
 	if typeof(tongue_variant) != TYPE_DICTIONARY:
 		return key + "/recipe/tongue: missing dictionary"
@@ -270,19 +262,11 @@ static func _extract_role_surface(label: String, arrays: Array, indices: PackedI
 		var lod_count: int = lod_data.size() / index_stride
 		for t2: int in lod_count / 3:
 			var corner_role: int = 0
-			var bad: bool = false
 			for c: int in 3:
 				var v2: int = _index_at(lod_data, t2 * 3 + c, index_stride)
-				if v2 < 0 or v2 >= vertices or vertex_roles[v2] == 0:
-					bad = true
-					break
-				if corner_role == 0:
-					corner_role = vertex_roles[v2]
-				elif corner_role != vertex_roles[v2]:
-					bad = true
-					break
-			if bad:
-				return label + ": LOD triangle " + str(t2) + " has invalid or cross-role corners"
+				if v2 < 0 or v2 >= vertices or vertex_roles[v2] == 0 or (corner_role != 0 and corner_role != vertex_roles[v2]):
+					return label + ": LOD triangle " + str(t2) + " has invalid or cross-role corners"
+				corner_role = vertex_roles[v2]
 			if corner_role != role:
 				continue
 			for c2: int in 3:
@@ -311,7 +295,6 @@ static func _extract_nt_bytes(label: String, surface_data: Dictionary, format: i
 		var start: int = normal_offset + selected[i] * stride
 		nt_bytes.append_array(vertex_data.slice(start, start + stride))
 	build["nt_bytes"] = nt_bytes
-	build["nt_stride"] = stride
 	return ""
 
 static func _update_derived_nt(target: ArrayMesh, out_index: int, format: int, build: Dictionary, label: String) -> String:

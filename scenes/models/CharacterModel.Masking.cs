@@ -56,13 +56,11 @@ public partial class CharacterModel
     /// <summary>One region entry minted and owned by its mask runtime.</summary>
     public sealed class Region
     {
-      private readonly bool _defaultEnabled;
-
-      internal Region(MaskRuntime owner, StringName name, bool defaultEnabled)
+      internal Region(MaskRuntime owner, StringName name, int index)
       {
         Owner = owner;
         Name = name;
-        _defaultEnabled = defaultEnabled;
+        Index = index;
       }
 
       /// <summary>The runtime that minted this entry.</summary>
@@ -72,10 +70,9 @@ public partial class CharacterModel
       public StringName Name { get; }
 
       /// <summary>Whether this region is enabled on its owning mask.</summary>
-      public bool Enabled => Owner._states.TryGetValue(Name, out bool enabled) ? enabled : _defaultEnabled;
+      public bool Enabled => (Owner._enabledBits & (1L << Index)) != 0;
 
-      /// <summary>The configured initial enabled state.</summary>
-      internal bool DefaultEnabled => _defaultEnabled;
+      internal int Index { get; }
     }
 
     /// <summary>
@@ -117,7 +114,7 @@ public partial class CharacterModel
         VariantCacheByConfiguration[_cacheKey] = new VariantCache();
       }
 
-      ApplyCurrent(StoredMaskBits());
+      ApplyCurrent(_enabledBits);
     }
 
     private CharacterModel Model { get; }
@@ -133,9 +130,8 @@ public partial class CharacterModel
     // Plain fields on purpose: hot reload persists plain fields but empties
     // field-initialized readonly collections, so these caches and states survive.
     private SysColGeneric.List<Region> _regions = new();
-    private SysColGeneric.Dictionary<Region, int> _regionBits = new();
     private SysColGeneric.List<long[]> _triangleMasks = new();
-    private SysColGeneric.Dictionary<string, bool> _states = new();
+    private long _enabledBits;
     private MeshInstance3D _body;
     private ArrayMesh _fullMesh;
     private long _defaultBits;
@@ -145,19 +141,6 @@ public partial class CharacterModel
     // Null until the first render, not a sentinel bitset: the all-64-enabled
     // combination is the valid bitset -1 and must still render.
     private long? _lastBits;
-
-    /// <summary>Bits computed from the stored mask states; prepared selections seed from these so uncontrolled regions survive.</summary>
-    private long StoredMaskBits()
-    {
-      long bits = 0;
-      for (int i = 0; i < _regions.Count; i++)
-      {
-        if (_states.TryGetValue(_regions[i].Name, out bool enabled) ? enabled : _regions[i].DefaultEnabled)
-          bits |= 1L << i;
-      }
-
-      return bits;
-    }
 
     private long BitsOf(System.Collections.Generic.IEnumerable<Region> regions)
     {
@@ -180,7 +163,7 @@ public partial class CharacterModel
       System.Collections.Generic.IEnumerable<Region> controlled,
       System.Collections.Generic.IEnumerable<Region> active)
     {
-      long bits = (StoredMaskBits() & ~BitsOf(controlled)) | BitsOf(active);
+      long bits = (_enabledBits & ~BitsOf(controlled)) | BitsOf(active);
       return () => WriteStates(bits);
     }
 
@@ -202,8 +185,7 @@ public partial class CharacterModel
 
     private void WriteStates(long bits)
     {
-      for (int i = 0; i < _regions.Count; i++)
-        _states[_regions[i].Name] = (bits & (1L << i)) != 0;
+      _enabledBits = bits;
       if (Model.IsNodeReady())
         ApplyCurrent(bits);
     }
@@ -212,7 +194,9 @@ public partial class CharacterModel
     // and fabricated entries are absent from the minted table.
     private int BitIndexOf(Region region)
     {
-      if (!_regionBits.TryGetValue(region, out int index))
+      ArgumentNullException.ThrowIfNull(region);
+      int index = region.Index;
+      if (index < 0 || index >= _regions.Count || !ReferenceEquals(_regions[index], region))
         throw new InvalidOperationException(
           $"The mask region '{region.Name}' was not minted by the mesh mask '{MeshPath}' of '{Model.Name}'.");
       return index;
@@ -304,7 +288,11 @@ public partial class CharacterModel
 
       var regions = new SysColGeneric.List<Region>();
       foreach (SysColGeneric.KeyValuePair<string, bool> entry in configuration.Masks)
-        regions.Add(new Region(this, entry.Key, entry.Value));
+      {
+        if (entry.Value)
+          _enabledBits |= 1L << regions.Count;
+        regions.Add(new Region(this, entry.Key, regions.Count));
+      }
       if (regions.Count > 64)
         throw new InvalidOperationException(
           $"The mesh mask '{MeshPath}' configuration defines {regions.Count} masks; the mask bitset holds at most 64.");
@@ -329,8 +317,6 @@ public partial class CharacterModel
       }
 
       _regions = regions;
-      for (int i = 0; i < regions.Count; i++)
-        _regionBits[regions[i]] = i;
     }
 
     private InvalidOperationException MissingConfigurationField(string field) => new(

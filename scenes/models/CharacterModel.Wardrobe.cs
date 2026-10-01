@@ -321,15 +321,13 @@ public partial class CharacterModel
   private void ApplySelection(string? key, Variant? selection)
   {
     var (garments, masks) = DeriveChanges(key, selection);
-    foreach ((NodePath path, _) in garments)
-      ResolveGarment(path);
     if (key is not null)
       Selections[key] = selection!.Value;
     else
       MaterializeDefaultPieceSelections();
-    foreach ((NodePath path, bool visible) in garments)
-      GetNode<Node>(path).Set("visible", Variant.From(visible));
-    foreach (Action commit in masks.Values)
+    foreach ((Node node, bool visible) in garments)
+      node.Set("visible", Variant.From(visible));
+    foreach (Action commit in masks)
       commit();
   }
 
@@ -344,8 +342,8 @@ public partial class CharacterModel
   // bound to it — not only the rules this write affects — so a rule another
   // component controls still contributes from the proposed state, and no write
   // re-resolves mesh paths.
-  private (SysColGeneric.List<(NodePath Path, bool Visible)> Garments,
-    SysColGeneric.Dictionary<MaskRuntime, Action> Masks) DeriveChanges(
+  private (SysColGeneric.List<(Node Node, bool Visible)> Garments,
+    SysColGeneric.List<Action> Masks) DeriveChanges(
     string? key, Variant? selection)
   {
     bool global = key is null or OutfitKey or ClothingEnabledKey;
@@ -373,23 +371,17 @@ public partial class CharacterModel
         return true;
       if (!clothing || !Selected(rule.Component))
         return false;
-      foreach (WardrobePiece piece in _components[rule.Component].Pieces)
-      {
-        if (piece.Variant == -1 || piece.Variant == outfit)
-          return true;
-      }
-
-      return false;
+      return HasGarmentForOutfit(rule.Component, outfit);
     }
 
-    var garments = new SysColGeneric.List<(NodePath Path, bool Visible)>();
+    var garments = new SysColGeneric.List<(Node Node, bool Visible)>();
     void GarmentsFor(string affected)
     {
       bool enabled = clothing && Selected(affected);
       foreach (WardrobePiece piece in _components[affected].Pieces)
       {
         bool visible = enabled && (piece.Variant == -1 || piece.Variant == outfit);
-        garments.Add((piece.Path, visible));
+        garments.Add((ResolveGarment(piece.Path), visible));
       }
     }
 
@@ -403,61 +395,29 @@ public partial class CharacterModel
       GarmentsFor(component);
     }
 
-    var groups = new SysColGeneric.Dictionary<MaskRuntime,
-      (SysColGeneric.List<MaskRuntime.Region> Controlled, SysColGeneric.List<MaskRuntime.Region> Active)>();
-    // Affected owners first: a runtime any affected rule binds to is fully
-    // re-derived below, so earlier unaffected rules of the same owner keep
-    // contributing from the proposed state instead of vanishing when a later
-    // rule's component created the group. Owners no affected rule binds to
-    // stay untouched by this write.
-    foreach (MaskRule rule in _maskRules)
+    var masks = new SysColGeneric.List<Action>();
+    foreach (MaskRuntime owner in _maskRules.AsValueEnumerable()
+      .Where(rule => global || rule.Component == component)
+      .Select(rule => rule.Region!.Owner).Distinct())
     {
-      if (!global && rule.Component != component)
-        continue;
-      MaskRuntime owner = rule.Region!.Owner;
-      if (!groups.ContainsKey(owner))
-        groups[owner] = (new SysColGeneric.List<MaskRuntime.Region>(),
-          new SysColGeneric.List<MaskRuntime.Region>());
-    }
-
-    foreach (MaskRule rule in _maskRules)
-    {
-      if (!groups.TryGetValue(rule.Region!.Owner, out var group))
-        continue;
-      group.Controlled.Add(rule.Region);
-      if (RuleIsActive(rule))
-        group.Active.Add(rule.Region);
-    }
-
-    var masks = new SysColGeneric.Dictionary<MaskRuntime, Action>();
-    foreach ((MaskRuntime owner,
-      (SysColGeneric.List<MaskRuntime.Region> controlled,
-        SysColGeneric.List<MaskRuntime.Region> active)) in groups)
-    {
-      masks[owner] = owner.PrepareSelection(controlled, active);
+      // Re-derive every rule on an affected mask, including other components'
+      // rules. Keep the first affected rule's commit order across masks.
+      var rules = _maskRules.AsValueEnumerable().Where(rule => rule.Region!.Owner == owner);
+      masks.Add(owner.PrepareSelection(
+        rules.Select(rule => rule.Region!).ToArray(),
+        rules.Where(RuleIsActive).Select(rule => rule.Region!).ToArray()));
     }
 
     return (garments, masks);
   }
 
-  private bool ComponentEnabled(StringName component)
-    => ClothingEnabled && ReadSelectionBool(PiecesPrefix + component, ComponentDefaultVisible(component));
+  private bool HasGarmentForOutfit(string component, int outfit)
+    => _components[component].Pieces.AsValueEnumerable()
+      .Any(piece => piece.Variant == -1 || piece.Variant == outfit);
 
-  // Effective visibility of one component's garments in the stored state: the
-  // piece is selected, clothing is enabled, and the current outfit owns at
-  // least one of its garments.
+  // Stored selection, master switch, and outfit membership jointly determine visibility.
   internal bool ComponentActive(string component)
-  {
-    if (!ComponentEnabled(component))
-      return false;
-    foreach (WardrobePiece piece in _components[component].Pieces)
-    {
-      if (piece.Variant == -1 || piece.Variant == OutfitIndex)
-        return true;
-    }
-
-    return false;
-  }
+    => ClothingEnabled && GetPiece(component) && HasGarmentForOutfit(component, OutfitIndex);
 
   // Garment pieces are required data: a missing node is invalid authored data and
   // must reject before any selection is stored or visibility applied.
