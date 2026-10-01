@@ -153,6 +153,50 @@ public partial class BattleStartupLifecycleTest
     Assert.True(ReferenceEquals(expected, AssertStartupFailureDisposes(setup, system)));
   }
 
+  [TestCase(typeof(SessionStartedBattleEvent), TestName = "A declared system submitting from SessionStarted is rejected and the opening stays intact")]
+  [TestCase(typeof(TurnStartedBattleEvent), TestName = "A declared system submitting from the opening turn-start is rejected and the opening stays intact")]
+  public void NestedOpeningSubmissionIsRejectedAndOpeningStaysIntact(Type sourceEvent)
+  {
+    var (setup, _, _) = GroupedSetup();
+    NestedOpeningSubmitHook? nested = null;
+    var recorder = new RecordingHook();
+    int startedCount = 0;
+    int completedCount = 0;
+    var system = new SetupSystemData
+    {
+      OnRegister = runtime =>
+      {
+        BattleUnitState registered = runtime.Query(new GetUnitAtTile(
+          runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
+        nested = new NestedOpeningSubmitHook(runtime, registered, sourceEvent);
+        runtime.RegisterHook<BattleEventTag>(nested);
+        runtime.RegisterHook<BattleEventTag>(recorder);
+        // Subscribed before the opening dispatch: the opening must fire no public pair.
+        runtime.ActionStarted += _ => startedCount++;
+        runtime.ActionCompleted += _ => completedCount++;
+      },
+    };
+
+    using var runtime = BattleFactory.Start(setup with { Systems = [system] }).RequireRight();
+
+    // The nested ExecuteAction was rejected at the open submission window: no damage cost,
+    // no lifecycle pair, and no committed or queued work from the attempt.
+    Assert.True(nested!.Rejected);
+    BattleUnitState unit = runtime.Query(new GetUnitAtTile(
+      runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
+    Assert.Equal(20, unit.CurrentHealth);
+    Assert.Equal(0, recorder.Received.EventsOf<UnitDamagedBattleEvent>().Length);
+    Assert.Equal(0, startedCount);
+    Assert.Equal(0, completedCount);
+    // The opening itself finished intact: exactly the two startup events in order, and the
+    // full initial AP top-up still ran.
+    Assert.Equal(1, recorder.Received.EventsOf<SessionStartedBattleEvent>().Length);
+    Assert.Equal(1, recorder.Received.EventsOf<TurnStartedBattleEvent>().Length);
+    recorder.Received.EventBefore<SessionStartedBattleEvent, TurnStartedBattleEvent>();
+    Assert.Equal(4, unit.MaxActionPoints);
+    Assert.Equal(4, unit.CurrentActionPoints);
+  }
+
   [TestCase(TestName = "A malformed spawn buff throws during preparation, before systems receive a runtime")]
   public void MalformedSpawnBuffDisposesRuntime()
   {
@@ -300,6 +344,30 @@ public partial class BattleStartupLifecycleTest
     using var runtime = BattleFactory.Start(terminal).RequireRight();
     Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsSome);
     Assert.True(runtime.Query(new GetCurrentTurnQuery()).IsNone);
+  }
+
+  // A declared-system callback that submits gameplay inside the opening dispatch window;
+  // the nested submission must be rejected before its damage cost or any queue work.
+  private sealed class NestedOpeningSubmitHook(BattleRuntime runtime, BattleUnitState unit, Type sourceEvent)
+    : BattleHook
+  {
+    public bool Rejected { get; private set; }
+
+    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
+    {
+      if (battleEvent.GetType() != sourceEvent)
+        return [];
+      try
+      {
+        runtime.ExecuteAction(BattleAction.ApplyDamage(
+          context.Read.State.TryGetAlive(unit).RequireSome(), 1));
+      }
+      catch (InvalidOperationException)
+      {
+        Rejected = true;
+      }
+      return [];
+    }
   }
 
   // The buff only activates once both sides are on the board, so its +2 maximum exists

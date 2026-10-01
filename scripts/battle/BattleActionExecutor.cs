@@ -18,6 +18,10 @@ public readonly struct BattleActionExecResult(BattleAction action, List<BattleEv
 /// </summary>
 public sealed class BattleActionExecutor : IDisposable
 {
+  // Exception.Data key under which a failed unwind capture retains its actual secondary
+  // cause; the primary exception itself always surfaces unchanged.
+  internal const string BattleCompletionCaptureFailureDataKey = "FunProject.Battle.BattleCompletionCaptureFailure";
+
   private readonly BattleRuntime _runtime;
   private readonly BattleHookRegistry _hooks = new();
 
@@ -153,9 +157,9 @@ public sealed class BattleActionExecutor : IDisposable
       if (step.TryTakeOutcome(out BattleOutcome outcome))
         Settle(session, outcome);
     }
-    catch
+    catch (Exception primary)
     {
-      UnwindFailedSubmission(session, step);
+      UnwindFailedSubmission(session, step, primary);
       throw;
     }
     finally
@@ -185,26 +189,30 @@ public sealed class BattleActionExecutor : IDisposable
   // and dirty options, and — only when a terminal request was already accepted — closes
   // combat from the actual retained state, without executing further effects, emitting a
   // synthetic success or end event, or turning the failure into ActionCompleted.
-  private void UnwindFailedSubmission(BattleSession session, BattleStep step)
+  private void UnwindFailedSubmission(BattleSession session, BattleStep step, Exception primary)
   {
     _pendingActions.Clear();
     _capturedInterrupts.Clear();
     session.ActionOptions.InvalidateAll();
 
-    if (!step.TryTakeOutcome(out BattleOutcome outcome))
+    // A settled-then-faulted submission already installed its completion (only the end-event
+    // broadcast failed); recapturing would replace the frozen report the end callback saw,
+    // so the first install always wins.
+    if (!_runtime.IsRunning || !step.TryTakeOutcome(out BattleOutcome outcome))
       return;
 
-    // The original exception must survive unwinding, so a secondary capture fault here is
-    // deliberately not propagated over it (an end-notification fault keeps the snapshot
-    // this path would install; an accepted outcome is committed execution state).
     try
     {
       _runtime.InstallCompleted(
         CompletedBattle.Capture(session.State, outcome, session.RoundNumber));
     }
-    catch
+    catch (Exception captureFailure)
     {
-      // Deliberate: cleanup serves the original exception (see the failure contract above).
+      // Fatal completion failure — not a frozen success: the primary exception still surfaces,
+      // the actual capture cause is retained on it, and the half-settled runtime is closed
+      // through its owner disposal so no fresh gameplay or query can run.
+      primary.Data[BattleCompletionCaptureFailureDataKey] = captureFailure;
+      _runtime.Dispose();
     }
   }
 

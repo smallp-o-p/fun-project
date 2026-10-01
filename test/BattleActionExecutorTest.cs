@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
@@ -77,10 +78,11 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Interrupts whose actor died earlier in the submission are interrupted")]
   public void InterruptWithDeadActorIsInterrupted()
   {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), health: 10, actionPoints: 5);
+    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), health: 10, actionPoints: 5, start: false);
     var unit = battle.Unit;
     var usable = TestData.MakeUsableItem("Medkit", maxCharges: 2);
     unit.AddInventoryItem(usable.Item);
+    battle.Start();
     battle.ClearEvents();
     battle.RegisterHook<UnitMovedBattleEvent>(new InterruptActionsHook(
       context =>
@@ -195,7 +197,14 @@ public partial class BattleActionExecutorTest
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
     var expected = new InvalidOperationException("end notification fault");
-    battle.RegisterHook<SessionEndedBattleEvent>(new ThrowOnFirstEventHook(expected));
+    CompletedBattle? callbackSnapshot = null;
+    int liveMaxAtEndCallback = 0;
+    battle.RegisterHook<SessionEndedBattleEvent>(new CampaignMutationFaultOnSessionEndedHook(
+      battle, battle.PlayerUnit, expected, (snapshot, liveMax) =>
+      {
+        callbackSnapshot = snapshot;
+        liveMaxAtEndCallback = liveMax;
+      }));
     int completedCount = 0;
     battle.Runtime.ActionCompleted += _ => completedCount++;
 
@@ -211,11 +220,67 @@ public partial class BattleActionExecutorTest
 
     Assert.True(ReferenceEquals(expected, caught));
     Assert.Equal(0, completedCount);
-    // The snapshot installed before the broadcast stays authoritative; fresh gameplay is gone.
+    // The real end callback proved the campaign mutation was live before it threw.
+    Assert.Equal(40, liveMaxAtEndCallback);
+    // The snapshot installed before the broadcast stays authoritative: the failed
+    // notification never recaptures, so the same reference survives with its original
+    // frozen numbers even though the campaign health stat now reads 40.
     CompletedBattle snapshot = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+    Assert.True(ReferenceEquals(callbackSnapshot, snapshot));
+    Assert.Equal(20,
+      snapshot.FactionSummaries[battle.PlayerFaction]
+        .HealthByCombatant[battle.PlayerUnit.Combatant].MaxHealth);
     Assert.Equal(BattleOutcome.Draw, snapshot.Outcome);
     Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
     Assert.True(battle.Submit(BattleAction.EndFactionTurn(battle.PlayerFaction)).IsNone);
+  }
+
+  [TestCase(TestName = "A capture fault during unwind keeps the primary exception, retains the cause, and closes the runtime")]
+  public void SecondaryCaptureFailureRetainsCauseAndDisposesRuntime()
+  {
+    // The loadout StatMod is the supported TargetType seam: armed inside the hook right
+    // after the terminal request, its TargetType read faults the frozen report's effective
+    // stat resolution, so the unwind's real CompletedBattle.Capture is what fails — no
+    // production seam and no replacement capture function involved.
+    var armedMod = new ArmedFaultStatMod(new InvalidOperationException("capture stat fault"));
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
+    var unit = battle.Spawn(
+      TestData.MakeCombatant("Alpha", player, actionPoints: 5), new Vector3I(0, 0, 0), statMods: [armedMod]);
+    battle.Spawn(TestData.MakeCombatant("Hostile", enemy, health: 100), new Vector3I(3, 0, 3));
+    battle.Start();
+    var runtime = battle.Runtime;
+    var expected = new InvalidOperationException("primary hook fault");
+    Exception captureCause = armedMod.Fault;
+    battle.RegisterHook<UnitMovedBattleEvent>(
+      new RequestEndArmThrowHook(armedMod, expected));
+    int completedCount = 0;
+    runtime.ActionCompleted += _ => completedCount++;
+
+    Exception? caught = null;
+    try
+    {
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)]));
+    }
+    catch (Exception error)
+    {
+      caught = error;
+    }
+
+    // The primary exception keeps its identity; the actual capture cause rides on it.
+    Assert.True(ReferenceEquals(expected, caught));
+    var data = caught!.Data;
+    const string captureFailureKey = BattleActionExecutor.BattleCompletionCaptureFailureDataKey;
+    Assert.True(data.Contains(captureFailureKey));
+    Assert.True(ReferenceEquals(captureCause, data[captureFailureKey]));
+    // A fatal completion failure, not a frozen success: no ActionCompleted, no synthetic end
+    // event, and the closed runtime refuses fresh queries and submissions.
+    Assert.Equal(0, completedCount);
+    Assert.Equal(0, battle.Events.EventsOf<SessionEndedBattleEvent>().Length);
+    Assert.Throws<ObjectDisposedException>(() => battle.Query(new GetCompletedBattleQuery()));
+    Assert.Throws<ObjectDisposedException>(() =>
+      battle.Submit(BattleAction.EndFactionTurn(battle.PlayerFaction)));
   }
 
   [TestCase(TestName = "A stun reaction after the first movement step interrupts the remaining route")]
@@ -804,6 +869,55 @@ public partial class BattleActionExecutorTest
   {
     protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitMovedBattleEvent evt)
       => build(context);
+  }
+
+  // Loadout StatMod double: inert until armed; the armed TargetType read throws, faulting
+  // every effective-stat resolution — the real Capture read path, without a production seam.
+  private sealed partial class ArmedFaultStatMod(Exception failure) : StatMod
+  {
+    private bool _armed;
+
+    public Exception Fault => failure;
+
+    public void Arm() => _armed = true;
+
+    public override Type TargetType
+    {
+      get
+      {
+        if (_armed)
+          throw failure;
+        return typeof(HealthStat);
+      }
+    }
+  }
+
+  // Terminal request, then arm the stat collaborator, then throw: earlier setup and the
+  // broadcast succeeded, so the unwind's Capture read is what faults.
+  private sealed class RequestEndArmThrowHook(ArmedFaultStatMod armedMod, Exception failure)
+    : BattleHook<UnitMovedBattleEvent>
+  {
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitMovedBattleEvent evt)
+    {
+      context.Read.RunningSession.IfSome(session => session.RequestEnd(BattleOutcome.Victory));
+      armedMod.Arm();
+      throw failure;
+    }
+  }
+
+  // Real end-notification fault: records the callback-visible snapshot, mutates the original
+  // campaign health stat (a recapture would read the changed value), then throws the sentinel.
+  private sealed class CampaignMutationFaultOnSessionEndedHook(
+    BattleFixture battle, BattleUnitState unit, Exception failure, Action<CompletedBattle, int> observe)
+    : BattleHook<SessionEndedBattleEvent>
+  {
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, SessionEndedBattleEvent evt)
+    {
+      CompletedBattle callbackSnapshot = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+      unit.Combatant.GetStat<HealthStat>().BaseValue = 40;
+      observe(callbackSnapshot, unit.MaxHealth);
+      throw failure;
+    }
   }
 
   // Throws the supplied failure on its first firing, whichever event key it is registered

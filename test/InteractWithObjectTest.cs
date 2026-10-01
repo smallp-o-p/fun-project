@@ -160,8 +160,17 @@ public class InteractWithObjectTest
     battle.Submit(BattleAction.InteractWithObject(unitProof, objectProof));
 
     Assert.True(battle.Session.TryGetAliveObject(bomb).IsNone);
-    // The stale proof interrupts quietly inside the submission: exactly the first
-    // interaction's event committed, and the object stays terminal.
+    int apAfterInteraction = unit.CurrentActionPoints;
+
+    // The saved object proof went stale at defusal: a second submission with it interrupts
+    // quietly — no AP cost, no second interaction event, terminal status/occupancy unchanged.
+    battle.Submit(BattleAction.InteractWithObject(unitProof, objectProof));
+
+    Assert.Equal(apAfterInteraction, unit.CurrentActionPoints);
+    Assert.Equal(Some(ObjectStatus.Interacted), bomb.Status);
+    Assert.True(battle.Session.TryGetAliveObject(bomb).IsNone);
+    Assert.False(battle.Board.IsBlockedByObject(point));
+    Assert.Equal(point.Raw, bomb.Position);
     Assert.Equal(1, battle.Events.EventsOf<ObjectInteractedBattleEvent>().AsValueEnumerable().Count());
   }
 }

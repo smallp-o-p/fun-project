@@ -188,9 +188,10 @@ public class UnitActionCacheTest
   [TestCase]
   public void UseAndThrowSpendingLastActionPointDisableActorVerbs()
   {
-    using var useBattle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1, Weapon: TestData.MakeWeapon("Rifle")));
+    using var useBattle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1, Weapon: TestData.MakeWeapon("Rifle")), start: false);
     ItemWith<ChargesCapability> usable = TestData.MakeUsableItem("Medkit");
     useBattle.PlayerUnit.AddInventoryItem(usable.Item);
+    useBattle.Start();
     IReadOnlyList<UnitAction> useActions = useBattle.Query(
       new GetAvailableActionsForUnit(useBattle.Alive(useBattle.PlayerUnit)));
     EvaluateAll(useActions);
@@ -201,9 +202,10 @@ public class UnitActionCacheTest
     Assert.False(Row<AttackActionDefinition>(useActions).IsAvailable);
     Assert.False(Row<PassActionDefinition>(useActions).IsAvailable);
 
-    using var throwBattle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1, Weapon: TestData.MakeWeapon("Rifle")));
+    using var throwBattle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1, Weapon: TestData.MakeWeapon("Rifle")), start: false);
     ItemWith<ThrowableCapability> throwable = TestData.MakeThrowable("Rock");
     throwBattle.PlayerUnit.AddInventoryItem(throwable.Item);
+    throwBattle.Start();
     IReadOnlyList<UnitAction> throwActions = throwBattle.Query(
       new GetAvailableActionsForUnit(throwBattle.Alive(throwBattle.PlayerUnit)));
     EvaluateAll(throwActions);

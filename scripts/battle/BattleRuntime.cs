@@ -76,7 +76,18 @@ public sealed class BattleRuntime : IDisposable
   internal void DispatchOpeningTurn()
   {
     ThrowIfDisposed();
-    _actions.Execute(new OpeningTurn());
+    // The opening owns the same submission window as any Submit: declared-system callbacks
+    // fire inside it, and a nested ExecuteAction from them must be rejected before touching
+    // either queue. It stays internal orchestration — no public ActionStarted/ActionCompleted.
+    _actions.BeginSubmission();
+    try
+    {
+      _actions.Execute(new OpeningTurn());
+    }
+    finally
+    {
+      _actions.EndSubmission();
+    }
   }
 
   private sealed class OpeningTurn : BattleAction
