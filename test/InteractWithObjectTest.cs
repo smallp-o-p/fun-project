@@ -130,10 +130,11 @@ public class InteractWithObjectTest
 
     LiveObject foreignProof = foreign.Live(foreignBomb);
 
-    Assert.Equal(
-      BattleAction.Result.Interrupted,
-      BattleAction.InteractWithObject(local.Alive(localUnit), foreignProof).Execute(local.Session));
+    // The foreign proof is stale inside the local battle, so the submission interrupts
+    // quietly: no interaction event, no local occupancy change.
+    local.Submit(BattleAction.InteractWithObject(local.Alive(localUnit), foreignProof));
 
+    Assert.Equal(0, local.Events.EventsOf<ObjectInteractedBattleEvent>().AsValueEnumerable().Count());
     Assert.True(localBomb.Status.IsNone);
     Assert.True(local.Session.TryGetAliveObject(localBomb).IsSome);
     Assert.True(local.Board.IsBlockedByObject(localPoint));
@@ -159,7 +160,8 @@ public class InteractWithObjectTest
     battle.Submit(BattleAction.InteractWithObject(unitProof, objectProof));
 
     Assert.True(battle.Session.TryGetAliveObject(bomb).IsNone);
-    Assert.Equal(BattleAction.Result.Interrupted,
-      BattleAction.InteractWithObject(unitProof, objectProof).Execute(battle.Session));
+    // The stale proof interrupts quietly inside the submission: exactly the first
+    // interaction's event committed, and the object stays terminal.
+    Assert.Equal(1, battle.Events.EventsOf<ObjectInteractedBattleEvent>().AsValueEnumerable().Count());
   }
 }

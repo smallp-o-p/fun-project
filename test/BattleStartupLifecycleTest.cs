@@ -177,6 +177,39 @@ public partial class BattleStartupLifecycleTest
     Assert.True(observed.Message.Contains("no activation condition"));
   }
 
+  // A condition fault during preparation's spawn-buff evaluation is the preparation-fault
+  // class with a capturable cause: the original exception must surface unwrapped.
+  private sealed partial class ThrowingBuffCondition(Exception failure) : BuffCondition
+  {
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) => throw failure;
+  }
+
+  [TestCase(TestName = "A preparation fault preserves its original cause and never registers declared systems")]
+  public void PreparationFaultPreservesCauseAndNeverRegistersSystems()
+  {
+    var (setup, player, _) = GroupedSetup();
+    var expected = new InvalidOperationException("preparation sentinel");
+    var broken = setup with
+    {
+      Sides =
+      [
+        setup.Sides[0] with
+        {
+          Units = [new UnitPlacement(
+            new UnitLoadout(TestData.MakeCombatant("Alpha", player,
+              buffs: [TestData.MakeBuff("Throwing", new ThrowingBuffCondition(expected))])),
+            new Vector3I(0, 0, 0))],
+        },
+        setup.Sides[1],
+      ],
+    };
+    var system = new SetupSystemData();
+
+    Exception observed = AssertPreparationFailureBeforeRegistration(broken, system);
+
+    Assert.True(ReferenceEquals(expected, observed));
+  }
+
   [TestCase(TestName = "An empty side is a typed NoConsciousUnits failure naming the faction, before systems register")]
   public void EmptyRosterFailsTyped()
   {

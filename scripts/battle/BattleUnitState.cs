@@ -95,12 +95,12 @@ public sealed class BattleUnitState
     }
   }
 
-  public void RefreshForNewTurn()
+  internal void RefreshForNewTurn()
   {
     CurrentActionPoints = MaxActionPoints;
   }
 
-  public bool TrySpendActionPoints(int cost)
+  internal bool TrySpendActionPoints(int cost)
   {
     if (cost < 0 || CurrentActionPoints < cost)
       return false;
@@ -118,7 +118,7 @@ public sealed class BattleUnitState
         $"Unit {Id} cannot spend {cost} action points (has {CurrentActionPoints}).");
   }
 
-  public void ReceiveDamage(int amount)
+  internal void ReceiveDamage(int amount)
   {
     if (amount <= 0)
       return;
@@ -172,7 +172,7 @@ public sealed class BattleUnitState
       () => throw new InvalidOperationException($"Unit {Id} has no equipped weapon."));
   }
 
-  public void AddInventoryItem(EquippableItem item)
+  internal void AddInventoryItem(EquippableItem item)
   {
     _inventory.Add(item);
   }
@@ -182,7 +182,7 @@ public sealed class BattleUnitState
     return _inventory.Contains(item);
   }
 
-  public bool RemoveInventoryItem(EquippableItem item)
+  internal bool RemoveInventoryItem(EquippableItem item)
   {
     return _inventory.Remove(item);
   }

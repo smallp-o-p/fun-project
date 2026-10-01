@@ -81,7 +81,7 @@ public sealed class BattleRuntime : IDisposable
 
   private sealed class OpeningTurn : BattleAction
   {
-    public override Result Execute(BattleSession session)
+    internal override Result ExecuteStep(BattleSession session)
     {
       session.OpeningTurnDispatch();
       return Result.Completed;
@@ -160,10 +160,24 @@ public sealed class BattleRuntime : IDisposable
     if (_lifecycle is not Lifecycle.Running)
       return None;
 
-    ActionStarted.Invoke(action);
-    BattleActionExecResult result = _actions.Execute(action);
-    ActionCompleted.Invoke(result);
-    return Some(result);
+    // The submission window opens before ActionStarted and closes before ActionCompleted:
+    // nested calls are rejected before touching either queue, while an ActionCompleted
+    // observer may start a separate submission whose events stay outside this result's
+    // bounded range. An observer fault after ActionCompleted begins is a notification
+    // failure — the committed submission stands.
+    _actions.BeginSubmission();
+    try
+    {
+      ActionStarted.Invoke(action);
+      BattleActionExecResult result = _actions.Execute(action);
+      _actions.EndSubmission();
+      ActionCompleted.Invoke(result);
+      return Some(result);
+    }
+    finally
+    {
+      _actions.EndSubmission();
+    }
   }
 
   public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0)

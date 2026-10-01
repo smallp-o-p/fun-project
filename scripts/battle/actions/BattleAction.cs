@@ -18,11 +18,22 @@ public abstract class BattleAction
     Incomplete,
   }
 
+  // The single guarded entry: only the executor's open submission step may run an action,
+  // so direct calls are rejected before any AP, ammunition, or occupancy cost.
+  internal Result Execute(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(session);
+    if (!session.IsExecutingStep)
+      throw new InvalidOperationException(
+        "Battle actions execute only inside the executor's submission step.");
+    return ExecuteStep(session);
+  }
+
   /// <summary>
   /// Execute a single step in the action. Returns the result, which indicates to the executor whether the action is finished.
   /// </summary>
   /// <param name="session"></param>
-  public abstract Result Execute(BattleSession session);
+  internal abstract Result ExecuteStep(BattleSession session);
 
   public static SpawnUnit SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position)
   {
@@ -105,7 +116,7 @@ public sealed class MoveUnit : BattleAction
     StepApCost = actionPointCostPerStep;
   }
 
-  public override Result Execute(BattleSession session)
+  internal override Result ExecuteStep(BattleSession session)
   {
     if (session.TryGetAlive(Unit).IsNone || Unit.IsIncapacitated)
       return Result.Interrupted;

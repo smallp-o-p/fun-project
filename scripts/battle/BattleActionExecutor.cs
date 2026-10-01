@@ -34,6 +34,7 @@ public sealed class BattleActionExecutor : IDisposable
 
   private readonly List<BattleAction> _capturedInterrupts = [];
   private Option<BattleAction> _inFlightAction = None;
+  private bool _submissionOpen;
   private bool _settling;
   private bool _disposed;
 
@@ -43,6 +44,9 @@ public sealed class BattleActionExecutor : IDisposable
   {
     ArgumentNullException.ThrowIfNull(runtime);
     _runtime = runtime;
+    // One live executor per receiver: reject a duplicate before subscribing to the
+    // committed stream or attaching any default hook.
+    _runtime.CurrentSession.AttachExecutor();
     _runtime.State.ActionOptions.InvalidateAll();
     _runtime.State.Committed += OnEventCommitted;
 
@@ -151,10 +155,7 @@ public sealed class BattleActionExecutor : IDisposable
     }
     catch
     {
-      // A failed submission is fully unwound: nothing queued stays executable, so a later
-      // Submit starts from a clean slate instead of resuming stale work.
-      _pendingActions.Clear();
-      session.ActionOptions.InvalidateAll();
+      UnwindFailedSubmission(session, step);
       throw;
     }
     finally
@@ -166,6 +167,45 @@ public sealed class BattleActionExecutor : IDisposable
     }
 
     return new BattleActionExecResult(action, _eventLog, logStart, _eventLog.Count - logStart);
+  }
+
+  // The submission window is open: a second overlapping submission would corrupt the
+  // shared queues, so it is rejected before either is touched.
+  internal void BeginSubmission()
+  {
+    if (_submissionOpen)
+      throw new InvalidOperationException(
+        "A battle submission is already running; nested submissions are rejected.");
+    _submissionOpen = true;
+  }
+
+  internal void EndSubmission() => _submissionOpen = false;
+
+  // A failed submission preserves its committed mutations and events, clears queued work
+  // and dirty options, and — only when a terminal request was already accepted — closes
+  // combat from the actual retained state, without executing further effects, emitting a
+  // synthetic success or end event, or turning the failure into ActionCompleted.
+  private void UnwindFailedSubmission(BattleSession session, BattleStep step)
+  {
+    _pendingActions.Clear();
+    _capturedInterrupts.Clear();
+    session.ActionOptions.InvalidateAll();
+
+    if (!step.TryTakeOutcome(out BattleOutcome outcome))
+      return;
+
+    // The original exception must survive unwinding, so a secondary capture fault here is
+    // deliberately not propagated over it (an end-notification fault keeps the snapshot
+    // this path would install; an accepted outcome is committed execution state).
+    try
+    {
+      _runtime.InstallCompleted(
+        CompletedBattle.Capture(session.State, outcome, session.RoundNumber));
+    }
+    catch
+    {
+      // Deliberate: cleanup serves the original exception (see the failure contract above).
+    }
   }
 
   private void PushCapturedInterrupts(BattleStep step)

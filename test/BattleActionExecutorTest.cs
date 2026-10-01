@@ -101,18 +101,121 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "A failed submission is unwound; the next Submit does not resume stale work")]
   public void FailedSubmissionIsUnwoundForNextSubmit()
   {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
-    var faction = battle.PlayerFaction;
-    battle.RegisterHook<TurnEndedBattleEvent>(new ThrowOnFirstTurnEndedHook());
+    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), actionPoints: 5);
+    var unit = battle.Unit;
+    var runtime = battle.Runtime;
+    var expected = new InvalidOperationException("route fault");
+    battle.RegisterHook<UnitMovedBattleEvent>(new InterruptActionsHook(
+      context => [BattleAction.PassUnit(context.Read.State.TryGetAlive(unit).RequireSome())]));
+    battle.RegisterHook<TileOccupiedBattleEvent>(new ThrowOnFirstEventHook(expected));
+    IReadOnlyList<UnitAction> retainedOptions = battle.Query(
+      new GetAvailableActionsForUnit(battle.Alive(unit)));
+    foreach (UnitAction option in retainedOptions)
+      _ = option.IsAvailable;
+    int completedCount = 0;
+    runtime.ActionCompleted += _ => completedCount++;
+    battle.ClearEvents();
 
-    Assert.Throws<InvalidOperationException>(
-      () => battle.Submit(BattleAction.EndFactionTurn(faction)));
+    Exception? caught = null;
+    try
+    {
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0), battle.At(2, 0, 0)]));
+    }
+    catch (Exception error)
+    {
+      caught = error;
+    }
 
-    // The failed submission must leave nothing queued: the recovery submission advances the
-    // round exactly once (a stale queued EndFactionTurn would advance it twice).
-    battle.Submit(BattleAction.EndFactionTurn(faction));
+    // The original fault surfaces unchanged and never turns into a completion.
+    Assert.True(ReferenceEquals(expected, caught));
+    Assert.Equal(0, completedCount);
+    // The first tile's committed mutations survive; the queued interrupt, the remaining
+    // route, and any undispatched follow-up do not run.
+    Assert.Equal(new Vector3I(1, 0, 0), battle.PositionOf(unit).RequireSome().Raw);
+    Assert.Equal(4, unit.CurrentActionPoints);
+    Assert.Equal(0, battle.Events.EventsOf<UnitActivationEndedBattleEvent>().Length);
+    // Every retained option leaves the failed submission dirty, even the ones the events
+    // alone would not have touched.
+    Assert.True(retainedOptions.AsValueEnumerable()
+      .Single(option => option.Action is EndTurnActionDefinition).IsDirty);
 
+    // The recovery submission starts from a clean slate: one activation ends, the round
+    // advances exactly once, and no stale route step executes.
+    battle.ClearEvents();
+    battle.Pass(unit);
+    Assert.Equal(new Vector3I(1, 0, 0), battle.PositionOf(unit).RequireSome().Raw);
+    Assert.Equal(1, battle.Events.EventsOf<UnitActivationEndedBattleEvent>().Length);
     Assert.Equal(2, battle.Query(new GetCurrentTurnQuery()).RequireSome().RoundNumber);
+  }
+
+  [TestCase(TestName = "A terminal request followed by a hook fault closes combat from retained state without success events")]
+  public void TerminalRequestThenHookFaultClosesWithoutSuccessEvents()
+  {
+    var start = new Vector3I(0, 0, 0);
+    var mid = new Vector3I(1, 0, 0);
+    var end = new Vector3I(2, 0, 0);
+    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), start, actionPoints: 5);
+    var unit = battle.Unit;
+    var runtime = battle.Runtime;
+    var expected = new InvalidOperationException("terminal route fault");
+    battle.RegisterHook<UnitMovedBattleEvent>(new RequestVictoryOnMovedHook());
+    battle.RegisterHook<TileOccupiedBattleEvent>(new ThrowOnFirstEventHook(expected));
+    int completedCount = 0;
+    runtime.ActionCompleted += _ => completedCount++;
+
+    Exception? caught = null;
+    try
+    {
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)]));
+    }
+    catch (Exception error)
+    {
+      caught = error;
+    }
+
+    Assert.True(ReferenceEquals(expected, caught));
+    Assert.Equal(mid, battle.Alive(unit).Position.Raw);
+    Assert.Equal(0, completedCount);
+    Assert.Equal(0, battle.Events.EventsOf<SessionEndedBattleEvent>().Length);
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsSome);
+    Assert.True(battle.Submit(BattleAction.EndFactionTurn(battle.PlayerFaction)).IsNone);
+    // The frozen report reflects the actual retained state: the mover survived the first
+    // tile unwounded, so nobody is wounded and the roster is the one combatant.
+    CompletedBattle completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+    Assert.Equal(BattleOutcome.Victory, completed.Outcome);
+    Assert.Equal(1, completed.Factions[battle.PlayerFaction].Spawned);
+    Assert.Equal(0, completed.Factions[battle.PlayerFaction].Killed);
+    Assert.Equal(0, completed.FactionSummaries[battle.PlayerFaction].CombatantsWounded.Count);
+  }
+
+  [TestCase(TestName = "A fault during end-event notification keeps the installed snapshot and propagates the cause")]
+  public void EndNotificationFaultKeepsInstalledSnapshotAvailable()
+  {
+    using var battle = BattleFixture.Duel();
+    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+    var expected = new InvalidOperationException("end notification fault");
+    battle.RegisterHook<SessionEndedBattleEvent>(new ThrowOnFirstEventHook(expected));
+    int completedCount = 0;
+    battle.Runtime.ActionCompleted += _ => completedCount++;
+
+    Exception? caught = null;
+    try
+    {
+      battle.EndFactionTurn(battle.PlayerFaction);
+    }
+    catch (Exception error)
+    {
+      caught = error;
+    }
+
+    Assert.True(ReferenceEquals(expected, caught));
+    Assert.Equal(0, completedCount);
+    // The snapshot installed before the broadcast stays authoritative; fresh gameplay is gone.
+    CompletedBattle snapshot = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+    Assert.Equal(BattleOutcome.Draw, snapshot.Outcome);
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
+    Assert.True(battle.Submit(BattleAction.EndFactionTurn(battle.PlayerFaction)).IsNone);
   }
 
   [TestCase(TestName = "A stun reaction after the first movement step interrupts the remaining route")]
@@ -539,6 +642,63 @@ public partial class BattleActionExecutorTest
     Assert.Equal(factionB, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
   }
 
+  [TestCase(TestName = "A second live executor attachment on one receiver is rejected before any default hook attaches")]
+  public void DuplicateExecutorAttachmentIsRejected()
+  {
+    // A directly owned engine subject, not a fixture battle: construction doors only.
+    var faction = TestData.MakeFaction("Player");
+    var state = new BattleState(new BattleBoardState(new Vector3I(3, 1, 3)), [faction]);
+    using var runtime = BattleRuntime.Create(state);
+
+    Assert.Throws<InvalidOperationException>(() => _ = new BattleActionExecutor(runtime));
+
+    // The rejected constructor left no second committed-stream handler behind: the real
+    // executor's submission forwards every committed event exactly once.
+    var forwarded = new List<BattleEvent>();
+    runtime.BattleEventCommitted += forwarded.Add;
+    runtime.ExecuteAction(BattleAction.SpawnUnit(
+      TestData.MakeCombatant("Alpha", faction), state.Board.At(0, 0, 0)));
+    Assert.Equal(1, forwarded.Count);
+    Assert.True(forwarded[0] is UnitAddedBattleEvent);
+  }
+
+  [TestCase(TestName = "Direct action execution outside the executor step is rejected before any cost")]
+  public void DirectActionExecutionOutsideExecutorStepIsRejected()
+  {
+    // A directly owned engine subject: the receiver resolves through the actual internal
+    // read context, and the built-in actions run through their real entry door.
+    var faction = TestData.MakeFaction("Player");
+    var state = new BattleState(new BattleBoardState(new Vector3I(4, 1, 4)), [faction]);
+    using var runtime = BattleRuntime.Create(state);
+    BattleSession session = runtime.GetReadContext().RunningSession.RequireSome();
+    var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 1);
+    Assert.True(weapon.TrySpendShot([]).IsSome);
+    BattleUnitState unit = state.AddUnit(
+      TestData.MakeCombatant("Alpha", faction, actionPoints: 5), state.Board.At(1, 0, 1),
+      Some((Weapon)weapon), None);
+    var forwarded = new List<BattleEvent>();
+    runtime.BattleEventCommitted += forwarded.Add;
+    int startedCount = 0;
+    int completedCount = 0;
+    runtime.ActionStarted += _ => startedCount++;
+    runtime.ActionCompleted += _ => completedCount++;
+
+    BattleAction move = BattleAction.MoveUnit(
+      state.TryGetAlive(unit).RequireSome(), [state.Board.At(2, 0, 1)]);
+    BattleAction reload = BattleAction.ReloadWeapon(state.TryGetAlive(unit).RequireSome(), weapon);
+
+    Assert.Throws<InvalidOperationException>(() => move.Execute(session));
+    Assert.Throws<InvalidOperationException>(() => reload.Execute(session));
+
+    // Nothing was spent, moved, fired, or signalled.
+    Assert.Equal(5, unit.CurrentActionPoints);
+    Assert.Equal(0, weapon.CurrentAmmo);
+    Assert.Equal(new Vector3I(1, 0, 1), state.Board.FindOccupantPosition(unit.Id).RequireSome().Raw);
+    Assert.Equal(0, forwarded.Count);
+    Assert.Equal(0, startedCount);
+    Assert.Equal(0, completedCount);
+  }
+
   private sealed partial class DamageOnTileOccupiedHook<TEventKey> : BattleHook
     where TEventKey : BattleEventTag
   {
@@ -646,17 +806,29 @@ public partial class BattleActionExecutorTest
       => build(context);
   }
 
-  // Throws on its first firing only, so a recovery submission can succeed afterwards.
-  private sealed class ThrowOnFirstTurnEndedHook : BattleHook<TurnEndedBattleEvent>
+  // Throws the supplied failure on its first firing, whichever event key it is registered
+  // under; the original exception identity is what the fault tests assert.
+  private sealed class ThrowOnFirstEventHook(Exception failure) : BattleHook
   {
     private bool _thrown;
 
-    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TurnEndedBattleEvent evt)
+    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
     {
       if (_thrown)
         return [];
       _thrown = true;
-      throw new InvalidOperationException("Hook failure.");
+      throw failure;
+    }
+  }
+
+  // Requests a terminal outcome through the running receiver, the way an objective
+  // directive does inside an accepted step.
+  private sealed class RequestVictoryOnMovedHook : BattleHook<UnitMovedBattleEvent>
+  {
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitMovedBattleEvent evt)
+    {
+      context.Read.RunningSession.IfSome(session => session.RequestEnd(BattleOutcome.Victory));
+      return [];
     }
   }
 }

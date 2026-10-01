@@ -26,6 +26,7 @@ public sealed class BattleSession
 
   private readonly TurnScheduler _scheduler;
   private BattleStep? _step;
+  private bool _executorAttached;
 
   internal BattleState State { get; }
 
@@ -63,7 +64,22 @@ public sealed class BattleSession
 
   internal void EndStep() => _step = null;
 
+  // One executor submission is open: actions may execute and terminal requests are legal.
+  // BeginStep is the executor's door, so an open step is always an executor-owned one.
+  internal bool IsExecutingStep => _step is not null;
+
   internal bool HasPendingOutcome => _step is not null && _step.HasPendingOutcome;
+
+  // One live executor per receiver: the runtime's constructor path attaches its single
+  // executor here before anything subscribes, so a duplicate attachment is rejected
+  // before it could double-handle the committed stream.
+  internal void AttachExecutor()
+  {
+    if (_executorAttached)
+      throw new InvalidOperationException(
+        "This receiver already has a live executor attached.");
+    _executorAttached = true;
+  }
 
   internal void RequestEnd(BattleOutcome outcome)
   {

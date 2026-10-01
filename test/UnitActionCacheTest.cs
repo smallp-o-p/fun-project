@@ -52,7 +52,7 @@ public class UnitActionCacheTest
 
   private sealed class SpendThenThrow(BattleUnitState unit, Exception failure) : BattleAction
   {
-    public override Result Execute(BattleSession session)
+    internal override Result ExecuteStep(BattleSession session)
     {
       unit.SpendActionPoints(1);
       throw failure;
@@ -61,7 +61,7 @@ public class UnitActionCacheTest
 
   private sealed class SpendThenReject(BattleUnitState unit) : BattleAction
   {
-    public override Result Execute(BattleSession session)
+    internal override Result ExecuteStep(BattleSession session)
     {
       unit.SpendActionPoints(1);
       return Result.Rejected;

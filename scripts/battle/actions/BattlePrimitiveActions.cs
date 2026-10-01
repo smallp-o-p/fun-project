@@ -40,7 +40,7 @@ public sealed class SpawnUnit : BattleAction
     StatMods = statMods ?? [];
   }
 
-  public override Result Execute(BattleSession session)
+  internal override Result ExecuteStep(BattleSession session)
   {
     // A running reinforcement: preparation owns initial placement, so occupancy is the only
     // rejectable fact here (the executor never runs primitives against completed combat).
@@ -57,7 +57,7 @@ public sealed class SpawnUnit : BattleAction
 /// action wrapping this primitive.</summary>
 public sealed class InteractWithObject(AliveUnit unit, LiveObject obj) : BattleAction
 {
-  public override Result Execute(BattleSession session)
+  internal override Result ExecuteStep(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
@@ -90,7 +90,7 @@ public sealed class InteractWithObject(AliveUnit unit, LiveObject obj) : BattleA
 // quiet drop is preferred to unwinding the whole submission over a normal reaction chain.
 public sealed class AttackEntity(AliveUnit attacker, AttackTarget target) : BattleAction
 {
-  public override Result Execute(BattleSession session)
+  internal override Result ExecuteStep(BattleSession session)
   {
     // A dead or incapacitated attacker has no right to perform a new action; that staleness
     // (killed or disabled by an earlier interrupt) interrupts quietly like every other mutable
@@ -166,7 +166,7 @@ public sealed class ThrowItem(
     return Consumable.From(proof);
   }
 
-  public override Result Execute(BattleSession session)
+  internal override Result ExecuteStep(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
@@ -200,7 +200,7 @@ public sealed class UseItem(AliveUnit unit, ItemWith<ChargesCapability> usable) 
     return Consumable.From(proof);
   }
 
-  public override Result Execute(BattleSession session)
+  internal override Result ExecuteStep(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
@@ -237,7 +237,7 @@ public sealed class ApplyDamage : BattleAction
     Kind = kind;
   }
 
-  public override Result Execute(BattleSession session)
+  internal override Result ExecuteStep(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
@@ -255,7 +255,7 @@ public sealed class ApplyDamage : BattleAction
 public sealed class PassUnit(AliveUnit unit) : BattleAction
 {
 
-  public override Result Execute(BattleSession session)
+  internal override Result ExecuteStep(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
@@ -269,7 +269,7 @@ public sealed class PassUnit(AliveUnit unit) : BattleAction
 
 public sealed class EndFactionTurn(Faction expectedActiveSide) : BattleAction
 {
-  public override Result Execute(BattleSession session)
+  internal override Result ExecuteStep(BattleSession session)
   {
     Faction activeSide = session.ActiveFaction;
     if (activeSide != expectedActiveSide)
@@ -282,7 +282,7 @@ public sealed class EndFactionTurn(Faction expectedActiveSide) : BattleAction
 
 public sealed class ReloadWeapon(AliveUnit unit, AmmunitionedWeapon weapon) : BattleAction
 {
-  public override Result Execute(BattleSession session)
+  internal override Result ExecuteStep(BattleSession session)
   {
     if (session.TryGetAlive(unit.State).IsNone || unit.State.IsIncapacitated)
       return Result.Interrupted;
