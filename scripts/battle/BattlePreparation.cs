@@ -61,6 +61,7 @@ internal sealed class BattlePreparation
     // The runtime path evaluates spawn buffs inside the UnitAdded dispatch (executor
     // default hook); preparation owns that bookkeeping itself, committing the same order.
     unit.EvaluateBuffs(_readContext);
+    ReconcileParticipant(unit);
     return unit;
   }
 
@@ -72,37 +73,25 @@ internal sealed class BattlePreparation
     State.RaiseEvents(new ObjectPlacedBattleEvent(state, position));
   }
 
-  // Preparation-side damage/stun preset bookkeeping: applies the raw unit change and mirrors
-  // the terminal facts the running pipeline would commit — a dead body leaves the board so
-  // its tile is reusable, an unconscious body stays occupied, and every identity remains in
-  // the pool — without fabricating gameplay events. The unit is marked visibility-affected;
-  // Complete's forced full refresh recompute resolves visibility at the opening dispatch.
-  internal void ApplyDamagePreset(BattleUnitState unit, int amount, DamageKind kind)
+  // Shared initialization reconciliation, used by AddUnit and the fixture's preset path:
+  // a dead participant leaves the board so its tile is reusable (already absent is valid
+  // after prior initialization), an unconscious body stays occupied, and every identity
+  // remains in the pool. Visibility work completes here — clearing the unit's own caches
+  // at once instead of waiting for a later event or opening dispatch — without fabricating
+  // gameplay events; the placement stream's own first-spots stay on their dispatches.
+  internal void ReconcileParticipant(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
-    switch (kind)
-    {
-      case DamageKind.Stun:
-        unit.ReceiveStun(amount);
-        break;
-      case DamageKind.Health:
-        unit.ReceiveDamage(amount);
-        break;
-      default:
-        throw new ArgumentOutOfRangeException(nameof(kind));
-    }
-
     if (unit.IsDead)
-    {
       State.Board.FindOccupantPosition(unit.Id).Match(
         Some: point =>
         {
           if (!State.Board.TryClearOccupant(point, unit.Id))
             throw new InvalidOperationException($"Could not clear unit {unit.Id} from {point.Raw}.");
         },
-        None: () => throw new InvalidOperationException($"Dead unit {unit.Id} is not board-indexed."));
-    }
+        None: () => { });
     State.MarkVisibilityAffected(unit);
+    State.RefreshVisibility();
   }
 
   internal void AddObjective(Faction faction, Objective objective)

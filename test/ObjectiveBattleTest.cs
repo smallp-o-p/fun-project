@@ -249,7 +249,7 @@ public class ObjectiveBattleTest
     var mid = new Vector3I(1, 0, 0);
     var end = new Vector3I(2, 0, 0);
     var unit = battle.Spawn(
-      TestData.MakeCombatant("Runner", player, actionPoints: 5),
+      TestData.MakeCombatant("Runner", player, actionPoints: 5, vision: 1),
       start);
     battle.AddObjective(player, new FakeObjectiveData
     {
@@ -258,6 +258,11 @@ public class ObjectiveBattleTest
       OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
     }.Instantiate());
     battle.Start();
+
+    // Vision 1 from the start tile: the mid step's reveal is genuinely new, and the tile of
+    // the discarded second step must stay hidden.
+    Assert.False(battle.Query(new IsTileVisibleToFaction(player, battle.Board.At(2, 0, 0))));
+    Assert.False(battle.Query(new IsTileVisibleToFaction(player, battle.Board.At(3, 0, 0))));
 
     battle.Move(unit, [mid, end]);
 
@@ -268,10 +273,13 @@ public class ObjectiveBattleTest
     Assert.Equal(1, battle.Events.EventsOf<UnitMovedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(1, battle.Events.EventsOf<TileOccupiedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(4, unit.CurrentActionPoints);
-    // The committed tile carries its occupancy and visibility bookkeeping.
+    // The committed tile carries its occupancy and visibility bookkeeping: the first step
+    // revealed (2,0,0), while the dropped second step never revealed (3,0,0).
     Assert.True(battle.Board.IsOccupied(battle.Board.At(1, 0, 0)));
     Assert.False(battle.Board.IsOccupied(battle.Board.At(0, 0, 0)));
     Assert.True(battle.Query(new IsTileVisibleToFaction(player, battle.Board.At(1, 0, 0))));
+    Assert.True(battle.Query(new IsTileVisibleToFaction(player, battle.Board.At(2, 0, 0))));
+    Assert.False(battle.Query(new IsTileVisibleToFaction(player, battle.Board.At(3, 0, 0))));
     // Exactly one end event, and it is the last terminal notification in the stream.
     Assert.Equal(1, battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(typeof(SessionEndedBattleEvent),

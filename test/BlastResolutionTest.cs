@@ -138,6 +138,9 @@ public partial class BlastResolutionTest
     BattleOutcome observedOutcome = BattleOutcome.Draw;
     int observedKilled = -1;
     List<Combatant> observedCaptured = [];
+    long observedFirstDamageTaken = -1;
+    long observedCapturedDamageTaken = -1;
+    bool observedCrateDestroyed = false;
     battle.OnCommitted(battleEvent =>
     {
       if (battleEvent is not SessionEndedBattleEvent)
@@ -146,6 +149,12 @@ public partial class BlastResolutionTest
       observedOutcome = completed.Outcome;
       observedKilled = completed.Factions[enemyFaction].Killed;
       observedCaptured.AddRange(completed.FactionSummaries[playerFaction].CapturedEnemies);
+      // Frozen end-callback facts: the surviving recipients' final damage and the crate's
+      // final state, read from the report installed before SessionEnded broadcast.
+      FactionBattleSummary enemyReport = completed.FactionSummaries[enemyFaction];
+      observedFirstDamageTaken = enemyReport.HealthByCombatant[first.Combatant].HealthDamageTaken;
+      observedCapturedDamageTaken = enemyReport.HealthByCombatant[captured.Combatant].HealthDamageTaken;
+      observedCrateDestroyed = crate.Status == Some(ObjectStatus.Destroyed);
     });
     var grenade = TestData.MakeGrenade("Frag", throwRange: 10, blastRadius: 1,
       effects: [new DamageEffectData { BaseDamage = 5 }, new DamageEffectData { BaseDamage = 5 }]);
@@ -161,11 +170,15 @@ public partial class BlastResolutionTest
     Assert.Equal(Some(ObjectStatus.Destroyed), crate.Status);
     Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     // End callback saw the frozen report: dead units are absent from captures, the surviving
-    // unconscious body is present, and the kill count is final.
+    // unconscious body is present, the kill count is final, both surviving recipients' frozen
+    // health report carries the full 10 damage, and the crate was already destroyed there.
     Assert.Equal(BattleOutcome.Victory, observedOutcome);
     Assert.Equal(1, observedKilled);
     Assert.Equal(1, observedCaptured.Count);
     Assert.True(ReferenceEquals(captured.Combatant, observedCaptured.AsValueEnumerable().Single()));
+    Assert.Equal(10L, observedFirstDamageTaken);
+    Assert.Equal(10L, observedCapturedDamageTaken);
+    Assert.True(observedCrateDestroyed);
     // The queued reaction never ran: settlement discarded it.
     Assert.Equal(0, battle.Events.EventsOf<UnitActivationEndedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(typeof(SessionEndedBattleEvent), battle.Events.AsValueEnumerable().Last().GetType());

@@ -178,10 +178,10 @@ public sealed class BattleFixture : IDisposable
     _preparation.AddObjective(faction, objective);
   }
 
-  // Preparation presets apply through the preparation's own bookkeeping: no gameplay
-  // damage/kill events are fabricated, armor does not split the packet, and dead bodies
-  // leave the board while unconscious bodies stay. After Start the same call submits the
-  // real damage action through the runtime.
+  // Preparation presets apply the raw unit change (no gameplay damage/kill events are
+  // fabricated, armor does not split the packet) through the preparation's shared
+  // reconciliation: dead bodies leave the board while unconscious bodies stay. After Start
+  // the same call submits the real damage action through the runtime.
   public void Damage(BattleUnitState unit, int amount, DamageKind kind = DamageKind.Health)
   {
     ThrowIfDisposed();
@@ -193,7 +193,18 @@ public sealed class BattleFixture : IDisposable
       return;
     }
 
-    _preparation.ApplyDamagePreset(unit, amount, kind);
+    switch (kind)
+    {
+      case DamageKind.Stun:
+        unit.ReceiveStun(amount);
+        break;
+      case DamageKind.Health:
+        unit.ReceiveDamage(amount);
+        break;
+      default:
+        throw new ArgumentOutOfRangeException(nameof(kind));
+    }
+    _preparation.ReconcileParticipant(unit);
   }
 
   // Progression integration setup: awards the first step's cost, commits the path, and

@@ -459,30 +459,47 @@ public partial class BattleSessionTest
   public void ConsciousTeammatePermitsDisabledCompanions()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 1), [faction]);
-    var conscious = battle.Spawn(TestData.MakeCombatant("Alive", faction), Vector3I.Zero);
+    using var battle = new BattleFixture(new Vector3I(6, 1, 1), [faction]);
+    var conscious = battle.Spawn(TestData.MakeCombatant("Alive", faction, vision: 2), Vector3I.Zero);
     var dead = battle.Spawn(TestData.MakeCombatant("Dead", faction), new Vector3I(1, 0, 0));
-    var unconscious = battle.Spawn(TestData.MakeCombatant("Out", faction), new Vector3I(2, 0, 0));
+    var stillborn = battle.Spawn(TestData.MakeCombatant("Stillborn", faction, health: 0), new Vector3I(4, 0, 0));
+    var unconscious = battle.Spawn(TestData.MakeCombatant("Out", faction), new Vector3I(3, 0, 0));
+    var exclusiveTile = battle.At(5, 0, 0); // only the fighter at (3,0,0) sees it
+    var sharedTile = battle.At(2, 0, 0); // inside the conscious teammate's vision 2
+    Assert.True(battle.Query(new IsTileVisibleToFaction(faction, exclusiveTile)));
+    Assert.True(battle.Query(new IsTileVisibleToFaction(faction, sharedTile)));
+
     battle.Damage(dead, 999);
     battle.Damage(unconscious, 20, DamageKind.Stun);
 
-    // Preparation preset bookkeeping: the dead body left the board (its tile is reusable),
+    // Immediately after the preset — no intervening spawn, event, or Start — the knocked-out
+    // fighter's exclusive tile is hidden while the teammate's own vision still answers.
+    Assert.False(battle.Query(new IsTileVisibleToFaction(faction, exclusiveTile)));
+    Assert.True(battle.Query(new IsTileVisibleToFaction(faction, sharedTile)));
+
+    // Preparation bookkeeping: the dead bodies left the board (their tiles are reusable),
     // the unconscious body still occupies its tile, and every identity stays in the pool.
     Assert.True(battle.PositionOf(dead).IsNone);
     Assert.False(battle.Board.IsOccupied(battle.Board.At(1, 0, 0)));
+    Assert.True(battle.PositionOf(stillborn).IsNone);
+    Assert.False(battle.Board.IsOccupied(battle.Board.At(4, 0, 0)));
+    battle.Damage(dead, 999); // reconciliation is idempotent: the body is already off the board
+    Assert.True(battle.PositionOf(dead).IsNone);
     var tileHeir = battle.Spawn(TestData.MakeCombatant("Fill", faction), new Vector3I(1, 0, 0));
-    Assert.True(battle.Board.IsOccupied(battle.Board.At(2, 0, 0)));
+    Assert.True(battle.Board.IsOccupied(battle.Board.At(3, 0, 0)));
 
     battle.Start();
 
     Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
     Assert.True(conscious.IsAlive);
     Assert.True(dead.IsDead);
+    Assert.True(stillborn.IsDead);
     Assert.True(unconscious.IsUnconscious);
     Assert.False(battle.Query(new CanUnitActNow(unconscious)));
     Assert.True(battle.PositionOf(dead).IsNone);
+    Assert.True(battle.PositionOf(stillborn).IsNone);
     Assert.True(battle.PositionOf(tileHeir).IsSome);
-    Assert.True(battle.Board.IsOccupied(battle.Board.At(2, 0, 0)));
+    Assert.True(battle.Board.IsOccupied(battle.Board.At(3, 0, 0)));
   }
 
   [TestCase(TestName = "Preparation rejects a wholly dead side with the typed NoConsciousUnits reason")]
