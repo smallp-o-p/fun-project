@@ -1,6 +1,7 @@
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Stats;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System;
@@ -261,18 +262,27 @@ public class BattleSetupResolverTest
     Assert.False(ReferenceEquals(firstEnemy, secondEnemy));
   }
 
-  [TestCase(TestName = "Authored quantity expands with fresh combatant, weapon, and armor identities")]
-  public void QuantityAndEquipmentExpansion()
+  [TestCase(TestName = "Authored loadouts expand into fresh combatant, weapon, and armor instances per unit")]
+  public void AuthoredLoadoutsCreateIndependentInstances()
   {
     var type = TestData.MakeDuelBattleType();
     type.Factions[0].Roster.Clear();
     type.Factions[0].Roster.Add(new FunProject.Battle.RosterEntryData
     {
-      Combatant = TestData.MakeCombatantData("Trooper", health: 20, aim: 65),
-      Quantity = 3,
-      Weapon = TestData.MakeWeaponData(damage: 3, range: 8),
-      Armor = TestData.MakeArmorData("Vest", armor: 4),
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Trooper", health: 20, aim: 65),
+        Weapon = TestData.MakeAmmoWeaponData("Rifle", magazine: 4, damage: 3, range: 8),
+        Armor = TestData.MakeArmorData("Vest", armor: 4),
+      },
+      Quantity = 2,
     });
+    type.MapPool.Clear();
+    type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(4, 1, 1),
+      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(1, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(2, 0, 0), TestData.SpawnTile(1)),
+      (new Vector3I(3, 0, 0), TestData.SpawnTile(1)))));
     type.MapPool.Clear();
     type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(4, 1, 1),
       (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
@@ -282,26 +292,64 @@ public class BattleSetupResolverTest
 
     BattleSetup setup = BattleSetupResolver.Resolve(type, seed: 7).RequireRight();
     BattleSideSetup playerSide = setup.Sides[0];
-    Assert.Equal(3, playerSide.Units.Count);
-    for (int i = 0; i < playerSide.Units.Count; i++)
-    {
-      UnitLoadout loadout = playerSide.Units[i].Loadout;
-      Assert.True(loadout.Weapon.IsSome);
-      Assert.True(loadout.Armor.IsSome);
-      Assert.True(ReferenceEquals(loadout.Combatant.OwningFaction, playerSide.Faction));
-      for (int j = i + 1; j < playerSide.Units.Count; j++)
-      {
-        UnitLoadout other = playerSide.Units[j].Loadout;
-        Assert.False(ReferenceEquals(loadout.Combatant, other.Combatant));
-        Assert.False(ReferenceEquals(loadout.Weapon.RequireSome(), other.Weapon.RequireSome()));
-        Assert.False(ReferenceEquals(loadout.Armor.RequireSome().Item, other.Armor.RequireSome().Item));
-      }
-    }
+    Assert.Equal(2, playerSide.Units.Count);
+    UnitLoadout first = playerSide.Units[0].Loadout;
+    UnitLoadout second = playerSide.Units[1].Loadout;
+    Assert.True(ReferenceEquals(first.Combatant.OwningFaction, playerSide.Faction));
+    Assert.True(ReferenceEquals(second.Combatant.OwningFaction, playerSide.Faction));
+    Assert.False(ReferenceEquals(first.Combatant, second.Combatant));
+    Assert.False(ReferenceEquals(first.Weapon.RequireSome(), second.Weapon.RequireSome()));
+    Assert.False(ReferenceEquals(first.Armor.RequireSome().Item, second.Armor.RequireSome().Item));
+
+    // Spent ammunition and damaged armor on one instance leave the sibling untouched.
+    var spent = (AmmunitionedWeapon)first.Weapon.RequireSome();
+    spent.TrySpendShot();
+    Assert.Equal(3, spent.CurrentAmmo);
+    Assert.Equal(4, ((AmmunitionedWeapon)second.Weapon.RequireSome()).CurrentAmmo);
+    first.Armor.RequireSome().Capability.Reduce(2);
+    Assert.Equal(2, first.Armor.RequireSome().Capability.Current);
+    Assert.Equal(4, second.Armor.RequireSome().Capability.Current);
 
     // Authored quantity floors at one.
     type.Factions[0].Roster[0].Quantity = 0;
     BattleSetup floored = BattleSetupResolver.Resolve(type, seed: 7).RequireRight();
     Assert.Equal(1, floored.Sides[0].Units.Count);
+  }
+
+  [TestCase(TestName = "Equipment authored as armor without an armor capability throws at resolution")]
+  public void MalformedArmorThrows()
+  {
+    var type = TestData.MakeDuelBattleType();
+    type.Factions[0].Roster.Clear();
+    type.Factions[0].Roster.Add(new FunProject.Battle.RosterEntryData
+    {
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Trooper", health: 20, aim: 65),
+        Armor = TestData.MakeWeaponData(damage: 3, range: 8),
+      },
+    });
+
+    Assert.Throws<InvalidOperationException>(() => BattleSetupResolver.Resolve(type, seed: 7));
+  }
+
+  [TestCase(TestName = "A loadout without authored gear stays unarmed and unarmored")]
+  public void MissingGearRemainsUnequipped()
+  {
+    var type = TestData.MakeDuelBattleType();
+    type.Factions[0].Roster.Clear();
+    type.Factions[0].Roster.Add(new FunProject.Battle.RosterEntryData
+    {
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Trooper", health: 20, aim: 65),
+      },
+    });
+
+    BattleSetup setup = BattleSetupResolver.Resolve(type, seed: 7).RequireRight();
+    UnitLoadout loadout = setup.Sides[0].Units[0].Loadout;
+    Assert.True(loadout.Weapon.IsNone);
+    Assert.True(loadout.Armor.IsNone);
   }
 
   [TestCase(TestName = "Resolved output keeps collection membership independent of the authored lists")]

@@ -1,7 +1,4 @@
 using FunProject.Combatants;
-using FunProject.Items;
-using FunProject.Items.Capabilities;
-using FunProject.Weapons;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -116,23 +113,16 @@ public static class BattleSetupResolver
     });
   }
 
-  // Authored quantity/equipment expansion: quantity floors at one; weapons route through
-  // ItemRuntimeFactory and armor needs its capability proof. Equipment comes only from the
-  // roster entries — campaign equipment slots are never read or written here.
+  // Authored quantity expansion: every spawned unit instantiates fresh runtime gear through
+  // its loadout; quantity floors at one. Equipment comes only from the roster entries —
+  // campaign equipment slots are never read or written here.
   private static List<UnitLoadout> ExpandRoster(FactionDeploymentData authoredSide, Faction faction)
   {
     var loadouts = new List<UnitLoadout>();
     foreach (RosterEntryData entry in authoredSide.Roster)
     {
       for (int count = 0; count < Math.Max(1, entry.Quantity); count++)
-      {
-        Combatant combatant = new(entry.Combatant, faction);
-        Option<Weapon> weapon = entry.Weapon is null ? None : Some(ItemRuntimeFactory.CreateWeapon(entry.Weapon));
-        Option<ItemWith<ArmorCapability>> armor = entry.Armor is null
-          ? None
-          : ItemRuntimeFactory.Create(entry.Armor).With<ArmorCapability>();
-        loadouts.Add(new UnitLoadout(combatant, weapon, armor));
-      }
+        loadouts.Add(entry.Loadout.CreateRuntime(faction));
     }
 
     return loadouts;

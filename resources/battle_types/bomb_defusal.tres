@@ -19,6 +19,7 @@
 [ext_resource type="Resource" uid="uid://65ekcmcl2al8" path="res://resources/battle_objects/alien_bomb.tres" id="13_bomb"]
 [ext_resource type="Script" uid="uid://bace8m8tw5wcn" path="res://scripts/combatants/FactionData.cs" id="14_faction_data"]
 [ext_resource type="Script" uid="uid://nmkf8wn0ice" path="res://scripts/battle/types/BattleTypeSystemData.cs" id="18_0b15x"]
+[ext_resource type="Script" uid="uid://ctwonv3i1dx1r" path="res://scripts/battle/types/UnitLoadoutData.cs" id="19_loadout"]
 
 [sub_resource type="Resource" id="Resource_player_faction"]
 script = ExtResource("14_faction_data")
@@ -37,11 +38,15 @@ script = ExtResource("7_defuse")
 OnComplete = SubResource("Resource_end_victory")
 OnFail = SubResource("Resource_end_defeat")
 
+[sub_resource type="Resource" id="Resource_trooper_loadout"]
+script = ExtResource("19_loadout")
+Combatant = ExtResource("10_trooper")
+Weapon = ExtResource("12_pistol")
+
 [sub_resource type="Resource" id="Resource_trooper_entry"]
 script = ExtResource("4_roster")
-Combatant = ExtResource("10_trooper")
+Loadout = SubResource("Resource_trooper_loadout")
 Quantity = 3
-Weapon = ExtResource("12_pistol")
 
 [sub_resource type="Resource" id="Resource_player_deployment"]
 script = ExtResource("3_faction")
@@ -58,9 +63,13 @@ Description = "Bomb-planting invaders"
 script = ExtResource("8_eliminate")
 OnComplete = SubResource("Resource_end_defeat")
 
+[sub_resource type="Resource" id="Resource_grunt_loadout"]
+script = ExtResource("19_loadout")
+Combatant = ExtResource("11_grunt")
+
 [sub_resource type="Resource" id="Resource_grunt_entry"]
 script = ExtResource("4_roster")
-Combatant = ExtResource("11_grunt")
+Loadout = SubResource("Resource_grunt_loadout")
 Quantity = 3
 
 [sub_resource type="Resource" id="Resource_enemy_deployment"]

@@ -436,8 +436,11 @@ internal static class TestData
       var side = new FactionDeploymentData { Faction = new FactionData { Name = name } };
       side.Roster.Add(new FunProject.Battle.RosterEntryData
       {
-        Combatant = MakeCombatantData(name, health: 20, aim: 65),
-        Weapon = MakeWeaponData(damage: 1, critChance: 0, range: 10),
+        Loadout = new UnitLoadoutData
+        {
+          Combatant = MakeCombatantData(name, health: 20, aim: 65),
+          Weapon = MakeWeaponData(damage: 1, critChance: 0, range: 10),
+        },
       });
       side.Objectives.Add(new FakeObjectiveData());
       type.Factions.Add(side);
