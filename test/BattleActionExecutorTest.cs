@@ -190,6 +190,69 @@ public partial class BattleActionExecutorTest
     Assert.Equal(0, completed.FactionSummaries[battle.PlayerFaction].CombatantsWounded.Count);
   }
 
+  [TestCase(TestName = "Shared campaign killer identity accumulates both victims in the frozen completion")]
+  public void SharedCampaignKillerIdentityAccumulatesBothVictims()
+  {
+    // SpawnUnit accepts the same campaign Combatant on distinct cells and each runtime
+    // instance kills independently, so the frozen completion must accumulate attribution
+    // under the one shared identity instead of colliding on the projected ledger key.
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
+    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [player, enemy],
+      hitChanceCalculator: new AlwaysHitCalculator(), playerFaction: Some(player));
+    var twin = TestData.MakeCombatant("Twin", player, actionPoints: 5);
+    var original = battle.Spawn(twin, new Vector3I(0, 0, 0),
+      weapon: Some(TestData.MakeWeapon("Rifle", damage: 10)));
+    var victim1 = battle.Spawn(TestData.MakeCombatant("Victim1", enemy, health: 10), new Vector3I(0, 0, 1));
+    var victim2 = battle.Spawn(TestData.MakeCombatant("Victim2", enemy, health: 10), new Vector3I(3, 0, 3));
+    battle.Spawn(TestData.MakeCombatant("Survivor", enemy, health: 100), new Vector3I(7, 0, 7));
+    battle.Start();
+
+    battle.Submit(BattleAction.SpawnUnit(twin, battle.At(new Vector3I(0, 0, 2)),
+      TestData.MakeWeapon("Blade", damage: 10))).RequireSome();
+    BattleUnitState reinforcement = battle.UnitAt(new Vector3I(0, 0, 2));
+    battle.Attack(original, victim1);
+    battle.Attack(reinforcement, victim2);
+
+    var expected = new InvalidOperationException("terminal route fault");
+    battle.RegisterHook<UnitMovedBattleEvent>(new RequestVictoryOnMovedHook());
+    battle.RegisterHook<TileOccupiedBattleEvent>(new ThrowOnFirstEventHook(expected));
+    int completedCount = 0;
+    battle.Runtime.ActionCompleted += _ => completedCount++;
+
+    Exception? caught = null;
+    try
+    {
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(original), [battle.At(1, 0, 0)]));
+    }
+    catch (Exception error)
+    {
+      caught = error;
+    }
+
+    Assert.True(ReferenceEquals(expected, caught));
+    Assert.False(caught!.Data.Contains(BattleActionExecutor.BattleCompletionCaptureFailureDataKey),
+      "a supported shared-identity completion must not fail capture");
+    Assert.Equal(0, completedCount);
+    Assert.Equal(0, battle.Events.EventsOf<SessionEndedBattleEvent>().Length);
+
+    CompletedBattle completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+    Assert.Equal(BattleOutcome.Victory, completed.Outcome);
+    var summary = completed.FactionSummaries[player];
+    Assert.Equal(1, summary.DefeatedPerCombatant.Count);
+    Assert.True(ReferenceEquals(twin, summary.DefeatedPerCombatant.Keys.AsValueEnumerable().Single()),
+      "the killer key is the original campaign Combatant, not a copy");
+    Assert.True(summary.DefeatedPerCombatant[twin].AsValueEnumerable()
+      .SequenceEqual([victim1.Combatant, victim2.Combatant]));
+    Assert.Equal(2, completed.Factions[enemy].Killed);
+    if (summary.DefeatedPerCombatant[twin] is IList<Combatant> mutableVictims)
+      Assert.True(mutableVictims.IsReadOnly);
+    if (summary.DefeatedPerCombatant is IDictionary<Combatant, IReadOnlyList<Combatant>> mutableLedger)
+      Assert.True(mutableLedger.IsReadOnly);
+
+    Assert.True(battle.Submit(BattleAction.EndFactionTurn(player)).IsNone);
+  }
+
   [TestCase(TestName = "A fault during end-event notification keeps the installed snapshot and propagates the cause")]
   public void EndNotificationFaultKeepsInstalledSnapshotAvailable()
   {

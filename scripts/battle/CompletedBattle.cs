@@ -116,12 +116,19 @@ public sealed class CompletedBattle
         health[unit.Combatant] = new BattleHealthSummary(unit.MaxHealth, unit.TotalHealthDamageTaken);
       }
 
-      var defeated = state.KillsByUnit.AsValueEnumerable()
-        .Where(entry => entry.Key.Side == faction)
-        .ToDictionary(
-          entry => entry.Key.Combatant,
-          entry => (SysColGeneric.IReadOnlyList<Combatant>)System.Array.AsReadOnly(
-            entry.Value.AsValueEnumerable().Select(killedUnit => killedUnit.Combatant).ToArray()));
+      // Runtime killer instances can share one campaign Combatant (SpawnUnit accepts the
+      // same combatant on distinct cells), so their victims accumulate per Combatant in
+      // ledger order instead of projecting one dictionary entry per runtime instance.
+      var defeatedByCombatant = new SysColGeneric.Dictionary<Combatant, SysColGeneric.List<Combatant>>();
+      foreach (SysColGeneric.KeyValuePair<BattleUnitState, SysColGeneric.List<BattleUnitState>> entry in state.KillsByUnit)
+      {
+        if (entry.Key.Side != faction)
+          continue;
+        if (!defeatedByCombatant.TryGetValue(entry.Key.Combatant, out SysColGeneric.List<Combatant>? victims))
+          defeatedByCombatant[entry.Key.Combatant] = victims = [];
+        foreach (BattleUnitState killedUnit in entry.Value)
+          victims.Add(killedUnit.Combatant);
+      }
 
       factions[faction] = new FactionResultCounts(roster.Count, killed);
       summaries[faction] = new FactionBattleSummary
@@ -134,7 +141,9 @@ public sealed class CompletedBattle
         CombatantsPresent = present.ToFrozenSet(),
         CombatantsDead = dead.ToFrozenSet(),
         CombatantsWounded = wounded.ToFrozenSet(),
-        DefeatedPerCombatant = defeated.ToFrozenDictionary(),
+        DefeatedPerCombatant = defeatedByCombatant.ToFrozenDictionary(
+          entry => entry.Key,
+          entry => (SysColGeneric.IReadOnlyList<Combatant>)System.Array.AsReadOnly([.. entry.Value])),
         TurnCount = turnCount,
         HealthByCombatant = health.ToFrozenDictionary(),
       };
