@@ -15,27 +15,12 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_7h8wm")
 
-[node name="Heading" type="Label" parent="."]
-layout_mode = 0
-offset_left = 16.0
-offset_top = 16.0
-offset_right = 320.0
-offset_bottom = 60.0
-mouse_filter = 2
-theme_override_font_sizes/font_size = 24
-text = "Geoscape"
-vertical_alignment = 1
-
 [node name="TimePanel" type="PanelContainer" parent="."]
 layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -336.0
+offset_left = 16.0
 offset_top = 16.0
-offset_right = -16.0
+offset_right = 336.0
 offset_bottom = 76.0
-grow_horizontal = 0
 
 [node name="Margin" type="MarginContainer" parent="TimePanel"]
 layout_mode = 2
@@ -127,7 +112,7 @@ layout_mode = 2
 
 [node name="EngineeringProgress" type="Label" parent="BottomBar/Margin/Row"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(200, 0)
+custom_maximum_size = Vector2(200, -1)
 layout_mode = 2
 mouse_filter = 1
 text = "No active manufacturing."

@@ -93,8 +93,9 @@ public class GeoscapeCameraLayoutTest
     Assert.Equal(zoom, camera.Zoom);
   }
 
-  [TestCase]
-  public async Task UpperRightMapEventRemainsClickableBelowTimeControls()
+  [TestCase(8)]
+  [TestCase(1480)]
+  public async Task UpperCornerMapEventRemainsClickableBelowTimeControls(int x)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = CreateGeoscapeScene(TestData.MakeStart(
@@ -104,7 +105,7 @@ public class GeoscapeCameraLayoutTest
     region.AddChild(new Polygon2D
     {
       Name = "Fill",
-      Polygon = [new(1480, 8), new(1520, 8), new(1520, 48), new(1480, 48)],
+      Polygon = [new(x, 8), new(x + 40, 8), new(x + 40, 48), new(x, 48)],
     });
     scene.GetNode<GeoscapeMapControl>("%Map").AddChild(region);
     var viewport = CreateUiViewport(scene, new Vector2I(800, 600));
@@ -128,7 +129,7 @@ public class GeoscapeCameraLayoutTest
 
     var current = scene.GetNode<GeoscapeViewManager>("%ViewManager").Current;
     Assert.True(current is GeoscapeEventResolution,
-      "The time controls must not intercept clicks on upper-right map events.");
+      "The time controls must not intercept clicks on upper-corner map events.");
     Assert.Equal("Corner event", current.GetNode<Label>("%Title").Text);
   }
 

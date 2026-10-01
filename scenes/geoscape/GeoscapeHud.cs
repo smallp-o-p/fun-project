@@ -28,6 +28,8 @@ public sealed partial class GeoscapeHud : Control
     _clockLabel = GetNode<Label>("%ClockLabel");
     _engineeringProgress = GetNode<Label>("%EngineeringProgress");
     _engineeringRemaining = GetNode<Label>("%EngineeringRemaining");
+    _engineeringProgress.ThemeChanged += UpdateManufacturingNameWidth;
+    UpdateManufacturingNameWidth();
 
     _speedButton.Pressed += UpdateSpeed;
     _pauseButton.Toggled += pressed =>
@@ -44,10 +46,21 @@ public sealed partial class GeoscapeHud : Control
     _engineeringProgress.Text = manufacturing.Match(
       job => job.Project.Item.Name,
       () => "No active manufacturing.");
+    UpdateManufacturingNameWidth();
     _engineeringProgress.TooltipText = manufacturing.Match(job => job.Project.Item.Name, () => "");
     _engineeringRemaining.Text = manufacturing.Match(
       job => RemainingDays(job.CompletesAtTick, tick), () => "");
     _engineeringRemaining.Visible = manufacturing.IsSome;
+  }
+
+  private void UpdateManufacturingNameWidth()
+  {
+    // A clipped Label reports a one-pixel minimum to HBoxContainer in Godot 4.7.
+    // Reserve its natural text width; the scene's maximum bounds long names.
+    Font font = _engineeringProgress.GetThemeFont("font");
+    int fontSize = _engineeringProgress.GetThemeFontSize("font_size");
+    float width = font.GetStringSize(_engineeringProgress.Text, HorizontalAlignment.Left, -1, fontSize).X;
+    _engineeringProgress.CustomMinimumSize = new Vector2(Mathf.Ceil(width), 0);
   }
 
   private static string RemainingDays(long completesAtTick, long tick)
