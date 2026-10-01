@@ -1,8 +1,11 @@
 using FunProject.Battle;
+using FunProject.Combatants;
 using FunProject.Core;
 using FunProject.Items.Effects;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
+using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -92,6 +95,80 @@ public partial class BlastResolutionTest
 
     Assert.True(enemy.IsImmobilized);
     Assert.True(battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, enemy)));
+  }
+
+  // Reaction double: queues a PassUnit interrupt on the first damage event it sees, so the
+  // terminal-blast case can prove queued reactions are discarded at settlement.
+  private sealed class QueueReactionOnDamage(BattleUnitState unit) : BattleHook
+  {
+    private bool _queued;
+
+    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
+    {
+      if (_queued || battleEvent is not UnitDamagedBattleEvent damaged
+        || !ReferenceEquals(damaged.Unit, unit))
+        return [];
+      _queued = true;
+      return [BattleAction.PassUnit(context.Read.State.TryGetAlive(unit).RequireSome())];
+    }
+  }
+
+  [TestCase(TestName = "A terminal request at the first blast recipient still damages the remaining recipients")]
+  public void TerminalRequestAtFirstRecipientStillDamagesRemainingRecipients()
+  {
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [playerFaction, enemyFaction],
+      playerFaction: Some(playerFaction));
+    var thrower = battle.Spawn(TestData.MakeCombatant("Thrower", playerFaction, actionPoints: 4), new Vector3I(1, 0, 1));
+    var first = battle.Spawn(TestData.MakeCombatant("First", enemyFaction, health: 30), new Vector3I(3, 0, 1));
+    var captured = battle.Spawn(TestData.MakeCombatant("Captured", enemyFaction, health: 12), new Vector3I(4, 0, 1));
+    var laterKilled = battle.Spawn(TestData.MakeCombatant("Later", enemyFaction, health: 6), new Vector3I(5, 0, 1));
+    battle.Damage(captured, 6, DamageKind.Stun); // unconscious once health drops to 6 or less
+    battle.Damage(laterKilled, 5, DamageKind.Stun); // unconscious at 5, then killed by the second packet
+    var crate = battle.PlaceObject(TestData.MakeObject("Crate", 5), new Vector3I(4, 0, 2));
+    battle.AddObjective(playerFaction, new FakeObjective(new FakeObjectiveData
+    {
+      Complete = true,
+      Observe = typeof(UnitDamagedBattleEvent),
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    }));
+    battle.Start();
+    battle.RegisterHook<UnitDamagedBattleEvent>(new QueueReactionOnDamage(first), 0);
+    BattleOutcome observedOutcome = BattleOutcome.Draw;
+    int observedKilled = -1;
+    List<Combatant> observedCaptured = [];
+    battle.OnCommitted(battleEvent =>
+    {
+      if (battleEvent is not SessionEndedBattleEvent)
+        return;
+      CompletedBattle completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+      observedOutcome = completed.Outcome;
+      observedKilled = completed.Factions[enemyFaction].Killed;
+      observedCaptured.AddRange(completed.FactionSummaries[playerFaction].CapturedEnemies);
+    });
+    var grenade = TestData.MakeGrenade("Frag", throwRange: 10, blastRadius: 1,
+      effects: [new DamageEffectData { BaseDamage = 5 }, new DamageEffectData { BaseDamage = 5 }]);
+    thrower.AddInventoryItem(grenade.Item);
+    battle.ClearEvents();
+
+    battle.Throw(thrower, grenade, new Vector3I(4, 0, 1)); // the first recipient's damage flips the objective
+
+    // The remaining eligible recipients still took every synchronous packet.
+    Assert.Equal(20, first.CurrentHealth);
+    Assert.True(captured.IsUnconscious);
+    Assert.True(laterKilled.IsDead);
+    Assert.Equal(Some(ObjectStatus.Destroyed), crate.Status);
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
+    // End callback saw the frozen report: dead units are absent from captures, the surviving
+    // unconscious body is present, and the kill count is final.
+    Assert.Equal(BattleOutcome.Victory, observedOutcome);
+    Assert.Equal(1, observedKilled);
+    Assert.Equal(1, observedCaptured.Count);
+    Assert.True(ReferenceEquals(captured.Combatant, observedCaptured.AsValueEnumerable().Single()));
+    // The queued reaction never ran: settlement discarded it.
+    Assert.Equal(0, battle.Events.EventsOf<UnitActivationEndedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(typeof(SessionEndedBattleEvent), battle.Events.AsValueEnumerable().Last().GetType());
   }
 
   [TestCase]

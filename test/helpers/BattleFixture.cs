@@ -42,6 +42,9 @@ public sealed class BattleFixture : IDisposable
     }
   }
 
+  // Trusted-core door for tests: resolves the current running receiver through the runtime's
+  // lifecycle at each call (the Running value owns it persistently), so a completed battle
+  // has no receiver to hand out and nothing is stored here.
   internal BattleSession Session
   {
     get
@@ -49,7 +52,7 @@ public sealed class BattleFixture : IDisposable
       ObjectDisposedException.ThrowIf(_disposed, this);
       if (!_started)
         throw new InvalidOperationException("This fixture has no running receiver before Start.");
-      return _runtime.Session;
+      return _runtime.CurrentSession;
     }
   }
 
@@ -100,21 +103,21 @@ public sealed class BattleFixture : IDisposable
   }
 
   // Observes committed events from the first opening dispatch onward, ordered after the
-  // default hooks: the handler binds to the receiver's committed stream, after the
-  // executor's own subscription on it.
+  // executor's log append and option invalidation: the handler binds to the runtime's
+  // shared ordered stream, before the hook pass fires.
   internal void OnCommitted(Action<BattleEvent> handler)
   {
     ThrowIfDisposed();
     ArgumentNullException.ThrowIfNull(handler);
     if (!_started)
     {
-      _deferredRegistrations.Add(runtime => runtime.Session.BattleEventCommitted += handler);
+      _deferredRegistrations.Add(runtime => runtime.BattleEventCommitted += handler);
       return;
     }
-    _runtime.Session.BattleEventCommitted += handler;
+    _runtime.BattleEventCommitted += handler;
   }
 
-  private BattleState ReadState => _started ? _runtime.Session.State : _preparation.State;
+  private BattleState ReadState => _started ? _runtime.State : _preparation.State;
 
   public AliveUnit Alive(BattleUnitState unit) => ReadState.TryGetAlive(unit).RequireSome();
 
@@ -175,8 +178,9 @@ public sealed class BattleFixture : IDisposable
     _preparation.AddObjective(faction, objective);
   }
 
-  // Preparation presets apply directly to the unit state: no gameplay damage/kill events are
-  // fabricated and armor does not split the packet. After Start the same call submits the
+  // Preparation presets apply through the preparation's own bookkeeping: no gameplay
+  // damage/kill events are fabricated, armor does not split the packet, and dead bodies
+  // leave the board while unconscious bodies stay. After Start the same call submits the
   // real damage action through the runtime.
   public void Damage(BattleUnitState unit, int amount, DamageKind kind = DamageKind.Health)
   {
@@ -189,10 +193,7 @@ public sealed class BattleFixture : IDisposable
       return;
     }
 
-    if (kind == DamageKind.Stun)
-      unit.ReceiveStun(amount);
-    else
-      unit.ReceiveDamage(amount);
+    _preparation.ApplyDamagePreset(unit, amount, kind);
   }
 
   // Progression integration setup: awards the first step's cost, commits the path, and

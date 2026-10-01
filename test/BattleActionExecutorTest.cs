@@ -155,20 +155,59 @@ public partial class BattleActionExecutorTest
   public void BattleEventCommittedSubscribersObserveCommittedSessionState()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(1, 0, 1), actionPoints: 5);
-    var session = battle.Session;
     var unit = battle.Unit;
     var destination = new Vector3I(1, 0, 2);
 
     Option<Vector3I> observedPositionDuringEvent = None;
-    session.BattleEventCommitted += battleEvent =>
+    battle.OnCommitted(battleEvent =>
     {
       if (battleEvent is UnitMovedBattleEvent)
         observedPositionDuringEvent = battle.PositionOf(unit).Map(point => point.Raw);
-    };
+    });
 
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(destination)], 2));
 
     Assert.Equal(destination, observedPositionDuringEvent.RequireSome());
+  }
+
+  [TestCase(TestName = "A throwing runtime subscriber preserves the exception while the cause stays committed")]
+  public void ThrowingRuntimeSubscriberPreservesTheCommittedCause()
+  {
+    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), actionPoints: 4);
+    var unit = battle.Unit;
+    var expected = new InvalidOperationException("subscriber sentinel");
+    var observed = new List<BattleEvent>();
+    var hook = new RecordingHook();
+    battle.RegisterHook<UnitMovedBattleEvent>(hook);
+    battle.OnCommitted(observed.Add);
+    battle.OnCommitted(battleEvent =>
+    {
+      if (battleEvent is UnitMovedBattleEvent)
+        throw expected;
+    });
+
+    Exception? caught = null;
+    try
+    {
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)]));
+    }
+    catch (Exception error)
+    {
+      caught = error;
+    }
+
+    // The original exception survives unwinding, and subscribers earlier in the chain saw
+    // the cause before the throw stopped the stream.
+    Assert.True(ReferenceEquals(expected, caught));
+    Assert.True(observed.AsValueEnumerable().Any(battleEvent => battleEvent is UnitMovedBattleEvent));
+    // The mutation stayed committed: tile, cost, and options all reflect the step.
+    Assert.Equal(new Vector3I(1, 0, 0), battle.PositionOf(unit).RequireSome().Raw);
+    Assert.Equal(3, unit.CurrentActionPoints);
+    // Hooks fire after the subscriber pass, so the cause never reached the hook registry.
+    Assert.Equal(0, hook.Received.Count);
+    // A fresh submission finds no stale work: it advances the round exactly once.
+    battle.Pass(unit);
+    Assert.Equal(2, battle.Query(new GetCurrentTurnQuery()).RequireSome().RoundNumber);
   }
 
   [TestCase(TestName = "Executor evaluates matching hooks deterministically")]

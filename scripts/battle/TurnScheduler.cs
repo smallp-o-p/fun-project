@@ -44,12 +44,16 @@ internal sealed class TurnScheduler
   internal int RoundNumber { get; private set; }
   internal BattleTurn CurrentTurn => new(ActiveSide, RoundNumber);
 
-  // One cohesive transition: mark the outgoing side acted, drop its queue head, prune
+  // One cohesive transition: refuse the whole transition when no conscious forces remain
+  // anywhere (None) so the installed queue/acted/clock keep the outgoing turn coherent for
+  // the Draw settlement; otherwise mark the outgoing side acted, drop its queue head, prune
   // eliminated sides, roll the round (rebuilding from conscious sides) when drained, select
-  // the next side, and establish its availability. None means no conscious forces remain
-  // anywhere; the outgoing current turn stays installed for the Draw settlement.
+  // the next side, and establish its availability.
   internal Option<BattleTurn> AdvanceTurn()
   {
+    if (!_orderedFactions.AsValueEnumerable().Any(_hasConsciousUnits))
+      return None;
+
     _sidesActedThisRound.Add(ActiveSide);
     _turnQueue.Dequeue();
     _turnQueue = new Queue<Faction>(_turnQueue.AsValueEnumerable().Where(_hasConsciousUnits).ToArray());
@@ -69,24 +73,31 @@ internal sealed class TurnScheduler
     return Some(CurrentTurn);
   }
 
-  // In-progress reinforcement: keep global faction order current, fold an unacted side into
-  // the round, and make active-side joiners available immediately.
+  // In-progress reinforcement: the scheduler owns the authoritative ordered faction list
+  // (the shared state list — candidates register even when dead/unconscious), then folds an
+  // unacted conscious side into the round and makes active-side joiners available
+  // immediately. Already-acted sides wait for the next round — acted history clears only
+  // at a real round rollover, so elimination cannot rejoin a side into the same round.
   internal void RegisterReinforcement(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
+    Faction side = unit.Side;
+    if (!_orderedFactions.Contains(side))
+      _orderedFactions.Add(side);
+
     if (!unit.IsAlive || unit.IsUnconscious)
       return;
 
-    if (unit.Side == ActiveSide)
+    if (side == ActiveSide)
     {
       _activeFactionUnitsAvailable.Add(unit);
       return;
     }
 
-    if (_sidesActedThisRound.Contains(unit.Side) || _turnQueue.Contains(unit.Side))
+    if (_sidesActedThisRound.Contains(side) || _turnQueue.Contains(side))
       return;
 
-    _turnQueue.Enqueue(unit.Side);
+    _turnQueue.Enqueue(side);
   }
 
   internal bool ConsumeActivation(BattleUnitState unit)
@@ -95,17 +106,17 @@ internal sealed class TurnScheduler
     return _activeFactionUnitsAvailable.Remove(unit);
   }
 
-  // Scheduler-side reaction to a faction losing consciousness: drop it from the acted set,
-  // then either prune it from the queue or — when it is the active side mid-turn — clear
-  // the active availability so its remaining activations end. Eliminating the active
-  // faction leaves its current turn installed until it ends.
+  // Scheduler-side reaction to a faction losing consciousness: the acted set is untouched
+  // (it clears only at a real round rollover), and the faction is either pruned from the
+  // queue or — when it is the active side mid-turn — its active availability clears so its
+  // remaining activations end. Eliminating the active faction leaves its current turn
+  // installed until it ends.
   internal void ReconcileConsciousness(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
     if (_hasConsciousUnits(unit.Side))
       return;
 
-    _sidesActedThisRound.Remove(unit.Side);
     if (unit.Side == ActiveSide)
       _activeFactionUnitsAvailable.Clear();
     else

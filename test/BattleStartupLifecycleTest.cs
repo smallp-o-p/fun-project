@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Buffs;
 using FunProject.Combatants;
 using FunProject.Items.Effects;
 using FunProject.Stats;
@@ -9,7 +10,7 @@ using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
-public class BattleStartupLifecycleTest
+public partial class BattleStartupLifecycleTest
 {
   private static (BattleSetup Setup, Faction Player, Faction Enemy) GroupedSetup()
   {
@@ -189,9 +190,16 @@ public class BattleStartupLifecycleTest
       ],
     };
     var system = new SetupSystemData();
-    Exception observed = AssertPreparationFailureBeforeRegistration(empty, system);
-    Assert.True(observed is InvalidOperationException);
-    Assert.True(observed.Message.Contains("Enemy"));
+
+    Either<BattleSetupFailure, BattleRuntime> started = BattleFactory.Start(empty with { Systems = [system] });
+
+    Assert.True(started.IsLeft);
+    started.IfLeft(failure =>
+    {
+      Assert.Equal(BattleSetupFailureReason.NoConsciousUnits, failure.Reason);
+      Assert.True(failure.Message.Contains("Enemy"));
+    });
+    Assert.True(system.RegisteredRuntime is null);
   }
 
   [TestCase(TestName = "Repeated starts from one setup get fresh board, objective, object, and hook state")]
@@ -259,6 +267,69 @@ public class BattleStartupLifecycleTest
     using var runtime = BattleFactory.Start(terminal).RequireRight();
     Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsSome);
     Assert.True(runtime.Query(new GetCurrentTurnQuery()).IsNone);
+  }
+
+  // The buff only activates once both sides are on the board, so its +2 maximum exists
+  // exclusively in the opening turn-start pass — preparation's earlier top-up saw AP 4.
+  private sealed partial class RosterCompleteCondition : BuffCondition
+  {
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
+      context.State.AliveUnits.AsValueEnumerable().Count() >= 2;
+  }
+
+  [TestCase(TestName = "A terminal opening turn still finishes the started-turn AP refresh")]
+  public void TerminalOpeningTurnFinishesTheStartedTurnApRefresh()
+  {
+    var (setup, player, _) = GroupedSetup();
+    var roused = TestData.MakeBuff("Roused", new RosterCompleteCondition(),
+      statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
+    var buffed = setup with
+    {
+      Sides =
+      [
+        setup.Sides[0] with
+        {
+          Units = [new UnitPlacement(
+            new UnitLoadout(TestData.MakeCombatant("Alpha", player, actionPoints: 4, buffs: [roused])),
+            new Vector3I(0, 0, 0))],
+        },
+        setup.Sides[1],
+      ],
+    };
+    int liveApAtSessionEnd = -1;
+    var observer = new SetupSystemData
+    {
+      OnRegister = runtime => runtime.BattleEventCommitted += battleEvent =>
+      {
+        if (battleEvent is not SessionEndedBattleEvent)
+          return;
+        var unit = runtime.Query(new GetUnitAtTile(
+          runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
+        liveApAtSessionEnd = unit.CurrentActionPoints;
+      },
+    };
+    var terminal = buffed with
+    {
+      Systems = [observer],
+      Sides =
+      [
+        buffed.Sides[0] with
+        {
+          Objectives = [new SurviveUntilTurnObjectiveData
+          {
+            TargetTurn = 1,
+            OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+          }],
+        },
+        buffed.Sides[1],
+      ],
+    };
+
+    using var runtime = BattleFactory.Start(terminal).RequireRight();
+
+    Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsSome);
+    Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
+    Assert.Equal(6, liveApAtSessionEnd);
   }
 
   [TestCase(TestName = "Initial units start at full effective maximum AP on every side")]

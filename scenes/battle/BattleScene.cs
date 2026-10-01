@@ -76,6 +76,12 @@ public sealed partial class BattleScene : Node3D
     _director.PlaybackIdle += OnPlaybackIdle;
 
     RefreshView();
+
+    // A runtime that completed during factory startup entered BattleOver inside the UI
+    // constructor — before this subscription existed — so the initial state must still
+    // show the end banner.
+    if (_ui.State == UiState.BattleOver)
+      ShowBattleOverBanner();
   }
 
   public override void _ExitTree()

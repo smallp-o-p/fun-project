@@ -12,18 +12,19 @@ namespace FunProject.Battle;
 /// </summary>
 public sealed class BattleRuntime : IDisposable
 {
-  // The single lifecycle representation: running combat, or the frozen result installed at
-  // settlement. Both total queries derive their answers from this one value.
+  // The single lifecycle representation: running combat owning its receiver, or the frozen
+  // result installed at settlement. The Running value is the sole persistent receiver owner;
+  // both total queries derive their answers from this one value.
   private abstract record Lifecycle
   {
-    internal sealed record Running : Lifecycle;
+    internal sealed record Running(BattleSession Session) : Lifecycle;
 
     internal sealed record Completed(CompletedBattle Result) : Lifecycle;
   }
 
-  private readonly BattleSession _session;
+  private readonly BattleState _state;
   private readonly BattleActionExecutor _actions;
-  private Lifecycle _lifecycle = new Lifecycle.Running();
+  private Lifecycle _lifecycle;
   private bool _disposed;
 
   public event Action<BattleEvent> BattleEventCommitted = delegate { };
@@ -31,18 +32,31 @@ public sealed class BattleRuntime : IDisposable
   public event Action<BattleActionExecResult> ActionCompleted = delegate { };
 
   // Engine-owned construction: the factory mints the runtime from a prepared state and
-  // dispatches the opening turn; there is one session and one executor per runtime.
-  internal BattleRuntime(BattleSession session)
+  // dispatches the opening turn; there is one state, one receiver, and one executor per
+  // runtime. The executor owns the committed stream from the shared state.
+  private BattleRuntime(BattleState state, BattleSession session)
   {
+    ArgumentNullException.ThrowIfNull(state);
     ArgumentNullException.ThrowIfNull(session);
 
-    _session = session;
-    _session.BattleEventCommitted += RaiseBattleEventCommitted;
+    _state = state;
+    _lifecycle = new Lifecycle.Running(session);
     _actions = new BattleActionExecutor(this);
-    _session.ActionOptions.InstallContextProvider(GetReadContext);
+    _state.ActionOptions.InstallContextProvider(GetReadContext);
   }
 
-  internal BattleSession Session => _session;
+  // The one persistent receiver owner is the Running lifecycle value; this door resolves
+  // the current receiver per call and refuses once completion replaced it. Execution
+  // scopes and trusted-core doors resolve here; nothing retains the receiver.
+  internal BattleSession CurrentSession => _lifecycle switch
+  {
+    Lifecycle.Running running => running.Session,
+    _ => throw new InvalidOperationException("The battle has no running receiver after completion."),
+  };
+
+  // Lifetime-owned tactical state: cross-lifecycle mints, reads, and the committed stream
+  // dispatch live here, independent of which lifecycle value is installed.
+  internal BattleState State => _state;
 
   // Factory-owned construction door: builds the valid scheduler from the complete prepared
   // state and the running receiver around it.
@@ -53,7 +67,7 @@ public sealed class BattleRuntime : IDisposable
       preparedState.Factions,
       preparedState.HasConsciousUnits,
       preparedState.GetFactionConsciousUnits);
-    return new BattleRuntime(new BattleSession(preparedState, scheduler));
+    return new BattleRuntime(preparedState, new BattleSession(preparedState, scheduler));
   }
 
   // Factory-owned dispatch door: registers are done; the opening step reuses the ordinary
@@ -82,13 +96,15 @@ public sealed class BattleRuntime : IDisposable
   {
     ArgumentNullException.ThrowIfNull(completed);
     _lifecycle = new Lifecycle.Completed(completed);
-    _session.ActionOptions.InvalidateAll();
+    _state.ActionOptions.InvalidateAll();
   }
 
   internal BattleReadContext GetReadContext() => _lifecycle switch
   {
-    Lifecycle.Completed completed => new BattleReadContext(_session.State, None, Some(completed.Result), None),
-    _ => new BattleReadContext(_session.State, Some(_session.CurrentTurn), None, Some(_session)),
+    Lifecycle.Running running => new BattleReadContext(
+      _state, Some(running.Session.CurrentTurn), None, Some(running.Session)),
+    Lifecycle.Completed completed => new BattleReadContext(_state, None, Some(completed.Result), None),
+    _ => throw new InvalidOperationException("Unknown lifecycle representation."),
   };
 
   public TResult Query<TResult>(IBattleSessionQuery<TResult> query)
@@ -101,18 +117,20 @@ public sealed class BattleRuntime : IDisposable
   // The interaction door for scene code holding a raw BattleUnitState: mints an aliveness proof
   // (Some iff the unit is alive in this battle). The None path is what used to surface as a
   // query Left for a dead/foreign unit.
+  // Proof mint doors route through the lifetime-owned state, so they keep working against
+  // a completed battle without any running receiver.
   public Option<AliveUnit> TryGetAlive(BattleUnitState unit)
   {
     ThrowIfDisposed();
     ArgumentNullException.ThrowIfNull(unit);
-    return _session.TryGetAlive(unit);
+    return _state.TryGetAlive(unit);
   }
 
   public Option<LiveObject> TryGetAliveObject(BattleObjectState obj)
   {
     ThrowIfDisposed();
     ArgumentNullException.ThrowIfNull(obj);
-    return _session.TryGetAliveObject(obj);
+    return _state.TryGetAliveObject(obj);
   }
 
   // The attack-target mint door for scene code holding a raw identity: Some iff the entity is
@@ -122,7 +140,7 @@ public sealed class BattleRuntime : IDisposable
   {
     ThrowIfDisposed();
     ArgumentNullException.ThrowIfNull(entity);
-    return _session.TryGetAttackTarget(entity);
+    return _state.TryGetAttackTarget(entity);
   }
 
   // The tile mint door for scene code holding a raw coordinate (Some iff the tile is on this
@@ -130,7 +148,7 @@ public sealed class BattleRuntime : IDisposable
   public Option<BattleBoardState.ValidatedPoint> TryGetTile(Vector3I coordinates)
   {
     ThrowIfDisposed();
-    return _session.State.Board.ValidatePoint(coordinates);
+    return _state.Board.ValidatePoint(coordinates);
   }
 
   // Total facade door: Some means the submission actually ran; None means the battle was
@@ -167,7 +185,6 @@ public sealed class BattleRuntime : IDisposable
     if (_disposed)
       return;
 
-    _session.BattleEventCommitted -= RaiseBattleEventCommitted;
     _actions.Dispose();
     _disposed = true;
   }
@@ -177,7 +194,9 @@ public sealed class BattleRuntime : IDisposable
     ObjectDisposedException.ThrowIf(_disposed, this);
   }
 
-  private void RaiseBattleEventCommitted(BattleEvent battleEvent)
+  // The executor's committed handler forwards to runtime subscribers after it has logged
+  // the cause; runtime subscribers therefore never observe an event that missed the log.
+  internal void RaiseBattleEventCommitted(BattleEvent battleEvent)
   {
     BattleEventCommitted.Invoke(battleEvent);
   }

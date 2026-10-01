@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Buffs;
 using FunProject.Combatants;
 using FunProject.Stats;
 using FunProject.Weapons;
@@ -9,7 +10,7 @@ using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
-public class BattleSessionTest
+public partial class BattleSessionTest
 {
   [TestCase(TestName = "Board dimensions follow Vector3I axis order")]
   public void BoardDimensionsFollowVector3IAxisOrder()
@@ -224,6 +225,9 @@ public class BattleSessionTest
     battle.Start();
 
     battle.Spawn(TestData.MakeCombatant("C1", factionC), new Vector3I(2, 0, 0));
+    // The scheduler owns the authoritative ordered list: the new faction registered without
+    // any separate caller-side registration.
+    Assert.Equal(3, battle.Query(new GetGlobalFactionTurnOrderQuery()).Count);
 
     Assert.Equal(1, battle.Query(new GetCurrentTurnQuery()).RequireSome().RoundNumber);
 
@@ -247,7 +251,7 @@ public class BattleSessionTest
     var factionB = TestData.MakeFaction("B");
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [factionA, factionB]);
 
-    battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
+    var unitA = battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
     battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
     battle.Start();
 
@@ -255,6 +259,9 @@ public class BattleSessionTest
     Assert.Equal(factionB, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
     Assert.Equal(1, battle.Query(new GetCurrentTurnQuery()).RequireSome().RoundNumber);
 
+    // A acted this round, was eliminated, and then reinforced: its acted history must
+    // survive, so the reinforcement still waits for round 2 instead of rejoining round 1.
+    battle.ApplyDamage(unitA, 999);
     battle.Spawn(TestData.MakeCombatant("A2", factionA), new Vector3I(2, 0, 0));
 
     battle.AdvanceTurn();
@@ -429,7 +436,7 @@ public class BattleSessionTest
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
-    var state = battle.Session.State;
+    var state = battle.Read.State;
     var scheduler = new TurnScheduler(state.Factions, state.HasConsciousUnits, state.GetFactionConsciousUnits);
 
     scheduler.RegisterReinforcement(battle.PlayerUnit);
@@ -459,6 +466,13 @@ public class BattleSessionTest
     battle.Damage(dead, 999);
     battle.Damage(unconscious, 20, DamageKind.Stun);
 
+    // Preparation preset bookkeeping: the dead body left the board (its tile is reusable),
+    // the unconscious body still occupies its tile, and every identity stays in the pool.
+    Assert.True(battle.PositionOf(dead).IsNone);
+    Assert.False(battle.Board.IsOccupied(battle.Board.At(1, 0, 0)));
+    var tileHeir = battle.Spawn(TestData.MakeCombatant("Fill", faction), new Vector3I(1, 0, 0));
+    Assert.True(battle.Board.IsOccupied(battle.Board.At(2, 0, 0)));
+
     battle.Start();
 
     Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
@@ -466,6 +480,91 @@ public class BattleSessionTest
     Assert.True(dead.IsDead);
     Assert.True(unconscious.IsUnconscious);
     Assert.False(battle.Query(new CanUnitActNow(unconscious)));
+    Assert.True(battle.PositionOf(dead).IsNone);
+    Assert.True(battle.PositionOf(tileHeir).IsSome);
+    Assert.True(battle.Board.IsOccupied(battle.Board.At(2, 0, 0)));
+  }
+
+  [TestCase(TestName = "Preparation rejects a wholly dead side with the typed NoConsciousUnits reason")]
+  public void PreparationRejectsWhollyDeadSidesWithTypedReason()
+  {
+    var faction = TestData.MakeFaction("Player");
+    var preparation = new BattlePreparation(new BattleBoardState(new Vector3I(3, 1, 1)), [faction]);
+    var unit = preparation.AddUnit(
+      TestData.MakeCombatant("Solo", faction, health: 20),
+      preparation.State.Board.At(0, 0, 0), None, None);
+    unit.ReceiveDamage(999);
+
+    Either<BattleSetupFailure, BattleState> outcome = preparation.Complete();
+
+    Assert.True(outcome.IsLeft);
+    outcome.IfLeft(failure =>
+    {
+      Assert.Equal(BattleSetupFailureReason.NoConsciousUnits, failure.Reason);
+      Assert.True(failure.Message.Contains("Player"));
+    });
+  }
+
+  // A buff whose +2 maximum only exists from round 2 on: the round-1 refresh saw AP 4,
+  // the unit spent down to 3, and the round-2 turn-start pass raises the maximum to 6.
+  private sealed partial class RoundTwoCondition : BuffCondition
+  {
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
+      context.RunningSession.Match(session => session.RoundNumber >= 2, () => false);
+  }
+
+  [TestCase(TestName = "A terminal next-turn start still refreshes the owning faction's action points")]
+  public void TerminalNextTurnStillRefreshesTheOwningFaction()
+  {
+    var factionA = TestData.MakeFaction("A");
+    var factionB = TestData.MakeFaction("B");
+    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
+    var roused = TestData.MakeBuff("Roused", new RoundTwoCondition(),
+      statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
+    var unitA = battle.Spawn(TestData.MakeCombatant("A1", factionA, actionPoints: 4, buffs: [roused]),
+      new Vector3I(0, 0, 0));
+    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
+    var terminal = new FakeObjective(new FakeObjectiveData
+    {
+      Observe = typeof(TurnStartedBattleEvent),
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    });
+    battle.AddObjective(factionA, terminal);
+    battle.Start();
+    int liveApAtSessionEnd = -1;
+    battle.OnCommitted(battleEvent =>
+    {
+      if (battleEvent is SessionEndedBattleEvent)
+        liveApAtSessionEnd = unitA.CurrentActionPoints;
+    });
+
+    battle.Move(unitA, [new Vector3I(0, 0, 1)]); // round 1: spend down to 3
+    battle.AdvanceTurn(); // ends A: B starts its round-1 turn with the battle still running
+    terminal.Complete = true;
+    battle.AdvanceTurn(); // ends B: the round-2 turn start flips the objective mid-dispatch
+
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
+    Assert.Equal(6, liveApAtSessionEnd);
+  }
+
+  [TestCase(TestName = "Advancing without conscious forces retains the installed turn")]
+  public void AdvancingWithoutConsciousForcesRetainsTheInstalledTurn()
+  {
+    var factionA = TestData.MakeFaction("A");
+    var factionB = TestData.MakeFaction("B");
+    var preparation = new BattlePreparation(new BattleBoardState(new Vector3I(4, 1, 4)), [factionA, factionB]);
+    var unitA = preparation.AddUnit(
+      TestData.MakeCombatant("A1", factionA, health: 10), preparation.State.Board.At(0, 0, 0), None, None);
+    var unitB = preparation.AddUnit(
+      TestData.MakeCombatant("B1", factionB, health: 10), preparation.State.Board.At(1, 0, 0), None, None);
+    var scheduler = new TurnScheduler(
+      preparation.State.Factions, preparation.State.HasConsciousUnits, preparation.State.GetFactionConsciousUnits);
+    unitA.ReceiveStun(10);
+    unitB.ReceiveStun(10);
+    BattleTurn before = scheduler.CurrentTurn;
+
+    Assert.True(scheduler.AdvanceTurn().IsNone);
+    Assert.Equal(before, scheduler.CurrentTurn);
   }
 
   [TestCase(TestName = "Killing the only active unit on an eliminated faction does not auto-advance")]

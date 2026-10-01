@@ -44,12 +44,36 @@ public class BattleOutcomeTest
     battle.ApplyDamage(battle.PlayerUnit, amount, kind);
     Assert.True(battle.Query(new GetCurrentTurnQuery()).IsSome);
     Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
+    // Opposite lifecycle answers across the settlement boundary, observed in-stream:
+    // the outgoing turn is still Some during the step, and both switch inside the end event.
+    Option<BattleTurn> turnAtTurnEnd = None;
+    Option<CompletedBattle> completionAtTurnEnd = None;
+    Option<BattleTurn> turnAtSessionEnd = None;
+    Option<CompletedBattle> completionAtSessionEnd = None;
+    battle.OnCommitted(battleEvent =>
+    {
+      switch (battleEvent)
+      {
+        case TurnEndedBattleEvent:
+          turnAtTurnEnd = battle.Query(new GetCurrentTurnQuery());
+          completionAtTurnEnd = battle.Query(new GetCompletedBattleQuery());
+          break;
+        case SessionEndedBattleEvent:
+          turnAtSessionEnd = battle.Query(new GetCurrentTurnQuery());
+          completionAtSessionEnd = battle.Query(new GetCompletedBattleQuery());
+          break;
+      }
+    });
 
     if (kind == DamageKind.Stun)
       battle.EndFactionTurn(battle.PlayerFaction);
     else
       battle.AdvanceTurn();
 
+    Assert.True(turnAtTurnEnd.IsSome);
+    Assert.True(completionAtTurnEnd.IsNone);
+    Assert.True(turnAtSessionEnd.IsNone);
+    Assert.Equal(BattleOutcome.Draw, completionAtSessionEnd.RequireSome().Outcome);
     Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
     Assert.Equal(BattleOutcome.Draw, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();

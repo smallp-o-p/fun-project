@@ -138,6 +138,36 @@ public class StunRecoveryTest
     Assert.Equal(8, battle.PlayerUnit.CurrentStun);
   }
 
+  [TestCase(TestName = "A pending terminal outcome still recovers conscious survivors during turn-end upkeep")]
+  public void PendingTerminalOutcomeStillRecoversConsciousSurvivors()
+  {
+    var armor = TestData.MakeArmor("Shield", regenPerTurn: 3);
+    using var battle = BattleFixture.Duel(playerControlled: true, start: false,
+      player: new("Alpha", Armor: armor));
+    battle.Start();
+    battle.ApplyDamage(battle.PlayerUnit, 4); // armor damage so regeneration has work
+    battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
+    battle.PlayerUnit.ApplyStatusEffect(TestData.MakeStun(duration: 2));
+    // A runtime subscriber requests the end before the upkeep hooks fire: the request lands
+    // ahead of recovery and must not cancel it.
+    battle.Runtime.BattleEventCommitted += battleEvent =>
+    {
+      if (battleEvent is TurnEndedBattleEvent)
+        battle.Session.RequestEnd(BattleOutcome.Victory);
+    };
+    battle.ClearEvents();
+
+    battle.EndFactionTurn(battle.PlayerFaction);
+
+    Assert.Equal(3, battle.PlayerUnit.CurrentStun);
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
+    battle.Events.EventBefore<UnitStatusEffectTickedBattleEvent, UnitArmorRegeneratedBattleEvent>();
+    battle.Events.EventBefore<UnitArmorRegeneratedBattleEvent, UnitStunRecoveredBattleEvent>();
+    battle.Events.EventBefore<UnitStunRecoveredBattleEvent, SessionEndedBattleEvent>();
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
+    Assert.Equal(0, battle.Events.EventsOf<TurnStartedBattleEvent>().AsValueEnumerable().Count());
+  }
+
   [TestCase]
   public void RecoveryEventRejectsInvalidPayloads()
   {

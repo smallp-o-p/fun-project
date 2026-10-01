@@ -19,7 +19,6 @@ public readonly struct BattleActionExecResult(BattleAction action, List<BattleEv
 public sealed class BattleActionExecutor : IDisposable
 {
   private readonly BattleRuntime _runtime;
-  private readonly BattleSession _session;
   private readonly BattleHookRegistry _hooks = new();
 
   /// <summary>
@@ -39,13 +38,13 @@ public sealed class BattleActionExecutor : IDisposable
   private bool _disposed;
 
   // Engine-owned construction: the runtime mints its executor; there is one per runtime.
+  // The executor owns the committed stream from the runtime's lifetime state.
   internal BattleActionExecutor(BattleRuntime runtime)
   {
     ArgumentNullException.ThrowIfNull(runtime);
     _runtime = runtime;
-    _session = runtime.Session;
-    _session.ActionOptions.InvalidateAll();
-    _session.BattleEventCommitted += OnEventCommitted;
+    _runtime.State.ActionOptions.InvalidateAll();
+    _runtime.State.Committed += OnEventCommitted;
 
     // Status effects and armor regen run before conscious stun recovery at turn end.
     RegisterHook<TurnEndedBattleEvent>(new StatusEffectSystem(), priority: -100);
@@ -61,12 +60,17 @@ public sealed class BattleActionExecutor : IDisposable
     RegisterHook<BattleEventTag>(new ObjectiveSystem(), priority: 100);
   }
 
+  // The single committed-stream handler: the cause enters the append-only log FIRST,
+  // cached options invalidate before any observer inspects them, runtime subscribers are
+  // forwarded SECOND, and hooks fire THIRD — hook follow-ups stay queued and linear.
   private void OnEventCommitted(BattleEvent battleEvent)
   {
     _eventLog.Add(battleEvent);
+    _runtime.State.ActionOptions.Invalidate(battleEvent);
+    _runtime.RaiseBattleEventCommitted(battleEvent);
 
-    // The receiver and read context come from the runtime per firing, so an event committed
-    // at or after settlement observes the completed representation with no running receiver.
+    // The read context derives from the runtime per firing, so an event committed at or
+    // after settlement observes the completed representation with no running receiver.
     var interrupts = _hooks.Fire(battleEvent, new HookContext(_runtime.GetReadContext(), _inFlightAction));
     if (interrupts.Count == 0)
       return;
@@ -92,11 +96,14 @@ public sealed class BattleActionExecutor : IDisposable
 
   internal BattleActionExecResult Execute(BattleAction action)
   {
+    // The running receiver resolves into this local execution scope and is released when
+    // the submission finishes; the round is captured from the same scope at settlement.
+    BattleSession session = _runtime.CurrentSession;
     int logStart = _eventLog.Count;
     var step = new BattleStep();
-    _session.BeginStep(step);
+    session.BeginStep(step);
     _pendingActions.Push(action);
-    _session.ActionOptions.BeginExecution();
+    session.ActionOptions.BeginExecution();
 
     try
     {
@@ -109,7 +116,7 @@ public sealed class BattleActionExecutor : IDisposable
 
         _capturedInterrupts.Clear();
         _inFlightAction = Some(currentAction);
-        var actionState = currentAction.Execute(_session);
+        var actionState = currentAction.Execute(session);
 
         switch (actionState)
         {
@@ -140,22 +147,22 @@ public sealed class BattleActionExecutor : IDisposable
       // Successful settlement happens only after the primitive returned and the synchronous
       // event queue drained: capture once, install Completed, broadcast exactly one end event.
       if (step.TryTakeOutcome(out BattleOutcome outcome))
-        Settle(outcome);
+        Settle(session, outcome);
     }
     catch
     {
       // A failed submission is fully unwound: nothing queued stays executable, so a later
       // Submit starts from a clean slate instead of resuming stale work.
       _pendingActions.Clear();
-      _session.ActionOptions.InvalidateAll();
+      session.ActionOptions.InvalidateAll();
       throw;
     }
     finally
     {
       _inFlightAction = None;
       _capturedInterrupts.Clear();
-      _session.ActionOptions.EndExecution();
-      _session.EndStep();
+      session.ActionOptions.EndExecution();
+      session.EndStep();
     }
 
     return new BattleActionExecResult(action, _eventLog, logStart, _eventLog.Count - logStart);
@@ -170,7 +177,7 @@ public sealed class BattleActionExecutor : IDisposable
       _pendingActions.Push(reaction);
   }
 
-  private void Settle(BattleOutcome outcome)
+  private void Settle(BattleSession session, BattleOutcome outcome)
   {
     _settling = true;
     try
@@ -179,12 +186,12 @@ public sealed class BattleActionExecutor : IDisposable
       _capturedInterrupts.Clear();
       _inFlightAction = None;
 
-      CompletedBattle completed = CompletedBattle.Capture(_session.State, outcome, _session.RoundNumber);
+      CompletedBattle completed = CompletedBattle.Capture(session.State, outcome, session.RoundNumber);
       _runtime.InstallCompleted(completed);
 
       // End-event subscribers read frozen results and may record objective history; hook
       // follow-ups dispatch linearly, and any interrupts they return are discarded here.
-      _session.State.RaiseEvents(new SessionEndedBattleEvent(outcome));
+      session.State.RaiseEvents(new SessionEndedBattleEvent(outcome));
     }
     finally
     {
@@ -199,7 +206,7 @@ public sealed class BattleActionExecutor : IDisposable
     if (_disposed)
       return;
 
-    _session.BattleEventCommitted -= OnEventCommitted;
+    _runtime.State.Committed -= OnEventCommitted;
     _disposed = true;
   }
 

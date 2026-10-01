@@ -124,7 +124,43 @@ public partial class AttackUnitTest
     // The dead-target case dies at the proof mint itself: TryGetAttackTarget refuses to mint
     // for a dead unit, so constructing the action (not executing it) throws.
     Assert.Throws<InvalidOperationException>(()
-      => BattleAction.AttackEntity(battle.Alive(armedAttacker), battle.Session.TryGetAttackTarget(new BattleEntity.Unit(target)).RequireSome()));
+      => BattleAction.AttackEntity(battle.Alive(armedAttacker), battle.Target(target)));
+  }
+
+  [TestCase(TestName = "A terminal attack still spends its cost and delivers its hit before the session ends")]
+  public void TerminalAttackStillSpendsCostAndDeliversItsHit()
+  {
+    var frame = new WeaponFrameData { Name = "Terminal Frame", Packets = [] };
+    frame.Packets.Add(new DamagePacketData
+    { Element = Element.Kinetic, Multiplier = 1f, Status = TestData.MakeBurn(applyChancePercent: 100) });
+    var weaponData = TestData.MakeAmmoWeaponData("Rifle", magazine: 2, damage: 5);
+    weaponData.Frame = frame;
+    var weapon = new AmmunitionedWeapon(weaponData);
+    using var battle = BattleFixture.Duel(
+      hitChanceCalculator: new AlwaysHitCalculator(),
+      player: new("Alpha", Weapon: weapon),
+      enemy: new("Hostile", Health: 20), start: false);
+    battle.AddObjective(battle.PlayerFaction, new FakeObjective(new FakeObjectiveData
+    {
+      Complete = true,
+      Observe = typeof(UnitAttackedBattleEvent),
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    }));
+    battle.Start();
+    battle.ClearEvents();
+
+    battle.Attack(battle.PlayerUnit, battle.EnemyUnit); // the terminal request lands in the attack dispatch
+
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
+    Assert.Equal(3, battle.PlayerUnit.CurrentActionPoints);
+    Assert.Equal(1, weapon.CurrentAmmo);
+    Assert.Equal(15, battle.EnemyUnit.CurrentHealth);
+    Assert.Equal(1, battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Count());
+    battle.Events.EventBefore<UnitAttackedBattleEvent, UnitDamagedBattleEvent>();
+    battle.Events.EventBefore<UnitDamagedBattleEvent, UnitStatusEffectAppliedBattleEvent>();
+    battle.Events.EventBefore<UnitStatusEffectAppliedBattleEvent, SessionEndedBattleEvent>();
+    Assert.Equal(0, battle.Events.EventsOf<TurnEndedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(typeof(SessionEndedBattleEvent), battle.Events.AsValueEnumerable().Last().GetType());
   }
 
   [TestCase(TestName = "A stale attack whose target died to an earlier interrupt interrupts silently")]

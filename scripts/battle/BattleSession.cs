@@ -39,15 +39,6 @@ public sealed class BattleSession
     ArgumentNullException.ThrowIfNull(scheduler);
     State = state;
     _scheduler = scheduler;
-    State.Committed += OnStateEventCommitted;
-  }
-
-  internal event Action<BattleEvent> BattleEventCommitted = delegate { };
-
-  private void OnStateEventCommitted(BattleEvent battleEvent)
-  {
-    ActionOptions.Invalidate(battleEvent);
-    BattleEventCommitted.Invoke(battleEvent);
   }
 
   internal BattleTurn CurrentTurn => _scheduler.CurrentTurn;
@@ -84,7 +75,8 @@ public sealed class BattleSession
   // ---- Reinforcements and turn flow -----------------------------------------------------
 
   // In-progress reinforcement: initial placement belongs to preparation; this door is the
-  // submission path (SpawnUnit) for units joining a running battle.
+  // submission path (SpawnUnit) for units joining a running battle. The scheduler maintains
+  // the authoritative ordered faction list itself — no separate registration coordination.
   internal BattleUnitState AddUnit(
     Combatant combatant,
     BattleBoardState.ValidatedPoint position,
@@ -94,7 +86,6 @@ public sealed class BattleSession
   {
     ArgumentNullException.ThrowIfNull(combatant);
 
-    State.RegisterFaction(combatant.OwningFaction);
     BattleUnitState unit = State.AddUnit(combatant, position, equippedWeapon, equippedArmor, statMods);
     _scheduler.RegisterReinforcement(unit);
 
@@ -106,7 +97,8 @@ public sealed class BattleSession
   // Opening session/turn dispatch through the same event machinery as later turns. The
   // full visibility recompute picks up board authoring (tile BlocksLineOfSight) finalized
   // after the last spawn; the all-unit AP refresh tops every initial unit up after the
-  // opening-turn buff pass, so the factory returns with full effective AP everywhere.
+  // opening-turn buff pass — an already-started turn always finishes its buff/AP work,
+  // even when a terminal opening objective settled inside the dispatch.
   internal void OpeningTurnDispatch()
   {
     State.InvalidateVisibility();
@@ -115,11 +107,6 @@ public sealed class BattleSession
     State.RaiseEvents(
       new SessionStartedBattleEvent(),
       new TurnStartedBattleEvent(opening.ActiveFaction, opening.RoundNumber));
-
-    // A terminal opening-turn objective skips only the refresh; its buff/AP work finished
-    // in the dispatch above before the executor settled.
-    if (HasPendingOutcome)
-      return;
 
     foreach (BattleUnitState unit in State.AliveUnits)
       unit.RefreshForNewTurn();
@@ -190,11 +177,8 @@ public sealed class BattleSession
       new ActiveSideChangedBattleEvent(started.ActiveFaction),
       new TurnStartedBattleEvent(started.ActiveFaction, started.RoundNumber));
 
-    // A turn-start objective flip (e.g. SurviveUntilTurn reaching its target) can request
-    // the ending inside that dispatch; skip the AP refresh for the settled battle.
-    if (HasPendingOutcome)
-      return;
-
+    // An already-started turn finishes its buff/AP work even when a terminal directive
+    // settled inside this dispatch: the owning faction's refresh is residual upkeep.
     foreach (BattleUnitState unit in State.GetFactionAliveUnits(started.ActiveFaction))
       unit.RefreshForNewTurn();
   }

@@ -581,10 +581,12 @@ public class UnitActionCacheTest
     {
       if (battleEvent is SessionStartedBattleEvent)
       {
+        // The shared ordered stream forwards subscribers before the hook pass, so this
+        // read observes pre-drain state; materializing here gives TurnStarted an existing
+        // row to re-check against the drained, pre-refresh values.
         IReadOnlyList<UnitAction> existing = battle.Query(
           new GetAvailableActionsForUnit(battle.Alive(player)));
         existingMove = Row<MoveActionDefinition>(existing);
-        Assert.False(existingMove.IsAvailable);
         return;
       }
       if (battleEvent is not TurnStartedBattleEvent)

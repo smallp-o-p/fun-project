@@ -211,14 +211,14 @@ public class BattleVisibilityTest
     Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile)));
 
     bool observedKnockout = false;
-    battle.Session.BattleEventCommitted += battleEvent =>
+    battle.OnCommitted(battleEvent =>
     {
       if (battleEvent is not UnitUnconsciousBattleEvent)
         return;
       observedKnockout = true;
       Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile)));
       Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, sharedTile)));
-    };
+    });
 
     battle.ApplyDamage(observer, 20, DamageKind.Stun);
 
@@ -245,7 +245,7 @@ public class BattleVisibilityTest
     var support = battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction, vision: 1), Vector3I.Zero);
     battle.ApplyDamage(observer, 20, DamageKind.Stun);
     if (forceFullRebuild)
-      battle.Session.State.InvalidateVisibility();
+      battle.Read.State.InvalidateVisibility();
 
     battle.Move(support, [new Vector3I(0, 0, 1)]);
 
@@ -431,7 +431,7 @@ public class BattleVisibilityTest
     battle.Board.GetTile(battle.At(new Vector3I(1, 0, 0))).BlocksLineOfSight = true;
     battle.Board.GetTile(battle.At(new Vector3I(1, 0, 1))).BlocksLineOfSight = true;
     battle.Board.GetTile(battle.At(new Vector3I(1, 0, 2))).BlocksLineOfSight = true;
-    battle.Session.State.InvalidateVisibility();
+    battle.Read.State.InvalidateVisibility();
 
     battle.Move(mover, [new Vector3I(0, 0, 1)]);
 

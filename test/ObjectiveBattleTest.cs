@@ -268,6 +268,10 @@ public class ObjectiveBattleTest
     Assert.Equal(1, battle.Events.EventsOf<UnitMovedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(1, battle.Events.EventsOf<TileOccupiedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(4, unit.CurrentActionPoints);
+    // The committed tile carries its occupancy and visibility bookkeeping.
+    Assert.True(battle.Board.IsOccupied(battle.Board.At(1, 0, 0)));
+    Assert.False(battle.Board.IsOccupied(battle.Board.At(0, 0, 0)));
+    Assert.True(battle.Query(new IsTileVisibleToFaction(player, battle.Board.At(1, 0, 0))));
     // Exactly one end event, and it is the last terminal notification in the stream.
     Assert.Equal(1, battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(typeof(SessionEndedBattleEvent),
@@ -348,6 +352,31 @@ public class ObjectiveBattleTest
       _queued = true;
       return [build(context)];
     }
+  }
+
+  [TestCase(TestName = "A terminal activation-ended completes the battle without a turn transition")]
+  public void TerminalActivationEndedDoesNotStartAnotherTurn()
+  {
+    using var battle = BattleFixture.Duel(
+      dimensions: new Vector3I(5, 1, 5), playerControlled: true, start: false,
+      player: new("P1", Position: new Vector3I(0, 0, 0)), enemy: new("E1", Position: new Vector3I(2, 0, 0)));
+    battle.AddObjective(battle.PlayerFaction, new FakeObjective(new FakeObjectiveData
+    {
+      Complete = true,
+      Observe = typeof(UnitActivationEndedBattleEvent),
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    }));
+    battle.Start();
+    battle.ClearEvents();
+
+    battle.Pass(battle.PlayerUnit); // the terminal request lands inside the activation-ended dispatch
+
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
+    Assert.Equal(1, battle.Events.EventsOf<UnitActivationEndedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(0, battle.Events.EventsOf<TurnEndedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(0, battle.Events.EventsOf<ActiveSideChangedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(0, battle.Events.EventsOf<TurnStartedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(typeof(SessionEndedBattleEvent), battle.Events.AsValueEnumerable().Last().GetType());
   }
 
   [TestCase(TestName = "A mid-submission end drops queued interrupts and they never execute")]

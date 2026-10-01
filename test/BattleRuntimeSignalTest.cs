@@ -69,12 +69,17 @@ public sealed partial class BattleRuntimeSignalTest
     runtime.ActionStarted += _ => started++;
     runtime.ActionCompleted += _ => completed++;
     battle.ClearEvents();
+    Vector3I positionBefore = battle.PositionOf(battle.PlayerUnit).RequireSome().Raw;
+    int apBefore = battle.PlayerUnit.CurrentActionPoints;
 
     Assert.True(battle.Submit(BattleAction.EndFactionTurn(battle.PlayerFaction)).IsNone);
 
     Assert.Equal(0, started);
     Assert.Equal(0, completed);
     Assert.Equal(0, battle.Events.Count);
+    // A fresh completed submission mutates nothing: AP and position stay frozen too.
+    Assert.Equal(positionBefore, battle.PositionOf(battle.PlayerUnit).RequireSome().Raw);
+    Assert.Equal(apBefore, battle.PlayerUnit.CurrentActionPoints);
     Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
     Assert.True(battle.Query(new GetCompletedBattleQuery()).IsSome);
   }

@@ -11,9 +11,10 @@ public sealed class StunRecoverySystem : BattleHook<TurnEndedBattleEvent>
   {
     foreach (var unit in context.Read.State.GetFactionAliveUnits(evt.Faction))
     {
-      // Turn-end upkeep belongs to the current running step: once its terminal decision is
-      // pending (or the completion is installed), remaining units skip recovery.
-      if (!context.Read.RunningSession.Match(session => !session.HasPendingOutcome, () => false))
+      // Turn-end upkeep belongs to the current running step: a running receiver is
+      // required, but a pending terminal decision inside that step does not cancel the
+      // residual recovery of conscious survivors. RecoverStun gates dead/unconscious units.
+      if (context.Read.RunningSession.IsNone)
         break;
 
       uint recovered = unit.RecoverStun(RecoveryPerTurn);
