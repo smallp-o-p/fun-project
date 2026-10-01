@@ -218,6 +218,47 @@ public partial class GeoscapeMissionLaunchTest
     }
   }
 
+  [TestCase(TestName = "Startup selection mutation cannot alter the validated deployment")]
+  public void StartupSelectionMutationKeepsValidatedDeployment()
+  {
+    var mutation = new ScriptedSystemData();
+    using var campaign = NewMissionCampaign(customize: mission =>
+      mission.BattleType.Systems.Add(mutation));
+    var active = campaign.ActiveEvent;
+    var alpha = campaign.State.Roster[0];
+    var beta = campaign.State.Roster[1];
+    campaign.OpenResolution(active);
+
+    var selected = new List<Combatant> { alpha, beta };
+    mutation.OnRegister = () =>
+    {
+      selected.Clear();
+      selected.Add(campaign.State.Roster[2]);
+    };
+
+    var battle = campaign.Session.LaunchMission(active, selected).RequireRight();
+    try
+    {
+      var deployment = campaign.Session.ActiveMission.RequireSome();
+      Assert.True(ReferenceEquals(battle.Deployment, deployment),
+        "The association is stored only after startup succeeded.");
+      Assert.True(ReferenceEquals(active, deployment.Event));
+      Assert.Equal(2, deployment.Participants.Count);
+      Assert.True(ReferenceEquals(alpha, deployment.Participants[0]));
+      Assert.True(ReferenceEquals(beta, deployment.Participants[1]),
+        "Captured membership is the validated selection, not the callback-mutated caller list.");
+      BattleSideSetup player = battle.Setup.Sides[0];
+      Assert.Equal(2, player.Units.Count);
+      Assert.True(ReferenceEquals(alpha, player.Units[0].Loadout.Combatant));
+      Assert.True(ReferenceEquals(beta, player.Units[1].Loadout.Combatant),
+        "The battle setup still deploys the original validated selection.");
+    }
+    finally
+    {
+      battle.Runtime.Dispose();
+    }
+  }
+
   [TestCase(TestName = "Setup shortfall retains the typed failure and the pending event")]
   public void SetupShortfallRetainsTypedFailureAndPending()
   {
@@ -239,7 +280,7 @@ public partial class GeoscapeMissionLaunchTest
   {
     var boom = new InvalidOperationException("Initialization exploded.");
     using var campaign = NewMissionCampaign(customize: mission =>
-      mission.BattleType.Systems.Add(new ThrowingSystemData { Failure = boom }));
+      mission.BattleType.Systems.Add(new ScriptedSystemData { OnRegister = () => throw boom }));
     var active = campaign.ActiveEvent;
     campaign.OpenResolution(active);
 
@@ -299,30 +340,35 @@ public partial class GeoscapeMissionLaunchTest
     var squad = new[] { campaign.State.Roster[0], campaign.State.Roster[1] };
     campaign.OpenResolution(active);
     var battle = campaign.Session.LaunchMission(active, squad).RequireRight();
-
-    Assert.Throws<ArgumentNullException>(
-      () => campaign.Session.AbortMissionPresentation(null!));
-
-    new GeoscapeSession(campaign.State).AbortMissionPresentation(battle);
-
-    Assert.True(campaign.Session.ActiveMission.IsNone);
-    Assert.True(campaign.Session.PendingResolution.IsSome);
-    Assert.True(ReferenceEquals(active, campaign.Session.PendingResolution.RequireSome().Event));
-    Assert.Equal(seed, active.BattleSeed.RequireSome(), "The retained event keeps its generation seed.");
-    Assert.True(campaign.Session.ActiveEvents.AsValueEnumerable()
-      .Any(member => ReferenceEquals(member, active)));
-    Assert.True(battle.Runtime.TryGetTile(Vector3I.Zero).IsSome,
-      "Abort must not dispose the host-owned runtime.");
-
-    Assert.Throws<System.InvalidOperationException>(
-      () => campaign.Session.AbortMissionPresentation(battle));
-
     try
     {
+      Assert.Throws<ArgumentNullException>(
+        () => campaign.Session.AbortMissionPresentation(null!));
+
+      new GeoscapeSession(campaign.State).AbortMissionPresentation(battle);
+
+      Assert.True(campaign.Session.ActiveMission.IsNone);
+      Assert.True(campaign.Session.PendingResolution.IsSome);
+      Assert.True(ReferenceEquals(active, campaign.Session.PendingResolution.RequireSome().Event));
+      Assert.Equal(seed, active.BattleSeed.RequireSome(), "The retained event keeps its generation seed.");
+      Assert.True(campaign.Session.ActiveEvents.AsValueEnumerable()
+        .Any(member => ReferenceEquals(member, active)));
+      Assert.True(battle.Runtime.TryGetTile(Vector3I.Zero).IsSome,
+        "Abort must not dispose the host-owned runtime.");
+
+      Assert.Throws<System.InvalidOperationException>(
+        () => campaign.Session.AbortMissionPresentation(battle));
+
       var retry = campaign.Session.LaunchMission(active, squad).RequireRight();
-      retry.Runtime.Dispose();
-      Assert.True(campaign.Session.ActiveMission.IsSome,
-        "A presentation abort allows a later retry of the retained mission.");
+      try
+      {
+        Assert.True(campaign.Session.ActiveMission.IsSome,
+          "A presentation abort allows a later retry of the retained mission.");
+      }
+      finally
+      {
+        retry.Runtime.Dispose();
+      }
     }
     finally
     {
@@ -330,12 +376,12 @@ public partial class GeoscapeMissionLaunchTest
     }
   }
 
-  // Test-local authored system whose registration faults, driving BattleFactory's startup
-  // failure path through LaunchMission.
-  private sealed partial class ThrowingSystemData : BattleTypeSystemData
+  // Test-local authored system scripting registration behavior, driving BattleFactory's
+  // startup callbacks through LaunchMission.
+  private sealed partial class ScriptedSystemData : BattleTypeSystemData
   {
-    public required Exception Failure { get; set; }
+    public Action? OnRegister { get; set; }
 
-    public override void Register(BattleRuntime runtime) => throw Failure;
+    public override void Register(BattleRuntime runtime) => OnRegister?.Invoke();
   }
 }

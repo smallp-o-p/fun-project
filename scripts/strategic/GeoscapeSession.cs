@@ -155,12 +155,17 @@ public sealed class GeoscapeSession
         MissionLaunchFailureReason.WrongPendingMission,
         "The requested event is not the currently pending mission."));
 
-    if (squad.Count == 0)
+    // Captured once, before any validation or startup callback runs: every check, the
+    // loadouts, and the association membership share this snapshot, so a startup callback
+    // mutating the caller's list cannot desynchronize the battle from the association.
+    var deployment = new MissionDeployment(mission, squad);
+
+    if (deployment.Participants.Count == 0)
       return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
         MissionLaunchFailureReason.EmptySquad, "The squad is empty."));
 
     var seen = new SysColGeneric.HashSet<Combatant>();
-    foreach (Combatant combatant in squad)
+    foreach (Combatant combatant in deployment.Participants)
     {
       ArgumentNullException.ThrowIfNull(combatant);
       if (!seen.Add(combatant))
@@ -170,12 +175,12 @@ public sealed class GeoscapeSession
     }
 
     TacticalMissionData authored = MissionContract(mission);
-    if (squad.Count > authored.Size.MaxPlayerUnits)
+    if (deployment.Participants.Count > authored.Size.MaxPlayerUnits)
       return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
         MissionLaunchFailureReason.SquadTooLarge,
-        $"Squad of {squad.Count} exceeds the mission capacity of {authored.Size.MaxPlayerUnits}."));
+        $"Squad of {deployment.Participants.Count} exceeds the mission capacity of {authored.Size.MaxPlayerUnits}."));
 
-    foreach (Combatant combatant in squad)
+    foreach (Combatant combatant in deployment.Participants)
     {
       if (!ReferenceEquals(combatant.OwningFaction, _state.PlayerFaction))
         return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
@@ -199,7 +204,7 @@ public sealed class GeoscapeSession
     // Battle stats compose inside the battle; the loadout carries only the campaign's
     // deployment-time condition penalties.
     var player = new PlayerDeployment(_state.PlayerFaction,
-      [.. squad.AsValueEnumerable().Select(combatant => new UnitLoadout(
+      [.. deployment.Participants.AsValueEnumerable().Select(combatant => new UnitLoadout(
         combatant, combatant.EquippedWeapon, combatant.EquippedArmor)
       {
         StatMods = _state.Conditions.StatContributions(combatant),
@@ -212,7 +217,6 @@ public sealed class GeoscapeSession
         MissionLaunchFailureReason.SetupFailed, failure.Message, Some(failure)))
       .Map(launched =>
       {
-        var deployment = new MissionDeployment(mission, squad);
         _state.ActiveMission = Some(deployment);
         return new MissionBattle(deployment, launched.Setup, launched.Runtime);
       });
