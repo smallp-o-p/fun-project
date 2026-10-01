@@ -730,103 +730,55 @@ internal static class TestData
     return visible;
   }
 
-  // Wardrobe payload building blocks: one piece entry and one enabled mask rule
-  // in the original payload shape.
-  private static Godot.Collections.Dictionary Piece(string path, int variant = -1) => new()
+  private static ModelWardrobeGarment Piece(string path, int variant = -1) => new()
   {
-    ["path"] = path,
-    ["variant"] = variant,
+    Path = path,
+    Variant = variant,
   };
 
-  private static Godot.Collections.Dictionary MaskRule(string path, string name, int index,
+  private static ModelWardrobeMaskRule MaskRule(string path, string name, int index,
     string component, int variant) => new()
     {
-      ["path"] = path,
-      ["name"] = name,
-      ["index"] = index,
-      ["component"] = component,
-      ["enabled"] = true,
-      ["body"] = true,
-      ["variant"] = variant,
+      Path = path,
+      Name = name,
+      Index = index,
+      Component = component,
+      Variant = variant,
     };
 
-  // Wardrobe configuration in the original payload shape: one component with a
-  // piece per variant and per-variant body mask rules against the "Body" mesh
-  // path (same value as the fixture's MaskSetups MeshPath).
-  public static Godot.Collections.Dictionary MakeWardrobeConfiguration()
+  // One authored component with a garment and body mask rule per outfit.
+  public static ModelWardrobeConfiguration MakeWardrobeConfiguration() => new()
   {
-    return new Godot.Collections.Dictionary
+    Variants = ["outfit0", "outfit1"],
+    Components = new()
     {
-      ["variants"] = new Godot.Collections.Array { "outfit0", "outfit1" },
-      ["default_variant"] = 0,
-      ["components"] = new Godot.Collections.Dictionary
+      ["Garment"] = new()
       {
-        ["Garment"] = new Godot.Collections.Dictionary
-        {
-          ["visible"] = true,
-          ["pieces"] = new Godot.Collections.Array
-          {
-            Piece("GarmentA", 0),
-            Piece("GarmentB", 1),
-          },
-        },
+        Pieces = [Piece("GarmentA", 0), Piece("GarmentB", 1)],
       },
-      ["masks"] = new Godot.Collections.Array
-      {
-        MaskRule("Body", "Mask0", 0, "Garment", 0),
-        MaskRule("Body", "Mask1", 1, "Garment", 1),
-      },
-    };
-  }
+    },
+    Masks = [MaskRule("Body", "Mask0", 0, "Garment", 0), MaskRule("Body", "Mask1", 1, "Garment", 1)],
+  };
 
-  // Overlapping wardrobe configuration: two variant-independent components (shirt
-  // = GarmentA, jacket = GarmentB) whose enabled body rules both cover bit zero of
-  // the same mesh, so coordinated derivation must OR both contributions instead of
-  // applying last-rule-wins.
-  public static Godot.Collections.Dictionary MakeOverlappingWardrobeConfiguration()
+  // Two outfit-independent components cover the same region. Their rules must
+  // OR their contributions rather than allowing the last rule to win.
+  public static ModelWardrobeConfiguration MakeOverlappingWardrobeConfiguration() => new()
   {
-    return new Godot.Collections.Dictionary
+    Variants = ["outfit0", "outfit1"],
+    Components = new()
     {
-      ["variants"] = new Godot.Collections.Array { "outfit0", "outfit1" },
-      ["default_variant"] = 0,
-      ["components"] = new Godot.Collections.Dictionary
-      {
-        ["shirt"] = new Godot.Collections.Dictionary
-        {
-          ["visible"] = true,
-          ["pieces"] = new Godot.Collections.Array { Piece("GarmentA") },
-        },
-        ["jacket"] = new Godot.Collections.Dictionary
-        {
-          ["visible"] = true,
-          ["pieces"] = new Godot.Collections.Array { Piece("GarmentB") },
-        },
-      },
-      ["masks"] = new Godot.Collections.Array
-      {
-        MaskRule("Body", "Mask0", 0, "shirt", -1),
-        MaskRule("Body", "Mask0", 0, "jacket", -1),
-      },
-    };
-  }
+      ["shirt"] = new() { Pieces = [Piece("GarmentA")] },
+      ["jacket"] = new() { Pieces = [Piece("GarmentB")] },
+    },
+    Masks = [MaskRule("Body", "Mask0", 0, "shirt", -1), MaskRule("Body", "Mask0", 0, "jacket", -1)],
+  };
 
-  // The standard wardrobe plus one componentless variant rule on the fixture's
-  // second mask ("AccessoryBody", scaffolded by WithWardrobe), whose mesh path
-  // carries no component-associated rule. Componentless rules have no component
-  // gating, so outfit-wide derivations must reach them.
-  public static Godot.Collections.Dictionary MakeWardrobeConfigurationWithComponentlessVariantRule(int variant)
+  // The second mask has no component-associated rule; outfit-wide changes
+  // must still reach its componentless rule.
+  public static ModelWardrobeConfiguration MakeWardrobeConfigurationWithComponentlessVariantRule(int variant)
   {
     var configuration = MakeWardrobeConfiguration();
-    configuration["masks"].AsGodotArray().Add(new Godot.Collections.Dictionary
-    {
-      ["path"] = "AccessoryBody",
-      ["name"] = "Mask1",
-      ["index"] = 1,
-      ["component"] = "",
-      ["enabled"] = true,
-      ["body"] = false,
-      ["variant"] = variant,
-    });
+    configuration.Masks.Add(MaskRule("AccessoryBody", "Mask1", 1, "", variant));
     return configuration;
   }
 
@@ -846,9 +798,9 @@ internal static class TestData
       uniform sampler2D vertex_weights : filter_nearest;
       """;
     var shader = new Shader { Code = code };
-    var outline = new ShaderMaterial { Shader = shader };
+    var outline = new ShaderMaterial { Shader = shader, ResourceLocalToScene = true };
     outline.SetMeta("source_weights", new float[] { 1, 1, 1, 1, 1, 1 });
-    var material = new ShaderMaterial { Shader = shader, NextPass = outline };
+    var material = new ShaderMaterial { Shader = shader, NextPass = outline, ResourceLocalToScene = true };
     material.SetShaderParameter("use_face_sdf", true);
     return material;
   }

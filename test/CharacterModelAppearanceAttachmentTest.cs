@@ -17,7 +17,7 @@ public class CharacterModelAppearanceAttachmentTest
   [TestCase]
   public void IsolationCarriesFaceAxesAndLeavesAuthoredMaterialsUntouched()
   {
-    using var fixture = ModelFixture.WithAppearance();
+    using var fixture = ModelFixture.WithAppearance(headRest: new Basis(Vector3.Up, 0.4f));
     fixture.Model.Rotation = new Vector3(0, MathF.PI / 2, 0);
     fixture.Model.UpdateFaceAxes();
 
@@ -33,7 +33,7 @@ public class CharacterModelAppearanceAttachmentTest
     Assert.True(face.GetShaderParameter("head_right_world").AsVector3()
       .DistanceTo(new Vector3(0, 0, -1)) < 1e-4);
 
-    fixture.FaceSkeleton!.SetBonePoseRotation(0, Quaternion.FromEuler(new Vector3(0, MathF.PI, 0)));
+    fixture.FaceSkeleton!.SetBonePoseRotation(0, Quaternion.FromEuler(new Vector3(0, MathF.PI + 0.4f, 0)));
     fixture.Model.UpdateFaceAxes();
     Assert.True(face.GetShaderParameter("head_forward_world").AsVector3()
       .DistanceTo(new Vector3(-1, 0, 0)) < 1e-4);
@@ -45,36 +45,33 @@ public class CharacterModelAppearanceAttachmentTest
   [TestCase]
   public void IsolationCarriesAuthoredOutlineSettings()
   {
-    using var widthFixture = ModelFixture.WithAppearance(start: false);
-    ((ShaderMaterial)widthFixture.SharedMaterial!.NextPass!)
-      .SetShaderParameter("width_scale", 2.5);
+    using var widthFixture = ModelFixture.WithAppearance(start: false,
+      authorMaterial: material => ((ShaderMaterial)material.NextPass!).SetShaderParameter("width_scale", 2.5));
     widthFixture.Start();
     Assert.Equal(2.5, widthFixture.Outline.GetShaderParameter("width_scale").AsDouble());
-    Assert.Equal(2.5, ((ShaderMaterial)widthFixture.SharedMaterial.NextPass!)
+    Assert.Equal(2.5, ((ShaderMaterial)widthFixture.SharedMaterial!.NextPass!)
       .GetShaderParameter("width_scale").AsDouble());
 
-    using var disabledFixture = ModelFixture.WithAppearance(start: false);
-    ((ShaderMaterial)disabledFixture.SharedMaterial!.NextPass!)
-      .SetShaderParameter("enabled", false);
+    using var disabledFixture = ModelFixture.WithAppearance(start: false,
+      authorMaterial: material => ((ShaderMaterial)material.NextPass!).SetShaderParameter("enabled", false));
     disabledFixture.Start();
     Assert.False(disabledFixture.Outline.GetShaderParameter("enabled").AsBool());
-    Assert.False(((ShaderMaterial)disabledFixture.SharedMaterial.NextPass!)
+    Assert.False(((ShaderMaterial)disabledFixture.SharedMaterial!.NextPass!)
       .GetShaderParameter("enabled").AsBool());
 
-    using var passlessFixture = ModelFixture.WithAppearance(start: false);
-    passlessFixture.SharedMaterial!.NextPass = null;
+    using var passlessFixture = ModelFixture.WithAppearance(start: false,
+      authorMaterial: material => material.NextPass = null);
     passlessFixture.Start();
     Assert.That(passlessFixture.Body.GetSurfaceOverrideMaterial(0)!.NextPass is null,
       "A surface authored without an outline pass must stay without one after isolation.");
-    Assert.That(passlessFixture.SharedMaterial.NextPass is null);
+    Assert.That(passlessFixture.SharedMaterial!.NextPass is null);
   }
 
   [TestCase]
   public void InitializeRetryReusesIsolatedMaterials()
   {
-    // The failed-initialization retry door (a MaskSetups assignment on a ready,
-    // still-uninitialized model) re-runs InitializeAppearance after _EnterTree
-    // already isolated: the isolated materials must be reused, not duplicated.
+    // Failed initialization and its late-assignment retry must keep the same
+    // native resources that PackedScene already localized.
     using var fixture = ModelFixture.WithAppearance(withMask: true, start: false);
     ModelMeshMaskSetup setup = fixture.Model.MaskSetups[0];
     NodePath meshPath = setup.MeshPath;
@@ -87,6 +84,7 @@ public class CharacterModelAppearanceAttachmentTest
     fixture.Model.MaskSetups = new Godot.Collections.Array<ModelMeshMaskSetup> { setup };
     Assert.Equal(surfaceId, fixture.Body.GetSurfaceOverrideMaterial(0)!.GetInstanceId());
     Assert.Equal(outlineId, fixture.Outline.GetInstanceId());
+    Assert.Equal(1, fixture.Model.ProcessPriority, "A recovered model must still sample after the native mixer.");
   }
 
   // ------------------------------------------------------------------
@@ -96,9 +94,8 @@ public class CharacterModelAppearanceAttachmentTest
   [TestCase]
   public void MaskRenderUsesIsolatedOutlineWeights()
   {
-    // The masked body lives inside the mesh wrapper, yet the root isolates in
-    // its _EnterTree — before the _Ready that first renders a mask — so the
-    // first mask render must still see isolated overrides.
+    // The first mask render uses overrides already localized by instantiation,
+    // even though the masked body lives inside a nested mesh wrapper.
     using var fixture = ModelFixture.WithAppearance(withMask: true);
     TestData.SelectMaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
     Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");

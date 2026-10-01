@@ -1,10 +1,8 @@
 # Character model controls simplification and component report
 
-Reviewed 1 October 2026 in the Linux cloud clone. The feature now uses less runtime state and less repeated derivation while retaining the same public model controls, authored assets, import safety checks, and scene layout. The largest reduction is in wardrobe coordination; mask selection now has one authoritative bitset instead of a name-keyed state dictionary plus a reconstructed bitset and a second region-index dictionary.
+Reviewed 1 October 2026 in the Linux cloud clone. The latest pass moves fixed material, face-binding, and wardrobe-definition work to Godot scene instantiation, import, and typed authored resources. Runtime retains animated transforms, instance bindings, clothing selections, and coordinated mask writes. The earlier simplification and clean master rebase are retained.
 
-The branch rebased cleanly onto current master. Post-rebase checks pass except the unchanged dialogue timing test documented below; all 68 model cases pass.
-
-This report covers the **whole character-model-controls feature**, then the additional simplification and rebase passes. The authoring guide remains [model-controls.md](model-controls.md).
+This report covers the **whole character-model-controls feature**, followed by the original simplification/rebase history and the consolidated author-time ownership pass below. The authoring guide remains [model-controls.md](model-controls.md).
 
 ## Scope and comparison
 
@@ -19,6 +17,44 @@ This report covers the **whole character-model-controls feature**, then the addi
 - Simplifications are committed and locally rebased at the user's request. A separate review branch is used for PR publication; the existing remote feature branch is not force-pushed. No user-desktop edit or legacy-asset deletion was performed
 
 The final appendix lists every feature-changed path, including generated identity/import sidecars and binary dependencies, so the component descriptions do not hide unexamined file categories.
+
+## Author-time ownership pass
+
+This consolidated pass starts at published baseline `b47069a0ad0a7b896b27be7b575f8ce2d92ef0e9` and addresses all three follow-up requests together:
+
+1. **Materials:** remove `ModelMaterials`, its UID, `_EnterTree`, and material-isolation guards. Existing authored scene-local flags already isolate each mutable base/outline resource during instantiation; no captured material binary needed modification
+2. **Appearance:** generate exact face bindings during import, after skeleton repair. Remove recursive runtime discovery, shader-flag probing, head-bone lookup, rest inversion, and the wrapper `HeadBoneName` setting. Retain per-instance node/material resolution and animated-axis updates
+3. **Wardrobe:** replace the untyped Dictionary schema with four small typed Resource classes and two authored wardrobe resources. Remove runtime schema parsing and copied definitions. Keep owner-bound controls, live instance bindings, `Selections`, overlapping rules, and atomic preflight/commit
+4. **Recovery:** retain late mask assignment and add the equivalent late typed-wardrobe assignment retry. Set process priority before initialization so a recovered model still samples after native animation
+
+The wardrobe resources are fixed after authoring. Editor warning queries and saved-asset tests perform definition validation; programmatic authors call `ValidateAuthoring()` before saving. Warning output is tested, but automatic warning refresh after nested resource edits is not claimed; whole-resource assignment explicitly refreshes it. Runtime still validates the facts that depend on live nodes/regions. This is a deliberate authoring-contract change, not support for mutating a shared wardrobe definition while characters are running.
+
+Saved wrapper graphs were compared before and after migration by external resource paths: only the intended wardrobe property/reference and retired head-name setting changed. Existing editable flags, material overrides, animation settings, masks, and selections are preserved. The older claim that these wrappers were noneditable has been corrected in the guide; removing retained overrides would require a separate visual migration.
+
+### Scope and size
+
+Relative to `b47069a`, production C#/GDScript is **70 net lines smaller** (including the four new Resource classes; excluding tests, docs, identities, and assets). The wardrobe portion alone is **11 net lines larger**: it trades a runtime parser/copied graph for typed authoring classes and validation. The reduction is concentrated in material copying and appearance discovery. These are source/state simplifications; no performance or memory benchmark was run.
+
+The current PR changes 332 paths against the rebased master. The two new wardrobe resources total 13,080 bytes. The wrapper binaries shrink from 128,234 to 121,943 bytes, for a net **6,789-byte authored-asset increase**. These actual byte counts avoid confusing LFS pointer line changes with binary size. Four new class UIDs replace one removed copier UID. No model, shader, texture, or captured material asset was deleted.
+
+### Verification
+
+| Check | Final result |
+| --- | --- |
+| Normal full GdUnit suite, real OpenGL compatibility renderer | **1,043 passed, 0 failed, 0 skipped**, 40 seconds, exit 0 |
+| All model suites | **72 passed, 0 failed, 0 skipped**, exit 0 |
+| Changed-C# `dotnet format`, then `--verify-no-changes` | Passed, exit 0 |
+| Debug build | Passed, zero errors/warnings in final incremental run; earlier full compile reported 11 pre-existing nullable warnings outside model code |
+| ExportRelease build | Passed, zero errors/warnings in final incremental run; earlier full compile reported two pre-existing geoscape nullable warnings |
+| Fresh Blender source imports | Both models rebuilt successfully; generated face bindings read by real-scene tests |
+| Direct importer regression | **129 checks, 0 failures**, exit 0 |
+| Independent review, normalized wrapper/wardrobe comparison, links and `git diff --check` | Passed; limitations below documented |
+
+The model inventory grows from 68 to 72 cases; the full inventory grows from 1,039 to 1,043. No tests were skipped. Obsolete Dictionary-parser cases were adapted to typed authoring validation and actual binding-retry boundaries. An earlier full run hit the already-recorded `DialogueViewTest.PhysicsProcessDrivesReveal` timing failure; the final full run above passed it without any dialogue test/source change. Two new real-scene checks initially exposed test issues (managed wrapper equality and an incorrect assumption that shipped body outlines had optional weight metadata); both were corrected at the test boundary, reviewed independently, and passed in the final run.
+
+The existing missing `godot_ai` autoload/plugin and intentional negative-fixture diagnostics still appear during headless import checks. Shell-launched GdUnit could not open its IPC socket, including an escalation attempt; the normal project test/build/format commands were therefore launched through the supported cloud desktop launcher. No test runner stubs, security settings, user desktop, or weakened assertions were used.
+
+Earlier red/green evidence confirms the old material recopying, missing import-baked bindings, missing authoring warnings, and the two late-initialization ordering/recovery cases. The shared-resource wardrobe tests keep instance bindings independent. The new real-scene test covers both models before tree entry, different rendered mask geometry and face axes, untouched source materials, distinct per-surface outlines, and shared shader/authored texture identity. The shipped masked body outlines have no optional `source_weights` metadata, so actual weight-remapping behavior remains covered by the synthetic PackedScene fixture; the real-scene test checks authored outline mutation directly rather than inventing weights. Synthetic appearance fixtures now pack and instantiate their authored subtree instead of relying on manual runtime copying.
 
 ## Rebase onto current master
 
@@ -56,14 +92,14 @@ Test inventory reconciles exactly, rather than indicating lost discovery:
 
 Master's intentional test consolidation in `4ee9c22`, `687cac2`, `ccf3eaf`, and `f085088` accounts for the net reduction of 41 attributes. Static counts match both GdUnit discovery totals; range-diff reports unchanged feature patches, and the feature's model-test files are byte-identical before and after rebase. No missing, ignored, or skipped feature test explains the count change. The extra Debug warning is in `ObjectiveSystemBattleTest.cs`; the other warnings remain in the files documented below. The report-only follow-up records these results after code verification. The original pre-rebase verification record is preserved later in this document, including earlier timing-sensitive failures rather than hiding them.
 
-The resulting review scope contains 324 changed paths against current master. The appendix preserves the 322 original feature paths; it includes the subsequently removed orphan UID. The three review additions (this report and the importer harness plus UID) are described separately above the appendix.
+After rebase, before the author-time pass, the review scope contained 324 changed paths against current master. The appendix preserves the 322 original feature paths; it includes the subsequently removed orphan UID. The three review additions (this report and the importer harness plus UID) are described separately above the appendix.
 
 ## How the pieces fit together
 
 1. Blender sources and PNG inputs are imported using the committed humanoid bone maps and import settings
 2. The post-import callback repairs bone hierarchy while preserving global transforms, then applies the structure recipe and presentation manifest
-3. Thin model wrapper scenes instance the imported result and add the CharacterModel root, native animation player/tree, mask setups, and wardrobe configuration
-4. Each live root isolates its material overrides before masking can alter outline weights
+3. Model wrapper scenes instance the imported result and add the CharacterModel root, native animation player/tree, mask setups, and typed wardrobe configuration; retained wrapper material overrides remain authored data
+4. Godot localizes authored surface and outline materials during scene instantiation, before masking can alter outline weights
 5. Masks resolve authored geometry and region identities; the wardrobe derives visibility and mask changes from the saved Selections dictionary
 6. Native AnimationTree parameters drive body and facial clips. The root samples the animated head after the mixer and updates face-lighting axes
 7. Optional attachment visibility changes the imported container's own visibility flag. Tongue and weapon topology need no runtime attachment service
@@ -76,13 +112,13 @@ All of this is presentation-owned. It has no battle-session, combatant, command-
 
 [CharacterModel.cs](../scenes/models/CharacterModel.cs) is the single scene-facing C# entry point. It coordinates initialization and exposes the native AnimationTree and optional attachment visibility. The fixed `ModelAnimationTree` child is resolved once; missing means unconfigured, wrong type is invalid authoring. A nonempty attachment path must resolve to Node3D.
 
-The order is intentional: `_EnterTree` isolates materials; `_Ready` initializes masks, wardrobe, then attachments. The ready initializer also requests appearance setup, because tests, failed initialization, and late MaskSetups assignment can enter through that path. The one-time guards and late-assignment retry are not redundant calls that can simply be deleted. Process priority 1 places face-axis updates after the native mixer's default-priority evaluation.
+Native scene-local resource duplication happens before callbacks. `_Ready` establishes process priority 1, binds baked face slots, then initializes masks, wardrobe, and attachments. Late assignment of missing mask or wardrobe configuration retries an uninitialized model. Face binding can safely rebuild on a retry without recopying materials. Establishing priority before initialization also preserves post-mixer ordering after a failed `_Ready` and later recovery.
 
 ### Appearance and material isolation
 
-[CharacterModel.Appearance.cs](../scenes/models/CharacterModel.Appearance.cs) finds face-SDF materials below MeshRoot, resolves their head bone, and derives world-space forward/right axes from the animated skeleton relative to its rest orientation. It tracks freed native objects defensively for editor/reimport activity and disables processing when no face materials need updates. The last sampled basis avoids redundant shader writes.
+[CharacterModel.Appearance.cs](../scenes/models/CharacterModel.Appearance.cs) resolves the exact mesh and skeleton slots from import-baked metadata. Face-SDF discovery, head-bone lookup, and inverse-rest calculation happen in the importer. Runtime derives world-space axes from each instance's changing skeleton/head pose, skips freed native objects defensively, disables processing when no faces are configured, and avoids redundant shader writes using the last sampled basis.
 
-[ModelMaterials.cs](../scenes/models/ModelMaterials.cs) duplicates each surface override and its authored ShaderMaterial outline pass per instance, marking the copies local to the scene. Shader and texture resources remain shared. This prevents one model's lighting or remapped outline weights from changing another model. Replacing this with indiscriminate deep duplication would copy reusable assets; deleting it would leak mutable visual state between instances.
+The former `ModelMaterials` copier and isolation lifecycle fields are removed. Direct inspection found all 86 captured surface overrides and 78 outline passes already saved scene-local, with separate outlines per surface. Godot already instantiated local copies before `_EnterTree`; copying them again was redundant. Shaders and authored textures remain shared. The same contract applies to the wrappers' retained local material overrides. Local-to-scene does not split aliases within a scene: independently masked surfaces must keep distinct authored outline resources.
 
 ### Mesh mask configuration and binding
 
@@ -102,9 +138,9 @@ The compacted mesh needs remapped per-vertex outline weights. The texture is 256
 
 ### Wardrobe coordination
 
-[CharacterModel.Wardrobe.cs](../scenes/models/CharacterModel.Wardrobe.cs) parses authored variants, components, garment paths, and mask rules. Selections is the sole serialized clothing state. The root exposes lazy inventories and lookup, outfit selection, the clothing master switch, and piece toggles; the editor's clothing switch delegates to the same selection path.
+[CharacterModel.Wardrobe.cs](../scenes/models/CharacterModel.Wardrobe.cs) uses shared typed authored resources directly, without Dictionary schema parsing or a second copied definition graph. [ModelWardrobeConfiguration.cs](../scenes/models/ModelWardrobeConfiguration.cs) and the three small component/garment/mask-rule resource types hold fixed data. `ValidateAuthoring()` runs for editor configuration warnings, scripted resource creation, and saved-asset tests; actual nodes and owner-bound regions still bind per instance. Selections remains the sole serialized clothing state, with the same inventories, lookups, master switch, and piece/outfit API.
 
-Parsing uses locals and publishes only a valid payload, so corrected invalid authoring can retry. Required garment paths and mask rule name/index pairs bind before normal operation. Typed writes coerce/clamp where already specified; replacing the raw dictionary keeps the existing separate semantics and rolls it back if derivation rejects.
+The per-instance binding list pairs shared immutable rule definitions with that model's minted region handles; it never writes runtime ownership into shared resources. Required garment paths and mask rule name/index pairs still validate against actual instances. Typed selection writes retain coercion/clamping, and whole `Selections` dictionary replacement retains rollback on rejected derivation.
 
 A coordinated write derives proposed garment visibility and prepares mask commits before storing the new selection. Every rule on an affected mask contributes, not just the rule belonging to the changed piece. Contributions OR together; uncontrolled regions and unaffected mask owners survive. Commit order remains the order in which affected rules first introduce owners. Removing this preflight or treating a rule as an independent last-writer-wins update would break overlapping garments and rejected-write guarantees.
 
@@ -124,7 +160,7 @@ Arm extraction copies selected vertex attributes, skin references, surface names
 
 ### Presentation manifest
 
-[humanoid_presentation.gd](../scenes/models/import/humanoid_presentation.gd) loads presentation.res without relying on a stale nested resource cache, translates recorded legacy paths into the import-owned hierarchy, restores surface overrides, visibility, transforms, and blend-shape defaults, and hides required source/weapon groups. These manifests preserve authored choices not reproduced by Blender-to-glTF import alone. Their legacy-path map is a compatibility boundary for the committed data, not an unused migration utility.
+[humanoid_presentation.gd](../scenes/models/import/humanoid_presentation.gd) loads presentation.res without relying on a stale nested resource cache, translates recorded legacy paths into the import-owned hierarchy, restores surface overrides, visibility, transforms, and blend-shape defaults, and hides required source/weapon groups. While assigning known face-SDF surfaces it validates the normalized Head bone and records mesh/skeleton paths, surface/head indices, and inverse rest basis on the imported root. Reimport regenerates these bindings with the repaired skeleton. These manifests preserve authored choices not reproduced by Blender-to-glTF import alone. Their legacy-path map is a compatibility boundary for the committed data, not an unused migration utility.
 
 ## Authored scenes and resources
 
@@ -133,7 +169,8 @@ Arm extraction copies selected vertex attributes, skin references, surface names
 - `scenes/models/ZhuYuan/ZhuYuan.blend` and `scenes/models/Trigger/Trigger4.2.blend` are the authoritative models. Despite Trigger's filename, both stored files have Blender 5.1 headers; a compatible Blender is needed for fresh import
 - Each model folder holds eight PNG inputs beside its Blender file, wrapper, and import sidecars. The former guide's references to absent textures/ directories were corrected
 - The two `.blend.import` files retain source UID, humanoid mapping and post-import settings. They are necessary reproducibility inputs, not disposable imported-cache output
-- `ZhuYuan.scn` and `Trigger.scn` are noneditable wrappers around the imported model. They save animation libraries/parameters and the root's mask/wardrobe/attachment configuration. Binary serialization keeps the authored graph and nested resource references together
+- `ZhuYuan.scn` and `Trigger.scn` wrap the imported model, preserving animation parameters, selections, mask/attachment configuration, and existing local material overrides. Contrary to the earlier guide, both contain an editable `Model` path. The author-time pass changes only the wardrobe reference and removes the retired `HeadBoneName` export; it does not silently remove authored overrides
+- `resources/models/<model>/presentation/wardrobe.tres` are the new typed shared wardrobe definitions, replacing the wrappers' embedded legacy dictionaries
 
 ### Native animation resources
 
@@ -172,7 +209,7 @@ The missing `addons/godot_ai` files are a pre-existing clean-clone setup issue: 
 
 - [CharacterModelAssetTest.cs](../test/CharacterModelAssetTest.cs): real scene topology, fixed-child contract, authored defaults/outlines, wardrobe/masks, attachments, and cross-instance isolation
 - [CharacterModelAnimationAssetTest.cs](../test/CharacterModelAnimationAssetTest.cs): actual bone/blend-shape output, automatic-frame lighting order, overlapping and multi-channel deltas, saved parameters, and playback preservation during clothing changes
-- [CharacterModelAppearanceAttachmentTest.cs](../test/CharacterModelAppearanceAttachmentTest.cs): synthetic material isolation, lighting axes, initialization retry, outline/mask interaction, and invalid attachment paths
+- [CharacterModelAppearanceAttachmentTest.cs](../test/CharacterModelAppearanceAttachmentTest.cs): PackedScene-based material localization, nonidentity-rest lighting axes, initialization retry/order, outline/mask interaction, and invalid attachment paths
 - [ModelClothingTest.cs](../test/ModelClothingTest.cs): discovery/lookup, outfit and clothing changes, persistent piece choices, owner rejection, overlapping rules, componentless rules, and malformed/missing garment authoring
 - [ModelMaskWardrobeTest.cs](../test/ModelMaskWardrobeTest.cs): lifecycle/retry, dictionary replacement, bit combinations, channel/skin compaction, outline remapping, all-64-bit behavior, invalid geometry/configuration, cache reuse/eviction, and per-instance state
 - [ModelAuthoringApiExampleTest.cs](../test/ModelAuthoringApiExampleTest.cs): compiles and executes the guide's discovery-based API example against synthetic and real models
@@ -184,7 +221,7 @@ The missing `addons/godot_ai` files are a pre-existing clean-clone setup issue: 
 
 The new GDScript harness checks both models' required hidden paths, recipe metadata validation, 16/32-bit LOD partitioning and invalid corners, copied vertex channels, and exact encoded normal/tangent bytes after upload. Assertions protect the simplifications rather than merely checking line counts or private dead fields.
 
-## Simplifications made in this pass
+## Simplifications made in the original pass
 
 1. **One mask selection representation.** Replaced the name-to-bool dictionary and repeated reconstruction with `_enabledBits`; moved the immutable bit index into each minted Region and replaced the second region-index dictionary with a direct index/reference membership check. Initial defaults, all 64 bits, foreign/fabricated rejection, and delayed rendering remain covered
 2. **Direct affected-mask derivation.** Replaced the manual grouping dictionary, controlled/active list-building passes, and redundant commit dictionary with ordered distinct affected owners and a list of prepared commits. All rules for each selected owner still participate, preserving overlap and uncontrolled state
@@ -204,7 +241,7 @@ The six edited production C#/GDScript files lose **80 net lines**: 50 inserted a
 
 Regression coverage adds 42 C# lines and a 172-line GDScript harness. Therefore this pass is a production-code reduction, **not a claim that the entire diff has fewer lines**; the test/report additions deliberately make the total diff larger. No existing test was deleted or weakened.
 
-Further shortening would mostly compress syntax, remove diagnostics/tests, or collapse useful authoring boundaries. The retained validation and lifetime distinctions account for most remaining code. This is a measured reduction in state and control flow, not a claim that physical minimum line count proves correctness.
+At that review stage, further shortening within the runtime-only design would mostly compress syntax, remove diagnostics/tests, or collapse useful authoring boundaries. The author-time ownership pass described above changes those boundaries and removes additional runtime work. The retained validation and lifetime distinctions account for most remaining code. This is a measured reduction in state and control flow, not a claim that physical minimum line count proves correctness.
 
 ## Pre-rebase verification record
 

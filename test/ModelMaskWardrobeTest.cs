@@ -121,6 +121,27 @@ public class ModelMaskWardrobeTest
     Assert.Equal(1, TestData.VisibleTriangles(fixture.Model.MaskRenderMesh(fixture.MaskPath)));
   }
 
+  [TestCase]
+  public void LateWardrobeAssignmentRecoversInitializationAndSelections()
+  {
+    using var fixture = ModelFixture.WithWardrobe(start: false);
+    ModelWardrobeConfiguration configuration = fixture.Model.WardrobeConfiguration;
+    fixture.Model.WardrobeConfiguration = null!;
+    fixture.Start();
+    fixture.Model.Selections[CharacterModel.ClothingEnabledKey] = false;
+    Assert.True(fixture.GarmentA!.Visible);
+    Assert.True(fixture.GarmentB!.Visible);
+
+    fixture.Model.WardrobeConfiguration = configuration;
+    Assert.False(fixture.GarmentA!.Visible);
+    Assert.False(fixture.GarmentB!.Visible);
+    Assert.MaskRegions(fixture.Model, fixture.MaskPath);
+    fixture.Model.ClothingEnabled = true;
+    Assert.True(fixture.GarmentA.Visible);
+    Assert.False(fixture.GarmentB.Visible);
+    Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
+  }
+
   // Whole-dictionary Selections replacements follow the lifecycle: once
   // initialized they preflight, apply, and re-materialize the pieces/<name>
   // entries; before initialization they store as-is and derive on Initialize.
@@ -514,46 +535,23 @@ public class ModelMaskWardrobeTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void WardrobeConfigurationParseRetriesAfterTheAuthoredObjectIsCorrected()
+  public void WardrobeBindingRetriesAfterTheAuthoredPathIsCorrected()
   {
     using var fixture = ModelFixture.WithWardrobe(start: false);
-    Variant rules = fixture.Model.WardrobeConfiguration["masks"];
-    fixture.Model.WardrobeConfiguration.Remove("masks");
+    var rule = fixture.Model.WardrobeConfiguration.Masks[0];
+    rule.Path = "MissingBody";
     Assert.Throws<InvalidOperationException>(() => fixture.Model.Initialize());
 
-    fixture.Model.WardrobeConfiguration["masks"] = rules;
+    rule.Path = fixture.MaskPath;
     fixture.Model.Initialize();
     Assert.True(fixture.GarmentA!.Visible);
     Assert.False(fixture.GarmentB!.Visible);
     Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
 
-    // The outside-tree Initialize stores the derivation without rendering it
-    // (region selection applies only on a ready node); a live write renders it.
     fixture.Start();
-    fixture.Model.OutfitIndex = 0;
-    Assert.Equal(1, TestData.VisibleTriangles(fixture.Model.MaskRenderMesh(fixture.MaskPath)));
-  }
-
-  [TestCase]
-  public void WardrobeConfigurationWithoutBodyRuleKeysInitializesAndOperates()
-  {
-    // Saved scenes may still carry the ignored legacy 'body' flag in rule
-    // dictionaries; parsing must require only the fields the rules actually read.
-    Godot.Collections.Dictionary configuration = TestData.MakeWardrobeConfiguration();
-    foreach (Variant rule in configuration["masks"].AsGodotArray())
-      rule.AsGodotDictionary().Remove("body");
-    using var fixture = ModelFixture.WithWardrobe(start: false, configuration: configuration);
-
-    fixture.Start();
-    Assert.True(fixture.GarmentA!.Visible);
-    Assert.False(fixture.GarmentB!.Visible);
-    Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
-    Assert.Equal(1, TestData.VisibleTriangles(fixture.Model.MaskRenderMesh(fixture.MaskPath)));
-
     fixture.Model.OutfitIndex = 1;
-    Assert.False(fixture.GarmentA!.Visible);
-    Assert.True(fixture.GarmentB!.Visible);
     Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask1");
+    Assert.Equal(1, TestData.VisibleTriangles(fixture.Model.MaskRenderMesh(fixture.MaskPath)));
   }
 
   // ------------------------------------------------------------------
@@ -661,11 +659,15 @@ public class ModelMaskWardrobeTest
   [TestCase]
   public void MaskStateIsIndependentAcrossInstances()
   {
-    using var first = ModelFixture.WithWardrobe();
-    using var second = ModelFixture.WithWardrobe();
-    TestData.SelectMaskRegions(first.Model, first.MaskPath, "Mask1");
+    using var configuration = TestData.MakeWardrobeConfiguration();
+    using var first = ModelFixture.WithWardrobe(configuration: configuration);
+    using var second = ModelFixture.WithWardrobe(configuration: configuration);
+    first.Model.OutfitIndex = 1;
     Assert.MaskRegions(first.Model, first.MaskPath, "Mask1");
     Assert.MaskRegions(second.Model, second.MaskPath, "Mask0");
+    Assert.True(second.GarmentA!.Visible);
+    Assert.False(second.GarmentB!.Visible);
+    Assert.Equal(0, second.Model.OutfitIndex);
     Assert.Equal(1, TestData.VisibleTriangles(first.Model.MaskRenderMesh(first.MaskPath)));
   }
 }

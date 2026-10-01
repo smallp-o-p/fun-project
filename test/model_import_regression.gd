@@ -10,6 +10,7 @@ var checks: int = 0
 var failures: int = 0
 
 func _initialize() -> void:
+	_test_face_bindings()
 	_test_hidden_groups()
 	_test_recipes()
 	_test_role_surfaces()
@@ -21,6 +22,40 @@ func _expect(actual: Variant, expected: Variant, label: String) -> void:
 	if actual != expected:
 		failures += 1
 		printerr("FAIL %s: expected %s, got %s" % [label, str(expected), str(actual)])
+
+func _test_face_bindings() -> void:
+	var scene := Node3D.new()
+	var skeleton := Skeleton3D.new()
+	_add_path(scene, "rig_D/GeneralSkeleton", skeleton)
+	skeleton.add_bone("Head")
+	skeleton.set_bone_rest(0, Transform3D(Basis(Vector3.UP, 0.4), Vector3.ZERO))
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = BoxMesh.new()
+	_add_path(scene, "rig_D/GeneralSkeleton/Face", mesh)
+	mesh.skeleton = NodePath("..")
+	var shader := Shader.new()
+	shader.code = "shader_type spatial; uniform bool use_face_sdf = false;"
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.resource_local_to_scene = true
+	material.set_shader_parameter("use_face_sdf", true)
+	var manifest := Resource.new()
+	manifest.set_meta("surfaces", [{"node_path": "Model/rig_D/Skeleton3D/Face", "surface_index": 0, "material": material}])
+	_expect(PRESENTATION._apply_surfaces(scene, "fixture", manifest), "", "face binding import")
+	var bindings: Array = scene.get_meta("face_lighting", [])
+	_expect(bindings.size(), 1, "import bakes face binding")
+	if bindings.size() == 1:
+		var binding: Dictionary = bindings[0]
+		_expect(binding.get("mesh_path"), NodePath("rig_D/GeneralSkeleton/Face"), "face mesh path")
+		_expect(binding.get("surface_index"), 0, "face surface")
+		_expect(binding.get("skeleton_path"), NodePath("rig_D/GeneralSkeleton"), "face skeleton path")
+		_expect(binding.get("head_bone"), 0, "face bone index")
+		_expect(binding.get("inverse_rest"), skeleton.get_bone_global_rest(0).basis.inverse(), "face inverse rest")
+	skeleton.set_bone_name(0, "NotHead")
+	_expect(PRESENTATION._apply_surfaces(scene, "fixture", manifest), "fixture/surfaces/Model/rig_D/Skeleton3D/Face: face skeleton has no Head bone", "import rejects missing head")
+	mesh.skeleton = NodePath("Missing")
+	_expect(PRESENTATION._apply_surfaces(scene, "fixture", manifest), "fixture/surfaces/Model/rig_D/Skeleton3D/Face: face skeleton is missing", "import rejects missing skeleton")
+	scene.free()
 
 func _test_hidden_groups() -> void:
 	var expected: Dictionary = {

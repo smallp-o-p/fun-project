@@ -139,7 +139,7 @@ public class CharacterModelAnimationAssetTest
   {
     var clip = new Animation { Length = 1.0, LoopMode = Animation.LoopModeEnum.Linear };
     int track = clip.AddTrack(Animation.TrackType.Rotation3D);
-    clip.TrackSetPath(track, "Model/FaceSkeleton:head.x");
+    clip.TrackSetPath(track, $"Model/FaceSkeleton:{CharacterModel.FaceBoneName}");
     clip.TrackInsertKey(track, 0.0, Quaternion.Identity);
     clip.TrackInsertKey(track, 1.0, Quaternion.FromEuler(new Vector3(0, MathF.PI / 4, 0)));
     return clip;

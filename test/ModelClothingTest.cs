@@ -33,13 +33,10 @@ public class ModelClothingTest
     Assert.Equal(model.Outfits[0], model.CurrentOutfit);
   }
 
-  // Each inventory getter is exercised as the FIRST operation on its own
-  // unstarted fixture: any earlier wardrobe call would parse the configuration
-  // and hide a getter that skips EnsureParsed. A malformed configuration must
-  // reject repeatedly without publishing a partial inventory, and work after a
-  // correction.
+  // Each inventory getter is the first operation on its unstarted fixture:
+  // inventories must be available without initializing scene bindings.
   [TestCase]
-  public void InventoryGettersParseLazilyAndRejectMalformedConfigurations()
+  public void InventoryGettersExposeAuthoredEntriesBeforeInitialization()
   {
     using var piecesFixture = ModelFixture.WithWardrobe(start: false);
     CharacterModel piecesModel = piecesFixture.Model;
@@ -54,32 +51,23 @@ public class ModelClothingTest
     Assert.Equal("outfit0", outfitsModel.Outfits[0].Id.ToString());
     Assert.True(outfitsModel.FindOutfit("outfit1").Match(
       outfit => ReferenceEquals(outfit, outfitsModel.Outfits[1]), () => false));
-
-    // A mask rule genuinely missing a required field (its 'path'), so the
-    // retained validation — not the removed legacy 'body' check — rejects it.
-    using var malformed = ModelFixture.WithWardrobe(
-      start: false, configuration: ConfigurationWithIncompleteMaskRule());
-    Assert.Throws<InvalidOperationException>(() => _ = malformed.Model.Pieces);
-    Assert.Throws<InvalidOperationException>(() => _ = malformed.Model.Pieces);
-    malformed.Model.WardrobeConfiguration["masks"] = TestData.MakeWardrobeConfiguration()["masks"];
-    malformed.Model.Initialize();
-    Assert.Equal(1, malformed.Model.Pieces.Count);
   }
 
-  // A mask rule genuinely missing a required field (its 'path'), so the retained
-  // validation — not the removed legacy 'body' check — is what rejects it.
-  private static Godot.Collections.Dictionary ConfigurationWithIncompleteMaskRule()
+  [TestCase]
+  public void InvalidWardrobeAuthoringIsReportedBeforeInitialization()
   {
-    var configuration = TestData.MakeWardrobeConfiguration();
-    configuration["masks"] = new Godot.Collections.Array
-    {
-      new Godot.Collections.Dictionary
-      {
-        ["name"] = "Mask0", ["index"] = 0,
-        ["component"] = "Garment", ["enabled"] = true, ["variant"] = 0,
-      },
-    };
-    return configuration;
+    using var fixture = ModelFixture.WithWardrobe(start: false);
+    fixture.Model.WardrobeConfiguration.Variants = ["outfit0", "outfit0"];
+
+    string[] warnings = fixture.Model._GetConfigurationWarnings();
+    Assert.True(warnings is not null && warnings.Length > 0,
+      "The editor must report invalid wardrobe authoring before an instance initializes.");
+    Assert.True(warnings![0].Contains("duplicate outfit"));
+    fixture.Model.WardrobeConfiguration.Variants = ["outfit0", "outfit1"];
+    Assert.Equal(0, fixture.Model._GetConfigurationWarnings().Length);
+    Assert.Equal(0, fixture.Model.Selections.Count);
+    Assert.True(fixture.GarmentA!.Visible);
+    Assert.True(fixture.GarmentB!.Visible);
   }
 
   // ------------------------------------------------------------------
@@ -234,13 +222,9 @@ public class ModelClothingTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void InvalidWardrobeAuthoringRejectsSetupBeforeAnyWrite()
+  public void RequiredWardrobeBindingsRejectSetupBeforeAnyWrite()
   {
-    // Every invalid authored wardrobe dictionary rejects initialization before
-    // any write: garments keep their authored visibility and nothing is stored.
-    // (The mask walk renders each mask's own default before the wardrobe
-    // derives, so the rejection must leave the defaults in place.)
-    void AssertRejectedSetup(Godot.Collections.Dictionary configuration)
+    void AssertRejectedSetup(ModelWardrobeConfiguration configuration)
     {
       using var fixture = ModelFixture.WithWardrobe(start: false, configuration: configuration);
       Assert.Throws<InvalidOperationException>(() => fixture.Model.Initialize());
@@ -249,64 +233,45 @@ public class ModelClothingTest
       Assert.Equal(0, fixture.Model.Selections.Count);
     }
 
-    static Godot.Collections.Array MaskRules(Godot.Collections.Dictionary configuration)
-      => configuration["masks"].AsGodotArray();
-    static Godot.Collections.Dictionary ShirtPiece(Godot.Collections.Dictionary configuration)
-      => configuration["components"].AsGodotDictionary()["shirt"].AsGodotDictionary()["pieces"]
-        .AsGodotArray()[0].AsGodotDictionary();
-
     var missingGarment = TestData.MakeOverlappingWardrobeConfiguration();
-    ShirtPiece(missingGarment)["path"] = "MissingGarment";
+    missingGarment.Components["shirt"].Pieces[0].Path = "MissingGarment";
     AssertRejectedSetup(missingGarment);
 
     var missingMask = TestData.MakeOverlappingWardrobeConfiguration();
-    MaskRules(missingMask)[0].AsGodotDictionary()["path"] = "MissingMask";
+    missingMask.Masks[0].Path = "MissingMask";
     AssertRejectedSetup(missingMask);
 
     var outOfRangeIndex = TestData.MakeOverlappingWardrobeConfiguration();
-    MaskRules(outOfRangeIndex)[0].AsGodotDictionary()["index"] = 5;
+    outOfRangeIndex.Masks[0].Index = 5;
     AssertRejectedSetup(outOfRangeIndex);
 
     var mismatchedName = TestData.MakeOverlappingWardrobeConfiguration();
-    MaskRules(mismatchedName)[0].AsGodotDictionary()["name"] = "Mask1";
+    mismatchedName.Masks[0].Name = "Mask1";
     AssertRejectedSetup(mismatchedName);
+  }
 
-    var duplicateOutfits = TestData.MakeOverlappingWardrobeConfiguration();
-    duplicateOutfits["variants"] = new Godot.Collections.Array { "outfit0", "outfit0" };
-    AssertRejectedSetup(duplicateOutfits);
-
-    var invalidPieceVariant = TestData.MakeOverlappingWardrobeConfiguration();
-    ShirtPiece(invalidPieceVariant)["variant"] = 5;
-    AssertRejectedSetup(invalidPieceVariant);
-
-    var invalidRuleVariant = TestData.MakeOverlappingWardrobeConfiguration();
-    MaskRules(invalidRuleVariant)[0].AsGodotDictionary()["variant"] = 5;
-    AssertRejectedSetup(invalidRuleVariant);
-
-    // A configuration without its 'masks' array is incomplete even on a bare root:
-    // with the mesh root unconfigured, the failure must come from the wardrobe
-    // parse (which runs after the appearance stage), not the mesh-root lookup.
-    var incomplete = new CharacterModel
+  [TestCase]
+  public void InvalidWardrobeDefinitionsRejectAuthoring()
+  {
+    // Fixed schema errors belong to the authoring boundary, before a resource
+    // is saved. Runtime tests above own actual scene and mask-region bindings.
+    Action<ModelWardrobeConfiguration>[] corruptions =
+    [
+      configuration => configuration.Variants = ["outfit0", "outfit0"],
+      configuration => configuration.DefaultVariant = 5,
+      configuration => configuration.Components["shirt"].Pieces[0].Variant = 5,
+      configuration => configuration.Components["shirt"].Pieces[0].Path = new(),
+      configuration => configuration.Masks[0].Variant = 5,
+      configuration => configuration.Masks[0].Component = "missing",
+      configuration => configuration.Masks[0].Path = new(),
+    ];
+    foreach (var corrupt in corruptions)
     {
-      MeshRoot = new(),
-      WardrobeConfiguration = new Godot.Collections.Dictionary
-      {
-        ["variants"] = new Godot.Collections.Array { "only" },
-        ["components"] = new Godot.Collections.Dictionary(),
-      },
-    };
-    bool rejected = false;
-    try
-    {
-      incomplete.Initialize();
+      using var configuration = TestData.MakeOverlappingWardrobeConfiguration();
+      configuration.ValidateAuthoring();
+      corrupt(configuration);
+      Assert.Throws<InvalidOperationException>(configuration.ValidateAuthoring);
     }
-    catch (InvalidOperationException failure)
-    {
-      rejected = true;
-      Assert.True(failure.Message.Contains("no 'masks'"),
-        $"The bare root rejected for the wrong reason: '{failure.Message}'.");
-    }
-    Assert.True(rejected, "The incomplete wardrobe configuration did not reject initialization.");
   }
 
   // ------------------------------------------------------------------

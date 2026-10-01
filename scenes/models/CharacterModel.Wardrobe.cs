@@ -16,30 +16,44 @@ public partial class CharacterModel
   public const string ClothingEnabledKey = "clothing_enabled";
   public const string PiecesPrefix = "pieces/";
 
-  private readonly record struct WardrobePiece(NodePath Path, int Variant);
-
-  private sealed class WardrobeComponent
-  {
-    internal required bool Visible { get; init; }
-    internal required SysColGeneric.List<WardrobePiece> Pieces { get; init; }
-  }
+  private ModelWardrobeConfiguration _wardrobeConfiguration = new();
 
   /// <summary>
-  /// One authored mask rule; its path/name/index triple binds to a region entry
-  /// during initialization, and a retried initialization rebinds.
+  /// Fixed authored definitions, shared across instances. A late assignment to
+  /// a ready, uninitialized model retries setup, like <see cref="MaskSetups"/>.
   /// </summary>
-  private sealed class MaskRule
+  [Export]
+  public ModelWardrobeConfiguration WardrobeConfiguration
   {
-    internal required NodePath Path { get; init; }
-    internal required StringName Name { get; init; }
-    internal required int Index { get; init; }
-    internal required string Component { get; init; }
-    internal required bool Enabled { get; init; }
-    internal required int Variant { get; init; }
-    internal MaskRuntime.Region? Region { get; set; }
+    get => _wardrobeConfiguration;
+    set
+    {
+      _wardrobeConfiguration = value;
+      if (!_wardrobeInitialized)
+      {
+        _boundWardrobe = null;
+        if (IsNodeReady() && value is not null)
+          Initialize();
+      }
+      if (Engine.IsEditorHint())
+        UpdateConfigurationWarnings();
+    }
   }
 
-  [Export] public Godot.Collections.Dictionary WardrobeConfiguration { get; set; } = new();
+  public override string[] _GetConfigurationWarnings()
+  {
+    try
+    {
+      if (WardrobeConfiguration is null)
+        return ["The model has no wardrobe configuration."];
+      WardrobeConfiguration.ValidateAuthoring();
+      return [];
+    }
+    catch (InvalidOperationException failure)
+    {
+      return [failure.Message];
+    }
+  }
 
   private Godot.Collections.Dictionary<string, Variant> _selections = new();
 
@@ -70,23 +84,22 @@ public partial class CharacterModel
     }
   }
 
-  private int _defaultVariant;
-  private readonly SysColGeneric.Dictionary<string, WardrobeComponent> _components = new();
-  private readonly SysColGeneric.List<MaskRule> _maskRules = new();
+  private ModelWardrobeConfiguration? _boundWardrobe;
+  private Godot.Collections.Dictionary<string, ModelWardrobeComponent> Components => _boundWardrobe!.Components;
+  private SysColGeneric.List<(ModelWardrobeMaskRule Rule, MaskRuntime.Region Region)> _maskRules = [];
   private readonly SysColGeneric.List<ModelClothingPiece> _pieces = [];
   private readonly SysColGeneric.List<ModelOutfit> _outfits = [];
-  private bool _parsed;
   private bool _wardrobeInitialized;
 
   /// <summary>
-  /// Parses the authored configuration and applies the stored selections once;
+  /// Binds the authored definitions and applies the stored selections once;
   /// the wardrobe publishes only after the complete combination preflights.
   /// </summary>
   private void InitializeWardrobe()
   {
     if (_wardrobeInitialized)
       return;
-    EnsureParsed();
+    EnsureWardrobeEntries();
     BindRequiredData();
     ApplySelection(null, null);
     _wardrobeInitialized = true;
@@ -96,8 +109,8 @@ public partial class CharacterModel
   {
     get
     {
-      EnsureParsed();
-      return Selections.TryGetValue(OutfitKey, out Variant stored) ? stored.AsInt32() : _defaultVariant;
+      EnsureWardrobeEntries();
+      return Selections.TryGetValue(OutfitKey, out Variant stored) ? stored.AsInt32() : _boundWardrobe!.DefaultVariant;
     }
     set => WriteSelection(OutfitKey, Variant.From(value));
   }
@@ -106,7 +119,7 @@ public partial class CharacterModel
   {
     get
     {
-      EnsureParsed();
+      EnsureWardrobeEntries();
       return ReadSelectionBool(ClothingEnabledKey, true);
     }
     set => WriteSelection(ClothingEnabledKey, Variant.From(value));
@@ -114,7 +127,7 @@ public partial class CharacterModel
 
   /// <summary>
   /// Editor-only view of the stored <c>clothing_enabled</c> selection — never a
-  /// second stored value. The read bypasses wardrobe parsing so early editor
+  /// second stored value. The read bypasses wardrobe binding so early editor
   /// probes cannot cache an empty wardrobe.
   /// </summary>
   public override Godot.Collections.Array<Godot.Collections.Dictionary> _GetPropertyList()
@@ -147,7 +160,7 @@ public partial class CharacterModel
   {
     get
     {
-      EnsureParsed();
+      EnsureWardrobeEntries();
       return _pieces;
     }
   }
@@ -157,7 +170,7 @@ public partial class CharacterModel
   {
     get
     {
-      EnsureParsed();
+      EnsureWardrobeEntries();
       return _outfits;
     }
   }
@@ -165,7 +178,7 @@ public partial class CharacterModel
   /// <summary>Looks a clothing piece up by its component name.</summary>
   public Option<ModelClothingPiece> FindPiece(StringName id)
   {
-    EnsureParsed();
+    EnsureWardrobeEntries();
     foreach (ModelClothingPiece piece in _pieces)
     {
       if (piece.Id == id)
@@ -178,7 +191,7 @@ public partial class CharacterModel
   /// <summary>Looks an outfit up by its variant label.</summary>
   public Option<ModelOutfit> FindOutfit(StringName id)
   {
-    EnsureParsed();
+    EnsureWardrobeEntries();
     foreach (ModelOutfit outfit in _outfits)
     {
       if (outfit.Id == id)
@@ -193,7 +206,7 @@ public partial class CharacterModel
   {
     get
     {
-      EnsureParsed();
+      EnsureWardrobeEntries();
       int index = OutfitIndex;
       return index >= 0 && index < _outfits.Count
         ? _outfits[index]
@@ -236,7 +249,7 @@ public partial class CharacterModel
   /// <summary>The stored per-piece selection.</summary>
   public bool GetPiece(StringName component)
   {
-    EnsureParsed();
+    EnsureWardrobeEntries();
     return ReadSelectionBool(PiecesPrefix + component, ComponentDefaultVisible(component));
   }
 
@@ -252,7 +265,7 @@ public partial class CharacterModel
   /// </summary>
   private void WriteSelection(string key, Variant value)
   {
-    EnsureParsed();
+    EnsureWardrobeEntries();
     Variant selection = ValidateSelection(key, value);
     if (!_wardrobeInitialized)
     {
@@ -271,7 +284,7 @@ public partial class CharacterModel
   // pre-initialization writes and rejected writes stay observable.
   private void MaterializeDefaultPieceSelections()
   {
-    foreach (string component in _components.Keys)
+    foreach (string component in Components.Keys)
     {
       string key = PiecesPrefix + component;
       if (!Selections.ContainsKey(key))
@@ -298,7 +311,7 @@ public partial class CharacterModel
           if (!key.StartsWith(PiecesPrefix, StringComparison.Ordinal))
             throw new InvalidOperationException($"The wardrobe '{Name}' has no control '{key}'.");
           StringName component = key[PiecesPrefix.Length..];
-          if (!_components.ContainsKey(component))
+          if (!Components.ContainsKey(component))
             throw new InvalidOperationException($"The wardrobe '{Name}' has no component '{component}'.");
           return Variant.From(value.AsBool());
         }
@@ -307,7 +320,7 @@ public partial class CharacterModel
 
   // The authored visible default; unknown components default to visible.
   private bool ComponentDefaultVisible(StringName component)
-    => !_components.TryGetValue(component, out WardrobeComponent? info) || info.Visible;
+    => !Components.TryGetValue(component, out ModelWardrobeComponent? info) || info.Visible;
 
   private bool ReadSelectionBool(string key, bool fallback)
     => Selections.TryGetValue(key, out Variant stored) ? stored.AsBool() : fallback;
@@ -351,7 +364,7 @@ public partial class CharacterModel
     int outfit = key == OutfitKey
       ? selection!.Value.AsInt32()
       : Selections.TryGetValue(OutfitKey, out Variant storedOutfit)
-        ? storedOutfit.AsInt32() : _defaultVariant;
+        ? storedOutfit.AsInt32() : _boundWardrobe!.DefaultVariant;
     bool clothing = key == ClothingEnabledKey
       ? selection!.Value.AsBool() : ReadSelectionBool(ClothingEnabledKey, true);
     bool Selected(string name) => key == PiecesPrefix + name
@@ -363,7 +376,7 @@ public partial class CharacterModel
     // proposed state with at least one garment matching the proposed outfit. A
     // rule without a component stays an authored global rule with no component
     // gating.
-    bool RuleIsActive(MaskRule rule)
+    bool RuleIsActive(ModelWardrobeMaskRule rule)
     {
       if (!rule.Enabled || (rule.Variant >= 0 && rule.Variant != outfit))
         return false;
@@ -378,7 +391,7 @@ public partial class CharacterModel
     void GarmentsFor(string affected)
     {
       bool enabled = clothing && Selected(affected);
-      foreach (WardrobePiece piece in _components[affected].Pieces)
+      foreach (ModelWardrobeGarment piece in Components[affected].Pieces)
       {
         bool visible = enabled && (piece.Variant == -1 || piece.Variant == outfit);
         garments.Add((ResolveGarment(piece.Path), visible));
@@ -387,7 +400,7 @@ public partial class CharacterModel
 
     if (global)
     {
-      foreach (string affected in _components.Keys)
+      foreach (string affected in Components.Keys)
         GarmentsFor(affected);
     }
     else
@@ -397,22 +410,22 @@ public partial class CharacterModel
 
     var masks = new SysColGeneric.List<Action>();
     foreach (MaskRuntime owner in _maskRules.AsValueEnumerable()
-      .Where(rule => global || rule.Component == component)
-      .Select(rule => rule.Region!.Owner).Distinct())
+      .Where(binding => global || binding.Rule.Component == component)
+      .Select(binding => binding.Region.Owner).Distinct())
     {
       // Re-derive every rule on an affected mask, including other components'
       // rules. Keep the first affected rule's commit order across masks.
-      var rules = _maskRules.AsValueEnumerable().Where(rule => rule.Region!.Owner == owner);
+      var rules = _maskRules.AsValueEnumerable().Where(binding => binding.Region.Owner == owner);
       masks.Add(owner.PrepareSelection(
-        rules.Select(rule => rule.Region!).ToArray(),
-        rules.Where(RuleIsActive).Select(rule => rule.Region!).ToArray()));
+        rules.Select(binding => binding.Region).ToArray(),
+        rules.Where(binding => RuleIsActive(binding.Rule)).Select(binding => binding.Region).ToArray()));
     }
 
     return (garments, masks);
   }
 
   private bool HasGarmentForOutfit(string component, int outfit)
-    => _components[component].Pieces.AsValueEnumerable()
+    => Components[component].Pieces.AsValueEnumerable()
       .Any(piece => piece.Variant == -1 || piece.Variant == outfit);
 
   // Stored selection, master switch, and outfit membership jointly determine visibility.
@@ -433,127 +446,31 @@ public partial class CharacterModel
   // rebinds to the newly created runtimes.
   private void BindRequiredData()
   {
-    foreach (WardrobeComponent component in _components.Values)
+    foreach (ModelWardrobeComponent component in Components.Values)
     {
-      foreach (WardrobePiece piece in component.Pieces)
+      foreach (ModelWardrobeGarment piece in component.Pieces)
         ResolveGarment(piece.Path);
     }
 
-    var bindings = new SysColGeneric.List<(MaskRule Rule, MaskRuntime.Region Region)>();
-    foreach (MaskRule rule in _maskRules)
+    var bindings = new SysColGeneric.List<(ModelWardrobeMaskRule Rule, MaskRuntime.Region Region)>();
+    foreach (ModelWardrobeMaskRule rule in _boundWardrobe!.Masks)
       bindings.Add((rule, ResolveMask(rule.Path).BindRegion(rule.Name, rule.Index)));
-    foreach ((MaskRule rule, MaskRuntime.Region region) in bindings)
-      rule.Region = region;
+    _maskRules = bindings;
   }
 
-  private void EnsureParsed()
+  // Mint owner-bound controls without parsing or copying the shared definitions.
+  private void EnsureWardrobeEntries()
   {
-    if (_parsed)
+    if (_boundWardrobe is not null)
       return;
-    ParseConfiguration();
-    _parsed = true;
-  }
-
-  private void ParseConfiguration()
-  {
-    var variants = new SysColGeneric.List<string>();
-    int defaultVariant = 0;
-    var components = new SysColGeneric.Dictionary<string, WardrobeComponent>();
-    var maskRules = new SysColGeneric.List<MaskRule>();
-
-    if (WardrobeConfiguration.Count > 0)
-    {
-      if (WardrobeConfiguration.ContainsKey("variants"))
-      {
-        var seenVariants = new SysColGeneric.HashSet<string>();
-        foreach (Variant variant in WardrobeConfiguration["variants"].AsGodotArray())
-        {
-          string label = variant.AsString();
-          if (!seenVariants.Add(label))
-            throw new InvalidOperationException(
-              $"The wardrobe '{Name}' configuration has a duplicate outfit id '{label}'.");
-          variants.Add(label);
-        }
-      }
-
-      if (WardrobeConfiguration.ContainsKey("default_variant"))
-      {
-        defaultVariant = WardrobeConfiguration["default_variant"].AsInt32();
-        if (variants.Count > 0 && (defaultVariant < 0 || defaultVariant >= variants.Count))
-          throw new InvalidOperationException(
-            $"The wardrobe '{Name}' configuration default_variant {defaultVariant} is outside the {variants.Count} authored variants.");
-      }
-
-      if (!WardrobeConfiguration.ContainsKey("components"))
-        throw new InvalidOperationException($"The wardrobe '{Name}' configuration has no 'components' dictionary.");
-      foreach (SysColGeneric.KeyValuePair<Variant, Variant> entry
-        in WardrobeConfiguration["components"].AsGodotDictionary())
-      {
-        string name = entry.Key.AsString();
-        Godot.Collections.Dictionary info = entry.Value.AsGodotDictionary();
-        var pieces = new SysColGeneric.List<WardrobePiece>();
-        if (info.ContainsKey("pieces"))
-        {
-          foreach (Variant pieceVariant in info["pieces"].AsGodotArray())
-          {
-            Godot.Collections.Dictionary piece = pieceVariant.AsGodotDictionary();
-            if (!piece.ContainsKey("path"))
-              throw new InvalidOperationException(
-                $"The wardrobe '{Name}' component '{name}' has a piece without a 'path'.");
-            int variant = piece.ContainsKey("variant") ? piece["variant"].AsInt32() : -1;
-            if (variant != -1 && (variant < 0 || variant >= variants.Count))
-              throw new InvalidOperationException(
-                $"The wardrobe '{Name}' component '{name}' has a piece with variant {variant} outside the {variants.Count} authored variants.");
-            pieces.Add(new WardrobePiece(new NodePath(piece["path"].AsString()), variant));
-          }
-        }
-
-        bool visible = !info.ContainsKey("visible") || info["visible"].AsBool();
-        components[name] = new WardrobeComponent { Visible = visible, Pieces = pieces };
-      }
-
-      if (!WardrobeConfiguration.ContainsKey("masks"))
-        throw new InvalidOperationException($"The wardrobe '{Name}' configuration has no 'masks' array.");
-      foreach (Variant ruleVariant in WardrobeConfiguration["masks"].AsGodotArray())
-      {
-        Godot.Collections.Dictionary rule = ruleVariant.AsGodotDictionary();
-        if (!rule.ContainsKey("path") || !rule.ContainsKey("name") || !rule.ContainsKey("index")
-            || !rule.ContainsKey("component") || !rule.ContainsKey("enabled"))
-          throw new InvalidOperationException(
-            $"The wardrobe '{Name}' configuration has an incomplete mask rule entry.");
-        string component = rule["component"].AsString();
-        if (component.Length > 0 && !components.ContainsKey(component))
-          throw new InvalidOperationException(
-            $"The wardrobe '{Name}' mask rule '{rule["name"]}' references unknown component '{component}'.");
-        int variant = rule.ContainsKey("variant") ? rule["variant"].AsInt32() : -1;
-        if (variant != -1 && (variant < 0 || variant >= variants.Count))
-          throw new InvalidOperationException(
-            $"The wardrobe '{Name}' mask rule '{rule["name"]}' has variant {variant} outside the {variants.Count} authored variants.");
-        maskRules.Add(new MaskRule
-        {
-          Path = new NodePath(rule["path"].AsString()),
-          Name = rule["name"].AsStringName(),
-          Index = rule["index"].AsInt32(),
-          Component = component,
-          Enabled = rule["enabled"].AsBool(),
-          Variant = variant,
-        });
-      }
-    }
-
-    // The whole payload validated: commit the typed fields only now, so a failed
-    // parse leaves no partial state and the next EnsureParsed retries from scratch.
-    _defaultVariant = defaultVariant;
-    _components.Clear();
-    foreach (SysColGeneric.KeyValuePair<string, WardrobeComponent> component in components)
-      _components[component.Key] = component.Value;
-    _maskRules.Clear();
-    _maskRules.AddRange(maskRules);
+    ModelWardrobeConfiguration configuration = WardrobeConfiguration
+      ?? throw new InvalidOperationException($"The character model '{Name}' has no wardrobe configuration.");
     _pieces.Clear();
-    foreach (string component in components.Keys)
+    foreach (string component in configuration.Components.Keys)
       _pieces.Add(new ModelClothingPiece(this, component));
     _outfits.Clear();
-    for (int i = 0; i < variants.Count; i++)
-      _outfits.Add(new ModelOutfit(this, variants[i], i));
+    for (int i = 0; i < configuration.Variants.Length; i++)
+      _outfits.Add(new ModelOutfit(this, configuration.Variants[i], i));
+    _boundWardrobe = configuration;
   }
 }

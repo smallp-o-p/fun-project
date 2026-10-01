@@ -1,0 +1,198 @@
+[gd_resource type="Resource" script_class="ModelWardrobeConfiguration" format=3]
+
+[ext_resource type="Script" path="res://scenes/models/ModelWardrobeComponent.cs" id="1_h1oy2"]
+[ext_resource type="Script" path="res://scenes/models/ModelWardrobeGarment.cs" id="2_yo7sx"]
+[ext_resource type="Script" path="res://scenes/models/ModelWardrobeMaskRule.cs" id="3_5l3u1"]
+[ext_resource type="Script" path="res://scenes/models/ModelWardrobeConfiguration.cs" id="4_6fn8w"]
+
+[sub_resource type="Resource" id="Resource_w8x65"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Head")
+
+[sub_resource type="Resource" id="Resource_p64xt"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Acc01")
+Variant = 0
+
+[sub_resource type="Resource" id="Resource_mu36d"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Acc02")
+
+[sub_resource type="Resource" id="Resource_hi66a"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Acc01_Clo 2")
+Variant = 1
+
+[sub_resource type="Resource" id="Resource_3gvbc"]
+script = ExtResource("1_h1oy2")
+Pieces = Array[ExtResource("2_yo7sx")]([SubResource("Resource_w8x65"), SubResource("Resource_p64xt"), SubResource("Resource_mu36d"), SubResource("Resource_hi66a")])
+
+[sub_resource type="Resource" id="Resource_7tr0m"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Shoes")
+Variant = 0
+
+[sub_resource type="Resource" id="Resource_bjrm1"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Shoes_Clo 2")
+Variant = 1
+
+[sub_resource type="Resource" id="Resource_b4fwk"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Shoes_Clo Voluptuous")
+Variant = 2
+
+[sub_resource type="Resource" id="Resource_trrsx"]
+script = ExtResource("1_h1oy2")
+Pieces = Array[ExtResource("2_yo7sx")]([SubResource("Resource_7tr0m"), SubResource("Resource_bjrm1"), SubResource("Resource_b4fwk")])
+
+[sub_resource type="Resource" id="Resource_52dg7"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Gloves")
+Variant = 0
+
+[sub_resource type="Resource" id="Resource_5tpht"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Gloves_Clo 2")
+Variant = 1
+
+[sub_resource type="Resource" id="Resource_oe5hs"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Gloves_Clo Voluptuous")
+Variant = 2
+
+[sub_resource type="Resource" id="Resource_3x0bh"]
+script = ExtResource("1_h1oy2")
+Pieces = Array[ExtResource("2_yo7sx")]([SubResource("Resource_52dg7"), SubResource("Resource_5tpht"), SubResource("Resource_oe5hs")])
+
+[sub_resource type="Resource" id="Resource_1qe67"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Pantyhose")
+
+[sub_resource type="Resource" id="Resource_s3glg"]
+script = ExtResource("1_h1oy2")
+Visible = false
+Pieces = Array[ExtResource("2_yo7sx")]([SubResource("Resource_1qe67")])
+
+[sub_resource type="Resource" id="Resource_tlxuk"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Clo1")
+Variant = 0
+
+[sub_resource type="Resource" id="Resource_jv3gf"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Clock")
+
+[sub_resource type="Resource" id="Resource_x7xum"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Clo1_Clo 2")
+Variant = 1
+
+[sub_resource type="Resource" id="Resource_pwcty"]
+script = ExtResource("2_yo7sx")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Trigger_Clo Voluptuous")
+Variant = 2
+
+[sub_resource type="Resource" id="Resource_t6p0y"]
+script = ExtResource("1_h1oy2")
+Pieces = Array[ExtResource("2_yo7sx")]([SubResource("Resource_tlxuk"), SubResource("Resource_jv3gf"), SubResource("Resource_x7xum"), SubResource("Resource_pwcty")])
+
+[sub_resource type="Resource" id="Resource_w2efd"]
+script = ExtResource("3_5l3u1")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Pantyhose")
+Name = &"mask_GlovesL"
+Component = "Gloves"
+Enabled = false
+
+[sub_resource type="Resource" id="Resource_awj8r"]
+script = ExtResource("3_5l3u1")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Pantyhose")
+Name = &"mask_GlovesR"
+Index = 1
+Component = "Gloves"
+Enabled = false
+
+[sub_resource type="Resource" id="Resource_j46ap"]
+script = ExtResource("3_5l3u1")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Pantyhose")
+Name = &"mask_Foot"
+Index = 2
+Component = "Footwear"
+Enabled = false
+
+[sub_resource type="Resource" id="Resource_rygvk"]
+script = ExtResource("3_5l3u1")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Pantyhose")
+Name = &"mask_Clo1"
+Index = 3
+Component = "UpperBody"
+Enabled = false
+Variant = 0
+
+[sub_resource type="Resource" id="Resource_tya2l"]
+script = ExtResource("3_5l3u1")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Pantyhose")
+Name = &"mask_Clo2"
+Index = 4
+Component = "UpperBody"
+Enabled = false
+Variant = 1
+
+[sub_resource type="Resource" id="Resource_hm0o3"]
+script = ExtResource("3_5l3u1")
+Path = NodePath("Model/rig_D/GeneralSkeleton/Pantyhose")
+Name = &"mask_Clo3"
+Index = 5
+Component = "UpperBody"
+Enabled = false
+Variant = 2
+
+[sub_resource type="Resource" id="Resource_8r2dw"]
+script = ExtResource("3_5l3u1")
+Path = NodePath("Model/rig_D/GeneralSkeleton/ZZZ_Size02_C")
+Name = &"mask_Gloves"
+Component = "Gloves"
+
+[sub_resource type="Resource" id="Resource_1s74h"]
+script = ExtResource("3_5l3u1")
+Path = NodePath("Model/rig_D/GeneralSkeleton/ZZZ_Size02_C")
+Name = &"mask_Foot"
+Index = 1
+Component = "Footwear"
+
+[sub_resource type="Resource" id="Resource_r3yuk"]
+script = ExtResource("3_5l3u1")
+Path = NodePath("Model/rig_D/GeneralSkeleton/ZZZ_Size02_C")
+Name = &"mask_Clo1"
+Index = 2
+Component = "UpperBody"
+Variant = 0
+
+[sub_resource type="Resource" id="Resource_xbsi8"]
+script = ExtResource("3_5l3u1")
+Path = NodePath("Model/rig_D/GeneralSkeleton/ZZZ_Size02_C")
+Name = &"mask_Clo2"
+Index = 3
+Component = "UpperBody"
+Variant = 1
+
+[sub_resource type="Resource" id="Resource_yqqi2"]
+script = ExtResource("3_5l3u1")
+Path = NodePath("Model/rig_D/GeneralSkeleton/ZZZ_Size02_C")
+Name = &"mask_Clo3"
+Index = 4
+Component = "UpperBody"
+Variant = 2
+
+[resource]
+script = ExtResource("4_6fn8w")
+Variants = PackedStringArray("Original", "Clothing 2", "Clothing Voluptuous")
+DefaultVariant = 1
+Components = Dictionary[String, ExtResource("1_h1oy2")]({
+"Accessories": SubResource("Resource_3gvbc"),
+"Footwear": SubResource("Resource_trrsx"),
+"Gloves": SubResource("Resource_3x0bh"),
+"Legwear": SubResource("Resource_s3glg"),
+"UpperBody": SubResource("Resource_t6p0y")
+})
+Masks = Array[ExtResource("3_5l3u1")]([SubResource("Resource_w2efd"), SubResource("Resource_awj8r"), SubResource("Resource_j46ap"), SubResource("Resource_rygvk"), SubResource("Resource_tya2l"), SubResource("Resource_hm0o3"), SubResource("Resource_8r2dw"), SubResource("Resource_1s74h"), SubResource("Resource_r3yuk"), SubResource("Resource_xbsi8"), SubResource("Resource_yqqi2")])

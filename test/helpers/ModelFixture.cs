@@ -140,7 +140,7 @@ public sealed class ModelFixture : IDisposable
   /// mesh path carries no component-associated rule.
   /// </summary>
   public static ModelFixture WithWardrobe(bool start = true, int maskCount = 2,
-    Godot.Collections.Dictionary? configuration = null,
+    ModelWardrobeConfiguration? configuration = null,
     ModelMaskConfiguration? accessoryMaskConfiguration = null)
   {
     ArrayMesh source = TestData.MakeMaskedSourceMesh(maskCount);
@@ -188,29 +188,49 @@ public sealed class ModelFixture : IDisposable
 
   /// <summary>
   /// Appearance fixture: a "Model" wrapper (like the real scenes' mesh container)
-  /// holding a Body MeshInstance3D with an isolated-per-instance override material
-  /// and its outline NextPass, plus a FaceSkeleton carrying the "head.x" face bone.
-  /// The root's appearance exports target the wrapper, and isolation runs in the
-  /// root's _EnterTree before any child's _Ready, so tests never rely on node order.
+  /// holding a Body MeshInstance3D and FaceSkeleton. Pack/instantiate the authored
+  /// subtree so Godot localizes materials exactly as it does for imported scenes.
+  /// Authored settings are applied before instantiation, never at tree entry.
   /// </summary>
-  public static ModelFixture WithAppearance(bool withMask = false, bool start = true)
+  public static ModelFixture WithAppearance(bool withMask = false, bool start = true,
+    Action<ShaderMaterial>? authorMaterial = null, Basis? headRest = null)
   {
     var fixture = new ModelFixture(start: false);
     fixture.SourceMesh = TestData.MakeMaskedSourceMesh(2);
     // The authored outline material carries per-vertex outline weights for the mask.
     ShaderMaterial authored = TestData.MakeModelFaceMaterial();
+    authorMaterial?.Invoke(authored);
     fixture.SharedMaterial = authored;
     fixture.Body = new MeshInstance3D
     { Name = "Body", Mesh = fixture.SourceMesh, Skeleton = "../FaceSkeleton" };
     fixture.Body.SetSurfaceOverrideMaterial(0, authored);
     fixture.FaceSkeleton = new Skeleton3D { Name = "FaceSkeleton" };
     fixture.FaceSkeleton.AddBone(CharacterModel.FaceBoneName);
+    fixture.FaceSkeleton.SetBoneRest(0, new Transform3D(headRest ?? Basis.Identity, Vector3.Zero));
+    fixture.FaceSkeleton.ResetBonePose(0);
     var wrapper = new Node3D { Name = "Model" };
     wrapper.AddChild(fixture.Body);
     wrapper.AddChild(fixture.FaceSkeleton);
-    fixture.Model.AddChild(wrapper);
+    fixture.Body.Owner = wrapper;
+    fixture.FaceSkeleton.Owner = wrapper;
+    wrapper.SetMeta(CharacterModel.FaceLightingMetadata, new Godot.Collections.Array
+    {
+      new Godot.Collections.Dictionary
+      {
+        ["mesh_path"] = new NodePath("Body"), ["surface_index"] = 0,
+        ["skeleton_path"] = new NodePath("FaceSkeleton"), ["head_bone"] = 0,
+        ["inverse_rest"] = fixture.FaceSkeleton.GetBoneGlobalRest(0).Basis.Inverse(),
+      },
+    });
+    using var scene = new PackedScene();
+    if (scene.Pack(wrapper) != Error.Ok)
+      throw new InvalidOperationException("Cannot pack the authored appearance fixture.");
+    Node instance = scene.Instantiate();
+    wrapper.Free();
+    fixture.Body = instance.GetNode<MeshInstance3D>("Body");
+    fixture.FaceSkeleton = instance.GetNode<Skeleton3D>("FaceSkeleton");
+    fixture.Model.AddChild(instance);
     fixture.Model.MeshRoot = "Model";
-    fixture.Model.HeadBoneName = CharacterModel.FaceBoneName;
     if (withMask)
     {
       fixture.MaskPath = new NodePath("Model/Body");

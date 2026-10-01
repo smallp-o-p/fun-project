@@ -123,7 +123,27 @@ public class CharacterModelAssetTest
   [TestCase(TriggerScene)]
   public void AuthoredOutlineSettingsSurviveIsolationWithoutRuntimeWrites(string scene)
   {
-    using var fixture = ModelFixture.FromScene(scene);
+    using var fixture = ModelFixture.FromScene(scene, start: false);
+    fixture.Model.WardrobeConfiguration.ValidateAuthoring();
+    var authoredIds = new SysColGeneric.List<(MeshInstance3D Mesh, int Surface, ulong Material, ulong Outline)>();
+    foreach (Node node in fixture.Root.FindChildren("*", "MeshInstance3D", true, false))
+    {
+      var mesh = (MeshInstance3D)node;
+      if (mesh.Mesh is null)
+        continue;
+      for (int surface = 0; surface < mesh.Mesh.GetSurfaceCount(); surface++)
+      {
+        if (mesh.GetSurfaceOverrideMaterial(surface) is Material material)
+          authoredIds.Add((mesh, surface, material.GetInstanceId(), material.NextPass?.GetInstanceId() ?? 0));
+      }
+    }
+    fixture.Start();
+    foreach (var saved in authoredIds)
+    {
+      Material material = saved.Mesh.GetSurfaceOverrideMaterial(saved.Surface);
+      Assert.Equal(saved.Material, material.GetInstanceId(), "Ready must use the scene-local material already instantiated by Godot.");
+      Assert.Equal(saved.Outline, material.NextPass?.GetInstanceId() ?? 0, "Ready must preserve the scene-local outline.");
+    }
     Assert.True(FindNamedDescendant(fixture.Root, "Appearance") is null,
       $"The '{scene}' still carries a leftover appearance node; the appearance lives on the model root.");
     Assert.True(FindNamedDescendant(fixture.Root, "Wardrobe") is null,
@@ -414,6 +434,112 @@ public class CharacterModelAssetTest
 
   // ------------------------------------------------------------------
 
+  [TestCase(ZhuYuanScene, "res://scenes/models/ZhuYuan/ZhuYuan.blend")]
+  [TestCase(TriggerScene, "res://scenes/models/Trigger/Trigger4.2.blend")]
+  public void SceneLocalMaterialsKeepMasksAndFaceAxesIndependent(string scene, string importedScene)
+  {
+    using var first = ModelFixture.FromScene(scene, start: false);
+    using var second = ModelFixture.FromScene(scene, start: false);
+    SceneState source = ResourceLoader.Load<PackedScene>(importedScene).GetState();
+    var surfaces = new SysColGeneric.List<(ShaderMaterial Source, ShaderMaterial First, ShaderMaterial Second,
+      Variant Forward, Variant Right, Variant Weights)>();
+    var outlines = new SysColGeneric.HashSet<ulong>();
+    for (int node = 0; node < source.GetNodeCount(); node++)
+    {
+      for (int property = 0; property < source.GetNodePropertyCount(node); property++)
+      {
+        string name = source.GetNodePropertyName(node, property);
+        const string prefix = "surface_material_override/";
+        if (!name.StartsWith(prefix, StringComparison.Ordinal)
+          || source.GetNodePropertyValue(node, property).AsGodotObject() is not ShaderMaterial authored)
+          continue;
+        int surface = int.Parse(name[prefix.Length..]);
+        NodePath path = "Model/" + source.GetNodePath(node);
+        var a = (ShaderMaterial)first.Root.GetNode<MeshInstance3D>(path).GetSurfaceOverrideMaterial(surface);
+        var b = (ShaderMaterial)second.Root.GetNode<MeshInstance3D>(path).GetSurfaceOverrideMaterial(surface);
+        AssertMaterialLocality(authored, a, b);
+        if (authored.NextPass is ShaderMaterial outline)
+        {
+          AssertMaterialLocality(outline, (ShaderMaterial)a.NextPass, (ShaderMaterial)b.NextPass);
+          Assert.True(outlines.Add(a.NextPass.GetInstanceId()), "Independently masked surfaces must not alias an outline pass.");
+        }
+        surfaces.Add((authored, a, b,
+          authored.GetShaderParameter(CharacterModel.HeadForwardParameter),
+          authored.GetShaderParameter(CharacterModel.HeadRightParameter),
+          (authored.NextPass as ShaderMaterial)?.GetShaderParameter("vertex_weights") ?? default));
+      }
+    }
+    Assert.True(surfaces.Count > 0, "The imported scene must expose authored surface overrides.");
+    first.Start();
+    second.Start();
+    foreach (ModelMeshMaskSetup setup in first.Model.MaskSetups)
+    {
+      CharacterModel.MaskRuntime a = first.Model.ResolveMask(setup.MeshPath);
+      CharacterModel.MaskRuntime b = second.Model.ResolveMask(setup.MeshPath);
+      a.SetRegions(a.Regions);
+      b.SetRegions([]);
+      Assert.True(TestData.VisibleTriangles(first.Model.MaskRenderMesh(setup.MeshPath))
+        < TestData.VisibleTriangles(second.Model.MaskRenderMesh(setup.MeshPath)),
+        "Different mask selections must retain independent rendered geometry.");
+    }
+    first.Model.Rotation = new Vector3(0, 0.7f, 0);
+    second.Model.Rotation = new Vector3(0, -0.4f, 0);
+    first.Model.UpdateFaceAxes();
+    second.Model.UpdateFaceAxes();
+    int faces = 0;
+    int outlinedSurfaces = 0;
+    foreach (var item in surfaces)
+    {
+      Assert.Equal(item.Forward, item.Source.GetShaderParameter(CharacterModel.HeadForwardParameter));
+      Assert.Equal(item.Right, item.Source.GetShaderParameter(CharacterModel.HeadRightParameter));
+      if (item.Source.GetShaderParameter(CharacterModel.UseFaceSdfParameter).AsBool())
+      {
+        faces++;
+        Vector3 a = item.First.GetShaderParameter(CharacterModel.HeadForwardParameter).AsVector3();
+        Vector3 b = item.Second.GetShaderParameter(CharacterModel.HeadForwardParameter).AsVector3();
+        Assert.True(a.DistanceTo(b) > 0.5f, "Different instance poses must produce independent face axes.");
+      }
+      if (item.Source.NextPass is not ShaderMaterial sourceOutline)
+        continue;
+      Assert.True(SameTextureParameter(item.Weights, sourceOutline.GetShaderParameter("vertex_weights")),
+        "Masking must not replace the authored source texture.");
+      var firstOutline = (ShaderMaterial)item.First.NextPass;
+      var secondOutline = (ShaderMaterial)item.Second.NextPass;
+      outlinedSurfaces++;
+      double width = sourceOutline.GetShaderParameter("width_scale").AsDouble();
+      double otherWidth = secondOutline.GetShaderParameter("width_scale").AsDouble();
+      firstOutline.SetShaderParameter("width_scale", width + 1.0);
+      Assert.Equal(width, sourceOutline.GetShaderParameter("width_scale").AsDouble());
+      Assert.Equal(otherWidth, secondOutline.GetShaderParameter("width_scale").AsDouble());
+    }
+    Assert.True(faces > 0 && outlinedSurfaces > 0, "Both face lighting and mutable outlines must be exercised.");
+  }
+
+  // Resource property reads can create new managed wrappers for the same native texture.
+  private static bool SameTextureParameter(Variant first, Variant second)
+    => first.VariantType == second.VariantType && (first.VariantType != Variant.Type.Object
+      ? first.Equals(second) : ModelFixture.SameNative(first.AsGodotObject(), second.AsGodotObject()));
+
+  private static void AssertMaterialLocality(ShaderMaterial source, ShaderMaterial first, ShaderMaterial second)
+  {
+    Assert.True(source.ResourceLocalToScene);
+    Assert.False(ModelFixture.SameNative(source, first));
+    Assert.False(ModelFixture.SameNative(first, second));
+    Assert.True(ModelFixture.SameNative(source.Shader, first.Shader));
+    Assert.True(ModelFixture.SameNative(source.Shader, second.Shader));
+    Assert.False(source.Shader.ResourceLocalToScene);
+    foreach (Godot.Collections.Dictionary uniform in source.Shader.GetShaderUniformList())
+    {
+      StringName name = uniform["name"].AsStringName();
+      Variant value = source.GetShaderParameter(name);
+      if (value.VariantType != Variant.Type.Object || value.AsGodotObject() is not Texture2D texture)
+        continue;
+      Assert.False(texture.ResourceLocalToScene);
+      Assert.True(ModelFixture.SameNative(texture, first.GetShaderParameter(name).AsGodotObject()));
+      Assert.True(ModelFixture.SameNative(texture, second.GetShaderParameter(name).AsGodotObject()));
+    }
+  }
+
   private static string DescribeRoot(Node root)
   {
     string script = (root.GetScript().AsGodotObject() as Script)?.ResourcePath ?? "";
@@ -464,21 +590,18 @@ public class CharacterModelAssetTest
   private static (Node originalPiece, Node switchedPiece) TriggerUpperBodyPieces(
     Node root, CharacterModel wardrobe)
   {
-    var components = (Godot.Collections.Dictionary)wardrobe.WardrobeConfiguration["components"];
-    var upperBody = (Godot.Collections.Dictionary)components["UpperBody"];
-    var pieces = (Godot.Collections.Array)upperBody["pieces"];
+    var pieces = wardrobe.WardrobeConfiguration.Components["UpperBody"].Pieces;
     Node variant0 = null;
     Node variant2 = null;
-    foreach (Variant pieceVariant in pieces)
+    foreach (ModelWardrobeGarment piece in pieces)
     {
-      var piece = (Godot.Collections.Dictionary)pieceVariant;
-      switch (piece["variant"].AsInt32())
+      switch (piece.Variant)
       {
         case 0:
-          variant0 = root.GetNode<Node>(piece["path"].AsString());
+          variant0 = root.GetNode<Node>(piece.Path);
           break;
         case 2:
-          variant2 = root.GetNode<Node>(piece["path"].AsString());
+          variant2 = root.GetNode<Node>(piece.Path);
           break;
       }
     }

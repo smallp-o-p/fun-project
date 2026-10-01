@@ -1,12 +1,12 @@
 # Character model controls
 
-`CharacterModel` (in `scenes/models/`) is the single C# entry point on the Zhu Yuan and Trigger model scenes — one root node owning material isolation, mesh masks, clothing, face lighting, and attachments directly, with its source split across `CharacterModel.cs` and the `CharacterModel.Appearance.cs`/`CharacterModel.Wardrobe.cs`/`CharacterModel.Masking.cs` partials. Native Godot `Animation` clips ARE the expression presets: each preset is an authored clip — a single clip may author several facial channels — and a native `AnimationTree` per model drives them, with the graph's own parameters as the independently adjustable preset weights. Designers edit, pose, and keyframe clips in Godot, wire and preview presets in the native `AnimationTree` panel, and can keyframe preset weights like any parameter. Wardrobe selection runs through one uniform clothing API on the root. The tongue and optional-weapon attachments are import-owned native topology (a `BoneAttachment3D` and fixed import-time groups), not scripted services. Each scene is a thin, noneditable wrapper around its authoritative Blender import — meshes, materials, mesh defaults, and hidden source collections are rebuilt by the import pipeline, so import-owned visuals are edited in the Blender source plus the committed import manifests, never inside the wrapper. Everything here is presentation: no battle runtime, no combatant context.
+`CharacterModel` (in `scenes/models/`) is the single C# entry point on the Zhu Yuan and Trigger model scenes — one root node owning mesh masks, clothing, face lighting, and attachments directly, with its source split across `CharacterModel.cs` and the `CharacterModel.Appearance.cs`/`CharacterModel.Wardrobe.cs`/`CharacterModel.Masking.cs` partials. Native Godot `Animation` clips ARE the expression presets: each preset is an authored clip — a single clip may author several facial channels — and a native `AnimationTree` per model drives them, with the graph's own parameters as the independently adjustable preset weights. Designers edit, pose, and keyframe clips in Godot, wire and preview presets in the native `AnimationTree` panel, and can keyframe preset weights like any parameter. Wardrobe selection runs through one uniform clothing API on the root. The tongue and optional-weapon attachments are import-owned native topology (a `BoneAttachment3D` and fixed import-time groups), not scripted services. Each scene wraps its authoritative Blender import. The pipeline rebuilds topology, source presentation, and face bindings; the committed wrappers also retain editable `Model` instances and local material overrides. Those existing overrides are preserved by this change. Prefer upstream source/manifest edits for new import-owned visual changes, and reconcile any retained wrapper override when changing the corresponding source material. Everything here is presentation: no battle runtime, no combatant context.
 
 ## Scenes and resources
 
 | Asset | Purpose |
 | --- | --- |
-| `res://scenes/models/ZhuYuan/ZhuYuan.scn` | Zhu Yuan: a thin, noneditable wrapper. Root is `CharacterModel` with its fixed `ModelAnimationTree` child resolved by name; a `Model` child instances the imported Blender scene, the mask setups, wardrobe configuration, and selections are authored on the root, and `AttachmentsPath` points at the import-owned, default-hidden weapons group `Model/rig_D/GeneralSkeleton/Weapons`. |
+| `res://scenes/models/ZhuYuan/ZhuYuan.scn` | Zhu Yuan: a wrapper retaining local material overrides. Root is `CharacterModel` with its fixed `ModelAnimationTree` child resolved by name; a `Model` child instances the imported Blender scene, the mask setups, wardrobe configuration, and selections are authored on the root, and `AttachmentsPath` points at the import-owned, default-hidden weapons group `Model/rig_D/GeneralSkeleton/Weapons`. |
 | `res://scenes/models/Trigger/Trigger.scn` | Trigger: the same root shape minus attachments — `AttachmentsPath` is empty and its optional weapon source collection stays hidden inside the import (it is not an extracted production scene). |
 | `res://scenes/models/ZhuYuan/ZhuYuan.blend`, `res://scenes/models/Trigger/Trigger4.2.blend` | Authoritative Blender sources. Godot's import pipeline — `scenes/models/import/humanoid_post_import.gd` with `humanoid_structure.gd` and `humanoid_presentation.gd` — normalizes the skeleton, reparents the tongue rig, adds Zhu Yuan's weapon copies and derived arm meshes, and applies the committed per-model manifests. Each model folder carries eight committed PNG inputs beside its Blender file and wrapper, with matching import sidecars. |
 | `res://resources/models/shared/humanoid_body.res` | One shared body animation library for both models: `neutral`, `head_turn`, and `motion_demo` as rotation-only tracks on the normalized `Head`/`LeftUpperArm` bones. |
@@ -15,6 +15,7 @@
 | `res://resources/models/<model>/import_bindings.res`, `res://resources/models/<model>/presentation/presentation.res` | Import-time manifests applied on every reimport: the structure recipe (tongue placement, weapon copies) and the presentation manifest (captured surface materials, saved mesh defaults, required hidden groups). |
 | `res://resources/models/<model>/presentation/body_mask.res`, `res://resources/models/trigger/presentation/pantyhose_mask.res` | Saved typed `ModelMaskConfiguration` mesh-mask configurations, including original embedded default meshes. |
 | `res://resources/models/<model>/presentation/*_mask_setup.tres` | Saved `ModelMeshMaskSetup` resources, each binding one masked mesh's root-relative path to the `ModelMaskConfiguration` beside it; the root's `MaskSetups` array references them. |
+| `res://resources/models/<model>/presentation/wardrobe.tres` | Shared typed `ModelWardrobeConfiguration` with fixed outfit/component/garment/mask-rule definitions; instance choices remain in `Selections`. |
 | `res://scenes/models/shared/character.gdshader`, `outline.gdshader` | Shared shader source for surfaces and their authored outline passes. |
 
 The wrapper's `ModelAnimationPlayer` carries two named libraries — `body` (the shared `humanoid_body.res`) and `face` (the per-model `humanoid_face.res`) — so both models share one body clip set while expression clips stay per-model; graph clip references use those library names (`body/neutral`, `face/expr_<Preset>`, …). Scene trees stay active: `ModelAnimationTree.active = true` is saved in both scenes, so the native mixer drives the rig from load. The root's fixed `ModelAnimationTree` child resolves once when the root's `_Ready` runs; a missing child of that name leaves the animation component unconfigured (synthetic fixtures do this), and a child of the wrong type is an authoring error. `MeshRoot` and `AttachmentsPath` are the path-based, optional inputs.
@@ -25,15 +26,14 @@ One node owns the whole scripted surface — there are no scripted component chi
 
 | Export | Purpose |
 | --- | --- |
-| `MeshRoot` | Path of the mesh container whose surface materials are isolated once per instance and whose meshes are scanned for face materials. Empty leaves the appearance unconfigured. |
-| `HeadBoneName` | Bone driving the face-lighting axes; fixed for the initialized instance like `MeshRoot`. |
+| `MeshRoot` | Path of the imported mesh container carrying baked `face_lighting` metadata. Empty leaves appearance unconfigured. |
 | `MaskSetups` | Array of `ModelMeshMaskSetup` resources, each binding one root-relative masked-mesh path to its typed `ModelMaskConfiguration`. |
-| `WardrobeConfiguration` | Authored wardrobe dictionary: variants, components with pieces, and mask rules. |
+| `WardrobeConfiguration` | Shared typed `ModelWardrobeConfiguration`: outfits, components with garment resources, and mask-rule resources. Fixed after authoring. |
 | `Selections` | Per-instance clothing selections (`outfit`, `clothing_enabled`, `pieces/<name>`) — the sole serialized clothing control surface. |
 | `AttachmentsPath` | Path of the optional attachment container; empty means no attachment set. |
 | `AttachmentsVisible` | Whole-set visibility toggle for the attachment container. |
 
-Initialization order is fixed: `_EnterTree` isolates the surface materials (the root's `_EnterTree` always precedes its own `_Ready`, where the masks first render, so the ordering never depends on sibling node order), then `_Ready`/`Initialize()` initializes the mask setups against their meshes, the wardrobe against the now-ready masks, and the attachments — `isolate → masks → wardrobe → attachments`. Editor startup can assign the typed `MaskSetups` array before the C# class can instantiate, leaving the property empty through a failed `_Ready`; a later non-null assignment to a ready, still-uninitialized model retries `Initialize` (see [Clothing](#clothing-one-uniform-wardrobe-api)). Models are instanced fresh per scene and freed with it — nothing detaches an initialized model and re-adds it (hiding runs through `AttachmentsVisible`, not tree removal) — so initialization runs once per instance.
+Godot localizes marked materials when `PackedScene.Instantiate()` creates the scene, before any lifecycle callbacks. `_Ready`/`Initialize()` binds the import-baked face slots, initializes masks, binds/applies the wardrobe, and applies attachment visibility. There is no material-copy `_EnterTree` hook. A later non-null `MaskSetups` assignment to a ready, still-uninitialized model retries initialization after an earlier authoring/setup failure; face bindings rebuild from the baked data and reuse the existing local materials. Models are instanced fresh per scene and freed with it; fixed topology is not detached/rebound at runtime.
 
 Mask state is runtime-derived, never serialized: each setup resolves its mesh/configuration pair into a mask runtime that mints the region entries and seeds the states from its configuration defaults on initialization, and every wardrobe write re-derives the complete combination from the controlled and active region entries. `Selections` is the only clothing state that persists in the scene.
 
@@ -79,7 +79,7 @@ The parameters live on the per-instance `AnimationTree`, so weights stay fully s
 
 ## Clothing: one uniform wardrobe API
 
-The root parses its authored `WardrobeConfiguration` dictionary once and exposes every piece and outfit as a discovered entry — callers never address garment nodes or variant indices directly.
+The root uses a shared, typed `ModelWardrobeConfiguration` directly and creates only its owner-bound piece/outfit handles and mask-region bindings. It does not parse a dictionary or copy authored definitions per character. Callers discover the model's pieces/outfits rather than addressing garment nodes or variant indices.
 
 ```csharp
 // Piece and outfit IDs come from the model's own Pieces/Outfits inventories;
@@ -106,7 +106,16 @@ model.ClothingEnabled = true;    // restore it exactly
 - **Foreign entries are caller bugs.** `SelectOutfit`/`SetPieceEnabled` reject entries discovered by another model before any state changes.
 - **Playback independence.** Clothing operations change garments and masks only; animation playback and preset weights keep running untouched.
 
-The authored `WardrobeConfiguration` schema: `variants` (ordered labels), optional `default_variant` (Trigger authors it; `OutfitIndex` falls back to it when nothing is stored, and writes clamp to the variant range), `components` (piece name → `{visible, pieces: [{path, source, variant}]}`, where `variant: -1` means outfit-independent), and `masks` (rules with `path`, `name`, `index`, `component`, `enabled`, `variant`; saved scenes may still carry a legacy ignored `body` flag). Per-instance selection state lives in `Selections` (`outfit`, `clothing_enabled`, `pieces/<name>`) — the sole serialized clothing control surface. The string-keyed `GetPiece`/`SetPiece` remain available alongside the typed API.
+The typed authored resources are:
+
+- `ModelWardrobeConfiguration`: ordered `Variants`, `DefaultVariant`, `Components` keyed by piece ID, and `Masks`
+- `ModelWardrobeComponent`: initial `Visible` selection and `Pieces`
+- `ModelWardrobeGarment`: root-relative `Path` and outfit `Variant`; `-1` means outfit-independent
+- `ModelWardrobeMaskRule`: `Path`, region `Name`/`Index`, `Component`, `Enabled`, and `Variant`
+
+These resources are shared definitions and must not be mutated after a model uses them. `ValidateAuthoring()` checks duplicate labels, variants, missing definitions/paths, and component references before generated resources are saved. The root's Godot configuration warnings expose the same checks; whole-resource assignment refreshes them. Live warning refresh after editing nested resource fields is not guaranteed, so use `ValidateAuthoring()` and the saved-asset tests as the verification gate. Actual garment nodes and owner-bound mask regions still resolve against each live instance, and selection writes retain their preflight checks. No owner-bound region is stored in a shared resource.
+
+Per-instance selections remain in the original `Selections` dictionary (`outfit`, `clothing_enabled`, `pieces/<name>`), the sole serialized clothing state. The string-keyed `GetPiece`/`SetPiece` APIs remain available. The migrated wrapper resources no longer carry ignored legacy `source`/`body` dictionary fields.
 
 ## Mesh masks
 
@@ -116,9 +125,13 @@ Mask state is runtime-only, derived state — never serialized. Each setup's con
 
 ## Appearance, materials, and authored outlines
 
-Outlines are authored material settings, not runtime state: each outlined surface's material carries the shared outline shader as a `NextPass` with its authored `width_scale` and enabled flag. The root duplicates the mesh root's mutable materials once per instance (`ModelMaterials.Isolate` over `MeshRoot`), so runtime edits — including mask-driven outline weights — stay per-instance while shared shaders and textures stay shared.
+Each mutable surface override and its mutable outline `NextPass` must be saved with `ResourceLocalToScene = true`. Godot creates the instance-local materials during `PackedScene.Instantiate()`; there is no manual runtime duplication. The shipped external `.res` materials already meet this contract. Shaders and authored textures stay shared (their local-to-scene flags stay false). Masking replaces the instance's `vertex_weights` texture reference; it does not mutate the shared source texture.
 
-Face materials that enable `use_face_sdf` receive world-space lighting axes derived from the bone named by the root's `HeadBoneName` (authored as `Head` — the normalized imported bone — on both wrapper scenes; the C# default stays `head.x` for legacy scenes): the root samples the head pose after the native mixer applies its own (`ProcessPriority = 1`) and updates `head_forward_world`/`head_right_world` every frame — automatically during playback, or on demand via `UpdateFaceAxes()`.
+Local-to-scene preserves aliases within a scene. Independently masked surfaces therefore need distinct authored outline materials, even if they share the same shader and texture. Do not assign one mutable outline pass to two surfaces that can generate different weight textures. Setting a flag after instantiation does not retroactively isolate existing resources; programmatic authoring must save the flags before packing/instantiating the scene. See [Godot's resource-local-to-scene contract](https://docs.godotengine.org/en/stable/classes/class_resource.html#class-resource-property-resource-local-to-scene).
+
+During import, `humanoid_presentation.gd` finds face-SDF surfaces while assigning the presentation manifest and validates their normalized `Head` bone. It saves `face_lighting` metadata on the imported root: mesh path, surface index, skeleton path, head index, and inverse global rest basis. All paths are relative to that imported root; every reimport regenerates indices/rest bases after skeleton repair. `HeadBoneName` is no longer a wrapper export.
+
+Runtime resolves only those exact instance nodes/material slots, then samples the changing skeleton global basis and animated head pose. It updates `head_forward_world`/`head_right_world` after the native mixer (`ProcessPriority = 1`), skipping unchanged axes. `UpdateFaceAxes()` remains available for explicit samples. An unconfigured synthetic model uses an empty `MeshRoot`; a configured custom container must carry the same metadata (an empty list explicitly means no face lighting). Runtime references are necessarily per instance, while face discovery, bone lookup, and rest inversion are import-time work.
 
 ## Attachments
 
@@ -132,7 +145,7 @@ Import-owned attachment nodes follow their parent skeleton whenever the model is
 
 ## Authoring workflow
 
-All wrapper and animation authoring happens in Godot (editor panels or scripted `ResourceSaver` writes); scenes and resources are never hand-edited. Import-owned visuals — meshes, surface materials, saved mesh defaults, hidden source collections, the tongue, and Zhu Yuan's weapons — are authored upstream: edit the Blender `.blend` source and the committed `import_bindings.res`/`presentation.res` manifests, then re-import. Never edit the imported `Model` child's nested mesh, material, or default properties inside the thin wrapper: it is noneditable, and hand edits there are lost on the next reimport.
+All wrapper and animation authoring happens in Godot (editor panels or scripted `ResourceSaver` writes); scenes and resources are never hand-edited. Import-owned visuals — meshes, surface materials, saved mesh defaults, hidden source collections, the tongue, and Zhu Yuan's weapons — are authored upstream: edit the Blender `.blend` source and the committed `import_bindings.res`/`presentation.res` manifests, then re-import. The current wrappers retain `[editable path="Model"]` and local material overrides; those can take precedence over imported presentation settings. This pass preserves them rather than attempting a visual migration. For new work, prefer upstream edits and explicitly reconcile existing wrapper overrides, then verify the saved wrapper after reimport.
 
 **Adding an expression preset** to a model:
 
@@ -146,9 +159,11 @@ All wrapper and animation authoring happens in Godot (editor panels or scripted 
 
 **Preset names and overlaps.** Preset names are the graph node base names, authored directly in the blend tree; clip names follow the `expr_<Preset>` convention. Independent presets may intentionally overlap one physical channel with different contributions (the tested `Smile`/`SmileExtra` fixture pair drives the same `Face:Smile` blend shape through two weights), and that stays valid.
 
+**Wardrobe authoring.** Edit the typed wardrobe resource assigned to the wrapper root. Resolve any configuration warnings and call `ValidateAuthoring()` before scripted saves, then instantiate the saved wrapper and verify its clothing/mask defaults. Keep definitions shared and immutable; only `Selections` contains per-character choices.
+
 **Fixed topology.** After initialization the graph structure, rig paths, attachment set, and attachment visibility default are fixed — and the imported `Model` child's own topology is fixed at import. Runtime code adjusts preset weights (native `AnimationTree` parameters), clothing selections, and attachment visibility; it never rewrites graphs, node paths, or attachment wiring.
 
-**Lifecycle.** The root initializes once when it enters the tree (material isolation in `_EnterTree`, masks/wardrobe/attachments in `_Ready`); models are instanced fresh per scene and freed with it, so preset weights, mask bits, and selections never leak into another instance. The public component getters (for example `AnimationTree`) throw while the model is uninitialized or the component is unconfigured (a root without its `ModelAnimationTree` child); an initialized model lives with its scene — freed access fails through Godot's own native errors rather than extra guards.
+**Lifecycle.** Native material localization happens at scene instantiation; the root binds face slots and initializes masks/wardrobe/attachments in `_Ready`; models are instanced fresh per scene and freed with it, so preset weights, mask bits, and selections never leak into another instance. The public component getters (for example `AnimationTree`) throw while the model is uninitialized or the component is unconfigured (a root without its `ModelAnimationTree` child); an initialized model lives with its scene — freed access fails through Godot's own native errors rather than extra guards.
 
 ## Tested API example
 
