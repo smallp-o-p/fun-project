@@ -85,6 +85,26 @@ public class GameStateTest
         timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Raid",
           FunProject.Strategic.GeoscapeEventKind.TacticalBattle,
           tacticalMission: MissionWithCombatantlessEntry()))])),
+      ("tactical mission with an out-of-range player index", TestData.MakeStart(
+        regions: [],
+        timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Raid",
+          FunProject.Strategic.GeoscapeEventKind.TacticalBattle,
+          tacticalMission: MissionWithBrokenPlayerIndex()))])),
+      ("tactical mission whose enemy slot deployment is null", TestData.MakeStart(
+        regions: [],
+        timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Raid",
+          FunProject.Strategic.GeoscapeEventKind.TacticalBattle,
+          tacticalMission: MissionWithNullEnemySlot()))])),
+      ("tactical mission whose player slot has no faction", TestData.MakeStart(
+        regions: [],
+        timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Raid",
+          FunProject.Strategic.GeoscapeEventKind.TacticalBattle,
+          tacticalMission: MissionWithNullPlayerFaction()))])),
+      ("tactical mission whose enemy slot has no faction", TestData.MakeStart(
+        regions: [],
+        timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Raid",
+          FunProject.Strategic.GeoscapeEventKind.TacticalBattle,
+          tacticalMission: MissionWithNullEnemyFaction()))])),
     ];
     foreach ((string name, CampaignStartData start) in malformed)
       Assert.Throws<InvalidOperationException>(() => new GameState(start), name);
@@ -103,6 +123,34 @@ public class GameStateTest
   {
     var mission = TestData.MakeTacticalMission();
     mission.OrdinaryEnemies[0].Combatant = null!;
+    return mission;
+  }
+
+  private static FunProject.Strategic.TacticalMissionData MissionWithBrokenPlayerIndex()
+  {
+    var mission = TestData.MakeTacticalMission();
+    mission.BattleType.PlayerFactionIndex = -1;
+    return mission;
+  }
+
+  private static FunProject.Strategic.TacticalMissionData MissionWithNullEnemySlot()
+  {
+    var mission = TestData.MakeTacticalMission();
+    mission.BattleType.Factions[1] = null!;
+    return mission;
+  }
+
+  private static FunProject.Strategic.TacticalMissionData MissionWithNullPlayerFaction()
+  {
+    var mission = TestData.MakeTacticalMission();
+    mission.BattleType.Factions[0].Faction = null!;
+    return mission;
+  }
+
+  private static FunProject.Strategic.TacticalMissionData MissionWithNullEnemyFaction()
+  {
+    var mission = TestData.MakeTacticalMission();
+    mission.BattleType.Factions[1].Faction = null!;
     return mission;
   }
 

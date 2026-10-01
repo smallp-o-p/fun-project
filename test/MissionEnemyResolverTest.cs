@@ -63,6 +63,47 @@ public class MissionEnemyResolverTest
     }
   }
 
+  [TestCase(TestName = "Enemy count sampling observes both endpoints of an extreme inclusive range")]
+  public void ExtremeRangeSamplingObservesBothEndpoints()
+  {
+    var size = new BattleSizeData
+    {
+      MaxPlayerUnits = 1,
+      MinEnemyUnits = int.MaxValue - 1,
+      MaxEnemyUnits = int.MaxValue,
+    };
+    int minimumDraws = 0;
+    int maximumDraws = 0;
+
+    foreach (int seed in new[] { 1, 2, 3, 4, 5, 6, 7, 8 })
+    {
+      int count = size.SampleEnemyCount(new Random(seed));
+      if (count == int.MaxValue - 1)
+        minimumDraws++;
+      if (count == int.MaxValue)
+        maximumDraws++;
+    }
+
+    Assert.True(minimumDraws > 0, "Never sampled the minimum endpoint int.MaxValue - 1.");
+    Assert.True(maximumDraws > 0, "Never sampled the inclusive maximum endpoint int.MaxValue.");
+  }
+
+  [TestCase(TestName = "Enemy count sampling respects small, zero, and fixed inclusive bounds")]
+  public void BoundedRangeSamplingStaysInclusive()
+  {
+    var small = new BattleSizeData { MaxPlayerUnits = 1, MinEnemyUnits = 2, MaxEnemyUnits = 5 };
+    var zero = new BattleSizeData { MaxPlayerUnits = 3, MinEnemyUnits = 0, MaxEnemyUnits = 0 };
+    var fixedRange = new BattleSizeData { MaxPlayerUnits = 3, MinEnemyUnits = 4, MaxEnemyUnits = 4 };
+
+    foreach (int seed in new[] { 7, -7, 99 })
+    {
+      int drawn = small.SampleEnemyCount(new Random(seed));
+      Assert.True(drawn >= 2 && drawn <= 5, $"Seed {seed} drew {drawn} outside [2, 5].");
+      Assert.Equal(0, zero.SampleEnemyCount(new Random(seed)));
+      Assert.Equal(4, fixedRange.SampleEnemyCount(new Random(seed)));
+    }
+  }
+
   [TestCase(TestName = "Malformed mission authoring fails validation")]
   public void MalformedMissionAuthoringFailsValidation()
   {
@@ -72,6 +113,14 @@ public class MissionEnemyResolverTest
     playerSlot.EnemyFactionIndex = 0;
     var outOfRangeSlot = TestData.MakeTacticalMission();
     outOfRangeSlot.EnemyFactionIndex = 2;
+    var brokenPlayerIndex = TestData.MakeTacticalMission();
+    brokenPlayerIndex.BattleType.PlayerFactionIndex = -1;
+    var nullEnemySlot = TestData.MakeTacticalMission();
+    nullEnemySlot.BattleType.Factions[1] = null!;
+    var nullPlayerFaction = TestData.MakeTacticalMission();
+    nullPlayerFaction.BattleType.Factions[0].Faction = null!;
+    var nullEnemyFaction = TestData.MakeTacticalMission();
+    nullEnemyFaction.BattleType.Factions[1].Faction = null!;
 
     (string Case, Func<TacticalMissionData> Build)[] malformed =
     [
@@ -93,6 +142,10 @@ public class MissionEnemyResolverTest
       ("loadout entry without a combatant", () => missingEntryCombatant),
       ("enemy slot on the player faction", () => playerSlot),
       ("enemy slot out of range", () => outOfRangeSlot),
+      ("battle type with an out-of-range player index", () => brokenPlayerIndex),
+      ("enemy slot without a deployment", () => nullEnemySlot),
+      ("player slot without a faction", () => nullPlayerFaction),
+      ("enemy slot without a faction", () => nullEnemyFaction),
       ("empty ordinary pool with a positive maximum", () => new TacticalMissionData
       {
         BattleType = TestData.MakeDuelBattleType(),

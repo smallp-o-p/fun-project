@@ -20,12 +20,7 @@ public static class MissionEnemyResolver
     mission.Validate();
 
     var random = new Random(unchecked(seed ^ StreamSalt));
-    int minimum = mission.Size.MinEnemyUnits;
-    int maximum = mission.Size.MaxEnemyUnits;
-    // Inclusive [minimum, maximum] over Random's exclusive upper bound; the maximum itself
-    // is unreachable only when it saturates int.MaxValue, where +1 would overflow.
-    int upperExclusive = maximum == int.MaxValue ? maximum : maximum + 1;
-    int ordinaryCount = random.Next(minimum, upperExclusive);
+    int ordinaryCount = mission.Size.SampleEnemyCount(random);
 
     FactionDeploymentData authoredSlot = mission.BattleType.Factions[mission.EnemyFactionIndex];
     var faction = new Faction(authoredSlot.Faction);

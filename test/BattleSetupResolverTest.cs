@@ -438,21 +438,30 @@ public class BattleSetupResolverTest
     Assert.True(ReferenceEquals(expected, authored.MapScene.RequireSome()));
   }
 
-  [TestCase(TestName = "Same-seed resolutions of a generated force repeat the layout with fresh identities")]
-  public void GeneratedForcesRepeatLayoutWithFreshIdentities()
+  [TestCase(7, TestName = "Seed 7: same-seed resolutions of a generated force repeat the layout with fresh identities")]
+  [TestCase(-7, TestName = "Seed -7: same-seed resolutions of a generated force repeat the layout with fresh identities")]
+  public void GeneratedForcesRepeatLayoutWithFreshIdentities(int seed)
   {
     var type = MissionStageType();
-    var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 2);
+    var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 3);
+    mission.OrdinaryEnemies.Add(new UnitLoadoutData
+    {
+      Combatant = TestData.MakeCombatantData("Heavy", health: 25, aim: 55),
+    });
     mission.SpecialEnemies.Add(new UnitLoadoutData
     {
       Combatant = TestData.MakeCombatantData("Special", health: 30),
     });
 
-    BattleSetup first = BattleSetupResolver.Resolve(type, seed: 7,
-      sideDeployment: Some(MissionEnemyResolver.Resolve(mission, seed: 7))).RequireRight();
-    BattleSetup second = BattleSetupResolver.Resolve(type, seed: 7,
-      sideDeployment: Some(MissionEnemyResolver.Resolve(mission, seed: 7))).RequireRight();
+    BattleSetup first = BattleSetupResolver.Resolve(type, seed: seed,
+      sideDeployment: Some(MissionEnemyResolver.Resolve(mission, seed: seed))).RequireRight();
+    BattleSetup second = BattleSetupResolver.Resolve(type, seed: seed,
+      sideDeployment: Some(MissionEnemyResolver.Resolve(mission, seed: seed))).RequireRight();
 
+    int enemyCount = first.Sides[1].Units.Count;
+    Assert.True(enemyCount >= 3 && enemyCount <= 4,
+      $"Expected an ordinary draw in [2, 3] plus the special, found {enemyCount} units.");
+    Assert.Equal("Special", first.Sides[1].Units[enemyCount - 1].Loadout.Combatant.Name);
     Assert.True(ReferenceEquals(first.MapScene.RequireSome(), second.MapScene.RequireSome()));
     Assert.False(ReferenceEquals(first.Sides[1].Faction, second.Sides[1].Faction));
     Assert.Equal(first.Sides.Count, second.Sides.Count);
@@ -468,6 +477,34 @@ public class BattleSetupResolverTest
           second.Sides[side].Units[unit].Loadout.Combatant));
       }
     }
+  }
+
+  [TestCase(TestName = "Generated ordinary draws span the pool and the count range across seeds 7 and -7")]
+  public void GeneratedOrdinaryDrawsSpanPoolAndCountAcrossSeeds()
+  {
+    var type = MissionStageType();
+    var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 4);
+    mission.OrdinaryEnemies.Add(new UnitLoadoutData
+    {
+      Combatant = TestData.MakeCombatantData("Heavy", health: 25, aim: 55),
+    });
+
+    var names = new SysColGeneric.HashSet<string>();
+    var counts = new SysColGeneric.HashSet<int>();
+    foreach (int seed in new[] { 7, -7 })
+    {
+      SideDeployment force = MissionEnemyResolver.Resolve(mission, seed);
+      counts.Add(force.Loadouts.Count);
+      foreach (UnitLoadout loadout in force.Loadouts)
+        names.Add(loadout.Combatant.Name);
+    }
+
+    Assert.True(names.Contains("Grunt") && names.Contains("Heavy"),
+      $"Expected both pool entries across seeds 7/-7, saw [{string.Join(", ", names)}].");
+    Assert.True(counts.Count >= 2,
+      $"Expected divergent ordinary counts across seeds 7/-7, saw [{string.Join(", ", counts)}].");
+    foreach (int count in counts)
+      Assert.True(count >= 2 && count <= 4, $"Ordinary count {count} outside [2, 4].");
   }
 
   [TestCase(TestName = "Side deployments guard index, player slot, membership, and required inputs")]

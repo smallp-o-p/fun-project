@@ -26,4 +26,13 @@ public partial class BattleSizeData : NamedEntityData
       throw new InvalidOperationException(
         $"{nameof(BattleSizeData)} requires 0 <= {nameof(MinEnemyUnits)} <= {nameof(MaxEnemyUnits)}; found [{MinEnemyUnits}, {MaxEnemyUnits}].");
   }
+
+  /// <summary>Ordinary count for one resolution: inclusive
+  /// [MinEnemyUnits, MaxEnemyUnits]; the exclusive upper bound is widened to long so a
+  /// maximum of int.MaxValue stays reachable.</summary>
+  public int SampleEnemyCount(Random random)
+  {
+    ArgumentNullException.ThrowIfNull(random);
+    return (int)random.NextInt64(MinEnemyUnits, (long)MaxEnemyUnits + 1);
+  }
 }

@@ -42,6 +42,26 @@ public partial class TacticalMissionData : Resource
     if (Size.MaxEnemyUnits > 0 && OrdinaryEnemies.Count == 0)
       throw new InvalidOperationException(
         $"{nameof(TacticalMissionData)} can draw up to {Size.MaxEnemyUnits} ordinary enemies but has an empty {nameof(OrdinaryEnemies)} pool.");
+
+    // Startup requires the player deployment's faction and generation the selected enemy
+    // slot's; fail the authoring here instead of at preparation. Map and objective authoring
+    // stay at the startup boundary.
+    if (BattleType.PlayerFactionIndex < 0 || BattleType.PlayerFactionIndex >= BattleType.Factions.Count)
+      throw new InvalidOperationException(
+        $"{nameof(TacticalMissionData)} battle type '{BattleType.Name}' has {nameof(BattleTypeData.PlayerFactionIndex)} {BattleType.PlayerFactionIndex} out of range for {BattleType.Factions.Count} factions.");
+    FactionDeploymentData playerSlot = BattleType.Factions[BattleType.PlayerFactionIndex]
+      ?? throw new InvalidOperationException(
+        $"{nameof(TacticalMissionData)} battle type '{BattleType.Name}' has no deployment in its player faction slot {BattleType.PlayerFactionIndex}.");
+    if (playerSlot.Faction is null)
+      throw new InvalidOperationException(
+        $"{nameof(TacticalMissionData)} battle type '{BattleType.Name}' has no Faction in its player faction slot {BattleType.PlayerFactionIndex}.");
+    FactionDeploymentData enemySlot = BattleType.Factions[EnemyFactionIndex]
+      ?? throw new InvalidOperationException(
+        $"{nameof(TacticalMissionData)} battle type '{BattleType.Name}' has no deployment in the mission's enemy faction slot {EnemyFactionIndex}.");
+    if (enemySlot.Faction is null)
+      throw new InvalidOperationException(
+        $"{nameof(TacticalMissionData)} battle type '{BattleType.Name}' has no Faction in the mission's enemy faction slot {EnemyFactionIndex}.");
+
     ValidateEntries(OrdinaryEnemies, nameof(OrdinaryEnemies));
     ValidateEntries(SpecialEnemies, nameof(SpecialEnemies));
   }
