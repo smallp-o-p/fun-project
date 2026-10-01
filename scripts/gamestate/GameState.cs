@@ -11,6 +11,7 @@ namespace FunProject.GameState;
 /// <summary>
 /// The campaign truth container: everything that holds for the life of the campaign —
 /// clock position, the baked event timeline, active events, the pending resolution, the
+/// active mission association, the
 /// region binding, the roster, the player faction, and the condition registry
 /// (<see cref="Conditions"/>). <see cref="Strategic.GeoscapeSession"/> is the ephemeral runtime
 /// constructed over this state (the BattleSession-over-BattleBoardState pattern);
@@ -162,6 +163,11 @@ public sealed class GameState
   internal List<GeoscapeEvent> ActiveEvents { get; } = [];
 
   internal Option<PendingResolution> Pending { get; set; }
+
+  /// <summary>The launched-mission association: campaign truth, so a rebuilt session observes
+  /// the same active mission and cannot permit a second launch. Cleared by the mission return
+  /// or by AbortMissionPresentation (host presentation failure recovery).</summary>
+  internal Option<MissionDeployment> ActiveMission { get; set; }
 
   // Bakes one authored entry into an immutable firing. Unset events and out-of-range expiry
   // are authoring mistakes: they fail the load instead of being silently dropped.
