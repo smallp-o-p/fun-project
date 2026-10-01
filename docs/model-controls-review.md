@@ -2,20 +2,61 @@
 
 Reviewed 1 October 2026 in the Linux cloud clone. The feature now uses less runtime state and less repeated derivation while retaining the same public model controls, authored assets, import safety checks, and scene layout. The largest reduction is in wardrobe coordination; mask selection now has one authoritative bitset instead of a name-keyed state dictionary plus a reconstructed bitset and a second region-index dictionary.
 
-This report covers the **whole character-model-controls feature**, then the additional local simplification pass. The authoring guide remains [model-controls.md](model-controls.md).
+The branch rebased cleanly onto current master. Post-rebase checks pass except the unchanged dialogue timing test documented below; all 68 model cases pass.
+
+This report covers the **whole character-model-controls feature**, then the additional simplification and rebase passes. The authoring guide remains [model-controls.md](model-controls.md).
 
 ## Scope and comparison
 
 - Repository: `smallp-o-p/fun-project`
 - Starting feature commit: `1b67154611c8788f1d987b6eba0373c4971f88f1`
 - Fetched master tip: `f08508843e92d97d7945fc642bbce3c513873f15`
-- Merge base: `9d690124e9d9141cd231be2102e7f43cbb9e5d55`
-- Feature scope: `git diff origin/master...HEAD`, equivalent here to the feature commit versus its parent
+- Original review merge base: `9d690124e9d9141cd231be2102e7f43cbb9e5d55`
+- Current rebased base: `f08508843e92d97d7945fc642bbce3c513873f15`
+- Original feature scope: `git diff 9d69012..1b67154`; the current PR also includes the simplification/report commits described below
 - The feature changes 322 tracked paths. Git reports 7,435 insertions and six deletions, but this includes three-line LFS pointers; it is **not** a meaningful source-code or asset-size measure
 - The feature adds 27 C#/GDScript/shader source files or source-file changes, totalling 5,477 inserted source lines before this pass, including tests
-- This pass is an uncommitted local diff. No push, merge, history rewrite, desktop edit, or legacy-asset deletion was performed
+- Simplifications are committed and locally rebased at the user's request. A separate review branch is used for PR publication; the existing remote feature branch is not force-pushed. No user-desktop edit or legacy-asset deletion was performed
 
 The final appendix lists every feature-changed path, including generated identity/import sidecars and binary dependencies, so the component descriptions do not hide unexamined file categories.
+
+## Rebase onto current master
+
+After the simplification review, master was fetched again and remained at `f08508843e92d97d7945fc642bbce3c513873f15`. The completed changes were committed as `6c27f92`, with recovery branch `backup/character-model-controls-pre-rebase-20261001` retaining that exact pre-rebase result.
+
+The feature and simplification commits replayed **without source conflicts**:
+
+- Original feature `1b67154` became `dc4a45f`
+- Simplification/report commit `6c27f92` became `7d6d76d`
+- Git range-diff reports both patches unchanged. Model runtime, import scripts, resources, shaders, and plugin contents are identical to the reviewed pre-rebase result
+- Master's test consolidation and shared-helper additions are retained. No tests were removed to make the rebase pass
+
+The first checkout attempt requested an uncached historical LFS scene from master and stopped at authentication. It was aborted safely. Deferring LFS materialization for the intermediate checkout allowed the rebase to finish; the final feature files were then hydrated from the existing cache, and **all 239 LFS file SHA-256 hashes matched**. No credential configuration was changed.
+
+Post-rebase verification, repeated on the rebased code:
+
+| Check | Result |
+| --- | --- |
+| Normal full GdUnit suite | **1038 passed, 1 failed, 0 skipped**, exit 1 |
+| Changed-C# formatting verification | Passed, exit 0 |
+| Debug build | Passed, zero errors, 11 nullable warnings in unchanged geoscape/test code |
+| ExportRelease build | Passed, zero errors, two existing geoscape nullable warnings |
+| Direct importer regression | **120 checks, zero failures** |
+| Git diff/patch equivalence and asset hydration | Passed |
+
+The first post-rebase full run passed 1,038 of 1,039 cases and failed the same unchanged `DialogueViewTest.PhysicsProcessDrivesReveal` timing assertion recorded before rebase. The table reports the one subsequent full repeat, with no source changes between runs. This timing-sensitive test was not modified or skipped.
+
+Test inventory reconciles exactly, rather than indicating lost discovery:
+
+| Inventory | Original base or pre-rebase | Current master or post-rebase |
+| --- | --- | --- |
+| Non-feature TestCase attributes | 1,012 at `9d69012` | 971 at `f085088` |
+| Feature model TestCase attributes | 68 | 68 |
+| Actual full-suite discovery | 1,080 | 1039 |
+
+Master's intentional test consolidation in `4ee9c22`, `687cac2`, `ccf3eaf`, and `f085088` accounts for the net reduction of 41 attributes. Static counts match both GdUnit discovery totals; range-diff reports unchanged feature patches, and the feature's model-test files are byte-identical before and after rebase. No missing, ignored, or skipped feature test explains the count change. The extra Debug warning is in `ObjectiveSystemBattleTest.cs`; the other warnings remain in the files documented below. The report-only follow-up records these results after code verification. The original pre-rebase verification record is preserved later in this document, including earlier timing-sensitive failures rather than hiding them.
+
+The resulting review scope contains 324 changed paths against current master. The appendix preserves the 322 original feature paths; it includes the subsequently removed orphan UID. The three review additions (this report and the importer harness plus UID) are described separately above the appendix.
 
 ## How the pieces fit together
 
@@ -165,9 +206,9 @@ Regression coverage adds 42 C# lines and a 172-line GDScript harness. Therefore 
 
 Further shortening would mostly compress syntax, remove diagnostics/tests, or collapse useful authoring boundaries. The retained validation and lifetime distinctions account for most remaining code. This is a measured reduction in state and control flow, not a claim that physical minimum line count proves correctness.
 
-## Verification
+## Pre-rebase verification record
 
-### Final results
+### Final pre-rebase results
 
 | Check | Result |
 | --- | --- |
@@ -181,7 +222,7 @@ Further shortening would mostly compress syntax, remove diagnostics/tests, or co
 | Diff whitespace and report-link checks | Passed; no missing local report links |
 | Static final-diff and component-coverage review | No unresolved behavior-equivalence finding; appendix covers all 322 original feature paths |
 
-The final normal-suite result is the completion evidence. It was run after temporary direct-runner source/scene files were removed from the repository. No existing test was skipped to obtain it.
+This normal-suite result is the pre-rebase completion evidence; the post-rebase result is recorded above. It was run after temporary direct-runner source/scene files were removed from the repository. No existing test was skipped to obtain it.
 
 ### Earlier failures and remaining warnings
 
