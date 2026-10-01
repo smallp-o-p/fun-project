@@ -72,10 +72,11 @@ public partial class GeoscapeBattleHandoffTest
     return AddToTree(scene);
   }
 
-  // Fires the mission, opens its dialog, engages preparation, and selects Alpha. The dialog
-  // reference is captured here: after the engage the squad is the stack's current view.
+  // Fires the mission, captures the scene's live session at the Present boundary, opens
+  // its dialog, engages preparation, and selects Alpha. The dialog reference is captured
+  // here: after the engage the squad is the stack's current view.
   private static (GeoscapeBattleHandoffScene Scene, GeoscapeViewManager Manager,
-    SquadLoadoutView Squad, GeoscapeEventResolution Dialog) PreparedScene(
+    SquadLoadoutView Squad, GeoscapeEventResolution Dialog, GeoscapeSession Session) PreparedScene(
     TacticalMissionData? mission, out RuntimeCaptureSystemData capture,
     GeoscapeEventDefinition[]? backgroundEvents = null)
   {
@@ -83,12 +84,13 @@ public partial class GeoscapeBattleHandoffTest
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     SpeedButton(scene).EmitSignal(Button.SignalName.Pressed); // Normal
     scene._PhysicsProcess(0.1); // the mission fires at tick 1
+    GeoscapeSession session = CaptureSceneSession(manager); // before the mission flow opens
     OpenResolutionViaAlert(scene);
     var dialog = (GeoscapeEventResolution)manager.Current;
     DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
     var squad = (SquadLoadoutView)manager.Current;
     ChooseSquadUnit(squad, 0, "Alpha");
-    return (scene, manager, squad, dialog);
+    return (scene, manager, squad, dialog, session);
   }
 
   // A session-level launch for host-boundary tests that present the runtime themselves.
@@ -116,7 +118,7 @@ public partial class GeoscapeBattleHandoffTest
   public async Task DeployPresentsBattleAndReturnRestoresGeoscape()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, dialog) = PreparedScene(null, out var capture);
+    var (scene, manager, squad, dialog, _) = PreparedScene(null, out var capture);
     CampaignGameState campaign = scene.Campaign!;
     var session = new GeoscapeSession(campaign); // sessions are rebuildable views over state
 
@@ -183,7 +185,7 @@ public partial class GeoscapeBattleHandoffTest
   {
 
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, _) = PreparedScene(StartupTerminalMission(), out var capture);
+    var (scene, manager, squad, _, _) = PreparedScene(StartupTerminalMission(), out var capture);
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
 
@@ -211,7 +213,7 @@ public partial class GeoscapeBattleHandoffTest
   {
 
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, _) = PreparedScene(null, out _);
+    var (scene, manager, squad, _, _) = PreparedScene(null, out _);
 
     scene.BattleScene = Pack(new Label { Name = "NotABattleScene" });
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed); // guard throws inside the handler
@@ -230,7 +232,7 @@ public partial class GeoscapeBattleHandoffTest
   public async Task CorrectlyTypedInstallFailureAbortsInstallationAndRestoresPreparation(bool dropCamera)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, _) = PreparedScene(null, out var capture);
+    var (scene, manager, squad, _, _) = PreparedScene(null, out var capture);
     CampaignGameState campaign = scene.Campaign!;
     var session = new GeoscapeSession(campaign);
     PendingResolution pending = session.PendingResolution.Match(
@@ -270,7 +272,7 @@ public partial class GeoscapeBattleHandoffTest
     await using var cleanup = new DeferredNodeCleanup();
     TacticalMissionData mission = EliminationMission();
     mission.BattleType.Systems.Add(new ThrowingSystemData());
-    var (scene, manager, squad, _) = PreparedScene(mission, out _);
+    var (scene, manager, squad, _, _) = PreparedScene(mission, out _);
     var session = new GeoscapeSession(scene.Campaign!);
     Option<int> seedBefore = session.PendingResolution.Match(
       value => value.Event.BattleSeed,
@@ -331,7 +333,7 @@ public partial class GeoscapeBattleHandoffTest
   {
 
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, dialog) = PreparedScene(null, out var capture,
+    var (scene, manager, squad, dialog, _) = PreparedScene(null, out var capture,
       [MakeEvent("Rumor", GeoscapeEventKind.Plot)]); // stays active so the close refresh renders
     CampaignGameState campaign = scene.Campaign!;
     var session = new GeoscapeSession(campaign);
@@ -365,9 +367,83 @@ public partial class GeoscapeBattleHandoffTest
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
 
+    // The throwing close-path refresh skipped the HUD rebuild: the guaranteed return
+    // cleanup must retract the consumed mission's alert from campaign truth anyway.
+    Assert.Equal(1, AlertCount(scene));
+
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
     Assert.False(GodotObject.IsInstanceValid(squad));
     Assert.False(GodotObject.IsInstanceValid(dialog));
     Assert.False(GodotObject.IsInstanceValid(battle));
+
+    // Only the background event stays clickable: the surviving alert opens Rumor, and the
+    // consumed Ambush can no longer be reopened from the HUD.
+    OpenResolutionViaAlert(scene);
+    Assert.Equal("Rumor", session.PendingResolution.Match(
+      value => value.Event.Definition.Title,
+      () => throw new InvalidOperationException("The background event's resolution must open.")));
+  }
+
+  [TestCase(TestName = "A conditions subscriber throw before the close still retracts the consumed mission's marker")]
+  public async Task ConditionsThrowBeforeCloseStillRetractsConsumedMarker()
+  {
+
+    await using var cleanup = new DeferredNodeCleanup();
+    var (scene, manager, squad, dialog, liveSession) = PreparedScene(null, out var capture,
+      [MakeEvent("Rumor", GeoscapeEventKind.Plot)]); // stays active; its marker must remain
+    CampaignGameState campaign = scene.Campaign!;
+    var session = new GeoscapeSession(campaign);
+
+    SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
+    var battle = OnlyChild<BattleScene>(scene);
+    BattleRuntime runtime = capture.Captured!;
+    runtime.ExecuteAction(BattleAction.ApplyDamage(
+      runtime.TryGetAlive(GruntAt(runtime)).RequireSome(), 999));
+    DrainDirector(battle);
+    var map = scene.GetNode<GeoscapeMapControl>("%Map");
+    int childrenBeforeReturn = map.GetChildCount(); // authored regions plus both markers
+
+    // A commit-stream subscriber ahead of the close explodes on the conditions
+    // notification: ResolutionEventClosed never reaches the scene router, so neither the
+    // map nor the HUD refreshes after the mission was consumed.
+    liveSession.EventCommitted += geoscapeEvent =>
+    {
+      if (geoscapeEvent is CombatantConditionsChanged)
+        throw new InvalidOperationException("Subscriber exploded.");
+    };
+
+    int probe = 0;
+    battle.ReturnRequested += () => probe++; // skipped when the geoscape handler throws
+
+    ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
+
+    Assert.Equal(0, probe); // the geoscape handler did not complete: the failure propagated
+    Assert.True(session.ActiveMission.IsNone);
+    Assert.True(session.PendingResolution.IsNone);
+    Assert.Equal(1, campaign.ActiveEvents.Count); // the mission is consumed despite the throw
+    Assert.Equal("Rumor", campaign.ActiveEvents.AsValueEnumerable().Single().Definition.Title);
+    Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(manager.Visible);
+    Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
+    Assert.True(ReferenceEquals(manager.RootView, manager.Current));
+
+    // The guaranteed cleanup retracts the consumed mission's marker without re-stamping
+    // (the broken-refresh route must not gain a resurrection path); the background
+    // event's marker and alert survive.
+    Assert.Equal(childrenBeforeReturn - 1, map.GetChildCount());
+    Assert.Equal(1, AlertCount(scene));
+
+    await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
+    Assert.False(GodotObject.IsInstanceValid(squad));
+    Assert.False(GodotObject.IsInstanceValid(dialog));
+    Assert.False(GodotObject.IsInstanceValid(battle));
+
+    // The surviving marker is the background event's and still routes its click.
+    GeoscapeEvent? clicked = null;
+    map.EventClicked += adapter => clicked = adapter.Event;
+    ((RegionButton)map.GetChild(map.GetChildCount() - 1)).EmitSignal(Button.SignalName.Pressed);
+    Assert.Equal("Rumor", clicked!.Definition.Title);
+    Assert.True(session.PendingResolution.Match(
+      value => ReferenceEquals(value.Event, clicked), () => false));
   }
 }

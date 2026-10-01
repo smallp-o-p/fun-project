@@ -313,6 +313,14 @@ public partial class GeoscapeScene : Control
       RemoveChild(host); // synchronous tree exit releases the owned runtime before any replay
     host.QueueFree();
 
+    // Reconcile the retained UI from campaign truth before any fallible re-presentation:
+    // the close event may never reach the router (a subscriber threw earlier in the commit
+    // chain) or its map refresh may have thrown first, leaving the consumed mission's
+    // alert and marker actionable. Both steps derive from ActiveEvents alone and stamp
+    // nothing, so neither can fail the way the close-path refresh can.
+    _hud.RefreshAlerts(_session.ActiveEvents);
+    _map.RemoveInactiveEventMarkers();
+
     _viewManager.Show();
     _viewManager.ProcessMode = ProcessModeEnum.Inherit;
     PopMissionViews();

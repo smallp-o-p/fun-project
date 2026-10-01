@@ -1,8 +1,10 @@
 using System;
 using System.Threading.Tasks;
+using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Battle;
 using FunProject.GameState;
 using FunProject.Geoscape;
+using FunProject.Strategic;
 using Godot;
 using static GdUnit4.Assertions;
 
@@ -30,6 +32,29 @@ internal static partial class GeoscapeTestScenes
   {
     public override void Register(BattleRuntime runtime)
       => throw new InvalidOperationException("The startup system registration failed.");
+  }
+
+  // Momentary capture of the composition root's live session at the production Present
+  // boundary: the manager presents every pushed view with its session, so a capture view
+  // records it without any production seam. Callers pop it back before asserting.
+  public sealed partial class SessionCaptureView : GeoscapeView
+  {
+    public GeoscapeSession? Captured { get; private set; }
+
+    public override void Present(CampaignGameState state, GeoscapeSession session)
+      => Captured = session;
+  }
+
+  // Pushes a capture view over the stack top and pops it back via RequestBack (which
+  // frees the temporary view); valid at any stack depth, so mission flows stay untouched.
+  public static GeoscapeSession CaptureSceneSession(GeoscapeViewManager manager)
+  {
+    var capture = new SessionCaptureView();
+    manager.RootView.RequestView(capture);
+    GeoscapeSession session = capture.Captured
+      ?? throw new InvalidOperationException("The capture view was never presented.");
+    capture.RequestBack();
+    return session;
   }
   public static GeoscapeHud CreateHud()
     => GD.Load<PackedScene>("res://scenes/geoscape/GeoscapeHud.tscn").Instantiate<GeoscapeHud>();
