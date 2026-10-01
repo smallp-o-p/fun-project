@@ -196,7 +196,12 @@ public sealed class GeoscapeSession
         fire.Definition,
         fire.TargetRegionIndex >= 0 ? Some(fire.TargetRegionIndex) : Option<int>.None,
         Tick,
-        fire.ExpiresAtTick);
+        fire.ExpiresAtTick)
+      {
+        BattleSeed = fire.Definition.Kind == GeoscapeEventKind.TacticalBattle
+          ? Some(Random.Shared.Next())
+          : Option<int>.None,
+      };
       _state.ActiveEvents.Add(active);
       Commit(new ScheduledEventFired(active));
     }

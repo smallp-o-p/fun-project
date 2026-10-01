@@ -463,7 +463,8 @@ internal static class TestData
     string targetRegionName = "",
     int expiresAfterTicks = -1,
     bool allowUnfitDeployment = false,
-    DialogueSequenceData? dialogue = null)
+    DialogueSequenceData? dialogue = null,
+    TacticalMissionData? tacticalMission = null)
   {
     return new GeoscapeEventDefinition
     {
@@ -474,7 +475,33 @@ internal static class TestData
       TargetRegionName = targetRegionName,
       AllowUnfitDeployment = allowUnfitDeployment,
       Dialogue = dialogue,
+      TacticalMission = tacticalMission ?? (kind == GeoscapeEventKind.TacticalBattle ? MakeTacticalMission() : null),
     };
+  }
+
+  // Valid tactical-mission default over the duel battle type. The ordinary pool entry is
+  // only present when a positive maximum can draw from it, so zero-range (specials-only)
+  // missions stay pool-less; tests add specials or shrink bounds explicitly.
+  public static TacticalMissionData MakeTacticalMission(
+    BattleTypeData? type = null, int maxPlayerUnits = 3, int minEnemyUnits = 1, int maxEnemyUnits = 1)
+  {
+    var mission = new TacticalMissionData
+    {
+      BattleType = type ?? MakeDuelBattleType(),
+      Size = new BattleSizeData
+      {
+        MaxPlayerUnits = maxPlayerUnits,
+        MinEnemyUnits = minEnemyUnits,
+        MaxEnemyUnits = maxEnemyUnits,
+      },
+      EnemyFactionIndex = 1,
+    };
+    if (maxEnemyUnits > 0)
+      mission.OrdinaryEnemies.Add(new UnitLoadoutData
+      {
+        Combatant = MakeCombatantData("Grunt", health: 20, aim: 65),
+      });
+    return mission;
   }
 
   public static ScheduledEventData MakeScheduled(int atTick, GeoscapeEventDefinition evt)

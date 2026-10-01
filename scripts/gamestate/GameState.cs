@@ -175,6 +175,22 @@ public sealed class GameState
       throw new InvalidOperationException(
         $"Event '{entry.Event.Title}' has ExpiresAfterTicks {entry.Event.ExpiresAfterTicks}; -1 means never, otherwise a non-negative tick count is required.");
 
+    if (entry.Event.Kind == GeoscapeEventKind.TacticalBattle)
+    {
+      if (entry.Event.TacticalMission is null)
+        throw new InvalidOperationException(
+          $"Tactical event '{entry.Event.Title}' has no TacticalMission assigned in GeoscapeMapData.Timeline.");
+      try
+      {
+        entry.Event.TacticalMission.Validate();
+      }
+      catch (InvalidOperationException broken)
+      {
+        throw new InvalidOperationException(
+          $"Event '{entry.Event.Title}' carries an invalid TacticalMission: {broken.Message}", broken);
+      }
+    }
+
     return new ScheduledFire(
       entry.Event,
       entry.AtTick,

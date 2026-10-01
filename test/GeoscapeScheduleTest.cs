@@ -136,4 +136,42 @@ public class GeoscapeScheduleTest
     foreach ((string name, CampaignStartData start) in malformed)
       Assert.Throws<System.InvalidOperationException>(() => new CampaignGameState(start), name);
   }
+
+  [TestCase(TestName = "Tactical events retain a battle seed; other events carry none")]
+  public void TacticalEventRetainsBattleSeed()
+  {
+    using var campaign = new GeoscapeFixture(timeline:
+    [
+      TestData.MakeScheduled(1, TestData.MakeEvent("Raid", GeoscapeEventKind.TacticalBattle)),
+      TestData.MakeScheduled(1, TestData.MakeEvent("Broadcast")),
+    ]);
+
+    campaign.AdvanceTicks(1);
+
+    Assert.Equal(2, campaign.Session.ActiveEvents.Count);
+    foreach (GeoscapeEvent active in campaign.Session.ActiveEvents)
+    {
+      if (active.Definition.Kind == GeoscapeEventKind.TacticalBattle)
+        Assert.True(active.BattleSeed.IsSome, "Tactical events must retain a battle seed.");
+      else
+        Assert.True(active.BattleSeed.IsNone, "Non-tactical events must not carry a battle seed.");
+    }
+  }
+
+  [TestCase(TestName = "A fired tactical event keeps its battle seed across a session rebuild")]
+  public void BattleSeedSurvivesSessionRebuild()
+  {
+    using var campaign = new GeoscapeFixture(timeline:
+    [
+      TestData.MakeScheduled(1, TestData.MakeEvent("Raid", GeoscapeEventKind.TacticalBattle)),
+    ]);
+    campaign.AdvanceTicks(1);
+    int seed = campaign.ActiveEvent.BattleSeed.RequireSome();
+
+    var rebuilt = new GeoscapeSession(campaign.State);
+
+    Assert.Equal(1, rebuilt.ActiveEvents.Count);
+    Assert.True(rebuilt.ActiveEvents[0].BattleSeed.IsSome);
+    Assert.Equal(seed, rebuilt.ActiveEvents[0].BattleSeed.RequireSome());
+  }
 }

@@ -13,7 +13,13 @@ public sealed record GeoscapeEvent(
   GeoscapeEventDefinition Definition,
   Option<int> TargetRegionIndex,
   long OccurredTick,
-  Option<long> ExpiresAtTick);
+  Option<long> ExpiresAtTick)
+{
+  /// <summary>Seed minted once when a tactical event fires and retained on the active record,
+  /// so battle resolution reproduces the same force across session rebuilds. Non-tactical
+  /// events carry None.</summary>
+  public Option<int> BattleSeed { get; init; } = Option<int>.None;
+}
 
 public sealed record ManufacturingStarted(ManufacturingJob Job) : IGeoscapeEvent;
 

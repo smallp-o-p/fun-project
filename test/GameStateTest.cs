@@ -77,9 +77,33 @@ public class GameStateTest
         new CaptiveEntryData { Unit = TestData.MakeCombatantData("Grunt"), Faction = null! },
       ])),
       ("armory with a duplicated item reference", TestData.MakeStart(armory: [duplicate, duplicate])),
+      ("tactical event without a mission", TestData.MakeStart(
+        regions: [],
+        timeline: [TestData.MakeScheduled(1, TacticalEventWithoutMission())])),
+      ("tactical mission entry without a combatant", TestData.MakeStart(
+        regions: [],
+        timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Raid",
+          FunProject.Strategic.GeoscapeEventKind.TacticalBattle,
+          tacticalMission: MissionWithCombatantlessEntry()))])),
     ];
     foreach ((string name, CampaignStartData start) in malformed)
       Assert.Throws<InvalidOperationException>(() => new GameState(start), name);
+  }
+
+  // The helper default makes omitted tactical fixtures valid; invalid-resource cases
+  // construct their broken inputs directly on top of it.
+  private static FunProject.Strategic.GeoscapeEventDefinition TacticalEventWithoutMission()
+  {
+    var definition = TestData.MakeEvent("Raid", FunProject.Strategic.GeoscapeEventKind.TacticalBattle);
+    definition.TacticalMission = null!;
+    return definition;
+  }
+
+  private static FunProject.Strategic.TacticalMissionData MissionWithCombatantlessEntry()
+  {
+    var mission = TestData.MakeTacticalMission();
+    mission.OrdinaryEnemies[0].Combatant = null!;
+    return mission;
   }
 
   [TestCase(TestName = "Captives are stamped with override and fallback names and leave the roster untouched")]
