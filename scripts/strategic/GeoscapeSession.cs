@@ -250,6 +250,77 @@ public sealed class GeoscapeSession
     return mission.Definition.TacticalMission;
   }
 
+  /// <summary>Applies the terminal return of the associated mission battle exactly once:
+  /// queries the player summary from the handle's live runtime, verifies the association,
+  /// the player faction, and exact participant membership, then lands every campaign effect
+  /// — survivor conditions, roster removal of the reported deaths, captivity of the reported
+  /// captures, and consumption of the mission, its pending resolution, and the association —
+  /// before the first notification. Survivors are notified per reported identity and the
+  /// resolution closes as Engaged. A throwing subscriber propagates without replay or
+  /// rollback, and the host-owned runtime is never disposed here.</summary>
+  public void CompleteMission(MissionBattle battle)
+  {
+    ArgumentNullException.ThrowIfNull(battle);
+
+    // Query while the runtime is live; a battle that has not ended carries no return yet.
+    FactionBattleSummary summary = battle.Runtime
+      .Query(new GetFactionEndOfBattleSummary(_state.PlayerFaction))
+      .Match(
+        Right: value => value,
+        Left: failure => throw new InvalidOperationException(
+          $"The mission battle has no terminal return: {failure.Message}."));
+    if (!ReferenceEquals(summary.Faction, _state.PlayerFaction))
+      throw new InvalidOperationException(
+        "The queried battle return is not the campaign player's.");
+
+    MissionDeployment active = _state.ActiveMission.Match(
+      value => value,
+      () => throw new InvalidOperationException(
+        "No mission is active; there is nothing to complete."));
+    if (!ReferenceEquals(active, battle.Deployment))
+      throw new InvalidOperationException(
+        "The completed battle is not the active mission association.");
+    VerifyReturnedParticipants(summary, battle.Deployment);
+
+    // The pending resolution outlives the association everywhere else, so an associated
+    // mission always has one; extraction first keeps every later mutation unconditional.
+    PendingResolution pending = _state.Pending.Match(
+      value => value,
+      () => throw new InvalidOperationException(
+        "The active mission lost its pending resolution."));
+
+    foreach ((Combatant combatant, BattleHealthSummary health) in summary.HealthByCombatant)
+      _state.Conditions.ApplyMissionReturn(combatant, health.HealthDamageTaken, health.MaxHealth, Tick);
+    _state.RemoveRosterParticipants(summary.CombatantsDead);
+    foreach (Combatant captured in summary.CapturedEnemies)
+      _state.Captivity.Add(captured);
+
+    // Consumed before any broadcast: synchronous subscribers observe the post-state, and a
+    // reentrant completion finds no association left to apply.
+    _state.ActiveMission = Option<MissionDeployment>.None;
+    _state.Pending = Option<PendingResolution>.None;
+    _state.ActiveEvents.Remove(pending.Event);
+
+    foreach (Combatant combatant in summary.HealthByCombatant.Keys)
+      Commit(new CombatantConditionsChanged(combatant));
+    Commit(new ResolutionEventClosed(pending, ResolutionOutcome.Engaged));
+  }
+
+  // The return must cover exactly the captured deployment — no foreign or partial summary
+  // may touch the roster. Present membership spans alive and dead units.
+  private static void VerifyReturnedParticipants(
+    FactionBattleSummary summary, MissionDeployment deployment)
+  {
+    if (summary.CombatantsPresent.Count != deployment.Participants.Count)
+      throw new InvalidOperationException(
+        $"The battle returned {summary.CombatantsPresent.Count} participants; "
+        + $"the deployment captured {deployment.Participants.Count}.");
+    foreach (Combatant combatant in deployment.Participants)
+      if (!summary.CombatantsPresent.Contains(combatant))
+        throw new InvalidOperationException(
+          $"Combatant {combatant.Name} deployed but is absent from the battle return.");
+  }
+
   public void ApplyMissionReturn(FactionBattleSummary summary)
   {
     foreach ((Combatant combatant, BattleHealthSummary health) in summary.HealthByCombatant)

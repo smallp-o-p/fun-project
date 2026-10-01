@@ -169,6 +169,20 @@ public sealed class GameState
   /// or by AbortMissionPresentation (host presentation failure recovery).</summary>
   internal Option<MissionDeployment> ActiveMission { get; set; }
 
+  /// <summary>Removes exactly the reported deployed deaths from the roster — never unrelated
+  /// members — and drops their condition records, because a removed member can never recover.
+  /// The dead keep their equipment; nothing is returned to the Armory.</summary>
+  internal void RemoveRosterParticipants(IReadOnlySet<Combatant> dead)
+  {
+    ArgumentNullException.ThrowIfNull(dead);
+
+    foreach (Combatant combatant in _roster.AsValueEnumerable().Where(dead.Contains).ToArray())
+    {
+      _roster.Remove(combatant);
+      Conditions.Forget(combatant);
+    }
+  }
+
   // Bakes one authored entry into an immutable firing. Unset events and out-of-range expiry
   // are authoring mistakes: they fail the load instead of being silently dropped.
   private ScheduledFire BakeEntry(ScheduledEventData entry)
