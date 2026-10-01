@@ -1,6 +1,9 @@
 using FunProject.Battle;
+using FunProject.Items;
 using GdUnit4;
 using Godot;
+using System;
+using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -24,6 +27,36 @@ public class UseItemActionTest
     var usedEvent = battle.Events.SingleEvent<ItemUsedBattleEvent>();
     Assert.True(ReferenceEquals(unit, usedEvent.Unit));
     Assert.True(ReferenceEquals(usable.Item, usedEvent.Item));
+  }
+
+  [TestCase(TestName = "The inventory read view refuses raw mutation and reflects real use and throw consumption")]
+  public void InventoryReadViewRefusesRawMutationAndTracksRealConsumption()
+  {
+    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(1, 0, 1), actionPoints: 4);
+    var unit = battle.Unit;
+    var medkit = TestData.MakeUsableItem("Medkit", maxCharges: 2);
+    var throwable = TestData.MakeThrowable("Flare");
+    unit.AddInventoryItem(medkit.Item);
+    unit.AddInventoryItem(throwable.Item);
+    battle.ClearEvents();
+    IReadOnlyList<EquippableItem> inventory = unit.Inventory; // one live read view, retained below
+    var raw = (SysColGeneric.IList<EquippableItem>)inventory;
+
+    Assert.Throws<NotSupportedException>(() => raw.Clear());
+    Assert.Throws<NotSupportedException>(() => raw.Add(medkit.Item));
+    Assert.Throws<NotSupportedException>(() => raw.Remove(throwable.Item));
+    Assert.Equal(2, inventory.Count);
+    Assert.Equal(4, unit.CurrentActionPoints);
+    Assert.Equal(0, battle.Events.Count);
+
+    battle.Use(unit, medkit);
+    battle.Throw(unit, throwable, new Vector3I(0, 0, 1));
+
+    Assert.True(ReferenceEquals(inventory, unit.Inventory));
+    Assert.Equal(1, medkit.Capability.Current);
+    Assert.True(inventory.AsValueEnumerable().Contains(medkit.Item));
+    Assert.False(inventory.AsValueEnumerable().Contains(throwable.Item));
+    Assert.Equal(1, inventory.Count);
   }
 
   [TestCase(TestName = "Using a depleted item is interrupted without spending AP or raising the event")]

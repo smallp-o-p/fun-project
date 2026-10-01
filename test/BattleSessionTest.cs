@@ -460,9 +460,11 @@ public partial class BattleSessionTest
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(6, 1, 1), [faction]);
+    var roused = TestData.MakeBuff("Roused", new AlwaysMetBuffCondition(),
+      statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
     var conscious = battle.Spawn(TestData.MakeCombatant("Alive", faction, vision: 2), Vector3I.Zero);
     var dead = battle.Spawn(TestData.MakeCombatant("Dead", faction), new Vector3I(1, 0, 0));
-    var stillborn = battle.Spawn(TestData.MakeCombatant("Stillborn", faction, health: 0), new Vector3I(4, 0, 0));
+    var stillborn = battle.Spawn(TestData.MakeCombatant("Stillborn", faction, health: 0, buffs: [roused]), new Vector3I(4, 0, 0));
     var unconscious = battle.Spawn(TestData.MakeCombatant("Out", faction), new Vector3I(3, 0, 0));
     var exclusiveTile = battle.At(5, 0, 0); // only the fighter at (3,0,0) sees it
     var sharedTile = battle.At(2, 0, 0); // inside the conscious teammate's vision 2
@@ -488,6 +490,17 @@ public partial class BattleSessionTest
     var tileHeir = battle.Spawn(TestData.MakeCombatant("Fill", faction), new Vector3I(1, 0, 0));
     Assert.True(battle.Board.IsOccupied(battle.Board.At(3, 0, 0)));
 
+    // The session-start observer reads before the hook pass: it captures the preparation
+    // boundary's dead-companion AP. The drain hook then spends everyone's AP, so the value
+    // left after Start can only come from the opening dispatch's own normalization pass.
+    int stillbornApAtSessionStart = -1;
+    battle.OnCommitted(battleEvent =>
+    {
+      if (battleEvent is SessionStartedBattleEvent)
+        stillbornApAtSessionStart = stillborn.CurrentActionPoints;
+    });
+    battle.RegisterHook<SessionStartedBattleEvent>(new SpendActionPointsHook([conscious, stillborn]));
+
     battle.Start();
 
     Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
@@ -496,10 +509,16 @@ public partial class BattleSessionTest
     Assert.True(stillborn.IsDead);
     Assert.True(unconscious.IsUnconscious);
     Assert.False(battle.Query(new CanUnitActNow(unconscious)));
+    Assert.False(battle.Query(new CanUnitActNow(stillborn)));
     Assert.True(battle.PositionOf(dead).IsNone);
     Assert.True(battle.PositionOf(stillborn).IsNone);
     Assert.True(battle.PositionOf(tileHeir).IsSome);
     Assert.True(battle.Board.IsOccupied(battle.Board.At(3, 0, 0)));
+    // The dead companion's spawn-active grant raised its effective maximum, and both
+    // normalization passes treat it as the initial participant it is.
+    Assert.Equal(6, stillbornApAtSessionStart);
+    Assert.Equal(6, stillborn.MaxActionPoints);
+    Assert.Equal(6, stillborn.CurrentActionPoints);
   }
 
   // Spawn buffs can genuinely extend vision after the placement dispatch: the observer's

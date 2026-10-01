@@ -445,9 +445,15 @@ public partial class BattleStartupLifecycleTest
       [
         setup.Sides[0] with
         {
-          Units = [new UnitPlacement(
-            new UnitLoadout(TestData.MakeCombatant("Alpha", player, actionPoints: 4, buffs: [boost])),
-            new Vector3I(0, 0, 0))],
+          Units =
+          [
+            new UnitPlacement(
+              new UnitLoadout(TestData.MakeCombatant("Alpha", player, actionPoints: 4, buffs: [boost])),
+              new Vector3I(0, 0, 0)),
+            new UnitPlacement(
+              new UnitLoadout(TestData.MakeCombatant("Fallen", player, health: 0, actionPoints: 4, buffs: [boost])),
+              new Vector3I(1, 0, 0)),
+          ],
         },
         setup.Sides[1] with
         {
@@ -464,6 +470,11 @@ public partial class BattleStartupLifecycleTest
         Assert.Equal(6, unit.State.MaxActionPoints);
         Assert.Equal(6, unit.State.CurrentActionPoints);
       }
+    // A dead companion is still an initial participant: its spawn-active grant raised the
+    // effective maximum, and the initial normalization must top it up all the same.
+    DeadUnit fallen = runtime.Query(new GetFactionDeadUnits(player)).AsValueEnumerable().Single();
+    Assert.Equal(6, fallen.State.MaxActionPoints);
+    Assert.Equal(6, fallen.State.CurrentActionPoints);
   }
 
   [TestCase(TestName = "Seed 7 produces the same combat rolls from the type and resolved setups")]

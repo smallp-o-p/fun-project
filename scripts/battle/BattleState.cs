@@ -198,15 +198,25 @@ internal sealed class BattleState
   internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
   {
     ArgumentNullException.ThrowIfNull(side);
-    return AliveUnits.AsValueEnumerable().Where(unit => unit.Side == side).ToArray();
+    return _units.AsValueEnumerable().Where(unit => unit.IsAlive && unit.Side == side).ToArray();
   }
 
   internal IEnumerable<BattleUnitState> GetFactionConsciousUnits(Faction side)
-    => GetFactionAliveUnits(side).AsValueEnumerable()
-      .Where(unit => !unit.IsUnconscious).ToArray();
+  {
+    ArgumentNullException.ThrowIfNull(side);
+    return _units.AsValueEnumerable()
+      .Where(unit => unit.Side == side && unit.IsAlive && !unit.IsUnconscious).ToArray();
+  }
 
+  // A boolean, not a snapshot: no effect runs inside this predicate, so the faction's
+  // living conscious members are answered directly from the pool without materializing
+  // intermediate faction snapshots.
   internal bool HasConsciousUnits(Faction side)
-    => GetFactionConsciousUnits(side).AsValueEnumerable().Any();
+  {
+    ArgumentNullException.ThrowIfNull(side);
+    return _units.AsValueEnumerable().Any(unit =>
+      unit.Side == side && unit.IsAlive && !unit.IsUnconscious);
+  }
 
   // Mints a proof iff the unit instance belongs to this storage's alive pool (provenance +
   // aliveness in one check). The single door for callers holding a raw BattleUnitState.

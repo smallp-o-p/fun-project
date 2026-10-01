@@ -14,6 +14,10 @@ namespace FunProject.Battle;
 public sealed class BattleUnitState
 {
   private readonly List<EquippableItem> _inventory;
+  // Created once after _inventory assignment: a live read-only wrapper over the same list,
+  // so Inventory hands out membership without copying or allocating on each read while raw
+  // mutation through the returned view stays refused.
+  private readonly IReadOnlyList<EquippableItem> _inventoryView;
   private readonly StatMod[] _loadoutStatMods;
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
@@ -26,7 +30,7 @@ public sealed class BattleUnitState
   public Faction Side => Combatant.OwningFaction;
   public Option<Weapon> EquippedWeapon { get; private set; }
   public Option<ItemWith<ArmorCapability>> EquippedArmor { get; }
-  public IReadOnlyList<EquippableItem> Inventory => _inventory;
+  public IReadOnlyList<EquippableItem> Inventory => _inventoryView;
   internal IReadOnlySet<BattleUnitState> VisibleUnits => _visibleUnits;
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> VisibleTiles => _visibleTiles;
 
@@ -79,6 +83,7 @@ public sealed class BattleUnitState
       if (combatant.Inventory.TryGetValue(slot, out EquippableItem? item))
         inventory.Add(item);
     _inventory = inventory;
+    _inventoryView = inventory.AsReadOnly();
 
     // Preserve every grant in source order, including repeated resources.
     IEnumerable<Buff> granted = combatant.InnateBuffs

@@ -33,8 +33,9 @@ public sealed class Consumable
     => new(charged.Item, charged.Capability);
 
   // Trusted-core spend: the caller has proven the use is legal, so a charge that cannot be
-  // spent is a broken invariant rather than a rejectable outcome.
-  public void SpendOnce(BattleUnitState owner)
+  // spent is a broken invariant rather than a rejectable outcome. Only the trusted use/throw
+  // primitives may spend; the public surface mints read-only consumable proofs.
+  internal void SpendOnce(BattleUnitState owner)
   {
     _charges.Match(
       charges =>

@@ -112,9 +112,10 @@ public sealed class BattleSession
 
   // Opening session/turn dispatch through the same event machinery as later turns. The
   // full visibility recompute picks up board authoring (tile BlocksLineOfSight) finalized
-  // after the last spawn; the all-unit AP refresh tops every initial unit up after the
-  // opening-turn buff pass — an already-started turn always finishes its buff/AP work,
-  // even when a terminal opening objective settled inside the dispatch.
+  // after the last spawn; the all-participant AP refresh tops every initial unit — dead
+  // companions included — up after the opening-turn buff pass. An already-started turn
+  // always finishes its buff/AP work, even when a terminal opening objective settled
+  // inside the dispatch.
   internal void OpeningTurnDispatch()
   {
     State.InvalidateVisibility();
@@ -124,7 +125,7 @@ public sealed class BattleSession
       new SessionStartedBattleEvent(),
       new TurnStartedBattleEvent(opening.ActiveFaction, opening.RoundNumber));
 
-    foreach (BattleUnitState unit in State.AliveUnits)
+    foreach (BattleUnitState unit in State.Units)
       unit.RefreshForNewTurn();
   }
 

@@ -135,7 +135,10 @@ internal sealed class BattlePreparation
           $"Faction {faction.Name} has no living, conscious units."));
     }
 
-    foreach (BattleUnitState unit in State.AliveUnits)
+    // The complete initial pool tops up to its effective maximum AP (post spawn-buff
+    // evaluation) — dead companions included: their spawn-active grants raise the maximum
+    // after the constructor initialized current AP, and they remain pool identities.
+    foreach (BattleUnitState unit in State.Units)
       unit.RefreshForNewTurn();
     State.InvalidateVisibility();
 

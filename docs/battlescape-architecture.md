@@ -109,7 +109,7 @@ flowchart LR
   - the single public entry points for reads (`Query`) and writes (`ExecuteAction`: `Some` submission ran, `None` already completed)
   - null and disposal guards around invocation
   - the proof mint doors for scene code: `TryGetAlive(unit) : Option<AliveUnit>`, `TryGetTile(coordinates) : Option<ValidatedPoint>`, and `TryGetAttackTarget(entity) : Option<AttackTarget>`
-  - the session's single executor (constructed after subscribing its `BattleEventCommitted` re-raise, so subscribers observe a cause event before hook-born follow-up events), plus the `RegisterHook`/`UnregisterHook` facade doors delegating to that executor
+  - the session's single executor (the state's sole `Committed` subscriber: its `OnEventCommitted` handler logs the event, invalidates cached options, forwards the runtime's `BattleEventCommitted` observers, then fires hooks — subscribers observe a cause event before hook-born follow-up events), plus the `RegisterHook`/`UnregisterHook` facade doors delegating to that executor
 - concrete `IBattleSessionQuery<TResult>` implementations own:
   - one specific read-side question
   - the result shape for that question — bare `TResult`, `Option<T>`, or `Either<BattleQueryFailure, TResult>`

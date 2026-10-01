@@ -628,16 +628,6 @@ public partial class UnitActionCacheTest
     Assert.False(Row<MoveActionDefinition>(createdDuringCallback).IsDirty);
   }
 
-  private sealed class SpendActionPointsHook(IReadOnlyList<BattleUnitState> units) : BattleHook<SessionStartedBattleEvent>
-  {
-    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, SessionStartedBattleEvent evt)
-    {
-      foreach (BattleUnitState unit in units)
-        unit.TrySpendActionPoints(unit.CurrentActionPoints);
-      return [];
-    }
-  }
-
   [TestCase]
   public void MoveInterruptIncapacitationUpdatesOtherActorsRetainedEntries()
   {
