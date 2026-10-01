@@ -45,7 +45,7 @@ public partial class BattleHudTest
 
     hud.ShowActionOptions([moveOption, new PassActionOption(passAction)]);
 
-    var verbs = hud.GetNode<VBoxContainer>("%VerbButtons");
+    var verbs = hud.GetNode<Container>("%VerbButtons");
     Assert.Equal(2, verbs.GetChildCount());
     var moveButton = (Button)verbs.GetChild(0);
     Assert.Equal("Move", moveButton.Text);

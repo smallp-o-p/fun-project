@@ -1,44 +1,105 @@
-[gd_scene format=3 uid="uid://b2qpwhgni581u"]
+[gd_scene load_steps=4 format=3 uid="uid://b2qpwhgni581u"]
 
-[ext_resource type="Script" path="res://scenes/geoscape/squad/SquadSlotCard.cs" id="1_6crd1"]
+[ext_resource type="Script" path="res://scenes/geoscape/squad/SquadSlotCard.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/ui/ModelPresentation.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://scenes/models/ZhuYuan/ZhuYuan.scn" id="3_standin"]
 
-[node name="SquadSlotCard" type="PanelContainer" unique_id=831453822]
-script = ExtResource("1_6crd1")
+[node name="SquadSlotCard" type="PanelContainer"]
+custom_minimum_size = Vector2(260, 0)
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("1_script")
 
-[node name="VBox" type="VBoxContainer" parent="." unique_id=1128450019]
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="Layout" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="PresentationArea" type="Control" parent="Margin/Layout"]
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="SlotPresentation" parent="Margin/Layout/PresentationArea" instance=ExtResource("2_model")]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+ModelScene = ExtResource("3_standin")
+FramingHeight = 0.65
+FocusHeight = 0.7
+FitWidth = false
+
+[node name="EmptySlot" type="Label" parent="Margin/Layout/PresentationArea"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "+"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 40
+
+[node name="CardTitle" type="Label" parent="Margin/Layout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+autowrap_mode = 3
+
+[node name="Divider" type="HSeparator" parent="Margin/Layout"]
 layout_mode = 2
 
-[node name="Header" type="HBoxContainer" parent="VBox" unique_id=1471901028]
+[node name="Equipment" type="RichTextLabel" parent="Margin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/normal_font_size = 14
+fit_content = true
+scroll_active = false
+
+[node name="StatsDivider" type="HSeparator" parent="Margin/Layout"]
 layout_mode = 2
 
-[node name="CardTitle" type="Label" parent="VBox/Header" unique_id=1182704034]
+[node name="Stats" type="RichTextLabel" parent="Margin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 14
+fit_content = true
+scroll_active = false
+
+[node name="Actions" type="HBoxContainer" parent="Margin/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ChooseUnit" type="Button" parent="Margin/Layout/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Choose"
+
+[node name="EditUnit" type="Button" parent="Margin/Layout/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-
-[node name="EditUnit" type="Button" parent="VBox/Header" unique_id=1544617415]
-unique_name_in_owner = true
-layout_mode = 2
 text = "Edit"
 
-[node name="ChooseUnit" type="Button" parent="VBox/Header" unique_id=1823777983]
+[node name="RemoveUnit" type="Button" parent="Margin/Layout/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Choose"
-
-[node name="RemoveUnit" type="Button" parent="VBox/Header" unique_id=723838495]
-unique_name_in_owner = true
-layout_mode = 2
+size_flags_horizontal = 3
 text = "Remove"
-
-[node name="Equipment" type="RichTextLabel" parent="VBox" unique_id=677521093]
-unique_name_in_owner = true
-layout_mode = 2
-fit_content = true
-scroll_active = false
-
-[node name="Stats" type="RichTextLabel" parent="VBox" unique_id=155141552]
-unique_name_in_owner = true
-layout_mode = 2
-fit_content = true
-scroll_active = false

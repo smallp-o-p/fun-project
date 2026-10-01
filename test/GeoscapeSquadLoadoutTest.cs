@@ -72,7 +72,7 @@ public class GeoscapeSquadLoadoutTest
     view.Configure("Interrogation prep", 2, allowEquipmentEditing: true);
     view.Present(fixture.State, fixture.Session);
 
-    Assert.Equal(2, view.GetNode<VBoxContainer>("%Slots").GetChildCount());
+    Assert.Equal(2, view.GetNode<BoxContainer>("%Slots").GetChildCount());
     Assert.Equal("Squad: 0/2", view.GetNode<Label>("%SquadCount").Text); // picks were reset
     Assert.Equal(0, view.GetSelectedCombatants().Count);
     Assert.Equal("Interrogation prep", view.GetNode<Label>("%Title").Text);
@@ -115,13 +115,13 @@ public class GeoscapeSquadLoadoutTest
 
     Assert.Equal("Operation Iron", view.GetNode<Label>("%Title").Text);
     Assert.Equal("Squad: 0/3", view.GetNode<Label>("%SquadCount").Text);
-    Assert.Equal(3, view.GetNode<VBoxContainer>("%Slots").GetChildCount());
+    Assert.Equal(3, view.GetNode<BoxContainer>("%Slots").GetChildCount());
     Assert.Equal(0, view.GetSelectedCombatants().Count);
 
     var choiceText = view.GetNode<VBoxContainer>("%RosterChoices")
       .GetChild(0) is Label note ? note.Text : "";
     Assert.True(choiceText.Contains("No units"), $"Expected an empty-roster note, got '{choiceText}'.");
-    foreach (Node card in view.GetNode<VBoxContainer>("%Slots").GetChildren())
+    foreach (Node card in view.GetNode<BoxContainer>("%Slots").GetChildren())
     {
       var text = CardText((Control)card);
       Assert.True(text.Contains("empty"), $"Expected an empty slot card, got '{text}'.");

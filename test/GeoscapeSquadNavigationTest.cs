@@ -111,7 +111,7 @@ public class GeoscapeSquadNavigationTest
     Assert.True(allowUnfitDeployment
       ? prompt.Contains("Exceptional deployment")
       : !prompt.Contains("Exceptional"));
-    squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(0)
+    squad.GetNode<BoxContainer>("%Slots").GetChild<Control>(0)
       .GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(!allowUnfitDeployment, SquadChoice(squad, "Alpha").Disabled); // the opener's mission context
     if (!allowUnfitDeployment)
@@ -157,7 +157,7 @@ public class GeoscapeSquadNavigationTest
       return;
 
     ChooseSquadUnit(squad, selectedSlot, "Alpha");
-    squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(selectedSlot)
+    squad.GetNode<BoxContainer>("%Slots").GetChild<Control>(selectedSlot)
       .GetNode<Button>("%EditUnit").EmitSignal(Button.SignalName.Pressed);
     var editor = (UnitView)manager.Current;
     Assert.False(squad.IsVisibleInTree()); // the nested editor covers preparation
@@ -187,7 +187,7 @@ public class GeoscapeSquadNavigationTest
       var second = (SquadLoadoutView)manager.Current;
       Assert.False(ReferenceEquals(squad, second)); // a fresh view each Engage
       Assert.Equal(0, second.GetSelectedCombatants().Count); // slots start empty
-      Assert.Equal(3, second.GetNode<VBoxContainer>("%Slots").GetChildCount());
+      Assert.Equal(3, second.GetNode<BoxContainer>("%Slots").GetChildCount());
       Assert.Equal(2, dialog.GetNode<HBoxContainer>("%Buttons").GetChildCount()); // no growth
 
       // Choices start inert (no destination); Alpha is available again and keeps the rifle.

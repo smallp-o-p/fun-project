@@ -41,7 +41,7 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
 
     foreach (var (txt, outcome) in ButtonsFor(pending.Event.Definition.Kind))
     {
-      var button = new Button { Text = txt };
+      var button = new Button { Text = txt, CustomMinimumSize = new Vector2(120, 44) };
       if (outcome == ResolutionOutcome.Engaged)
       {
         button.Pressed += () => RequestSquadView(pending.Event.Definition);

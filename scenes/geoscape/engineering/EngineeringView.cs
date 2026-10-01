@@ -81,6 +81,9 @@ public sealed partial class EngineeringView : GeoscapeView
       {
         Text = option.Project.Item.Name,
         AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        ToggleMode = true,
+        Alignment = HorizontalAlignment.Left,
+        CustomMinimumSize = new Vector2(0, 36),
       };
       button.Pressed += () =>
       {
@@ -99,6 +102,14 @@ public sealed partial class EngineeringView : GeoscapeView
 
   private void RefreshSelection()
   {
+    var rows = GetNode<VBoxContainer>("%ManufacturableItems");
+    for (int index = 0; index < _options.Count; index++)
+    {
+      int rowIndex = index;
+      rows.GetChild<Button>(index).SetPressedNoSignal(_selection.Match(
+        selected => ReferenceEquals(selected.Project.Item, _options[rowIndex].Project.Item),
+        () => false));
+    }
     GetNode<Label>("%ItemName").Text = _selection.Match(
       option => option.Project.Item.Name, () => "Select an item to manufacture.");
     GetNode<Label>("%ItemDescription").Text = _selection.Match(

@@ -71,17 +71,19 @@ public class DialogueViewTest
     Assert.True(view.GetNode<Label>("%Continue").Visible);
   }
 
-  // Physics, not render process, drives the reveal: the layout wait's process frames
-  // interleave physics ticks on the running SceneTree, and ~10 ticks of 1/60 s at 40 cps
-  // reveal roughly 6 of 8 characters — advanced but not complete, with no direct
-  // TickReveal call anywhere.
+  // Physics, not render process, drives the reveal. Await actual physics boundaries
+  // rather than a layout wait whose wall-clock duration can finish a short line.
+  // The long line leaves room for the initial physics ticks without calling TickReveal.
   [TestCase]
   public async Task PhysicsProcessDrivesReveal()
   {
-    DialogueView view = MakeView(Sequence(Line(Speaker(), "12345678")));
+    DialogueView view = MakeView(Sequence(Line(Speaker(), new string('a', 400))));
     Label body = view.GetNode<Label>("%Body");
 
-    await WaitForLayout(view);
+    // PhysicsFrame is emitted before node callbacks; three boundaries include at least
+    // two completed 40-cps ticks, enough to reveal one full character at 60 Hz.
+    for (int i = 0; i < 3; i++)
+      await view.ToSignal(view.GetTree(), SceneTree.SignalName.PhysicsFrame);
 
     Assert.True(body.VisibleCharacters > 0);
     Assert.True(body.VisibleCharacters < body.GetTotalCharacterCount());

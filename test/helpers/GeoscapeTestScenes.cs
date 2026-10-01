@@ -65,7 +65,7 @@ internal static class GeoscapeTestScenes
   }
 
   public static Control SquadSlot(SquadLoadoutView view, int slot)
-    => view.GetNode<VBoxContainer>("%Slots").GetChild<Control>(slot);
+    => view.GetNode<BoxContainer>("%Slots").GetChild<Control>(slot);
 
   public static Button SquadChoice(SquadLoadoutView view, string unitName)
     => view.GetNode<VBoxContainer>("%RosterChoices").GetChildren()

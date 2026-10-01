@@ -1,17 +1,21 @@
-[gd_scene load_steps=5 format=3 uid="uid://dm5w72otw20q2"]
+[gd_scene load_steps=8 format=3 uid="uid://dm5w72otw20q2"]
 
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitLabel.tscn" id="2_label"]
 [ext_resource type="Script" path="res://scenes/geoscape/units/UnitRoster.cs" id="3_script"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/units/UnitView.tscn" id="4_unitview"]
+[ext_resource type="PackedScene" path="res://scenes/ui/ModelPresentation.tscn" id="5_model"]
+[ext_resource type="PackedScene" path="res://scenes/models/ZhuYuan/ZhuYuan.scn" id="6_standin"]
+[ext_resource type="StyleBox" path="res://scenes/ui/ScreenBackground.tres" id="90_background"]
 
 [node name="UnitRoster" instance=ExtResource("1_base") node_paths=PackedStringArray("BackButton")]
 script = ExtResource("3_script")
-BackButton = NodePath("Content/MarginContainer/VBoxContainer/Header/HBox/BackButton")
+BackButton = NodePath("Content/Margin/Layout/Body/RosterColumn/Footer/BackButton")
 UnitLabelScene = ExtResource("2_label")
 UnitViewScene = ExtResource("4_unitview")
 
 [node name="Content" type="PanelContainer" parent="."]
+theme_override_styles/panel = ExtResource("90_background")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -19,77 +23,151 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="MarginContainer" type="MarginContainer" parent="Content" unique_id=654992870]
+[node name="Margin" type="MarginContainer" parent="Content"]
 layout_mode = 2
-theme_override_constants/margin_left = 4
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 4
-theme_override_constants/margin_bottom = 4
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Content/MarginContainer" unique_id=1109419286]
+[node name="Layout" type="VBoxContainer" parent="Content/Margin"]
 layout_mode = 2
+theme_override_constants/separation = 16
 
-[node name="Header" type="MarginContainer" parent="Content/MarginContainer/VBoxContainer" unique_id=1973534816]
-custom_minimum_size = Vector2(0, 96)
+[node name="TimeState" type="Label" parent="Content/Margin/Layout"]
 layout_mode = 2
-theme_override_constants/margin_bottom = 16
+text = "Time frozen while browsing"
+horizontal_alignment = 2
 
-[node name="HBox" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer/Header" unique_id=1299085671]
+[node name="Body" type="HBoxContainer" parent="Content/Margin/Layout"]
 layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 24
 
-[node name="Title" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Header/HBox" unique_id=1828378539]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/normal_font_size = 64
-text = "Units"
-scroll_active = false
-vertical_alignment = 2
-
-[node name="BackButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Header/HBox" unique_id=1077662828]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 0)
-layout_mode = 2
-text = "Back"
-
-[node name="TableHeader" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer" unique_id=1298819191]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 72)
-layout_mode = 2
-theme_override_constants/separation = 32
-
-[node name="NameHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/TableHeader" unique_id=463276382]
-unique_name_in_owner = true
+[node name="PresentationColumn" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Name"
-vertical_alignment = 1
+size_flags_stretch_ratio = 0.85
 
-[node name="RankHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/TableHeader" unique_id=894196081]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Rank"
-vertical_alignment = 1
-
-[node name="StatusHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/TableHeader" unique_id=1418123614]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Status"
-vertical_alignment = 1
-
-[node name="HSeparator" type="HSeparator" parent="Content/MarginContainer/VBoxContainer" unique_id=552138463]
-layout_mode = 2
-
-[node name="UnitLabels" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer" unique_id=1334131116]
+[node name="RosterPresentation" parent="Content/Margin/Layout/Body/PresentationColumn" instance=ExtResource("5_model")]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
+ModelScene = ExtResource("6_standin")
+FramingHeight = 1.05
+FocusHeight = 0.5
+
+[node name="ModelNote" type="Label" parent="Content/Margin/Layout/Body/PresentationColumn"]
+layout_mode = 2
+text = "3D model stand-in"
+autowrap_mode = 3
+
+[node name="RosterColumn" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.65
+theme_override_constants/separation = 16
+
+[node name="TopSpace" type="Control" parent="Content/Margin/Layout/Body/RosterColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 0.16
+mouse_filter = 2
+
+[node name="RosterPanel" type="PanelContainer" parent="Content/Margin/Layout/Body/RosterColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Margin" type="MarginContainer" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="Table" type="VBoxContainer" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Unit roster"
+
+[node name="Summary" type="HBoxContainer" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table"]
+layout_mode = 2
+
+[node name="Subtitle" type="Label" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table/Summary"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Personnel"
+
+[node name="UnitCount" type="Label" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table/Summary"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "0 units"
+
+[node name="Divider" type="HSeparator" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table"]
+layout_mode = 2
+
+[node name="TableHeader" type="HBoxContainer" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="NameHeader" type="Label" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table/TableHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.2
+text = "Name"
+
+[node name="RankHeader" type="Label" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table/TableHeader"]
+custom_minimum_size = Vector2(65, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Rank"
+
+[node name="StatusHeader" type="Label" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table/TableHeader"]
+custom_minimum_size = Vector2(55, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Status"
+
+[node name="RosterScroll" type="ScrollContainer" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="UnitLabels" type="VBoxContainer" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table/RosterScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
-[node name="UnitLabel" parent="Content/MarginContainer/VBoxContainer/UnitLabels" unique_id=1450525365 instance=ExtResource("2_label")]
+[node name="EmptyState" type="Label" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "No units in the roster."
+autowrap_mode = 3
+
+[node name="FooterDivider" type="HSeparator" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table"]
 layout_mode = 2
 
-[node name="UnitLabel2" parent="Content/MarginContainer/VBoxContainer/UnitLabels" unique_id=1497590307 instance=ExtResource("2_label")]
+[node name="Instructions" type="Label" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table"]
 layout_mode = 2
+text = "Select a unit to view stats and equipment."
+autowrap_mode = 3
+
+[node name="Footer" type="HBoxContainer" parent="Content/Margin/Layout/Body/RosterColumn"]
+layout_mode = 2
+
+[node name="BackButton" type="Button" parent="Content/Margin/Layout/Body/RosterColumn/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(170, 40)
+layout_mode = 2
+text = "Back to geoscape"

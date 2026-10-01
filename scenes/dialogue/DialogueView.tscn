@@ -3,6 +3,13 @@
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
 [ext_resource type="Script" path="res://scenes/dialogue/DialogueView.cs" id="2_script"]
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_reading"]
+content_margin_left = 12.0
+content_margin_top = 12.0
+content_margin_right = 12.0
+content_margin_bottom = 12.0
+bg_color = Color(0.13, 0.13, 0.13, 1)
+
 [node name="DialogueView" instance=ExtResource("1_base")]
 script = ExtResource("2_script")
 HidesPreviousScene = false
@@ -10,7 +17,6 @@ CharactersPerSecond = 40.0
 
 [node name="Viewport" parent="Background" index="0"]
 handle_input_locally = false
-size = Vector2i(1600, 900)
 render_target_update_mode = 0
 
 [node name="Dim" type="ColorRect" parent="." index="1"]
@@ -26,34 +32,33 @@ color = Color(0, 0, 0, 0.45)
 
 [node name="Panel" type="PanelContainer" parent="." index="2"]
 layout_mode = 1
-anchors_preset = 12
-anchor_left = 0.0
-anchor_top = 1.0
-anchor_right = 1.0
+anchor_left = 0.05
+anchor_top = 0.64
+anchor_right = 0.95
 anchor_bottom = 1.0
-offset_left = 160.0
-offset_top = -240.0
-offset_right = -160.0
-offset_bottom = 0.0
+offset_bottom = -16.0
 grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_reading")
 
 [node name="HBox" type="HBoxContainer" parent="Panel" index="0"]
 layout_mode = 2
-theme_override_constants/separation = 24
+theme_override_constants/separation = 20
 mouse_filter = 2
 
 [node name="Portrait" type="SubViewportContainer" parent="Panel/HBox" index="0"]
-custom_minimum_size = Vector2(220, 220)
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 180)
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.3
 stretch = true
 mouse_filter = 2
 
 [node name="PortraitViewport" type="SubViewport" parent="Panel/HBox/Portrait" index="0"]
 transparent_bg = true
 own_world_3d = true
-size = Vector2i(220, 220)
 
 [node name="Camera3D" type="Camera3D" parent="Panel/HBox/Portrait/PortraitViewport" index="0"]
 transform = Transform3D(1, 0, 0, 0, 0.9982, -0.0599, 0, 0.0599, 0.9982, 0, 1.15, 2.4)
@@ -76,21 +81,34 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 text = "SpeakerName"
+autowrap_mode = 3
 mouse_filter = 2
 
-[node name="Body" type="Label" parent="Panel/HBox/VBox" index="1"]
+[node name="HSeparator" type="HSeparator" parent="Panel/HBox/VBox" index="1"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BodyScroll" type="ScrollContainer" parent="Panel/HBox/VBox" index="2"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(560, 96)
 layout_mode = 2
 size_flags_vertical = 3
+focus_mode = 2
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="Body" type="Label" parent="Panel/HBox/VBox/BodyScroll" index="0"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
 text = "Body"
 autowrap_mode = 3
 mouse_filter = 2
 
-[node name="Continue" type="Label" parent="Panel/HBox/VBox" index="2"]
+[node name="Continue" type="Label" parent="Panel/HBox/VBox" index="3"]
 unique_name_in_owner = true
-layout_mode = 2
-text = "▼"
-horizontal_alignment = 2
 visible = false
+layout_mode = 2
+text = "Click or Enter to continue  ▾"
+horizontal_alignment = 2
+autowrap_mode = 3
 mouse_filter = 2

@@ -40,7 +40,8 @@ public sealed partial class UnitView : GeoscapeView
 
   private CampaignGameState? _state;
   private Combatant? _unit;
-  private UnitViewSlot? _selection;
+  private UnitViewSlot? _selection = UnitViewSlot.Weapon;
+  private readonly SysColGeneric.Dictionary<UnitViewSlot, Button> _slotButtons = [];
 
   public override void _Ready()
   {
@@ -57,7 +58,7 @@ public sealed partial class UnitView : GeoscapeView
   {
     _state = state;
     _unit = unit;
-    _selection = null;
+    _selection = UnitViewSlot.Weapon;
     RebuildAll();
   }
 
@@ -85,6 +86,7 @@ public sealed partial class UnitView : GeoscapeView
   public void SelectSlot(UnitViewSlot slot)
   {
     _selection = slot;
+    RefreshSlotSelection();
     RebuildBrowser();
   }
 
@@ -94,6 +96,7 @@ public sealed partial class UnitView : GeoscapeView
       return;
 
     GetNode<RichTextLabel>("%Title").Text = _unit.Name;
+    GetNode<Label>("%RankLabel").Text = _unit.Rank.RankName;
     RebuildStats();
     RebuildEquipment();
     RebuildBrowser();
@@ -101,7 +104,7 @@ public sealed partial class UnitView : GeoscapeView
 
   private void RebuildStats()
   {
-    var stats = GetNode<VBoxContainer>("%StatsList");
+    var stats = GetNode<Container>("%StatsList");
     stats.QueueFreeAllChildren();
     var contributions = _state!.CampaignStatContributions(_unit!);
     AddStatRow<HealthStat>("Health", contributions);
@@ -124,15 +127,19 @@ public sealed partial class UnitView : GeoscapeView
   {
     int baseValue = Mathf.RoundToInt(_unit!.GetStat<TStat>().BaseValue);
     int effective = Mathf.RoundToInt(_unit.Resolve<TStat>(contributions));
-    AddLabelRow(GetNode<VBoxContainer>("%StatsList"), $"{label}: {baseValue} -> {effective}");
+    AddLabelRow(GetNode<Container>("%StatsList"), $"{label}: {baseValue} -> {effective}");
   }
 
   private void RebuildEquipment()
   {
+    _slotButtons.Clear();
+    _slotButtons[UnitViewSlot.Weapon] = GetNode<Button>("%WeaponSlot");
+    _slotButtons[UnitViewSlot.Armor] = GetNode<Button>("%ArmorSlot");
     RebuildPersonalMods();
     RebuildWeaponSlot();
     RebuildArmorSlot();
     RebuildUtilitySlots();
+    RefreshSlotSelection();
   }
 
   private void RebuildPersonalMods()
@@ -148,13 +155,15 @@ public sealed partial class UnitView : GeoscapeView
   {
     var weaponMods = GetNode<VBoxContainer>("%WeaponModSlots");
     weaponMods.QueueFreeAllChildren();
+    GetNode<Button>("%WeaponSlot").TooltipText = "";
     GetNode<Button>("%WeaponSlot").Text = _unit!.EquippedWeapon.Match(
       Some: weapon =>
       {
         Godot.Collections.Array<ModSlot> modSlots = weapon.GetModSlots();
         for (int i = 0; i < modSlots.Count; i++)
           AddSlotButton(weaponMods, SlotLabel(modSlots[i]), UnitViewSlot.WeaponMod(i));
-        return $"Weapon: {WeaponSummary(weapon)}";
+        GetNode<Button>("%WeaponSlot").TooltipText = WeaponSummary(weapon);
+        return $"Weapon: {weapon.ItemName}";
       },
       None: () => "Weapon: — empty —");
   }
@@ -199,6 +208,7 @@ public sealed partial class UnitView : GeoscapeView
     var list = GetNode<VBoxContainer>("%ArmoryList");
     var unequip = GetNode<Button>("%UnequipButton");
     list.QueueFreeAllChildren();
+    RebuildSelectedItem();
 
     if (_selection is null || _state is null || _unit is null)
     {
@@ -215,10 +225,11 @@ public sealed partial class UnitView : GeoscapeView
       {
         if (!line.Unlimited && line.Remaining == 0)
           continue;
-        var button = new Button { Text = $"{line.Mod.Name}  {StockText(line.Unlimited, line.Remaining)}" };
+        var button = BrowserButton($"{line.Mod.Name}  {StockText(line.Unlimited, line.Remaining)}", line.Mod.Description);
         button.Pressed += () => EquipMod(line);
         list.AddChild(button);
       }
+      RefreshEmptyArmory(list);
       return;
     }
 
@@ -228,10 +239,84 @@ public sealed partial class UnitView : GeoscapeView
       // does not list an item.
       if (!line.Available || !AcceptsItem(slot, line.Data))
         continue;
-      var row = new Button { Text = $"{line.Data.Name}  {StockText(line.Unlimited, line.Remaining)}" };
+      var row = BrowserButton($"{line.Data.Name}  {StockText(line.Unlimited, line.Remaining)}", line.Data.Description);
       row.Pressed += () => EquipItem(line);
       list.AddChild(row);
     }
+    RefreshEmptyArmory(list);
+  }
+
+  private void RefreshSlotSelection()
+  {
+    foreach ((UnitViewSlot slot, Button button) in _slotButtons)
+      button.SetPressedNoSignal(_selection == slot);
+  }
+
+  private static Button BrowserButton(string text, string description) => new()
+  {
+    Text = text,
+    TooltipText = string.IsNullOrWhiteSpace(description) ? text : $"{text}\n{description}",
+    ClipText = true,
+    Alignment = HorizontalAlignment.Left,
+    CustomMinimumSize = new Vector2(0, 36),
+  };
+
+  private void RefreshEmptyArmory(Container list)
+    => GetNode<Label>("%ArmoryEmptyLabel").Visible = list.GetChildCount() == 0;
+
+  private void RebuildSelectedItem()
+  {
+    if (_selection is not UnitViewSlot slot || _unit is null)
+      return;
+
+    GetNode<Label>("%SelectedSlotLabel").Text = slot.Kind switch
+    {
+      UnitViewSlotKind.Weapon => "Weapon",
+      UnitViewSlotKind.Armor => "Armor",
+      UnitViewSlotKind.Utility => $"Utility {slot.Index + 1}",
+      UnitViewSlotKind.PersonalMod => $"Personal mod {slot.Index + 1}",
+      _ => $"Weapon mod {slot.Index + 1}",
+    };
+    string name = "Empty slot";
+    string details = "Choose an available item below.";
+    void ShowItem(EquippableItem item)
+    {
+      name = item.ItemName;
+      details = item.ItemDescription;
+      if (item is Weapon weapon)
+        details = $"{WeaponSummary(weapon)}\n{details}";
+      item.FindCapability<ArmorCapability>().IfSome(armor => details = $"ARMOR {armor.Max}\n{details}");
+      if (string.IsNullOrWhiteSpace(details))
+        details = "Equipped";
+    }
+    void ShowMod(ModSlot modSlot)
+      => modSlot.EquippedMod.IfSome(mod =>
+      {
+        name = mod.Name;
+        details = string.IsNullOrWhiteSpace(mod.Description) ? "Equipped mod" : mod.Description;
+      });
+
+    switch (slot.Kind)
+    {
+      case UnitViewSlotKind.Weapon:
+        _unit.EquippedWeapon.IfSome(weapon => ShowItem(weapon));
+        break;
+      case UnitViewSlotKind.Armor:
+        _unit.EquippedArmor.IfSome(armor => ShowItem(armor.Item));
+        break;
+      case UnitViewSlotKind.Utility:
+        if (_unit.Inventory.TryGetValue(slot.Index, out EquippableItem? item))
+          ShowItem(item);
+        break;
+      case UnitViewSlotKind.PersonalMod:
+        ShowMod(_unit.GetModSlots()[slot.Index]);
+        break;
+      case UnitViewSlotKind.WeaponMod:
+        WeaponModSlot(slot.Index).IfSome(ShowMod);
+        break;
+    }
+    GetNode<Label>("%SelectedItemName").Text = name;
+    GetNode<RichTextLabel>("%SelectedItemDetails").Text = details.Trim();
   }
 
   private static string StockText(bool unlimited, int remaining)
@@ -348,12 +433,30 @@ public sealed partial class UnitView : GeoscapeView
 
   private void AddLabelRow(Container parent, string text)
   {
-    parent.AddChild(new RichTextLabel { Text = text, FitContent = true, ScrollActive = false });
+    var label = new RichTextLabel
+    {
+      Text = text,
+      FitContent = true,
+      ScrollActive = false,
+      SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+      AutowrapMode = TextServer.AutowrapMode.WordSmart,
+    };
+    label.AddThemeFontSizeOverride("normal_font_size", 14);
+    parent.AddChild(label);
   }
 
   private void AddSlotButton(Container parent, string text, UnitViewSlot slot)
   {
-    var button = new Button { Text = text };
+    var button = new Button
+    {
+      Text = text,
+      TooltipText = text,
+      ToggleMode = true,
+      ClipText = true,
+      Alignment = HorizontalAlignment.Left,
+      CustomMinimumSize = new Vector2(0, 32),
+    };
+    _slotButtons[slot] = button;
     button.Pressed += () => SelectSlot(slot);
     parent.AddChild(button);
   }

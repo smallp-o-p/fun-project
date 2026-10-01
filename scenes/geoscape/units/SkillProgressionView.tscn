@@ -1,13 +1,15 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
 [ext_resource type="Script" path="res://scenes/geoscape/units/SkillProgressionView.cs" id="2_script"]
+[ext_resource type="StyleBox" path="res://scenes/ui/ScreenBackground.tres" id="90_background"]
 
 [node name="SkillProgressionView" instance=ExtResource("1_base") node_paths=PackedStringArray("BackButton")]
 script = ExtResource("2_script")
 BackButton = NodePath("Content/MarginContainer/VBoxContainer/Header/CloseButton")
 
 [node name="Content" type="PanelContainer" parent="."]
+theme_override_styles/panel = ExtResource("90_background")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -32,8 +34,9 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/normal_font_size = 40
+theme_override_font_sizes/normal_font_size = 28
 text = "Skill Paths"
+fit_content = true
 scroll_active = false
 vertical_alignment = 2
 
@@ -41,7 +44,7 @@ vertical_alignment = 2
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
-text = "Close"
+text = "Back"
 
 [node name="CurrencyBar" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer"]
 layout_mode = 2
@@ -52,6 +55,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/normal_font_size = 24
 text = "Points: 0"
+fit_content = true
 scroll_active = false
 vertical_alignment = 2
 
@@ -60,22 +64,36 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "DEBUG +5 pts"
 
-[node name="CommittedHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer"]
+[node name="PathsScroll" type="ScrollContainer" parent="Content/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+follow_focus = true
+horizontal_scroll_mode = 0
+
+[node name="PathsContent" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/PathsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="CommittedHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/PathsScroll/PathsContent"]
 layout_mode = 2
 theme_override_font_sizes/normal_font_size = 28
 text = "Committed Paths"
+fit_content = true
 scroll_active = false
 
-[node name="CommittedList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer"]
+[node name="CommittedList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/PathsScroll/PathsContent"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="AvailableHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer"]
+[node name="AvailableHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/PathsScroll/PathsContent"]
 layout_mode = 2
 theme_override_font_sizes/normal_font_size = 28
 text = "Available Paths"
+fit_content = true
 scroll_active = false
 
-[node name="AvailableList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer"]
+[node name="AvailableList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/PathsScroll/PathsContent"]
 unique_name_in_owner = true
 layout_mode = 2

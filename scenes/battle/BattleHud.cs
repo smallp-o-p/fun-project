@@ -10,7 +10,8 @@ using FunProject.Scenes.Ext;
 /// </summary>
 public sealed partial class BattleHud : CanvasLayer
 {
-  private VBoxContainer _verbButtons = null!;
+  private HFlowContainer _verbButtons = null!;
+  private HBoxContainer _turnButtons = null!;
   private Button _confirmButton = null!;
   private Button _cancelButton = null!;
   private Label _unitStatusLabel = null!;
@@ -23,7 +24,8 @@ public sealed partial class BattleHud : CanvasLayer
 
   public override void _Ready()
   {
-    _verbButtons = GetNode<VBoxContainer>("%VerbButtons");
+    _verbButtons = GetNode<HFlowContainer>("%VerbButtons");
+    _turnButtons = GetNode<HBoxContainer>("%TurnButtons");
     _confirmButton = GetNode<Button>("%ConfirmButton");
     _cancelButton = GetNode<Button>("%CancelButton");
     _unitStatusLabel = GetNode<Label>("%UnitStatus");
@@ -40,17 +42,19 @@ public sealed partial class BattleHud : CanvasLayer
   public void ShowActionOptions(IReadOnlyList<UnitActionOption> options)
   {
     _verbButtons.QueueFreeAllChildren();
+    _turnButtons.QueueFreeAllChildren();
 
     foreach (UnitActionOption option in options)
     {
       var button = new Button
       {
         Text = LabelFor(option),
+        CustomMinimumSize = new Vector2(72, 40),
         Disabled = !option.IsAvailable,
       };
       UnitActionOption captured = option;
       button.Pressed += () => VerbSelected?.Invoke(captured);
-      _verbButtons.AddChild(button);
+      (option is EndTurnActionOption ? (Container)_turnButtons : _verbButtons).AddChild(button);
     }
   }
 

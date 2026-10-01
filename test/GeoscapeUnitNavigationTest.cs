@@ -118,7 +118,7 @@ public class GeoscapeUnitNavigationTest
   private static string StatsText(UnitView unit)
   {
     var text = "";
-    foreach (Node row in unit.GetNode<VBoxContainer>("%StatsList").GetChildren())
+    foreach (Node row in unit.GetNode<Container>("%StatsList").GetChildren())
       if (row is RichTextLabel label)
         text += $"{label.Text}\n";
     return text;

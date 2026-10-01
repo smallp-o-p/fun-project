@@ -94,7 +94,13 @@ public sealed partial class GeoscapeHud : Control
 
     foreach (GeoscapeEvent active in activeEvents)
     {
-      var button = new Button();
+      var button = new Button
+      {
+        CustomMinimumSize = new Vector2(0, 56),
+        SizeFlagsHorizontal = SizeFlags.ExpandFill,
+        Alignment = HorizontalAlignment.Left,
+        AutowrapMode = TextServer.AutowrapMode.WordSmart,
+      };
       button.Pressed += () => ResolutionRequested?.Invoke(active);
       _alerts.AddChild(button);
       _alertButtons.Add((button, active));
@@ -108,7 +114,7 @@ public sealed partial class GeoscapeHud : Control
       string countdown = active.ExpiresAtTick.Match(
         expiresAt => $" ({Math.Max(0L, expiresAt - currentTick) * GeoscapeSession.TickGameSeconds / 60} min)",
         () => "");
-      button.Text = $"[{active.Definition.Kind}] {active.Definition.Title}{countdown}";
+      button.Text = $"[{active.Definition.Kind}]\n{active.Definition.Title}{countdown}";
     }
   }
 }

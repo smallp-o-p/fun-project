@@ -8,6 +8,33 @@ using static FunProject.Tests.GeoscapeTestScenes;
 [RequireGodotRuntime]
 public class EngineeringViewTest
 {
+  [TestCase(800, 600)]
+  [TestCase(1280, 720)]
+  [TestCase(1920, 1080)]
+  public async Task WorkshopCatalogAndInspectorFitWithoutHidingActions(int width, int height)
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [MakeItemData()]));
+    var view = CreateEngineeringView();
+    CreateUiViewport(view, new Vector2I(width, height));
+    view.Present(campaign.State, campaign.Session);
+    var item = view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0);
+    item.EmitSignal(Button.SignalName.Pressed);
+    await WaitForLayout(view);
+    var visible = new Rect2(0, 0, width, height);
+    var staff = view.GetNode<Control>("%StaffPresentation");
+    var catalog = view.GetNode<Control>("%Catalog");
+    var details = view.GetNode<Control>("%Details");
+    Assert.True(visible.Encloses(ScreenRect(staff)));
+    Assert.True(ScreenRect(staff).End.X <= ScreenRect(catalog).Position.X);
+    Assert.True(ScreenRect(catalog).End.X <= ScreenRect(details).Position.X);
+    Assert.True(visible.Encloses(ScreenRect(view.GetNode<Button>("%ManufactureButton"))));
+    Assert.True(visible.Encloses(ScreenRect(view.GetNode<Button>("%BackButton"))));
+    Assert.True(item.ButtonPressed);
+    view.Present(campaign.State, campaign.Session);
+    Assert.True(view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0).ButtonPressed);
+  }
+
   [TestCase]
   public async Task LongDescriptionScrollsWhileManufactureAndBackStayReachable()
   {

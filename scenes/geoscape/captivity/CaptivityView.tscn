@@ -1,19 +1,19 @@
-[gd_scene format=3 uid="uid://la0pq1jhi1xu"]
+[gd_scene load_steps=7 format=3 uid="uid://la0pq1jhi1xu"]
 
-[ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_bs1ur"]
-[ext_resource type="Script" path="res://scenes/geoscape/captivity/CaptivityView.cs" id="2_pf3f6"]
-[ext_resource type="PackedScene" path="res://scenes/geoscape/squad/SquadLoadoutView.tscn" id="3_bs1ur"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
+[ext_resource type="Script" path="res://scenes/geoscape/captivity/CaptivityView.cs" id="2_script"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/squad/SquadLoadoutView.tscn" id="3_squad"]
+[ext_resource type="PackedScene" path="res://scenes/ui/ModelPresentation.tscn" id="4_model"]
+[ext_resource type="PackedScene" path="res://scenes/models/ZhuYuan/ZhuYuan.scn" id="5_standin"]
+[ext_resource type="StyleBox" path="res://scenes/ui/ScreenBackground.tres" id="90_background"]
 
-[node name="CaptivityView" unique_id=1153850114 node_paths=PackedStringArray("BackButton") instance=ExtResource("1_bs1ur")]
-script = ExtResource("2_pf3f6")
-SquadViewScene = ExtResource("3_bs1ur")
-BackButton = NodePath("Content/MarginContainer/VBoxContainer/Header/HBox/BackButton")
+[node name="CaptivityView" node_paths=PackedStringArray("BackButton") instance=ExtResource("1_base")]
+script = ExtResource("2_script")
+SquadViewScene = ExtResource("3_squad")
+BackButton = NodePath("Content/Margin/Layout/Body/CaptivesColumn/BackButton")
 
-[node name="Viewport" parent="Background" index="0"]
-handle_input_locally = false
-render_target_update_mode = 0
-
-[node name="Content" type="PanelContainer" parent="." index="1" unique_id=80095951]
+[node name="Content" type="PanelContainer" parent="."]
+theme_override_styles/panel = ExtResource("90_background")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -21,122 +21,170 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="MarginContainer" type="MarginContainer" parent="Content" index="0" unique_id=654992870]
+[node name="Margin" type="MarginContainer" parent="Content"]
 layout_mode = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 20
-
-[node name="VBoxContainer" type="VBoxContainer" parent="Content/MarginContainer" index="0" unique_id=1109419286]
-layout_mode = 2
-theme_override_constants/separation = 16
-
-[node name="Header" type="MarginContainer" parent="Content/MarginContainer/VBoxContainer" index="0" unique_id=1973534816]
-custom_minimum_size = Vector2(0, 96)
-layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="HBox" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer/Header" index="0" unique_id=1299085671]
+[node name="Layout" type="VBoxContainer" parent="Content/Margin"]
 layout_mode = 2
+theme_override_constants/separation = 16
 
-[node name="Title" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Header/HBox" index="0" unique_id=1828378539]
-unique_name_in_owner = true
+[node name="TimeState" type="Label" parent="Content/Margin/Layout"]
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/normal_font_size = 64
-text = "Captivity"
-scroll_active = false
-vertical_alignment = 2
+text = "Time frozen while browsing"
+horizontal_alignment = 2
 
-[node name="BackButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Header/HBox" index="1" unique_id=1077662828]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 0)
+[node name="TopSpace" type="Control" parent="Content/Margin/Layout"]
 layout_mode = 2
-text = "Back"
+size_flags_vertical = 3
+size_flags_stretch_ratio = 0.1
+mouse_filter = 2
 
-[node name="HSeparator" type="HSeparator" parent="Content/MarginContainer/VBoxContainer" index="1" unique_id=552138463]
-layout_mode = 2
-
-[node name="Inspection" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer" index="2" unique_id=1238920964]
+[node name="Body" type="HBoxContainer" parent="Content/Margin/Layout"]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 16
 
-[node name="Instructions" type="Label" parent="Content/MarginContainer/VBoxContainer/Inspection" index="0" unique_id=322860906]
-layout_mode = 2
-text = "Select captives to prepare an interrogation. Select a row to inspect its details."
-autowrap_mode = 3
-
-[node name="Body" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer/Inspection" index="1" unique_id=135001110]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 24
-
-[node name="Captives" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Inspection/Body" index="0" unique_id=1108039549]
-custom_minimum_size = Vector2(320, 0)
+[node name="PresentationColumn" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 0.85
+size_flags_stretch_ratio = 0.95
+
+[node name="CaptivePresentation" parent="Content/Margin/Layout/Body/PresentationColumn" instance=ExtResource("4_model")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+ModelScene = ExtResource("5_standin")
+FramingHeight = 1.05
+FocusHeight = 0.5
+
+[node name="ModelNote" type="Label" parent="Content/Margin/Layout/Body/PresentationColumn"]
+layout_mode = 2
+text = "3D model stand-in"
+autowrap_mode = 3
+
+[node name="CaptivesColumn" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
+custom_minimum_size = Vector2(210, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 16
+
+[node name="CaptivesPanel" type="PanelContainer" parent="Content/Margin/Layout/Body/CaptivesColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Margin" type="MarginContainer" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 16
+
+[node name="Captives" type="VBoxContainer" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin"]
+layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="ListHeading" type="Label" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/Captives" index="0" unique_id=1220709067]
+[node name="Title" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 28
+text = "Captivity"
+
+[node name="Subtitle" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
+layout_mode = 2
 text = "Captured enemies"
 
-[node name="EmptyState" type="Label" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/Captives" index="1" unique_id=40079381]
+[node name="HeaderDivider" type="HSeparator" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
+layout_mode = 2
+
+[node name="ListHeading" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
+layout_mode = 2
+text = "Captives · multi-select"
+autowrap_mode = 3
+
+[node name="EmptyState" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "No captured enemies in captivity."
 autowrap_mode = 3
 
-[node name="ListScroll" type="ScrollContainer" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/Captives" index="2" unique_id=1003188860]
+[node name="ListScroll" type="ScrollContainer" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
+follow_focus = true
 
-[node name="CaptiveList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/Captives/ListScroll" index="0" unique_id=895669821]
+[node name="CaptiveList" type="VBoxContainer" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives/ListScroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
-[node name="Divider" type="VSeparator" parent="Content/MarginContainer/VBoxContainer/Inspection/Body" index="1" unique_id=474496341]
+[node name="Instructions" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
+layout_mode = 2
+text = "Select a row to inspect. Select captives to prepare an interrogation."
+autowrap_mode = 3
+
+[node name="FooterDivider" type="HSeparator" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
 layout_mode = 2
 
-[node name="InspectionDetails" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Inspection/Body" index="2" unique_id=773233395]
+[node name="SelectionCount" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Selected: 0"
+horizontal_alignment = 2
+
+[node name="BackButton" type="Button" parent="Content/Margin/Layout/Body/CaptivesColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Back"
+
+[node name="DetailsColumn" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
+custom_minimum_size = Vector2(250, 0)
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.25
+theme_override_constants/separation = 16
+
+[node name="DetailsPanel" type="PanelContainer" parent="Content/Margin/Layout/Body/DetailsColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Margin" type="MarginContainer" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="InspectionDetails" type="VBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsPanel/Margin"]
+layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="DetailsHeading" type="Label" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/InspectionDetails" index="0" unique_id=1961087345]
+[node name="DetailsHeading" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsPanel/Margin/InspectionDetails"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 text = "Captive details"
 
-[node name="Details" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Inspection/Body/InspectionDetails" index="1" unique_id=142630427]
+[node name="Divider" type="HSeparator" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsPanel/Margin/InspectionDetails"]
+layout_mode = 2
+
+[node name="Details" type="RichTextLabel" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsPanel/Margin/InspectionDetails"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_constants/line_separation = 8
 text = "Select a captive to inspect."
 
-[node name="FooterDivider" type="HSeparator" parent="Content/MarginContainer/VBoxContainer/Inspection" index="2" unique_id=894204847]
-layout_mode = 2
-
-[node name="Footer" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer/Inspection" index="3" unique_id=1301764436]
-layout_mode = 2
-theme_override_constants/separation = 16
-
-[node name="SelectionCount" type="Label" parent="Content/MarginContainer/VBoxContainer/Inspection/Footer" index="0" unique_id=1078574959]
+[node name="PrepareButton" type="Button" parent="Content/Margin/Layout/Body/DetailsColumn"]
 unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Selected: 0"
-
-[node name="PrepareButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Inspection/Footer" index="1" unique_id=984817310]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(230, 42)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 disabled = true
 text = "Prepare interrogation"

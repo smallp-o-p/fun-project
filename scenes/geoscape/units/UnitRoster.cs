@@ -24,6 +24,8 @@ public sealed partial class UnitRoster : GeoscapeView
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
     _unitLabels.QueueFreeAllChildren();
+    GetNode<Label>("%UnitCount").Text = $"{state.Roster.Count} units";
+    GetNode<Label>("%EmptyState").Visible = state.Roster.Count == 0;
 
     PackedScene scene = UnitLabelScene ?? throw new InvalidOperationException(
       "UnitRoster requires UnitLabelScene; assign a PackedScene in the inspector.");
