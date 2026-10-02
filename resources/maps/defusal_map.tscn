@@ -91,8 +91,10 @@ Vector3i(7, 0, 7): SubResource("Resource_spawn_b")
 script = ExtResource("3_e4gu4")
 Walkable = false
 BlocksLineOfSight = true
-CoverDirections = 15
-CoverAmount = 60
+CoverNorth = 60
+CoverEast = 60
+CoverSouth = 60
+CoverWest = 60
 
 [sub_resource type="Resource" id="Resource_n2luj"]
 script = ExtResource("5_40t88")

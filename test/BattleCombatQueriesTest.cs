@@ -12,7 +12,7 @@ public partial class BattleCombatQueriesTest
   public void HitChancePreviewMatchesResolution(bool execute)
   {
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(CoverDirections.North, 40);
+    board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(40, 0, 0, 0);
     using var battle = BattleFixture.Duel(
       board: board,
       randomSeed: execute ? 99 : null,

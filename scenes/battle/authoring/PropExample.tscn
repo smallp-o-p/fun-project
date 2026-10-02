@@ -1,0 +1,93 @@
+[gd_scene format=3]
+
+[ext_resource type="MeshLibrary" path="res://scenes/debug/DebugMeshLib.meshlib" id="1_2c1uw"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleMapAuthoring.cs" id="2_1nh2n"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapTileData.cs" id="3_nj1kd"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleTilePalette.cs" id="4_cesgl"]
+[ext_resource type="PackedScene" path="res://scenes/battle/props/ExampleCar.tscn" id="5_sld3g"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattlePropAuthoring.cs" id="6_j8kcw"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattlePropCoverEdgeData.cs" id="7_5le4m"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattlePropData.cs" id="8_hdj16"]
+
+[sub_resource type="Resource" id="Resource_gbl4c"]
+script = ExtResource("3_nj1kd")
+
+[sub_resource type="Resource" id="Resource_i1m1x"]
+script = ExtResource("3_nj1kd")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_670cs"]
+script = ExtResource("3_nj1kd")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_b6vs2"]
+script = ExtResource("3_nj1kd")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_yrade"]
+script = ExtResource("4_cesgl")
+MeshLibrary = ExtResource("1_2c1uw")
+Brushes = Dictionary[StringName, ExtResource("3_nj1kd")]({
+&"DebugBox": SubResource("Resource_gbl4c"),
+&"DebugFloor": SubResource("Resource_i1m1x"),
+&"DebugSpawnFloor": SubResource("Resource_670cs"),
+&"DebugSpawnFloorB": SubResource("Resource_b6vs2")
+})
+metadata/_custom_type_script = "uid://djtekemlaytk4"
+
+[sub_resource type="Resource" id="Resource_cur26"]
+script = ExtResource("7_5le4m")
+Direction = 1
+Amount = 40
+
+[sub_resource type="Resource" id="Resource_okxgh"]
+script = ExtResource("7_5le4m")
+Direction = 4
+Amount = 40
+
+[sub_resource type="Resource" id="Resource_efyxb"]
+script = ExtResource("7_5le4m")
+Direction = 8
+Amount = 40
+
+[sub_resource type="Resource" id="Resource_yfna8"]
+script = ExtResource("7_5le4m")
+Cell = Vector3i(0, 0, 1)
+Direction = 2
+Amount = 40
+
+[sub_resource type="Resource" id="Resource_8vvo8"]
+script = ExtResource("7_5le4m")
+Cell = Vector3i(0, 0, 1)
+Direction = 4
+Amount = 40
+
+[sub_resource type="Resource" id="Resource_3fs5x"]
+script = ExtResource("7_5le4m")
+Cell = Vector3i(0, 0, 1)
+Direction = 8
+Amount = 40
+
+[sub_resource type="Resource" id="Resource_27jnk"]
+script = ExtResource("8_hdj16")
+Footprint = Array[Vector3i]([Vector3i(0, 0, 0), Vector3i(0, 0, 1)])
+BlocksMovement = true
+CoverEdges = Array[ExtResource("7_5le4m")]([SubResource("Resource_cur26"), SubResource("Resource_okxgh"), SubResource("Resource_efyxb"), SubResource("Resource_yfna8"), SubResource("Resource_8vvo8"), SubResource("Resource_3fs5x")])
+
+[node name="BattleMapAuthoring" type="GridMap" unique_id=1566391189]
+mesh_library = ExtResource("1_2c1uw")
+cell_size = Vector3(1, 1, 1)
+cell_center_y = false
+data = {
+"cells": PackedInt32Array(3, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 4, 0, 0, 5, 0, 0, 6, 0, 0, 7, 0, 0, 7, 1, 0, 6, 1, 0, 5, 1, 0, 4, 1, 0, 3, 1, 0, 1, 1, 0, 0, 1, 0, 2, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 0, 5, 0, 0, 6, 0, 0, 7, 0, 1, 7, 0, 2, 7, 0, 3, 7, 0, 4, 7, 0, 5, 7, 0, 6, 7, 0, 7, 7, 0, 7, 6, 0, 7, 5, 0, 7, 4, 0, 7, 3, 0, 7, 2, 0, 6, 2, 0, 5, 2, 0, 4, 2, 0, 3, 2, 0, 2, 2, 0, 1, 2, 0, 1, 3, 0, 1, 4, 0, 2, 4, 0, 2, 3, 0, 3, 3, 0, 4, 3, 0, 5, 3, 0, 6, 3, 0, 6, 4, 0, 5, 4, 0, 4, 4, 0, 3, 4, 0, 3, 5, 0, 2, 5, 0, 2, 6, 0, 1, 6, 0, 1, 5, 0, 3, 6, 0, 4, 6, 0, 5, 6, 0, 6, 6, 0, 6, 5, 0, 5, 5, 0, 4, 5, 0)
+}
+script = ExtResource("2_1nh2n")
+Palette = SubResource("Resource_yrade")
+TargetPath = "res://resources/maps/prop_example_map.tscn"
+metadata/_editor_floor_ = Vector3(0, 0, 0)
+
+[node name="ExampleCar" type="Node3D" parent="." unique_id=664901381 instance=ExtResource("5_sld3g")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0.05, 3.5)
+script = ExtResource("6_j8kcw")
+Definition = SubResource("Resource_27jnk")
+Anchor = Vector3i(3, 0, 3)

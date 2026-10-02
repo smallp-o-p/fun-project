@@ -1,64 +1,25 @@
-# Authoring battle maps
+# Battle map authoring
 
-Battle maps are authored in the Godot editor on a **`GridMap`** and baked to a `BattleMapData`
-`.tres` that `BattleMapData.CreateBoardState()` turns into a `BattleBoardState`. The GridMap is
-Godot's native 3D tiler, so its cells line up 1:1 with the board's `Vector3I` grid and you see
-the real meshes in 3D while you author.
+Open `scenes/battle/authoring/BattleMapAuthoring.tscn` in Godot 4.7.2 .NET. Paint terrain using the GridMap and its `BattleTilePalette`. Palette brushes describe independent movement, line-of-sight, vertical sight blocking, four directional cover strengths and optional spawn slots.
 
-## Pieces
+For a ready-to-export example, open `scenes/battle/authoring/PropExample.tscn`. Its output is `resources/maps/prop_example_map.tscn`.
 
-- **`TileBrushData`** (`scripts/battle/map`) — per-tile gameplay template: `Walkable`,
-  `BlocksLineOfSight`, `CoverDirections` + `CoverAmount` (amount editable only when a direction
-  is set), `SpawnFactionSlot` (-1 = none). All independent — a wall with no cover, or walkable
-  smoke that blocks LOS, are both legal. Cover is never inferred.
-- **`BattleMapAuthoring`** (`scenes/battle/authoring`) — a `[Tool]` node that **extends
-  `GridMap`**; you paint terrain directly on it. Its `MeshLibrary` supplies the terrain meshes;
-  the `Brushes` palette (`Dictionary<StringName, TileBrushData>`) maps each MeshLibrary item
-  **name** to a gameplay brush. The **Bake to BattleMapData** button reads the painted cells and
-  writes `TargetPath`.
-- **`BattleMapBaker` / `MapDeployment` / `MapSpawnZoneData`** — pure C# (`scripts/battle/map`),
-  no Godot loading, unit-tested.
+## Reusable props
 
-## Coordinate mapping
+Instance `scenes/battle/props/ExampleCar.tscn` as a **direct child** of the authoring GridMap. Its root is `BattlePropAuthoring`; its children are the visual model. Set **Anchor** (the first occupied tile) and **Quarter Turns** (0–3, positive Godot Y rotation). These controls position the prop on the ground surface. After dragging or rotating with the standard editor gizmo, press **Snap to grid**. Press **Refresh preview** after editing shared metadata or terrain.
 
-A `GridMap` cell `Vector3I(x, y, z)` is already board space: **X = width** (East = +X),
-**Y = elevation/level**, **Z = depth** (South = +Z), consistent with the engine's `North = -Z`.
-The baker normalizes painted cells to a `(0,0,0)` origin and sets `AuthoredTilesAreComplete =
-true`, so any unpainted cell is a hole.
+A prop definition contains a flat set of local footprint cells, separate movement/LOS flags, and explicit exterior cover edges. An edge identifies its local occupied cell, one outward cardinal direction and strength (0–100). The origin must be in the footprint. Interior edges are invalid. The example occupies `(0,0,0)` and `(0,0,1)`; it blocks walking, allows sight and provides 40 cover around its six exterior edges. This is a simple placeholder, not physical projectile collision.
 
-## Editor setup (one-time)
+The model's root pivot contacts the ground at the anchor cell center. Offset visual children once to fit the footprint. Terrain brushes supply `GroundSurfaceOffset` relative to their integer level; the debug floor's 0.1-high centered box uses **0.05**. Every supporting tile must be walkable, at the same level and have the same surface offset. Props do not create new terrain.
 
-1. Build a **`MeshLibrary`** with one item per terrain type; name items meaningfully
-   (e.g. `floor`, `wall`, `cover_n`, `spawn_a`).
-2. Author a `TileBrushData` `.tres` for each meaning:
-   - floor = `Walkable`
-   - wall = `!Walkable` + `BlocksLineOfSight` (cover stays `None` ⇒ zero cover)
-   - cover = `Walkable` + `CoverDirections` + `CoverAmount`
-   - spawn = a floor brush + `SpawnFactionSlot = N`
-3. Create a scene with a **`BattleMapAuthoring`** (GridMap) node; assign the `MeshLibrary`;
-   fill `Brushes` (item name → brush `.tres`); set `TargetPath`.
+Footprint outlines and cover arrows are editor-only. Invalid placements are red. Only axis-aligned, unscaled, untilted placements are supported. The GridMap uses one-unit cells, X/Z centered, Y uncentered, and an identity transform. Nonblocking decorations may overlap; two movement-blocking props may not.
 
-## Workflow
+## Export
 
-- **Create:** paint the 3D grid, click **Bake**.
-- **Edit:** reopen the scene, repaint, re-bake.
+Set **Target Path** to a `.tscn` or `.scn`, then click **Export BattleMap**. Export validates painted cells, metadata, transforms, support, solid overlaps and blocked spawns before saving anything. It creates a `BattleMap` scene with fresh per-cell gameplay data, the painted GridMap and owned prop visuals. Palette resources remain unchanged. Open the exported scene to inspect it, then use that PackedScene in the battle type's map pool.
 
-The `.tscn` is the source of truth; the baked `.tres` is a build artifact. A painted cell whose
-MeshLibrary item name isn't in `Brushes` bakes as a plain walkable floor.
+Coordinates are preserved, including maps starting away from zero. Dimensions are maximum coordinates plus one; missing cells remain holes. Negative coordinates are unsupported.
 
-## Spawning from a baked map
+Cover belongs to the unit's **standing tile**, facing the obstacle. A car east of a unit stamps East cover into that unit's tile. Rotating the car rotates both footprint and edges. Only existing, ultimately walkable neighbors receive cover. Contributions merge by maximum **per side**, so North 20 and East 60 stay distinct. A diagonal shot uses the strongest of its two approach sides (the existing either-component rule); amounts do not add. Height differences retain the existing horizontal cover rule.
 
-`BattleSetupResolver.Resolve(type, seed?, playerDeployment?)` chooses the map and
-builds ordered sides. `MapDeployment.AssignSpawns(map, slot, loadouts)` pairs each
-side's roster directly with that slot's cells, sorted X/Y/Z. The slot is the
-side's index in `BattleTypeData.Factions`; roster order is preserved.
-
-The resolved `BattleSetup` groups each faction with its objectives and positioned
-units. `BattleFactory.Start(setup)` creates a fresh board, checks all placements,
-registers systems, and submits the spawn, object-placement, and start actions.
-An out-of-bounds or blocked cell is a cell failure; insufficient slot capacity
-is `SpawnSlotShortfall`.
-
-A supplied `PlayerDeployment` retains its campaign faction and combatants. It
-replaces the player roster while keeping that side's authored objectives and
-spawn slot. Startup never reassigns a combatant's owning faction.
+Terrain collision is layer 1 for mouse ground picking. Exported prop collisions use layer 2 so a roof cannot select a false ground level. Logical movement and visibility use baked tile data, independently of physics geometry. Authoring metadata and previews are not shipped as runtime prop systems.

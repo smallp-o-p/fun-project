@@ -23,8 +23,9 @@ public sealed class StandardHitChanceCalculator : IHitChanceCalculator
     List<HitChanceModifier> modifiers = [];
     TileCover cover = context.Board.GetTile(context.DefenderPosition).Cover;
     CoverDirections approach = CoverRules.GetApproach(context.AttackerPosition.Raw, context.DefenderPosition.Raw);
-    if (CoverRules.Applies(cover, approach))
-      modifiers.Add(new HitChanceModifier(CoverModifierLabel, -cover.Amount));
+    int coverAmount = CoverRules.GetAmount(cover, approach);
+    if (coverAmount > 0)
+      modifiers.Add(new HitChanceModifier(CoverModifierLabel, -coverAmount));
 
     return new HitChanceBreakdown(baseChance, modifiers);
   }

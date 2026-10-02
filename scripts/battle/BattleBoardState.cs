@@ -100,7 +100,7 @@ public sealed class BattleBoardState
           tile.IsWalkable = data.Walkable;
           tile.BlocksLineOfSight = data.BlocksLineOfSight;
           tile.BlocksVerticalLineOfSight = data.BlocksVerticalLineOfSight;
-          tile.Cover = new TileCover(data.CoverDirections, data.CoverAmount);
+          tile.Cover = new TileCover(data.CoverNorth, data.CoverEast, data.CoverSouth, data.CoverWest);
         },
         () =>
         {

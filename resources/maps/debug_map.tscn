@@ -17,8 +17,10 @@ SpawnFactionSlot = 0
 script = ExtResource("3_qjsg6")
 Walkable = false
 BlocksLineOfSight = true
-CoverDirections = 15
-CoverAmount = 60
+CoverNorth = 60
+CoverEast = 60
+CoverSouth = 60
+CoverWest = 60
 
 [sub_resource type="Resource" id="Resource_xpr8u"]
 script = ExtResource("4_7w3e4")

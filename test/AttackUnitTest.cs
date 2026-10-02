@@ -54,7 +54,7 @@ public partial class AttackUnitTest
   public void ApplicableCoverLowersTheResolvedHitChance()
   {
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(CoverDirections.North, 60);
+    board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(60, 0, 0, 0);
     using var battle = BattleFixture.Duel(
       board: board,
       player: new("Alpha", Aim: 60, Weapon: TestData.MakeWeapon("Rifle")));
