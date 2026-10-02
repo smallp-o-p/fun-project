@@ -10,12 +10,13 @@ public sealed class ModelOutfit
 {
   internal ModelOutfit(CharacterModel owner, StringName id, int variantIndex)
   {
-    Owner = owner;
+    _model = owner;
     Id = id;
-    VariantIndex = variantIndex;
+    _variantIndex = variantIndex;
   }
 
-  internal CharacterModel Owner { get; }
+  private readonly CharacterModel _model;
+  private readonly int _variantIndex;
 
   /// <summary>The authored variant label; the stable lookup key of this outfit.</summary>
   public StringName Id { get; }
@@ -23,6 +24,6 @@ public sealed class ModelOutfit
   /// <summary>Human-facing outfit name; the authored variant label.</summary>
   public string DisplayName => Id.ToString();
 
-  /// <summary>The wardrobe variant index this outfit selects.</summary>
-  internal int VariantIndex { get; }
+  /// <summary>Selects this imported outfit on the instance that exposes it.</summary>
+  public void Select() => _model.OutfitIndex = _variantIndex;
 }

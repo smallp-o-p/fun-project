@@ -2,6 +2,7 @@
 extends EditorScenePostImport
 
 const STRUCTURE := preload("res://scenes/models/import/humanoid_structure.gd")
+const WARDROBE := preload("res://scenes/models/import/humanoid_wardrobe.gd")
 const PRESENTATION := preload("res://scenes/models/import/humanoid_presentation.gd")
 const SKELETON := "rig_D/GeneralSkeleton"
 const MAP := [
@@ -80,6 +81,14 @@ func _post_import(scene: Node) -> Object:
 	var presentation_error: String = PRESENTATION.apply(scene, get_source_file())
 	if not presentation_error.is_empty():
 		return _fail(presentation_error)
+	var wardrobe_result: Variant = WARDROBE.apply(scene, get_source_file())
+	if typeof(wardrobe_result) != TYPE_STRING:
+		return _fail("Wardrobe compiler did not return a result")
+	if not wardrobe_result.is_empty():
+		return _fail(wardrobe_result)
+	var catalog: Variant = scene.get_meta("wardrobe_catalog") if scene.has_meta("wardrobe_catalog") else null
+	if not catalog is Resource or catalog.get_script() != load("res://scenes/models/ModelWardrobeConfiguration.cs"):
+		return _fail("Wardrobe compiler did not publish a typed catalog")
 	return scene
 
 func _unsupported_skeletal_clip(scene: Node, skeleton: Skeleton3D) -> String:

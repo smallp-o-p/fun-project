@@ -54,20 +54,80 @@ public class ModelClothingTest
   }
 
   [TestCase]
-  public void InvalidWardrobeAuthoringIsReportedBeforeInitialization()
+  public void CatalogAndInventoriesCannotBeEditedByConsumers()
+  {
+    using var fixture = ModelFixture.WithWardrobe();
+    var catalog = fixture.Model.WardrobeConfiguration;
+    Assert.Throws<NotSupportedException>(() =>
+      ((SysColGeneric.IList<string>)catalog.Variants)[0] = "changed");
+    Assert.Throws<NotSupportedException>(() =>
+      ((SysColGeneric.IDictionary<string, ModelWardrobeComponent>)catalog.Components).Clear());
+    Assert.Throws<NotSupportedException>(() =>
+      ((SysColGeneric.IList<ModelWardrobeGarment>)catalog.Components["Garment"].Pieces).Clear());
+    Assert.Throws<NotSupportedException>(() =>
+      ((SysColGeneric.IList<ModelWardrobeMaskRule>)catalog.Masks).Clear());
+    Assert.Throws<NotSupportedException>(() =>
+      ((SysColGeneric.IList<ModelClothingPiece>)fixture.Model.Pieces).Clear());
+    Assert.Throws<NotSupportedException>(() =>
+      ((SysColGeneric.IList<ModelOutfit>)fixture.Model.Outfits).Clear());
+    Assert.Equal("outfit0", fixture.Model.Outfits[0].Id.ToString());
+    fixture.Model.Pieces[0].Enabled = false;
+    Assert.False(fixture.GarmentA!.Visible);
+    fixture.Model.Pieces[0].Enabled = true;
+    Assert.True(fixture.GarmentA.Visible);
+  }
+
+  [TestCase]
+  public void DiscoveredControlsSelectTheirOwnInstanceWithoutForeignHandleInputs()
+  {
+    using var first = ModelFixture.WithWardrobe();
+    using var second = ModelFixture.WithWardrobe();
+    first.Model.Pieces[0].Enabled = false;
+    Assert.False(first.GarmentA!.Visible);
+    Assert.True(second.GarmentA!.Visible);
+    second.Model.Outfits[1].Select();
+    Assert.Equal(0, first.Model.OutfitIndex);
+    Assert.Equal(1, second.Model.OutfitIndex);
+    Assert.True(typeof(CharacterModel).GetMethod("SetPieceEnabled") is null);
+    Assert.True(typeof(CharacterModel).GetMethod("SelectOutfit") is null);
+  }
+
+  [TestCase]
+  public void SelectionBeforeImportedChildIsAttachedUsesCatalogAtInitialization()
   {
     using var fixture = ModelFixture.WithWardrobe(start: false);
-    fixture.Model.WardrobeConfiguration.Variants = ["outfit0", "outfit0"];
+    var imported = fixture.Model.GetNode("Model");
+    fixture.Model.RemoveChild(imported);
+    fixture.Model.ClothingEnabled = false;
+    fixture.Model.AddChild(imported);
+    fixture.Model.Initialize();
+    Assert.Equal(1, fixture.Model.Pieces.Count);
+    Assert.Equal(2, fixture.Model.Outfits.Count);
+    Assert.False(fixture.GarmentA!.Visible);
+    Assert.False(fixture.GarmentB!.Visible);
+    fixture.Model.ClothingEnabled = true;
+    Assert.True(fixture.GarmentA.Visible);
+    Assert.False(fixture.GarmentB.Visible);
+  }
 
-    string[] warnings = fixture.Model._GetConfigurationWarnings();
-    Assert.True(warnings is not null && warnings.Length > 0,
-      "The editor must report invalid wardrobe authoring before an instance initializes.");
-    Assert.True(warnings![0].Contains("duplicate outfit"));
-    fixture.Model.WardrobeConfiguration.Variants = ["outfit0", "outfit1"];
-    Assert.Equal(0, fixture.Model._GetConfigurationWarnings().Length);
-    Assert.Equal(0, fixture.Model.Selections.Count);
-    Assert.True(fixture.GarmentA!.Visible);
-    Assert.True(fixture.GarmentB!.Visible);
+  [TestCase]
+  public void ImportedCatalogHasNoInspectorAuthoringSurface()
+  {
+    using var fixture = ModelFixture.WithWardrobe();
+    foreach (var property in fixture.Model.GetPropertyList())
+      Assert.False(property["name"].AsString() == "WardrobeConfiguration",
+        "The model must obtain its catalog from the import, not an editable resource slot.");
+    GodotObject[] definitions = [fixture.Model.WardrobeConfiguration,
+      fixture.Model.WardrobeConfiguration.Components["Garment"],
+      fixture.Model.WardrobeConfiguration.Components["Garment"].Pieces[0],
+      fixture.Model.WardrobeConfiguration.Masks[0]];
+    foreach (var definition in definitions)
+      foreach (var property in definition.GetPropertyList())
+      {
+        var usage = (PropertyUsageFlags)property["usage"].AsInt64();
+        Assert.False(usage.HasFlag(PropertyUsageFlags.ScriptVariable) && usage.HasFlag(PropertyUsageFlags.Editor),
+          "Generated catalog fields must be storage-only.");
+      }
   }
 
   // ------------------------------------------------------------------
@@ -79,14 +139,14 @@ public class ModelClothingTest
   {
     using var fixture = ModelFixture.WithWardrobe();
     CharacterModel model = fixture.Model;
-    model.SelectOutfit(model.Outfits[1]);
+    model.Outfits[1].Select();
     Assert.Equal(model.Outfits[1], model.CurrentOutfit);
     Assert.False(fixture.GarmentA!.Visible);
     Assert.True(fixture.GarmentB!.Visible);
     Assert.MaskRegions(model, fixture.MaskPath, "Mask1");
     Assert.Equal(1, TestData.VisibleTriangles(model.MaskRenderMesh(fixture.MaskPath)));
 
-    model.SelectOutfit(model.Outfits[0]);
+    model.Outfits[0].Select();
     Assert.Equal(model.Outfits[0], model.CurrentOutfit);
     Assert.True(fixture.GarmentA!.Visible);
     Assert.False(fixture.GarmentB!.Visible);
@@ -127,40 +187,18 @@ public class ModelClothingTest
     Assert.True(piece.Enabled);
     Assert.True(piece.IsVisible);
 
-    fixture.Model.SetPieceEnabled(piece, false);
+    piece.Enabled = false;
     Assert.False(piece.Enabled);
     Assert.False(piece.IsVisible);
     Assert.False(fixture.GarmentA!.Visible);
     Assert.MaskRegions(fixture.Model, fixture.MaskPath);
 
-    fixture.Model.SelectOutfit(fixture.Outfit("outfit1"));
+    fixture.Outfit("outfit1").Select();
     fixture.Model.ClothingEnabled = false;
     fixture.Model.ClothingEnabled = true;
     Assert.False(piece.Enabled);
     Assert.False(piece.IsVisible);
     Assert.False(fixture.GarmentB!.Visible);
-  }
-
-  [TestCase]
-  public void ForeignPieceAndOutfitAreRejectedWithoutEffect()
-  {
-    using var fixture = ModelFixture.WithWardrobe();
-    using var other = ModelFixture.WithWardrobe();
-    CharacterModel model = fixture.Model;
-    ModelClothingPiece foreignPiece = other.Piece("Garment");
-    ModelOutfit foreignOutfit = other.Outfit("outfit1");
-
-    Assert.Throws<InvalidOperationException>(() => model.SetPieceEnabled(foreignPiece, false));
-    Assert.Throws<InvalidOperationException>(() => model.SelectOutfit(foreignOutfit));
-    Assert.True(fixture.GarmentA!.Visible);
-    Assert.False(fixture.GarmentB!.Visible);
-    Assert.MaskRegions(model, fixture.MaskPath, "Mask0");
-    Assert.Equal(0, model.OutfitIndex);
-    // The only stored entry is the materialized default; the foreign piece's id
-    // is also "Garment", so its rejection leaving it at true proves nothing
-    // was stored.
-    Assert.Equal(1, model.Selections.Count);
-    Assert.True(model.Selections[CharacterModel.PiecesPrefix + "Garment"].AsBool());
   }
 
   // ------------------------------------------------------------------
@@ -183,16 +221,16 @@ public class ModelClothingTest
     Assert.True(fixture.GarmentB!.Visible);
     Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
 
-    fixture.Model.SetPieceEnabled(fixture.Piece("jacket"), false);
+    fixture.Piece("jacket").Enabled = false;
     Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
-    fixture.Model.SetPieceEnabled(fixture.Piece("jacket"), true);
+    fixture.Piece("jacket").Enabled = true;
     Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
 
-    fixture.Model.SetPieceEnabled(fixture.Piece("shirt"), false);
+    fixture.Piece("shirt").Enabled = false;
     Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
-    fixture.Model.SetPieceEnabled(fixture.Piece("jacket"), false);
+    fixture.Piece("jacket").Enabled = false;
     Assert.MaskRegions(fixture.Model, fixture.MaskPath);
-    fixture.Model.SetPieceEnabled(fixture.Piece("shirt"), true);
+    fixture.Piece("shirt").Enabled = true;
     Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
   }
 
@@ -208,11 +246,11 @@ public class ModelClothingTest
     // shares its path.
     Assert.MaskRegions(fixture.Model, fixture.AccessoryMaskPath!);
 
-    model.SelectOutfit(model.Outfits[1]);
+    model.Outfits[1].Select();
     Assert.MaskRegions(model, fixture.MaskPath, "Mask1");
     Assert.MaskRegions(model, fixture.AccessoryMaskPath!, "Mask1");
 
-    model.SelectOutfit(model.Outfits[0]);
+    model.Outfits[0].Select();
     Assert.MaskRegions(model, fixture.MaskPath, "Mask0");
     Assert.MaskRegions(model, fixture.AccessoryMaskPath!);
   }
@@ -234,44 +272,20 @@ public class ModelClothingTest
     }
 
     var missingGarment = TestData.MakeOverlappingWardrobeConfiguration();
-    missingGarment.Components["shirt"].Pieces[0].Path = "MissingGarment";
+    missingGarment.Components["shirt"].Pieces[0].Set("_path", new NodePath("MissingGarment"));
     AssertRejectedSetup(missingGarment);
 
     var missingMask = TestData.MakeOverlappingWardrobeConfiguration();
-    missingMask.Masks[0].Path = "MissingMask";
+    missingMask.Masks[0].Set("_path", new NodePath("MissingMask"));
     AssertRejectedSetup(missingMask);
 
     var outOfRangeIndex = TestData.MakeOverlappingWardrobeConfiguration();
-    outOfRangeIndex.Masks[0].Index = 5;
+    outOfRangeIndex.Masks[0].Set("_index", 5);
     AssertRejectedSetup(outOfRangeIndex);
 
     var mismatchedName = TestData.MakeOverlappingWardrobeConfiguration();
-    mismatchedName.Masks[0].Name = "Mask1";
+    mismatchedName.Masks[0].Set("_name", new StringName("Mask1"));
     AssertRejectedSetup(mismatchedName);
-  }
-
-  [TestCase]
-  public void InvalidWardrobeDefinitionsRejectAuthoring()
-  {
-    // Fixed schema errors belong to the authoring boundary, before a resource
-    // is saved. Runtime tests above own actual scene and mask-region bindings.
-    Action<ModelWardrobeConfiguration>[] corruptions =
-    [
-      configuration => configuration.Variants = ["outfit0", "outfit0"],
-      configuration => configuration.DefaultVariant = 5,
-      configuration => configuration.Components["shirt"].Pieces[0].Variant = 5,
-      configuration => configuration.Components["shirt"].Pieces[0].Path = new(),
-      configuration => configuration.Masks[0].Variant = 5,
-      configuration => configuration.Masks[0].Component = "missing",
-      configuration => configuration.Masks[0].Path = new(),
-    ];
-    foreach (var corrupt in corruptions)
-    {
-      using var configuration = TestData.MakeOverlappingWardrobeConfiguration();
-      configuration.ValidateAuthoring();
-      corrupt(configuration);
-      Assert.Throws<InvalidOperationException>(configuration.ValidateAuthoring);
-    }
   }
 
   // ------------------------------------------------------------------
@@ -291,7 +305,7 @@ public class ModelClothingTest
     ArrayMesh authoredRender = model.MaskRenderMesh(fixture.MaskPath)!;
     fixture.GarmentA!.Free();
 
-    Assert.Throws<InvalidOperationException>(() => model.SelectOutfit(model.Outfits[1]));
+    Assert.Throws<InvalidOperationException>(() => model.Outfits[1].Select());
     Assert.Equal(0, model.OutfitIndex);
     Assert.False(model.Selections.ContainsKey(CharacterModel.OutfitKey));
     Assert.MaskRegions(model, fixture.MaskPath, "Mask0");

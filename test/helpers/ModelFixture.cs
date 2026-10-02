@@ -142,8 +142,9 @@ public sealed class ModelFixture : IDisposable
   {
     ArrayMesh source = TestData.MakeMaskedSourceMesh(maskCount);
     var fixture = WithMask(source, TestData.MakeModelMaskConfiguration(source, maskCount), start: false);
-    fixture.Model.WardrobeConfiguration =
-      configuration ?? TestData.MakeWardrobeConfiguration();
+    var imported = new Node3D { Name = "Model" };
+    imported.SetMeta("wardrobe_catalog", configuration ?? TestData.MakeWardrobeConfiguration());
+    fixture.Model.AddChild(imported);
     AddGarmentPair(fixture);
     if (accessoryMaskConfiguration is not null)
     {
@@ -202,6 +203,7 @@ public sealed class ModelFixture : IDisposable
     { Name = "Body", Mesh = fixture.SourceMesh };
     fixture.Body.SetSurfaceOverrideMaterial(0, authored);
     var wrapper = new Node3D { Name = "Model" };
+    wrapper.SetMeta("wardrobe_catalog", new ModelWardrobeConfiguration());
     wrapper.AddChild(fixture.Body);
     fixture.Body.Owner = wrapper;
     using var scene = new PackedScene();

@@ -1,8 +1,22 @@
 # Character model controls simplification and component report
 
-Reviewed 2 October 2026 in the Linux cloud clone. The latest pass replaces face-SDF lighting with the existing normal-based toon path, as selected in the visual comparison. Face-axis runtime sampling, import bindings, and SDF shader plumbing are removed. Material isolation, clothing selections, poses, and coordinated mask writes are retained. Earlier verification below is historical; the face-shading verification is recorded separately.
+Reviewed 2 October 2026 in the Linux cloud clone. The latest pass makes wardrobe membership Blender-owned and import-validated, removes Godot catalog authoring and foreign-piece ownership guards, and preserves the preceding normal-based toon shading simplification. Material isolation, clothing selections, poses, and coordinated mask writes remain intact. Earlier verification below is historical; each later pass records its own verification.
 
 This report covers the **whole character-model-controls feature**, followed by the original simplification/rebase history and the consolidated author-time ownership pass below. The authoring guide remains [model-controls.md](model-controls.md).
+
+## Import-owned wardrobe (2 October 2026)
+
+Baseline: `a7fcc7ac9811aaa3e8ba098a365033dc25c04076`.
+
+- Blender `rig_D` custom properties now carry the exact existing catalog; stable source-object IDs resolve garments without inferring membership from collections or sanitized names. Zhu Yuan retains 7 components, 16 garment entries and 6 mask rules; Trigger retains 5, 15 and 11 respectively, including defaults and outfit-independent pieces
+- The actual post-import callback validates source metadata, references and fixed body-mask compatibility, then compiles a shared catalog into the imported scene. JSON is parsed only at import. Four small typed resources persist generated fields privately and expose read-only C# collections; their Inspector authoring surface, root resource assignment, editor authoring warnings, and two external wardrobe resources are removed
+- Piece controls now use `piece.Enabled = false`; outfits use `outfit.Select()`. These operate directly on their own instance, eliminating cross-model handle arguments and ownership validation. The existing selection keys/IDs, string-based selection methods, masks, overlap composition, material isolation and animation behavior are preserved
+- Only the obsolete wardrobe slot was removed from each wrapper. Semantic comparisons verified every other stored node property, instance reference, ownership/group data, connection, editable-instance flag and scene UID unchanged. Blender geometry fingerprints matched the original sources before/after metadata migration
+- This pass does not bake body variants, split body geometry, remove runtime mask rendering, or change the separate HUD/UI work
+
+Verification: all **72 model cases passed**; the full normal GdUnit suite finished **1,040 passed, 1 failed, 0 skipped**. The sole failure remains the pre-existing `DialogueViewTest.PhysicsProcessDrivesReveal` timing assertion at line 87; dialogue/HUD source and tests were not changed. Import regression finished **438 checks, 0 failures**, including real-scene invalid metadata/recovery and deterministic recompilation. Both Blender sources completed fresh imports. Debug and ExportRelease builds, changed-C# formatting and `--verify-no-changes` passed; full compiles retained 11 Debug / 2 ExportRelease existing nullable warnings outside model code. Two independent code reviews reported no remaining blockers after their findings were addressed.
+
+Regression checks were run red/green for the removed editable catalog surface, read-only collections, direct instance-scoped controls, pre-ready catalog attachment, and importer validation. Test-only deep duplication of C# mask resources exposed a Godot GC-handle failure during negative fixtures; explicit fixture construction retained all assertions and the complete importer suite then passed. Runtime and import production paths do not use that duplication.
 
 ## Normal-based face shading (2 October 2026)
 
@@ -126,7 +140,7 @@ All of this is presentation-owned. It has no battle-session, combatant, command-
 
 [CharacterModel.cs](../scenes/models/CharacterModel.cs) is the single scene-facing C# entry point. It coordinates initialization and exposes the native AnimationTree and optional attachment visibility. The fixed `ModelAnimationTree` child is resolved once; missing means unconfigured, wrong type is invalid authoring. A nonempty attachment path must resolve to Node3D.
 
-Native scene-local resource duplication happens before callbacks. `_Ready` initializes masks, wardrobe, and attachments. Late assignment of missing mask or wardrobe configuration retries an uninitialized model. No per-frame appearance callback or special process priority remains.
+Native scene-local resource duplication happens before callbacks. `_Ready` initializes masks, wardrobe, and attachments. Late assignment of missing mask setups retries an uninitialized model. Wardrobe definitions come exclusively from the imported child; early selections are applied when it is available at initialization. No per-frame appearance callback or special process priority remains.
 
 ### Appearance and material isolation
 
@@ -152,7 +166,7 @@ The compacted mesh needs remapped per-vertex outline weights. The texture is 256
 
 ### Wardrobe coordination
 
-[CharacterModel.Wardrobe.cs](../scenes/models/CharacterModel.Wardrobe.cs) uses shared typed authored resources directly, without Dictionary schema parsing or a second copied definition graph. [ModelWardrobeConfiguration.cs](../scenes/models/ModelWardrobeConfiguration.cs) and the three small component/garment/mask-rule resource types hold fixed data. `ValidateAuthoring()` runs for editor configuration warnings, scripted resource creation, and saved-asset tests; actual nodes and owner-bound regions still bind per instance. Selections remains the sole serialized clothing state, with the same inventories, lookups, master switch, and piece/outfit API.
+[CharacterModel.Wardrobe.cs](../scenes/models/CharacterModel.Wardrobe.cs) resolves the import-generated catalog without runtime JSON parsing or a copied definition graph. [ModelWardrobeConfiguration.cs](../scenes/models/ModelWardrobeConfiguration.cs) and its component/garment/mask-rule types expose read-only generated data. The real import compiler enforces definition and source compatibility checks; actual nodes and mask regions bind per instance. `Selections` remains the sole serialized clothing state; inventories/lookups and the master switch remain, while discovered pieces/outfits select themselves without foreign-handle arguments.
 
 The per-instance binding list pairs shared immutable rule definitions with that model's minted region handles; it never writes runtime ownership into shared resources. Required garment paths and mask rule name/index pairs still validate against actual instances. Typed selection writes retain coercion/clamping, and whole `Selections` dictionary replacement retains rollback on rejected derivation.
 
@@ -184,7 +198,7 @@ Arm extraction copies selected vertex attributes, skin references, surface names
 - Each model folder holds eight PNG inputs beside its Blender file, wrapper, and import sidecars. The former guide's references to absent textures/ directories were corrected
 - The two `.blend.import` files retain source UID, humanoid mapping and post-import settings. They are necessary reproducibility inputs, not disposable imported-cache output
 - `ZhuYuan.scn` and `Trigger.scn` wrap the imported model, preserving animation parameters, selections, mask/attachment configuration, and existing local material overrides. Contrary to the earlier guide, both contain an editable `Model` path. The author-time pass changes only the wardrobe reference and removes the retired `HeadBoneName` export; it does not silently remove authored overrides
-- `resources/models/<model>/presentation/wardrobe.tres` are the new typed shared wardrobe definitions, replacing the wrappers' embedded legacy dictionaries
+- The wardrobe catalogs are now generated inside the imported model scenes from Blender metadata; the two formerly authored `wardrobe.tres` files have been removed
 
 ### Native animation resources
 

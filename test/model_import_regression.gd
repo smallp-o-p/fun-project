@@ -14,6 +14,9 @@ func _initialize() -> void:
 	_test_hidden_groups()
 	_test_recipes()
 	_test_role_surfaces()
+	_test_mask_import_geometry()
+	_test_wardrobe_compiler()
+	_test_imported_wardrobes()
 	print("MODEL IMPORT REGRESSION: %d checks, %d failures" % [checks, failures])
 	quit(0 if failures == 0 else 1)
 
@@ -188,3 +191,225 @@ func _source_arrays() -> Array:
 		arrays[Mesh.ARRAY_BONES].append_array(PackedInt32Array([v, 0, 0, 0]))
 		arrays[Mesh.ARRAY_WEIGHTS].append_array(PackedFloat32Array([1, 0, 0, 0]))
 	return arrays
+
+func _test_wardrobe_compiler() -> void:
+	var path := "res://scenes/models/import/humanoid_wardrobe.gd"
+	_expect(ResourceLoader.exists(path), true, "wardrobe compiler exists")
+	if not ResourceLoader.exists(path):
+		return
+	var compiler: Script = load(path)
+	var scene := Node3D.new()
+	var rig := _add_path(scene, "rig_D", Node3D.new())
+	var garment := MeshInstance3D.new()
+	garment.mesh = BoxMesh.new()
+	garment.set_meta("extras", {"wardrobe_source_id": "garment"})
+	_add_path(scene, "rig_D/GeneralSkeleton/Name With Spaces", garment)
+	_add_mask_sources(scene, "res://scenes/models/Trigger/Trigger4.2.blend")
+	var data := {"version": 1, "variants": ["Original", "Alternate"], "default_variant": 1,
+		"components": {"UpperBody": {"visible": false, "pieces": [{"source": "garment", "variant": -1}]}}, "masks": []}
+	_expect(compiler.apply(scene, "res://scenes/models/Trigger/Trigger4.2.blend").is_empty(), false, "rejects absent wardrobe metadata")
+	rig.set_meta("extras", {"wardrobe_catalog": "{"})
+	_expect(compiler.apply(scene, "res://scenes/models/Trigger/Trigger4.2.blend").is_empty(), false, "rejects malformed JSON")
+	for field: String in ["version", "variants", "default_variant", "components", "masks"]:
+		var bad := data.duplicate(true)
+		bad.erase(field)
+		rig.set_meta("extras", {"wardrobe_catalog": JSON.stringify(bad)})
+		_expect(compiler.apply(scene, "res://scenes/models/Trigger/Trigger4.2.blend").is_empty(), false, "rejects missing " + field)
+	for bad: Dictionary in [
+		{"components": {"UpperBody": {"visible": false, "pieces": []}}},
+		{"components": {"UpperBody": {"visible": true, "pieces": [{"source": "garment", "variant": -1}, {"source": "garment", "variant": 1}]}}},
+		{"components": {"UpperBody": {"visible": true, "pieces": [{"source": "garment", "variant": -1}]}, "Other": {"visible": true, "pieces": [{"source": "garment", "variant": -1}]}}},
+		{"variants": ["Original", "Original"]}, {"variants": []}, {"default_variant": 2}, {"default_variant": 0.5},
+		{"components": {"UpperBody": {"visible": "false", "pieces": []}}},
+		{"components": {"UpperBody": {"visible": false, "pieces": [{"source": "missing", "variant": -1}]}}},
+		{"components": {"UpperBody": {"visible": false, "pieces": [{"source": "garment", "variant": 2}]}}},
+		{"components": {"UpperBody": {"visible": false, "pieces": [{"role": "NotARole", "variant": -1}]}}},
+		{"masks": [{"source": "garment", "name": "missing", "index": 0, "component": "Missing", "enabled": true, "variant": -1}]},
+	]:
+		var altered := data.duplicate(true)
+		altered.merge(bad, true)
+		rig.set_meta("extras", {"wardrobe_catalog": JSON.stringify(altered)})
+		_expect(compiler.apply(scene, "res://scenes/models/Trigger/Trigger4.2.blend").is_empty(), false, "rejects malformed wardrobe " + str(bad))
+		_expect(scene.has_meta("wardrobe_catalog"), false, "invalid input publishes no catalog")
+	rig.set_meta("extras", {"wardrobe_catalog": JSON.stringify(data)})
+	var duplicate := MeshInstance3D.new()
+	duplicate.set_meta("extras", {"wardrobe_source_id": "garment"})
+	scene.add_child(duplicate)
+	_expect(compiler.apply(scene, "res://scenes/models/Trigger/Trigger4.2.blend").is_empty(), false, "rejects duplicate source IDs")
+	duplicate.free()
+	_expect(compiler.apply(scene, "res://scenes/models/Trigger/Trigger4.2.blend"), "", "compiles valid source catalog")
+	_expect(scene.has_meta("wardrobe_catalog"), true, "publishes generated resource")
+	if scene.has_meta("wardrobe_catalog"):
+		var catalog: Resource = scene.get_meta("wardrobe_catalog")
+		_expect(catalog.get("_variants"), PackedStringArray(["Original", "Alternate"]), "preserves ordered outfit IDs")
+		_expect(catalog.get("_defaultVariant"), 1, "preserves default outfit")
+		var component: Resource = catalog.get("_components")["UpperBody"]
+		_expect(component.get("_visible"), false, "preserves hidden component default")
+		var piece: Resource = component.get("_pieces")[0]
+		_expect(piece.get("_path"), NodePath("Model/rig_D/GeneralSkeleton/Name With Spaces"), "resolves actual node path without sanitization")
+		_expect(piece.get("_variant"), -1, "preserves common garment")
+	var body: MeshInstance3D = scene.get_node("rig_D/GeneralSkeleton/ZZZ_Size02_C")
+	var original_mesh: Mesh = body.mesh
+	body.mesh = ArrayMesh.new()
+	_expect(compiler.apply(scene, "res://scenes/models/Trigger/Trigger4.2.blend").is_empty(), false, "empty rules still reject stale fixed mask geometry")
+	body.mesh = original_mesh
+	_add_mask_sources(scene, "res://scenes/models/ZhuYuan/ZhuYuan.blend")
+	var weapons := _add_path(scene, "rig_D/GeneralSkeleton/Weapons", Node3D.new())
+	var copy := MeshInstance3D.new()
+	copy.set_meta("extras", {"wardrobe_source_id": "garment"})
+	weapons.add_child(copy)
+	_add_path(scene, "rig_D/GeneralSkeleton/Weapons/BackModule", Node3D.new())
+	_add_path(scene, "rig_D/GeneralSkeleton/Weapons/ArmModules", Node3D.new())
+	data["components"]["Equipment"] = {"visible": true, "pieces": [{"role": "BackModule", "variant": -1}, {"role": "ArmModules", "variant": -1}]}
+	rig.set_meta("extras", {"wardrobe_catalog": JSON.stringify(data)})
+	_expect(compiler.apply(scene, "res://scenes/models/ZhuYuan/ZhuYuan.blend"), "", "compiles existing equipment roles despite copied identity metadata")
+	if scene.has_meta("wardrobe_catalog"):
+		var catalog: Resource = scene.get_meta("wardrobe_catalog")
+		var equipment: Resource = catalog.get("_components")["Equipment"]
+		_expect(equipment.get("_pieces")[0].get("_path"), NodePath("Model/rig_D/GeneralSkeleton/Weapons/BackModule"), "resolves existing back module subgroup")
+		_expect(equipment.get("_pieces")[1].get("_path"), NodePath("Model/rig_D/GeneralSkeleton/Weapons/ArmModules"), "resolves existing arm modules subgroup")
+	scene.free()
+
+func _test_mask_import_geometry() -> void:
+	var config: Resource = load("res://scenes/models/ModelMaskConfiguration.cs").new()
+	_expect(config.has_method("ValidateImportGeometry"), true, "mask configuration exposes import geometry validation")
+	if not config.has_method("ValidateImportGeometry"):
+		return
+	_expect(config.call("ValidateImportGeometry", null).is_empty(), false, "rejects null mask source mesh")
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _source_arrays())
+	_expect(config.call("ValidateImportGeometry", mesh).is_empty(), false, "rejects stale mask geometry")
+	var real_scene: Node = (load("res://scenes/models/Trigger/Trigger4.2.blend") as PackedScene).instantiate()
+	var real_mesh: ArrayMesh = real_scene.get_node("rig_D/GeneralSkeleton/ZZZ_Size02_C").mesh
+	var real_config: Resource = load("res://resources/models/trigger/presentation/body_mask.res")
+	_expect(real_config.call("ValidateImportGeometry", real_mesh), "", "valid real mask source")
+	for kind: String in ["mask count", "default bits", "triangle flags"]:
+		var broken: Resource = _copy_mask_config(real_config)
+		if kind == "mask count":
+			var names: Dictionary = broken.get("Masks")
+			for i: int in 65:
+				names["extra_" + str(i)] = false
+		elif kind == "default bits":
+			broken.set("DefaultBits", 1 << 62)
+		else:
+			var surfaces: Array = broken.get("TriangleMasks")
+			var flags: PackedInt64Array = surfaces[0]
+			flags[0] = 1 << 62
+			surfaces[0] = flags
+		_expect(broken.call("ValidateImportGeometry", real_mesh).is_empty(), false, "rejects invalid " + kind)
+	real_scene.free()
+
+
+func _test_imported_wardrobes() -> void:
+	var compiler: Script = load("res://scenes/models/import/humanoid_wardrobe.gd")
+	for source: String in compiler.MASKS:
+		var scene: Node = (load(source) as PackedScene).instantiate()
+		var key: String = "trigger" if source.contains("Trigger") else "zhu_yuan"
+		_expect(scene.has_meta("wardrobe_catalog"), true, key + " packed scene owns generated wardrobe")
+		var rig := scene.get_node("rig_D")
+		_expect(compiler._extras(rig).has("wardrobe_catalog"), true, key + " retains Blender-owned catalog metadata")
+		if not compiler._extras(rig).has("wardrobe_catalog") or not scene.has_meta("wardrobe_catalog"):
+			scene.free()
+			continue
+		var data: Dictionary = JSON.parse_string(compiler._extras(rig)["wardrobe_catalog"])
+		var catalog: Resource = scene.get_meta("wardrobe_catalog")
+		var components: Dictionary = catalog.get("_components")
+		var masks: Array = catalog.get("_masks")
+		_expect(components.size(), 5 if key == "trigger" else 7, key + " migrated component count")
+		_expect(masks.size(), 11 if key == "trigger" else 6, key + " migrated mask count")
+		_expect(catalog.get("_variants"), PackedStringArray(["Original", "Clothing 2", "Clothing Voluptuous"] if key == "trigger" else ["Original"]), key + " exact outfit IDs")
+		_expect(catalog.get("_defaultVariant"), 1 if key == "trigger" else 0, key + " exact default outfit")
+		var piece_count := 0
+		for id: String in components:
+			var component: Resource = components[id]
+			_expect(component.get("_visible"), data["components"][id]["visible"], key + "/" + id + " visibility")
+			var pieces: Array = component.get("_pieces")
+			piece_count += pieces.size()
+			_expect(pieces.size(), data["components"][id]["pieces"].size(), key + "/" + id + " piece count")
+			for i: int in pieces.size():
+				var piece: Resource = pieces[i]
+				var path: String = str(piece.get("_path"))
+				_expect(path.begins_with("Model/"), true, key + " model-relative garment path")
+				_expect(scene.get_node_or_null(NodePath(path.trim_prefix("Model/"))) is Node3D, true, key + " garment target exists")
+				_expect(piece.get("_variant"), int(data["components"][id]["pieces"][i]["variant"]), key + " garment variant")
+		_expect(piece_count, 15 if key == "trigger" else 16, key + " exact garment count")
+		for i: int in masks.size():
+			var rule: Resource = masks[i]
+			var row: Dictionary = data["masks"][i]
+			for pair: Array in [["_name", "name"], ["_index", "index"], ["_component", "component"], ["_enabled", "enabled"], ["_variant", "variant"]]:
+				_expect(rule.get(pair[0]), row[pair[1]], key + " preserves mask " + str(pair[1]))
+		var before := _catalog_snapshot(catalog)
+		_expect(compiler.apply(scene, source), "", key + " revalidates actual mask geometry and source IDs")
+		_expect(_catalog_snapshot(scene.get_meta("wardrobe_catalog")), before, key + " deterministic recompilation matches packed catalog")
+		_expect(compiler.apply(scene, source), "", key + " repeated compile succeeds")
+		_expect(_catalog_snapshot(scene.get_meta("wardrobe_catalog")), before, key + " repeated compile has no accumulated entries")
+		for source_id: String in compiler.MASKS[source]:
+			var config: Resource = load(compiler.MASKS[source][source_id])
+			var sources := {}
+			_expect(compiler._collect_sources(scene, scene, sources), "", key + " indexes source identities")
+			var mesh: ArrayMesh = sources[source_id].mesh
+			_expect(config.call("ValidateImportGeometry", mesh), "", key + " mask geometry matches")
+			var too_many: Resource = _copy_mask_config(config)
+			var names: Dictionary = too_many.get("Masks")
+			for i: int in 65:
+				names["extra_" + str(i)] = false
+			_expect(too_many.call("ValidateImportGeometry", mesh).is_empty(), false, key + " rejects more than 64 masks")
+			var bad_default: Resource = _copy_mask_config(config)
+			bad_default.set("DefaultBits", 1 << 62)
+			_expect(bad_default.call("ValidateImportGeometry", mesh).is_empty(), false, key + " rejects unknown default bits")
+			var bad_flags: Resource = _copy_mask_config(config)
+			var surfaces: Array = bad_flags.get("TriangleMasks")
+			var flags: PackedInt64Array = surfaces[0]
+			flags[0] = 1 << 62
+			surfaces[0] = flags
+			_expect(bad_flags.call("ValidateImportGeometry", mesh).is_empty(), false, key + " rejects unknown triangle flags")
+			var bad_count: Resource = _copy_mask_config(config)
+			var bad_surfaces: Array = bad_count.get("TriangleMasks")
+			bad_surfaces[0] = PackedInt64Array()
+			_expect(bad_count.call("ValidateImportGeometry", mesh).is_empty(), false, key + " rejects wrong triangle count")
+
+		for patch: Dictionary in [{"name": "missing"}, {"index": 999}, {"component": "missing"}, {"variant": 99}, {"source": "missing"}]:
+			var bad: Dictionary = data.duplicate(true)
+			bad["masks"][0].merge(patch, true)
+			rig.set_meta("extras", {"wardrobe_catalog": JSON.stringify(bad)})
+			_expect(compiler.apply(scene, source).is_empty(), false, key + " rejects broken mask " + str(patch))
+			_expect(scene.has_meta("wardrobe_catalog"), false, key + " broken mask publishes no resource")
+		rig.set_meta("extras", {"wardrobe_catalog": JSON.stringify(data)})
+		_expect(compiler.apply(scene, source), "", key + " recovers after corrected metadata")
+		scene.free()
+
+func _add_mask_sources(scene: Node, source: String) -> void:
+	var compiler: Script = load("res://scenes/models/import/humanoid_wardrobe.gd")
+	var original: Node = (load(source) as PackedScene).instantiate()
+	for id: String in compiler.MASKS[source]:
+		var path := "rig_D/GeneralSkeleton/" + id
+		var old := scene.get_node_or_null(path)
+		if old != null:
+			old.free()
+		var mesh := MeshInstance3D.new()
+		mesh.mesh = (original.get_node(path) as MeshInstance3D).mesh
+		mesh.set_meta("extras", {"wardrobe_source_id": id})
+		_add_path(scene, path, mesh)
+	original.free()
+
+func _catalog_snapshot(catalog: Resource) -> Dictionary:
+	var result := {"variants": catalog.get("_variants"), "default": catalog.get("_defaultVariant"), "components": {}, "masks": []}
+	for id: String in catalog.get("_components"):
+		var component: Resource = catalog.get("_components")[id]
+		var row := {"visible": component.get("_visible"), "pieces": []}
+		for piece: Resource in component.get("_pieces"):
+			row["pieces"].append([piece.get("_path"), piece.get("_variant")])
+		result["components"][id] = row
+	for rule: Resource in catalog.get("_masks"):
+		result["masks"].append([rule.get("_path"), rule.get("_name"), rule.get("_index"), rule.get("_component"), rule.get("_enabled"), rule.get("_variant")])
+	return result
+
+func _copy_mask_config(original: Resource) -> Resource:
+	# Construct fixtures explicitly instead of deep-duplicating C# script handles.
+	var copy: Resource = load("res://scenes/models/ModelMaskConfiguration.cs").new()
+	copy.set("Masks", (original.get("Masks") as Dictionary).duplicate())
+	copy.set("DefaultBits", original.get("DefaultBits"))
+	copy.set("DefaultMesh", original.get("DefaultMesh"))
+	copy.set("GeometryHash", original.get("GeometryHash"))
+	copy.set("TriangleMasks", (original.get("TriangleMasks") as Array).duplicate(true))
+	return copy

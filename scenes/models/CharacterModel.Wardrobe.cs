@@ -8,7 +8,7 @@ namespace FunProject.Models;
 /// garments and body masks together. Initialized writes preflight affected
 /// garment and mask updates before applying them; each affected mask commits
 /// one prepared selection that ORs the active rules' contributions while
-/// retaining regions no rule controls; pieces and outfits are owner-bound handles.
+/// retaining regions no rule controls; pieces and outfits are instance-scoped controls.
 /// </summary>
 public partial class CharacterModel
 {
@@ -16,42 +16,25 @@ public partial class CharacterModel
   public const string ClothingEnabledKey = "clothing_enabled";
   public const string PiecesPrefix = "pieces/";
 
-  private ModelWardrobeConfiguration _wardrobeConfiguration = new();
-
-  /// <summary>
-  /// Fixed authored definitions, shared across instances. A late assignment to
-  /// a ready, uninitialized model retries setup, like <see cref="MaskSetups"/>.
-  /// </summary>
-  [Export]
-  public ModelWardrobeConfiguration WardrobeConfiguration
+  // The import owns the catalog. It is deliberately absent from the root's
+  // exported API: only per-instance selections are editable in Godot.
+  internal ModelWardrobeConfiguration WardrobeConfiguration
   {
-    get => _wardrobeConfiguration;
-    set
+    get
     {
-      _wardrobeConfiguration = value;
-      if (!_wardrobeInitialized)
+      if (_boundWardrobe is not null)
+        return _boundWardrobe;
+      Node? imported = GetNodeOrNull<Node>("Model");
+      if (imported is null)
       {
-        _boundWardrobe = null;
-        if (IsNodeReady() && value is not null)
-          Initialize();
+        _catalogProvisional = true;
+        return new ModelWardrobeConfiguration();
       }
-      if (Engine.IsEditorHint())
-        UpdateConfigurationWarnings();
-    }
-  }
-
-  public override string[] _GetConfigurationWarnings()
-  {
-    try
-    {
-      if (WardrobeConfiguration is null)
-        return ["The model has no wardrobe configuration."];
-      WardrobeConfiguration.ValidateAuthoring();
-      return [];
-    }
-    catch (InvalidOperationException failure)
-    {
-      return [failure.Message];
+      return imported.HasMeta("wardrobe_catalog")
+        && imported.GetMeta("wardrobe_catalog").AsGodotObject() is ModelWardrobeConfiguration catalog
+        ? catalog
+        : throw new InvalidOperationException(
+          $"The character model '{Name}' has no imported wardrobe catalog; reimport its Blender source.");
     }
   }
 
@@ -85,11 +68,12 @@ public partial class CharacterModel
   }
 
   private ModelWardrobeConfiguration? _boundWardrobe;
-  private Godot.Collections.Dictionary<string, ModelWardrobeComponent> Components => _boundWardrobe!.Components;
+  private SysColGeneric.IReadOnlyDictionary<string, ModelWardrobeComponent> Components => _boundWardrobe!.Components;
   private SysColGeneric.List<(ModelWardrobeMaskRule Rule, MaskRuntime.Region Region)> _maskRules = [];
   private readonly SysColGeneric.List<ModelClothingPiece> _pieces = [];
   private readonly SysColGeneric.List<ModelOutfit> _outfits = [];
   private bool _wardrobeInitialized;
+  private bool _catalogProvisional;
 
   /// <summary>
   /// Binds the authored definitions and applies the stored selections once;
@@ -99,6 +83,13 @@ public partial class CharacterModel
   {
     if (_wardrobeInitialized)
       return;
+    // Pre-ready selections may precede attachment of the imported child.
+    // Only an absent-source placeholder is discarded, never imported controls.
+    if (_catalogProvisional)
+    {
+      _boundWardrobe = null;
+      _catalogProvisional = false;
+    }
     EnsureWardrobeEntries();
     BindRequiredData();
     ApplySelection(null, null);
@@ -161,7 +152,7 @@ public partial class CharacterModel
     get
     {
       EnsureWardrobeEntries();
-      return _pieces;
+      return _pieces.AsReadOnly();
     }
   }
 
@@ -171,7 +162,7 @@ public partial class CharacterModel
     get
     {
       EnsureWardrobeEntries();
-      return _outfits;
+      return _outfits.AsReadOnly();
     }
   }
 
@@ -213,37 +204,6 @@ public partial class CharacterModel
         : throw new InvalidOperationException(
           $"The wardrobe '{Name}' has no outfit for the selected variant index {index}.");
     }
-  }
-
-  /// <summary>Selects an outfit discovered by this model; foreign outfits are rejected.</summary>
-  public void SelectOutfit(ModelOutfit outfit)
-  {
-    ValidateOwnership(outfit);
-    WriteSelection(OutfitKey, Variant.From(outfit.VariantIndex));
-  }
-
-  /// <summary>Enables or disables a piece discovered by this model; foreign pieces are rejected.</summary>
-  public void SetPieceEnabled(ModelClothingPiece piece, bool enabled)
-  {
-    ValidateOwnership(piece);
-    WriteSelection(PiecesPrefix + piece.Id, Variant.From(enabled));
-  }
-
-  // Foreign entries are caller bugs: reject them before any selection indexing.
-  private void ValidateOwnership(ModelClothingPiece piece)
-  {
-    ArgumentNullException.ThrowIfNull(piece);
-    if (!ReferenceEquals(piece.Owner, this))
-      throw new InvalidOperationException(
-        $"The clothing piece '{piece.Id}' belongs to the wardrobe '{piece.Owner.Name}', not '{Name}'.");
-  }
-
-  private void ValidateOwnership(ModelOutfit outfit)
-  {
-    ArgumentNullException.ThrowIfNull(outfit);
-    if (!ReferenceEquals(outfit.Owner, this))
-      throw new InvalidOperationException(
-        $"The outfit '{outfit.Id}' belongs to the wardrobe '{outfit.Owner.Name}', not '{Name}'.");
   }
 
   /// <summary>The stored per-piece selection.</summary>
@@ -458,7 +418,7 @@ public partial class CharacterModel
     _maskRules = bindings;
   }
 
-  // Mint owner-bound controls without parsing or copying the shared definitions.
+  // Create instance-scoped controls without parsing or copying the shared definitions.
   private void EnsureWardrobeEntries()
   {
     if (_boundWardrobe is not null)
@@ -469,7 +429,7 @@ public partial class CharacterModel
     foreach (string component in configuration.Components.Keys)
       _pieces.Add(new ModelClothingPiece(this, component));
     _outfits.Clear();
-    for (int i = 0; i < configuration.Variants.Length; i++)
+    for (int i = 0; i < configuration.Variants.Count; i++)
       _outfits.Add(new ModelOutfit(this, configuration.Variants[i], i));
     _boundWardrobe = configuration;
   }

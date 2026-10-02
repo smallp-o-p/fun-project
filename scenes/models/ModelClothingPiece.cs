@@ -10,11 +10,11 @@ public sealed class ModelClothingPiece
 {
   internal ModelClothingPiece(CharacterModel owner, StringName id)
   {
-    Owner = owner;
+    _model = owner;
     Id = id;
   }
 
-  internal CharacterModel Owner { get; }
+  private readonly CharacterModel _model;
 
   /// <summary>The authored component name; the stable lookup key of this piece.</summary>
   public StringName Id { get; }
@@ -26,11 +26,15 @@ public sealed class ModelClothingPiece
   /// The saved per-piece selection. The wardrobe's master clothing switch only
   /// suppresses its effect, so hiding and restoring the outfit preserves it.
   /// </summary>
-  public bool Enabled => Owner.GetPiece(Id);
+  public bool Enabled
+  {
+    get => _model.GetPiece(Id);
+    set => _model.SetPiece(Id, value);
+  }
 
   /// <summary>
   /// Effective visibility: the piece is selected, clothing is enabled, and the
   /// current outfit owns at least one garment of this piece.
   /// </summary>
-  public bool IsVisible => Owner.ComponentActive(Id);
+  public bool IsVisible => _model.ComponentActive(Id);
 }

@@ -16,7 +16,7 @@ public class ModelAuthoringApiExampleTest
     ModelClothingPiece piece = model.FindPiece(pieceId).Match(
       found => found,
       () => throw new InvalidOperationException($"Missing clothing piece '{pieceId}'."));
-    model.SetPieceEnabled(piece, false);
+    piece.Enabled = false;
     model.ClothingEnabled = false;
   }
 

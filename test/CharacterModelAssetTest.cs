@@ -124,7 +124,6 @@ public class CharacterModelAssetTest
   public void AuthoredOutlineSettingsSurviveIsolationWithoutRuntimeWrites(string scene)
   {
     using var fixture = ModelFixture.FromScene(scene, start: false);
-    fixture.Model.WardrobeConfiguration.ValidateAuthoring();
     var authoredIds = new SysColGeneric.List<(MeshInstance3D Mesh, int Surface, ulong Material, ulong Outline)>();
     foreach (Node node in fixture.Root.FindChildren("*", "MeshInstance3D", true, false))
     {
@@ -258,7 +257,7 @@ public class CharacterModelAssetTest
       "Expected Trigger's original-outfit UpperBody piece visible and the "
       + "clothing_voluptuous piece hidden before the switch.");
 
-    wardrobe.SelectOutfit(wardrobe.Outfits[2]);
+    wardrobe.Outfits[2].Select();
     Assert.Equal(2, wardrobe.OutfitIndex,
       $"The outfit switch left the wardrobe on variant {wardrobe.OutfitIndex} instead of 2.");
     Assert.True(!IsVisible(originalPiece) && IsVisible(switchedPiece),
@@ -268,7 +267,7 @@ public class CharacterModelAssetTest
       $"The outfit switch left the body mask at {switchedTriangles} visible triangles, "
       + $"unchanged from the authored {authoredTriangles}.");
 
-    wardrobe.SelectOutfit(wardrobe.Outfits[0]);
+    wardrobe.Outfits[0].Select();
     Assert.Equal(0, wardrobe.OutfitIndex,
       $"Restoring the outfit left the wardrobe on variant {wardrobe.OutfitIndex} instead of 0.");
     Assert.True(IsVisible(originalPiece) && !IsVisible(switchedPiece),

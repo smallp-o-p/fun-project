@@ -6,7 +6,7 @@
 
 | Asset | Purpose |
 | --- | --- |
-| `res://scenes/models/ZhuYuan/ZhuYuan.scn` | Zhu Yuan: a wrapper retaining local material overrides. Root is `CharacterModel` with its fixed `ModelAnimationTree` child resolved by name; a `Model` child instances the imported Blender scene, the mask setups, wardrobe configuration, and selections are authored on the root, and `AttachmentsPath` points at the import-owned, default-hidden weapons group `Model/rig_D/GeneralSkeleton/Weapons`. |
+| `res://scenes/models/ZhuYuan/ZhuYuan.scn` | Zhu Yuan: a wrapper retaining local material overrides. Root is `CharacterModel` with its fixed `ModelAnimationTree` child resolved by name; a `Model` child instances the imported Blender scene, the mask setups and selections are saved on the root, and the wardrobe catalog comes from the imported `Model`, and `AttachmentsPath` points at the import-owned, default-hidden weapons group `Model/rig_D/GeneralSkeleton/Weapons`. |
 | `res://scenes/models/Trigger/Trigger.scn` | Trigger: the same root shape minus attachments — `AttachmentsPath` is empty and its optional weapon source collection stays hidden inside the import (it is not an extracted production scene). |
 | `res://scenes/models/ZhuYuan/ZhuYuan.blend`, `res://scenes/models/Trigger/Trigger4.2.blend` | Authoritative Blender sources. Godot's import pipeline — `scenes/models/import/humanoid_post_import.gd` with `humanoid_structure.gd` and `humanoid_presentation.gd` — normalizes the skeleton, reparents the tongue rig, adds Zhu Yuan's weapon copies and derived arm meshes, and applies the committed per-model manifests. Each model folder carries eight committed PNG inputs beside its Blender file and wrapper, with matching import sidecars. |
 | `res://resources/models/shared/humanoid_body.res` | One shared body animation library for both models: `neutral`, `head_turn`, and `motion_demo` as rotation-only tracks on the normalized `Head`/`LeftUpperArm` bones. |
@@ -15,7 +15,7 @@
 | `res://resources/models/<model>/import_bindings.res`, `res://resources/models/<model>/presentation/presentation.res` | Import-time manifests applied on every reimport: the structure recipe (tongue placement, weapon copies) and the presentation manifest (captured surface materials, saved mesh defaults, required hidden groups). |
 | `res://resources/models/<model>/presentation/body_mask.res`, `res://resources/models/trigger/presentation/pantyhose_mask.res` | Saved typed `ModelMaskConfiguration` mesh-mask configurations, including original embedded default meshes. |
 | `res://resources/models/<model>/presentation/*_mask_setup.tres` | Saved `ModelMeshMaskSetup` resources, each binding one masked mesh's root-relative path to the `ModelMaskConfiguration` beside it; the root's `MaskSetups` array references them. |
-| `res://resources/models/<model>/presentation/wardrobe.tres` | Shared typed `ModelWardrobeConfiguration` with fixed outfit/component/garment/mask-rule definitions; instance choices remain in `Selections`. |
+| Imported `Model` metadata `wardrobe_catalog` | Generated, storage-only `ModelWardrobeConfiguration` compiled from Blender custom properties. Instance choices remain in `Selections`. |
 | `res://scenes/models/shared/character.gdshader`, `outline.gdshader` | Shared shader source for surfaces and their authored outline passes. |
 
 The wrapper's `ModelAnimationPlayer` carries two named libraries — `body` (the shared `humanoid_body.res`) and `face` (the per-model `humanoid_face.res`) — so both models share one body clip set while expression clips stay per-model; graph clip references use those library names (`body/neutral`, `face/expr_<Preset>`, …). Scene trees stay active: `ModelAnimationTree.active = true` is saved in both scenes, so the native mixer drives the rig from load. The root's fixed `ModelAnimationTree` child resolves once when the root's `_Ready` runs; a missing child of that name leaves the animation component unconfigured (synthetic fixtures do this), and a child of the wrong type is an authoring error. `AttachmentsPath` is the optional attachment input.
@@ -27,7 +27,6 @@ One node owns the whole scripted surface — there are no scripted component chi
 | Export | Purpose |
 | --- | --- |
 | `MaskSetups` | Array of `ModelMeshMaskSetup` resources, each binding one root-relative masked-mesh path to its typed `ModelMaskConfiguration`. |
-| `WardrobeConfiguration` | Shared typed `ModelWardrobeConfiguration`: outfits, components with garment resources, and mask-rule resources. Fixed after authoring. |
 | `Selections` | Per-instance clothing selections (`outfit`, `clothing_enabled`, `pieces/<name>`) — the sole serialized clothing control surface. |
 | `AttachmentsPath` | Path of the optional attachment container; empty means no attachment set. |
 | `AttachmentsVisible` | Whole-set visibility toggle for the attachment container. |
@@ -78,7 +77,7 @@ The parameters live on the per-instance `AnimationTree`, so weights stay fully s
 
 ## Clothing: one uniform wardrobe API
 
-The root uses a shared, typed `ModelWardrobeConfiguration` directly and creates only its owner-bound piece/outfit handles and mask-region bindings. It does not parse a dictionary or copy authored definitions per character. Callers discover the model's pieces/outfits rather than addressing garment nodes or variant indices.
+The root uses a shared, typed `ModelWardrobeConfiguration` directly and creates only its instance-scoped piece/outfit controls and mask-region bindings. It does not parse a dictionary or copy authored definitions per character. Callers discover the model's pieces/outfits rather than addressing garment nodes or variant indices.
 
 ```csharp
 // Piece and outfit IDs come from the model's own Pieces/Outfits inventories;
@@ -89,32 +88,25 @@ foreach (ModelOutfit outfit in model.Outfits) { /* discover */ }
 Option<ModelClothingPiece> piece = model.FindPiece("Gloves");
 Option<ModelOutfit> outfit = model.FindOutfit("Clothing 2");
 
-model.SelectOutfit(outfit.Match(o => o, () => throw new InvalidOperationException("missing")));
-model.SetPieceEnabled(piece.Match(p => p, () => throw new InvalidOperationException("missing")), false);
+outfit.Match(o => o, () => throw new InvalidOperationException("missing")).Select();
+piece.Match(p => p, () => throw new InvalidOperationException("missing")).Enabled = false;
 model.ClothingEnabled = false;   // hide the whole outfit
 model.ClothingEnabled = true;    // restore it exactly
 ```
 
-- **Saved versus effective visibility.** `piece.Enabled` is the saved per-piece selection: it only changes through `SetPieceEnabled`, and the master switch never overwrites it. `piece.IsVisible` is the effective state: selected, clothing enabled, and the current outfit owns at least one garment of the piece. `ClothingEnabled = false` therefore hides the outfit while preserving every saved selection for the restore.
+- **Saved versus effective visibility.** `piece.Enabled` is the saved per-piece selection: it only changes through its `Enabled` setter, and the master switch never overwrites it. `piece.IsVisible` is the effective state: selected, clothing enabled, and the current outfit owns at least one garment of the piece. `ClothingEnabled = false` therefore hides the outfit while preserving every saved selection for the restore.
 - **Preflight before visible changes.** Every write derives the complete resulting clothing state first; required garment nodes and every affected mask's prepared region selection validate before the selection is stored or anything is written, so a rejected write leaves selections, garments, and masks untouched. Selections serialized in the scene (or written before initialization) apply on first initialization, and every initialized write preflights and applies immediately.
 - **Editor inspector checkbox.** The model root exposes a `Clothing Enabled` checkbox in the editor inspector. It is an editor-only view of the `Selections` entry `clothing_enabled` — the same state the C# setter writes — so toggling it applies garment visibility and body-mask changes immediately in the editor (ordinary editor undo/redo applies) and the choice persists with the scene through `Selections`. The virtual property itself is never serialized, and the runtime C# API is unchanged.
 - **Live `Selections` edits.** Inspector dictionary edits replace the whole `Selections` value; once the model is initialized, the complete stored state preflights and applies immediately (outfit and `pieces/<name>` toggles apply live like the checkbox), a rejected combination reverts the assignment and rethrows, and a replacement made before initialization is stored as-is.
 - **Component selections listed.** Initialization materializes one `pieces/<name>` entry per authored component from its authored default — never overwriting a stored selection, and never materializing `outfit` or `clothing_enabled` — so the inspector's `Selections` dictionary lists every component the model has, ready to toggle. A whole-dictionary replacement re-materializes them.
 - **Recovery from a failed initialization.** Editor startup can assign the typed `MaskSetups` array before the C# class can instantiate it, so the exported setups land empty and the root fails its `_Ready` (leaving the wardrobe uninitialized too). A later non-null assignment to a ready, still-uninitialized model retries `Initialize`, so stored selections apply and inspector toggles work again without reloading the scene.
 - **Overlapping body masks.** Garments claim body regions through mask rules; authored rules (path, name, index) bind at initialization to region entries minted by the resolved mask runtime — the wardrobe never addresses bits afterwards, and a retried initialization rebinds. When several enabled rules cover the same mesh region the contributions OR together (never last-rule-wins), and each affected mesh commits one prepared region selection that retains every region no rule controls.
-- **Foreign entries are caller bugs.** `SelectOutfit`/`SetPieceEnabled` reject entries discovered by another model before any state changes.
+- **Instance-scoped controls.** `piece.Enabled = false` and `outfit.Select()` operate on the instance that exposes them. There is no API accepting another model’s piece or outfit, and no foreign-handle ownership validation.
 - **Playback independence.** Clothing operations change garments and masks only; animation playback and preset weights keep running untouched.
 
-The typed authored resources are:
+The importer compiles four small storage-only resource types: the catalog, components, garment paths, and mask rules. Their C# views are read-only, and none offers Inspector fields or runtime catalog setters. The model root resolves the compiled catalog from its imported `Model` child; no editable wardrobe resource slot remains. Import rejects invalid IDs, variants, garment references, mask links, or incompatible source geometry before publishing the catalog. Instance initialization still resolves actual garment nodes and mask runtimes; selection writes retain their coordinated preflight checks.
 
-- `ModelWardrobeConfiguration`: ordered `Variants`, `DefaultVariant`, `Components` keyed by piece ID, and `Masks`
-- `ModelWardrobeComponent`: initial `Visible` selection and `Pieces`
-- `ModelWardrobeGarment`: root-relative `Path` and outfit `Variant`; `-1` means outfit-independent
-- `ModelWardrobeMaskRule`: `Path`, region `Name`/`Index`, `Component`, `Enabled`, and `Variant`
-
-These resources are shared definitions and must not be mutated after a model uses them. `ValidateAuthoring()` checks duplicate labels, variants, missing definitions/paths, and component references before generated resources are saved. The root's Godot configuration warnings expose the same checks; whole-resource assignment refreshes them. Live warning refresh after editing nested resource fields is not guaranteed, so use `ValidateAuthoring()` and the saved-asset tests as the verification gate. Actual garment nodes and owner-bound mask regions still resolve against each live instance, and selection writes retain their preflight checks. No owner-bound region is stored in a shared resource.
-
-Per-instance selections remain in the original `Selections` dictionary (`outfit`, `clothing_enabled`, `pieces/<name>`), the sole serialized clothing state. The string-keyed `GetPiece`/`SetPiece` APIs remain available. The migrated wrapper resources no longer carry ignored legacy `source`/`body` dictionary fields.
+Per-instance selections remain in the original `Selections` dictionary (`outfit`, `clothing_enabled`, `pieces/<name>`), the sole serialized clothing state. The string-keyed `GetPiece`/`SetPiece` APIs remain available. The wrapper resources do not carry a wardrobe definition or ignored legacy `source`/`body` fields.
 
 ## Mesh masks
 
@@ -156,7 +148,11 @@ All wrapper and animation authoring happens in Godot (editor panels or scripted 
 
 **Preset names and overlaps.** Preset names are the graph node base names, authored directly in the blend tree; clip names follow the `expr_<Preset>` convention. Independent presets may intentionally overlap one physical channel with different contributions (the tested `Smile`/`SmileExtra` fixture pair drives the same `Face:Smile` blend shape through two weights), and that stays valid.
 
-**Wardrobe authoring.** Edit the typed wardrobe resource assigned to the wrapper root. Resolve any configuration warnings and call `ValidateAuthoring()` before scripted saves, then instantiate the saved wrapper and verify its clothing/mask defaults. Keep definitions shared and immutable; only `Selections` contains per-character choices.
+**Wardrobe membership belongs to Blender.** The `rig_D` object carries a `wardrobe_catalog` JSON custom property with version `1`, ordered `variants`, `default_variant`, `components`, and `masks`. Referenced mesh objects carry stable `wardrobe_source_id` strings; keep those IDs when renaming objects. Both imports export custom properties. Existing collections are not inferred to be game outfits, and extra source clothing is not automatically added.
+
+A component uses its existing saved selection ID and `{ "visible": true, "pieces": [{ "source": "Shirt", "variant": -1 }] }`. `variant: -1` means every outfit; other values index `variants`. A mask row has `{ "source": "Body", "name": "mask_Up", "index": 2, "component": "UpperBody", "enabled": true, "variant": -1 }`; an empty component is an ungated rule. Generated Zhu Yuan equipment containers use the import's fixed `role` names instead of a source mesh ID. Only already-supported structural roles are accepted.
+
+Edit these properties and garment meshes in Blender, build the C# project, then reimport. `humanoid_wardrobe.gd`, called by the real post-import pipeline, validates and compiles them into the imported scene. The catalog is generated output, never an authored Godot resource. Godot may wear/unwear those existing pieces and select outfits through `Selections`; adding/removing catalog entries requires a source change and reimport. Body-mask geometry generation and material/outline behavior are unchanged by this ownership change.
 
 **Fixed topology.** After initialization the graph structure, rig paths, attachment set, and attachment visibility default are fixed — and the imported `Model` child's own topology is fixed at import. Runtime code adjusts preset weights (native `AnimationTree` parameters), clothing selections, and attachment visibility; it never rewrites graphs, node paths, or attachment wiring.
 
@@ -172,7 +168,7 @@ static void Preview(CharacterModel model, StringName pieceId)
   ModelClothingPiece piece = model.FindPiece(pieceId).Match(
     found => found,
     () => throw new InvalidOperationException($"Missing clothing piece '{pieceId}'."));
-  model.SetPieceEnabled(piece, false);
+  piece.Enabled = false;
   model.ClothingEnabled = false;
 }
 ```

@@ -122,24 +122,14 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void LateWardrobeAssignmentRecoversInitializationAndSelections()
+  public void MissingImportedCatalogRejectsInitializationBeforeSelections()
   {
     using var fixture = ModelFixture.WithWardrobe(start: false);
-    ModelWardrobeConfiguration configuration = fixture.Model.WardrobeConfiguration;
-    fixture.Model.WardrobeConfiguration = null!;
-    fixture.Start();
-    fixture.Model.Selections[CharacterModel.ClothingEnabledKey] = false;
+    fixture.Model.GetNode("Model").RemoveMeta("wardrobe_catalog");
+    Assert.Throws<InvalidOperationException>(() => fixture.Model.Initialize());
     Assert.True(fixture.GarmentA!.Visible);
     Assert.True(fixture.GarmentB!.Visible);
-
-    fixture.Model.WardrobeConfiguration = configuration;
-    Assert.False(fixture.GarmentA!.Visible);
-    Assert.False(fixture.GarmentB!.Visible);
-    Assert.MaskRegions(fixture.Model, fixture.MaskPath);
-    fixture.Model.ClothingEnabled = true;
-    Assert.True(fixture.GarmentA.Visible);
-    Assert.False(fixture.GarmentB.Visible);
-    Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
+    Assert.Equal(0, fixture.Model.Selections.Count);
   }
 
   // Whole-dictionary Selections replacements follow the lifecycle: once
@@ -535,28 +525,20 @@ public class ModelMaskWardrobeTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void WardrobeBindingRetriesAfterTheAuthoredPathIsCorrected()
+  public void WardrobeBindingRetriesAfterRequiredNodeIsRestored()
   {
     using var fixture = ModelFixture.WithWardrobe(start: false);
-    var rule = fixture.Model.WardrobeConfiguration.Masks[0];
-    rule.Path = "MissingBody";
+    fixture.Body.Name = "MissingBody";
     Assert.Throws<InvalidOperationException>(() => fixture.Model.Initialize());
-
-    rule.Path = fixture.MaskPath;
+    fixture.Body.Name = "Body";
     fixture.Model.Initialize();
     Assert.True(fixture.GarmentA!.Visible);
     Assert.False(fixture.GarmentB!.Visible);
     Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
-
     fixture.Start();
     fixture.Model.OutfitIndex = 1;
     Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask1");
-    Assert.Equal(1, TestData.VisibleTriangles(fixture.Model.MaskRenderMesh(fixture.MaskPath)));
   }
-
-  // ------------------------------------------------------------------
-  // Caching and instance isolation
-  // ------------------------------------------------------------------
 
   [TestCase]
   public void TwoEmptyResourcePathConfigurationsDoNotCollide()

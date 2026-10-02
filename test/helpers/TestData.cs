@@ -730,55 +730,62 @@ internal static class TestData
     return visible;
   }
 
-  private static ModelWardrobeGarment Piece(string path, int variant = -1) => new()
+  // Test inputs simulate the importer's serialized output, not a runtime authoring API.
+  public static T ImportedResource<T>(params (string Name, Variant Value)[] fields) where T : Resource, new()
   {
-    Path = path,
-    Variant = variant,
-  };
+    var resource = new T();
+    foreach (var (name, value) in fields)
+      resource.Set(name, value);
+    return resource;
+  }
+
+  private static ModelWardrobeGarment Piece(string path, int variant = -1)
+    => ImportedResource<ModelWardrobeGarment>(("_path", new NodePath(path)), ("_variant", variant));
 
   private static ModelWardrobeMaskRule MaskRule(string path, string name, int index,
-    string component, int variant) => new()
-    {
-      Path = path,
-      Name = name,
-      Index = index,
-      Component = component,
-      Variant = variant,
-    };
+    string component, int variant)
+    => ImportedResource<ModelWardrobeMaskRule>(("_path", new NodePath(path)), ("_name", new StringName(name)),
+      ("_index", index), ("_component", component), ("_variant", variant));
 
-  // One authored component with a garment and body mask rule per outfit.
-  public static ModelWardrobeConfiguration MakeWardrobeConfiguration() => new()
-  {
-    Variants = ["outfit0", "outfit1"],
-    Components = new()
-    {
-      ["Garment"] = new()
+  private static ModelWardrobeComponent Component(params ModelWardrobeGarment[] pieces)
+    => ImportedResource<ModelWardrobeComponent>(("_pieces", new Godot.Collections.Array<ModelWardrobeGarment>(pieces)));
+
+  // One imported component with a garment and body mask rule per outfit.
+  public static ModelWardrobeConfiguration MakeWardrobeConfiguration()
+    => ImportedResource<ModelWardrobeConfiguration>(
+      ("_variants", new string[] { "outfit0", "outfit1" }),
+      ("_components", new Godot.Collections.Dictionary<string, ModelWardrobeComponent>
       {
-        Pieces = [Piece("GarmentA", 0), Piece("GarmentB", 1)],
-      },
-    },
-    Masks = [MaskRule("Body", "Mask0", 0, "Garment", 0), MaskRule("Body", "Mask1", 1, "Garment", 1)],
-  };
+        ["Garment"] = Component(Piece("GarmentA", 0), Piece("GarmentB", 1)),
+      }),
+      ("_masks", new Godot.Collections.Array<ModelWardrobeMaskRule>
+      {
+        MaskRule("Body", "Mask0", 0, "Garment", 0), MaskRule("Body", "Mask1", 1, "Garment", 1),
+      }));
 
   // Two outfit-independent components cover the same region. Their rules must
   // OR their contributions rather than allowing the last rule to win.
-  public static ModelWardrobeConfiguration MakeOverlappingWardrobeConfiguration() => new()
-  {
-    Variants = ["outfit0", "outfit1"],
-    Components = new()
-    {
-      ["shirt"] = new() { Pieces = [Piece("GarmentA")] },
-      ["jacket"] = new() { Pieces = [Piece("GarmentB")] },
-    },
-    Masks = [MaskRule("Body", "Mask0", 0, "shirt", -1), MaskRule("Body", "Mask0", 0, "jacket", -1)],
-  };
+  public static ModelWardrobeConfiguration MakeOverlappingWardrobeConfiguration()
+    => ImportedResource<ModelWardrobeConfiguration>(
+      ("_variants", new string[] { "outfit0", "outfit1" }),
+      ("_components", new Godot.Collections.Dictionary<string, ModelWardrobeComponent>
+      {
+        ["shirt"] = Component(Piece("GarmentA")),
+        ["jacket"] = Component(Piece("GarmentB")),
+      }),
+      ("_masks", new Godot.Collections.Array<ModelWardrobeMaskRule>
+      {
+        MaskRule("Body", "Mask0", 0, "shirt", -1), MaskRule("Body", "Mask0", 0, "jacket", -1),
+      }));
 
   // The second mask has no component-associated rule; outfit-wide changes
   // must still reach its componentless rule.
   public static ModelWardrobeConfiguration MakeWardrobeConfigurationWithComponentlessVariantRule(int variant)
   {
     var configuration = MakeWardrobeConfiguration();
-    configuration.Masks.Add(MaskRule("AccessoryBody", "Mask1", 1, "", variant));
+    var rules = new Godot.Collections.Array<ModelWardrobeMaskRule>(configuration.Masks);
+    rules.Add(MaskRule("AccessoryBody", "Mask1", 1, "", variant));
+    configuration.Set("_masks", rules);
     return configuration;
   }
 
