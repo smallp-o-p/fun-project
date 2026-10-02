@@ -5,39 +5,65 @@ using Cell = Godot.Vector3I;
 
 [TestSuite]
 [RequireGodotRuntime]
-public partial class BattleMapBakerTest
+public partial class BattlePropBakeTest
 {
-  [TestCase(0, 1, 0, TestName = "No quarter turn preserves an east footprint cell")]
-  [TestCase(1, 0, -1, TestName = "Positive Y quarter turn rotates east toward north")]
-  [TestCase(2, -1, 0, TestName = "Two quarter turns rotate east toward west")]
-  [TestCase(3, 0, 1, TestName = "Three quarter turns rotate east toward south")]
-  [TestCase(-1, 0, 1, TestName = "Negative quarter turns normalize")]
-  [TestCase(5, 0, -1, TestName = "Quarter turns wrap after a full rotation")]
-  public void RotateCellUsesGodotPositiveYConvention(int turns, int x, int z)
+  [TestCase(true, 0, 2, 3)]
+  [TestCase(false, 0, 2, 3)]
+  [TestCase(true, 1, 3, 2)]
+  [TestCase(true, 2, 2, 1)]
+  [TestCase(true, 3, 1, 2)]
+  [TestCase(true, -1, 1, 2)]
+  [TestCase(true, 5, 3, 2)]
+  public void FourIndependentSideStrengthsRotateWithTheTwoCellFootprint(bool blocksMovement, int turns, int secondX, int secondZ)
   {
-    Assert.Equal(new Cell(x, 2, z), BattleMapBaker.Rotate(new Cell(1, 2, 0), turns));
+    var prop = new BattlePropAuthoring
+    {
+      Footprint = [Cell.Zero, new(0, 0, 1)],
+      BlocksMovement = blocksMovement,
+      CoverNorth = 10,
+      CoverEast = 20,
+      CoverSouth = 30,
+      CoverWest = 40
+    };
+    var baked = Bake(TestData.MakeOpenBattleMap(5, 5).Tiles, [new(prop, new Cell(2, 0, 2), turns)]);
+    Cell[] occupied = [new(2, 0, 2), new(secondX, 0, secondZ)];
+    Cell[] offsets = [new(0, 0, -1), new(1, 0, 0), new(0, 0, 1), new(-1, 0, 0)];
+    int[] strengths = [10, 20, 30, 40];
+    foreach (var cell in occupied)
+    {
+      var tile = baked.Tiles[cell];
+      Assert.Equal(!blocksMovement, tile.Walkable);
+      Assert.Equal(0, tile.CoverNorth + tile.CoverEast + tile.CoverSouth + tile.CoverWest);
+      for (int side = 0; side < 4; side++)
+      {
+        var neighbor = cell + offsets[side];
+        if (neighbor == occupied[0] || neighbor == occupied[1]) continue;
+        tile = baked.Tiles[neighbor];
+        int facingCover = side switch { 0 => tile.CoverSouth, 1 => tile.CoverWest, 2 => tile.CoverNorth, _ => tile.CoverEast };
+        Assert.Equal(strengths[((turns + side) % 4 + 4) % 4], facingCover);
+      }
+    }
   }
 
-  [TestCase(0, CoverDirections.East)]
-  [TestCase(1, CoverDirections.North)]
-  [TestCase(2, CoverDirections.West)]
-  [TestCase(3, CoverDirections.South)]
-  public void RotateCoverUsesTheSameCompass(int turns, CoverDirections expected)
+  [TestCase]
+  public void NonwalkableSpawnTerrainIsRejectedWithoutProps()
   {
-    Assert.Equal(expected, BattleMapBaker.Rotate(CoverDirections.East, turns));
+    var tile = TestData.WallTile();
+    tile.SpawnFactionSlot = 0;
+    Assert.Throws<InvalidOperationException>(() => Bake(TestData.MakeMapData(new(1, 1, 1), (new Vector3I(0, 0, 0), tile)).Tiles, []));
   }
 
   [TestCase(TestName = "A three-cell prop rotates and stamps movement separately from sight")]
   public void RotatedFootprintBlocksEveryOccupiedCellWithoutInventingGround()
   {
     var cells = TestData.MakeOpenBattleMap(5, 5).Tiles;
-    var prop = new BattlePropData
+    var prop = new BattlePropAuthoring
     {
       Footprint = [Cell.Zero, new(1, 0, 0), new(2, 0, 0)],
       BlocksMovement = true,
     };
 
-    BattleMapData baked = BattleMapBaker.Bake(cells, [new(prop, new Cell(2, 0, 3), 1)]);
+    BattleMapData baked = Bake(cells, [new(prop, new Cell(2, 0, 3), 1)]);
 
     Assert.Equal(cells.Count, baked.Tiles.Count);
     for (int z = 1; z <= 3; z++)
@@ -53,9 +79,9 @@ public partial class BattleMapBakerTest
   public void SightOnlyPropDoesNotBlockMovementOrVerticalSight()
   {
     var cells = TestData.MakeOpenBattleMap().Tiles;
-    var prop = new BattlePropData { Footprint = [Cell.Zero], BlocksLineOfSight = true };
+    var prop = new BattlePropAuthoring { Footprint = [Cell.Zero], BlocksLineOfSight = true };
 
-    BattleMapTileData tile = BattleMapBaker.Bake(cells, [new(prop, Cell.Zero, 0)]).Tiles[Cell.Zero];
+    BattleMapTileData tile = Bake(cells, [new(prop, Cell.Zero, 0)]).Tiles[Cell.Zero];
 
     Assert.True(tile.Walkable);
     Assert.True(tile.BlocksLineOfSight);
@@ -78,7 +104,7 @@ public partial class BattleMapBakerTest
     var cells = TestData.MakeMapData(new Vector3I(1, 1, 1),
       (new Vector3I(4, 2, 5), brush), (new Vector3I(5, 2, 5), brush)).Tiles;
 
-    BattleMapData baked = BattleMapBaker.Bake(cells, []);
+    BattleMapData baked = Bake(cells, []);
     BattleMapTileData first = baked.Tiles[new Cell(4, 2, 5)];
     BattleMapTileData second = baked.Tiles[new Cell(5, 2, 5)];
 
@@ -98,14 +124,14 @@ public partial class BattleMapBakerTest
   public void CoverGoesOutsideTheFootprintAndRotatesWithIt()
   {
     var cells = TestData.MakeOpenBattleMap(5, 5).Tiles;
-    var prop = new BattlePropData
+    var prop = new BattlePropAuthoring
     {
       Footprint = [Cell.Zero, new(1, 0, 0)],
       BlocksMovement = true,
-      CoverEdges = [new() { Cell = new Cell(1, 0, 0), Direction = CoverDirections.East, Amount = 60 }],
+      CoverEast = 60,
     };
 
-    BattleMapData baked = BattleMapBaker.Bake(cells, [new(prop, new Cell(2, 0, 3), 1)]);
+    BattleMapData baked = Bake(cells, [new(prop, new Cell(2, 0, 3), 1)]);
 
     Assert.Equal(60, baked.Tiles[new Cell(2, 0, 1)].CoverSouth);
     Assert.Equal(0, baked.Tiles[new Cell(2, 0, 1)].CoverNorth);
@@ -119,18 +145,18 @@ public partial class BattleMapBakerTest
     var cells = TestData.MakeOpenBattleMap(3, 3).Tiles;
     cells[new Cell(1, 0, 1)].CoverNorth = 80;
     cells[new Cell(1, 0, 1)].CoverEast = 20;
-    var eastEdge = new BattlePropData
+    var eastEdge = new BattlePropAuthoring
     {
       Footprint = [Cell.Zero],
-      CoverEdges = [new() { Direction = CoverDirections.East, Amount = 45 }],
+      CoverEast = 45,
     };
-    var southEdge = new BattlePropData
+    var southEdge = new BattlePropAuthoring
     {
       Footprint = [Cell.Zero],
-      CoverEdges = [new() { Direction = CoverDirections.South, Amount = 55 }],
+      CoverSouth = 55,
     };
 
-    BattleMapTileData tile = BattleMapBaker.Bake(cells,
+    BattleMapTileData tile = Bake(cells,
       [new(eastEdge, new Cell(0, 0, 1), 0), new(southEdge, new Cell(1, 0, 0), 0)]).Tiles[new Cell(1, 0, 1)];
 
     Assert.Equal(80, tile.CoverNorth);
@@ -143,13 +169,13 @@ public partial class BattleMapBakerTest
   public void CoverDoesNotCreateGroundOutsideTheMap()
   {
     var cells = TestData.MakeMapData(new Vector3I(1, 1, 1), (Vector3I.Zero, TestData.FloorTile())).Tiles;
-    var prop = new BattlePropData
+    var prop = new BattlePropAuthoring
     {
       Footprint = [Cell.Zero],
-      CoverEdges = [new() { Direction = CoverDirections.North, Amount = 50 }],
+      CoverNorth = 50,
     };
 
-    BattleMapData baked = BattleMapBaker.Bake(cells, [new(prop, Cell.Zero, 0)]);
+    BattleMapData baked = Bake(cells, [new(prop, Cell.Zero, 0)]);
 
     Assert.Equal(1, baked.Tiles.Count);
     Assert.Equal(new Cell(1, 1, 1), baked.Dimensions);
@@ -159,14 +185,14 @@ public partial class BattleMapBakerTest
   public void CoverSkipsAllMovementBlockedStandingCells()
   {
     var cells = TestData.MakeOpenBattleMap().Tiles;
-    var cover = new BattlePropData
+    var cover = new BattlePropAuthoring
     {
       Footprint = [Cell.Zero],
-      CoverEdges = [new() { Direction = CoverDirections.East, Amount = 50 }],
+      CoverEast = 50,
     };
-    var blocker = new BattlePropData { Footprint = [Cell.Zero], BlocksMovement = true };
+    var blocker = new BattlePropAuthoring { Footprint = [Cell.Zero], BlocksMovement = true };
 
-    BattleMapData baked = BattleMapBaker.Bake(cells,
+    BattleMapData baked = Bake(cells,
       [new(cover, Cell.Zero, 0), new(blocker, new Cell(1, 0, 0), 0)]);
 
     Assert.Equal(0, baked.Tiles[new Cell(1, 0, 0)].CoverWest);
@@ -176,10 +202,10 @@ public partial class BattleMapBakerTest
   public void NonblockingDecorationOverlapIsAllowed()
   {
     var cells = TestData.MakeOpenBattleMap().Tiles;
-    var solid = new BattlePropData { Footprint = [Cell.Zero], BlocksMovement = true };
-    var decoration = new BattlePropData { Footprint = [Cell.Zero] };
+    var solid = new BattlePropAuthoring { Footprint = [Cell.Zero], BlocksMovement = true };
+    var decoration = new BattlePropAuthoring { Footprint = [Cell.Zero] };
 
-    BattleMapData baked = BattleMapBaker.Bake(cells,
+    BattleMapData baked = Bake(cells,
       [new(solid, Cell.Zero, 0), new(decoration, Cell.Zero, 0), new(decoration, Cell.Zero, 0)]);
 
     Assert.False(baked.Tiles[Cell.Zero].Walkable);
@@ -189,9 +215,9 @@ public partial class BattleMapBakerTest
   public void OverlappingMovementBlockersAreRejected()
   {
     var cells = TestData.MakeOpenBattleMap().Tiles;
-    var prop = new BattlePropData { Footprint = [Cell.Zero], BlocksMovement = true };
+    var prop = new BattlePropAuthoring { Footprint = [Cell.Zero], BlocksMovement = true };
 
-    Assert.Throws<InvalidOperationException>(() => BattleMapBaker.Bake(cells,
+    Assert.Throws<InvalidOperationException>(() => Bake(cells,
       [new(prop, Cell.Zero, 0), new(prop, Cell.Zero, 0)]));
     Assert.True(cells[Cell.Zero].Walkable);
   }
@@ -200,18 +226,18 @@ public partial class BattleMapBakerTest
   public void MissingSupportIsRejected()
   {
     var cells = TestData.MakeMapData(new Vector3I(2, 1, 1), (Vector3I.Zero, TestData.FloorTile())).Tiles;
-    var prop = new BattlePropData { Footprint = [Cell.Zero, new(1, 0, 0)] };
+    var prop = new BattlePropAuthoring { Footprint = [Cell.Zero, new(1, 0, 0)] };
 
-    Assert.Throws<InvalidOperationException>(() => BattleMapBaker.Bake(cells, [new(prop, Cell.Zero, 0)]));
+    Assert.Throws<InvalidOperationException>(() => Bake(cells, [new(prop, Cell.Zero, 0)]));
   }
 
   [TestCase(TestName = "Footprints require walkable ground before prop stamping")]
   public void NonwalkableSupportIsRejected()
   {
     var cells = TestData.MakeMapData(new Vector3I(1, 1, 1), (Vector3I.Zero, TestData.WallTile())).Tiles;
-    var prop = new BattlePropData { Footprint = [Cell.Zero] };
+    var prop = new BattlePropAuthoring { Footprint = [Cell.Zero] };
 
-    Assert.Throws<InvalidOperationException>(() => BattleMapBaker.Bake(cells, [new(prop, Cell.Zero, 0)]));
+    Assert.Throws<InvalidOperationException>(() => Bake(cells, [new(prop, Cell.Zero, 0)]));
   }
 
   [TestCase(TestName = "A prop cannot straddle mismatched authored ground surfaces")]
@@ -219,18 +245,18 @@ public partial class BattleMapBakerTest
   {
     var cells = TestData.MakeOpenBattleMap().Tiles;
     cells[new Cell(1, 0, 0)].GroundSurfaceOffset = 0.5f;
-    var prop = new BattlePropData { Footprint = [Cell.Zero, new(1, 0, 0)] };
+    var prop = new BattlePropAuthoring { Footprint = [Cell.Zero, new(1, 0, 0)] };
 
-    Assert.Throws<InvalidOperationException>(() => BattleMapBaker.Bake(cells, [new(prop, Cell.Zero, 0)]));
+    Assert.Throws<InvalidOperationException>(() => Bake(cells, [new(prop, Cell.Zero, 0)]));
   }
 
   [TestCase(TestName = "A rotated footprint cannot leave the nonnegative board")]
   public void NegativeOccupiedCoordinatesAreRejected()
   {
     var cells = TestData.MakeOpenBattleMap().Tiles;
-    var prop = new BattlePropData { Footprint = [Cell.Zero, new(1, 0, 0)] };
+    var prop = new BattlePropAuthoring { Footprint = [Cell.Zero, new(1, 0, 0)] };
 
-    Assert.Throws<InvalidOperationException>(() => BattleMapBaker.Bake(cells, [new(prop, Cell.Zero, 1)]));
+    Assert.Throws<InvalidOperationException>(() => Bake(cells, [new(prop, Cell.Zero, 1)]));
   }
 
   [TestCase(TestName = "Base cells cannot have negative coordinates")]
@@ -238,16 +264,16 @@ public partial class BattleMapBakerTest
   {
     var cells = TestData.MakeMapData(new Vector3I(1, 1, 1), (new Vector3I(-1, 0, 0), TestData.FloorTile())).Tiles;
 
-    Assert.Throws<InvalidOperationException>(() => BattleMapBaker.Bake(cells, []));
+    Assert.Throws<InvalidOperationException>(() => Bake(cells, []));
   }
 
   [TestCase(TestName = "Solid props cannot block tagged spawn cells")]
   public void MovementBlockedSpawnIsRejected()
   {
     var cells = TestData.MakeMapData(new Vector3I(1, 1, 1), (Vector3I.Zero, TestData.SpawnTile(0))).Tiles;
-    var prop = new BattlePropData { Footprint = [Cell.Zero], BlocksMovement = true };
+    var prop = new BattlePropAuthoring { Footprint = [Cell.Zero], BlocksMovement = true };
 
-    Assert.Throws<InvalidOperationException>(() => BattleMapBaker.Bake(cells, [new(prop, Cell.Zero, 0)]));
+    Assert.Throws<InvalidOperationException>(() => Bake(cells, [new(prop, Cell.Zero, 0)]));
     Assert.True(cells[Cell.Zero].Walkable);
   }
 
@@ -255,9 +281,9 @@ public partial class BattleMapBakerTest
   public void NonblockingSpawnDecorationIsAllowed()
   {
     var cells = TestData.MakeMapData(new Vector3I(1, 1, 1), (Vector3I.Zero, TestData.SpawnTile(0))).Tiles;
-    var prop = new BattlePropData { Footprint = [Cell.Zero], BlocksLineOfSight = true };
+    var prop = new BattlePropAuthoring { Footprint = [Cell.Zero], BlocksLineOfSight = true };
 
-    BattleMapTileData tile = BattleMapBaker.Bake(cells, [new(prop, Cell.Zero, 0)]).Tiles[Cell.Zero];
+    BattleMapTileData tile = Bake(cells, [new(prop, Cell.Zero, 0)]).Tiles[Cell.Zero];
 
     Assert.True(tile.Walkable);
     Assert.Equal(0, tile.SpawnFactionSlot);
@@ -270,7 +296,7 @@ public partial class BattleMapBakerTest
   public void InvalidFootprintIsRejected(int scenario)
   {
     var cells = TestData.MakeOpenBattleMap().Tiles;
-    var prop = new BattlePropData
+    var prop = new BattlePropAuthoring
     {
       Footprint = scenario switch
       {
@@ -281,32 +307,39 @@ public partial class BattleMapBakerTest
       },
     };
 
-    Assert.Throws<InvalidOperationException>(() => BattleMapBaker.Bake(cells, [new(prop, Cell.Zero, 0)]));
+    Assert.Throws<InvalidOperationException>(() => Bake(cells, [new(prop, Cell.Zero, 0)]));
   }
 
-  [TestCase(0, TestName = "A cover edge must originate inside its footprint")]
-  [TestCase(1, TestName = "A cover edge cannot face an internal footprint neighbor")]
-  [TestCase(2, TestName = "A cover edge must select one cardinal direction")]
-  [TestCase(3, TestName = "A cover edge cannot omit its direction")]
-  [TestCase(4, TestName = "A cover amount cannot be negative")]
-  [TestCase(5, TestName = "A cover amount cannot exceed one hundred")]
-  public void InvalidCoverEdgeIsRejected(int scenario)
+  [TestCase(-1)]
+  [TestCase(101)]
+  public void InvalidCoverStrengthIsRejected(int strength)
   {
-    var cells = TestData.MakeOpenBattleMap().Tiles;
-    var edge = new BattlePropCoverEdgeData
-    {
-      Cell = scenario == 0 ? new Cell(2, 0, 0) : Cell.Zero,
-      Direction = scenario switch
-      {
-        1 => CoverDirections.East,
-        2 => CoverDirections.North | CoverDirections.West,
-        3 => CoverDirections.None,
-        _ => CoverDirections.North,
-      },
-      Amount = scenario switch { 4 => -1, 5 => 101, _ => 50 },
-    };
-    var prop = new BattlePropData { Footprint = [Cell.Zero, new(1, 0, 0)], CoverEdges = [edge] };
+    var prop = new BattlePropAuthoring { Footprint = [Cell.Zero], CoverNorth = strength };
+    Assert.Throws<InvalidOperationException>(() => Bake(TestData.MakeOpenBattleMap().Tiles, [new(prop, Cell.Zero, 0)]));
+  }
 
-    Assert.Throws<InvalidOperationException>(() => BattleMapBaker.Bake(cells, [new(prop, new Cell(1, 0, 1), 0)]));
+  private readonly record struct Placement(BattlePropAuthoring Prop, Cell Anchor, int Turns);
+
+  private static BattleMapData Bake(Godot.Collections.Dictionary<Cell, BattleMapTileData> cells, Placement[] props)
+  {
+    var map = TestData.MakeMapAuthoring(cells);
+    try
+    {
+      foreach (var placement in props)
+      {
+        var prop = placement.Prop;
+        // Multiple placements can share authored metadata, but scene instances are distinct.
+        if (prop.GetParent() != null) prop = (BattlePropAuthoring)prop.Duplicate();
+        map.AddChild(prop);
+        prop.Position = map.MapToLocal(placement.Anchor) + Godot.Vector3.Up * cells[placement.Anchor].GroundSurfaceOffset;
+        prop.Rotation = new(0, placement.Turns * Godot.Mathf.Pi / 2, 0);
+      }
+      using var scene = map.BuildScene();
+      var exported = scene.Instantiate<BattleMap>();
+      var result = exported.MapData;
+      exported.Free();
+      return result;
+    }
+    finally { map.Free(); }
   }
 }

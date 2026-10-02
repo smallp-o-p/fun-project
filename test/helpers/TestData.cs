@@ -348,6 +348,23 @@ internal static class TestData
 
   // Takes runtime Vector3I coordinates (X = width, Y = levels/height, Z = depth) and converts
   // them to Godot.Vector3I dictionary keys when building the authored map.
+  public static BattleMapAuthoring MakeMapAuthoring(Godot.Collections.Dictionary<Godot.Vector3I, BattleMapTileData> cells)
+  {
+    var library = new MeshLibrary();
+    var palette = new BattleTilePalette { MeshLibrary = library };
+    var map = new BattleMapAuthoring { Palette = palette, MeshLibrary = library, CellSize = Vector3.One, CellCenterY = false };
+    int item = 0;
+    foreach (var (cell, tile) in cells)
+    {
+      library.CreateItem(item);
+      library.SetItemName(item, item.ToString());
+      library.SetItemMesh(item, new BoxMesh());
+      palette.Brushes[item.ToString()] = tile;
+      map.SetCellItem(cell, item++);
+    }
+    return map;
+  }
+
   public static BattleMapData MakeMapData(
     Vector3I dimensions,
     params (Vector3I Cell, BattleMapTileData Tile)[] tiles)

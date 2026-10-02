@@ -37,10 +37,12 @@ GroundSurfaceOffset = 0.05
 [sub_resource type="Resource" id="Resource_gun07"]
 script = ExtResource("3_s0ehm")
 GroundSurfaceOffset = 0.05
+CoverEast = 40
 
 [sub_resource type="Resource" id="Resource_ibscg"]
 script = ExtResource("3_s0ehm")
 GroundSurfaceOffset = 0.05
+CoverEast = 40
 
 [sub_resource type="Resource" id="Resource_jerx2"]
 script = ExtResource("3_s0ehm")
@@ -53,18 +55,22 @@ GroundSurfaceOffset = 0.05
 [sub_resource type="Resource" id="Resource_ixx2g"]
 script = ExtResource("3_s0ehm")
 GroundSurfaceOffset = 0.05
+CoverSouth = 40
 
 [sub_resource type="Resource" id="Resource_txynn"]
 script = ExtResource("3_s0ehm")
+Walkable = false
 GroundSurfaceOffset = 0.05
 
 [sub_resource type="Resource" id="Resource_aed0w"]
 script = ExtResource("3_s0ehm")
+Walkable = false
 GroundSurfaceOffset = 0.05
 
 [sub_resource type="Resource" id="Resource_l1lxj"]
 script = ExtResource("3_s0ehm")
 GroundSurfaceOffset = 0.05
+CoverNorth = 40
 
 [sub_resource type="Resource" id="Resource_irpw0"]
 script = ExtResource("3_s0ehm")
@@ -77,10 +83,12 @@ GroundSurfaceOffset = 0.05
 [sub_resource type="Resource" id="Resource_twdig"]
 script = ExtResource("3_s0ehm")
 GroundSurfaceOffset = 0.05
+CoverWest = 40
 
 [sub_resource type="Resource" id="Resource_v5tlb"]
 script = ExtResource("3_s0ehm")
 GroundSurfaceOffset = 0.05
+CoverWest = 40
 
 [sub_resource type="Resource" id="Resource_tljmi"]
 script = ExtResource("3_s0ehm")
@@ -107,237 +115,34 @@ script = ExtResource("3_s0ehm")
 GroundSurfaceOffset = 0.05
 
 [sub_resource type="Resource" id="Resource_weodq"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_m5vi6"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_5ljf2"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_fe1j5"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_qspuk"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_tq6oi"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_6ym4g"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_tq18j"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_jmf8c"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_dnjo2"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_sbmuy"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_t1t7x"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_rikdr"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-CoverSouth = 40
-
-[sub_resource type="Resource" id="Resource_y0gbr"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_ej4jp"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_4f88h"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_r5q6w"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_8m41v"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-CoverEast = 40
-
-[sub_resource type="Resource" id="Resource_ohqml"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-CoverEast = 40
-
-[sub_resource type="Resource" id="Resource_5w1ca"]
-script = ExtResource("3_s0ehm")
-Walkable = false
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_miloa"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-CoverWest = 40
-
-[sub_resource type="Resource" id="Resource_al11m"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_pd3cn"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_m36yd"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_21dff"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_h7fjo"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-CoverWest = 40
-
-[sub_resource type="Resource" id="Resource_bct2t"]
-script = ExtResource("3_s0ehm")
-Walkable = false
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_liner"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-CoverNorth = 40
-
-[sub_resource type="Resource" id="Resource_rjclw"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_tn675"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_0hnpi"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_h6bf7"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_fg4py"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_6rl5t"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_625xc"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_lh0ta"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_c5jvk"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_m21cd"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_hwguf"]
-script = ExtResource("3_s0ehm")
-GroundSurfaceOffset = 0.05
-
-[sub_resource type="Resource" id="Resource_vaot0"]
 script = ExtResource("4_4gyde")
-Dimensions = Vector3i(8, 1, 8)
+Dimensions = Vector3i(5, 1, 5)
 Tiles = Dictionary[Vector3i, ExtResource("3_s0ehm")]({
-Vector3i(0, 0, 0): SubResource("Resource_or0wh"),
-Vector3i(0, 0, 1): SubResource("Resource_l1lxj"),
-Vector3i(0, 0, 2): SubResource("Resource_6lyj0"),
-Vector3i(0, 0, 3): SubResource("Resource_twdig"),
-Vector3i(0, 0, 4): SubResource("Resource_v5tlb"),
-Vector3i(0, 0, 5): SubResource("Resource_tljmi"),
-Vector3i(0, 0, 6): SubResource("Resource_ibal5"),
-Vector3i(0, 0, 7): SubResource("Resource_houem"),
-Vector3i(1, 0, 0): SubResource("Resource_2mqbu"),
-Vector3i(1, 0, 1): SubResource("Resource_aed0w"),
-Vector3i(1, 0, 2): SubResource("Resource_ej4jp"),
-Vector3i(1, 0, 3): SubResource("Resource_4f88h"),
-Vector3i(1, 0, 4): SubResource("Resource_r5q6w"),
-Vector3i(1, 0, 5): SubResource("Resource_h6bf7"),
-Vector3i(1, 0, 6): SubResource("Resource_0hnpi"),
-Vector3i(1, 0, 7): SubResource("Resource_rc78i"),
-Vector3i(2, 0, 0): SubResource("Resource_bx20s"),
-Vector3i(2, 0, 1): SubResource("Resource_irpw0"),
-Vector3i(2, 0, 2): SubResource("Resource_y0gbr"),
-Vector3i(2, 0, 3): SubResource("Resource_ohqml"),
-Vector3i(2, 0, 4): SubResource("Resource_8m41v"),
-Vector3i(2, 0, 5): SubResource("Resource_rjclw"),
-Vector3i(2, 0, 6): SubResource("Resource_tn675"),
-Vector3i(2, 0, 7): SubResource("Resource_4tyq5"),
-Vector3i(3, 0, 0): SubResource("Resource_op7b2"),
-Vector3i(3, 0, 1): SubResource("Resource_txynn"),
-Vector3i(3, 0, 2): SubResource("Resource_rikdr"),
-Vector3i(3, 0, 3): SubResource("Resource_5w1ca"),
-Vector3i(3, 0, 4): SubResource("Resource_bct2t"),
-Vector3i(3, 0, 5): SubResource("Resource_liner"),
-Vector3i(3, 0, 6): SubResource("Resource_fg4py"),
-Vector3i(3, 0, 7): SubResource("Resource_o0yyf"),
-Vector3i(4, 0, 0): SubResource("Resource_ifbrf"),
-Vector3i(4, 0, 1): SubResource("Resource_ixx2g"),
-Vector3i(4, 0, 2): SubResource("Resource_t1t7x"),
-Vector3i(4, 0, 3): SubResource("Resource_miloa"),
-Vector3i(4, 0, 4): SubResource("Resource_h7fjo"),
-Vector3i(4, 0, 5): SubResource("Resource_hwguf"),
-Vector3i(4, 0, 6): SubResource("Resource_6rl5t"),
-Vector3i(4, 0, 7): SubResource("Resource_weodq"),
-Vector3i(5, 0, 0): SubResource("Resource_e3iu4"),
-Vector3i(5, 0, 1): SubResource("Resource_h2iqk"),
-Vector3i(5, 0, 2): SubResource("Resource_sbmuy"),
-Vector3i(5, 0, 3): SubResource("Resource_al11m"),
-Vector3i(5, 0, 4): SubResource("Resource_21dff"),
-Vector3i(5, 0, 5): SubResource("Resource_m21cd"),
-Vector3i(5, 0, 6): SubResource("Resource_625xc"),
-Vector3i(5, 0, 7): SubResource("Resource_m5vi6"),
-Vector3i(6, 0, 0): SubResource("Resource_a4ehy"),
-Vector3i(6, 0, 1): SubResource("Resource_jerx2"),
-Vector3i(6, 0, 2): SubResource("Resource_dnjo2"),
-Vector3i(6, 0, 3): SubResource("Resource_pd3cn"),
-Vector3i(6, 0, 4): SubResource("Resource_m36yd"),
-Vector3i(6, 0, 5): SubResource("Resource_c5jvk"),
-Vector3i(6, 0, 6): SubResource("Resource_lh0ta"),
-Vector3i(6, 0, 7): SubResource("Resource_5ljf2"),
-Vector3i(7, 0, 0): SubResource("Resource_gun07"),
-Vector3i(7, 0, 1): SubResource("Resource_ibscg"),
-Vector3i(7, 0, 2): SubResource("Resource_jmf8c"),
-Vector3i(7, 0, 3): SubResource("Resource_tq18j"),
-Vector3i(7, 0, 4): SubResource("Resource_6ym4g"),
-Vector3i(7, 0, 5): SubResource("Resource_tq6oi"),
-Vector3i(7, 0, 6): SubResource("Resource_qspuk"),
-Vector3i(7, 0, 7): SubResource("Resource_fe1j5")
+Vector3i(0, 0, 0): SubResource("Resource_op7b2"),
+Vector3i(0, 0, 1): SubResource("Resource_bx20s"),
+Vector3i(0, 0, 2): SubResource("Resource_2mqbu"),
+Vector3i(0, 0, 3): SubResource("Resource_or0wh"),
+Vector3i(0, 0, 4): SubResource("Resource_ifbrf"),
+Vector3i(1, 0, 0): SubResource("Resource_e3iu4"),
+Vector3i(1, 0, 1): SubResource("Resource_a4ehy"),
+Vector3i(1, 0, 2): SubResource("Resource_gun07"),
+Vector3i(1, 0, 3): SubResource("Resource_ibscg"),
+Vector3i(1, 0, 4): SubResource("Resource_jerx2"),
+Vector3i(2, 0, 0): SubResource("Resource_h2iqk"),
+Vector3i(2, 0, 1): SubResource("Resource_ixx2g"),
+Vector3i(2, 0, 2): SubResource("Resource_txynn"),
+Vector3i(2, 0, 3): SubResource("Resource_aed0w"),
+Vector3i(2, 0, 4): SubResource("Resource_l1lxj"),
+Vector3i(3, 0, 0): SubResource("Resource_irpw0"),
+Vector3i(3, 0, 1): SubResource("Resource_6lyj0"),
+Vector3i(3, 0, 2): SubResource("Resource_twdig"),
+Vector3i(3, 0, 3): SubResource("Resource_v5tlb"),
+Vector3i(3, 0, 4): SubResource("Resource_tljmi"),
+Vector3i(4, 0, 0): SubResource("Resource_ibal5"),
+Vector3i(4, 0, 1): SubResource("Resource_houem"),
+Vector3i(4, 0, 2): SubResource("Resource_rc78i"),
+Vector3i(4, 0, 3): SubResource("Resource_4tyq5"),
+Vector3i(4, 0, 4): SubResource("Resource_o0yyf")
 })
 
 [sub_resource type="Resource" id="Resource_gbl4c"]
@@ -366,136 +171,136 @@ Brushes = Dictionary[StringName, ExtResource("3_s0ehm")]({
 })
 metadata/_custom_type_script = "uid://djtekemlaytk4"
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ju5qa"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ilbj8"]
 albedo_color = Color(0.14509805, 0.5254902, 0.54901963, 1)
 roughness = 0.65
 
-[sub_resource type="BoxMesh" id="BoxMesh_xxnkd"]
-material = SubResource("StandardMaterial3D_ju5qa")
+[sub_resource type="BoxMesh" id="BoxMesh_yedj1"]
+material = SubResource("StandardMaterial3D_ilbj8")
 size = Vector3(0.82, 0.5, 1.85)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ryesi"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x42wd"]
 albedo_color = Color(0.078431375, 0.23921569, 0.33333334, 1)
 roughness = 0.65
 
-[sub_resource type="BoxMesh" id="BoxMesh_gqi0y"]
-material = SubResource("StandardMaterial3D_ryesi")
+[sub_resource type="BoxMesh" id="BoxMesh_bxmjf"]
+material = SubResource("StandardMaterial3D_x42wd")
 size = Vector3(0.68, 0.4, 0.83)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_o650g"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_27jnk"]
 albedo_color = Color(0.25490198, 0.7137255, 0.6901961, 1)
 roughness = 0.65
 
-[sub_resource type="BoxMesh" id="BoxMesh_nmh1l"]
-material = SubResource("StandardMaterial3D_o650g")
+[sub_resource type="BoxMesh" id="BoxMesh_ju5qa"]
+material = SubResource("StandardMaterial3D_27jnk")
 size = Vector3(0.8, 0.12, 0.52)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bx1js"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_xxnkd"]
 albedo_color = Color(0.25490198, 0.7137255, 0.6901961, 1)
 roughness = 0.65
 
-[sub_resource type="BoxMesh" id="BoxMesh_hv3fp"]
-material = SubResource("StandardMaterial3D_bx1js")
+[sub_resource type="BoxMesh" id="BoxMesh_ryesi"]
+material = SubResource("StandardMaterial3D_xxnkd")
 size = Vector3(0.8, 0.1, 0.4)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_36ycy"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gqi0y"]
 albedo_color = Color(0.1254902, 0.15686275, 0.19215687, 1)
 roughness = 0.65
 
-[sub_resource type="BoxMesh" id="BoxMesh_f8l8j"]
-material = SubResource("StandardMaterial3D_36ycy")
+[sub_resource type="BoxMesh" id="BoxMesh_o650g"]
+material = SubResource("StandardMaterial3D_gqi0y")
 size = Vector3(0.14, 0.36, 0.34)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i838g"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_nmh1l"]
 albedo_color = Color(0.1254902, 0.15686275, 0.19215687, 1)
 roughness = 0.65
 
-[sub_resource type="BoxMesh" id="BoxMesh_b8le7"]
-material = SubResource("StandardMaterial3D_i838g")
+[sub_resource type="BoxMesh" id="BoxMesh_bx1js"]
+material = SubResource("StandardMaterial3D_nmh1l")
 size = Vector3(0.14, 0.36, 0.34)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1p6o2"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hv3fp"]
 albedo_color = Color(0.1254902, 0.15686275, 0.19215687, 1)
 roughness = 0.65
 
-[sub_resource type="BoxMesh" id="BoxMesh_2pevk"]
-material = SubResource("StandardMaterial3D_1p6o2")
+[sub_resource type="BoxMesh" id="BoxMesh_36ycy"]
+material = SubResource("StandardMaterial3D_hv3fp")
 size = Vector3(0.14, 0.36, 0.34)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rfwlw"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_f8l8j"]
 albedo_color = Color(0.1254902, 0.15686275, 0.19215687, 1)
 roughness = 0.65
 
-[sub_resource type="BoxMesh" id="BoxMesh_lupin"]
-material = SubResource("StandardMaterial3D_rfwlw")
+[sub_resource type="BoxMesh" id="BoxMesh_i838g"]
+material = SubResource("StandardMaterial3D_f8l8j")
 size = Vector3(0.14, 0.36, 0.34)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_enm6m"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_b8le7"]
 albedo_color = Color(1, 0.9411765, 0.6901961, 1)
 roughness = 0.65
 
-[sub_resource type="BoxMesh" id="BoxMesh_xmg64"]
-material = SubResource("StandardMaterial3D_enm6m")
+[sub_resource type="BoxMesh" id="BoxMesh_1p6o2"]
+material = SubResource("StandardMaterial3D_b8le7")
 size = Vector3(0.18, 0.12, 0.025)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_08vqt"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2pevk"]
 albedo_color = Color(1, 0.9411765, 0.6901961, 1)
 roughness = 0.65
 
-[sub_resource type="BoxMesh" id="BoxMesh_0lo8t"]
-material = SubResource("StandardMaterial3D_08vqt")
+[sub_resource type="BoxMesh" id="BoxMesh_rfwlw"]
+material = SubResource("StandardMaterial3D_2pevk")
 size = Vector3(0.18, 0.12, 0.025)
 
-[node name="Map" type="GridMap" unique_id=1677185836]
+[node name="Map" type="GridMap" unique_id=1237679751]
 mesh_library = ExtResource("1_j8m5l")
 cell_size = Vector3(1, 1, 1)
 cell_center_y = false
 data = {
-"cells": PackedInt32Array(3, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 4, 0, 0, 5, 0, 0, 6, 0, 0, 7, 0, 0, 7, 1, 0, 6, 1, 0, 5, 1, 0, 4, 1, 0, 3, 1, 0, 1, 1, 0, 0, 1, 0, 2, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 0, 5, 0, 0, 6, 0, 0, 7, 0, 1, 7, 0, 2, 7, 0, 3, 7, 0, 4, 7, 0, 5, 7, 0, 6, 7, 0, 7, 7, 0, 7, 6, 0, 7, 5, 0, 7, 4, 0, 7, 3, 0, 7, 2, 0, 6, 2, 0, 5, 2, 0, 4, 2, 0, 3, 2, 0, 2, 2, 0, 1, 2, 0, 1, 3, 0, 1, 4, 0, 2, 4, 0, 2, 3, 0, 3, 3, 0, 4, 3, 0, 5, 3, 0, 6, 3, 0, 6, 4, 0, 5, 4, 0, 4, 4, 0, 3, 4, 0, 3, 5, 0, 2, 5, 0, 2, 6, 0, 1, 6, 0, 1, 5, 0, 3, 6, 0, 4, 6, 0, 5, 6, 0, 6, 6, 0, 6, 5, 0, 5, 5, 0, 4, 5, 0)
+"cells": PackedInt32Array(0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 1, 0, 0, 1, 1, 0, 1, 2, 0, 1, 3, 0, 1, 4, 0, 2, 0, 0, 2, 1, 0, 2, 2, 0, 2, 3, 0, 2, 4, 0, 3, 0, 0, 3, 1, 0, 3, 2, 0, 3, 3, 0, 3, 4, 0, 4, 0, 0, 4, 1, 0, 4, 2, 0, 4, 3, 0, 4, 4, 0)
 }
 script = ExtResource("2_trocc")
-MapData = SubResource("Resource_vaot0")
+MapData = SubResource("Resource_weodq")
 UsedPalette = SubResource("Resource_yrade")
 
-[node name="ExampleCar" type="Node3D" parent="." unique_id=1033144723]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0.05, 3.5)
+[node name="ExampleCar" type="Node3D" parent="." unique_id=523977267]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0.05, 2.5)
 
-[node name="Body" type="MeshInstance3D" parent="ExampleCar" unique_id=1754277975]
+[node name="Body" type="MeshInstance3D" parent="ExampleCar" unique_id=314405628]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.43, 0.5)
-mesh = SubResource("BoxMesh_xxnkd")
+mesh = SubResource("BoxMesh_yedj1")
 
-[node name="Cabin" type="MeshInstance3D" parent="ExampleCar" unique_id=872188290]
+[node name="Cabin" type="MeshInstance3D" parent="ExampleCar" unique_id=387529280]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.81, 0.5)
-mesh = SubResource("BoxMesh_gqi0y")
+mesh = SubResource("BoxMesh_bxmjf")
 
-[node name="Hood" type="MeshInstance3D" parent="ExampleCar" unique_id=422244187]
+[node name="Hood" type="MeshInstance3D" parent="ExampleCar" unique_id=466373735]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.64, -0.13)
-mesh = SubResource("BoxMesh_nmh1l")
+mesh = SubResource("BoxMesh_ju5qa")
 
-[node name="Rear" type="MeshInstance3D" parent="ExampleCar" unique_id=1248339756]
+[node name="Rear" type="MeshInstance3D" parent="ExampleCar" unique_id=43108238]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.63, 1.19)
-mesh = SubResource("BoxMesh_hv3fp")
+mesh = SubResource("BoxMesh_ryesi")
 
-[node name="Wheel" type="MeshInstance3D" parent="ExampleCar" unique_id=1217378991]
+[node name="Wheel" type="MeshInstance3D" parent="ExampleCar" unique_id=1936028856]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 0.18, -0.07)
-mesh = SubResource("BoxMesh_f8l8j")
+mesh = SubResource("BoxMesh_o650g")
 
-[node name="Wheel2" type="MeshInstance3D" parent="ExampleCar" unique_id=959246272]
+[node name="Wheel2" type="MeshInstance3D" parent="ExampleCar" unique_id=1100454298]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 0.18, 1.07)
-mesh = SubResource("BoxMesh_b8le7")
+mesh = SubResource("BoxMesh_bx1js")
 
-[node name="Wheel3" type="MeshInstance3D" parent="ExampleCar" unique_id=666269259]
+[node name="Wheel3" type="MeshInstance3D" parent="ExampleCar" unique_id=458147351]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 0.18, -0.07)
-mesh = SubResource("BoxMesh_2pevk")
+mesh = SubResource("BoxMesh_36ycy")
 
-[node name="Wheel4" type="MeshInstance3D" parent="ExampleCar" unique_id=218410063]
+[node name="Wheel4" type="MeshInstance3D" parent="ExampleCar" unique_id=1959553530]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 0.18, 1.07)
-mesh = SubResource("BoxMesh_lupin")
+mesh = SubResource("BoxMesh_i838g")
 
-[node name="Headlight" type="MeshInstance3D" parent="ExampleCar" unique_id=834293544]
+[node name="Headlight" type="MeshInstance3D" parent="ExampleCar" unique_id=1517256280]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.28, 0.49, -0.437)
-mesh = SubResource("BoxMesh_xmg64")
+mesh = SubResource("BoxMesh_1p6o2")
 
-[node name="Headlight2" type="MeshInstance3D" parent="ExampleCar" unique_id=295842187]
+[node name="Headlight2" type="MeshInstance3D" parent="ExampleCar" unique_id=134363945]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, 0.49, -0.437)
-mesh = SubResource("BoxMesh_0lo8t")
+mesh = SubResource("BoxMesh_rfwlw")

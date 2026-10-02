@@ -31,8 +31,8 @@ public partial class BattlePropAuthoringTest
     prop.Position = new(3.7f, 0.2f, 4.4f);
     prop.Rotation = new(0, 1.6f, 0);
     prop.SnapToGrid();
-    Assert.Equal(new Cell(3, 0, 4), prop.Anchor);
-    Assert.Equal(1, prop.QuarterTurns);
+
+    Assert.True(Mathf.IsEqualApprox(Mathf.Pi / 2, prop.Rotation.Y));
     Assert.True(prop.Position.IsEqualApprox(new(3.5f, 0.05f, 4.5f)));
   }
 
@@ -52,20 +52,19 @@ public partial class BattlePropAuthoringTest
     using var packed = authoring.BuildScene();
     var reloaded = AutoFree(packed.Instantiate<BattleMap>())!;
     Assert.True(reloaded.HasNode("ExampleCar/Body"));
-    Assert.False(reloaded.MapData.Tiles[new(3, 0, 3)].Walkable);
+    Assert.False(reloaded.MapData.Tiles[new(2, 0, 2)].Walkable);
   }
 
   [TestCase]
   public void SnapKeepsTheNearestAuthoredSurfaceWithNegativeOffset()
   {
     var map = AutoFree(MakeMap())!;
-    map.Palette!.Brushes["Floor"].GroundSurfaceOffset = -0.05f;
+    map.Palette!.Brushes["0"].GroundSurfaceOffset = -0.05f;
     map.SetCellItem(new(3, 1, 4), 0);
     var prop = map.GetNode<BattlePropAuthoring>("Car");
-    prop.Anchor = new(3, 1, 4);
-    prop.ApplyPlacement();
+    prop.Position = new(3.5f, 0.95f, 4.5f);
     prop.SnapToGrid();
-    Assert.Equal(new Cell(3, 1, 4), prop.Anchor);
+
     Assert.True(prop.Position.IsEqualApprox(new(3.5f, 0.95f, 4.5f)));
   }
 
@@ -86,18 +85,10 @@ public partial class BattlePropAuthoringTest
 
   private static BattleMapAuthoring MakeMap()
   {
-    var library = new MeshLibrary();
-    library.CreateItem(0);
-    library.SetItemName(0, "Floor");
-    library.SetItemMesh(0, new BoxMesh());
-    var palette = new BattleTilePalette { MeshLibrary = library };
-    palette.Brushes["Floor"] = new BattleMapTileData { GroundSurfaceOffset = 0.05f };
-    var map = new BattleMapAuthoring { Palette = palette, MeshLibrary = library, CellSize = Vector3.One, CellCenterY = false };
-    map.SetCellItem(new(3, 0, 4), 0);
-    var prop = new BattlePropAuthoring { Name = "Car", Definition = new BattlePropData { Footprint = [Cell.Zero], BlocksMovement = true }, Anchor = new(3, 0, 4) };
+    var map = TestData.MakeMapAuthoring(new() { [new(3, 0, 4)] = new BattleMapTileData { GroundSurfaceOffset = 0.05f } });
+    var prop = new BattlePropAuthoring { Name = "Car", Footprint = [Cell.Zero], BlocksMovement = true, Position = new(3.5f, 0.05f, 4.5f) };
     map.AddChild(prop);
     prop.AddChild(new MeshInstance3D { Name = "Body", Mesh = new BoxMesh() });
-    prop.ApplyPlacement();
     return map;
   }
 }
