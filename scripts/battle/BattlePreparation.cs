@@ -88,10 +88,6 @@ internal sealed class BattlePreparation
     State.RefreshVisibility();
   }
 
-  // Per-grant buff bookkeeping at the initial-placement mutation boundary lives in
-  // EvaluateBuffs: a spawn's stun is zero, so the shared clamp cannot knock the unit out
-  // here and no running receiver exists to notify.
-
   // Initial objective insertion shares the objective-owned addition routine (registration
   // plus the ObjectiveAdded notification).
   internal void AddObjective(Faction faction, Objective objective)

@@ -260,16 +260,14 @@ public sealed class BattleUnitState
       if (isActive == wasActive)
         continue;
 
-      bool wasConscious = !IsUnconscious;
+      bool wasUnconscious = IsUnconscious;
       int priorVision = Vision;
       _buffs[i] = (buff, isActive);
 
       ClampCurrentHealthToMax();
-      // wasConscious is the pre-flip consciousness flag, so equality here means it did not
-      // flip: mark only when the effective vision or consciousness actually changed.
-      if (priorVision != Vision || wasConscious == IsUnconscious)
+      if (priorVision != Vision || wasUnconscious != IsUnconscious)
         context.State.MarkVisibilityAffected(this);
-      if (wasConscious && IsUnconscious)
+      if (!wasUnconscious && IsUnconscious)
         context.RunningSession.IfSome(session => session.ReconcileBuffKnockout(this));
       context.State.RaiseBuffEvent(isActive
         ? new UnitBuffActivatedBattleEvent(this, buff)

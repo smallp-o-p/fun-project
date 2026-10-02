@@ -9,9 +9,7 @@ namespace FunProject.Battle;
 /// </summary>
 public sealed class BattleRuntime : IDisposable
 {
-  // The single lifecycle representation: running combat owning its receiver, or the frozen
-  // result installed at settlement. The Running value is the sole persistent receiver owner;
-  // both total queries derive their answers from this one value.
+  // The sole persistent owner of the running receiver or frozen result.
   private abstract record Lifecycle
   {
     internal sealed record Running(BattleSession Session) : Lifecycle;
@@ -28,9 +26,6 @@ public sealed class BattleRuntime : IDisposable
   public event Action<BattleAction> ActionStarted = delegate { };
   public event Action<BattleActionExecResult> ActionCompleted = delegate { };
 
-  // Engine-owned construction: the factory mints the runtime from a prepared state and
-  // dispatches the opening turn; there is one state, one receiver, and one executor per
-  // runtime. The executor owns the committed stream from the shared state.
   private BattleRuntime(BattleState state, BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(state);
@@ -42,21 +37,15 @@ public sealed class BattleRuntime : IDisposable
     _state.ActionOptions.InstallContextProvider(GetReadContext);
   }
 
-  // The one persistent receiver owner is the Running lifecycle value; this door resolves
-  // the current receiver per call and refuses once completion replaced it. Execution
-  // scopes and trusted-core doors resolve here; nothing retains the receiver.
+  // Resolves the current receiver and refuses after completion.
   internal BattleSession CurrentSession => _lifecycle switch
   {
     Lifecycle.Running running => running.Session,
     _ => throw new InvalidOperationException("The battle has no running receiver after completion."),
   };
 
-  // Lifetime-owned tactical state: cross-lifecycle mints, reads, and the committed stream
-  // dispatch live here, independent of which lifecycle value is installed.
   internal BattleState State => _state;
 
-  // Factory-owned construction door: builds the valid scheduler from the complete prepared
-  // state and the running receiver around it.
   internal static BattleRuntime Create(BattleState preparedState)
   {
     ArgumentNullException.ThrowIfNull(preparedState);
@@ -64,9 +53,6 @@ public sealed class BattleRuntime : IDisposable
       preparedState, new BattleSession(preparedState, new TurnScheduler(preparedState)));
   }
 
-  // Factory-owned dispatch door: registers are done; the opening step reuses the ordinary
-  // primitive orchestration (session-start and turn-start events, then the all-unit AP
-  // top-up), so a terminal opening-turn objective settles through the normal path.
   internal void DispatchOpeningTurn()
   {
     ThrowIfDisposed();
@@ -119,9 +105,7 @@ public sealed class BattleRuntime : IDisposable
     return query.Execute(GetReadContext());
   }
 
-  // Mints an aliveness proof for scene code holding a raw BattleUnitState (Some iff the
-  // unit is alive in this battle). Proof mint doors route through the lifetime-owned state,
-  // so they keep working against a completed battle without any running receiver.
+  // Proof mints use lifetime-owned state and remain usable after completion.
   public Option<AliveUnit> TryGetAlive(BattleUnitState unit)
   {
     ThrowIfDisposed();
@@ -211,8 +195,6 @@ public sealed class BattleRuntime : IDisposable
     ObjectDisposedException.ThrowIf(_disposed, this);
   }
 
-  // The executor's committed handler forwards to runtime subscribers after it has logged
-  // the cause; runtime subscribers therefore never observe an event that missed the log.
   internal void RaiseBattleEventCommitted(BattleEvent battleEvent)
   {
     BattleEventCommitted.Invoke(battleEvent);

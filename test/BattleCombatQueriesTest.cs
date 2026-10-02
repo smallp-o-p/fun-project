@@ -108,7 +108,6 @@ public partial class BattleCombatQueriesTest
     var target = battle.Target(battle.EnemyUnit);
     battle.Start();
 
-    // The previewed unit is off-turn with zero action points: the preview ignores both.
     Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
     // The opening-turn objective completes during Start: the runtime is already completed,
     // and the retained-state preview still answers.
