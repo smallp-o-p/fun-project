@@ -1,6 +1,7 @@
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Items.Effects;
+using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
@@ -31,7 +32,7 @@ public class BattleFactoryTest
   {
     var (setup, _, _, _, _) = MinimalSetup();
     using var runtime = BattleFactory.Start(setup).RequireRight();
-    var faction = runtime.Query(new GetActiveSideQuery());
+    var faction = runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction;
     var unit = runtime.Query(new GetFactionAliveUnits(faction)).AsValueEnumerable().First();
     runtime.ExecuteAction(BattleAction.ApplyDamage(runtime.TryGetAlive(unit.State).RequireSome(), 8, DamageKind.Stun));
     List<BattleEvent> committed = [];
@@ -46,7 +47,16 @@ public class BattleFactoryTest
   [TestCase(TestName = "Start places units, assigns objectives, and begins turn 1")]
   public void StartHappyPath()
   {
-    var (setup, player, enemy, _, _) = MinimalSetup();
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
+    // Both placements carry an always-active +2 AP grant: initial units on every side start
+    // at the full effective maximum (preparation placement plus the opening top-up).
+    var boost = TestData.MakeBuff("Roused", new AlwaysMetBuffCondition(),
+      statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
+    var setup = TestData.MakeBattleSetup(player, enemy,
+      new UnitLoadout(TestData.MakeCombatant("Alpha", player, actionPoints: 4, buffs: [boost])),
+      new UnitLoadout(TestData.MakeCombatant("Bandit", enemy, actionPoints: 4, buffs: [boost])),
+      [new FakeObjectiveData()], [new FakeObjectiveData()], Some(player));
 
     using var runtime = BattleFactory.Start(setup).RequireRight();
 
@@ -56,6 +66,12 @@ public class BattleFactoryTest
     Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw);
     Assert.Equal(new Vector3I(3, 0, 3), enemyUnit.Position.Raw);
     Assert.Equal(player, runtime.Query(new GetPlayerFactionQuery()).RequireSome());
+    // The same start also proves the completion query stays None while the battle runs.
+    Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsNone);
+    Assert.Equal(6, playerUnit.State.MaxActionPoints);
+    Assert.Equal(6, playerUnit.State.CurrentActionPoints);
+    Assert.Equal(6, enemyUnit.State.MaxActionPoints);
+    Assert.Equal(6, enemyUnit.State.CurrentActionPoints);
 
     // InProgress + player (Sides[0]) is the active side: it can act, enemy cannot yet.
     Assert.True(runtime.Query(new CanUnitActNow(playerUnit.State)));
@@ -324,8 +340,8 @@ public class BattleFactoryTest
     Assert.Equal(1, objects.Count);
     Assert.True(objects[0].Status.IsNone);
 
-    for (int turn = 0; turn < 6 && runtime.Query(new GetBattlePhaseQuery()) == BattlePhase.InProgress; turn++)
-      runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    for (int turn = 0; turn < 6 && runtime.Query(new GetCompletedBattleQuery()).IsNone; turn++)
+      runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction));
     Assert.Equal(Some(ObjectStatus.Expired), runtime.Query(new GetBattleSpecialObjectsQuery())[0].Status);
   }
 

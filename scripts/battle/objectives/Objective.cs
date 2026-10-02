@@ -7,9 +7,9 @@ namespace FunProject.Battle;
 // Runtime objective instance: behavior + parameters in code (constructor takes its authored
 // ObjectiveData subclass), display text + outcome directives on the data. Objectives are
 // faction-agnostic predicates; the router supplies the evaluating faction to Check. State flips
-// (Ongoing -> Passed/Failed) only through the session's Record doors, driven by ObjectiveSystem
-// when an observed event makes Check return a flip; an objective is evaluated from the NEXT
-// event after it was added.
+// (Ongoing -> Passed/Failed) only through the router, driven by ObjectiveSystem (or, during
+// preparation, the preparation router) when an observed event makes Check return a flip; an
+// objective is evaluated from the NEXT event after it was added.
 public abstract class Objective
 {
   public ObjectiveData Data { get; }
@@ -26,6 +26,6 @@ public abstract class Objective
   // (e.g. typeof(UnitKilledBattleEvent), typeof(IUnitBattleEvent)).
   public abstract IReadOnlyCollection<Type> ObservedEventKeys { get; }
 
-  // Pure query over the session plus the just-committed event: Ongoing, or the flip.
-  public abstract ObjectiveResult Check(Faction owner, BattleEvent battleEvent, BattleSession session);
+  // Pure query over the battle plus the just-committed event: Ongoing, or the flip.
+  public abstract ObjectiveResult Check(Faction owner, BattleEvent battleEvent, BattleReadContext context);
 }

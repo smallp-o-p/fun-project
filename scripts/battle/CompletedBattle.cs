@@ -1,0 +1,170 @@
+using FunProject.Combatants;
+using System.Collections.Frozen;
+
+namespace FunProject.Battle;
+
+/// <summary>Per-combatant mission health metrics: the combatant's effective max health at
+/// summary creation (including active condition/equipment/buff effects) and the actual
+/// health damage taken during the battle. Numeric values are snapshots.</summary>
+public sealed record BattleHealthSummary(int MaxHealth, long HealthDamageTaken);
+
+// End-of-battle summary for one faction: outcome, per-combatant kill attribution, and the
+// faction's present/dead/wounded roster. Served from the frozen completion; outer
+// dictionaries, roster sets, and nested defeated lists are all frozen.
+public sealed record FactionBattleSummary
+{
+  public required Faction Faction { get; init; }
+  public required SysColGeneric.IReadOnlySet<Combatant> CombatantsPresent { get; init; }
+  public required SysColGeneric.IReadOnlyDictionary<Combatant, SysColGeneric.IReadOnlyList<Combatant>> DefeatedPerCombatant { get; init; }
+  public required BattleOutcome Outcome { get; init; }
+  public required SysColGeneric.IReadOnlySet<Combatant> CombatantsDead { get; init; }
+  public required SysColGeneric.IReadOnlySet<Combatant> CombatantsWounded { get; init; }
+  public required int TurnCount { get; init; }
+  public SysColGeneric.IReadOnlyList<Combatant> CapturedEnemies { get; init; } = [];
+
+  /// <summary>
+  /// Health report to calculate Combatants' injuries
+  /// </summary>
+  public SysColGeneric.IReadOnlyDictionary<Combatant, BattleHealthSummary> HealthByCombatant { get; init; } = new SysColGeneric.Dictionary<Combatant, BattleHealthSummary>();
+}
+
+/// <summary>Per-faction unit counts captured in an end-of-battle result.</summary>
+public sealed record FactionResultCounts(int Spawned, int Killed);
+
+/// <summary>One grouped end-of-battle report: outcome, per-faction result counts and
+/// summaries, and the object tallies. Completion reads serve this single stored report.</summary>
+public sealed class CompletedBattle
+{
+  private CompletedBattle(
+    BattleOutcome outcome,
+    int turnCount,
+    SysColGeneric.IReadOnlyDictionary<Faction, FactionResultCounts> factions,
+    SysColGeneric.IReadOnlyDictionary<Faction, FactionBattleSummary> factionSummaries,
+    int objectsInteracted,
+    int objectsExpired)
+  {
+    Outcome = outcome;
+    TurnCount = turnCount;
+    Factions = factions;
+    FactionSummaries = factionSummaries;
+    ObjectsInteracted = objectsInteracted;
+    ObjectsExpired = objectsExpired;
+  }
+
+  public BattleOutcome Outcome { get; }
+  public int TurnCount { get; }
+  public SysColGeneric.IReadOnlyDictionary<Faction, FactionResultCounts> Factions { get; }
+  public SysColGeneric.IReadOnlyDictionary<Faction, FactionBattleSummary> FactionSummaries { get; }
+  public int ObjectsInteracted { get; }
+  public int ObjectsExpired { get; }
+
+  // One grouped pass at the terminal boundary: the pool is grouped by faction once and every
+  // count, summary, kill list, and health report derives from those groups, so later
+  // campaign-side mutations (faction reassignment, stat or health changes) cannot rewrite any
+  // issued report. Campaign Combatant/Faction references are preserved; only numeric values
+  // and collection membership are snapshotted, and every exposed container is frozen.
+  internal static CompletedBattle Capture(BattleState state, BattleOutcome outcome, int turnCount)
+  {
+    var rosters = new SysColGeneric.Dictionary<Faction, SysColGeneric.List<BattleUnitState>>();
+    foreach (BattleUnitState unit in state.Units)
+    {
+      if (!rosters.TryGetValue(unit.Side, out SysColGeneric.List<BattleUnitState>? roster))
+        rosters[unit.Side] = roster = [];
+      roster.Add(unit);
+    }
+
+    // Victory captures: living unconscious combatants of every non-player faction,
+    // reference-deduplicated in pool order; only the designated player's summary carries them.
+    SysColGeneric.List<Combatant> capturedEnemies = [];
+    if (outcome == BattleOutcome.Victory)
+    {
+      state.PlayerFaction.IfSome(player =>
+      {
+        var captured = new SysColGeneric.HashSet<Combatant>(SysColGeneric.ReferenceEqualityComparer.Instance);
+        foreach (BattleUnitState unit in state.Units)
+          if (unit.Side != player && unit.IsUnconscious && captured.Add(unit.Combatant))
+            capturedEnemies.Add(unit.Combatant);
+      });
+    }
+    SysColGeneric.IReadOnlyList<Combatant> frozenCaptures = System.Array.AsReadOnly([.. capturedEnemies]);
+
+    var factions = new SysColGeneric.Dictionary<Faction, FactionResultCounts>();
+    var summaries = new SysColGeneric.Dictionary<Faction, FactionBattleSummary>();
+    foreach (Faction faction in state.Factions)
+    {
+      SysColGeneric.List<BattleUnitState> roster = rosters.TryGetValue(faction, out SysColGeneric.List<BattleUnitState>? members)
+        ? members
+        : [];
+
+      int killed = 0;
+      var present = new SysColGeneric.HashSet<Combatant>();
+      var dead = new SysColGeneric.HashSet<Combatant>();
+      var wounded = new SysColGeneric.HashSet<Combatant>();
+      var health = new SysColGeneric.Dictionary<Combatant, BattleHealthSummary>();
+      foreach (BattleUnitState unit in roster)
+      {
+        present.Add(unit.Combatant);
+        if (unit.IsDead)
+        {
+          killed++;
+          dead.Add(unit.Combatant);
+          continue;
+        }
+
+        if (unit.MaxHealth > unit.CurrentHealth)
+          wounded.Add(unit.Combatant);
+        health[unit.Combatant] = new BattleHealthSummary(unit.MaxHealth, unit.TotalHealthDamageTaken);
+      }
+
+      // Runtime killer instances can share one campaign Combatant (SpawnUnit accepts the
+      // same combatant on distinct cells), so their victims accumulate per Combatant in
+      // ledger order instead of projecting one dictionary entry per runtime instance.
+      var defeatedByCombatant = new SysColGeneric.Dictionary<Combatant, SysColGeneric.List<Combatant>>();
+      foreach (SysColGeneric.KeyValuePair<BattleUnitState, SysColGeneric.List<BattleUnitState>> entry in state.KillsByUnit)
+      {
+        if (entry.Key.Side != faction)
+          continue;
+        if (!defeatedByCombatant.TryGetValue(entry.Key.Combatant, out SysColGeneric.List<Combatant>? victims))
+          defeatedByCombatant[entry.Key.Combatant] = victims = [];
+        foreach (BattleUnitState killedUnit in entry.Value)
+          victims.Add(killedUnit.Combatant);
+      }
+
+      factions[faction] = new FactionResultCounts(roster.Count, killed);
+      summaries[faction] = new FactionBattleSummary
+      {
+        Faction = faction,
+        Outcome = outcome,
+        CapturedEnemies = state.PlayerFaction == Some(faction)
+          ? frozenCaptures
+          : System.Array.AsReadOnly<Combatant>([]),
+        CombatantsPresent = present.ToFrozenSet(),
+        CombatantsDead = dead.ToFrozenSet(),
+        CombatantsWounded = wounded.ToFrozenSet(),
+        DefeatedPerCombatant = defeatedByCombatant.ToFrozenDictionary(
+          entry => entry.Key,
+          entry => (SysColGeneric.IReadOnlyList<Combatant>)System.Array.AsReadOnly([.. entry.Value])),
+        TurnCount = turnCount,
+        HealthByCombatant = health.ToFrozenDictionary(),
+      };
+    }
+
+    int objectsInteracted = 0;
+    int objectsExpired = 0;
+    foreach (BattleObjectState obj in state.Objects)
+    {
+      if (obj.Status == Some(ObjectStatus.Interacted))
+        objectsInteracted++;
+      else if (obj.Status == Some(ObjectStatus.Expired))
+        objectsExpired++;
+    }
+
+    return new CompletedBattle(
+      outcome,
+      turnCount,
+      factions.ToFrozenDictionary(),
+      summaries.ToFrozenDictionary(),
+      objectsInteracted,
+      objectsExpired);
+  }
+}

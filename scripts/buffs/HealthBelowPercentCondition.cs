@@ -9,6 +9,6 @@ public partial class HealthBelowPercentCondition : BuffCondition
 {
   [Export(PropertyHint.Range, "0,100")] public float Percent { get; set; } = 50f;
 
-  internal override bool IsMet(BattleSession session, BattleUnitState unit)
+  internal override bool IsMet(BattleReadContext context, BattleUnitState unit)
     => unit.CurrentHealth < unit.MaxHealth * (Percent / 100f);
 }

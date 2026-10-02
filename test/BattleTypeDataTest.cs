@@ -31,7 +31,7 @@ public partial class BattleTypeDataTest
       new StatusObserverHook(() => observed.Add(bomb.Status)), 0);
     new ObjectExpirySystemData { Priority = -50 }.Register(runtime);
 
-    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction));
 
     Assert.Equal(1, observed.Count);
     Assert.Equal(Some(ObjectStatus.Expired), observed[0]);

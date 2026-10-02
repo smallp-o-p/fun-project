@@ -7,5 +7,5 @@ namespace FunProject.Battle;
 /// </summary>
 public sealed class GetAvailableActionsForUnit(AliveUnit unit) : IBattleSessionQuery<IReadOnlyList<UnitAction>>
 {
-  public IReadOnlyList<UnitAction> Execute(BattleSession session) => session.ActionOptions.GetFor(unit);
+  public IReadOnlyList<UnitAction> Execute(BattleReadContext context) => context.State.ActionOptions.GetFor(unit);
 }

@@ -3,19 +3,20 @@ using System.Collections.Generic;
 namespace FunProject.Battle;
 
 /// <summary>
-/// Everything a firing hook needs to do its job: the session (mutate it or don't) and the
-/// in-flight executor action when the event was committed inside one (what the old trigger
-/// signature carried as sourceAction; None for setup/turn-transition dispatches that no
-/// action produced). Minted by the executor's BattleEventCommitted handler per firing.
+/// Everything a firing hook needs to do its job: the read context for its scope (runtime
+/// contexts derive from the one running-or-completed representation; trusted default systems
+/// obtain the running receiver through it) and the in-flight executor action when the event
+/// was committed inside one (None for dispatches no action produced, completion included).
+/// Minted by the executor's BattleEventCommitted handler per firing.
 /// </summary>
 public readonly struct HookContext
 {
-  public BattleSession Session { get; }
+  public BattleReadContext Read { get; }
   public Option<BattleAction> SourceAction { get; }
 
-  internal HookContext(BattleSession session, Option<BattleAction> sourceAction)
+  internal HookContext(BattleReadContext read, Option<BattleAction> sourceAction)
   {
-    Session = session;
+    Read = read;
     SourceAction = sourceAction;
   }
 }
@@ -23,17 +24,21 @@ public readonly struct HookContext
 /// <summary>
 /// The one battle observer/reactor concept. A hook matches a BattleEvent (registered by
 /// event-tag type: concrete record or marker interface) and fires once per committed event,
-/// receiving the context required to complete its work. It may mutate the session directly,
-/// raise follow-up events (context.Session.RaiseEvent — queued, the committed stream stays
+/// after the executor's single committed handler has logged the event, invalidated cached
+/// options, and forwarded runtime observers. The context carries the read context for the
+/// hook's scope (<see cref="HookContext.Read"/> — trusted default systems obtain the running
+/// receiver through it) and the in-flight action when one produced the event. A hook may
+/// mutate the session directly, raise follow-up events (queued, the committed stream stays
 /// linear), and/or RETURN interrupt actions: the executor pushes returned actions to the
 /// FRONT of the pending queue after the current primitive commits, so they run before the
 /// interrupted composite's next step, through full action validation. Most hooks return [].
-/// Returning interrupts while no executor action is in flight is a trusted-core violation
-/// and throws (gameplay flows only through the executor). One-shot hooks (mines) flip
+/// Gameplay mutations run only through <see cref="BattleRuntime.ExecuteAction"/>, whose open
+/// submission window rejects a nested call in code before either queue is touched. Returning
+/// interrupts while no executor action is in flight is a trusted-core violation and throws
+/// during ordinary dispatch; interrupts returned during settlement are collected and
+/// discarded with the settled action's queue. One-shot hooks (mines) flip
 /// <see cref="NeedsToUnregister"/> — the registry owns the removal and retires them after
-/// the firing. Hooks must never call executor.Submit from inside
-/// OnEvent — a nested submission would corrupt the executor's pending action stack (there is
-/// deliberately no guard; the rule is convention). Subclass freely — concrete hooks take whatever they need
+/// the firing. Subclass freely — concrete hooks take whatever they need
 /// (positions, factions, damage) through their own constructors; the root class and uniform
 /// registration are the only fixed points.
 /// </summary>

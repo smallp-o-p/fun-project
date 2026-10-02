@@ -16,37 +16,35 @@ public class BattleObjectSessionTest
     return data;
   }
 
-  [TestCase(TestName = "PlaceObject during setup occupies the tile and mints a live proof")]
+  [TestCase(TestName = "Preparation placement occupies the tile and mints a live proof once started")]
   public void PlacementBlocksOccupancy()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
-    var session = battle.Session;
     battle.Spawn(TestData.MakeCombatant("A", player), new Vector3I(0, 0, 0));
     battle.Spawn(TestData.MakeCombatant("B", enemy), new Vector3I(3, 0, 3));
 
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 2));
-    battle.Submit(BattleAction.PlaceObject(MakeBombData(), point));
+    BattleObjectState bomb = battle.PlaceObject(MakeBombData(), point.Raw);
+    battle.Start();
 
-    BattleObjectState[] objects = [.. session.Objects];
-    Assert.Equal(1, objects.Length);
-    BattleObjectState bomb = objects[0];
+    Assert.Equal(1, battle.Query(new GetBattleSpecialObjectsQuery()).Count);
     Assert.True(bomb.Status.IsNone);
     Assert.Equal(point, battle.Live(bomb).Position);
     Assert.Equal(point.Raw, bomb.Position);
 
-    // Occupancy: a unit cannot spawn onto the object tile (a rejected SpawnUnit surfaces
-    // from Submit as an InvalidOperationException — trusted parameters).
+    // Occupancy: a reinforcement cannot spawn onto the object tile (a rejected SpawnUnit
+    // surfaces from Submit as an InvalidOperationException — trusted parameters).
     var spawn = new SpawnUnit(TestData.MakeCombatant("X", player), point);
     Assert.Throws<System.InvalidOperationException>(() => battle.Submit(spawn));
 
-    // A second object cannot take the same tile.
-    Assert.Throws<System.InvalidOperationException>(() => battle.Submit(
-      BattleAction.PlaceObject(MakeBombData(), point)));
+    // Initial placement is preparation-only: a post-Start placement has no submission path.
+    Assert.Throws<System.InvalidOperationException>(
+      () => battle.PlaceObject(MakeBombData(), point.Raw));
   }
 
-  [TestCase(TestName = "PlaceObject is rejected once the battle is in progress")]
+  [TestCase(TestName = "Post-Start placement is refused: initial placement is preparation-only")]
   public void MidBattlePlacementRejected()
   {
     var player = TestData.MakeFaction("P");
@@ -56,8 +54,8 @@ public class BattleObjectSessionTest
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)));
 
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 2));
-    Assert.Throws<System.InvalidOperationException>(() => battle.Submit(
-      BattleAction.PlaceObject(MakeBombData(), point)));
+    Assert.Throws<System.InvalidOperationException>(
+      () => battle.PlaceObject(MakeBombData(), point.Raw));
     Assert.Equal(0, battle.Query(new GetBattleSpecialObjectsQuery()).Count);
   }
 

@@ -18,16 +18,22 @@ public abstract class BattleAction
     Incomplete,
   }
 
+  // The single guarded entry: only the executor's open submission step may run an action,
+  // so direct calls are rejected before any AP, ammunition, or occupancy cost.
+  internal Result Execute(BattleSession session)
+  {
+    ArgumentNullException.ThrowIfNull(session);
+    if (!session.IsExecutingStep)
+      throw new InvalidOperationException(
+        "Battle actions execute only inside the executor's submission step.");
+    return ExecuteStep(session);
+  }
+
   /// <summary>
   /// Execute a single step in the action. Returns the result, which indicates to the executor whether the action is finished.
   /// </summary>
   /// <param name="session"></param>
-  public abstract Result Execute(BattleSession session);
-
-  public static StartBattle StartBattle()
-  {
-    return new StartBattle();
-  }
+  internal abstract Result ExecuteStep(BattleSession session);
 
   public static SpawnUnit SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position)
   {
@@ -37,11 +43,6 @@ public abstract class BattleAction
   public static SpawnUnit SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position, Weapon equippedWeapon)
   {
     return new SpawnUnit(combatant, position, equippedWeapon);
-  }
-
-  public static PlaceObject PlaceObject(BattleSpecialObjectData data, BattleBoardState.ValidatedPoint position)
-  {
-    return new PlaceObject(data, position);
   }
 
   public static MoveUnit MoveUnit(
@@ -115,7 +116,7 @@ public sealed class MoveUnit : BattleAction
     StepApCost = actionPointCostPerStep;
   }
 
-  public override Result Execute(BattleSession session)
+  internal override Result ExecuteStep(BattleSession session)
   {
     if (session.TryGetAlive(Unit).IsNone || Unit.IsIncapacitated)
       return Result.Interrupted;
@@ -132,7 +133,7 @@ public sealed class MoveUnit : BattleAction
       .Match(
         unit =>
         {
-          if (!session.Board.CanOccupy(route.Peek()))
+          if (!session.State.Board.CanOccupy(route.Peek()))
             return Result.Rejected;
 
           Unit.SpendActionPoints(StepApCost);
@@ -157,14 +158,14 @@ public sealed class MoveUnit : BattleAction
     if (Unit.CurrentActionPoints < apCost)
       return null;
 
-    BattleBoardState.ValidatedPoint previousPoint = session.GetUnitPosition(Unit).ValueUnsafe();
+    BattleBoardState.ValidatedPoint previousPoint = session.State.GetUnitPosition(Unit).ValueUnsafe();
     Queue<BattleBoardState.ValidatedPoint> validatedSteps = [];
 
     // Steps arrive as ValidatedPoints (in-bounds is proven at the caller's mint door); only
     // the mutable facts — adjacency to the evolving position and occupancy — are checked here.
     foreach (BattleBoardState.ValidatedPoint stepPoint in _requestedDestinations)
     {
-      if (!BattleBoardState.AreAdjacent(previousPoint, stepPoint) || !session.Board.CanOccupy(stepPoint))
+      if (!BattleBoardState.AreAdjacent(previousPoint, stepPoint) || !session.State.Board.CanOccupy(stepPoint))
         return null;
 
       validatedSteps.Enqueue(stepPoint);

@@ -1,5 +1,6 @@
 #nullable disable warnings
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Battle;
@@ -82,21 +83,52 @@ public sealed class GeoscapeFixture : IDisposable
     params (Combatant Combatant, int Damage, int Stun)[] squad)
   {
     ThrowIfDisposed();
+    if (squad.Length == 0)
+      return EmptyReport(State.PlayerFaction, outcome);
+
+    // Real mission arrangement: the squad spawns conscious and the mission's damage and
+    // stun are dealt through the real pipeline; the second round's start then completes the
+    // battle through the ordinary pipeline (a fully knocked-out squad draws at turn end).
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [State.PlayerFaction]);
-    int slot = 0;
-    foreach ((Combatant combatant, int damage, int stun) in squad)
+    battle.AddObjective(State.PlayerFaction, new SurviveUntilTurnObjectiveData
     {
-      BattleUnitState unit = battle.Spawn(combatant, new Vector3I(slot++, 0, 0),
+      TargetTurn = 2,
+      OnComplete = new EndBattleDirectiveData { Outcome = outcome },
+    }.Instantiate());
+    var units = new System.Collections.Generic.List<BattleUnitState>();
+    int slot = 0;
+    foreach ((Combatant combatant, int _, int _) in squad)
+    {
+      units.Add(battle.Spawn(combatant, new Vector3I(slot++, 0, 0),
         combatant.EquippedWeapon, combatant.EquippedArmor,
-        State.Conditions.StatContributions(combatant));
-      if (damage > 0)
-        battle.ApplyDamage(unit, damage);
-      if (stun > 0)
-        battle.ApplyDamage(unit, stun, DamageKind.Stun);
+        State.Conditions.StatContributions(combatant)));
     }
-    battle.Session.EndBattle(outcome);
-    return battle.Query(new GetFactionEndOfBattleSummary(State.PlayerFaction)).RequireRight();
+    battle.Start();
+    for (int index = 0; index < squad.Length; index++)
+    {
+      (Combatant _, int damage, int stun) = squad[index];
+      if (damage > 0)
+        battle.ApplyDamage(units[index], damage);
+      if (stun > 0)
+        battle.ApplyDamage(units[index], stun, DamageKind.Stun);
+    }
+    battle.EndFactionTurn(State.PlayerFaction);
+    return battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[State.PlayerFaction];
   }
+
+  // Zero-participant report arrangement: preparation rejects unitless sides, so an empty
+  // mission report is the frozen empty summary shape the battle pipeline emits for a
+  // participating faction with no members.
+  internal static FactionBattleSummary EmptyReport(Faction faction, BattleOutcome outcome) => new()
+  {
+    Faction = faction,
+    Outcome = outcome,
+    TurnCount = 0,
+    CombatantsPresent = System.Array.Empty<Combatant>().ToFrozenSet(),
+    CombatantsDead = System.Array.Empty<Combatant>().ToFrozenSet(),
+    CombatantsWounded = System.Array.Empty<Combatant>().ToFrozenSet(),
+    DefeatedPerCombatant = new SysColGeneric.Dictionary<Combatant, SysColGeneric.IReadOnlyList<Combatant>>().ToFrozenDictionary(),
+  };
 
   // PlayMission plus the return application, for tests that only need the resulting
   // roster conditions.

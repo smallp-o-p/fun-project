@@ -14,6 +14,8 @@ public sealed partial class BattleRuntimeTest
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
+    battle.Start();
     var runtime = battle.Runtime;
     battle.ClearEvents();
     var cell = new Vector3I(1, 0, z);
@@ -24,9 +26,8 @@ public sealed partial class BattleRuntimeTest
 
     Option<BattleUnitState> queried = runtime.Query(new GetUnitAtTile(battle.Board.At(cell)));
 
-    Assert.Equal(battle.Session.GetUnitAt(battle.Board.At(cell)).RequireSome(), queried.RequireSome());
-    Assert.True(battle.Session.GetUnitPosition(
-      battle.Session.GetUnitAt(battle.Board.At(cell)).RequireSome()).IsSome);
+    Assert.Equal(battle.UnitAt(cell), queried.RequireSome());
+    Assert.True(battle.PositionOf(queried.RequireSome()).IsSome);
     Assert.True(battle.Events.EventsOf<UnitAddedBattleEvent>().Length > 0);
   }
 
@@ -52,32 +53,13 @@ public sealed partial class BattleRuntimeTest
     Assert.Equal(label, log[0]);
   }
 
-  [TestCase(TestName = "Disposed runtime no longer republishes session events")]
-  public void DisposedRuntimeNoLongerRepublishesSessionEvents()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
-    var runtime = battle.Runtime;
-    var observed = new List<BattleEvent>();
-    runtime.BattleEventCommitted += observed.Add;
-
-    runtime.Dispose();
-    // A retained replacement executor is safe here: the runtime's own executor was
-    // disposed with it, so this is still the session's only live executor, and it commits
-    // an event the disposed runtime must not re-raise.
-    using var replacement = new BattleActionExecutor(battle.Session);
-    replacement.Submit(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Alpha", faction), battle.Board.At(1, 0, 1)));
-
-    Assert.Equal(0, observed.Count);
-    runtime.BattleEventCommitted -= observed.Add;
-  }
-
   [TestCase(TestName = "Public methods throw after runtime is disposed")]
   public void PublicMethodsThrowAfterRuntimeIsDisposed()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
+    battle.Start();
     var runtime = battle.Runtime;
     var hook = new RuntimeRecordingHook("runtime_reaction", new Vector3I(1, 0, 0), []);
 
@@ -126,7 +108,7 @@ public sealed partial class BattleRuntimeTest
     var unit = battle.Unit;
     battle.RegisterHook<UnitMovedBattleEvent>(new DamageMoverOnMovedHook());
 
-    var from = battle.Session.GetUnitPosition(unit).RequireSome();
+    var from = battle.PositionOf(unit).RequireSome();
     var to = battle.Board.At(new Vector3I(1, 0, 0));
     Assert.Throws<InvalidOperationException>(() => battle.Session.MoveUnit(unit, from, to));
   }
@@ -158,6 +140,6 @@ public sealed partial class BattleRuntimeTest
   private sealed class DamageMoverOnMovedHook : BattleHook<UnitMovedBattleEvent>
   {
     protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitMovedBattleEvent evt)
-      => [BattleAction.ApplyDamage(context.Session.TryGetAlive(evt.Unit).RequireSome(), 3)];
+      => [BattleAction.ApplyDamage(context.Read.State.TryGetAlive(evt.Unit).RequireSome(), 3)];
   }
 }

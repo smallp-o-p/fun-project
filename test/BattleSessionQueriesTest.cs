@@ -50,7 +50,7 @@ public class BattleSessionQueriesTest
     var rawTiles = tiles.AsValueEnumerable().Select(tile => tile.Raw).ToHashSet();
     Assert.True(rawTiles.Contains(new Vector3I(1, 0, 0)));
     Assert.True(rawTiles.Contains(new Vector3I(2, 0, 0)));
-    Assert.False(tiles.AsValueEnumerable().Any(tile => tile.Raw == battle.Session.GetUnitPosition(unit).RequireSome().Raw));
+    Assert.False(tiles.AsValueEnumerable().Any(tile => tile.Raw == battle.PositionOf(unit).RequireSome().Raw));
   }
 
   [TestCase(TestName = "GetPossibleMoveTilesForUnit does not include unreachable tiles inside movement range")]

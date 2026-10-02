@@ -76,6 +76,12 @@ public sealed partial class BattleScene : Node3D
     _director.PlaybackIdle += OnPlaybackIdle;
 
     RefreshView();
+
+    // A runtime that completed during factory startup entered BattleOver inside the UI
+    // constructor — before this subscription existed — so the initial state must still
+    // show the end banner.
+    if (_ui.State == UiState.BattleOver)
+      ShowBattleOverBanner();
   }
 
   public override void _ExitTree()
@@ -139,19 +145,22 @@ public sealed partial class BattleScene : Node3D
 
   private void ShowBattleOverBanner()
   {
-    string text = _runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
-      Right: summary => summary.Outcome == BattleOutcome.Victory ? "VICTORY" : "DEFEAT",
-      Left: _ => "BATTLE OVER");
+    // The banner reads the frozen completion; a runtime that completed during factory
+    // startup reports the same frozen result here as a battle that just ended.
+    string text = _runtime.Query(new GetCompletedBattleQuery()).Match(
+      Some: completed => completed.FactionSummaries.TryGetValue(_playerFaction, out FactionBattleSummary? summary)
+        && summary.Outcome == BattleOutcome.Victory ? "VICTORY" : "DEFEAT",
+      None: () => "BATTLE OVER");
     _view.ShowBattleOver(text);
   }
 
   private void OnPlaybackIdle()
   {
     RefreshView();
-    if (_runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
+    if (_runtime.Query(new GetCurrentTurnQuery()).Case is not BattleTurn turn)
       return;
 
-    Faction activeSide = _runtime.Query(new GetActiveSideQuery());
+    Faction activeSide = turn.ActiveFaction;
     if (ReferenceEquals(activeSide, _playerFaction))
       return;
 

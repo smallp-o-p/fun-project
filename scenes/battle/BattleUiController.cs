@@ -45,6 +45,10 @@ public sealed class BattleUiController : IDisposable
     _playerFaction = playerFaction;
     _playbackBusy = playbackBusy;
     _runtime.ActionCompleted += OnActionResult;
+
+    // A runtime that already completed during factory startup lands directly in BattleOver.
+    if (_runtime.Query(new GetCompletedBattleQuery()).IsSome)
+      SetState(UiState.BattleOver);
   }
 
   public UiState State => _state;
@@ -56,11 +60,9 @@ public sealed class BattleUiController : IDisposable
     {
       if (_playbackBusy())
         return InputGate.PlaybackBusy;
-      if (_runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
-        return InputGate.NotPlayerTurn;
-      if (!ReferenceEquals(_runtime.Query(new GetActiveSideQuery()), _playerFaction))
-        return InputGate.NotPlayerTurn;
-      return InputGate.Open;
+      return _runtime.Query(new GetCurrentTurnQuery()).Match(
+        turn => ReferenceEquals(turn.ActiveFaction, _playerFaction) ? InputGate.Open : InputGate.NotPlayerTurn,
+        () => InputGate.NotPlayerTurn);
     }
   }
 
@@ -242,7 +244,7 @@ public sealed class BattleUiController : IDisposable
     if (_state == UiState.BattleOver)
       return;
 
-    if (_runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
+    if (_runtime.Query(new GetCompletedBattleQuery()).IsSome)
     {
       ResetTargeting();
       _selected = None;

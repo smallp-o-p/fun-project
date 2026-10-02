@@ -16,17 +16,18 @@ public sealed record AttackContext(
 {
   // Single source of truth for attack target-feasibility, shared by the write side
   // (AttackEntity) and the read side (GetHitChanceForAttack) so the two can never drift.
-  // Covers only target feasibility — attacker liveness/incapacitation/AP/phase/turn
+  // Covers only target feasibility — attacker liveness/incapacitation/AP/turn
   // gating is the caller's job (the action checks mutable actor state; AliveUnit proofs
   // guard the query). Conditions are checked in one fixed order so a shot rejected for
-  // multiple reasons surfaces a single, stable failure message.
+  // multiple reasons surfaces a single, stable failure message. Reads resolve against the
+  // retained tactical state, so previews stay usable after completion.
   internal static Either<string, AttackContext> Resolve(
-    BattleSession session, BattleUnitState attacker, AttackTarget target)
+    BattleReadContext context, BattleUnitState attacker, AttackTarget target)
   {
     if (attacker.EquippedWeapon.IsNone)
       return $"{attacker.Combatant.Name} has no equipped weapon.";
     Weapon weapon = attacker.RequireEquippedWeapon();
-    if (session.TryGetAlive(attacker).Case is not AliveUnit freshAttacker)
+    if (context.State.TryGetAlive(attacker).Case is not AliveUnit freshAttacker)
       return $"{attacker.Combatant.Name} is not alive in this session.";
 
     string name;
@@ -44,7 +45,7 @@ public sealed record AttackContext(
       default:
         throw new InvalidOperationException("An attack requires a typed target.");
     }
-    if (session.TryGetAttackTarget(target.Entity).Case is not AttackTarget freshTarget)
+    if (context.State.TryGetAttackTarget(target.Entity).Case is not AttackTarget freshTarget)
       return $"{name} is not alive or attackable in this session.";
 
     bool visible = target.Entity switch
@@ -54,9 +55,9 @@ public sealed record AttackContext(
       _ => throw new InvalidOperationException("Unknown battle entity."),
     };
     if (!visible) return $"{attacker.Combatant.Name} cannot see {name}.";
-    if (BattleSession.GetGridDistance(freshAttacker.Position.Raw, freshTarget.Position.Raw) > weapon.EffectiveRange)
+    if (BattleBoardState.GetGridDistance(freshAttacker.Position.Raw, freshTarget.Position.Raw) > weapon.EffectiveRange)
       return $"{name} is out of range for {weapon.ItemName}.";
-    return new AttackContext(attacker, weapon, freshAttacker.Position, freshTarget.Position, session.Board);
+    return new AttackContext(attacker, weapon, freshAttacker.Position, freshTarget.Position, context.State.Board);
   }
 
   // Object shots bypass the unit calculator entirely: a destructible object has no aim,

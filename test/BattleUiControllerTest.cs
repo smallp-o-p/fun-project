@@ -146,7 +146,7 @@ public sealed partial class BattleUiControllerTest
       battle.Runtime.TryGetAlive(battle.EnemyUnit).RequireSome(), 999));
     battle.Runtime.ExecuteAction(BattleAction.EndFactionTurn(battle.PlayerFaction));
 
-    Assert.Equal(BattlePhase.Ended, battle.Runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Runtime.Query(new GetCompletedBattleQuery()).IsSome);
     Assert.Equal(UiState.BattleOver, battle.Ui.State);
     Assert.True(battle.Ui.SelectedUnit.IsNone);
 
@@ -339,7 +339,7 @@ public sealed partial class BattleUiControllerTest
     battle.Ui.BeginAction(endTurn);
 
     Assert.Equal(UiState.UnitSelected, battle.Ui.State); // selection persisted
-    Assert.Equal(battle.EnemyFaction, battle.Runtime.Query(new GetActiveSideQuery()));
+    Assert.Equal(battle.EnemyFaction, battle.Runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
   }
 
   [TestCase(TestName = "PreviewAt updates LastPreview only while targeting")]

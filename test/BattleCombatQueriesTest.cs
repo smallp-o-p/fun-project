@@ -94,18 +94,24 @@ public partial class BattleCombatQueriesTest
       battle.Alive(battle.PlayerUnit), battle.Target(battle.EnemyUnit))).IsRight);
   }
 
-  [TestCase(TestName = "Hit chance preview ignores action points and phase availability")]
+  [TestCase(TestName = "Hit chance preview ignores action points and stays usable after completion")]
   public void HitChancePreviewIgnoresActionPointAndPhaseAvailability()
   {
     using var battle = BattleFixture.Duel(
-      player: new("Alpha", Weapon: TestData.MakeAmmoWeapon("Rifle")));
+      player: new("Alpha", ActionPoints: 0, Weapon: TestData.MakeAmmoWeapon("Rifle")), start: false);
+    battle.AddObjective(battle.PlayerFaction, new SurviveUntilTurnObjectiveData
+    {
+      TargetTurn = 1,
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    }.Instantiate());
     var attacker = battle.Alive(battle.PlayerUnit);
     var target = battle.Target(battle.EnemyUnit);
-    battle.PlayerUnit.SpendActionPoints(battle.PlayerUnit.CurrentActionPoints);
-    Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight);
+    battle.Start();
 
-    battle.Session.EndBattle(BattleOutcome.Draw);
-
+    Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
+    // The opening-turn objective completes during Start: the runtime is already completed,
+    // and the retained-state preview still answers.
+    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsSome);
     Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight);
   }
 }

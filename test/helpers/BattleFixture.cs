@@ -13,23 +13,50 @@ using ZLinq;
 
 namespace FunProject.Tests;
 
-// The owning test fixture for battle tests: one BattleSession/BattleRuntime pair per fixture
-// instance, the runtime owns the session's single executor, and the fixture records every
-// committed event behind an explicit assertion window (ClearEvents starts a new one; nothing
-// clears it implicitly). Spawn/UnitAt return the native BattleUnitState; Alive/Live/At mint
-// current proofs through the runtime on each call. The Solo/Duel/Started/UiBattle scenario
-// factories and the action conveniences are thin wrappers that submit once through those same
-// doors. Presentation objects are retained too: Ui mints one controller bound to the same
-// runtime, and OwnNode/AttachDirector transfer fresh Godot nodes to the fixture so disposal
-// frees them alongside the runtime.
+// The owning test fixture for battle tests: one private preparation builder until Start, then
+// the single runtime (and its sole executor) that Start constructs from the completed
+// preparation. Spawn/PlaceObject/AddObjective before Start are preparation operations sharing
+// the factory's routines; their events commit through the shared dispatcher and the fixture
+// records them from its owned builder. After Start, Spawn is a runtime reinforcement
+// submission and events record from the runtime. ClearEvents starts a new assertion window;
+// nothing clears it implicitly. Alive/Live/At/Target mint current proofs through the runtime
+// on each call. The Solo/Duel/Started/UiBattle scenario factories and the action conveniences
+// are thin wrappers that submit once through those same doors.
 public sealed class BattleFixture : IDisposable
 {
   private readonly List<BattleEvent> _events = [];
+  private readonly BattlePreparation _preparation;
+  private readonly List<Action<BattleRuntime>> _deferredRegistrations = [];
+  private BattleRuntime _runtime;
+  private bool _started;
   private bool _disposed;
 
-  public BattleSession Session { get; }
-  public BattleRuntime Runtime { get; }
-  public BattleBoardState Board => Session.Board;
+  public BattleRuntime Runtime
+  {
+    get
+    {
+      ObjectDisposedException.ThrowIf(_disposed, this);
+      if (!_started)
+        throw new InvalidOperationException("This fixture has no runtime before Start.");
+      return _runtime;
+    }
+  }
+
+  // Trusted-core door for tests: resolves the current running receiver through the runtime's
+  // lifecycle at each call (the Running value owns it persistently), so a completed battle
+  // has no receiver to hand out and nothing is stored here.
+  internal BattleSession Session
+  {
+    get
+    {
+      ObjectDisposedException.ThrowIf(_disposed, this);
+      if (!_started)
+        throw new InvalidOperationException("This fixture has no running receiver before Start.");
+      return _runtime.CurrentSession;
+    }
+  }
+
+  public BattleBoardState Board => _preparation.State.Board;
   public IReadOnlyList<Faction> Factions { get; }
   public IReadOnlyList<BattleEvent> Events => _events;
 
@@ -54,50 +81,134 @@ public sealed class BattleFixture : IDisposable
     Option<Faction> playerFaction = default)
   {
     // Materialize once: the caller may pass a one-shot enumerable, and the same faction
-    // instances must reach both the fixture and the session.
+    // instances must reach both the fixture and the preparation.
     Factions = factions.AsValueEnumerable().ToArray();
-    Session = new BattleSession(board, Factions, hitChanceCalculator, randomSeed, playerFaction);
-    Runtime = new BattleRuntime(Session);
-    Runtime.BattleEventCommitted += RecordEvent;
+    _preparation = new BattlePreparation(board, Factions, hitChanceCalculator, randomSeed, playerFaction);
+    // Direct recording from the shared dispatcher (the preparation's objective route stays
+    // subscribed first). Detached after a successful Complete; a failed preparation keeps
+    // recording until disposal.
+    _preparation.State.Committed += RecordEvent;
   }
 
   // Raw submission door: deliberately invalid or stale actions reach the executor unchanged,
-  // so tests keep exercising rejection, interruption, and stale-proof paths.
-  public BattleActionExecResult Submit(BattleAction action) => Runtime.ExecuteAction(action);
+  // so tests keep exercising rejection, interruption, and stale-proof paths. Returns None
+  // when the battle already completed; conveniences unwrap the Some side.
+  public Option<BattleActionExecResult> Submit(BattleAction action) => Runtime.ExecuteAction(action);
 
-  public T Query<T>(IBattleSessionQuery<T> query) => Runtime.Query(query);
+  // The read side of the current phase: preparation contexts before Start, the runtime's
+  // context afterwards. Inspection queries answer in both phases; submissions need Start.
+  public T Query<T>(IBattleSessionQuery<T> query)
+  {
+    ThrowIfDisposed();
+    return _started
+      ? _runtime.Query(query)
+      : query.Execute(new BattleReadContext(_preparation.State, None, None, None));
+  }
 
-  public AliveUnit Alive(BattleUnitState unit) => Runtime.TryGetAlive(unit).RequireSome();
+  // Observes committed events from the first opening dispatch onward, ordered after the
+  // executor's log append and option invalidation: the handler binds to the runtime's
+  // shared ordered stream, before the hook pass fires.
+  internal void OnCommitted(Action<BattleEvent> handler)
+  {
+    ThrowIfDisposed();
+    ArgumentNullException.ThrowIfNull(handler);
+    if (!_started)
+    {
+      _deferredRegistrations.Add(runtime => runtime.BattleEventCommitted += handler);
+      return;
+    }
+    _runtime.BattleEventCommitted += handler;
+  }
 
-  public LiveObject Live(BattleObjectState obj) => Runtime.TryGetAliveObject(obj).RequireSome();
+  private BattleState ReadState => _started ? _runtime.State : _preparation.State;
+
+  public AliveUnit Alive(BattleUnitState unit) => ReadState.TryGetAlive(unit).RequireSome();
+
+  public LiveObject Live(BattleObjectState obj) => ReadState.TryGetAliveObject(obj).RequireSome();
 
   public AttackTarget Target(BattleUnitState unit) =>
-    Runtime.TryGetAttackTarget(new BattleEntity.Unit(unit)).RequireSome();
+    ReadState.TryGetAttackTarget(new BattleEntity.Unit(unit)).RequireSome();
 
   public AttackTarget Target(BattleObjectState obj) =>
-    Runtime.TryGetAttackTarget(new BattleEntity.Object(obj)).RequireSome();
+    ReadState.TryGetAttackTarget(new BattleEntity.Object(obj)).RequireSome();
 
-  public BattleBoardState.ValidatedPoint At(Vector3I position) => Runtime.TryGetTile(position).RequireSome();
+  public BattleBoardState.ValidatedPoint At(Vector3I position) => Board.ValidatePoint(position).RequireSome();
 
   public BattleBoardState.ValidatedPoint At(int x, int y, int z) => At(new Vector3I(x, y, z));
 
-  public BattleUnitState UnitAt(Vector3I position) => Query(new GetUnitAtTile(At(position))).RequireSome();
+  public BattleUnitState UnitAt(Vector3I position)
+    => Query(new GetUnitAtTile(At(position))).RequireSome();
+
+  // Where a pooled unit currently stands (None once it is dead and off the board).
+  public Option<BattleBoardState.ValidatedPoint> PositionOf(BattleUnitState unit)
+    => ReadState.TryGetAlive(unit).Map(alive => alive.Position);
 
   public AliveUnit SingleAliveUnit(Faction faction)
     => Query(new GetFactionAliveUnits(faction)).AsValueEnumerable().Single();
 
+  // Before Start: preparation placement through the factory's routine (its events commit
+  // immediately and are recorded). After Start: a reinforcement submission; the returned
+  // state is read back through the unit-at-tile query.
   public BattleUnitState Spawn(Combatant combatant, Vector3I position,
     Option<Weapon> weapon = default, Option<ItemWith<ArmorCapability>> armor = default,
     IReadOnlyList<StatMod>? statMods = null)
   {
+    ThrowIfDisposed();
+    if (!_started)
+      return _preparation.AddUnit(combatant, At(position), weapon, armor, statMods);
+
     Submit(new SpawnUnit(combatant, At(position), weapon, armor, statMods));
     return UnitAt(position);
   }
 
-  // Valid during setup only, preserving the existing placement contract.
-  public BattleObjectState PlaceObject(BattleSpecialObjectData data, Vector3I position) =>
-    Submit(BattleAction.PlaceObject(data, At(position)))
-      .EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
+  // Preparation-only: initial object placement is never a gameplay command.
+  public BattleObjectState PlaceObject(BattleSpecialObjectData data, Vector3I position)
+  {
+    ThrowIfDisposed();
+    if (_started)
+      throw new InvalidOperationException("Initial object placement happens before Start.");
+    _preparation.AddObject(data, At(position));
+    return _preparation.State.Objects.AsValueEnumerable().Last();
+  }
+
+  // Preparation-only objective setup, mirroring the factory's ordering (objectives before
+  // placements, so placement-counting objectives never miss an initial object).
+  public void AddObjective(Faction faction, Objective objective)
+  {
+    ThrowIfDisposed();
+    if (_started)
+      throw new InvalidOperationException("Initial objectives are prepared before Start.");
+    _preparation.AddObjective(faction, objective);
+  }
+
+  // Preparation presets apply the raw unit change (no gameplay damage/kill events are
+  // fabricated, armor does not split the packet) through the preparation's shared
+  // reconciliation: dead bodies leave the board while unconscious bodies stay. After Start
+  // the same call submits the real damage action through the runtime.
+  public void Damage(BattleUnitState unit, int amount, DamageKind kind = DamageKind.Health)
+  {
+    ThrowIfDisposed();
+    if (amount <= 0)
+      return;
+    if (_started)
+    {
+      Submit(BattleAction.ApplyDamage(Alive(unit), amount, kind));
+      return;
+    }
+
+    switch (kind)
+    {
+      case DamageKind.Stun:
+        unit.ReceiveStun(amount);
+        break;
+      case DamageKind.Health:
+        unit.ReceiveDamage(amount);
+        break;
+      default:
+        throw new ArgumentOutOfRangeException(nameof(kind));
+    }
+    _preparation.ReconcileParticipant(unit);
+  }
 
   // Progression integration setup: awards the first step's cost, commits the path, and
   // unlocks that step on the supplied combatant's own progression object. Call before
@@ -202,7 +313,7 @@ public sealed class BattleFixture : IDisposable
     try
     {
       foreach (Faction faction in factions)
-        battle.Session.AddObjective(faction, new FakeObjective());
+        battle.AddObjective(faction, new FakeObjective());
       foreach (UnitPlacement placement in placements)
         battle.Spawn(placement.Loadout.Combatant, placement.Position,
           placement.Loadout.Weapon, placement.Loadout.Armor, placement.Loadout.StatMods);
@@ -216,23 +327,38 @@ public sealed class BattleFixture : IDisposable
     }
   }
 
-  // Setup convenience preserving the old missing-objective policy: every faction without an
-  // authored objective gets EliminateAllOpposingForces, and only the configured player's
-  // copy carries the Victory directive. Tests of missing objectives submit the raw
-  // BattleAction.StartBattle() through Submit instead.
-  public BattleActionExecResult Start()
+  // Completes preparation, constructs the one runtime, binds hook registrations made before
+  // Start, and dispatches the opening step. Preparation failures (a side with no living,
+  // conscious units) throw before any runtime exists.
+  public void Start()
   {
     ThrowIfDisposed();
-    foreach (Faction faction in Session.GlobalFactionTurnOrder)
+    if (_started)
+      throw new InvalidOperationException("This fixture has already started.");
+    foreach (Faction faction in _preparation.State.Factions)
     {
-      if (Session.GetObjectives(faction).Count > 0)
+      if (_preparation.State.GetObjectives(faction).Count > 0)
         continue;
       var data = new EliminateAllOpposingForcesObjectiveData();
-      if (Session.PlayerFaction == Some(faction))
+      if (_preparation.State.PlayerFaction == Some(faction))
         data.OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory };
-      Session.AddObjective(faction, data.Instantiate());
+      _preparation.AddObjective(faction, data.Instantiate());
     }
-    return Submit(BattleAction.StartBattle());
+
+    BattleState state = _preparation.Complete().Match(
+      Right: prepared => prepared,
+      Left: failure => throw new InvalidOperationException(failure.Message));
+
+    // Recording moves to the runtime's committed stream: detach the direct state recorder
+    // before the runtime binds so no event is ever recorded twice.
+    _preparation.State.Committed -= RecordEvent;
+    _runtime = BattleRuntime.Create(state);
+    _runtime.BattleEventCommitted += RecordEvent;
+    foreach (Action<BattleRuntime> registration in _deferredRegistrations)
+      registration(_runtime);
+    _deferredRegistrations.Clear();
+    _started = true;
+    _runtime.DispatchOpeningTurn();
   }
 
   // Explicitly starts a new assertion window; never called by Start, Submit, or conveniences.
@@ -243,50 +369,67 @@ public sealed class BattleFixture : IDisposable
   }
 
   // ---- Action conveniences ------------------------------------------------------------
-  // Each mints fresh proofs at call time and submits exactly once. They never clear the
-  // recorded event window, and invalid/stale routes still surface through Submit unchanged.
+  // Each mints fresh proofs at call time and submits exactly once, unwrapping the Some
+  // result (an accepted-but-interrupted action still returns its result here). They never
+  // clear the recorded event window, and invalid/stale routes still surface unchanged.
 
   public BattleActionExecResult Move(BattleUnitState unit, Vector3I[] destinations,
     int actionPointCost = BattleSession.DefaultMovementStepActionPointCost) =>
-    Submit(BattleAction.MoveUnit(Alive(unit), destinations.AsValueEnumerable().Select(position => At(position)).ToArray(), actionPointCost));
+    Submit(BattleAction.MoveUnit(Alive(unit), destinations.AsValueEnumerable().Select(position => At(position)).ToArray(), actionPointCost)).RequireSome();
 
   public BattleActionExecResult Attack(BattleUnitState attacker, BattleUnitState target) =>
-    Submit(BattleAction.AttackEntity(Alive(attacker), Target(target)));
+    Submit(BattleAction.AttackEntity(Alive(attacker), Target(target))).RequireSome();
 
   public BattleActionExecResult Attack(BattleUnitState attacker, BattleObjectState target) =>
-    Submit(BattleAction.AttackEntity(Alive(attacker), Target(target)));
+    Submit(BattleAction.AttackEntity(Alive(attacker), Target(target))).RequireSome();
 
   public BattleActionExecResult ApplyDamage(BattleUnitState unit, int amount, DamageKind kind = DamageKind.Health) =>
-    Submit(BattleAction.ApplyDamage(Alive(unit), amount, kind));
+    Submit(BattleAction.ApplyDamage(Alive(unit), amount, kind)).RequireSome();
 
   public BattleActionExecResult Pass(BattleUnitState unit) =>
-    Submit(BattleAction.PassUnit(Alive(unit)));
+    Submit(BattleAction.PassUnit(Alive(unit))).RequireSome();
 
   public BattleActionExecResult EndFactionTurn(Faction faction) =>
-    Submit(BattleAction.EndFactionTurn(faction));
+    Submit(BattleAction.EndFactionTurn(faction)).RequireSome();
 
   public BattleActionExecResult AdvanceTurn() =>
-    EndFactionTurn(Query(new GetActiveSideQuery()));
+    EndFactionTurn(Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
 
   public BattleActionExecResult Throw(BattleUnitState unit, ItemWith<ThrowableCapability> item, Vector3I target) =>
-    Submit(BattleAction.ThrowItem(Alive(unit), item, At(target)));
+    Submit(BattleAction.ThrowItem(Alive(unit), item, At(target))).RequireSome();
 
   public BattleActionExecResult Use(BattleUnitState unit, ItemWith<ChargesCapability> item) =>
-    Submit(BattleAction.UseItem(Alive(unit), item));
+    Submit(BattleAction.UseItem(Alive(unit), item)).RequireSome();
 
   public BattleActionExecResult Reload(BattleUnitState unit, AmmunitionedWeapon weapon) =>
-    Submit(BattleAction.ReloadWeapon(Alive(unit), weapon));
+    Submit(BattleAction.ReloadWeapon(Alive(unit), weapon)).RequireSome();
 
   public BattleActionExecResult Interact(BattleUnitState unit, BattleObjectState obj) =>
-    Submit(BattleAction.InteractWithObject(Alive(unit), Live(obj)));
+    Submit(BattleAction.InteractWithObject(Alive(unit), Live(obj))).RequireSome();
 
   // ---- Hook forwarding ----------------------------------------------------------------
+  // Registrations made before Start bind when Start constructs the runtime — after complete
+  // preparation, before the opening dispatch — matching declared-system timing.
 
-  public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0) where TEventKey : BattleEventTag =>
+  public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0) where TEventKey : BattleEventTag
+  {
+    ThrowIfDisposed();
+    if (!_started)
+    {
+      _deferredRegistrations.Add(runtime => runtime.RegisterHook<TEventKey>(hook, priority));
+      return;
+    }
     Runtime.RegisterHook<TEventKey>(hook, priority);
+  }
 
   public bool UnregisterHook<TEventKey>(BattleHook hook) where TEventKey : BattleEventTag =>
     Runtime.UnregisterHook<TEventKey>(hook);
+
+  // The current read context for boundary tests over conditions/objectives: preparation
+  // before Start, the runtime's lifecycle-derived context afterwards.
+  internal BattleReadContext Read => _started
+    ? _runtime.GetReadContext()
+    : new BattleReadContext(_preparation.State, None, None, None);
 
   // ---- Presentation ownership ---------------------------------------------------------
 
@@ -339,9 +482,9 @@ public sealed class BattleFixture : IDisposable
   }
 
   // Detaches recording, disposes the UI, frees owned nodes in reverse registration order,
-  // then closes the runtime — all under one idempotent flag set at entry. Events and the raw
-  // Session/Board handles stay inspectable afterwards for lifecycle tests. The runtime and
-  // any bound directors share this lifetime because Bind exposes no unbind.
+  // then closes the runtime — all under one idempotent flag set at entry. Events and the
+  // board stay inspectable afterwards for lifecycle tests. The runtime and any bound
+  // directors share this lifetime because Bind exposes no unbind.
   public void Dispose()
   {
     if (_disposed)
@@ -364,8 +507,10 @@ public sealed class BattleFixture : IDisposable
     }
     finally
     {
-      Runtime.BattleEventCommitted -= RecordEvent;
-      Runtime.Dispose();
+      _preparation.State.Committed -= RecordEvent;
+      if (_started)
+        _runtime.BattleEventCommitted -= RecordEvent;
+      _runtime?.Dispose();
     }
   }
 

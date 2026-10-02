@@ -109,7 +109,7 @@ public sealed class BattleBoardState
     }
   }
 
-  public void SetTileWalkable(ValidatedPoint point, bool walkable)
+  internal void SetTileWalkable(ValidatedPoint point, bool walkable)
   {
     GetTile(point).IsWalkable = walkable;
   }
@@ -139,7 +139,7 @@ public sealed class BattleBoardState
     return _occupants.TryGetValue(point, out int unitId) ? Some(unitId) : None;
   }
 
-  public bool TryPlaceOccupant(ValidatedPoint point, int unitId)
+  internal bool TryPlaceOccupant(ValidatedPoint point, int unitId)
   {
     if (!GetTile(point).IsWalkable || _occupants.ContainsKey(point) || _objectOccupants.ContainsKey(point))
       return false;
@@ -149,7 +149,7 @@ public sealed class BattleBoardState
     return true;
   }
 
-  public bool TryMoveOccupant(ValidatedPoint source, ValidatedPoint destination, int unitId)
+  internal bool TryMoveOccupant(ValidatedPoint source, ValidatedPoint destination, int unitId)
   {
     if (!_occupants.TryGetValue(source, out int sourceOccupant) || sourceOccupant != unitId)
       return false;
@@ -164,7 +164,7 @@ public sealed class BattleBoardState
     return true;
   }
 
-  public bool TryClearOccupant(ValidatedPoint point, int unitId)
+  internal bool TryClearOccupant(ValidatedPoint point, int unitId)
   {
     if (!_occupants.TryGetValue(point, out int occupant) || occupant != unitId)
       return false;
@@ -332,7 +332,7 @@ public sealed class BattleBoardState
   public bool IsBlockedByObject(ValidatedPoint point)
     => _objectOccupants.ContainsKey(point);
 
-  public bool TryPlaceObjectOccupant(ValidatedPoint point, int objectId)
+  internal bool TryPlaceObjectOccupant(ValidatedPoint point, int objectId)
   {
     if (!GetTile(point).IsWalkable || _occupants.ContainsKey(point) || _objectOccupants.ContainsKey(point))
       return false;
@@ -342,7 +342,7 @@ public sealed class BattleBoardState
     return true;
   }
 
-  public bool TryClearObjectOccupant(ValidatedPoint point, int objectId)
+  internal bool TryClearObjectOccupant(ValidatedPoint point, int objectId)
   {
     if (!_objectOccupants.TryGetValue(point, out int occupant) || occupant != objectId)
       return false;

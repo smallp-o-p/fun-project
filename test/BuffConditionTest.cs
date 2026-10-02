@@ -5,7 +5,7 @@ using Godot;
 
 public partial class AlwaysMetBuffCondition : FunProject.Buffs.BuffCondition
 {
-  internal override bool IsMet(BattleSession session, BattleUnitState unit) => true;
+  internal override bool IsMet(BattleReadContext context, BattleUnitState unit) => true;
 }
 
 [TestSuite]
@@ -18,12 +18,12 @@ public partial class BuffConditionTest
     using var battle = BattleFixture.Solo(new Vector3I(8, 1, 8), new Vector3I(4, 0, 4), health: 20);
     var condition = new FunProject.Buffs.HealthBelowPercentCondition { Percent = 50f };
 
-    Assert.False(condition.IsMet(battle.Session, battle.Unit));
+    Assert.False(condition.IsMet(battle.Read, battle.Unit));
     battle.ApplyDamage(battle.Unit, 10);
-    Assert.False(condition.IsMet(battle.Session, battle.Unit));
+    Assert.False(condition.IsMet(battle.Read, battle.Unit));
     battle.ApplyDamage(battle.Unit, 1);
-    Assert.True(condition.IsMet(battle.Session, battle.Unit));
-    Assert.True(condition.IsMet(battle.Session, battle.Unit));
+    Assert.True(condition.IsMet(battle.Read, battle.Unit));
+    Assert.True(condition.IsMet(battle.Read, battle.Unit));
   }
 
   [TestCase(TestName = "Adjacent-enemy predicate reads the supplied battle")]
@@ -37,8 +37,8 @@ public partial class BuffConditionTest
       enemy: new("Hostile", Position: new Vector3I(4, 0, 4)));
     var condition = new FunProject.Buffs.AdjacentEnemyCondition();
 
-    Assert.True(condition.IsMet(adjacent.Session, adjacent.PlayerUnit));
-    Assert.False(condition.IsMet(apart.Session, apart.PlayerUnit));
+    Assert.True(condition.IsMet(adjacent.Read, adjacent.PlayerUnit));
+    Assert.False(condition.IsMet(apart.Read, apart.PlayerUnit));
   }
 
   [TestCase(TestName = "A condition subclass activates a buff without factory registration")]

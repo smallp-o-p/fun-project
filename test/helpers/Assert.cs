@@ -82,7 +82,7 @@ public static class Assert
       throw new Exception(string.IsNullOrEmpty(msg) ? $"Expected {expect} but got {real}." : $"Expected {expect} but got {real}. {msg}");
   }
 
-  public static void Throws<T>(Action body, string msg = "") where T : Exception
+  public static T Throws<T>(Action body, string msg = "") where T : Exception
   {
     try
     {
@@ -90,7 +90,7 @@ public static class Assert
     }
     catch (Exception exception) when (exception is T)
     {
-      return;
+      return (T)exception;
     }
 
     throw new Exception(string.IsNullOrEmpty(msg) ? $"Expected {typeof(T).Name} but no exception was thrown." : $"Expected {typeof(T).Name} but no exception was thrown. {msg}");

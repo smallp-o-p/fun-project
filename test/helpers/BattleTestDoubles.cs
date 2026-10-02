@@ -19,6 +19,18 @@ internal sealed class RecordingHook : BattleHook
   }
 }
 
+// Spends every listed unit's remaining AP during the session-start dispatch: a shared
+// stand-in for pre-refresh state that a later normalization pass must repair.
+internal sealed class SpendActionPointsHook(IReadOnlyList<BattleUnitState> units) : BattleHook<SessionStartedBattleEvent>
+{
+  protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, SessionStartedBattleEvent evt)
+  {
+    foreach (BattleUnitState unit in units)
+      unit.TrySpendActionPoints(unit.CurrentActionPoints);
+    return [];
+  }
+}
+
 // Setup-time declared-system double: records the runtime it registered with and forwards to
 // a test-supplied callback, so lifecycle tests can hook in during startup.
 internal sealed partial class SetupSystemData : BattleTypeSystemData
@@ -105,7 +117,7 @@ public sealed class FakeObjective : Objective
   public override IReadOnlyCollection<Type> ObservedEventKeys =>
     Observe is null ? [typeof(UnitKilledBattleEvent)] : [Observe];
 
-  public override ObjectiveResult Check(Faction _, BattleEvent battleEvent, BattleSession session)
+  public override ObjectiveResult Check(Faction _, BattleEvent battleEvent, BattleReadContext context)
   {
     CheckCount++;
     if (Failed)

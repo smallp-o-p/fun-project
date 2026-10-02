@@ -6,9 +6,9 @@ public sealed class BattleTileState
   // BattleBoardState.SetTileWalkable.
   public bool IsWalkable { get; internal set; } = true;
 
-  public bool BlocksLineOfSight { get; set; }
+  public bool BlocksLineOfSight { get; internal set; }
 
-  public bool BlocksVerticalLineOfSight { get; set; }
+  public bool BlocksVerticalLineOfSight { get; internal set; }
 
-  public TileCover Cover { get; set; } = TileCover.None;
+  public TileCover Cover { get; internal set; } = TileCover.None;
 }

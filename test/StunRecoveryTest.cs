@@ -111,23 +111,43 @@ public class StunRecoveryTest
     using var battle = BattleFixture.Duel(player: new("Alpha", Armor: armor));
     battle.ApplyDamage(battle.PlayerUnit, 4);
     battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
+    battle.PlayerUnit.ApplyStatusEffect(TestData.MakeStun(duration: 2));
+    // A runtime subscriber requests the end before the upkeep hooks fire: the pending
+    // terminal outcome must not cancel the residual upkeep.
+    battle.Runtime.BattleEventCommitted += battleEvent =>
+    {
+      if (battleEvent is TurnEndedBattleEvent)
+        battle.Session.RequestEnd(BattleOutcome.Victory);
+    };
     battle.ClearEvents();
 
     battle.EndFactionTurn(battle.PlayerFaction);
 
+    battle.Events.EventBefore<UnitStatusEffectTickedBattleEvent, UnitArmorRegeneratedBattleEvent>();
     battle.Events.EventBefore<UnitArmorRegeneratedBattleEvent, UnitStunRecoveredBattleEvent>();
+    battle.Events.EventBefore<UnitStunRecoveredBattleEvent, SessionEndedBattleEvent>();
+    Assert.Equal(3, battle.PlayerUnit.CurrentStun);
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
+    Assert.Equal(0, battle.Events.EventsOf<TurnStartedBattleEvent>().AsValueEnumerable().Count());
   }
 
   [TestCase]
   public void EndedSessionIgnoresRecoveryHook()
   {
-    using var battle = BattleFixture.Duel();
-    battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
-    battle.Session.EndBattle(BattleOutcome.Draw);
+    using var battle = BattleFixture.Duel(playerControlled: true, start: false);
+    battle.AddObjective(battle.PlayerFaction, new SurviveUntilTurnObjectiveData
+    {
+      TargetTurn = 1,
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    }.Instantiate());
+    battle.Damage(battle.PlayerUnit, 8, DamageKind.Stun);
+    battle.Start();   // the terminal opening objective completes before any turn-end upkeep runs
     BattleHook hook = new StunRecoverySystem();
 
-    hook.OnEvent(new HookContext(battle.Session, None),
-      new TurnEndedBattleEvent(battle.PlayerFaction, battle.Session.TurnNumber));
+    // A completed event context carries no running receiver, so upkeep skips recovery.
+    hook.OnEvent(new HookContext(battle.Read, None),
+      new TurnEndedBattleEvent(battle.PlayerFaction, 1));
 
     Assert.Equal(8, battle.PlayerUnit.CurrentStun);
   }

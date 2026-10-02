@@ -77,6 +77,8 @@ public enum BattleSetupFailureReason
   ObjectCellUnavailable,
   /// <summary>Two objects were assigned to the same placement cell.</summary>
   DuplicateObjectCell,
+  /// <summary>A participating side finished preparation without a living, conscious unit.</summary>
+  NoConsciousUnits,
 }
 
 /// <summary>A typed setup failure with a human-readable explanation.</summary>

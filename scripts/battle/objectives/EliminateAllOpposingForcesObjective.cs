@@ -12,11 +12,11 @@ public sealed class EliminateAllOpposingForcesObjective : Objective
 
   public override IReadOnlyCollection<Type> ObservedEventKeys { get; } = [typeof(UnitKilledBattleEvent), typeof(UnitUnconsciousBattleEvent)];
 
-  public override ObjectiveResult Check(Faction owner, BattleEvent battleEvent, BattleSession session)
+  public override ObjectiveResult Check(Faction owner, BattleEvent battleEvent, BattleReadContext context)
   {
-    if (session.GlobalFactionTurnOrder.AsValueEnumerable().All(side => side == owner || !session.HasConsciousUnits(side)))
+    if (context.State.Factions.AsValueEnumerable().All(side => side == owner || !context.State.HasConsciousUnits(side)))
       return ObjectiveResult.Passed;
-    if (!session.HasConsciousUnits(owner))
+    if (!context.State.HasConsciousUnits(owner))
       return ObjectiveResult.Failed;
     return ObjectiveResult.Ongoing;
   }

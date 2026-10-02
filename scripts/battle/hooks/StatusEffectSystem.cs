@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using FunProject.Combatants;
 
 namespace FunProject.Battle;
 
@@ -17,15 +15,19 @@ public sealed class StatusEffectSystem : BattleHook<TurnEndedBattleEvent>
 {
   protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TurnEndedBattleEvent turnEnded)
   {
-    Faction faction = turnEnded.Faction;
-    foreach (BattleUnitState unit in context.Session.GetFactionAliveUnits(faction).ToImmutableList()) // snapshot: a lethal tick removes the unit from AliveUnits mid-iteration
+    // Status effects tick through the running receiver: they are synchronous upkeep of the
+    // ending turn's step, and completed event contexts carry no receiver by contract.
+    if (context.Read.RunningSession.Case is not BattleSession session)
+      return [];
+
+    foreach (BattleUnitState unit in session.State.GetFactionAliveUnits(turnEnded.Faction)) // snapshot: a lethal tick removes the unit from AliveUnits mid-iteration
     {
       foreach (ActiveStatusEffect active in unit.ActiveStatusEffects.AsValueEnumerable().ToList())
       {
         active.TickDown();
-        context.Session.RaiseEvents(new UnitStatusEffectTickedBattleEvent(unit, active.Spec, active.RemainingTurns));
+        session.RaiseEvents(new UnitStatusEffectTickedBattleEvent(unit, active.Spec, active.RemainingTurns));
 
-        active.OnFactionTurnEnd(context.Session, unit);
+        active.OnFactionTurnEnd(session, unit);
 
         if (unit.IsDead)
           break;
@@ -33,7 +35,7 @@ public sealed class StatusEffectSystem : BattleHook<TurnEndedBattleEvent>
         if (active.IsExpired)
         {
           unit.RemoveStatusEffect(active.Spec);
-          context.Session.RaiseEvents(new UnitStatusEffectExpiredBattleEvent(unit, active.Spec));
+          session.RaiseEvents(new UnitStatusEffectExpiredBattleEvent(unit, active.Spec));
         }
       }
     }

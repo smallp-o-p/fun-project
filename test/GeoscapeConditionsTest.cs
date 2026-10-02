@@ -56,9 +56,15 @@ public class GeoscapeConditionsTest
     var alpha = campaign.State.Roster[0];
     using var battle = new BattleFixture(new Vector3I(5, 1, 5), [campaign.State.PlayerFaction]);
     var unit = battle.Spawn(alpha, Vector3I.Zero, armor: TestData.MakeArmor("Vest", armor: 10));
+    battle.AddObjective(campaign.State.PlayerFaction, new SurviveUntilTurnObjectiveData
+    {
+      TargetTurn = 2,
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    }.Instantiate());
+    battle.Start();
     battle.ApplyDamage(unit, 5);
-    battle.Session.EndBattle(BattleOutcome.Victory);
-    var summary = battle.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
+    battle.EndFactionTurn(campaign.State.PlayerFaction);   // turn two's start completes
+    var summary = battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[campaign.State.PlayerFaction];
     Assert.Equal(0L, summary.HealthByCombatant[alpha].HealthDamageTaken);
 
     campaign.Session.ApplyMissionReturn(summary);
@@ -140,9 +146,9 @@ public class GeoscapeConditionsTest
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [campaign.State.PlayerFaction]);
-    battle.Session.EndBattle(BattleOutcome.Victory);
-    var empty = battle.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
+    // Zero participants: no legal battle exists (preparation requires units), so the
+    // report arrangement is the frozen empty summary the battle pipeline would emit.
+    var empty = GeoscapeFixture.EmptyReport(campaign.State.PlayerFaction, BattleOutcome.Victory);
 
     campaign.ClearEvents();
     campaign.Session.ApplyMissionReturn(empty);

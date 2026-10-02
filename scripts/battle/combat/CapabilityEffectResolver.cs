@@ -29,15 +29,15 @@ public static class CapabilityEffectResolver
     // Snapshot every recipient within radius (via BattleSession.GetGridDistance) of the
     // origin BEFORE applying anything; radius 0 = only the origin tile's occupant.
     // Friendly-fire is intentional, so no side filtering.
-    List<BattleUnitState> affected = session.AliveUnits
-      .AsValueEnumerable().Where(unit => session.GetUnitPosition(unit).Match(
-        Some: point => BattleSession.GetGridDistance(point.Raw, origin.Raw) <= radius,
+    List<BattleUnitState> affected = session.State.AliveUnits
+      .AsValueEnumerable().Where(unit => session.State.GetUnitPosition(unit).Match(
+        Some: point => BattleBoardState.GetGridDistance(point.Raw, origin.Raw) <= radius,
         None: () => false))
       .ToList();
-    List<BattleObjectState> affectedObjects = session.Objects.AsValueEnumerable()
+    List<BattleObjectState> affectedObjects = session.State.Objects.AsValueEnumerable()
       .Where(obj => obj.Status.IsNone
         && obj.FindCapability<ObjectHealthCapability>().IsSome
-        && BattleSession.GetGridDistance(obj.Position, origin.Raw) <= radius)
+        && BattleBoardState.GetGridDistance(obj.Position, origin.Raw) <= radius)
       .ToList();
 
     foreach (BattleUnitState unit in affected)
@@ -46,7 +46,7 @@ public static class CapabilityEffectResolver
       {
         // An earlier effect can have killed this unit (which removes it from the board);
         // ApplyDamageTo throws on a dead/off-board unit, so re-check before each application.
-        if (unit.IsDead || session.GetUnitPosition(unit).IsNone)
+        if (unit.IsDead || session.State.GetUnitPosition(unit).IsNone)
           break;
 
         switch (effect)
@@ -56,11 +56,6 @@ public static class CapabilityEffectResolver
             break;
           case StatusEffectSpecData status:
             session.ApplyStatusEffectTo(unit, status);
-            break;
-          default:
-            // TODO: other BattleEffectData subclasses (e.g. SpawnHazardEffectData,
-            // TerrainEffectData, VisibilityEffectData) are not yet resolved. Add a
-            // dispatch case here when their behavior is implemented.
             break;
         }
       }

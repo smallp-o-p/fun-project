@@ -17,9 +17,12 @@ public sealed class SpecialObjectTimerSystem : BattleHook<TurnEndedBattleEvent>
 {
   protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TurnEndedBattleEvent evt)
   {
-    BattleSession session = context.Session;
+    // Expiry resolves against the running receiver: it is synchronous upkeep of the ending
+    // turn's step, and completed event contexts carry no receiver by contract.
+    if (context.Read.RunningSession.Case is not BattleSession session)
+      return [];
 
-    foreach (BattleObjectState obj in session.Objects.AsValueEnumerable()
+    foreach (BattleObjectState obj in session.State.Objects.AsValueEnumerable()
              .Where(obj => obj.Status.IsNone))
     {
       // One lookup: capabilities are fixed at construction, so a live object that carries

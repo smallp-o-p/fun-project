@@ -14,6 +14,10 @@ namespace FunProject.Battle;
 public sealed class BattleUnitState
 {
   private readonly List<EquippableItem> _inventory;
+  // Created once after _inventory assignment: a live read-only wrapper over the same list,
+  // so Inventory hands out membership without copying or allocating on each read while raw
+  // mutation through the returned view stays refused.
+  private readonly IReadOnlyList<EquippableItem> _inventoryView;
   private readonly StatMod[] _loadoutStatMods;
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
@@ -26,7 +30,7 @@ public sealed class BattleUnitState
   public Faction Side => Combatant.OwningFaction;
   public Option<Weapon> EquippedWeapon { get; private set; }
   public Option<ItemWith<ArmorCapability>> EquippedArmor { get; }
-  public IReadOnlyList<EquippableItem> Inventory => _inventory;
+  public IReadOnlyList<EquippableItem> Inventory => _inventoryView;
   internal IReadOnlySet<BattleUnitState> VisibleUnits => _visibleUnits;
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> VisibleTiles => _visibleTiles;
 
@@ -79,6 +83,7 @@ public sealed class BattleUnitState
       if (combatant.Inventory.TryGetValue(slot, out EquippableItem? item))
         inventory.Add(item);
     _inventory = inventory;
+    _inventoryView = inventory.AsReadOnly();
 
     // Preserve every grant in source order, including repeated resources.
     IEnumerable<Buff> granted = combatant.InnateBuffs
@@ -95,12 +100,12 @@ public sealed class BattleUnitState
     }
   }
 
-  public void RefreshForNewTurn()
+  internal void RefreshForNewTurn()
   {
     CurrentActionPoints = MaxActionPoints;
   }
 
-  public bool TrySpendActionPoints(int cost)
+  internal bool TrySpendActionPoints(int cost)
   {
     if (cost < 0 || CurrentActionPoints < cost)
       return false;
@@ -118,7 +123,7 @@ public sealed class BattleUnitState
         $"Unit {Id} cannot spend {cost} action points (has {CurrentActionPoints}).");
   }
 
-  public void ReceiveDamage(int amount)
+  internal void ReceiveDamage(int amount)
   {
     if (amount <= 0)
       return;
@@ -172,7 +177,7 @@ public sealed class BattleUnitState
       () => throw new InvalidOperationException($"Unit {Id} has no equipped weapon."));
   }
 
-  public void AddInventoryItem(EquippableItem item)
+  internal void AddInventoryItem(EquippableItem item)
   {
     _inventory.Add(item);
   }
@@ -182,7 +187,7 @@ public sealed class BattleUnitState
     return _inventory.Contains(item);
   }
 
-  public bool RemoveInventoryItem(EquippableItem item)
+  internal bool RemoveInventoryItem(EquippableItem item)
   {
     return _inventory.Remove(item);
   }
@@ -238,18 +243,33 @@ public sealed class BattleUnitState
     CurrentHealth = Math.Min(CurrentHealth, Math.Max(MaxHealth, 1));
   }
 
-  internal void EvaluateBuffs(BattleSession session)
+  // Evaluates every grant in source order; each grant completes its flag update, health
+  // clamp, visibility reconciliation, and event enqueue before the next grant is evaluated —
+  // the buff-event path resolves pending visibility before returning, so the next grant's
+  // condition reads the reconciled world. A flip that changed the effective vision or
+  // consciousness marks the unit affected; a new knockout runs the running receiver's
+  // knockout policy (preparation contexts carry no receiver). Notification itself may
+  // remain deferred while an outer dispatch runs (the shared dispatcher broadcasts in FIFO
+  // order).
+  internal void EvaluateBuffs(BattleReadContext context)
   {
     for (int i = 0; i < _buffs.Count; i++)
     {
       (Buff buff, bool wasActive) = _buffs[i];
-      bool isActive = buff.Condition.IsMet(session, this);
+      bool isActive = buff.Condition.IsMet(context, this);
       if (isActive == wasActive)
         continue;
 
+      bool wasUnconscious = IsUnconscious;
+      int priorVision = Vision;
       _buffs[i] = (buff, isActive);
+
       ClampCurrentHealthToMax();
-      session.RaiseEvents(isActive
+      if (priorVision != Vision || wasUnconscious != IsUnconscious)
+        context.State.MarkVisibilityAffected(this);
+      if (!wasUnconscious && IsUnconscious)
+        context.RunningSession.IfSome(session => session.ReconcileBuffKnockout(this));
+      context.State.RaiseBuffEvent(isActive
         ? new UnitBuffActivatedBattleEvent(this, buff)
         : new UnitBuffDeactivatedBattleEvent(this, buff));
     }

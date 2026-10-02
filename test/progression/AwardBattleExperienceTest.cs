@@ -11,7 +11,7 @@ public class AwardBattleExperienceTest
   private static FactionBattleSummary MakeSummary(
     Faction faction,
     IReadOnlySet<Combatant> present,
-    IReadOnlyDictionary<Combatant, List<Combatant>> kills,
+    IReadOnlyDictionary<Combatant, IReadOnlyList<Combatant>> kills,
     IReadOnlySet<Combatant>? dead = null,
     BattleOutcome outcome = BattleOutcome.Victory)
     => new()
@@ -41,7 +41,8 @@ public class AwardBattleExperienceTest
     var table = new ExperienceTableData { ParticipationXp = 10, KillXp = 25 };
 
     var awards = AwardBattleExperience.Award(
-      MakeSummary(faction, new System.Collections.Generic.HashSet<Combatant> { alpha, bravo }, new Dictionary<Combatant, List<Combatant>>()),
+      MakeSummary(faction, new System.Collections.Generic.HashSet<Combatant> { alpha, bravo },
+        new Dictionary<Combatant, IReadOnlyList<Combatant>>()),
       table);
 
     Assert.Equal(10, alpha.Rank.Xp);
@@ -61,7 +62,7 @@ public class AwardBattleExperienceTest
     var awards = AwardBattleExperience.Award(
       MakeSummary(faction,
         new System.Collections.Generic.HashSet<Combatant> { alpha },
-        new Dictionary<Combatant, List<Combatant>> { [alpha] = [victim1, victim2] }),
+        new Dictionary<Combatant, IReadOnlyList<Combatant>> { [alpha] = [victim1, victim2] }),
       new ExperienceTableData { ParticipationXp = 10, KillXp = 25 });
 
     Assert.Equal(60, alpha.Rank.Xp); // 10 participation + 2 * 25 kills
@@ -80,7 +81,7 @@ public class AwardBattleExperienceTest
     var awards = AwardBattleExperience.Award(
       MakeSummary(faction,
         new System.Collections.Generic.HashSet<Combatant> { alpha, bravo, charlie },
-        new Dictionary<Combatant, List<Combatant>>
+        new Dictionary<Combatant, IReadOnlyList<Combatant>>
         {
           [alpha] = [victim],
           [charlie] = [victim], // killed, then fell — no posthumous credit
@@ -111,7 +112,7 @@ public class AwardBattleExperienceTest
     AwardBattleExperience.Award(
       MakeSummary(faction,
         new System.Collections.Generic.HashSet<Combatant> { alpha },
-        new Dictionary<Combatant, List<Combatant>> { [alpha] = [victim] }),
+        new Dictionary<Combatant, IReadOnlyList<Combatant>> { [alpha] = [victim] }),
       new ExperienceTableData { ParticipationXp = 10, KillXp = 25 });
 
     Assert.Equal(1, alpha.Rank.Xp);
@@ -122,7 +123,7 @@ public class AwardBattleExperienceTest
   {
     var faction = TestData.MakeFaction("Player");
     Assert.Throws<System.InvalidOperationException>(() => AwardBattleExperience.Award(
-      MakeSummary(faction, new System.Collections.Generic.HashSet<Combatant>(), new Dictionary<Combatant, List<Combatant>>()),
+      MakeSummary(faction, new System.Collections.Generic.HashSet<Combatant>(), new Dictionary<Combatant, IReadOnlyList<Combatant>>()),
       new ExperienceTableData { ParticipationXp = 0, KillXp = 25 }));
   }
 }

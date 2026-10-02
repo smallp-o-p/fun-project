@@ -14,11 +14,14 @@ public sealed class CapabilityEffectSystem : BattleHook<ItemThrownBattleEvent>
 {
   protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, ItemThrownBattleEvent thrown)
   {
-    thrown.Item.FindCapability<BlastCapability>().IfSome(blast =>
-    {
-      CapabilityEffectResolver.Resolve(context.Session, thrown.Position, blast.BlastRadius, blast.Effects);
-      context.Session.RaiseEvents(new CapabilityResolvedBattleEvent(thrown.Item, thrown.Position));
-    });
+    // Blast payloads apply through the running receiver: they are synchronous effects of the
+    // throw's step, and a completed event context carries no receiver by contract.
+    context.Read.RunningSession.IfSome(session =>
+      thrown.Item.FindCapability<BlastCapability>().IfSome(blast =>
+      {
+        CapabilityEffectResolver.Resolve(session, thrown.Position, blast.BlastRadius, blast.Effects);
+        session.RaiseEvents(new CapabilityResolvedBattleEvent(thrown.Item, thrown.Position));
+      }));
 
     return [];
   }

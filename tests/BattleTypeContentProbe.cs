@@ -37,15 +37,18 @@ public partial class BattleTypeContentProbe : SceneTree
       Right: started => started,
       Left: failure => throw new InvalidOperationException($"Battle setup failed: {failure.Message}"));
 
-    if (runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
-      throw new InvalidOperationException("Bomb defusal battle did not start in progress.");
+    if (runtime.Query(new GetCurrentTurnQuery()).IsNone)
+      throw new InvalidOperationException("Bomb defusal battle did not start with a current turn.");
     if (runtime.Query(new GetBattleSpecialObjectsQuery()).Count != 2)
       throw new InvalidOperationException("Bomb defusal battle did not place two bombs.");
 
-    for (int turn = 0; turn < 12 && runtime.Query(new GetBattlePhaseQuery()) == BattlePhase.InProgress; turn++)
-      runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    for (int turn = 0; turn < 12 && runtime.Query(new GetCompletedBattleQuery()).IsNone; turn++)
+      runtime.ExecuteAction(BattleAction.EndFactionTurn(
+        runtime.Query(new GetCurrentTurnQuery()).Match(
+          currentTurn => currentTurn.ActiveFaction,
+          () => throw new InvalidOperationException("Running battle has no current turn."))));
 
-    if (runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.Ended)
+    if (runtime.Query(new GetCompletedBattleQuery()).IsNone)
       throw new InvalidOperationException("Bomb defusal battle did not end after the authored deadline.");
 
     GD.Print("BOMB_DEFUSAL_CONTENT_OK");
@@ -59,8 +62,8 @@ public partial class BattleTypeContentProbe : SceneTree
       Right: started => started,
       Left: failure => throw new InvalidOperationException($"Battle setup failed: {failure.Message}"));
 
-    if (runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
-      throw new InvalidOperationException("Skirmish battle did not start in progress.");
+    if (runtime.Query(new GetCurrentTurnQuery()).IsNone)
+      throw new InvalidOperationException("Skirmish battle did not start with a current turn.");
 
     int units = 0;
     foreach (Faction faction in runtime.Query(new GetGlobalFactionTurnOrderQuery()))

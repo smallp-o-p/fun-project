@@ -10,8 +10,16 @@ using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
-public class UnitActionCacheTest
+public partial class UnitActionCacheTest
 {
+  private sealed partial class ActiveOnRound : BuffCondition
+  {
+    public int Round { get; set; }
+
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
+      context.RunningSession.Match(session => session.RoundNumber == Round, () => false);
+  }
+
   private sealed class TestActionDefinition(UnitActionCondition condition) : UnitActionDefinition
   {
     private readonly IReadOnlyList<UnitActionCondition> _conditions = [condition];
@@ -24,7 +32,7 @@ public class UnitActionCacheTest
   {
     public int Calls { get; private set; }
 
-    internal override bool IsMet(BattleSession session, AliveUnit unit)
+    internal override bool IsMet(BattleReadContext context, AliveUnit unit)
     {
       Calls++;
       return true;
@@ -39,7 +47,7 @@ public class UnitActionCacheTest
     public int Calls { get; private set; }
     public bool ShouldThrow { get; set; } = true;
 
-    internal override bool IsMet(BattleSession session, AliveUnit unit)
+    internal override bool IsMet(BattleReadContext context, AliveUnit unit)
     {
       Calls++;
       if (ShouldThrow)
@@ -52,7 +60,7 @@ public class UnitActionCacheTest
 
   private sealed class SpendThenThrow(BattleUnitState unit, Exception failure) : BattleAction
   {
-    public override Result Execute(BattleSession session)
+    internal override Result ExecuteStep(BattleSession session)
     {
       unit.SpendActionPoints(1);
       throw failure;
@@ -61,7 +69,7 @@ public class UnitActionCacheTest
 
   private sealed class SpendThenReject(BattleUnitState unit) : BattleAction
   {
-    public override Result Execute(BattleSession session)
+    internal override Result ExecuteStep(BattleSession session)
     {
       unit.SpendActionPoints(1);
       return Result.Rejected;
@@ -103,7 +111,7 @@ public class UnitActionCacheTest
     public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
     {
       _spent = true;
-      return context.Session.TryGetAlive(target).Match(
+      return context.Read.State.TryGetAlive(target).Match(
         alive => (IReadOnlyList<BattleAction>)[BattleAction.ApplyDamage(alive, amount, kind)],
         () => []);
     }
@@ -188,9 +196,10 @@ public class UnitActionCacheTest
   [TestCase]
   public void UseAndThrowSpendingLastActionPointDisableActorVerbs()
   {
-    using var useBattle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1, Weapon: TestData.MakeWeapon("Rifle")));
+    using var useBattle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1, Weapon: TestData.MakeWeapon("Rifle")), start: false);
     ItemWith<ChargesCapability> usable = TestData.MakeUsableItem("Medkit");
     useBattle.PlayerUnit.AddInventoryItem(usable.Item);
+    useBattle.Start();
     IReadOnlyList<UnitAction> useActions = useBattle.Query(
       new GetAvailableActionsForUnit(useBattle.Alive(useBattle.PlayerUnit)));
     EvaluateAll(useActions);
@@ -201,9 +210,10 @@ public class UnitActionCacheTest
     Assert.False(Row<AttackActionDefinition>(useActions).IsAvailable);
     Assert.False(Row<PassActionDefinition>(useActions).IsAvailable);
 
-    using var throwBattle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1, Weapon: TestData.MakeWeapon("Rifle")));
+    using var throwBattle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1, Weapon: TestData.MakeWeapon("Rifle")), start: false);
     ItemWith<ThrowableCapability> throwable = TestData.MakeThrowable("Rock");
     throwBattle.PlayerUnit.AddInventoryItem(throwable.Item);
+    throwBattle.Start();
     IReadOnlyList<UnitAction> throwActions = throwBattle.Query(
       new GetAvailableActionsForUnit(throwBattle.Alive(throwBattle.PlayerUnit)));
     EvaluateAll(throwActions);
@@ -275,17 +285,21 @@ public class UnitActionCacheTest
   [TestCase]
   public void BuffClampIncapacitatesUnselectedUnitAndUpdatesRetainedOptions()
   {
+    // Collapse halves max health (20 -> 10) while the support is stunned to 15: the stun
+    // lands after its faction's round-1 turn end, so no recovery precedes the flip, and the
+    // clamp itself pushes current health across the un-reduced stun threshold — the knockout
+    // is the clamp's reconciliation, not a damage outcome.
     var collapse = TestData.MakeBuff(
       "Collapse",
-      new HealthBelowPercentCondition { Percent = 50f },
-      statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-15)] }]);
+      new ActiveOnRound { Round = 2 },
+      statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-10)] }]);
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
     using var battle = new BattleFixture(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    battle.Spawn(TestData.MakeCombatant("Lead", playerFaction), new Vector3I(1, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("Lead", playerFaction, vision: 1), new Vector3I(0, 0, 0));
     BattleUnitState support = battle.Spawn(
-      TestData.MakeCombatant("Support", playerFaction, buffs: [collapse]), new Vector3I(2, 0, 1));
-    battle.Spawn(TestData.MakeCombatant("Durable", enemyFaction, health: 100), new Vector3I(1, 0, 5));
+      TestData.MakeCombatant("Support", playerFaction, vision: 3, buffs: [collapse]), new Vector3I(2, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("Durable", enemyFaction, health: 100, vision: 0), new Vector3I(6, 0, 6));
     battle.Start();
     IReadOnlyList<UnitAction> actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(support)));
     UnitAction move = Row<MoveActionDefinition>(actions);
@@ -293,33 +307,38 @@ public class UnitActionCacheTest
     Assert.True(move.IsAvailable);
     Assert.True(endTurn.IsAvailable);
 
-    battle.EndFactionTurn(playerFaction);
-    battle.ApplyDamage(support, 11);
-    battle.ApplyDamage(support, 8, DamageKind.Stun);
+    battle.AdvanceTurn(); // round 1: enemy turn — the support's own faction turn end precedes its stun
+    battle.ApplyDamage(support, 15, DamageKind.Stun);
     Assert.False(support.IsIncapacitated);
-    Assert.False(move.IsAvailable);
-    Assert.False(endTurn.IsAvailable);
+    BattleBoardState.ValidatedPoint exclusiveTile = battle.At(new Vector3I(4, 0, 1));
+    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile)));
 
-    bool incapacitatedAtTurnStarted = true;
-    bool moveAtTurnStarted = false;
-    bool endTurnAtTurnStarted = false;
-    battle.Runtime.BattleEventCommitted += battleEvent =>
+    bool clampedAtBuffEvent = false;
+    battle.OnCommitted(battleEvent =>
     {
-      if (battleEvent is not TurnStartedBattleEvent started || started.Faction != playerFaction)
+      if (battleEvent is not UnitBuffActivatedBattleEvent activated || activated.Unit != support)
         return;
-      incapacitatedAtTurnStarted = support.IsIncapacitated;
-      moveAtTurnStarted = move.IsAvailable;
-      endTurnAtTurnStarted = endTurn.IsAvailable;
-    };
+      clampedAtBuffEvent = true;
+      Assert.Equal(15, support.CurrentStun); // the un-reduced stun the scenario describes
+      Assert.Equal(10, support.CurrentHealth);
+      Assert.True(support.IsUnconscious);
+      Assert.False(move.IsAvailable);
+      Assert.False(endTurn.IsAvailable);
+      Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile)));
+    });
 
-    battle.EndFactionTurn(enemyFaction);
+    battle.AdvanceTurn(); // round 2: the player's turn starts and Collapse activates
 
-    Assert.False(incapacitatedAtTurnStarted);
-    Assert.True(moveAtTurnStarted);
-    Assert.True(endTurnAtTurnStarted);
-    Assert.Equal(5, support.MaxHealth);
-    Assert.Equal(5, support.CurrentHealth);
+    Assert.True(clampedAtBuffEvent);
+    battle.Events.EventBefore<UnitUnconsciousBattleEvent, UnitBuffActivatedBattleEvent>();
+    var unconscious = battle.Events.SingleEvent<UnitUnconsciousBattleEvent>();
+    Assert.True(ReferenceEquals(unconscious.Unit, support));
+    Assert.True(unconscious.MaybeCause.IsNone);
+    Assert.False(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Any());
+    Assert.Equal(10, support.MaxHealth);
+    Assert.Equal(10, support.CurrentHealth);
     Assert.True(support.IsUnconscious);
+    Assert.False(battle.Query(new IsUnitStillAvailableThisTurn(support)));
     Assert.False(move.IsAvailable);
     Assert.False(endTurn.IsAvailable);
   }
@@ -570,17 +589,25 @@ public class UnitActionCacheTest
     BattleUnitState player = battle.Spawn(TestData.MakeCombatant("Player", playerFaction), new Vector3I(1, 0, 1));
     BattleUnitState support = battle.Spawn(TestData.MakeCombatant("Support", playerFaction), new Vector3I(2, 0, 1));
     battle.Spawn(TestData.MakeCombatant("Enemy", enemyFaction), new Vector3I(1, 0, 5));
-    player.TrySpendActionPoints(player.CurrentActionPoints);
-    support.TrySpendActionPoints(support.CurrentActionPoints);
-    IReadOnlyList<UnitAction> existing = battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(player)));
-    UnitAction existingMove = Row<MoveActionDefinition>(existing);
-    Assert.False(existingMove.IsAvailable);
+    // A session-start hook drains the two player units' AP before the turn-start dispatch,
+    // standing in for pre-refresh state the turn-start reads must observe without caching.
+    battle.RegisterHook<SessionStartedBattleEvent>(new SpendActionPointsHook([player, support]));
     IReadOnlyList<UnitAction> createdDuringCallback = null;
     bool existingDuringCallback = true;
     bool createdDuringCallbackValue = true;
-    battle.Session.BattleEventCommitted += battleEvent =>
+    UnitAction existingMove = null;
+    battle.OnCommitted(battleEvent =>
     {
+      if (battleEvent is SessionStartedBattleEvent)
+      {
+        // The shared ordered stream forwards subscribers before the hook pass, so this
+        // read observes pre-drain state; materializing here gives TurnStarted an existing
+        // row to re-check against the drained, pre-refresh values.
+        IReadOnlyList<UnitAction> existing = battle.Query(
+          new GetAvailableActionsForUnit(battle.Alive(player)));
+        existingMove = Row<MoveActionDefinition>(existing);
+        return;
+      }
       if (battleEvent is not TurnStartedBattleEvent)
         return;
       existingDuringCallback = existingMove.IsAvailable;
@@ -589,7 +616,7 @@ public class UnitActionCacheTest
       createdDuringCallbackValue = Row<MoveActionDefinition>(createdDuringCallback).IsAvailable;
       Assert.True(existingMove.IsDirty);
       Assert.True(Row<MoveActionDefinition>(createdDuringCallback).IsDirty);
-    };
+    });
 
     battle.Start();
 
@@ -635,7 +662,7 @@ public class UnitActionCacheTest
     Assert.Throws<InvalidOperationException>(() =>
       battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2), new Vector3I(4, 0, 3)]));
 
-    Assert.Equal(new Vector3I(4, 0, 2), battle.Session.GetUnitPosition(battle.PlayerUnit).RequireSome().Raw);
+    Assert.Equal(new Vector3I(4, 0, 2), battle.PositionOf(battle.PlayerUnit).RequireSome().Raw);
     Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
     Assert.Equal(1, battle.Events.EventsOf<UnitMovedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(1, battle.Events.EventsOf<TileOccupiedBattleEvent>().AsValueEnumerable().Count());
@@ -649,7 +676,7 @@ public class UnitActionCacheTest
 
     battle.Pass(battle.PlayerUnit);
 
-    Assert.Equal(new Vector3I(4, 0, 2), battle.Session.GetUnitPosition(battle.PlayerUnit).RequireSome().Raw);
+    Assert.Equal(new Vector3I(4, 0, 2), battle.PositionOf(battle.PlayerUnit).RequireSome().Raw);
     Assert.Equal(1, battle.Events.EventsOf<UnitMovedBattleEvent>().AsValueEnumerable().Count());
   }
 
@@ -674,12 +701,12 @@ public class UnitActionCacheTest
     }
 
     Assert.True(ReferenceEquals(failure, caught));
-    Assert.Equal(new Vector3I(4, 0, 2), battle.Session.GetUnitPosition(battle.PlayerUnit).RequireSome().Raw);
+    Assert.Equal(new Vector3I(4, 0, 2), battle.PositionOf(battle.PlayerUnit).RequireSome().Raw);
     Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
     Assert.False(Row<MoveActionDefinition>(actions).IsAvailable);
 
     battle.Submit(BattleAction.PassUnit(battle.Alive(battle.PlayerUnit)));
-    Assert.Equal(new Vector3I(4, 0, 2), battle.Session.GetUnitPosition(battle.PlayerUnit).RequireSome().Raw);
+    Assert.Equal(new Vector3I(4, 0, 2), battle.PositionOf(battle.PlayerUnit).RequireSome().Raw);
   }
 
   [TestCase]
@@ -710,20 +737,6 @@ public class UnitActionCacheTest
     Assert.False(Row<MoveActionDefinition>(playerActions).IsAvailable);
     Assert.False(Row<PassActionDefinition>(playerActions).IsAvailable);
     Assert.True(Row<EndTurnActionDefinition>(playerActions).IsAvailable);
-  }
-
-  [TestCase]
-  public void ExecutorReplacementInvalidatesExistingEntries()
-  {
-    using var battle = BattleFixture.Duel();
-    IReadOnlyList<UnitAction> actions = battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    EvaluateAll(actions);
-    battle.Runtime.Dispose();
-
-    using var replacement = new BattleActionExecutor(battle.Session);
-
-    Assert.True(actions.AsValueEnumerable().All(action => action.IsDirty));
   }
 
   [TestCase]

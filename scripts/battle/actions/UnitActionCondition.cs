@@ -1,4 +1,3 @@
-
 namespace FunProject.Battle;
 
 /// <summary>
@@ -7,7 +6,7 @@ namespace FunProject.Battle;
 /// </summary>
 public abstract class UnitActionCondition
 {
-  internal abstract bool IsMet(BattleSession session, AliveUnit unit);
+  internal abstract bool IsMet(BattleReadContext context, AliveUnit unit);
   internal abstract bool MayChange(BattleEvent battleEvent, BattleUnitState unit);
 
   internal static bool IncapacityMayChange(BattleEvent battleEvent, BattleUnitState unit) => battleEvent switch
@@ -48,7 +47,7 @@ public abstract class UnitActionCondition
       },
       None: () => false);
 
-  protected static bool PhaseOrSideMayChange(BattleEvent battleEvent) => battleEvent is
+  protected static bool LifecycleOrSideMayChange(BattleEvent battleEvent) => battleEvent is
     SessionStartedBattleEvent or
     SessionEndedBattleEvent or
     TurnStartedBattleEvent or
@@ -56,16 +55,16 @@ public abstract class UnitActionCondition
     ActiveSideChangedBattleEvent;
 
   protected static bool SchedulingMayChange(BattleEvent battleEvent, BattleUnitState unit)
-    => PhaseOrSideMayChange(battleEvent)
+    => LifecycleOrSideMayChange(battleEvent)
       || battleEvent is UnitActivationEndedBattleEvent ended && ended.Unit == unit;
 }
 
-// Battle is in progress and the scheduler allows this unit to act right now
+// The battle is running and the scheduler allows this unit to act right now
 // (active side, still available this turn, alive, and not incapacitated).
 public sealed class UnitCanActNowCondition : UnitActionCondition
 {
-  internal override bool IsMet(BattleSession session, AliveUnit unit)
-    => session.Phase == BattlePhase.InProgress && session.CanUnitActNow(unit.State);
+  internal override bool IsMet(BattleReadContext context, AliveUnit unit)
+    => context.RunningSession.Match(session => session.CanUnitActNow(unit.State), () => false);
 
   internal override bool MayChange(BattleEvent battleEvent, BattleUnitState unit)
     => SchedulingMayChange(battleEvent, unit) || ActionPointsMayChange(battleEvent, unit);
@@ -75,7 +74,7 @@ public sealed class HasActionPointsCondition(int cost) : UnitActionCondition
 {
   public int Cost { get; } = cost;
 
-  internal override bool IsMet(BattleSession session, AliveUnit unit)
+  internal override bool IsMet(BattleReadContext context, AliveUnit unit)
     => unit.State.CurrentActionPoints >= Cost;
 
   internal override bool MayChange(BattleEvent battleEvent, BattleUnitState unit)
@@ -85,7 +84,7 @@ public sealed class HasActionPointsCondition(int cost) : UnitActionCondition
 // Weapons without a magazine are always loaded.
 public sealed class WeaponIsLoadedCondition : UnitActionCondition
 {
-  internal override bool IsMet(BattleSession session, AliveUnit unit)
+  internal override bool IsMet(BattleReadContext context, AliveUnit unit)
     => unit.State.EquippedWeapon.Match(
       Some: weapon => weapon.IsLoaded,
       None: () => false);
@@ -96,7 +95,7 @@ public sealed class WeaponIsLoadedCondition : UnitActionCondition
 
 public sealed class CanReloadCondition : UnitActionCondition
 {
-  internal override bool IsMet(BattleSession session, AliveUnit unit)
+  internal override bool IsMet(BattleReadContext context, AliveUnit unit)
     => unit.State.EquippedWeapon.Match(
       Some: weapon => weapon.CanReload(),
       None: () => false);
@@ -107,9 +106,9 @@ public sealed class CanReloadCondition : UnitActionCondition
 
 public sealed class IsActiveSideCondition : UnitActionCondition
 {
-  internal override bool IsMet(BattleSession session, AliveUnit unit)
-    => session.Phase == BattlePhase.InProgress && unit.State.Side == session.ActiveSide;
+  internal override bool IsMet(BattleReadContext context, AliveUnit unit)
+    => context.CurrentTurn.Match(turn => unit.State.Side == turn.ActiveFaction, () => false);
 
   internal override bool MayChange(BattleEvent battleEvent, BattleUnitState unit)
-    => PhaseOrSideMayChange(battleEvent);
+    => LifecycleOrSideMayChange(battleEvent);
 }

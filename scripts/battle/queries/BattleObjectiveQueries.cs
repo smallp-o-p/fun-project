@@ -7,8 +7,8 @@ namespace FunProject.Battle;
 // None when the faction was never given any.
 public sealed class GetObjectivesForFaction(Faction side) : IBattleSessionQuery<Option<IReadOnlyList<Objective>>>
 {
-  public Option<IReadOnlyList<Objective>> Execute(BattleSession session)
+  public Option<IReadOnlyList<Objective>> Execute(BattleReadContext context)
   {
-    return session.GetObjectives(side) is { Count: > 0 } list ? Some(list) : None;
+    return context.State.GetObjectives(side) is { Count: > 0 } list ? Some(list) : None;
   }
 }

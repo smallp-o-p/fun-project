@@ -1,6 +1,9 @@
 using FunProject.Battle;
+using FunProject.Items;
 using GdUnit4;
 using Godot;
+using System;
+using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -16,8 +19,26 @@ public class UseItemActionTest
     unit.AddInventoryItem(usable.Item);
     battle.ClearEvents();
 
+    // The public inventory is one live read view over the private backing list: raw
+    // mutation through it must be refused while the real use commands remove for real. The
+    // contract is refusing membership mutation if a writable interface is exposed, not a
+    // particular representation, so the negative asserts only run when one is implemented.
+    IReadOnlyList<EquippableItem> inventory = unit.Inventory;
+    if (inventory is SysColGeneric.IList<EquippableItem> raw)
+    {
+      Assert.Throws<NotSupportedException>(() => raw.Clear());
+      Assert.Throws<NotSupportedException>(() => raw.Add(usable.Item));
+      Assert.Throws<NotSupportedException>(() => raw.Remove(usable.Item));
+    }
+    Assert.Equal(1, inventory.Count);
+    Assert.Equal(4, unit.CurrentActionPoints);
+    Assert.Equal(0, battle.Events.Count);
+
     battle.Use(unit, usable);
 
+    Assert.True(ReferenceEquals(inventory, unit.Inventory));
+    Assert.Equal(remainsInInventory ? 1 : 0, inventory.Count);
+    Assert.Equal(remainsInInventory, inventory.AsValueEnumerable().Contains(usable.Item));
     Assert.Equal(remainsInInventory, unit.HasInventoryItem(usable.Item));
     Assert.Equal(expectedCurrent, usable.Capability.Current);
     Assert.Equal(4 - BattleSession.DefaultUseItemActionPointCost, unit.CurrentActionPoints);

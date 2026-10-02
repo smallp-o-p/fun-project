@@ -14,13 +14,15 @@ public sealed partial class EventPlaybackDirectorTest
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Seed", faction, vision: 0), new Vector3I(0, 0, 0));
+    battle.Start();
     int idleCount = 0;
     var director = battle.AttachDirector(new CaptureDirector()); // bound before the spawn
     director.PlaybackIdle += () => idleCount++;
 
     Assert.False(director.Busy);
 
-    battle.Spawn(TestData.MakeCombatant("Alpha", battle.PlayerFaction), new Vector3I(1, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("Alpha", battle.PlayerFaction, vision: 0), new Vector3I(1, 0, 1));
 
     Assert.True(director.Busy); // queued but not yet ticked
     director.Tick();

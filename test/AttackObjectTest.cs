@@ -108,8 +108,8 @@ public partial class AttackObjectTest
   {
     protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitMovedBattleEvent evt)
     {
-      var actor = context.Session.TryGetAlive(shooter).RequireSome();
-      var proof = context.Session.TryGetAttackTarget(new BattleEntity.Object(target)).RequireSome();
+      var actor = context.Read.State.TryGetAlive(shooter).RequireSome();
+      var proof = context.Read.State.TryGetAttackTarget(new BattleEntity.Object(target)).RequireSome();
       return [BattleAction.AttackEntity(actor, proof), BattleAction.AttackEntity(actor, proof)];
     }
   }
@@ -135,7 +135,8 @@ public partial class AttackObjectTest
   {
     protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitAttackedBattleEvent evt)
     {
-      context.Session.ApplyDamageTo(obj, [new Damage(999, Element.Kinetic)], None);
+      context.Read.RunningSession.IfSome(session =>
+        session.ApplyDamageTo(obj, [new Damage(999, Element.Kinetic)], None));
       return [];
     }
   }
@@ -222,6 +223,8 @@ public partial class AttackObjectTest
     using var foreign = BattleFixture.Duel(start: false);
     var obj = battle.PlaceObject(TestData.MakeObject("Crate", 10), new Vector3I(3, 0, 2));
     var scenery = battle.PlaceObject(TestData.MakeObject(), new Vector3I(2, 0, 2));
+    battle.Start();
+    foreign.Start();
     Assert.Throws<InvalidOperationException>(() => battle.Session.ApplyDamageTo(scenery, [], None));
     Assert.Throws<InvalidOperationException>(() => foreign.Session.ApplyDamageTo(obj, [], None));
     Assert.Throws<ArgumentNullException>(() => battle.Session.ApplyDamageTo(obj, null!, None));

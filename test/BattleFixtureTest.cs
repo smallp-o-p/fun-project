@@ -45,10 +45,20 @@ public partial class BattleFixtureTest
     var armor = TestData.MakeArmor("Recharger", armor: 10, element: Element.Thermal,
       regenDelayTurns: 2, regenPerTurn: 3);
     using var battle = BattleFixture.Duel(player: new("Alpha", Armor: armor));
+    // The runtime owns the session's sole executor: a second attachment is rejected before
+    // duplicate defaults or double event forwarding can exist.
+    Assert.Throws<InvalidOperationException>(() => _ = new BattleActionExecutor(battle.Runtime));
+    int ended = 0;
+    battle.OnCommitted(battleEvent =>
+    {
+      if (battleEvent is TurnEndedBattleEvent)
+        ended++;
+    });
     battle.ApplyDamage(battle.PlayerUnit, 5);
     battle.EndFactionTurn(battle.PlayerFaction);
     Assert.Equal(1, armor.Capability.RegenDelayRemaining);
     Assert.Equal(5, armor.Capability.Current);
+    Assert.Equal(1, ended);
   }
 
   [TestCase]
@@ -66,10 +76,12 @@ public partial class BattleFixtureTest
     using var uiBattle = BattleFixture.UiBattle();
     Assert.True(ReferenceEquals(uiBattle.Ui, uiBattle.Ui));
     using var battle = new BattleFixture(new Vector3I(3, 1, 3), [TestData.MakeFaction("Player")]);
+    battle.Spawn(TestData.MakeCombatant("Seed", battle.PlayerFaction, vision: 0), new Vector3I(2, 0, 2));
+    battle.Start();
     var mesh = battle.OwnNode(new Godot.Node3D());
     var director = battle.AttachDirector(new EventPlaybackDirector());
     Assert.True(ReferenceEquals(director, battle.AttachDirector(director)));
-    battle.Spawn(TestData.MakeCombatant("Extra", battle.PlayerFaction), new Vector3I(0, 0, 0));
+    battle.Spawn(TestData.MakeCombatant("Extra", battle.PlayerFaction, vision: 0), new Vector3I(0, 0, 0));
     director.Tick();
     Assert.False(director.Busy); // one subscription queued one spawn event
     battle.Dispose();
@@ -87,11 +99,29 @@ public partial class BattleFixtureTest
     var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
     battle.Dispose();
     battle.Dispose();
-    using var replacement = new BattleActionExecutor(battle.Session);
-    replacement.Submit(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Later", faction), battle.Board.At(0, 0, 0)));
     Assert.Equal(0, battle.Events.Count);
-    Assert.Throws<ObjectDisposedException>(() => battle.Query(new GetBattlePhaseQuery()));
+    Assert.Throws<InvalidOperationException>(() => _ = battle.Session);
+    Assert.Throws<ObjectDisposedException>(() => battle.Query(new GetCurrentTurnQuery()));
     Assert.Throws<ObjectDisposedException>(() => battle.ClearEvents());
+  }
+
+  [TestCase(TestName = "A failed preparation keeps recording and its recorded events through disposal")]
+  public void FailedPreparationKeepsRecordedEventsThroughDisposal()
+  {
+    var faction = TestData.MakeFaction("Player");
+    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Fallen", faction, health: 0), new Vector3I(0, 0, 0));
+    Assert.Throws<InvalidOperationException>(() => battle.Start()); // no living, conscious unit
+    Assert.Equal(1, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
+
+    // The recorder must stay attached across the failed Start: later placement events are
+    // still captured with the failing preparation, not just the pre-failure ones.
+    BattleUnitState late = battle.Spawn(TestData.MakeCombatant("Riser", faction), new Vector3I(2, 0, 0));
+    var added = battle.Events.EventsOf<UnitAddedBattleEvent>();
+    Assert.Equal(2, added.Length);
+    Assert.True(ReferenceEquals(late, added[1].Unit));
+
+    battle.Dispose();
+    Assert.Equal(2, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
   }
 }

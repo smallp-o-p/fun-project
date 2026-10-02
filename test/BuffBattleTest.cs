@@ -14,6 +14,24 @@ public partial class BuffBattleTest
       new HealthBelowPercentCondition { Percent = 50f },
       statMods: [new AimStatMod { Modifiers = [StatModifier.Add(10)] }]);
 
+  private sealed partial class ActiveOnRound : BuffCondition
+  {
+    public int Round { get; set; }
+
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
+      context.RunningSession.Match(session => session.RoundNumber == Round, () => false);
+  }
+
+  // Supported-condition boundary: reads the ordinary visibility query for an authored tile.
+  private sealed partial class TileVisibleCondition : BuffCondition
+  {
+    public Vector3I Tile { get; set; }
+
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
+      context.Query(new IsTileVisibleToFaction(
+        unit.Side, context.State.Board.ValidatePoint(Tile).RequireSome()));
+  }
+
   [TestCase(TestName = "A buff whose condition already holds activates at spawn, after UnitAdded")]
   public void SpawnEvaluatesBuffs()
   {
@@ -66,12 +84,28 @@ public partial class BuffBattleTest
       "Adrenaline",
       new HealthBelowPercentCondition { Percent = 50f },
       statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
+    // Initially unarmed terminal objective observing the turn start: the round-2 player
+    // turn both refreshes the owning faction's AP and, once armed, ends the battle there.
+    var terminal = new FakeObjective(new FakeObjectiveData
+    {
+      Observe = typeof(TurnStartedBattleEvent),
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    });
     using var battle = BattleFixture.Duel(
-      player: new("Alpha", ActionPoints: 4, Buffs: [apBuff]));
+      player: new("Alpha", ActionPoints: 4, Buffs: [apBuff]), start: false);
+    battle.AddObjective(battle.PlayerFaction, terminal);
+    battle.Start();
     var player = battle.PlayerUnit;
+    int liveApAtSessionEnd = -1;
+    battle.OnCommitted(battleEvent =>
+    {
+      if (battleEvent is SessionEndedBattleEvent)
+        liveApAtSessionEnd = player.CurrentActionPoints;
+    });
 
     battle.EndFactionTurn(battle.PlayerFaction); // enemy turn (buff evaluated: still inactive)
     battle.ApplyDamage(player, 11);               // condition becomes true DURING the enemy turn
+    terminal.Complete = true;                     // arm the directive for the next turn start
     battle.EndFactionTurn(battle.EnemyFaction);  // player turn starts: eval must precede refresh
 
     // The damage lands after the last evaluation before the player's refresh, so the flip can
@@ -79,6 +113,11 @@ public partial class BuffBattleTest
     // read Max=4 (buff not yet active) and CurrentActionPoints would be 4, failing this assert.
     Assert.Equal(6, player.MaxActionPoints);
     Assert.Equal(6, player.CurrentActionPoints); // the ordering regression this design exists for
+    // The terminal directive on that same turn start did not truncate the refresh: the end
+    // callback observes the fully refreshed AP, and the battle ends without a next turn.
+    Assert.Equal(6, liveApAtSessionEnd);
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
+    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
   }
 
   [TestCase(TestName = "A buff deactivates at the next turn start once its condition no longer holds")]
@@ -109,6 +148,82 @@ public partial class BuffBattleTest
     Assert.Equal(0, player.ActiveBuffs.AsValueEnumerable().Count());
     Assert.Equal(aura, battle.Events.SingleEvent<UnitBuffDeactivatedBattleEvent>().Buff);
   }
+
+  [TestCase(TestName = "Buff vision activation and deactivation refresh visibility before their events broadcast")]
+  public void VisionBuffRefreshesBeforeBroadcast()
+  {
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    // EagleEye raises vision 1 -> 3 for round 2 only: the tile (and the watcher on it) two
+    // cells away flips into and back out of sight at the round-2 and round-3 turn starts.
+    // KeenEye's supported condition reads that refreshed visibility in the same passes and
+    // gates its aim contribution on it — grant order matters, both flips land in one pass.
+    var eagleEye = TestData.MakeBuff(
+      "EagleEye",
+      new ActiveOnRound { Round = 2 },
+      statMods: [new VisionStatMod { Modifiers = [StatModifier.Add(2)] }]);
+    var keenEye = TestData.MakeBuff(
+      "KeenEye",
+      new TileVisibleCondition { Tile = new Vector3I(2, 0, 2) },
+      statMods: [new AimStatMod { Modifiers = [StatModifier.Add(10)] }]);
+    using var battle = new BattleFixture(new Vector3I(6, 1, 3), [playerFaction, enemyFaction]);
+    // Lone player observer: no conscious teammate already covers the far tile.
+    var observer = battle.Spawn(
+      TestData.MakeCombatant("Scout", playerFaction, vision: 1, aim: 65, buffs: [eagleEye, keenEye]), new Vector3I(2, 0, 0));
+    var target = battle.Spawn(TestData.MakeCombatant("Watcher", enemyFaction, vision: 1), new Vector3I(2, 0, 2));
+    BattleBoardState.ValidatedPoint tile = battle.At(new Vector3I(2, 0, 2));
+
+    battle.Start();
+    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, tile)));
+    Assert.False(battle.Query(new HasFactionExploredTile(playerFaction, tile)));
+    battle.ClearEvents();
+
+    bool sawActivation = false;
+    bool sawDeactivation = false;
+    battle.OnCommitted(battleEvent =>
+    {
+      if (battleEvent is UnitBuffActivatedBattleEvent activated && ReferenceEquals(activated.Unit, observer))
+      {
+        sawActivation = true;
+        Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, tile)));
+        Assert.True(battle.Query(new HasFactionExploredTile(playerFaction, tile)));
+        Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+      }
+
+      if (battleEvent is UnitBuffDeactivatedBattleEvent deactivated && ReferenceEquals(deactivated.Unit, observer))
+      {
+        sawDeactivation = true;
+        Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, tile)));
+        Assert.True(battle.Query(new HasFactionExploredTile(playerFaction, tile)));
+      }
+    });
+
+    battle.AdvanceTurn(); // round 1: enemy turn, both grants still inactive
+    battle.AdvanceTurn(); // round 2: the scout's turn starts and both grants activate in one pass
+
+    Assert.True(sawActivation);
+    Assert.Equal(2, battle.Events.EventsOf<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(2, observer.ActiveBuffs.AsValueEnumerable().Count());
+    Assert.Equal(75f, observer.EffectiveStat<AimStat>()); // KeenEye's gated contribution is live
+    battle.Events.EventBefore<UnitBuffActivatedBattleEvent, UnitSpottedBattleEvent>();
+
+    battle.AdvanceTurn(); // round 2: enemy turn, both grants stay active
+    battle.AdvanceTurn(); // round 3: the scout's turn starts and both grants deactivate in one pass
+
+    Assert.True(sawDeactivation);
+    Assert.Equal(2, battle.Events.EventsOf<UnitBuffDeactivatedBattleEvent>().AsValueEnumerable().Count());
+    Assert.Equal(0, observer.ActiveBuffs.AsValueEnumerable().Count());
+    Assert.Equal(65f, observer.EffectiveStat<AimStat>());
+    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, tile)));
+    Assert.True(battle.Query(new HasFactionExploredTile(playerFaction, tile)));
+    Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+    Assert.Equal(1, MatchingSpottings(battle, observer, target));
+  }
+
+  private static int MatchingSpottings(BattleFixture battle, BattleUnitState observer, BattleUnitState target) =>
+    battle.Events.EventsOf<UnitSpottedBattleEvent>()
+      .AsValueEnumerable()
+      .Count(e => ReferenceEquals(e.Unit, observer) && ReferenceEquals(e.Target, target));
 
   [TestCase(TestName = "A negative max-health buff activating at spawn clamps current health down")]
   public void HealthClampOnActivation()

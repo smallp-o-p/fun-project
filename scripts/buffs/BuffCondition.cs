@@ -7,5 +7,5 @@ namespace FunProject.Buffs;
 [GlobalClass]
 public abstract partial class BuffCondition : Resource
 {
-  internal abstract bool IsMet(BattleSession session, BattleUnitState unit);
+  internal abstract bool IsMet(BattleReadContext context, BattleUnitState unit);
 }
