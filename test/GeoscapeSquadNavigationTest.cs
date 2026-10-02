@@ -222,7 +222,7 @@ public class GeoscapeSquadNavigationTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (scene, manager) = TacticalScene([MakeEntry("Alpha")]);
-    OpenResolutionViaAlert(scene);
+    OpenResolutionViaMapEvent(scene);
     var dialog = (GeoscapeEventResolution)manager.Current;
 
     DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);

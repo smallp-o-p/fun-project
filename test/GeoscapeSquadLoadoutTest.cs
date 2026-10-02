@@ -177,7 +177,7 @@ public class GeoscapeSquadLoadoutTest
     using var _ = fixture;
     var squad = PresentedMissionView(pending, fixture.State, fixture.Session);
 
-    Assert.Equal(1, squad.GetNode<VBoxContainer>("%Slots").GetChildCount());
+    Assert.Equal(1, squad.GetNode<BoxContainer>("%Slots").GetChildCount());
     Assert.Equal("Squad: 0/1", squad.GetNode<Label>("%SquadCount").Text);
     Assert.True(SquadDeployButton(squad).Visible); // configured tactical mission
     Assert.True(SquadDeployButton(squad).Disabled); // empty selection

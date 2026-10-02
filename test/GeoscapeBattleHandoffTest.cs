@@ -85,7 +85,7 @@ public partial class GeoscapeBattleHandoffTest
     SpeedButton(scene).EmitSignal(Button.SignalName.Pressed); // Normal
     scene._PhysicsProcess(0.1); // the mission fires at tick 1
     GeoscapeSession session = CaptureSceneSession(manager); // before the mission flow opens
-    OpenResolutionViaAlert(scene);
+    OpenResolutionViaMapEvent(scene);
     var dialog = (GeoscapeEventResolution)manager.Current;
     DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
     var squad = (SquadLoadoutView)manager.Current;
@@ -123,7 +123,7 @@ public partial class GeoscapeBattleHandoffTest
     var session = new GeoscapeSession(campaign); // sessions are rebuildable views over state
 
     Assert.True(manager.Visible);
-    Assert.Equal(1, AlertCount(scene));
+    Assert.Equal(1, MapEventMarkers(scene).Length); // the pending mission's marker is live
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
 
@@ -158,7 +158,7 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(session.ActiveMission.IsNone);
     Assert.True(session.PendingResolution.IsNone);
     Assert.Equal(0, campaign.ActiveEvents.Count); // mission consumed
-    Assert.Equal(0, AlertCount(scene));
+    Assert.Equal(0, MapEventMarkers(scene).Length); // the consumed mission's marker is gone
     Assert.Equal(1, campaign.Conditions.GetFatigue(campaign.Roster[0]).RequireSome().Tier);
     Assert.True(ReferenceEquals(campaign, scene.Campaign),
       "The scene keeps one campaign instance across presentation and return.");
@@ -367,21 +367,15 @@ public partial class GeoscapeBattleHandoffTest
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
 
-    // The throwing close-path refresh skipped the HUD rebuild: the guaranteed return
-    // cleanup must retract the consumed mission's alert from campaign truth anyway.
-    Assert.Equal(1, AlertCount(scene));
+    // The throwing close-path refresh cleared every marker before its failed
+    // instantiation: the guaranteed cleanup must not resurrect the consumed mission's
+    // marker from campaign truth.
+    Assert.Equal(0, MapEventMarkers(scene).Length);
 
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
     Assert.False(GodotObject.IsInstanceValid(squad));
     Assert.False(GodotObject.IsInstanceValid(dialog));
     Assert.False(GodotObject.IsInstanceValid(battle));
-
-    // Only the background event stays clickable: the surviving alert opens Rumor, and the
-    // consumed Ambush can no longer be reopened from the HUD.
-    OpenResolutionViaAlert(scene);
-    Assert.Equal("Rumor", session.PendingResolution.Match(
-      value => value.Event.Definition.Title,
-      () => throw new InvalidOperationException("The background event's resolution must open.")));
   }
 
   [TestCase(TestName = "A conditions subscriber throw before the close still retracts the consumed mission's marker")]
@@ -429,9 +423,9 @@ public partial class GeoscapeBattleHandoffTest
 
     // The guaranteed cleanup retracts the consumed mission's marker without re-stamping
     // (the broken-refresh route must not gain a resurrection path); the background
-    // event's marker and alert survive.
+    // event's marker survives.
     Assert.Equal(childrenBeforeReturn - 1, map.GetChildCount());
-    Assert.Equal(1, AlertCount(scene));
+    Assert.Equal(1, MapEventMarkers(scene).Length);
 
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
     Assert.False(GodotObject.IsInstanceValid(squad));

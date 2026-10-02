@@ -53,7 +53,7 @@ public partial class BattleLauncherTest
     AddToTree(launcher);
 
     var battle = (BattleScene)launcher.GetChild(0);
-    Assert.False(battle.GetNode<Button>("BattleUI/BattleHud/VBox/ReturnButton").Visible);
+    Assert.False(ReturnButton(battle).Visible);
   }
 
   [TestCase(TestName = "Present guards against nulls")]

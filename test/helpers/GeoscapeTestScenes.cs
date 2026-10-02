@@ -142,16 +142,13 @@ internal static partial class GeoscapeTestScenes
       .Single(button => button.Text == text);
 
   public static Button ReturnButton(BattleScene battle)
-    => battle.GetNode<Button>("BattleUI/BattleHud/VBox/ReturnButton");
+    => battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Button>("%ReturnButton");
 
   public static EventPlaybackDirector Director(BattleScene battle)
     => battle.GetNode<EventPlaybackDirector>("EventPlaybackDirector");
 
   public static Label Clock(GeoscapeScene scene)
     => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Label>("%ClockLabel");
-
-  public static int AlertCount(GeoscapeScene scene)
-    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<VBoxContainer>("%Alerts").GetChildCount();
 
   // Integration shell for manager suites: an authored root under a manager whose
   // ViewChanged presents every pushed/popped view. It never Configures, Pushes, Pops, or
