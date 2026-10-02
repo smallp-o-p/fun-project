@@ -1,4 +1,3 @@
-using FunProject.Battle;
 using Godot;
 using System;
 using Cell = Godot.Vector3I;
@@ -44,14 +43,7 @@ public partial class BattlePropAuthoring : Node3D
     Scale = Vector3.One;
   }
 
-  // Godot's positive Y rotation sends +X toward -Z.
-  internal Cell Rotate(Cell cell) => ((Mathf.RoundToInt(Rotation.Y / (Mathf.Pi / 2)) % 4 + 4) % 4) switch
-  {
-    1 => new(cell.Z, cell.Y, -cell.X),
-    2 => new(-cell.X, cell.Y, -cell.Z),
-    3 => new(-cell.Z, cell.Y, cell.X),
-    _ => cell,
-  };
+  internal Cell Rotate(Cell cell) => (Cell)(Basis * (Vector3)cell).Round();
 
   public override void _Ready()
   {
@@ -90,12 +82,5 @@ public partial class BattlePropAuthoring : Node3D
       Mesh = mesh,
       CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
     }, false, InternalMode.Back);
-  }
-
-  internal Node3D CopyVisual()
-  {
-    var visual = new Node3D { Name = Name, Transform = Transform };
-    foreach (var child in GetChildren()) visual.AddChild(child.Duplicate());
-    return visual;
   }
 }

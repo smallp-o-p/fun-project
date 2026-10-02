@@ -346,8 +346,6 @@ internal static class TestData
 
   public static BattleMapTileData SpawnTile(int slot) => new() { SpawnFactionSlot = slot };
 
-  // Takes runtime Vector3I coordinates (X = width, Y = levels/height, Z = depth) and converts
-  // them to Godot.Vector3I dictionary keys when building the authored map.
   public static BattleMapAuthoring MakeMapAuthoring(Godot.Collections.Dictionary<Godot.Vector3I, BattleMapTileData> cells)
   {
     var library = new MeshLibrary();
@@ -365,6 +363,8 @@ internal static class TestData
     return map;
   }
 
+  // Takes runtime Vector3I coordinates (X = width, Y = levels/height, Z = depth) and converts
+  // them to Godot.Vector3I dictionary keys when building the authored map.
   public static BattleMapData MakeMapData(
     Vector3I dimensions,
     params (Vector3I Cell, BattleMapTileData Tile)[] tiles)

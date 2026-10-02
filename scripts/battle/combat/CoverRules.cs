@@ -37,6 +37,4 @@ public static class CoverRules
 
     return amount;
   }
-
-  public static bool Applies(TileCover cover, CoverDirections approach) => GetAmount(cover, approach) > 0;
 }

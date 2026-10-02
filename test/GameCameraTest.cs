@@ -31,17 +31,7 @@ public partial class GameCameraTest
     Assert.True(query.To.IsEqualApprox(expectedEnd));
     Assert.False(query.CollideWithAreas);
     Assert.True(query.CollideWithBodies);
-  }
-
-  [TestCase(TestName = "Viewport ray query includes only terrain and ignores prop collision layers")]
-  public void ViewportRayQueryIncludesOnlyTerrainAndIgnoresPropCollisionLayers()
-  {
-    var camera = AutoFree(new Camera3D());
-
-    PhysicsRayQueryParameters3D query = GameCamera.CreateViewportRayQuery(camera, Vector2.Zero);
-
     Assert.Equal(1u, query.CollisionMask);
-    Assert.Equal(0u, query.CollisionMask & 2u);
   }
 
   [TestCase(TestName = "Viewport raycast selects ground beneath a prop roof")]

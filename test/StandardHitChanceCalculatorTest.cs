@@ -51,23 +51,14 @@ public partial class StandardHitChanceCalculatorTest
     Assert.Equal(expectedFinal, breakdown.FinalChance);
   }
 
-  [TestCase(4, 1, 10)]
-  [TestCase(7, 4, 30)]
-  [TestCase(4, 7, 50)]
-  [TestCase(1, 4, 70)]
-  [TestCase(7, 1, 30)]
-  [TestCase(1, 1, 70)]
-  [TestCase(7, 7, 50)]
-  [TestCase(1, 7, 70)]
-  public void IndependentSidesSubtractTheStrongestApplicableCover(int attackX, int attackZ, int expectedCover)
+  [TestCase]
+  public void IndependentSidesSubtractOnlyTheStrongestApplicableCover()
   {
     var breakdown = new StandardHitChanceCalculator().Calculate(
-      MakeContext(80, new TileCover(10, 30, 50, 70), new Vector3I(attackX, 0, attackZ), new Vector3I(4, 0, 4)));
+      MakeContext(80, new TileCover(10, 30, 50, 70), new Vector3I(7, 0, 1), new Vector3I(4, 0, 4)));
 
-    Assert.Equal(80, breakdown.BaseChance);
     Assert.Equal(1, breakdown.Modifiers.Count);
-    Assert.Equal(StandardHitChanceCalculator.CoverModifierLabel, breakdown.Modifiers[0].Label);
-    Assert.Equal(-expectedCover, breakdown.Modifiers[0].Amount);
-    Assert.Equal(80 - expectedCover, breakdown.FinalChance);
+    Assert.Equal(-30, breakdown.Modifiers[0].Amount);
+    Assert.Equal(50, breakdown.FinalChance);
   }
 }

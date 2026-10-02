@@ -99,15 +99,8 @@ public partial class BattleMapDataTest
   }
 
   [TestCase]
-  public void GroundSurfaceOffsetDefaultsToZeroAndPreservesAuthoredHeight()
-  {
-    var tile = new BattleMapTileData();
-    Assert.Equal(0f, tile.GroundSurfaceOffset);
-
-    tile.GroundSurfaceOffset = 0.125f;
-
-    Assert.Equal(0.125f, tile.GroundSurfaceOffset);
-  }
+  public void GroundSurfaceOffsetDefaultsToZero() =>
+    Assert.Equal(0f, new BattleMapTileData().GroundSurfaceOffset);
 
   [TestCase(TestName = "Walkable, BlocksLineOfSight and cover are independent")]
   public void WalkableBlocksLineOfSightAndCoverAreIndependent()

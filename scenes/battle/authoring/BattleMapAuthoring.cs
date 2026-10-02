@@ -83,7 +83,8 @@ public partial class BattleMapAuthoring : GridMap
     foreach (var child in GetChildren())
     {
       if (child is not BattlePropAuthoring prop) continue;
-      var visual = prop.CopyVisual();
+      var visual = new Node3D { Name = prop.Name, Transform = prop.Transform };
+      foreach (var node in prop.GetChildren()) visual.AddChild(node.Duplicate());
       map.AddChild(visual);
       OwnVisual(visual, map);
     }
@@ -129,7 +130,6 @@ public partial class BattleMapAuthoring : GridMap
       dimensions = new(Math.Max(dimensions.X, cell.X + 1), Math.Max(dimensions.Y, cell.Y + 1), Math.Max(dimensions.Z, cell.Z + 1));
     }
 
-    var occupied = new SysColGeneric.HashSet<Cell>();
     var props = new SysColGeneric.List<(BattlePropAuthoring Prop, Cell Anchor)>();
     foreach (var child in FindChildren("*", "", true, false))
     {
@@ -156,7 +156,7 @@ public partial class BattleMapAuthoring : GridMap
         if (local.Y != 0 || !cells.TryGetValue(cell, out var tile) ||
             !Palette!.Brushes[MeshLibrary.GetItemName(GetCellItem(cell))].Walkable || tile.GroundSurfaceOffset != height)
           throw new InvalidOperationException($"{prop.Name}: footprint requires level, walkable ground at {cell}.");
-        if (prop.BlocksMovement && (!occupied.Add(cell) || tile.SpawnFactionSlot >= 0))
+        if (prop.BlocksMovement && (!tile.Walkable || tile.SpawnFactionSlot >= 0))
           throw new InvalidOperationException($"{prop.Name}: movement footprint overlaps another prop or spawn at {cell}.");
         if (prop.BlocksMovement) tile.Walkable = false;
         tile.BlocksLineOfSight |= prop.BlocksLineOfSight;

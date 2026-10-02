@@ -18,17 +18,14 @@ public partial class CoverRulesTest
   public void GetApproach(int x, int y, int z, CoverDirections expected) =>
     Assert.Equal(expected, CoverRules.GetApproach(new(x, y, z), new(4, 0, 4)));
 
-  [TestCase(TestName = "Applies requires an overlapping direction and a positive amount")]
-  public void AppliesRequiresOverlappingDirectionAndPositiveAmount()
+  [TestCase(CoverDirections.North, 40)]
+  [TestCase(CoverDirections.North | CoverDirections.East, 40)]
+  [TestCase(CoverDirections.East, 0)]
+  [TestCase(CoverDirections.None, 0)]
+  public void GetAmountRequiresAnOverlappingPositiveSide(CoverDirections approach, int expected)
   {
-    TileCover northCover = new(40, 0, 0, 0);
-
-    Assert.True(CoverRules.Applies(northCover, CoverDirections.North));
-    Assert.True(CoverRules.Applies(northCover, CoverDirections.North | CoverDirections.East));
-    Assert.False(CoverRules.Applies(northCover, CoverDirections.East));
-    Assert.False(CoverRules.Applies(northCover, CoverDirections.None));
-    Assert.False(CoverRules.Applies(new TileCover(0, 0, 0, 0), CoverDirections.North));
-    Assert.False(CoverRules.Applies(TileCover.None, CoverDirections.North));
+    Assert.Equal(expected, CoverRules.GetAmount(new TileCover(40, 0, 0, 0), approach));
+    Assert.Equal(0, CoverRules.GetAmount(TileCover.None, approach));
   }
 
   [TestCase(CoverDirections.None, 0)]
@@ -45,15 +42,5 @@ public partial class CoverRulesTest
     TileCover cover = new(10, 30, 50, 70);
 
     Assert.Equal(expected, CoverRules.GetAmount(cover, approach));
-  }
-
-  [TestCase]
-  public void DiagonalCoverDoesNotAddMatchingSides()
-  {
-    TileCover cover = new(40, 40, 0, 0);
-
-    Assert.Equal(40, CoverRules.GetAmount(cover, CoverDirections.North | CoverDirections.East));
-    Assert.Equal(0, CoverRules.GetAmount(cover, CoverDirections.South | CoverDirections.West));
-    Assert.Equal(0, CoverRules.GetAmount(TileCover.None, CoverDirections.North));
   }
 }

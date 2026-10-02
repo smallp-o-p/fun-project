@@ -10,43 +10,22 @@ namespace FunProject.Battle;
 [GlobalClass]
 public partial class BattleMapTileData : Resource
 {
-  private int _coverNorth;
-  private int _coverEast;
-  private int _coverSouth;
-  private int _coverWest;
-
   [Export] public bool Walkable { get; set; } = true;
   [Export] public bool BlocksLineOfSight { get; set; }
   [Export] public bool BlocksVerticalLineOfSight { get; set; }
   [Export] public float GroundSurfaceOffset { get; set; }
 
   [Export(PropertyHint.Range, "0,100")]
-  public int CoverNorth
-  {
-    get => _coverNorth;
-    set => _coverNorth = Math.Clamp(value, 0, 100);
-  }
+  public int CoverNorth { get; set => field = Math.Clamp(value, 0, 100); }
 
   [Export(PropertyHint.Range, "0,100")]
-  public int CoverEast
-  {
-    get => _coverEast;
-    set => _coverEast = Math.Clamp(value, 0, 100);
-  }
+  public int CoverEast { get; set => field = Math.Clamp(value, 0, 100); }
 
   [Export(PropertyHint.Range, "0,100")]
-  public int CoverSouth
-  {
-    get => _coverSouth;
-    set => _coverSouth = Math.Clamp(value, 0, 100);
-  }
+  public int CoverSouth { get; set => field = Math.Clamp(value, 0, 100); }
 
   [Export(PropertyHint.Range, "0,100")]
-  public int CoverWest
-  {
-    get => _coverWest;
-    set => _coverWest = Math.Clamp(value, 0, 100);
-  }
+  public int CoverWest { get; set => field = Math.Clamp(value, 0, 100); }
 
   [Export] public int SpawnFactionSlot { get; set; } = -1;
 }
