@@ -13,6 +13,8 @@ using System.Collections.Generic;
 // constant speed; deaths hide it; everything else is instant.
 public partial class EventPlaybackDirector : Node
 {
+  public BoardCoordinates Coordinates { get; set; } = BoardCoordinates.UnitGrid;
+
   private const float WorldUnitsPerSecond = 4f; // one orthogonal tile per 0.25s
 
   private readonly Queue<BattleEvent> _queue = new();
@@ -148,9 +150,9 @@ public partial class EventPlaybackDirector : Node
     Tween tween = CreateTween();
     foreach (UnitMovedBattleEvent step in run)
     {
-      Vector3 destination = BoardCoordinates.TileToWorldCenter(step.Position.Raw) + new Vector3(0f, 0.5f, 0f);
-      float segmentDuration = mesh.Position.DistanceTo(destination) / WorldUnitsPerSecond;
-      tween.TweenProperty(mesh, "position", destination, segmentDuration);
+      Vector3 destination = Coordinates.TileToWorldCenter(step.Position.Raw) + Coordinates.Up * Coordinates.CellSize.Y / 2;
+      float segmentDuration = mesh.GlobalPosition.DistanceTo(destination) / WorldUnitsPerSecond;
+      tween.TweenProperty(mesh, "global_position", destination, segmentDuration);
     }
 
     tween.TweenCallback(Callable.From(done));
