@@ -99,7 +99,8 @@ public sealed partial class SkillProgressionView : GeoscapeView
 
       if (slotsFree)
       {
-        var button = new Button { Text = $"Commit: {path.Name}  (first step: {EffectSummary(path.Steps[0])}, cost {path.Steps[0].Cost})" };
+        var button = new Button { ClipText = true, Text = $"Commit: {path.Name}  (first step: {EffectSummary(path.Steps[0])}, cost {path.Steps[0].Cost})" };
+        button.TooltipText = button.Text;
         button.Pressed += () =>
         {
           progression.TryCommit(path);

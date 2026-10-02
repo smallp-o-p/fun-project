@@ -29,6 +29,9 @@ public partial class SquadSlotCard : PanelContainer
     bool allowEquipmentEditing = true)
   {
     CardTitle!.Text = title;
+    CardTitle.TooltipText = title;
+    GetNode<Control>("%SlotPresentation").Visible = occupied;
+    GetNode<Label>("%EmptySlot").Visible = !occupied;
     EditUnit!.Visible = occupied && allowEquipmentEditing;
     RemoveUnit!.Visible = occupied;
     ChooseUnit!.Text = occupied ? "Replace" : "Choose";

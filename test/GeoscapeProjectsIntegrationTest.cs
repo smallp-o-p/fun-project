@@ -68,20 +68,22 @@ public class GeoscapeProjectsIntegrationTest
     string clock = hud.GetNode<Label>("%ClockLabel").Text;
     scene._PhysicsProcess(1.0); // browsing freezes the clock: 50 ticks at 5x would pass
     Assert.Equal(clock, hud.GetNode<Label>("%ClockLabel").Text);
-    Assert.Equal("", hud.GetNode<Label>("%EngineeringNotice").Text);
+    Assert.False(hud.HasNode("%EngineeringNotice"));
 
     engineering.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
     Assert.True(hud.IsVisibleInTree());
-    Assert.True(hud.GetNode<Label>("%EngineeringProgress").Text.Contains("Scanner — 1d 0h 0m"));
+    Assert.Equal("Scanner", hud.GetNode<Label>("%EngineeringProgress").Text);
+    Assert.Equal("1d remaining", hud.GetNode<Label>("%EngineeringRemaining").Text);
 
     // Complete on the final tick so a later TimeAdvanced cannot hide a missing refresh.
     for (int i = 0; i < 1439; i++)
       scene._PhysicsProcess(0.02);
-    Assert.True(hud.GetNode<Label>("%EngineeringProgress").Text.Contains("Scanner — 1m"));
-    Assert.Equal("", hud.GetNode<Label>("%EngineeringNotice").Text);
+    Assert.Equal("Scanner", hud.GetNode<Label>("%EngineeringProgress").Text);
+    Assert.Equal("1d remaining", hud.GetNode<Label>("%EngineeringRemaining").Text);
+    Assert.False(hud.HasNode("%EngineeringNotice"));
     scene._PhysicsProcess(0.02); // manufacturing completes at tick 1440
     Assert.Equal("No active manufacturing.", hud.GetNode<Label>("%EngineeringProgress").Text);
-    Assert.True(hud.GetNode<Label>("%EngineeringNotice").Text.Contains("Scanner"));
+    Assert.False(hud.GetNode<Label>("%EngineeringRemaining").Visible);
 
     PressEngineeringButton(scene);
     var reopened = (EngineeringView)manager.Current;
@@ -93,12 +95,13 @@ public class GeoscapeProjectsIntegrationTest
       .EmitSignal(Button.SignalName.Pressed);
     reopened.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
     reopened.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
-    Assert.True(hud.GetNode<Label>("%EngineeringProgress").Text.Contains("Field kit — 2d 0h 0m"));
+    Assert.Equal("Field kit", hud.GetNode<Label>("%EngineeringProgress").Text);
+    Assert.Equal("2d remaining", hud.GetNode<Label>("%EngineeringRemaining").Text);
     for (int i = 0; i < 2880; i++)
       scene._PhysicsProcess(0.02); // manufacturing completes at tick 4320
 
     Assert.Equal("No active manufacturing.", hud.GetNode<Label>("%EngineeringProgress").Text);
-    Assert.True(hud.GetNode<Label>("%EngineeringNotice").Text.Contains("Field kit"));
+    Assert.False(hud.GetNode<Label>("%EngineeringRemaining").Visible);
     PressEngineeringButton(scene);
     var supplied = (EngineeringView)manager.Current;
     Assert.Equal("Scanner", OnlyChild<Button>(supplied.GetNode<VBoxContainer>("%ManufacturableItems")).Text);
@@ -149,7 +152,7 @@ public class GeoscapeProjectsIntegrationTest
   }
 
   [TestCase]
-  public async Task ReopeningEngineeringStartsOneJobPerRequestAndPreservesItsPreviousNotice()
+  public async Task ReopeningEngineeringStartsOneJobPerRequestAndClearsCompletedSummary()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var item = MakeItemData("Field kit", manufacturingDays: 1);
@@ -166,8 +169,8 @@ public class GeoscapeProjectsIntegrationTest
     hud.GetNode<Button>("%SpeedButton").EmitSignal(Button.SignalName.Pressed);
     for (int i = 0; i < 1440; i++) // one day at 5x: exactly one tick per call
       scene._PhysicsProcess(0.02);
-    string notice = hud.GetNode<Label>("%EngineeringNotice").Text;
-    Assert.True(notice.Contains("Field kit"));
+    Assert.Equal("No active manufacturing.", hud.GetNode<Label>("%EngineeringProgress").Text);
+    Assert.False(hud.GetNode<Label>("%EngineeringRemaining").Visible);
 
     PressEngineeringButton(scene);
     var second = (EngineeringView)manager.Current;
@@ -176,7 +179,8 @@ public class GeoscapeProjectsIntegrationTest
     second.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
     Assert.Equal("", second.GetNode<Label>("%Status").Text); // duplicate handlers would show Busy
     Assert.True(second.GetNode<Button>("%ManufactureButton").Disabled);
-    Assert.Equal(notice, hud.GetNode<Label>("%EngineeringNotice").Text);
+    Assert.Equal("Field kit", hud.GetNode<Label>("%EngineeringProgress").Text);
+    Assert.Equal("1d remaining", hud.GetNode<Label>("%EngineeringRemaining").Text);
     second.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
     for (int i = 0; i < 1440; i++)
       scene._PhysicsProcess(0.02);
@@ -194,7 +198,7 @@ public class GeoscapeProjectsIntegrationTest
     // _Ready initializes the idle project status before any view action or foreign snapshot.
     var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
     Assert.Equal("No active manufacturing.", hud.GetNode<Label>("%EngineeringProgress").Text);
-    Assert.Equal("", hud.GetNode<Label>("%EngineeringNotice").Text);
+    Assert.False(hud.HasNode("%EngineeringNotice"));
 
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     PressEngineeringButton(scene);

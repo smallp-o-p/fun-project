@@ -12,15 +12,12 @@ public sealed partial class GeoscapeHud : Control
   private Label _clockLabel = null!;
   private Button _pauseButton = null!;
   private Button _speedButton = null!;
-  private VBoxContainer _alerts = null!;
   private Label _engineeringProgress = null!;
-  private Label _engineeringNotice = null!;
-  private readonly SysColGeneric.List<(Button Button, GeoscapeEvent Event)> _alertButtons = [];
+  private Label _engineeringRemaining = null!;
 
   private TimeSpeed _lastActiveSpeed = TimeSpeed.Normal;
 
   public event Action<TimeSpeed>? ChangeSpeed;
-  public event Action<GeoscapeEvent>? ResolutionRequested;
 
   [Signal] public delegate void ViewRequestedEventHandler(GeoscapeView view);
 
@@ -29,9 +26,10 @@ public sealed partial class GeoscapeHud : Control
     _speedButton = GetNode<Button>("%SpeedButton");
     _pauseButton = GetNode<Button>("%PauseButton");
     _clockLabel = GetNode<Label>("%ClockLabel");
-    _alerts = GetNode<VBoxContainer>("%Alerts");
     _engineeringProgress = GetNode<Label>("%EngineeringProgress");
-    _engineeringNotice = GetNode<Label>("%EngineeringNotice");
+    _engineeringRemaining = GetNode<Label>("%EngineeringRemaining");
+    _engineeringProgress.ThemeChanged += UpdateManufacturingNameWidth;
+    UpdateManufacturingNameWidth();
 
     _speedButton.Pressed += UpdateSpeed;
     _pauseButton.Toggled += pressed =>
@@ -46,12 +44,33 @@ public sealed partial class GeoscapeHud : Control
   public void UpdateManufacturing(Option<ManufacturingJob> manufacturing, long tick)
   {
     _engineeringProgress.Text = manufacturing.Match(
-      job => $"Manufacturing: {job.Project.Item.Name} — {ProjectTimeText.Remaining(job.CompletesAtTick, tick)} remaining",
+      job => job.Project.Item.Name,
       () => "No active manufacturing.");
+    UpdateManufacturingNameWidth();
+    _engineeringProgress.TooltipText = manufacturing.Match(job => job.Project.Item.Name, () => "");
+    _engineeringRemaining.Text = manufacturing.Match(
+      job => RemainingDays(job.CompletesAtTick, tick), () => "");
+    _engineeringRemaining.Visible = manufacturing.IsSome;
   }
 
-  public void ShowManufacturingCompleted(ManufacturingJob job)
-    => _engineeringNotice.Text = $"Manufacturing completed: {job.Project.Item.Name}";
+  private void UpdateManufacturingNameWidth()
+  {
+    // A clipped Label reports a one-pixel minimum to HBoxContainer in Godot 4.7.
+    // Reserve its natural text width; the scene's maximum bounds long names.
+    Font font = _engineeringProgress.GetThemeFont("font");
+    int fontSize = _engineeringProgress.GetThemeFontSize("font_size");
+    float width = font.GetStringSize(_engineeringProgress.Text, HorizontalAlignment.Left, -1, fontSize).X;
+    _engineeringProgress.CustomMinimumSize = new Vector2(Mathf.Ceil(width), 0);
+  }
+
+  private static string RemainingDays(long completesAtTick, long tick)
+  {
+    long ticks = completesAtTick <= tick ? 0 : completesAtTick - tick;
+    long ticksPerDay = (TimeSpan.TicksPerDay / TimeSpan.TicksPerSecond) / GeoscapeSession.TickGameSeconds;
+    // A partial day still needs work: keep 1d visible until the job actually completes.
+    long days = ticks / ticksPerDay + (ticks % ticksPerDay == 0 ? 0 : 1);
+    return $"{days}d remaining";
+  }
 
   private static string Speed2Text(TimeSpeed speed)
   {
@@ -84,31 +103,5 @@ public sealed partial class GeoscapeHud : Control
   public void UpdateClock(int day, DateTime newTime)
   {
     _clockLabel.Text = $"Day {day} {newTime:HH:mm}";
-  }
-
-  // Rebuild alert list when one of them changes
-  public void RefreshAlerts(SysColGeneric.IReadOnlyList<GeoscapeEvent> activeEvents)
-  {
-    _alerts.QueueFreeAllChildren();
-    _alertButtons.Clear();
-
-    foreach (GeoscapeEvent active in activeEvents)
-    {
-      var button = new Button();
-      button.Pressed += () => ResolutionRequested?.Invoke(active);
-      _alerts.AddChild(button);
-      _alertButtons.Add((button, active));
-    }
-  }
-
-  public void UpdateCountdowns(long currentTick)
-  {
-    foreach ((Button button, GeoscapeEvent active) in _alertButtons)
-    {
-      string countdown = active.ExpiresAtTick.Match(
-        expiresAt => $" ({Math.Max(0L, expiresAt - currentTick) * GeoscapeSession.TickGameSeconds / 60} min)",
-        () => "");
-      button.Text = $"[{active.Definition.Kind}] {active.Definition.Title}{countdown}";
-    }
   }
 }

@@ -1,114 +1,65 @@
-[gd_scene format=3]
+[gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://scenes/geoscape/units/UnitLabel.cs" id="1_lwaml"]
+[ext_resource type="Script" path="res://scenes/geoscape/units/UnitLabel.cs" id="1_script"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vbiw6"]
-bg_color = Color(0.19607843, 0.19607843, 0.19607843, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-
-[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_lwaml"]
-size = Vector2(64, 64)
-
-[sub_resource type="StyleBoxLine" id="StyleBoxLine_s55yl"]
-color = Color(1, 1, 1, 1)
-grow_begin = -8.0
-grow_end = -8.0
-thickness = 2
-vertical = true
-
-[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_vbiw6"]
-size = Vector2(64, 64)
-
-[node name="UnitLabel" type="PanelContainer" unique_id=1450525365]
-layout_direction = 2
-anchors_preset = 14
-anchor_top = 0.5
-anchor_right = 1.0
-anchor_bottom = 0.5
-offset_top = -32.0
-offset_bottom = 64.0
-grow_horizontal = 2
-grow_vertical = 2
+[node name="UnitLabel" type="PanelContainer"]
+custom_minimum_size = Vector2(0, 58)
 size_flags_horizontal = 3
-theme_override_styles/panel = SubResource("StyleBoxFlat_vbiw6")
-script = ExtResource("1_lwaml")
-
-[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=1987132182]
-layout_mode = 2
-size_flags_stretch_ratio = 5.0
-
-[node name="MarginContainer" type="MarginContainer" parent="HBoxContainer" unique_id=276021000]
-layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_bottom = 8
-
-[node name="CenterContainer" type="CenterContainer" parent="HBoxContainer/MarginContainer" unique_id=162766477]
-layout_mode = 2
-
-[node name="UnitIcon" type="TextureRect" parent="HBoxContainer/MarginContainer/CenterContainer" unique_id=1233799854]
-unique_name_in_owner = true
-layout_mode = 2
-texture = SubResource("PlaceholderTexture2D_lwaml")
-stretch_mode = 3
-
-[node name="Name" type="RichTextLabel" parent="HBoxContainer" unique_id=535781296]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Placeholder Name"
-vertical_alignment = 1
-
-[node name="VSeparator2" type="VSeparator" parent="HBoxContainer" unique_id=1511183797]
-layout_mode = 2
-theme_override_constants/separation = 4
-theme_override_styles/separator = SubResource("StyleBoxLine_s55yl")
-
-[node name="RankContainer" type="HBoxContainer" parent="HBoxContainer" unique_id=527514355]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 16
-
-[node name="MarginContainer" type="MarginContainer" parent="HBoxContainer/RankContainer" unique_id=552651636]
-layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_bottom = 8
-
-[node name="CenterContainer" type="CenterContainer" parent="HBoxContainer/RankContainer/MarginContainer" unique_id=339908125]
-layout_mode = 2
-
-[node name="RankIcon" type="TextureRect" parent="HBoxContainer/RankContainer/MarginContainer/CenterContainer" unique_id=1572167747]
-unique_name_in_owner = true
-layout_mode = 2
-texture = SubResource("PlaceholderTexture2D_vbiw6")
-stretch_mode = 3
-
-[node name="RankName" type="RichTextLabel" parent="HBoxContainer/RankContainer" unique_id=736076991]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Placeholder Rank Name"
-vertical_alignment = 1
-
-[node name="VSeparator3" type="VSeparator" parent="HBoxContainer" unique_id=595929848]
-layout_mode = 2
-theme_override_constants/separation = 8
-theme_override_styles/separator = SubResource("StyleBoxLine_s55yl")
-
-[node name="Status" type="RichTextLabel" parent="HBoxContainer" unique_id=2137311836]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Placeholder Status Name"
-vertical_alignment = 1
+script = ExtResource("1_script")
 
 [node name="ClickTarget" type="Button" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
 flat = true
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="Columns" type="HBoxContainer" parent="Margin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="UnitIcon" type="TextureRect" parent="Margin/Columns"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Name" type="RichTextLabel" parent="Margin/Columns"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.2
+mouse_filter = 2
+scroll_active = false
+vertical_alignment = 1
+
+[node name="RankIcon" type="TextureRect" parent="Margin/Columns"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="RankName" type="RichTextLabel" parent="Margin/Columns"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(65, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+scroll_active = false
+vertical_alignment = 1
+
+[node name="Status" type="RichTextLabel" parent="Margin/Columns"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(55, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+scroll_active = false
+vertical_alignment = 1

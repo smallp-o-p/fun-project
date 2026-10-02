@@ -1,0 +1,3 @@
+# Preserve upstream bytes (including license line endings) in checkouts and patches.
+*.ttf -text
+OFL.txt -text -diff

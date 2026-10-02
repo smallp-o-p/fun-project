@@ -14,7 +14,7 @@ using static FunProject.Tests.GeoscapeTestScenes;
 public class GeoscapeSquadNavigationTest
 {
   // Authored geoscape with a tactical mission firing at tick 1. One SpeedButton press
-  // un-pauses to Normal; a single physics step fires the mission. Opening the mission
+  // un-pauses to 5x; a single physics step fires the mission. Opening the mission
   // pushes the resolution dialog as a stacked view; Engage produces the squad view from
   // the dialog and requests it as the next stacked view.
   private static (GeoscapeScene Scene, GeoscapeViewManager Manager) TacticalScene(
@@ -37,16 +37,6 @@ public class GeoscapeSquadNavigationTest
     => dialog.GetNode<HBoxContainer>("%Buttons").GetChildren()
       .AsValueEnumerable().OfType<Button>()
       .Single(button => button.Text == text);
-
-  private static void OpenMissionViaMarker(GeoscapeScene scene)
-  {
-    var map = scene.GetNode<GeoscapeMapControl>("%Map");
-    ((RegionButton)map.GetChild(map.GetChildCount() - 1))
-      .EmitSignal(BaseButton.SignalName.Pressed);
-  }
-
-  private static int AlertCount(GeoscapeScene scene)
-    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<VBoxContainer>("%Alerts").GetChildCount();
 
   // Drives the real dialog's Engage handover and returns the presented squad view it
   // produced, so a test can assert the opener forwarded the pending mission's policy.
@@ -111,7 +101,7 @@ public class GeoscapeSquadNavigationTest
     Assert.True(allowUnfitDeployment
       ? prompt.Contains("Exceptional deployment")
       : !prompt.Contains("Exceptional"));
-    squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(0)
+    squad.GetNode<BoxContainer>("%Slots").GetChild<Control>(0)
       .GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(!allowUnfitDeployment, SquadChoice(squad, "Alpha").Disabled); // the opener's mission context
     if (!allowUnfitDeployment)
@@ -128,20 +118,17 @@ public class GeoscapeSquadNavigationTest
   [TestCase(false, false, 1, true,
     TestName = "Re-engaging starts empty while equipment edits persist")]
   [TestCase(true, false, 0, false,
-    TestName = "Marker route: Engage covers the dialog with squad preparation")]
-  public async Task PreparationRoundTrip(bool viaMarker, bool bravoInRoster, int selectedSlot, bool reEngage)
+    TestName = "Engage covers the dialog with squad preparation")]
+  public async Task PreparationRoundTrip(bool preparationOnly, bool bravoInRoster, int selectedSlot, bool reEngage)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var roster = bravoInRoster
       ? new[] { MakeEntry("Alpha"), MakeEntry("Bravo") }
       : new[] { MakeEntry("Alpha") };
-    var (scene, manager) = viaMarker
+    var (scene, manager) = preparationOnly
       ? TacticalScene(roster)
       : TacticalScene(roster, armory: [MakeFirearmWeaponData("Rifle")]);
-    if (viaMarker)
-      OpenMissionViaMarker(scene);
-    else
-      OpenResolutionViaAlert(scene);
+    OpenResolutionViaMapEvent(scene);
     var dialog = (GeoscapeEventResolution)manager.Current;
 
     DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
@@ -152,12 +139,12 @@ public class GeoscapeSquadNavigationTest
     string clock = Clock(scene).Text;
     scene._PhysicsProcess(1.0); // covered views freeze the clock at the composition root
     Assert.Equal(clock, Clock(scene).Text);
-    Assert.Equal(1, AlertCount(scene)); // the mission stays active: alert remains
-    if (viaMarker)
+    Assert.Equal(1, MapEventMarkers(scene).Length); // the mission stays active: its marker remains
+    if (preparationOnly)
       return;
 
     ChooseSquadUnit(squad, selectedSlot, "Alpha");
-    squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(selectedSlot)
+    squad.GetNode<BoxContainer>("%Slots").GetChild<Control>(selectedSlot)
       .GetNode<Button>("%EditUnit").EmitSignal(Button.SignalName.Pressed);
     var editor = (UnitView)manager.Current;
     Assert.False(squad.IsVisibleInTree()); // the nested editor covers preparation
@@ -187,7 +174,7 @@ public class GeoscapeSquadNavigationTest
       var second = (SquadLoadoutView)manager.Current;
       Assert.False(ReferenceEquals(squad, second)); // a fresh view each Engage
       Assert.Equal(0, second.GetSelectedCombatants().Count); // slots start empty
-      Assert.Equal(3, second.GetNode<VBoxContainer>("%Slots").GetChildCount());
+      Assert.Equal(3, second.GetNode<BoxContainer>("%Slots").GetChildCount());
       Assert.Equal(2, dialog.GetNode<HBoxContainer>("%Buttons").GetChildCount()); // no growth
 
       // Choices start inert (no destination); Alpha is available again and keeps the rifle.
@@ -203,7 +190,7 @@ public class GeoscapeSquadNavigationTest
 
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
     Assert.True(dialog.GetParent() is null); // popped views detach immediately
-    Assert.Equal(0, AlertCount(scene));
+    Assert.Equal(0, MapEventMarkers(scene).Length);
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
     Assert.False(GodotObject.IsInstanceValid(dialog));
   }
@@ -220,14 +207,14 @@ public class GeoscapeSquadNavigationTest
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     SpeedButton(scene).EmitSignal(Button.SignalName.Pressed);
     scene._PhysicsProcess(0.1);
-    OpenResolutionViaAlert(scene);
+    OpenResolutionViaMapEvent(scene);
     var dialog = (GeoscapeEventResolution)manager.Current;
 
     DialogButton(dialog, buttonText).EmitSignal(Button.SignalName.Pressed);
 
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
     Assert.True(dialog.GetParent() is null);
-    Assert.Equal(0, AlertCount(scene));
+    Assert.Equal(0, MapEventMarkers(scene).Length);
   }
 
   [TestCase(TestName = "Broken squad exports inside the scene preserve the pending mission")]
@@ -235,7 +222,7 @@ public class GeoscapeSquadNavigationTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (scene, manager) = TacticalScene([MakeEntry("Alpha")]);
-    OpenMissionViaMarker(scene);
+    OpenResolutionViaMapEvent(scene);
     var dialog = (GeoscapeEventResolution)manager.Current;
 
     // Engage's guard throws inside the pressed handler; Godot swallows it, so nothing
@@ -249,6 +236,6 @@ public class GeoscapeSquadNavigationTest
     Assert.True(ReferenceEquals(dialog, manager.Current));
     Assert.True(dialog.IsVisibleInTree());
     Assert.Equal(2, dialog.GetNode<HBoxContainer>("%Buttons").GetChildCount());
-    Assert.Equal(1, AlertCount(scene));
+    Assert.Equal(1, MapEventMarkers(scene).Length);
   }
 }

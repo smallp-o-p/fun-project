@@ -1,13 +1,16 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
 [ext_resource type="Script" path="res://scenes/geoscape/engineering/EngineeringView.cs" id="2_script"]
+[ext_resource type="PackedScene" path="res://scenes/ui/ModelPresentation.tscn" id="3_model"]
+[ext_resource type="StyleBox" path="res://scenes/ui/ScreenBackground.tres" id="90_background"]
 
 [node name="EngineeringView" instance=ExtResource("1_base") node_paths=PackedStringArray("BackButton")]
 script = ExtResource("2_script")
-BackButton = NodePath("Content/Margin/Layout/Header/BackButton")
+BackButton = NodePath("Content/Margin/Layout/Footer/BackButton")
 
 [node name="Content" type="PanelContainer" parent="."]
+theme_override_styles/panel = ExtResource("90_background")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -17,10 +20,10 @@ grow_vertical = 2
 
 [node name="Margin" type="MarginContainer" parent="Content"]
 layout_mode = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
 
 [node name="Layout" type="VBoxContainer" parent="Content/Margin"]
 layout_mode = 2
@@ -32,54 +35,106 @@ layout_mode = 2
 [node name="Title" type="Label" parent="Content/Margin/Layout/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Engineering"
+theme_override_font_sizes/font_size = 24
+text = "ENGINEERING"
 
-[node name="BackButton" type="Button" parent="Content/Margin/Layout/Header"]
+[node name="PauseHint" type="Label" parent="Content/Margin/Layout/Header"]
+layout_mode = 2
+text = "Time paused while browsing"
+
+[node name="Body" type="HBoxContainer" parent="Content/Margin/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="StaffPresentation" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
-text = "Back"
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.8
 
-[node name="PauseHint" type="Label" parent="Content/Margin/Layout"]
+[node name="StaffModel" parent="Content/Margin/Layout/Body/StaffPresentation" instance=ExtResource("3_model")]
 layout_mode = 2
-text = "Projects advance when you return to the map."
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="StaffCaption" type="Label" parent="Content/Margin/Layout/Body/StaffPresentation"]
+layout_mode = 2
+text = "WORKSHOP STAFF\n3D presentation slot\nNo staff model assigned"
 autowrap_mode = 3
 
-[node name="ActiveJob" type="Label" parent="Content/Margin/Layout"]
+[node name="Catalog" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.1
+theme_override_constants/separation = 8
+
+[node name="CatalogTitle" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "BUILD ITEMS"
+
+[node name="CatalogHint" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
+layout_mode = 2
+text = "Select an item"
+
+[node name="ItemsScroll" type="ScrollContainer" parent="Content/Margin/Layout/Body/Catalog"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="ManufacturableItems" type="VBoxContainer" parent="Content/Margin/Layout/Body/Catalog/ItemsScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="ProjectDivider" type="HSeparator" parent="Content/Margin/Layout/Body/Catalog"]
+layout_mode = 2
+
+[node name="ProjectTitle" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
+layout_mode = 2
+text = "CURRENT PROJECT"
+
+[node name="ActiveJob" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "No active manufacturing."
 autowrap_mode = 3
 
-[node name="Body" type="HBoxContainer" parent="Content/Margin/Layout"]
+[node name="ProjectHint" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
 layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 24
+text = "One project at a time.\nProjects advance on the map."
+autowrap_mode = 3
 
-[node name="ItemsScroll" type="ScrollContainer" parent="Content/Margin/Layout/Body"]
-custom_minimum_size = Vector2(260, 180)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-horizontal_scroll_mode = 0
-
-[node name="ManufacturableItems" type="VBoxContainer" parent="Content/Margin/Layout/Body/ItemsScroll"]
+[node name="Details" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 3
+size_flags_stretch_ratio = 1.3
 theme_override_constants/separation = 8
 
-[node name="Details" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
-custom_minimum_size = Vector2(340, 0)
+[node name="ItemPreview" parent="Content/Margin/Layout/Body/Details" instance=ExtResource("3_model")]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
-size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/separation = 12
+size_flags_stretch_ratio = 0.6
+
+[node name="PreviewCaption" type="Label" parent="Content/Margin/Layout/Body/Details"]
+layout_mode = 2
+text = "ITEM PREVIEW · 3D model not assigned"
+autowrap_mode = 3
 
 [node name="DetailsScroll" type="ScrollContainer" parent="Content/Margin/Layout/Body/Details"]
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
+follow_focus = true
 
 [node name="Text" type="VBoxContainer" parent="Content/Margin/Layout/Body/Details/DetailsScroll"]
 layout_mode = 2
@@ -89,6 +144,7 @@ theme_override_constants/separation = 12
 [node name="ItemName" type="Label" parent="Content/Margin/Layout/Body/Details/DetailsScroll/Text"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_font_sizes/font_size = 22
 text = "Select an item to manufacture."
 autowrap_mode = 3
 
@@ -114,7 +170,7 @@ autowrap_mode = 3
 
 [node name="ManufactureButton" type="Button" parent="Content/Margin/Layout/Body/Details"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 disabled = true
 text = "Manufacture"
@@ -123,3 +179,12 @@ text = "Manufacture"
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
+
+[node name="Footer" type="HBoxContainer" parent="Content/Margin/Layout"]
+layout_mode = 2
+
+[node name="BackButton" type="Button" parent="Content/Margin/Layout/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 36)
+layout_mode = 2
+text = "Back to Geoscape"

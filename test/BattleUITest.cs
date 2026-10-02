@@ -34,10 +34,10 @@ public partial class BattleUITest
     view.ShowUnits(units);
     view.ShowActionOptions([moveOption, passOption]);
 
-    var status = view.GetNode<Label>("BattleHud/VBox/UnitStatus");
+    var status = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%UnitStatus");
     Assert.True(status.Text.Contains("HP"));
     Assert.Equal(units.Length, status.Text.Split("\n").Length);
-    var verbs = view.GetNode<VBoxContainer>("BattleHud/VBox/VerbButtons");
+    var verbs = view.GetNode<BattleHud>("%BattleHud").GetNode<Container>("%VerbButtons");
     Assert.Equal(2, verbs.GetChildCount());
     Assert.Equal("Move", ((Button)verbs.GetChild(0)).Text);
   }
@@ -57,7 +57,7 @@ public partial class BattleUITest
 
     Assert.Equal(0, highlighter.GetChildCount());
     Assert.False(view.GetNode<MeshInstance3D>("MovementLine").Visible);
-    Assert.False(view.GetNode<Label>("BattleHud/VBox/HitChance").Visible);
+    Assert.False(view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%HitChance").Visible);
   }
 
   [TestCase(TestName = "Previews route by kind: path draws the line, attack shows hit chance")]
@@ -70,11 +70,11 @@ public partial class BattleUITest
 
     view.ShowPreview(new PathPreview([new Vector3I(0, 0, 0), new Vector3I(2, 0, 0), new Vector3I(4, 0, 0)]));
     Assert.True(view.GetNode<MeshInstance3D>("MovementLine").Visible);
-    Assert.False(view.GetNode<Label>("BattleHud/VBox/HitChance").Visible);
+    Assert.False(view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%HitChance").Visible);
 
     view.ShowPreview(new AttackPreview(new HitChanceBreakdown(65, [])));
     Assert.False(view.GetNode<MeshInstance3D>("MovementLine").Visible);
-    var hitChance = view.GetNode<Label>("BattleHud/VBox/HitChance");
+    var hitChance = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%HitChance");
     Assert.True(hitChance.Visible);
     Assert.Equal("65%", hitChance.Text);
   }
@@ -95,16 +95,16 @@ public partial class BattleUITest
     view.CancelRequested += () => cancels++;
     view.VerbSelected += option => selected = option;
 
-    view.GetNode<Button>("BattleHud/VBox/ConfirmButton").EmitSignal(Button.SignalName.Pressed);
-    view.GetNode<Button>("BattleHud/VBox/CancelButton").EmitSignal(Button.SignalName.Pressed);
-    ((Button)view.GetNode<VBoxContainer>("BattleHud/VBox/VerbButtons").GetChild(0))
+    view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ConfirmButton").EmitSignal(Button.SignalName.Pressed);
+    view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%CancelButton").EmitSignal(Button.SignalName.Pressed);
+    ((Button)view.GetNode<BattleHud>("%BattleHud").GetNode<Container>("%VerbButtons").GetChild(0))
       .EmitSignal(Button.SignalName.Pressed);
     view.ShowBattleOver("VICTORY");
 
     Assert.Equal(1, confirms);
     Assert.Equal(1, cancels);
     Assert.True(ReferenceEquals(moveOption, selected));
-    var banner = view.GetNode<Label>("BattleHud/BattleOverBanner");
+    var banner = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%BattleOverBanner");
     Assert.True(banner.Visible);
     Assert.Equal("VICTORY", banner.Text);
   }

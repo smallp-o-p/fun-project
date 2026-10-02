@@ -84,13 +84,13 @@ public sealed partial class SquadLoadoutView : GeoscapeView
 
   private void RebuildSlots()
   {
-    var slots = GetNode<VBoxContainer>("%Slots");
+    var slots = GetNode<BoxContainer>("%Slots");
     slots.QueueFreeAllChildren();
     for (int slot = 0; slot < _slots.Length; slot++)
       BuildCard(slots, slot);
   }
 
-  private void BuildCard(VBoxContainer slots, int slot)
+  private void BuildCard(BoxContainer slots, int slot)
   {
     var scene = SquadSlotCardScene ?? throw new InvalidOperationException(
       "SquadLoadoutView requires SquadSlotCardScene; assign a PackedScene in the inspector.");
@@ -125,7 +125,11 @@ public sealed partial class SquadLoadoutView : GeoscapeView
 
     if (_state.Roster.Count == 0)
     {
-      choices.AddChild(new Label { Text = "No units available for this mission." });
+      choices.AddChild(new Label
+      {
+        Text = "No units available for this mission.",
+        AutowrapMode = TextServer.AutowrapMode.WordSmart,
+      });
       return;
     }
 
@@ -137,6 +141,11 @@ public sealed partial class SquadLoadoutView : GeoscapeView
       var button = new Button
       {
         Text = RosterButtonText(unit),
+        TooltipText = RosterButtonText(unit),
+        CustomMinimumSize = new Vector2(0, 58),
+        Alignment = HorizontalAlignment.Left,
+        AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        ClipText = true,
         Disabled = _choosingSlot is null || InSquad(unit) || !CanDeploy(unit),
       };
       button.Pressed += () => ChooseUnit(unit);

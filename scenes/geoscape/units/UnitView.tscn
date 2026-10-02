@@ -1,15 +1,19 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
 [ext_resource type="Script" path="res://scenes/geoscape/units/UnitView.cs" id="2_script"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/units/SkillProgressionView.tscn" id="3_paths"]
+[ext_resource type="PackedScene" path="res://scenes/ui/ModelPresentation.tscn" id="4_presentation"]
+[ext_resource type="PackedScene" path="res://scenes/models/ZhuYuan/ZhuYuan.scn" id="5_model"]
+[ext_resource type="StyleBox" path="res://scenes/ui/ScreenBackground.tres" id="90_background"]
 
 [node name="UnitView" instance=ExtResource("1_base") node_paths=PackedStringArray("BackButton")]
 script = ExtResource("2_script")
-BackButton = NodePath("Content/MarginContainer/VBoxContainer/Header/BackButton")
+BackButton = NodePath("Content/Margin/Layout/Header/BackButton")
 SkillProgressionViewScene = ExtResource("3_paths")
 
 [node name="Content" type="PanelContainer" parent="."]
+theme_override_styles/panel = ExtResource("90_background")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -17,118 +21,244 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="MarginContainer" type="MarginContainer" parent="Content"]
+[node name="Margin" type="MarginContainer" parent="Content"]
 layout_mode = 2
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Content/MarginContainer"]
+[node name="Layout" type="VBoxContainer" parent="Content/Margin"]
 layout_mode = 2
+theme_override_constants/separation = 16
 
-[node name="Header" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer"]
+[node name="Header" type="HBoxContainer" parent="Content/Margin/Layout"]
 layout_mode = 2
+theme_override_constants/separation = 20
 
-[node name="Title" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Header"]
+[node name="BackButton" type="Button" parent="Content/Margin/Layout/Header"]
 unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/normal_font_size = 48
-text = "Unit"
-scroll_active = false
-vertical_alignment = 2
-
-[node name="BackButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Header"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 0)
+custom_minimum_size = Vector2(96, 36)
 layout_mode = 2
 text = "Back"
 
-[node name="PathsButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Header"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 0)
+[node name="ScreenLabel" type="Label" parent="Content/Margin/Layout/Header"]
 layout_mode = 2
-text = "Paths"
+size_flags_horizontal = 3
+text = "UNIT VIEW / EQUIPMENT"
 
-[node name="Body" type="HBoxContainer" parent="Content/MarginContainer/VBoxContainer"]
+[node name="TimeLabel" type="Label" parent="Content/Margin/Layout/Header"]
+layout_mode = 2
+text = "Time frozen"
+
+[node name="Body" type="HBoxContainer" parent="Content/Margin/Layout"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 64
+theme_override_constants/separation = 20
 
-[node name="StatsColumn" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body"]
+[node name="PresentationColumn" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
+custom_minimum_size = Vector2(220, 0)
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.9
 
-[node name="StatsHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
-layout_mode = 2
-theme_override_font_sizes/normal_font_size = 28
-text = "Stats"
-scroll_active = false
-
-[node name="StatsList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
+[node name="UnitPresentation" parent="Content/Margin/Layout/Body/PresentationColumn" instance=ExtResource("4_presentation")]
 unique_name_in_owner = true
 layout_mode = 2
+ModelScene = ExtResource("5_model")
+FramingHeight = 1.05
+FocusHeight = 0.5
+ModelYawDegrees = -8.0
+FitWidth = true
 
-[node name="BuffsHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
+[node name="PresentationCaption" type="Label" parent="Content/Margin/Layout/Body/PresentationColumn"]
 layout_mode = 2
-theme_override_font_sizes/normal_font_size = 28
-text = "Innate Buffs"
-scroll_active = false
+theme_override_font_sizes/font_size = 12
+text = "3D model stand-in"
+horizontal_alignment = 1
 
-[node name="BuffsList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="ModsHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
-layout_mode = 2
-theme_override_font_sizes/normal_font_size = 28
-text = "Personal Mods"
-scroll_active = false
-
-[node name="PersonalModSlots" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/StatsColumn"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="EquipColumn" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body"]
+[node name="DetailsColumn" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
+custom_minimum_size = Vector2(350, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 8
+size_flags_stretch_ratio = 1.1
+theme_override_constants/separation = 12
 
-[node name="EquipHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="Identity" type="VBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="RankLabel" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/Identity"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Rank"
+
+[node name="Title" type="RichTextLabel" parent="Content/Margin/Layout/Body/DetailsColumn/Identity"]
+unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/normal_font_size = 28
-text = "Equipment"
+text = "Unit"
+fit_content = true
 scroll_active = false
 
-[node name="WeaponSlot" type="Button" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="StatsHeading" type="HBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn/Identity"]
+layout_mode = 2
+
+[node name="StatsLabel" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/Identity/StatsHeading"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "STATS"
+
+[node name="StatsKey" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/Identity/StatsHeading"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "BASE → CURRENT"
+
+[node name="StatsList" type="GridContainer" parent="Content/Margin/Layout/Body/DetailsColumn/Identity"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 8
+columns = 3
+
+[node name="Separator" type="HSeparator" parent="Content/Margin/Layout/Body/DetailsColumn"]
+layout_mode = 2
+
+[node name="DetailsScroll" type="ScrollContainer" parent="Content/Margin/Layout/Body/DetailsColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+follow_focus = true
+horizontal_scroll_mode = 0
+
+[node name="Details" type="VBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 16
+
+[node name="EquipmentRow" type="HBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Loadout" type="VBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="LoadoutHeader" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Loadout"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "LOADOUT"
+
+[node name="WeaponSlot" type="Button" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Loadout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+toggle_mode = true
+text = "Weapon"
+clip_text = true
+alignment = 0
+
+[node name="WeaponModSlots" type="VBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Loadout"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="WeaponModSlots" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="ArmorSlot" type="Button" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Loadout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+toggle_mode = true
+text = "Armor"
+clip_text = true
+alignment = 0
+
+[node name="UtilitySlots" type="VBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Loadout"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="ArmorSlot" type="Button" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="ModsHeader" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Loadout"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "PERSONAL MODS"
+
+[node name="PersonalModSlots" type="VBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Loadout"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="UtilitySlots" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="Armory" type="VBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="ArmoryHeader" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Armory"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "ARMORY"
+
+[node name="SelectedSlotLabel" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Armory"]
 unique_name_in_owner = true
 layout_mode = 2
+text = "Weapon"
 
-[node name="ArmoryHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="SelectedItemName" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Armory"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/normal_font_size = 28
-text = "Armory"
+theme_override_font_sizes/font_size = 20
+text = "Empty slot"
+autowrap_mode = 3
+
+[node name="SelectedItemDetails" type="RichTextLabel" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Armory"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 14
+text = "Choose an available item below."
+fit_content = true
 scroll_active = false
 
-[node name="UnequipButton" type="Button" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="ItemSeparator" type="HSeparator" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Armory"]
+layout_mode = 2
+
+[node name="AvailableLabel" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Armory"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "AVAILABLE ITEMS"
+
+[node name="ArmoryList" type="VBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Armory"]
 unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ArmoryEmptyLabel" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Armory"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "No available items for this slot."
+autowrap_mode = 3
+
+[node name="ImmediateLabel" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Armory"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Select an item to equip. Changes take effect immediately."
+autowrap_mode = 3
+
+[node name="UnequipButton" type="Button" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details/EquipmentRow/Armory"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
 text = "Unequip"
-visible = false
 
-[node name="ArmoryList" type="VBoxContainer" parent="Content/MarginContainer/VBoxContainer/Body/EquipColumn"]
+[node name="BuffsHeader" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "INNATE BUFFS"
+
+[node name="BuffsList" type="VBoxContainer" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsScroll/Details"]
 unique_name_in_owner = true
 layout_mode = 2
+
+[node name="PathsButton" type="Button" parent="Content/Margin/Layout/Body/DetailsColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 36)
+layout_mode = 2
+size_flags_horizontal = 8
+text = "Paths"

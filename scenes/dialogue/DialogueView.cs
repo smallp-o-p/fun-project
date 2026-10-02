@@ -28,6 +28,7 @@ public sealed partial class DialogueView : GeoscapeView
   private Label _body = null!;
   private Label _continue = null!;
   private Node3D _modelRoot = null!;
+  private ScrollContainer _bodyScroll = null!;
 
   private DialogueLineData CurrentLine => _sequence.Lines[_lineIndex];
 
@@ -52,6 +53,8 @@ public sealed partial class DialogueView : GeoscapeView
     _body = GetNode<Label>("%Body");
     _continue = GetNode<Label>("%Continue");
     _modelRoot = GetNode<Node3D>("%ModelRoot");
+    _bodyScroll = GetNode<ScrollContainer>("%BodyScroll");
+    _bodyScroll.GuiInput += OnDimGuiInput;
     GetNode<Control>("%Dim").GuiInput += OnDimGuiInput;
 
     ShowLine();
@@ -114,6 +117,7 @@ public sealed partial class DialogueView : GeoscapeView
     DialogueLineData line = CurrentLine;
     _speakerName.Text = line.Speaker!.DisplayName;
     _body.Text = line.Text;
+    _bodyScroll.ScrollVertical = 0;
     _revealSeconds = 0;
     _blinkSeconds = 0;
     _continue.Modulate = Colors.White;

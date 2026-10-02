@@ -83,13 +83,17 @@ public sealed partial class CaptivityView : GeoscapeView
     list.QueueFreeAllChildren();
     foreach (Combatant captive in captives)
     {
-      if (IsSelected(captive))
-        continue;
       var row = new Button
       {
         Text = $"{captive.Name} — {captive.OwningFaction.Name}",
         ToggleMode = true,
+        CustomMinimumSize = new Vector2(0, 62),
+        Alignment = HorizontalAlignment.Left,
+        ClipText = true,
+        AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        TooltipText = $"{captive.Name} — {captive.OwningFaction.Name}",
       };
+      row.SetPressedNoSignal(IsSelected(captive));
       row.Toggled += pressed => OnCaptiveToggled(captive, pressed);
       list.AddChild(row);
     }
@@ -119,6 +123,7 @@ public sealed partial class CaptivityView : GeoscapeView
     int count = _selected.Count;
     GetNode<Label>("%SelectionCount").Text = $"Selected: {count}";
     GetNode<Button>("%PrepareButton").Disabled = count == 0;
+    GetNode<Control>("%CaptivePresentation").Visible = _details is not null;
     GetNode<RichTextLabel>("%Details").Text =
       _details is not null ? DetailsText(_details) : "";
   }
@@ -133,7 +138,8 @@ public sealed partial class CaptivityView : GeoscapeView
   private string DetailsText(Combatant captive) => string.Join("\n",
     $"Name: {captive.Name}",
     $"Faction: {captive.OwningFaction.Name}",
-    CombatantSummary.StatsText(captive, "Health (max)", _state!.CampaignStatContributions(captive)),
+    CombatantSummary.StatsText(captive, "Health (max)", _state!.CampaignStatContributions(captive))
+      .Replace("  ", "\n"),
     CombatantSummary.EquipmentText(captive, includeMods: false),
     BuffsText(captive));
 

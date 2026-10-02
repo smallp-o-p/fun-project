@@ -78,22 +78,31 @@ public class GeoscapeResolutionViewTest
   // Scene-level wiring: the composition root pushes the dialog on the session's opened
   // event and pops it on the committed close, restoring whatever the dialog covered.
   [TestCase]
-  public async Task AlertPressPushesDialogAndDeclinePopsBackToCoveredRoot()
+  public async Task MapEventPressPushesDialogAndDeclinePopsBackToCoveredRoot()
   {
     await using var cleanup = new DeferredNodeCleanup();
     // Regions need authored map visuals (GeoscapeMapControl.Setup), so the scene-level
     // test drives a map-wide event; region-suffix rendering is covered by the direct
     // view tests above.
     var scene = AddToTree(CreateGeoscapeScene(MakeStart(
-      timeline: [MakeScheduled(1, MakeEvent("Distress call", GeoscapeEventKind.TacticalBattle))])));
+      timeline:
+      [
+        MakeScheduled(1, MakeEvent("Distress call", GeoscapeEventKind.TacticalBattle)),
+        MakeScheduled(1, MakeEvent("Weather report")),
+      ])));
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
     hud.GetNode<Button>("%SpeedButton").EmitSignal(Button.SignalName.Pressed); // 5x, running
     scene._PhysicsProcess(0.02); // one tick at 5x fires the scheduled event
 
-    hud.GetNode<VBoxContainer>("%Alerts").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
+    OpenResolutionViaMapEvent(scene);
 
     var dialog = (GeoscapeEventResolution)manager.Current;
+    OpenResolutionViaMapEvent(scene); // repeated clicks cannot stack the same resolution
+    OpenResolutionViaMapEvent(scene, eventIndex: 1); // another event cannot replace the pending one
+    Assert.True(ReferenceEquals(dialog, manager.Current));
+    Assert.Equal(1, manager.GetChildren().AsValueEnumerable().OfType<GeoscapeEventResolution>().Count());
+    Assert.Equal(2, MapEventMarkers(scene).Length); // both events remain active while pending
     Assert.True(hud.IsVisibleInTree()); // the root view is covered by the dialog
     Assert.Equal("Distress call", dialog.GetNode<Label>("%Title").Text);
     Assert.Equal("[TacticalBattle]\nDistress call description.",
@@ -105,8 +114,39 @@ public class GeoscapeResolutionViewTest
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
     Assert.True(dialog.GetParent() is null); // popped views detach immediately
     Assert.True(hud.IsVisibleInTree());
-    Assert.Equal(0, hud.GetNode<VBoxContainer>("%Alerts").GetChildCount()); // resolved event left
+    Assert.Equal(1, MapEventMarkers(scene).Length); // only the resolved event left the map
+    OpenResolutionViaMapEvent(scene);
+    var nextDialog = (GeoscapeEventResolution)manager.Current;
+    Assert.Equal("Weather report", nextDialog.GetNode<Label>("%Title").Text);
+    nextDialog.GetNode<HBoxContainer>("%Buttons").GetChild<Button>(0)
+      .EmitSignal(Button.SignalName.Pressed);
+    Assert.True(ReferenceEquals(manager.RootView, manager.Current));
+    Assert.Equal(0, MapEventMarkers(scene).Length);
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
     Assert.False(GodotObject.IsInstanceValid(dialog));
+    Assert.False(GodotObject.IsInstanceValid(nextDialog));
+  }
+
+  [TestCase]
+  public async Task MapEventMarkerDisappearsAtItsDeadlineWithoutRemovingOtherEvents()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var scene = AddToTree(CreateGeoscapeScene(MakeStart(timeline:
+    [
+      MakeScheduled(1, MakeEvent("Brief", expiresAfterTicks: 2)),
+      MakeScheduled(1, MakeEvent("Persistent")),
+    ])));
+    var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
+    SpeedButton(scene).EmitSignal(Button.SignalName.Pressed); // 5x
+    scene._PhysicsProcess(0.02); // tick 1: both events fire
+    Assert.Equal(2, MapEventMarkers(scene).Length);
+    scene._PhysicsProcess(0.02); // tick 2: Brief is still active
+    Assert.Equal(2, MapEventMarkers(scene).Length);
+
+    scene._PhysicsProcess(0.02); // tick 3: Brief expires at its captured deadline
+
+    Assert.Equal(1, MapEventMarkers(scene).Length);
+    OpenResolutionViaMapEvent(scene);
+    Assert.Equal("Persistent", manager.Current.GetNode<Label>("%Title").Text);
   }
 }

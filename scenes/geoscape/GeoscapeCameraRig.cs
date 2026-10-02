@@ -1,18 +1,17 @@
 using Godot;
 
-// Static framing for the geoscape first pass: fit the authored map to the viewport once and
-// center on it. No interaction — zoom and pan were removed to keep the first pass simple;
-// when they return, they grow back here.
+// Fixed, HUD-aware initial framing. Native canvas scaling handles window resizing;
+// there is no player pan/zoom input or automatic refit after setup.
 public sealed partial class GeoscapeCameraRig : Camera2D
 {
-  public void Setup(Vector2I mapSize)
+  public void Setup(Vector2I mapSize, Rect2 availableArea)
   {
-    // Zoom values > 1 magnify; fit-map zoom = the smaller ratio, i.e. the largest zoom where
-    // the viewport still covers the whole map (the larger ratio would crop the other axis).
-    Vector2 viewport = GetViewport().GetVisibleRect().Size;
-    float fit = float.Min(viewport.X / mapSize.X, viewport.Y / mapSize.Y);
+    // The smaller ratio is the largest uniform zoom that still shows the whole map.
+    float fit = float.Min(availableArea.Size.X / mapSize.X, availableArea.Size.Y / mapSize.Y);
+    Vector2 viewportCenter = GetViewport().GetVisibleRect().GetCenter();
     Zoom = new Vector2(fit, fit);
-    Position = new Vector2(mapSize.X / 2f, mapSize.Y / 2f);
+    Position = (Vector2)mapSize / 2f + (viewportCenter - availableArea.GetCenter()) / fit;
     MakeCurrent();
+    ForceUpdateScroll();
   }
 }

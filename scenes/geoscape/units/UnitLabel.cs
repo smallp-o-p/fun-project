@@ -13,13 +13,15 @@ public partial class UnitLabel : PanelContainer
 
   public void Press() => Pressed?.Invoke();
 
-  private const string StatusPlaceholder = "Ready";
+  // Readiness depends on a mission; this general roster does not manufacture one.
+  private const string StatusPlaceholder = "—";
 
   public void Bind(Combatant unit)
   {
     UnitName!.Text = unit.Name;
     RankName!.Text = unit.Rank.RankName;
     Status!.Text = StatusPlaceholder;
+    GetNode<Button>("%ClickTarget").TooltipText = $"Inspect {unit.Name} ({unit.Rank.RankName})";
   }
 
   public override void _Ready()

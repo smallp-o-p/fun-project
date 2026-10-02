@@ -176,8 +176,9 @@ public class CaptivityViewTest
     ToggleRow(view, 1, true); // select Bravo; details show Bravo
 
     view.Present(fixture.State, fixture.Session); // same state: selection retained
-    Assert.True(Row(view, 1) is null);
-    Assert.False(Row(view, 0) is null);
+    Assert.Equal(2, view.GetNode<VBoxContainer>("%CaptiveList").GetChildCount());
+    Assert.True(Row(view, 1).ButtonPressed);
+    Assert.False(Row(view, 0).ButtonPressed);
     Assert.Equal("Selected: 1", view.GetNode<Label>("%SelectionCount").Text);
     Assert.True(view.GetNode<RichTextLabel>("%Details").Text.Contains("Bravo"));
 
@@ -210,7 +211,7 @@ public class CaptivityViewTest
     squad.Present(fixture.State, fixture.Session); // materializes the handed-over configuration
     string title = squad.GetNode<Label>("%Title").Text;
     Assert.Equal(title, squad.GetNode<Label>("%Title").TooltipText); // inspectable when clipped
-    Assert.Equal(2, squad.GetNode<VBoxContainer>("%Slots").GetChildCount());
+    Assert.Equal(2, squad.GetNode<BoxContainer>("%Slots").GetChildCount());
     Assert.Equal("Squad: 0/2", squad.GetNode<Label>("%SquadCount").Text);
   }
 
@@ -250,7 +251,7 @@ public class CaptivityViewTest
 
     if (secondInterrogator)
     {
-      squad.GetNode<VBoxContainer>("%Slots").GetChild<Control>(1)
+      squad.GetNode<BoxContainer>("%Slots").GetChild<Control>(1)
         .GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed); // mark slot 2
       Assert.True(SquadChoice(squad, "Scout").Disabled); // occupied units stay unavailable
       Assert.False(SquadChoice(squad, "Medic").Disabled);
@@ -290,9 +291,15 @@ public class CaptivityViewTest
 
     Assert.True(ReferenceEquals(captivity, manager.Current)); // back landed on captivity
     Assert.True(captivity.IsVisibleInTree());
-    Assert.True(Row(captivity, 0) is null); // selection intact after re-present
-    Assert.True(Row(captivity, 1) is null);
+    Assert.Equal(2, captivity.GetNode<VBoxContainer>("%CaptiveList").GetChildCount());
+    Assert.True(Row(captivity, 0).ButtonPressed); // selection intact after re-present
+    Assert.True(Row(captivity, 1).ButtonPressed);
     Assert.Equal("Selected: 2", captivity.GetNode<Label>("%SelectionCount").Text);
+
+    ToggleRow(captivity, 0, false); // returning must retain an accessible way to deselect
+    Assert.Equal("Selected: 1", captivity.GetNode<Label>("%SelectionCount").Text);
+    Assert.False(Row(captivity, 0).ButtonPressed);
+    Assert.True(Row(captivity, 1).ButtonPressed);
   }
 
   [TestCase(TestName = "The HUD captivity button forwards a fresh CaptivityView")]

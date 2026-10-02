@@ -27,7 +27,7 @@ public partial class BattleLauncherTest
     var unitMeshes = battle.GetNode<Node3D>("UnitMeshes");
     // The duel type deploys exactly one unit per side.
     Assert.Equal(2, unitMeshes.GetChildren().AsValueEnumerable().OfType<MeshInstance3D>().Count());
-    var status = battle.GetNode<Label>("BattleUI/BattleHud/VBox/UnitStatus");
+    var status = battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Label>("%UnitStatus");
     Assert.True(status.Text.Contains("HP"));
   }
 
