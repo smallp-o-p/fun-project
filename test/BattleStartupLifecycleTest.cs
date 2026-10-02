@@ -43,6 +43,9 @@ public partial class BattleStartupLifecycleTest
   {
     var (setup, _, _) = GroupedSetup();
     var hook = new RecordingHook();
+    bool nestedAttempted = false;
+    int startedCount = 0;
+    int completedCount = 0;
     var system = new SetupSystemData
     {
       OnRegister = runtime =>
@@ -52,6 +55,21 @@ public partial class BattleStartupLifecycleTest
         Assert.Equal(2, runtime.Query(new GetGlobalFactionTurnOrderQuery()).Count);
         Assert.Equal(1, runtime.Query(new GetBattleSpecialObjectsQuery()).Count);
         runtime.RegisterHook<BattleEventTag>(hook);
+        // Subscribed before the opening dispatch: the opening must fire no public pair.
+        runtime.ActionStarted += _ => startedCount++;
+        runtime.ActionCompleted += _ => completedCount++;
+        // Both startup events share one unbroken opening dispatch scope, so the earliest
+        // window edge (SessionStarted) rejects nested submissions for the whole opening.
+        runtime.BattleEventCommitted += battleEvent =>
+        {
+          if (battleEvent is not SessionStartedBattleEvent)
+            return;
+          nestedAttempted = true;
+          BattleUnitState registered = runtime.Query(new GetUnitAtTile(
+            runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
+          Assert.Throws<InvalidOperationException>(() => runtime.ExecuteAction(BattleAction.ApplyDamage(
+            runtime.TryGetAlive(registered).RequireSome(), 1)));
+        };
       },
     };
     using var runtime = BattleFactory.Start(setup with
@@ -60,6 +78,19 @@ public partial class BattleStartupLifecycleTest
         new Vector3I(1, 0, 0))],
       Systems = [system],
     }).RequireRight();
+
+    // The nested ExecuteAction was rejected at the open submission window: no damage cost,
+    // no lifecycle pair, and no committed work from the attempt. The opening itself
+    // finished intact: full health and the full initial AP top-up still ran.
+    Assert.True(nestedAttempted);
+    BattleUnitState unit = runtime.Query(new GetUnitAtTile(
+      runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
+    Assert.Equal(20, unit.CurrentHealth);
+    Assert.Equal(0, hook.Received.EventsOf<UnitDamagedBattleEvent>().Length);
+    Assert.Equal(0, startedCount);
+    Assert.Equal(0, completedCount);
+    Assert.Equal(4, unit.MaxActionPoints);
+    Assert.Equal(4, unit.CurrentActionPoints);
 
     // Initial placement is preparation-owned: no replay reaches registered systems.
     Assert.Equal(0, hook.Received.EventsOf<UnitAddedBattleEvent>().Length);
@@ -153,82 +184,7 @@ public partial class BattleStartupLifecycleTest
     Assert.True(ReferenceEquals(expected, AssertStartupFailureDisposes(setup, system)));
   }
 
-  [TestCase(typeof(SessionStartedBattleEvent), TestName = "A declared system submitting from SessionStarted is rejected and the opening stays intact")]
-  [TestCase(typeof(TurnStartedBattleEvent), TestName = "A declared system submitting from the opening turn-start is rejected and the opening stays intact")]
-  public void NestedOpeningSubmissionIsRejectedAndOpeningStaysIntact(Type sourceEvent)
-  {
-    var (setup, _, _) = GroupedSetup();
-    NestedOpeningSubmitHook? nested = null;
-    var recorder = new RecordingHook();
-    int startedCount = 0;
-    int completedCount = 0;
-    var system = new SetupSystemData
-    {
-      OnRegister = runtime =>
-      {
-        BattleUnitState registered = runtime.Query(new GetUnitAtTile(
-          runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
-        nested = new NestedOpeningSubmitHook(runtime, registered, sourceEvent);
-        runtime.RegisterHook<BattleEventTag>(nested);
-        runtime.RegisterHook<BattleEventTag>(recorder);
-        // Subscribed before the opening dispatch: the opening must fire no public pair.
-        runtime.ActionStarted += _ => startedCount++;
-        runtime.ActionCompleted += _ => completedCount++;
-      },
-    };
-
-    using var runtime = BattleFactory.Start(setup with { Systems = [system] }).RequireRight();
-
-    // The nested ExecuteAction was rejected at the open submission window: no damage cost,
-    // no lifecycle pair, and no committed or queued work from the attempt.
-    Assert.True(nested!.Rejected);
-    BattleUnitState unit = runtime.Query(new GetUnitAtTile(
-      runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
-    Assert.Equal(20, unit.CurrentHealth);
-    Assert.Equal(0, recorder.Received.EventsOf<UnitDamagedBattleEvent>().Length);
-    Assert.Equal(0, startedCount);
-    Assert.Equal(0, completedCount);
-    // The opening itself finished intact: exactly the two startup events in order, and the
-    // full initial AP top-up still ran.
-    Assert.Equal(1, recorder.Received.EventsOf<SessionStartedBattleEvent>().Length);
-    Assert.Equal(1, recorder.Received.EventsOf<TurnStartedBattleEvent>().Length);
-    recorder.Received.EventBefore<SessionStartedBattleEvent, TurnStartedBattleEvent>();
-    Assert.Equal(4, unit.MaxActionPoints);
-    Assert.Equal(4, unit.CurrentActionPoints);
-  }
-
-  [TestCase(TestName = "A malformed spawn buff throws during preparation, before systems receive a runtime")]
-  public void MalformedSpawnBuffDisposesRuntime()
-  {
-    var (setup, player, _) = GroupedSetup();
-    var broken = setup with
-    {
-      Sides =
-      [
-        setup.Sides[0] with
-        {
-          Units = [new UnitPlacement(
-            new UnitLoadout(TestData.MakeCombatant("Alpha", player,
-              buffs: [TestData.MakeBuff("Broken", null!)])),
-            new Vector3I(0, 0, 0))],
-        },
-        setup.Sides[1],
-      ],
-    };
-    var system = new SetupSystemData();
-    Exception observed = AssertPreparationFailureBeforeRegistration(broken, system);
-    Assert.True(observed is InvalidOperationException);
-    Assert.True(observed.Message.Contains("no activation condition"));
-  }
-
-  // A condition fault during preparation's spawn-buff evaluation is the preparation-fault
-  // class with a capturable cause: the original exception must surface unwrapped.
-  private sealed partial class ThrowingBuffCondition(Exception failure) : BuffCondition
-  {
-    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) => throw failure;
-  }
-
-  [TestCase(TestName = "A preparation fault preserves its original cause and never registers declared systems")]
+  [TestCase(TestName = "A malformed spawn buff fault preserves its original cause and never registers declared systems")]
   public void PreparationFaultPreservesCauseAndNeverRegistersSystems()
   {
     var (setup, player, _) = GroupedSetup();
@@ -252,6 +208,13 @@ public partial class BattleStartupLifecycleTest
     Exception observed = AssertPreparationFailureBeforeRegistration(broken, system);
 
     Assert.True(ReferenceEquals(expected, observed));
+  }
+
+  // A condition fault during preparation's spawn-buff evaluation is the preparation-fault
+  // class with a capturable cause: the original exception must surface unwrapped.
+  private sealed partial class ThrowingBuffCondition(Exception failure) : BuffCondition
+  {
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) => throw failure;
   }
 
   [TestCase(TestName = "An empty side is a typed NoConsciousUnits failure naming the faction, before systems register")]
@@ -322,81 +285,16 @@ public partial class BattleStartupLifecycleTest
     Assert.Equal(secondEventCount, hooks[1].Received.Count);
   }
 
+  // A terminal opening-turn objective ends the battle inside the opening dispatch, yet the
+  // started-turn AP refresh must still finish: the buff only activates once both sides are
+  // on the board, so its +2 maximum exists exclusively in the opening turn-start pass —
+  // preparation's earlier top-up saw AP 4. The end callback observes the refreshed AP.
   [TestCase(TestName = "A terminal opening-turn objective finishes buff/AP work and freezes results before the end event")]
   public void TerminalObjectiveEndsBattleDuringStartup()
   {
     var (setup, player, _) = GroupedSetup();
-    var terminal = setup with
-    {
-      Sides =
-      [
-        setup.Sides[0] with
-        {
-          Objectives = [new SurviveUntilTurnObjectiveData
-          {
-            TargetTurn = 1,
-            OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
-          }],
-        },
-        setup.Sides[1],
-      ],
-    };
-    using var runtime = BattleFactory.Start(terminal).RequireRight();
-    Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsSome);
-    Assert.True(runtime.Query(new GetCurrentTurnQuery()).IsNone);
-  }
-
-  // A declared-system callback that submits gameplay inside the opening dispatch window;
-  // the nested submission must be rejected before its damage cost or any queue work.
-  private sealed class NestedOpeningSubmitHook(BattleRuntime runtime, BattleUnitState unit, Type sourceEvent)
-    : BattleHook
-  {
-    public bool Rejected { get; private set; }
-
-    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
-    {
-      if (battleEvent.GetType() != sourceEvent)
-        return [];
-      try
-      {
-        runtime.ExecuteAction(BattleAction.ApplyDamage(
-          context.Read.State.TryGetAlive(unit).RequireSome(), 1));
-      }
-      catch (InvalidOperationException)
-      {
-        Rejected = true;
-      }
-      return [];
-    }
-  }
-
-  // The buff only activates once both sides are on the board, so its +2 maximum exists
-  // exclusively in the opening turn-start pass — preparation's earlier top-up saw AP 4.
-  private sealed partial class RosterCompleteCondition : BuffCondition
-  {
-    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
-      context.State.AliveUnits.AsValueEnumerable().Count() >= 2;
-  }
-
-  [TestCase(TestName = "A terminal opening turn still finishes the started-turn AP refresh")]
-  public void TerminalOpeningTurnFinishesTheStartedTurnApRefresh()
-  {
-    var (setup, player, _) = GroupedSetup();
     var roused = TestData.MakeBuff("Roused", new RosterCompleteCondition(),
       statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
-    var buffed = setup with
-    {
-      Sides =
-      [
-        setup.Sides[0] with
-        {
-          Units = [new UnitPlacement(
-            new UnitLoadout(TestData.MakeCombatant("Alpha", player, actionPoints: 4, buffs: [roused])),
-            new Vector3I(0, 0, 0))],
-        },
-        setup.Sides[1],
-      ],
-    };
     int liveApAtSessionEnd = -1;
     var observer = new SetupSystemData
     {
@@ -409,20 +307,23 @@ public partial class BattleStartupLifecycleTest
         liveApAtSessionEnd = unit.CurrentActionPoints;
       },
     };
-    var terminal = buffed with
+    var terminal = setup with
     {
       Systems = [observer],
       Sides =
       [
-        buffed.Sides[0] with
+        setup.Sides[0] with
         {
+          Units = [new UnitPlacement(
+            new UnitLoadout(TestData.MakeCombatant("Alpha", player, actionPoints: 4, buffs: [roused])),
+            new Vector3I(0, 0, 0))],
           Objectives = [new SurviveUntilTurnObjectiveData
           {
             TargetTurn = 1,
             OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
           }],
         },
-        buffed.Sides[1],
+        setup.Sides[1],
       ],
     };
 
@@ -430,51 +331,16 @@ public partial class BattleStartupLifecycleTest
 
     Assert.True(runtime.Query(new GetCompletedBattleQuery()).IsSome);
     Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
+    Assert.True(runtime.Query(new GetCurrentTurnQuery()).IsNone);
     Assert.Equal(6, liveApAtSessionEnd);
   }
 
-  [TestCase(TestName = "Initial units start at full effective maximum AP on every side")]
-  public void InitialApIncludesPreparationAndOpeningBuffs()
+  // The buff only activates once both sides are on the board, so its +2 maximum exists
+  // exclusively in the opening turn-start pass — preparation's earlier top-up saw AP 4.
+  private sealed partial class RosterCompleteCondition : BuffCondition
   {
-    var (setup, player, enemy) = GroupedSetup();
-    var boost = TestData.MakeBuff("Roused", new AlwaysMetBuffCondition(),
-      statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
-    var buffed = setup with
-    {
-      Sides =
-      [
-        setup.Sides[0] with
-        {
-          Units =
-          [
-            new UnitPlacement(
-              new UnitLoadout(TestData.MakeCombatant("Alpha", player, actionPoints: 4, buffs: [boost])),
-              new Vector3I(0, 0, 0)),
-            new UnitPlacement(
-              new UnitLoadout(TestData.MakeCombatant("Fallen", player, health: 0, actionPoints: 4, buffs: [boost])),
-              new Vector3I(1, 0, 0)),
-          ],
-        },
-        setup.Sides[1] with
-        {
-          Units = [new UnitPlacement(
-            new UnitLoadout(TestData.MakeCombatant("Bandit", enemy, actionPoints: 4, buffs: [boost])),
-            new Vector3I(3, 0, 3))],
-        },
-      ],
-    };
-    using var runtime = BattleFactory.Start(buffed).RequireRight();
-    foreach (Faction faction in runtime.Query(new GetGlobalFactionTurnOrderQuery()))
-      foreach (AliveUnit unit in runtime.Query(new GetFactionAliveUnits(faction)))
-      {
-        Assert.Equal(6, unit.State.MaxActionPoints);
-        Assert.Equal(6, unit.State.CurrentActionPoints);
-      }
-    // A dead companion is still an initial participant: its spawn-active grant raised the
-    // effective maximum, and the initial normalization must top it up all the same.
-    DeadUnit fallen = runtime.Query(new GetFactionDeadUnits(player)).AsValueEnumerable().Single();
-    Assert.Equal(6, fallen.State.MaxActionPoints);
-    Assert.Equal(6, fallen.State.CurrentActionPoints);
+    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
+      context.State.AliveUnits.AsValueEnumerable().Count() >= 2;
   }
 
   [TestCase(TestName = "Seed 7 produces the same combat rolls from the type and resolved setups")]

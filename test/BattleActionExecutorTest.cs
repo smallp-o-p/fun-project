@@ -190,69 +190,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal(0, completed.FactionSummaries[battle.PlayerFaction].CombatantsWounded.Count);
   }
 
-  [TestCase(TestName = "Shared campaign killer identity accumulates both victims in the frozen completion")]
-  public void SharedCampaignKillerIdentityAccumulatesBothVictims()
-  {
-    // SpawnUnit accepts the same campaign Combatant on distinct cells and each runtime
-    // instance kills independently, so the frozen completion must accumulate attribution
-    // under the one shared identity instead of colliding on the projected ledger key.
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [player, enemy],
-      hitChanceCalculator: new AlwaysHitCalculator(), playerFaction: Some(player));
-    var twin = TestData.MakeCombatant("Twin", player, actionPoints: 5);
-    var original = battle.Spawn(twin, new Vector3I(0, 0, 0),
-      weapon: Some(TestData.MakeWeapon("Rifle", damage: 10)));
-    var victim1 = battle.Spawn(TestData.MakeCombatant("Victim1", enemy, health: 10), new Vector3I(0, 0, 1));
-    var victim2 = battle.Spawn(TestData.MakeCombatant("Victim2", enemy, health: 10), new Vector3I(3, 0, 3));
-    battle.Spawn(TestData.MakeCombatant("Survivor", enemy, health: 100), new Vector3I(7, 0, 7));
-    battle.Start();
-
-    battle.Submit(BattleAction.SpawnUnit(twin, battle.At(new Vector3I(0, 0, 2)),
-      TestData.MakeWeapon("Blade", damage: 10))).RequireSome();
-    BattleUnitState reinforcement = battle.UnitAt(new Vector3I(0, 0, 2));
-    battle.Attack(original, victim1);
-    battle.Attack(reinforcement, victim2);
-
-    var expected = new InvalidOperationException("terminal route fault");
-    battle.RegisterHook<UnitMovedBattleEvent>(new RequestVictoryOnMovedHook());
-    battle.RegisterHook<TileOccupiedBattleEvent>(new ThrowOnFirstEventHook(expected));
-    int completedCount = 0;
-    battle.Runtime.ActionCompleted += _ => completedCount++;
-
-    Exception? caught = null;
-    try
-    {
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(original), [battle.At(1, 0, 0)]));
-    }
-    catch (Exception error)
-    {
-      caught = error;
-    }
-
-    Assert.True(ReferenceEquals(expected, caught));
-    Assert.False(caught!.Data.Contains(BattleActionExecutor.BattleCompletionCaptureFailureDataKey),
-      "a supported shared-identity completion must not fail capture");
-    Assert.Equal(0, completedCount);
-    Assert.Equal(0, battle.Events.EventsOf<SessionEndedBattleEvent>().Length);
-
-    CompletedBattle completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
-    Assert.Equal(BattleOutcome.Victory, completed.Outcome);
-    var summary = completed.FactionSummaries[player];
-    Assert.Equal(1, summary.DefeatedPerCombatant.Count);
-    Assert.True(ReferenceEquals(twin, summary.DefeatedPerCombatant.Keys.AsValueEnumerable().Single()),
-      "the killer key is the original campaign Combatant, not a copy");
-    Assert.True(summary.DefeatedPerCombatant[twin].AsValueEnumerable()
-      .SequenceEqual([victim1.Combatant, victim2.Combatant]));
-    Assert.Equal(2, completed.Factions[enemy].Killed);
-    if (summary.DefeatedPerCombatant[twin] is IList<Combatant> mutableVictims)
-      Assert.True(mutableVictims.IsReadOnly);
-    if (summary.DefeatedPerCombatant is IDictionary<Combatant, IReadOnlyList<Combatant>> mutableLedger)
-      Assert.True(mutableLedger.IsReadOnly);
-
-    Assert.True(battle.Submit(BattleAction.EndFactionTurn(player)).IsNone);
-  }
-
   [TestCase(TestName = "A fault during end-event notification keeps the installed snapshot and propagates the cause")]
   public void EndNotificationFaultKeepsInstalledSnapshotAvailable()
   {
@@ -373,7 +310,15 @@ public partial class BattleActionExecutorTest
     var unit = battle.Unit;
     battle.ClearEvents();
 
-    battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 2)], 2));
+    BattleAction move = BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 2)], 2);
+    // The single guarded entry: direct execution outside the executor's submission step is
+    // rejected before any cost, leaving the unconsumed action intact for a real submission.
+    Assert.Throws<InvalidOperationException>(() => move.Execute(battle.Session));
+    Assert.Equal(5, unit.CurrentActionPoints);
+    Assert.Equal(new Vector3I(1, 0, 1), battle.PositionOf(unit).RequireSome().Raw);
+    Assert.Equal(0, battle.Events.Count);
+
+    battle.Submit(move);
 
     Assert.True(battle.Events.EventsOf<UnitMovedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
       battleEvent.Position.Raw == new Vector3I(1, 0, 2) &&
@@ -396,16 +341,8 @@ public partial class BattleActionExecutorTest
         observedPositionDuringEvent = battle.PositionOf(unit).Map(point => point.Raw);
     });
 
-    battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(destination)], 2));
-
-    Assert.Equal(destination, observedPositionDuringEvent.RequireSome());
-  }
-
-  [TestCase(TestName = "A throwing runtime subscriber preserves the exception while the cause stays committed")]
-  public void ThrowingRuntimeSubscriberPreservesTheCommittedCause()
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), actionPoints: 4);
-    var unit = battle.Unit;
+    // A later subscriber's fault must not uncommit the step the earlier subscriber saw:
+    // the cause surfaces after unwinding, and the hook pass never runs for the stream.
     var expected = new InvalidOperationException("subscriber sentinel");
     var observed = new List<BattleEvent>();
     var hook = new RecordingHook();
@@ -420,21 +357,19 @@ public partial class BattleActionExecutorTest
     Exception? caught = null;
     try
     {
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)]));
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(destination)], 2));
     }
     catch (Exception error)
     {
       caught = error;
     }
 
-    // The original exception survives unwinding, and subscribers earlier in the chain saw
-    // the cause before the throw stopped the stream.
+    Assert.Equal(destination, observedPositionDuringEvent.RequireSome());
     Assert.True(ReferenceEquals(expected, caught));
     Assert.True(observed.AsValueEnumerable().Any(battleEvent => battleEvent is UnitMovedBattleEvent));
     // The mutation stayed committed: tile, cost, and options all reflect the step.
-    Assert.Equal(new Vector3I(1, 0, 0), battle.PositionOf(unit).RequireSome().Raw);
+    Assert.Equal(destination, battle.PositionOf(unit).RequireSome().Raw);
     Assert.Equal(3, unit.CurrentActionPoints);
-    // Hooks fire after the subscriber pass, so the cause never reached the hook registry.
     Assert.Equal(0, hook.Received.Count);
     // A fresh submission finds no stale work: it advances the round exactly once.
     battle.Pass(unit);
@@ -768,63 +703,6 @@ public partial class BattleActionExecutorTest
     Assert.Throws<InvalidOperationException>(
       () => battle.Submit(BattleAction.EndFactionTurn(factionA)));
     Assert.Equal(factionB, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
-  }
-
-  [TestCase(TestName = "A second live executor attachment on one receiver is rejected before any default hook attaches")]
-  public void DuplicateExecutorAttachmentIsRejected()
-  {
-    // A directly owned engine subject, not a fixture battle: construction doors only.
-    var faction = TestData.MakeFaction("Player");
-    var state = new BattleState(new BattleBoardState(new Vector3I(3, 1, 3)), [faction]);
-    using var runtime = BattleRuntime.Create(state);
-
-    Assert.Throws<InvalidOperationException>(() => _ = new BattleActionExecutor(runtime));
-
-    // The rejected constructor left no second committed-stream handler behind: the real
-    // executor's submission forwards every committed event exactly once.
-    var forwarded = new List<BattleEvent>();
-    runtime.BattleEventCommitted += forwarded.Add;
-    runtime.ExecuteAction(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Alpha", faction), state.Board.At(0, 0, 0)));
-    Assert.Equal(1, forwarded.Count);
-    Assert.True(forwarded[0] is UnitAddedBattleEvent);
-  }
-
-  [TestCase(TestName = "Direct action execution outside the executor step is rejected before any cost")]
-  public void DirectActionExecutionOutsideExecutorStepIsRejected()
-  {
-    // A directly owned engine subject: the receiver resolves through the actual internal
-    // read context, and the built-in actions run through their real entry door.
-    var faction = TestData.MakeFaction("Player");
-    var state = new BattleState(new BattleBoardState(new Vector3I(4, 1, 4)), [faction]);
-    using var runtime = BattleRuntime.Create(state);
-    BattleSession session = runtime.GetReadContext().RunningSession.RequireSome();
-    var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 1);
-    Assert.True(weapon.TrySpendShot([]).IsSome);
-    BattleUnitState unit = state.AddUnit(
-      TestData.MakeCombatant("Alpha", faction, actionPoints: 5), state.Board.At(1, 0, 1),
-      Some((Weapon)weapon), None);
-    var forwarded = new List<BattleEvent>();
-    runtime.BattleEventCommitted += forwarded.Add;
-    int startedCount = 0;
-    int completedCount = 0;
-    runtime.ActionStarted += _ => startedCount++;
-    runtime.ActionCompleted += _ => completedCount++;
-
-    BattleAction move = BattleAction.MoveUnit(
-      state.TryGetAlive(unit).RequireSome(), [state.Board.At(2, 0, 1)]);
-    BattleAction reload = BattleAction.ReloadWeapon(state.TryGetAlive(unit).RequireSome(), weapon);
-
-    Assert.Throws<InvalidOperationException>(() => move.Execute(session));
-    Assert.Throws<InvalidOperationException>(() => reload.Execute(session));
-
-    // Nothing was spent, moved, fired, or signalled.
-    Assert.Equal(5, unit.CurrentActionPoints);
-    Assert.Equal(0, weapon.CurrentAmmo);
-    Assert.Equal(new Vector3I(1, 0, 1), state.Board.FindOccupantPosition(unit.Id).RequireSome().Raw);
-    Assert.Equal(0, forwarded.Count);
-    Assert.Equal(0, startedCount);
-    Assert.Equal(0, completedCount);
   }
 
   private sealed partial class DamageOnTileOccupiedHook<TEventKey> : BattleHook

@@ -61,6 +61,9 @@ public partial class BattleOutcomeTest
       new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
     Assert.True(retained.AsValueEnumerable().All(action => action.IsAvailable));
 
+    // The outgoing turn before elimination: the final refused advance must retain it.
+    BattleTurn outgoingTurn = battle.Query(new GetCurrentTurnQuery()).RequireSome();
+
     battle.ApplyDamage(battle.EnemyUnit, amount, kind);
     battle.ApplyDamage(battle.PlayerUnit, amount, kind);
     Assert.True(battle.Query(new GetCurrentTurnQuery()).IsSome);
@@ -92,14 +95,39 @@ public partial class BattleOutcomeTest
       battle.AdvanceTurn();
 
     Assert.True(turnAtTurnEnd.IsSome);
+    // The final advance refused (no conscious forces anywhere): the in-stream turn is still
+    // the installed outgoing one — no empty-round increment, no owner loss.
+    Assert.Equal(outgoingTurn, turnAtTurnEnd.RequireSome());
     Assert.True(completionAtTurnEnd.IsNone);
     Assert.True(turnAtSessionEnd.IsNone);
     Assert.Equal(BattleOutcome.Draw, completionAtSessionEnd.RequireSome().Outcome);
+    // The frozen completion keeps the outgoing round number as its turn count.
+    Assert.Equal(outgoingTurn.RoundNumber, completionAtSessionEnd.RequireSome().TurnCount);
     Assert.True(battle.Query(new GetCurrentTurnQuery()).IsNone);
     Assert.Equal(BattleOutcome.Draw, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Draw, ended.Outcome);
     Assert.True(retained.AsValueEnumerable().All(action => !action.IsAvailable));
+
+    // The completed facade refuses fresh submissions: no lifecycle signals fire, nothing
+    // commits, and neither position, AP, nor the installed completion changes.
+    int startedCount = 0;
+    int completedCount = 0;
+    battle.Runtime.ActionStarted += _ => startedCount++;
+    battle.Runtime.ActionCompleted += _ => completedCount++;
+    battle.ClearEvents();
+    Option<BattleBoardState.ValidatedPoint> positionBefore = battle.PositionOf(battle.PlayerUnit);
+    int apBefore = battle.PlayerUnit.CurrentActionPoints;
+    CompletedBattle snapshot = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+
+    Assert.True(battle.Submit(BattleAction.EndFactionTurn(battle.PlayerFaction)).IsNone);
+
+    Assert.Equal(0, startedCount);
+    Assert.Equal(0, completedCount);
+    Assert.Equal(0, battle.Events.Count);
+    Assert.Equal(positionBefore, battle.PositionOf(battle.PlayerUnit));
+    Assert.Equal(apBefore, battle.PlayerUnit.CurrentActionPoints);
+    Assert.True(ReferenceEquals(snapshot, battle.Query(new GetCompletedBattleQuery()).RequireSome()));
   }
 
   [TestCase(TestName = "A prepared battle exposes its declared player faction and no completion until it ends")]

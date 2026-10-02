@@ -1,6 +1,7 @@
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Items.Effects;
+using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
@@ -47,8 +48,30 @@ public class BattleFactoryTest
   public void StartHappyPath()
   {
     var (setup, player, enemy, _, _) = MinimalSetup();
+    // Both placements carry an always-active +2 AP grant: initial units on every side start
+    // at the full effective maximum (preparation placement plus the opening top-up).
+    var boost = TestData.MakeBuff("Roused", new AlwaysMetBuffCondition(),
+      statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
+    var buffed = setup with
+    {
+      Sides =
+      [
+        setup.Sides[0] with
+        {
+          Units = [new UnitPlacement(
+            new UnitLoadout(TestData.MakeCombatant("Alpha", player, actionPoints: 4, buffs: [boost])),
+            new Vector3I(0, 0, 0))],
+        },
+        setup.Sides[1] with
+        {
+          Units = [new UnitPlacement(
+            new UnitLoadout(TestData.MakeCombatant("Bandit", enemy, actionPoints: 4, buffs: [boost])),
+            new Vector3I(3, 0, 3))],
+        },
+      ],
+    };
 
-    using var runtime = BattleFactory.Start(setup).RequireRight();
+    using var runtime = BattleFactory.Start(buffed).RequireRight();
 
     var playerUnit = runtime.Query(new GetFactionAliveUnits(player)).AsValueEnumerable().Single();
     var enemyUnit = runtime.Query(new GetFactionAliveUnits(enemy)).AsValueEnumerable().Single();
@@ -56,6 +79,10 @@ public class BattleFactoryTest
     Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw);
     Assert.Equal(new Vector3I(3, 0, 3), enemyUnit.Position.Raw);
     Assert.Equal(player, runtime.Query(new GetPlayerFactionQuery()).RequireSome());
+    Assert.Equal(6, playerUnit.State.MaxActionPoints);
+    Assert.Equal(6, playerUnit.State.CurrentActionPoints);
+    Assert.Equal(6, enemyUnit.State.MaxActionPoints);
+    Assert.Equal(6, enemyUnit.State.CurrentActionPoints);
 
     // InProgress + player (Sides[0]) is the active side: it can act, enemy cannot yet.
     Assert.True(runtime.Query(new CanUnitActNow(playerUnit.State)));

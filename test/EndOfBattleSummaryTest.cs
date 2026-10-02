@@ -91,55 +91,37 @@ public class EndOfBattleSummaryTest
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.ApplyDamage(battle.PlayerUnit, 3);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+    CompletedBattle installed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
 
-    var first = battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[battle.PlayerFaction];
+    var first = installed.FactionSummaries[battle.PlayerFaction];
     var report = first.HealthByCombatant[battle.PlayerUnit.Combatant];
     Assert.Equal(20, report.MaxHealth);
     Assert.Equal(3L, report.HealthDamageTaken);
 
-    // Issued summaries are copies: raw post-battle mutation never rewrites them.
-    battle.PlayerUnit.ReceiveDamage(5);
-    Assert.Equal(3L, first.HealthByCombatant[battle.PlayerUnit.Combatant].HealthDamageTaken);
-
-    // The stored completion is frozen too: a fresh read reports the captured numbers.
-    var again = battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[battle.PlayerFaction];
-    Assert.Equal(20, again.HealthByCombatant[battle.PlayerUnit.Combatant].MaxHealth);
-    Assert.Equal(3L, again.HealthByCombatant[battle.PlayerUnit.Combatant].HealthDamageTaken);
-  }
-
-  [TestCase]
-  public void RepeatedCompletionReadsKeepFrozenHealthAndMembership()
-  {
-    using var battle = BattleFixture.Duel(playerControlled: true);
-    battle.ApplyDamage(battle.PlayerUnit, 3);
-    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
-    battle.Query(new GetCompletedBattleQuery()).RequireSome();
-
-    // Deliberate campaign-side mutation probes frozen membership; not a supported gameplay action.
+    // Issued summaries are copies, and the stored completion is frozen: raw campaign-side
+    // mutation — a live max-health negative control, faction reassignment, and extra damage,
+    // none of it a supported gameplay action — never rewrites installed reports.
     battle.PlayerUnit.ReceiveDamage(5);
     battle.PlayerUnit.Combatant.OwningFaction = battle.EnemyFaction;
     battle.PlayerUnit.Combatant.GetStat<HealthStat>().BaseValue = 40;
     Assert.Equal(40, battle.PlayerUnit.MaxHealth);
+    Assert.Equal(3L, first.HealthByCombatant[battle.PlayerUnit.Combatant].HealthDamageTaken);
 
-    var completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
-    Assert.Equal(BattleOutcome.Victory, completed.Outcome);
-    Assert.Equal(1, completed.TurnCount);
-    Assert.Equal(1, completed.Factions[battle.PlayerFaction].Spawned);
-    Assert.Equal(0, completed.Factions[battle.PlayerFaction].Killed);
-    Assert.Equal(1, completed.Factions[battle.EnemyFaction].Spawned);
-    Assert.Equal(0, completed.Factions[battle.EnemyFaction].Killed);
-    Assert.Equal(20, completed.FactionSummaries[battle.PlayerFaction]
-      .HealthByCombatant[battle.PlayerUnit.Combatant].MaxHealth);
-    Assert.Equal(3L, completed.FactionSummaries[battle.PlayerFaction]
-      .HealthByCombatant[battle.PlayerUnit.Combatant].HealthDamageTaken);
-    Assert.True(completed.FactionSummaries[battle.PlayerFaction]
-      .CombatantsPresent.Contains(battle.PlayerUnit.Combatant));
-    Assert.True(completed.FactionSummaries[battle.PlayerFaction]
-      .CombatantsWounded.Contains(battle.PlayerUnit.Combatant));
-    Assert.Equal(0, completed.FactionSummaries[battle.PlayerFaction].CombatantsDead.Count);
-    Assert.Equal(0, completed.FactionSummaries[battle.PlayerFaction].DefeatedPerCombatant.Count);
-    Assert.True(ReferenceEquals(battle.EnemyUnit.Combatant,
-      completed.FactionSummaries[battle.PlayerFaction].CapturedEnemies[0]));
+    // A fresh read answers the SAME installed completion with its captured numbers,
+    // membership, counts, turn, and outcome.
+    var again = battle.Query(new GetCompletedBattleQuery()).RequireSome();
+    Assert.True(ReferenceEquals(installed, again));
+    Assert.Equal(BattleOutcome.Victory, again.Outcome);
+    Assert.Equal(1, again.TurnCount);
+    Assert.Equal(1, again.Factions[battle.PlayerFaction].Spawned);
+    Assert.Equal(0, again.Factions[battle.PlayerFaction].Killed);
+    Assert.Equal(1, again.Factions[battle.EnemyFaction].Spawned);
+    Assert.Equal(0, again.Factions[battle.EnemyFaction].Killed);
+    var frozen = again.FactionSummaries[battle.PlayerFaction];
+    Assert.Equal(20, frozen.HealthByCombatant[battle.PlayerUnit.Combatant].MaxHealth);
+    Assert.Equal(3L, frozen.HealthByCombatant[battle.PlayerUnit.Combatant].HealthDamageTaken);
+    Assert.True(frozen.CombatantsPresent.Contains(battle.PlayerUnit.Combatant));
+    Assert.True(frozen.CombatantsWounded.Contains(battle.PlayerUnit.Combatant));
   }
 
   [TestCase(TestName = "The completion query answers None while the battle has not ended")]
@@ -184,7 +166,11 @@ public class EndOfBattleSummaryTest
       [battle.PlayerUnit.Combatant, bravo.Combatant, charlie.Combatant]),
       "Present should hold every faction combatant — dead, wounded, and untouched alike.");
     Assert.Equal(1, summary.DefeatedPerCombatant.Count);
+    // One shared killer identity: the ledger key is the player unit's own campaign combatant,
+    // and both victims accumulate under it in kill order.
+    Assert.True(summary.DefeatedPerCombatant.ContainsKey(battle.PlayerUnit.Combatant));
     Assert.True(summary.DefeatedPerCombatant[battle.PlayerUnit.Combatant].AsValueEnumerable().SequenceEqual([battle.EnemyUnit.Combatant, bandit2.Combatant]));
+    Assert.Equal(2, completed.Factions[battle.EnemyFaction].Killed);
 
     CompletedReportsDoNotExposeWritableCollections(completed);
   }

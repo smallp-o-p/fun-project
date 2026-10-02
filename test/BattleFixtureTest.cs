@@ -45,10 +45,20 @@ public partial class BattleFixtureTest
     var armor = TestData.MakeArmor("Recharger", armor: 10, element: Element.Thermal,
       regenDelayTurns: 2, regenPerTurn: 3);
     using var battle = BattleFixture.Duel(player: new("Alpha", Armor: armor));
+    // The runtime owns the session's sole executor: a second attachment is rejected before
+    // duplicate defaults or double event forwarding can exist.
+    Assert.Throws<InvalidOperationException>(() => _ = new BattleActionExecutor(battle.Runtime));
+    int ended = 0;
+    battle.OnCommitted(battleEvent =>
+    {
+      if (battleEvent is TurnEndedBattleEvent)
+        ended++;
+    });
     battle.ApplyDamage(battle.PlayerUnit, 5);
     battle.EndFactionTurn(battle.PlayerFaction);
     Assert.Equal(1, armor.Capability.RegenDelayRemaining);
     Assert.Equal(5, armor.Capability.Current);
+    Assert.Equal(1, ended);
   }
 
   [TestCase]

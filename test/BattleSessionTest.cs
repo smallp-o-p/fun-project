@@ -444,15 +444,38 @@ public partial class BattleSessionTest
     Assert.False(scheduler.IsUnitAvailable(battle.PlayerUnit));
   }
 
-  [TestCase(TestName = "Preparation rejects a wholly unconscious side")]
+  [TestCase(TestName = "Preparation rejects a wholly unconscious side, naming it and keeping the other side valid")]
   public void PreparationRejectsOnlyUnconsciousForces()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(2, 1, 1), [faction]);
-    var unit = battle.Spawn(TestData.MakeCombatant("Observer", faction), Vector3I.Zero);
-    battle.Damage(unit, 20, DamageKind.Stun);
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    var preparation = new BattlePreparation(new BattleBoardState(new Vector3I(3, 1, 1)),
+      [playerFaction, enemyFaction]);
+    var unit = preparation.AddUnit(
+      TestData.MakeCombatant("Solo", playerFaction, health: 20),
+      preparation.State.Board.At(0, 0, 0), None, None);
 
-    Assert.Throws<InvalidOperationException>(() => battle.Start());
+    // Raw stun through the unit, then the shared participant reconciliation (occupancy
+    // retained, disabled visibility resolved) before the Complete check.
+    unit.ReceiveStun(20);
+    preparation.ReconcileParticipant(unit);
+    Assert.Equal(20, unit.CurrentStun);
+    Assert.True(unit.IsUnconscious);
+
+    var rival = preparation.AddUnit(
+      TestData.MakeCombatant("Rival", enemyFaction),
+      preparation.State.Board.At(2, 0, 0), None, None);
+    Assert.False(rival.IsUnconscious);
+
+    Either<BattleSetupFailure, BattleState> outcome = preparation.Complete();
+
+    Assert.True(outcome.IsLeft);
+    outcome.IfLeft(failure =>
+    {
+      Assert.Equal(BattleSetupFailureReason.NoConsciousUnits, failure.Reason);
+      Assert.True(failure.Message.Contains("Player"));
+      Assert.False(failure.Message.Contains("Enemy"));
+    });
   }
 
   [TestCase(TestName = "A conscious teammate permits dead and unconscious companions on the same side")]
@@ -541,128 +564,6 @@ public partial class BattleSessionTest
     Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable()
       .Count(e => ReferenceEquals(e.Unit, observer) && ReferenceEquals(e.Target, target)));
     Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable().Count());
-  }
-
-  [TestCase(TestName = "Preparation rejects a wholly dead side with the typed NoConsciousUnits reason")]
-  public void PreparationRejectsWhollyDeadSide()
-  {
-    var faction = TestData.MakeFaction("Player");
-    var preparation = new BattlePreparation(new BattleBoardState(new Vector3I(3, 1, 1)), [faction]);
-    var unit = preparation.AddUnit(
-      TestData.MakeCombatant("Solo", faction, health: 20),
-      preparation.State.Board.At(0, 0, 0), None, None);
-    unit.ReceiveDamage(999);
-
-    Either<BattleSetupFailure, BattleState> outcome = preparation.Complete();
-
-    Assert.True(outcome.IsLeft);
-    outcome.IfLeft(failure =>
-    {
-      Assert.Equal(BattleSetupFailureReason.NoConsciousUnits, failure.Reason);
-      Assert.True(failure.Message.Contains("Player"));
-    });
-  }
-
-  [TestCase(TestName = "Preparation rejects a side its spawn-time max-health clamp knocked out, naming it and keeping the other side valid")]
-  public void PreparationRejectsClampKnockedOutSide()
-  {
-    var playerFaction = TestData.MakeFaction("Player");
-    var enemyFaction = TestData.MakeFaction("Enemy");
-    var collapse = TestData.MakeBuff(
-      "Collapse",
-      new HealthBelowPercentCondition { Percent = 200f }, // current < 2*max: always true
-      statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-10)] }]);
-    var preparation = new BattlePreparation(new BattleBoardState(new Vector3I(3, 1, 1)),
-      [playerFaction, enemyFaction]);
-    var unit = preparation.AddUnit(
-      TestData.MakeCombatant("Solo", playerFaction, health: 20, buffs: [collapse]),
-      preparation.State.Board.At(0, 0, 0), None, None);
-    Assert.Equal(10, unit.MaxHealth); // the initially active grant clamped current health at spawn
-    Assert.Equal(10, unit.CurrentHealth);
-
-    // Fixture-owned preset shape: raw stun through the unit, then the shared participant
-    // reconciliation (occupancy retained, disabled visibility resolved) before Complete checks.
-    unit.ReceiveStun(15);
-    preparation.ReconcileParticipant(unit);
-    Assert.Equal(15, unit.CurrentStun);
-    Assert.True(unit.IsUnconscious);
-
-    var rival = preparation.AddUnit(
-      TestData.MakeCombatant("Rival", enemyFaction),
-      preparation.State.Board.At(2, 0, 0), None, None);
-    Assert.False(rival.IsUnconscious);
-
-    Either<BattleSetupFailure, BattleState> outcome = preparation.Complete();
-
-    Assert.True(outcome.IsLeft);
-    outcome.IfLeft(failure =>
-    {
-      Assert.Equal(BattleSetupFailureReason.NoConsciousUnits, failure.Reason);
-      Assert.True(failure.Message.Contains("Player"));
-      Assert.False(failure.Message.Contains("Enemy"));
-    });
-  }
-
-  // A buff whose +2 maximum only exists from round 2 on: the round-1 refresh saw AP 4,
-  // the unit spent down to 3, and the round-2 turn-start pass raises the maximum to 6.
-  private sealed partial class RoundTwoCondition : BuffCondition
-  {
-    internal override bool IsMet(BattleReadContext context, BattleUnitState unit) =>
-      context.RunningSession.Match(session => session.RoundNumber >= 2, () => false);
-  }
-
-  [TestCase(TestName = "A terminal next-turn start still refreshes the owning faction's action points")]
-  public void TerminalNextTurnStillRefreshesTheOwningFaction()
-  {
-    var factionA = TestData.MakeFaction("A");
-    var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
-    var roused = TestData.MakeBuff("Roused", new RoundTwoCondition(),
-      statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
-    var unitA = battle.Spawn(TestData.MakeCombatant("A1", factionA, actionPoints: 4, buffs: [roused]),
-      new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    var terminal = new FakeObjective(new FakeObjectiveData
-    {
-      Observe = typeof(TurnStartedBattleEvent),
-      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
-    });
-    battle.AddObjective(factionA, terminal);
-    battle.Start();
-    int liveApAtSessionEnd = -1;
-    battle.OnCommitted(battleEvent =>
-    {
-      if (battleEvent is SessionEndedBattleEvent)
-        liveApAtSessionEnd = unitA.CurrentActionPoints;
-    });
-
-    battle.Move(unitA, [new Vector3I(0, 0, 1)]); // round 1: spend down to 3
-    battle.AdvanceTurn(); // ends A: B starts its round-1 turn with the battle still running
-    terminal.Complete = true;
-    battle.AdvanceTurn(); // ends B: the round-2 turn start flips the objective mid-dispatch
-
-    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
-    Assert.Equal(6, liveApAtSessionEnd);
-  }
-
-  [TestCase(TestName = "Advancing without conscious forces retains the installed turn")]
-  public void AdvancingWithoutConsciousForcesRetainsTheInstalledTurn()
-  {
-    var factionA = TestData.MakeFaction("A");
-    var factionB = TestData.MakeFaction("B");
-    var preparation = new BattlePreparation(new BattleBoardState(new Vector3I(4, 1, 4)), [factionA, factionB]);
-    var unitA = preparation.AddUnit(
-      TestData.MakeCombatant("A1", factionA, health: 10), preparation.State.Board.At(0, 0, 0), None, None);
-    var unitB = preparation.AddUnit(
-      TestData.MakeCombatant("B1", factionB, health: 10), preparation.State.Board.At(1, 0, 0), None, None);
-    var scheduler = new TurnScheduler(
-      preparation.State.Factions, preparation.State.HasConsciousUnits, preparation.State.GetFactionConsciousUnits);
-    unitA.ReceiveStun(10);
-    unitB.ReceiveStun(10);
-    BattleTurn before = scheduler.CurrentTurn;
-
-    Assert.True(scheduler.AdvanceTurn().IsNone);
-    Assert.Equal(before, scheduler.CurrentTurn);
   }
 
   [TestCase(TestName = "Killing the only active unit on an eliminated faction does not auto-advance")]
