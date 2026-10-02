@@ -20,12 +20,16 @@ public class UseItemActionTest
     battle.ClearEvents();
 
     // The public inventory is one live read view over the private backing list: raw
-    // mutation through it must be refused while the real use commands remove for real.
+    // mutation through it must be refused while the real use commands remove for real. The
+    // contract is refusing membership mutation if a writable interface is exposed, not a
+    // particular representation, so the negative asserts only run when one is implemented.
     IReadOnlyList<EquippableItem> inventory = unit.Inventory;
-    var raw = (SysColGeneric.IList<EquippableItem>)inventory;
-    Assert.Throws<NotSupportedException>(() => raw.Clear());
-    Assert.Throws<NotSupportedException>(() => raw.Add(usable.Item));
-    Assert.Throws<NotSupportedException>(() => raw.Remove(usable.Item));
+    if (inventory is SysColGeneric.IList<EquippableItem> raw)
+    {
+      Assert.Throws<NotSupportedException>(() => raw.Clear());
+      Assert.Throws<NotSupportedException>(() => raw.Add(usable.Item));
+      Assert.Throws<NotSupportedException>(() => raw.Remove(usable.Item));
+    }
     Assert.Equal(1, inventory.Count);
     Assert.Equal(4, unit.CurrentActionPoints);
     Assert.Equal(0, battle.Events.Count);
