@@ -149,11 +149,16 @@ public class EndOfBattleSummaryTest
     var bravo = battle.Spawn(TestData.MakeCombatant("Bravo", battle.PlayerFaction), new Vector3I(0, 0, 0));
     var charlie = battle.Spawn(TestData.MakeCombatant("Charlie", battle.PlayerFaction), new Vector3I(1, 0, 0));
     var bandit2 = battle.Spawn(TestData.MakeCombatant("Bandit2", battle.EnemyFaction, health: 10), new Vector3I(5, 0, 4));
+    // A second runtime state of the SAME campaign combatant: two distinct runtime killer
+    // states project onto one campaign identity, and the frozen ledger must accumulate both
+    // victims under that one key instead of colliding on the projected key.
+    BattleUnitState reinforcement = battle.Spawn(battle.PlayerUnit.Combatant,
+      new Vector3I(5, 0, 3), TestData.MakeWeapon("Rifle", damage: 10));
 
     battle.ApplyDamage(bravo, 999);
     battle.ApplyDamage(charlie, 1);
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
-    battle.Attack(battle.PlayerUnit, bandit2);   // the last kill completes the battle instantly
+    battle.Attack(reinforcement, bandit2);   // the reinforcement's last kill completes the battle instantly
     CompletedBattle completed = battle.Query(new GetCompletedBattleQuery()).RequireSome();
 
     var summary = completed.FactionSummaries[battle.PlayerFaction];
