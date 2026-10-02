@@ -1,0 +1,65 @@
+[gd_scene format=3]
+
+[ext_resource type="MeshLibrary" path="res://scenes/battle/authoring/PropExampleMeshLibrary.tres" id="1_fdowt"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleMapAuthoring.cs" id="2_0ybrr"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapTileData.cs" id="3_2c1uw"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleTilePalette.cs" id="4_1nh2n"]
+
+[sub_resource type="Resource" id="Resource_gbl4c"]
+script = ExtResource("3_2c1uw")
+
+[sub_resource type="Resource" id="Resource_i1m1x"]
+script = ExtResource("3_2c1uw")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_670cs"]
+script = ExtResource("3_2c1uw")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_b6vs2"]
+script = ExtResource("3_2c1uw")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_car"]
+script = ExtResource("3_2c1uw")
+PropFootprint = Array[Vector3i]([Vector3i(0, 0, 0), Vector3i(0, 0, 1)])
+PropBlocksMovement = true
+PropCoverNorth = 40
+PropCoverEast = 40
+PropCoverSouth = 40
+PropCoverWest = 40
+
+[sub_resource type="Resource" id="Resource_yrade"]
+script = ExtResource("4_1nh2n")
+MeshLibrary = ExtResource("1_fdowt")
+Brushes = Dictionary[StringName, ExtResource("3_2c1uw")]({
+&"DebugBox": SubResource("Resource_gbl4c"),
+&"DebugFloor": SubResource("Resource_i1m1x"),
+&"DebugSpawnFloor": SubResource("Resource_670cs"),
+&"DebugSpawnFloorB": SubResource("Resource_b6vs2"),
+&"ExampleCar": SubResource("Resource_car")
+})
+metadata/_custom_type_script = "uid://djtekemlaytk4"
+
+[node name="BattleMapAuthoring" type="GridMap" unique_id=1566391189 node_paths=PackedStringArray("Props")]
+mesh_library = ExtResource("1_fdowt")
+cell_size = Vector3(1, 1, 1)
+cell_center_y = false
+data = {
+"cells": PackedInt32Array(0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 1, 0, 0, 1, 1, 0, 1, 2, 0, 1, 3, 0, 1, 4, 0, 2, 0, 0, 2, 1, 0, 2, 2, 0, 2, 3, 0, 2, 4, 0, 3, 0, 0, 3, 1, 0, 3, 2, 0, 3, 3, 0, 3, 4, 0, 4, 0, 0, 4, 1, 0, 4, 2, 0, 4, 3, 0, 4, 4, 0)
+}
+script = ExtResource("2_0ybrr")
+Palette = SubResource("Resource_yrade")
+Props = NodePath("Props")
+TargetPath = "res://resources/maps/prop_example_map.tscn"
+metadata/_editor_floor_ = Vector3(0, 0, 0)
+
+[node name="Props" type="GridMap" parent="."]
+position = Vector3(0, 0.05, 0)
+mesh_library = ExtResource("1_fdowt")
+cell_size = Vector3(1, 1, 1)
+cell_center_y = false
+collision_layer = 2
+data = {
+"cells": PackedInt32Array(2, 2, 4)
+}

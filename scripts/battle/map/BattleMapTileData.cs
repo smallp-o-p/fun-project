@@ -10,44 +10,32 @@ namespace FunProject.Battle;
 [GlobalClass]
 public partial class BattleMapTileData : Resource
 {
-  private CoverDirections _coverDirections = CoverDirections.None;
-  private int _coverAmount;
-
   [Export] public bool Walkable { get; set; } = true;
   [Export] public bool BlocksLineOfSight { get; set; }
   [Export] public bool BlocksVerticalLineOfSight { get; set; }
+  [Export] public float GroundSurfaceOffset { get; set; }
 
-  [Export(PropertyHint.Flags, "North,South,East,West")]
-  public CoverDirections CoverDirections
-  {
-    get => _coverDirections;
-    set
-    {
-      _coverDirections = value;
-      if (_coverDirections == CoverDirections.None)
-        _coverAmount = 0;
+  [Export(PropertyHint.Range, "0,100")]
+  public int CoverNorth { get; set => field = Math.Clamp(value, 0, 100); }
 
-      NotifyPropertyListChanged();
-    }
-  }
+  [Export(PropertyHint.Range, "0,100")]
+  public int CoverEast { get; set => field = Math.Clamp(value, 0, 100); }
 
-  [Export(PropertyHint.Range, "0,100,10")]
-  public int CoverAmount
-  {
-    get => _coverAmount;
-    set => _coverAmount = _coverDirections != CoverDirections.None ? Math.Clamp(value, 0, 100) : 0;
-  }
+  [Export(PropertyHint.Range, "0,100")]
+  public int CoverSouth { get; set => field = Math.Clamp(value, 0, 100); }
 
+  [Export(PropertyHint.Range, "0,100")]
+  public int CoverWest { get; set => field = Math.Clamp(value, 0, 100); }
+
+  // Props use the same palette, but outward cover is not cover received by an occupant.
+  [ExportGroup("Props")]
+  [Export] public Godot.Collections.Array<Godot.Vector3I> PropFootprint { get; set; } = [];
+  [Export] public bool PropBlocksMovement { get; set; }
+  [Export(PropertyHint.Range, "0,100")] public int PropCoverNorth { get; set; }
+  [Export(PropertyHint.Range, "0,100")] public int PropCoverEast { get; set; }
+  [Export(PropertyHint.Range, "0,100")] public int PropCoverSouth { get; set; }
+  [Export(PropertyHint.Range, "0,100")] public int PropCoverWest { get; set; }
+
+  [ExportGroup("")]
   [Export] public int SpawnFactionSlot { get; set; } = -1;
-
-  public override void _ValidateProperty(Godot.Collections.Dictionary property)
-  {
-    if (property["name"].AsStringName() != PropertyName.CoverAmount)
-      return;
-    if (_coverDirections != CoverDirections.None)
-      return;
-
-    var usage = property["usage"].As<PropertyUsageFlags>() | PropertyUsageFlags.ReadOnly;
-    property["usage"] = (int)usage;
-  }
 }

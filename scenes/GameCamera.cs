@@ -7,6 +7,9 @@ public partial class GameCamera : AnimatableBody3D
   public const float QuarterTurnRatio = 0.25f;
   public const float DefaultRaycastLength = 1000.0f;
 
+  // Physics layer 1 is reserved for terrain picking; prop bodies use layer 2.
+  public const uint GroundPickingCollisionMask = 1u;
+
   [Export] public float PathRadius { get; set; } = 6.0f;
   [Export] public float RotationDurationSeconds { get; set; } = 0.2f;
   [Export] public float CenterLookAngleDegrees { get; set; } = -30.0f;
@@ -124,7 +127,7 @@ public partial class GameCamera : AnimatableBody3D
     Vector3 rayOrigin = activeCamera.ProjectRayOrigin(viewportPosition);
     Vector3 rayDirection = activeCamera.ProjectRayNormal(viewportPosition);
     Vector3 rayEnd = rayOrigin + (rayDirection * rayLength);
-    PhysicsRayQueryParameters3D query = PhysicsRayQueryParameters3D.Create(rayOrigin, rayEnd);
+    PhysicsRayQueryParameters3D query = PhysicsRayQueryParameters3D.Create(rayOrigin, rayEnd, GroundPickingCollisionMask);
     query.CollideWithAreas = false;
     query.CollideWithBodies = true;
 

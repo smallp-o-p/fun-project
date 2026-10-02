@@ -28,7 +28,7 @@ Brushes = Dictionary[StringName, ExtResource("2_i1m1x")]({
 })
 metadata/_custom_type_script = "uid://djtekemlaytk4"
 
-[node name="BattleMapAuthoring" type="GridMap" unique_id=1566391189]
+[node name="BattleMapAuthoring" type="GridMap" unique_id=1566391189 node_paths=PackedStringArray("Props")]
 mesh_library = ExtResource("3_gbl4c")
 cell_size = Vector3(1, 1, 1)
 cell_center_y = false
@@ -37,5 +37,12 @@ data = {
 }
 script = ExtResource("1_ouqxw")
 Palette = SubResource("Resource_yrade")
+Props = NodePath("Props")
 TargetPath = "res://resources/maps/test_map.tscn"
 metadata/_editor_floor_ = Vector3(0, 0, 0)
+
+[node name="Props" type="GridMap" parent="."]
+mesh_library = ExtResource("3_gbl4c")
+cell_size = Vector3(1, 1, 1)
+cell_center_y = false
+collision_layer = 2

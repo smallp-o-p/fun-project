@@ -1,6 +1,6 @@
 namespace FunProject.Battle;
 
-public readonly record struct TileCover(CoverDirections Directions, int Amount)
+public readonly record struct TileCover(int North, int East, int South, int West)
 {
-  public static readonly TileCover None = new(CoverDirections.None, 0);
+  public static readonly TileCover None = default;
 }

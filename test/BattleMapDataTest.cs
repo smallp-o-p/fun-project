@@ -25,15 +25,17 @@ public partial class BattleMapDataTest
     BattleMapData mapData = TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(1, 0, 1), new BattleMapTileData
       {
-        CoverDirections = CoverDirections.North | CoverDirections.East,
-        CoverAmount = 40
+        CoverNorth = 10,
+        CoverEast = 30,
+        CoverSouth = 50,
+        CoverWest = 70
       }));
 
     BattleBoardState board = new(mapData);
     BattleTileState coveredTile = board.GetTile(board.ValidatePoint(new Vector3I(1, 0, 1)).RequireSome());
     BattleTileState absentTile = board.GetTile(board.ValidatePoint(new Vector3I(2, 0, 2)).RequireSome());
 
-    Assert.Equal(new TileCover(CoverDirections.North | CoverDirections.East, 40), coveredTile.Cover);
+    Assert.Equal(new TileCover(10, 30, 50, 70), coveredTile.Cover);
     Assert.Equal(TileCover.None, absentTile.Cover);
   }
 
@@ -68,18 +70,37 @@ public partial class BattleMapDataTest
     Assert.False(empty.IsWalkable);
   }
 
-  [TestCase(TestName = "Clearing cover directions zeroes cover amount")]
-  public void ClearingCoverDirectionsZeroesCoverAmount()
+  [TestCase(TestName = "Directional cover strengths are independent")]
+  public void DirectionalCoverStrengthsAreIndependent()
   {
-    var tile = new BattleMapTileData { CoverDirections = CoverDirections.North, CoverAmount = 40 };
-    Assert.Equal(40, tile.CoverAmount);
+    var tile = new BattleMapTileData { CoverNorth = 10, CoverEast = 30, CoverSouth = 50, CoverWest = 70 };
 
-    tile.CoverDirections = CoverDirections.None;
-    Assert.Equal(0, tile.CoverAmount);
+    tile.CoverNorth = 0;
 
-    tile.CoverAmount = 50;
-    Assert.Equal(0, tile.CoverAmount);
+    Assert.Equal(0, tile.CoverNorth);
+    Assert.Equal(30, tile.CoverEast);
+    Assert.Equal(50, tile.CoverSouth);
+    Assert.Equal(70, tile.CoverWest);
   }
+
+  [TestCase(-1, 0)]
+  [TestCase(0, 0)]
+  [TestCase(37, 37)]
+  [TestCase(100, 100)]
+  [TestCase(101, 100)]
+  public void DirectionalCoverStrengthsClampToPercentageRange(int value, int expected)
+  {
+    var tile = new BattleMapTileData { CoverNorth = value, CoverEast = value, CoverSouth = value, CoverWest = value };
+
+    Assert.Equal(expected, tile.CoverNorth);
+    Assert.Equal(expected, tile.CoverEast);
+    Assert.Equal(expected, tile.CoverSouth);
+    Assert.Equal(expected, tile.CoverWest);
+  }
+
+  [TestCase]
+  public void GroundSurfaceOffsetDefaultsToZero() =>
+    Assert.Equal(0f, new BattleMapTileData().GroundSurfaceOffset);
 
   [TestCase(TestName = "Walkable, BlocksLineOfSight and cover are independent")]
   public void WalkableBlocksLineOfSightAndCoverAreIndependent()
@@ -87,11 +108,17 @@ public partial class BattleMapDataTest
     var smoke = new BattleMapTileData { Walkable = true, BlocksLineOfSight = true };
     Assert.True(smoke.Walkable);
     Assert.True(smoke.BlocksLineOfSight);
-    Assert.Equal(CoverDirections.None, smoke.CoverDirections);
+    Assert.Equal(0, smoke.CoverNorth);
+    Assert.Equal(0, smoke.CoverEast);
+    Assert.Equal(0, smoke.CoverSouth);
+    Assert.Equal(0, smoke.CoverWest);
 
     var wall = new BattleMapTileData { Walkable = false, BlocksLineOfSight = true };
     Assert.False(wall.Walkable);
-    Assert.Equal(0, wall.CoverAmount);
+    Assert.Equal(0, wall.CoverNorth);
+    Assert.Equal(0, wall.CoverEast);
+    Assert.Equal(0, wall.CoverSouth);
+    Assert.Equal(0, wall.CoverWest);
   }
 
   [TestCase(true, TestName = "BlocksVerticalLineOfSight bakes into runtime tile")]

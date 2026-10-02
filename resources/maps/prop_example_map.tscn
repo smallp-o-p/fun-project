@@ -1,0 +1,203 @@
+[gd_scene format=3]
+
+[ext_resource type="MeshLibrary" path="res://scenes/battle/authoring/PropExampleMeshLibrary.tres" id="1_j8m5l"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleMap.cs" id="2_trocc"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapTileData.cs" id="3_s0ehm"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapData.cs" id="4_4gyde"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleTilePalette.cs" id="5_48klr"]
+
+[sub_resource type="Resource" id="Resource_op7b2"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_bx20s"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_2mqbu"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_or0wh"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_ifbrf"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_e3iu4"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_a4ehy"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_gun07"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+CoverEast = 40
+
+[sub_resource type="Resource" id="Resource_ibscg"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+CoverEast = 40
+
+[sub_resource type="Resource" id="Resource_jerx2"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_h2iqk"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_ixx2g"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+CoverSouth = 40
+
+[sub_resource type="Resource" id="Resource_txynn"]
+script = ExtResource("3_s0ehm")
+Walkable = false
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_aed0w"]
+script = ExtResource("3_s0ehm")
+Walkable = false
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_l1lxj"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+CoverNorth = 40
+
+[sub_resource type="Resource" id="Resource_irpw0"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_6lyj0"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_twdig"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+CoverWest = 40
+
+[sub_resource type="Resource" id="Resource_v5tlb"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+CoverWest = 40
+
+[sub_resource type="Resource" id="Resource_tljmi"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_ibal5"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_houem"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_rc78i"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_4tyq5"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_o0yyf"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_weodq"]
+script = ExtResource("4_4gyde")
+Dimensions = Vector3i(5, 1, 5)
+Tiles = Dictionary[Vector3i, ExtResource("3_s0ehm")]({
+Vector3i(0, 0, 0): SubResource("Resource_op7b2"),
+Vector3i(0, 0, 1): SubResource("Resource_bx20s"),
+Vector3i(0, 0, 2): SubResource("Resource_2mqbu"),
+Vector3i(0, 0, 3): SubResource("Resource_or0wh"),
+Vector3i(0, 0, 4): SubResource("Resource_ifbrf"),
+Vector3i(1, 0, 0): SubResource("Resource_e3iu4"),
+Vector3i(1, 0, 1): SubResource("Resource_a4ehy"),
+Vector3i(1, 0, 2): SubResource("Resource_gun07"),
+Vector3i(1, 0, 3): SubResource("Resource_ibscg"),
+Vector3i(1, 0, 4): SubResource("Resource_jerx2"),
+Vector3i(2, 0, 0): SubResource("Resource_h2iqk"),
+Vector3i(2, 0, 1): SubResource("Resource_ixx2g"),
+Vector3i(2, 0, 2): SubResource("Resource_txynn"),
+Vector3i(2, 0, 3): SubResource("Resource_aed0w"),
+Vector3i(2, 0, 4): SubResource("Resource_l1lxj"),
+Vector3i(3, 0, 0): SubResource("Resource_irpw0"),
+Vector3i(3, 0, 1): SubResource("Resource_6lyj0"),
+Vector3i(3, 0, 2): SubResource("Resource_twdig"),
+Vector3i(3, 0, 3): SubResource("Resource_v5tlb"),
+Vector3i(3, 0, 4): SubResource("Resource_tljmi"),
+Vector3i(4, 0, 0): SubResource("Resource_ibal5"),
+Vector3i(4, 0, 1): SubResource("Resource_houem"),
+Vector3i(4, 0, 2): SubResource("Resource_rc78i"),
+Vector3i(4, 0, 3): SubResource("Resource_4tyq5"),
+Vector3i(4, 0, 4): SubResource("Resource_o0yyf")
+})
+
+[sub_resource type="Resource" id="Resource_gbl4c"]
+script = ExtResource("3_s0ehm")
+
+[sub_resource type="Resource" id="Resource_i1m1x"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_670cs"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_b6vs2"]
+script = ExtResource("3_s0ehm")
+GroundSurfaceOffset = 0.05
+
+[sub_resource type="Resource" id="Resource_car"]
+script = ExtResource("3_s0ehm")
+PropFootprint = Array[Vector3i]([Vector3i(0, 0, 0), Vector3i(0, 0, 1)])
+PropBlocksMovement = true
+PropCoverNorth = 40
+PropCoverEast = 40
+PropCoverSouth = 40
+PropCoverWest = 40
+
+[sub_resource type="Resource" id="Resource_yrade"]
+script = ExtResource("5_48klr")
+MeshLibrary = ExtResource("1_j8m5l")
+Brushes = Dictionary[StringName, ExtResource("3_s0ehm")]({
+&"DebugBox": SubResource("Resource_gbl4c"),
+&"DebugFloor": SubResource("Resource_i1m1x"),
+&"DebugSpawnFloor": SubResource("Resource_670cs"),
+&"DebugSpawnFloorB": SubResource("Resource_b6vs2"),
+&"ExampleCar": SubResource("Resource_car")
+})
+metadata/_custom_type_script = "uid://djtekemlaytk4"
+
+[node name="Map" type="GridMap" unique_id=306622168]
+mesh_library = ExtResource("1_j8m5l")
+cell_size = Vector3(1, 1, 1)
+cell_center_y = false
+data = {
+"cells": PackedInt32Array(0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 1, 0, 0, 1, 1, 0, 1, 2, 0, 1, 3, 0, 1, 4, 0, 2, 0, 0, 2, 1, 0, 2, 2, 0, 2, 3, 0, 2, 4, 0, 3, 0, 0, 3, 1, 0, 3, 2, 0, 3, 3, 0, 3, 4, 0, 4, 0, 0, 4, 1, 0, 4, 2, 0, 4, 3, 0, 4, 4, 0)
+}
+script = ExtResource("2_trocc")
+MapData = SubResource("Resource_weodq")
+UsedPalette = SubResource("Resource_yrade")
+
+[node name="Props" type="GridMap" parent="." unique_id=1415621351]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+mesh_library = ExtResource("1_j8m5l")
+cell_size = Vector3(1, 1, 1)
+cell_center_y = false
+collision_layer = 2
+data = {
+"cells": PackedInt32Array(2, 2, 4)
+}

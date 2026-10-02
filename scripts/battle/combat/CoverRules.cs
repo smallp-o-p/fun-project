@@ -1,3 +1,5 @@
+using System;
+
 namespace FunProject.Battle;
 
 public static class CoverRules
@@ -19,11 +21,20 @@ public static class CoverRules
     return approach;
   }
 
-  // Either-component rule: a diagonal approach is blocked when ANY of its
-  // compass components is covered. Flanking requires an angle whose
-  // components are all uncovered.
-  public static bool Applies(TileCover cover, CoverDirections approach)
+  // Either-component rule: a diagonal approach uses the strongest matching
+  // side. Flanking requires an angle whose components are all uncovered.
+  public static int GetAmount(TileCover cover, CoverDirections approach)
   {
-    return cover.Amount > 0 && (cover.Directions & approach) != CoverDirections.None;
+    int amount = 0;
+    if ((approach & CoverDirections.North) != 0)
+      amount = Math.Max(amount, cover.North);
+    if ((approach & CoverDirections.East) != 0)
+      amount = Math.Max(amount, cover.East);
+    if ((approach & CoverDirections.South) != 0)
+      amount = Math.Max(amount, cover.South);
+    if ((approach & CoverDirections.West) != 0)
+      amount = Math.Max(amount, cover.West);
+
+    return amount;
   }
 }

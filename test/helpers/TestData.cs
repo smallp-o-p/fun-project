@@ -346,6 +346,36 @@ internal static class TestData
 
   public static BattleMapTileData SpawnTile(int slot) => new() { SpawnFactionSlot = slot };
 
+  public static BattleMapAuthoring MakeMapAuthoring(Godot.Collections.Dictionary<Godot.Vector3I, BattleMapTileData> cells)
+  {
+    var library = new MeshLibrary();
+    var palette = new BattleTilePalette { MeshLibrary = library };
+    var props = new GridMap { Name = "Props", MeshLibrary = library, CellSize = Vector3.One, CellCenterY = false };
+    var map = new BattleMapAuthoring { Palette = palette, MeshLibrary = library, CellSize = Vector3.One, CellCenterY = false, Props = props };
+    map.AddChild(props);
+    int item = 0;
+    foreach (var (cell, tile) in cells)
+    {
+      library.CreateItem(item);
+      library.SetItemName(item, item.ToString());
+      library.SetItemMesh(item, new BoxMesh());
+      palette.Brushes[item.ToString()] = tile;
+      map.SetCellItem(cell, item++);
+    }
+    return map;
+  }
+
+  public static void PaintProp(BattleMapAuthoring map, BattleMapTileData brush, Godot.Vector3I anchor, int turns = 0)
+  {
+    int item = map.MeshLibrary.GetLastUnusedItemId();
+    string name = $"Prop{item}";
+    map.MeshLibrary.CreateItem(item);
+    map.MeshLibrary.SetItemName(item, name);
+    map.MeshLibrary.SetItemMesh(item, new BoxMesh());
+    map.Palette!.Brushes[name] = brush;
+    map.Props!.SetCellItem(anchor, item, map.Props.GetOrthogonalIndexFromBasis(new Basis(Vector3.Up, turns * Mathf.Pi / 2)));
+  }
+
   // Takes runtime Vector3I coordinates (X = width, Y = levels/height, Z = depth) and converts
   // them to Godot.Vector3I dictionary keys when building the authored map.
   public static BattleMapData MakeMapData(

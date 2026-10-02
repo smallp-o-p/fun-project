@@ -24,15 +24,14 @@ public partial class StandardHitChanceCalculatorTest
     return new AttackContext(attacker, weapon, attackerPoint, defenderPoint, board);
   }
 
-  [TestCase(65, CoverDirections.None, 0, 4, 1, 65, 0, TestName = "BaseChanceIsAttackerAimWhenNoCoverApplies")]
-  [TestCase(65, CoverDirections.North, 40, 4, 1, 25, 1, TestName = "ApplicableCoverSubtractsItsAmountAsNamedModifier")]
-  [TestCase(65, CoverDirections.North, 40, 6, 1, 25, 1, TestName = "DiagonalAttackerIsBlockedWhenEitherComponentIsCovered")]
-  [TestCase(65, CoverDirections.North, 40, 4, 7, 65, 0, TestName = "FlankingAttackerIgnoresCover")]
-  [TestCase(30, CoverDirections.North, 50, 4, 1, 0, 1, TestName = "FinalChanceClampsToZero")]
-  [TestCase(120, CoverDirections.None, 0, 4, 1, 100, 0, TestName = "FinalChanceClampsToOneHundred")]
+  [TestCase(65, 0, 4, 1, 65, 0, TestName = "BaseChanceIsAttackerAimWhenNoCoverApplies")]
+  [TestCase(65, 40, 4, 1, 25, 1, TestName = "ApplicableCoverSubtractsItsAmountAsNamedModifier")]
+  [TestCase(65, 40, 6, 1, 25, 1, TestName = "DiagonalAttackerIsBlockedWhenEitherComponentIsCovered")]
+  [TestCase(65, 40, 4, 7, 65, 0, TestName = "FlankingAttackerIgnoresCover")]
+  [TestCase(30, 50, 4, 1, 0, 1, TestName = "FinalChanceClampsToZero")]
+  [TestCase(120, 0, 4, 1, 100, 0, TestName = "FinalChanceClampsToOneHundred")]
   public void HitChance(
     int aim,
-    CoverDirections coverDirections,
     int coverAmount,
     int attackX,
     int attackZ,
@@ -40,7 +39,7 @@ public partial class StandardHitChanceCalculatorTest
     int expectedModifiers)
   {
     var breakdown = new StandardHitChanceCalculator().Calculate(
-      MakeContext(aim, new TileCover(coverDirections, coverAmount), new Vector3I(attackX, 0, attackZ), new Vector3I(4, 0, 4)));
+      MakeContext(aim, new TileCover(coverAmount, 0, 0, 0), new Vector3I(attackX, 0, attackZ), new Vector3I(4, 0, 4)));
 
     Assert.Equal(aim, breakdown.BaseChance);
     Assert.Equal(expectedModifiers, breakdown.Modifiers.Count);
@@ -50,5 +49,16 @@ public partial class StandardHitChanceCalculatorTest
       Assert.Equal(-coverAmount, breakdown.Modifiers[0].Amount);
     }
     Assert.Equal(expectedFinal, breakdown.FinalChance);
+  }
+
+  [TestCase]
+  public void IndependentSidesSubtractOnlyTheStrongestApplicableCover()
+  {
+    var breakdown = new StandardHitChanceCalculator().Calculate(
+      MakeContext(80, new TileCover(10, 30, 50, 70), new Vector3I(7, 0, 1), new Vector3I(4, 0, 4)));
+
+    Assert.Equal(1, breakdown.Modifiers.Count);
+    Assert.Equal(-30, breakdown.Modifiers[0].Amount);
+    Assert.Equal(50, breakdown.FinalChance);
   }
 }

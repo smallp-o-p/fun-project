@@ -18,16 +18,29 @@ public partial class CoverRulesTest
   public void GetApproach(int x, int y, int z, CoverDirections expected) =>
     Assert.Equal(expected, CoverRules.GetApproach(new(x, y, z), new(4, 0, 4)));
 
-  [TestCase(TestName = "Applies requires an overlapping direction and a positive amount")]
-  public void AppliesRequiresOverlappingDirectionAndPositiveAmount()
+  [TestCase(CoverDirections.North, 40)]
+  [TestCase(CoverDirections.North | CoverDirections.East, 40)]
+  [TestCase(CoverDirections.East, 0)]
+  [TestCase(CoverDirections.None, 0)]
+  public void GetAmountRequiresAnOverlappingPositiveSide(CoverDirections approach, int expected)
   {
-    TileCover northCover = new(CoverDirections.North, 40);
+    Assert.Equal(expected, CoverRules.GetAmount(new TileCover(40, 0, 0, 0), approach));
+    Assert.Equal(0, CoverRules.GetAmount(TileCover.None, approach));
+  }
 
-    Assert.True(CoverRules.Applies(northCover, CoverDirections.North));
-    Assert.True(CoverRules.Applies(northCover, CoverDirections.North | CoverDirections.East));
-    Assert.False(CoverRules.Applies(northCover, CoverDirections.East));
-    Assert.False(CoverRules.Applies(northCover, CoverDirections.None));
-    Assert.False(CoverRules.Applies(new TileCover(CoverDirections.North, 0), CoverDirections.North));
-    Assert.False(CoverRules.Applies(TileCover.None, CoverDirections.North));
+  [TestCase(CoverDirections.None, 0)]
+  [TestCase(CoverDirections.North, 10)]
+  [TestCase(CoverDirections.East, 30)]
+  [TestCase(CoverDirections.South, 50)]
+  [TestCase(CoverDirections.West, 70)]
+  [TestCase(CoverDirections.North | CoverDirections.East, 30)]
+  [TestCase(CoverDirections.North | CoverDirections.West, 70)]
+  [TestCase(CoverDirections.South | CoverDirections.East, 50)]
+  [TestCase(CoverDirections.South | CoverDirections.West, 70)]
+  public void GetAmountUsesStrongestMatchingSide(CoverDirections approach, int expected)
+  {
+    TileCover cover = new(10, 30, 50, 70);
+
+    Assert.Equal(expected, CoverRules.GetAmount(cover, approach));
   }
 }

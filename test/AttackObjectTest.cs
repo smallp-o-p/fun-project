@@ -23,7 +23,7 @@ public partial class AttackObjectTest
   {
     var weapon = TestData.MakeAmmoWeapon("Rifle", magazine: 1, damage: 5);
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    board.GetTile(board.At(4, 0, 2)).Cover = new TileCover(CoverDirections.North, 100);
+    board.GetTile(board.At(4, 0, 2)).Cover = new TileCover(100, 0, 0, 0);
     using var battle = BattleFixture.Duel(board: board, start: false,
       hitChanceCalculator: new MustNotCalculateObject(),
       player: new("Shooter", Aim: 0, Weapon: weapon));
