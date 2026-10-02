@@ -19,9 +19,8 @@ public sealed class SpecialObjectTimerSystem : BattleHook<TurnEndedBattleEvent>
   {
     // Expiry resolves against the running receiver: it is synchronous upkeep of the ending
     // turn's step, and completed event contexts carry no receiver by contract.
-    if (context.Read.RunningSession.IsNone)
+    if (context.Read.RunningSession.Case is not BattleSession session)
       return [];
-    BattleSession session = context.Read.RunningSession.RequireSome();
 
     foreach (BattleObjectState obj in session.State.Objects.AsValueEnumerable()
              .Where(obj => obj.Status.IsNone))

@@ -84,15 +84,8 @@ public sealed partial class BattleRuntimeSignalTest
       }
     };
 
-    Exception? caught = null;
-    try
-    {
-      runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)]));
-    }
-    catch (Exception error)
-    {
-      caught = error;
-    }
+    var caught = Assert.Throws<InvalidOperationException>(() =>
+      runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)])));
 
     Assert.True(ReferenceEquals(expected, caught));
     // Only the opening move completed; the faulted attempt fired Started but never Completed.
@@ -126,15 +119,8 @@ public sealed partial class BattleRuntimeSignalTest
       }
     };
 
-    Exception? caught = null;
-    try
-    {
-      runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)]));
-    }
-    catch (Exception error)
-    {
-      caught = error;
-    }
+    var caught = Assert.Throws<InvalidOperationException>(() =>
+      runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)])));
 
     // The notification failure propagates, but the primitive's committed state stands.
     Assert.True(ReferenceEquals(expected, caught));

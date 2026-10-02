@@ -118,15 +118,8 @@ public partial class BattleActionExecutorTest
     runtime.ActionCompleted += _ => completedCount++;
     battle.ClearEvents();
 
-    Exception? caught = null;
-    try
-    {
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0), battle.At(2, 0, 0)]));
-    }
-    catch (Exception error)
-    {
-      caught = error;
-    }
+    var caught = Assert.Throws<InvalidOperationException>(() =>
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0), battle.At(2, 0, 0)])));
 
     // The original fault surfaces unchanged and never turns into a completion.
     Assert.True(ReferenceEquals(expected, caught));
@@ -165,15 +158,8 @@ public partial class BattleActionExecutorTest
     int completedCount = 0;
     runtime.ActionCompleted += _ => completedCount++;
 
-    Exception? caught = null;
-    try
-    {
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)]));
-    }
-    catch (Exception error)
-    {
-      caught = error;
-    }
+    var caught = Assert.Throws<InvalidOperationException>(() =>
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)])));
 
     Assert.True(ReferenceEquals(expected, caught));
     Assert.Equal(mid, battle.Alive(unit).Position.Raw);
@@ -208,15 +194,8 @@ public partial class BattleActionExecutorTest
     int completedCount = 0;
     battle.Runtime.ActionCompleted += _ => completedCount++;
 
-    Exception? caught = null;
-    try
-    {
-      battle.EndFactionTurn(battle.PlayerFaction);
-    }
-    catch (Exception error)
-    {
-      caught = error;
-    }
+    var caught = Assert.Throws<InvalidOperationException>(() =>
+      battle.EndFactionTurn(battle.PlayerFaction));
 
     Assert.True(ReferenceEquals(expected, caught));
     Assert.Equal(0, completedCount);
@@ -258,19 +237,12 @@ public partial class BattleActionExecutorTest
     int completedCount = 0;
     runtime.ActionCompleted += _ => completedCount++;
 
-    Exception? caught = null;
-    try
-    {
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)]));
-    }
-    catch (Exception error)
-    {
-      caught = error;
-    }
+    var caught = Assert.Throws<InvalidOperationException>(() =>
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)])));
 
     // The primary exception keeps its identity; the actual capture cause rides on it.
     Assert.True(ReferenceEquals(expected, caught));
-    var data = caught!.Data;
+    var data = caught.Data;
     const string captureFailureKey = BattleActionExecutor.BattleCompletionCaptureFailureDataKey;
     Assert.True(data.Contains(captureFailureKey));
     Assert.True(ReferenceEquals(captureCause, data[captureFailureKey]));
@@ -354,15 +326,8 @@ public partial class BattleActionExecutorTest
         throw expected;
     });
 
-    Exception? caught = null;
-    try
-    {
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(destination)], 2));
-    }
-    catch (Exception error)
-    {
-      caught = error;
-    }
+    var caught = Assert.Throws<InvalidOperationException>(() =>
+      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(destination)], 2)));
 
     Assert.Equal(destination, observedPositionDuringEvent.RequireSome());
     Assert.True(ReferenceEquals(expected, caught));

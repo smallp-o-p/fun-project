@@ -17,9 +17,8 @@ public sealed class StatusEffectSystem : BattleHook<TurnEndedBattleEvent>
   {
     // Status effects tick through the running receiver: they are synchronous upkeep of the
     // ending turn's step, and completed event contexts carry no receiver by contract.
-    if (context.Read.RunningSession.IsNone)
+    if (context.Read.RunningSession.Case is not BattleSession session)
       return [];
-    BattleSession session = context.Read.RunningSession.RequireSome();
 
     foreach (BattleUnitState unit in session.State.GetFactionAliveUnits(turnEnded.Faction)) // snapshot: a lethal tick removes the unit from AliveUnits mid-iteration
     {

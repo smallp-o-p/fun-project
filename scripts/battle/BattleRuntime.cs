@@ -26,13 +26,12 @@ public sealed class BattleRuntime : IDisposable
   public event Action<BattleAction> ActionStarted = delegate { };
   public event Action<BattleActionExecResult> ActionCompleted = delegate { };
 
-  private BattleRuntime(BattleState state, BattleSession session)
+  private BattleRuntime(BattleState state)
   {
     ArgumentNullException.ThrowIfNull(state);
-    ArgumentNullException.ThrowIfNull(session);
 
     _state = state;
-    _lifecycle = new Lifecycle.Running(session);
+    _lifecycle = new Lifecycle.Running(new BattleSession(state, new TurnScheduler(state)));
     _actions = new BattleActionExecutor(this);
     _state.ActionOptions.InstallContextProvider(GetReadContext);
   }
@@ -46,12 +45,7 @@ public sealed class BattleRuntime : IDisposable
 
   internal BattleState State => _state;
 
-  internal static BattleRuntime Create(BattleState preparedState)
-  {
-    ArgumentNullException.ThrowIfNull(preparedState);
-    return new BattleRuntime(
-      preparedState, new BattleSession(preparedState, new TurnScheduler(preparedState)));
-  }
+  internal static BattleRuntime Create(BattleState preparedState) => new(preparedState);
 
   internal void DispatchOpeningTurn()
   {

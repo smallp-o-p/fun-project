@@ -126,37 +126,25 @@ public partial class BattleStartupLifecycleTest
   // the runtime, and that runtime must reject queries after disposal.
   private static Exception AssertStartupFailureDisposes(BattleSetup setup, SetupSystemData system)
   {
-    Exception? observed = null;
-    try
+    var observed = Assert.Throws<Exception>(() =>
     {
       using var unexpected = BattleFactory.Start(setup with { Systems = [system] }).RequireRight();
-    }
-    catch (Exception error)
-    {
-      observed = error;
-    }
-    Assert.True(observed is not null);
+    });
     Assert.True(system.RegisteredRuntime is not null);
     Assert.Throws<ObjectDisposedException>(() =>
       system.RegisteredRuntime!.Query(new GetCurrentTurnQuery()));
-    return observed!;
+    return observed;
   }
 
   // Preparation faults happen before any runtime exists: declared systems never register.
   private static Exception AssertPreparationFailureBeforeRegistration(BattleSetup setup, SetupSystemData system)
   {
-    Exception? observed = null;
-    try
+    var observed = Assert.Throws<Exception>(() =>
     {
       using var unexpected = BattleFactory.Start(setup with { Systems = [system] }).RequireRight();
-    }
-    catch (Exception error)
-    {
-      observed = error;
-    }
-    Assert.True(observed is not null);
+    });
     Assert.True(system.RegisteredRuntime is null);
-    return observed!;
+    return observed;
   }
 
   [TestCase(TestName = "A throwing declared-system registration preserves the exception and disposes the runtime")]

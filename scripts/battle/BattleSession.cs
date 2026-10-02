@@ -181,15 +181,13 @@ public sealed class BattleSession
     if (HasPendingOutcome)
       return;
 
-    Option<BattleTurn> next = _scheduler.AdvanceTurn();
-    if (next.IsNone)
+    if (_scheduler.AdvanceTurn().Case is not BattleTurn started)
     {
       // With no player faction there is no backstop: if no conscious forces remain, Draw.
       RequestEnd(BattleOutcome.Draw);
       return;
     }
 
-    BattleTurn started = next.RequireSome();
     State.RaiseEvents(
       new ActiveSideChangedBattleEvent(started.ActiveFaction),
       new TurnStartedBattleEvent(started.ActiveFaction, started.RoundNumber));
@@ -257,7 +255,7 @@ public sealed class BattleSession
 
     if (unit.IsDead)
     {
-      HandleUnitDeath(unit, cause);
+      HandleUnitDeath(unit, unitPoint.Value(), cause);
       return;
     }
 
@@ -322,17 +320,9 @@ public sealed class BattleSession
     TryApplyStatusEffect(unit, spec);
   }
 
-  private void HandleUnitDeath(BattleUnitState unit, Option<BattleUnitState> killedBy)
+  private void HandleUnitDeath(BattleUnitState unit, BattleBoardState.ValidatedPoint unitPoint,
+    Option<BattleUnitState> killedBy)
   {
-    ArgumentNullException.ThrowIfNull(unit);
-    if (unit.IsAlive)
-      throw new InvalidOperationException($"Cannot remove unit {unit.Id} as dead because it is still alive.");
-
-    Option<BattleBoardState.ValidatedPoint> unitPointOption = State.GetUnitPosition(unit);
-    if (unitPointOption.IsNone)
-      throw new InvalidOperationException($"Could not clear unit {unit.Id} because it is not on the board.");
-    BattleBoardState.ValidatedPoint unitPoint = unitPointOption.Value();
-
     bool occupantCleared = State.Board.TryClearOccupant(unitPoint, unit.Id);
     if (!occupantCleared)
       throw new InvalidOperationException($"Could not clear unit {unit.Id} from {unitPoint.Raw}.");

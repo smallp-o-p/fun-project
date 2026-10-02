@@ -44,7 +44,9 @@ public partial class BattleTypeContentProbe : SceneTree
 
     for (int turn = 0; turn < 12 && runtime.Query(new GetCompletedBattleQuery()).IsNone; turn++)
       runtime.ExecuteAction(BattleAction.EndFactionTurn(
-        runtime.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction));
+        runtime.Query(new GetCurrentTurnQuery()).Match(
+          currentTurn => currentTurn.ActiveFaction,
+          () => throw new InvalidOperationException("Running battle has no current turn."))));
 
     if (runtime.Query(new GetCompletedBattleQuery()).IsNone)
       throw new InvalidOperationException("Bomb defusal battle did not end after the authored deadline.");

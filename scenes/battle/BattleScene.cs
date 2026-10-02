@@ -157,11 +157,10 @@ public sealed partial class BattleScene : Node3D
   private void OnPlaybackIdle()
   {
     RefreshView();
-    var turn = _runtime.Query(new GetCurrentTurnQuery());
-    if (turn.IsNone)
+    if (_runtime.Query(new GetCurrentTurnQuery()).Case is not BattleTurn turn)
       return;
 
-    Faction activeSide = turn.RequireSome().ActiveFaction;
+    Faction activeSide = turn.ActiveFaction;
     if (ReferenceEquals(activeSide, _playerFaction))
       return;
 
