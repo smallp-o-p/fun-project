@@ -11,6 +11,8 @@ using Cell = Godot.Vector3I;
 [Tool]
 public partial class BattleMapAuthoring : GridMap
 {
+  private static readonly Cell[] Directions = [new(0, 0, -1), new(1, 0, 0), new(0, 0, 1), new(-1, 0, 0)];
+  [Export] public GridMap? Props { get; set; }
   private BattleTilePalette? _palette;
   [Export]
   public BattleTilePalette? Palette
@@ -50,7 +52,7 @@ public partial class BattleMapAuthoring : GridMap
   {
     if (Palette is null || MeshLibrary is null)
       throw new InvalidOperationException("Palette and mesh library are required.");
-    var cells = GetPaintedCells();
+    var cells = GetPaintedCells(this);
 
     if (cells.Count == 0)
     {
@@ -61,32 +63,25 @@ public partial class BattleMapAuthoring : GridMap
 
     var map = new BattleMap
     {
-      MeshLibrary = MeshLibrary,
       MapData = data,
       UsedPalette = Palette!,
-      CellOctantSize = CellOctantSize,
-      CellSize = CellSize,
-      CellCenterX = CellCenterX,
-      CellCenterY = CellCenterY,
-      CellCenterZ = CellCenterZ,
       Scale = Scale,
       Name = "Map"
     };
 
-    foreach (var c in GetUsedCells())
-    {
-      var item = GetCellItem(c);
-      var orientation = GetCellItemOrientation(c);
-      map.SetCellItem(c, item, orientation);
-    }
+    CopyGrid(this, map);
 
-    foreach (var child in GetChildren())
+    if (Props is not null)
     {
-      if (child is not BattlePropAuthoring prop) continue;
-      var visual = new Node3D { Name = prop.Name, Transform = prop.Transform };
-      foreach (var node in prop.GetChildren()) visual.AddChild(node.Duplicate());
-      map.AddChild(visual);
-      OwnVisual(visual, map);
+      var props = new GridMap
+      {
+        Name = "Props",
+        Transform = Props.Transform,
+        CollisionLayer = 2
+      };
+      CopyGrid(Props, props);
+      map.AddChild(props);
+      props.Owner = map;
     }
     var scene = new PackedScene();
     var res = scene.Pack(map);
@@ -96,20 +91,32 @@ public partial class BattleMapAuthoring : GridMap
     return scene;
   }
 
-  private Dictionary<Godot.Vector3I, BattleMapTileData> GetPaintedCells()
+  private static void CopyGrid(GridMap source, GridMap target)
+  {
+    target.MeshLibrary = source.MeshLibrary;
+    target.CellOctantSize = source.CellOctantSize;
+    target.CellSize = source.CellSize;
+    target.CellCenterX = source.CellCenterX;
+    target.CellCenterY = source.CellCenterY;
+    target.CellCenterZ = source.CellCenterZ;
+    foreach (var cell in source.GetUsedCells())
+      target.SetCellItem(cell, source.GetCellItem(cell), source.GetCellItemOrientation(cell));
+  }
+
+  private Dictionary<Godot.Vector3I, BattleMapTileData> GetPaintedCells(GridMap source)
   {
     var painted = new Dictionary<Godot.Vector3I, BattleMapTileData>();
 
-    foreach (Godot.Vector3I cell in GetUsedCells())
+    foreach (Godot.Vector3I cell in source.GetUsedCells())
     {
       if (cell.X < 0 || cell.Y < 0 || cell.Z < 0)
         throw new InvalidOperationException("Map has cells that have negative dimensions.");
 
-      var itemId = GetCellItem(cell);
+      var itemId = source.GetCellItem(cell);
       if (itemId == InvalidCellItem)
         continue;
 
-      StringName itemName = MeshLibrary.GetItemName(itemId);
+      StringName itemName = source.MeshLibrary.GetItemName(itemId);
 
       if (Palette!.Brushes.TryGetValue(itemName, out var value))
         painted[cell] = (BattleMapTileData)value.Duplicate();
@@ -130,68 +137,62 @@ public partial class BattleMapAuthoring : GridMap
       dimensions = new(Math.Max(dimensions.X, cell.X + 1), Math.Max(dimensions.Y, cell.Y + 1), Math.Max(dimensions.Z, cell.Z + 1));
     }
 
-    var props = new SysColGeneric.List<(BattlePropAuthoring Prop, Cell Anchor)>();
-    foreach (var child in FindChildren("*", "", true, false))
+    if (Props is null) return new BattleMapData { Dimensions = dimensions, Tiles = cells };
+    if (Props.GetParent() != this || Props.MeshLibrary != MeshLibrary ||
+        !Transform.IsEqualApprox(Transform3D.Identity) || !Props.Basis.IsEqualApprox(Basis.Identity) ||
+        !Props.Position.IsEqualApprox(Vector3.Up * Props.Position.Y) ||
+        !CellSize.IsEqualApprox(Vector3.One) || !Props.CellSize.IsEqualApprox(Vector3.One) ||
+        !Mathf.IsEqualApprox(CellScale, 1) || !Mathf.IsEqualApprox(Props.CellScale, 1) ||
+        !CellCenterX || CellCenterY || !CellCenterZ || !Props.CellCenterX || Props.CellCenterY || !Props.CellCenterZ)
+      throw new InvalidOperationException("Props must be a direct, unscaled GridMap using this palette, unit cells, X/Z centered, Y uncentered, and only a vertical surface offset.");
+
+    var props = new SysColGeneric.List<(BattleMapTileData Brush, Cell Anchor, Basis Rotation)>();
+    foreach (var (anchor, prop) in GetPaintedCells(Props))
     {
-      if (child is not BattlePropAuthoring prop) continue;
-      if (prop.GetParent() != this || !Transform.IsEqualApprox(Transform3D.Identity) ||
-          !CellSize.IsEqualApprox(Vector3.One) || !CellCenterX || CellCenterY || !CellCenterZ)
-        throw new InvalidOperationException("Props require direct parenting to an identity, unit-cell GridMap (X/Z centered, Y uncentered).");
-      var footprint = new SysColGeneric.HashSet<Cell>(prop.Footprint);
-      if (!footprint.Contains(Cell.Zero) || footprint.Count != prop.Footprint.Count)
-        throw new InvalidOperationException($"{prop.Name}: footprint must include the origin without duplicate cells.");
-      foreach (var amount in prop.Cover)
+      var name = $"Prop at {anchor}";
+      var rotation = Props.GetBasisWithOrthogonalIndex(Props.GetCellItemOrientation(anchor));
+      if (!rotation.Y.IsEqualApprox(Vector3.Up))
+        throw new InvalidOperationException($"{name}: props only support upright Y quarter-turns.");
+      var footprint = new SysColGeneric.HashSet<Cell>(prop.PropFootprint);
+      if (!footprint.Contains(Cell.Zero) || footprint.Count != prop.PropFootprint.Count)
+        throw new InvalidOperationException($"{name}: footprint must include the origin without duplicate cells.");
+      foreach (int amount in new[] { prop.PropCoverNorth, prop.PropCoverEast, prop.PropCoverSouth, prop.PropCoverWest })
         if (amount < 0 || amount > 100)
-          throw new InvalidOperationException($"{prop.Name}: cover must be between 0 and 100.");
-      // The snapped scene transform is the only placement state; find its actual support surface.
-      Cell? anchor = null;
-      foreach (var (cell, tile) in cells)
-        if ((MapToLocal(cell) + Vector3.Up * tile.GroundSurfaceOffset).IsEqualApprox(prop.Position)) anchor = cell;
-      if (anchor is null || !prop.Basis.IsEqualApprox(new Basis(Vector3.Up, Mathf.Round(prop.Rotation.Y / (Mathf.Pi / 2)) * Mathf.Pi / 2)))
-        throw new InvalidOperationException($"{prop.Name}: use Snap to grid; scale and tilt are unsupported.");
-      float height = cells[anchor.Value].GroundSurfaceOffset;
+          throw new InvalidOperationException($"{name}: cover must be between 0 and 100.");
       foreach (var local in footprint)
       {
-        var cell = anchor.Value + prop.Rotate(local);
+        var cell = anchor + (Cell)(rotation * (Vector3)local).Round();
         if (local.Y != 0 || !cells.TryGetValue(cell, out var tile) ||
-            !Palette!.Brushes[MeshLibrary.GetItemName(GetCellItem(cell))].Walkable || tile.GroundSurfaceOffset != height)
-          throw new InvalidOperationException($"{prop.Name}: footprint requires level, walkable ground at {cell}.");
-        if (prop.BlocksMovement && (!tile.Walkable || tile.SpawnFactionSlot >= 0))
-          throw new InvalidOperationException($"{prop.Name}: movement footprint overlaps another prop or spawn at {cell}.");
-        if (prop.BlocksMovement) tile.Walkable = false;
+            !Palette!.Brushes[MeshLibrary.GetItemName(GetCellItem(cell))].Walkable ||
+            !Mathf.IsEqualApprox(tile.GroundSurfaceOffset, Props.Position.Y))
+          throw new InvalidOperationException($"{name}: footprint requires walkable ground matching the Props layer's surface offset at {cell}.");
+        if (prop.PropBlocksMovement && (!tile.Walkable || tile.SpawnFactionSlot >= 0))
+          throw new InvalidOperationException($"{name}: movement footprint overlaps another prop or spawn at {cell}.");
+        if (prop.PropBlocksMovement) tile.Walkable = false;
         tile.BlocksLineOfSight |= prop.BlocksLineOfSight;
       }
-      props.Add((prop, anchor.Value));
+      props.Add((prop, anchor, rotation));
     }
     // Stamp cover after movement so order cannot give cover to a later blocked tile.
-    foreach (var (prop, anchor) in props)
-      foreach (var local in prop.Footprint)
+    foreach (var (prop, anchor, rotation) in props)
+    {
+      int[] cover = [prop.PropCoverNorth, prop.PropCoverEast, prop.PropCoverSouth, prop.PropCoverWest];
+      foreach (var local in prop.PropFootprint)
         for (int side = 0; side < 4; side++)
         {
-          var direction = BattlePropAuthoring.Directions[side];
-          if (prop.Footprint.Contains(local + direction)) continue;
-          var outward = prop.Rotate(direction);
-          var neighbor = anchor + prop.Rotate(local) + outward;
+          var direction = Directions[side];
+          if (prop.PropFootprint.Contains(local + direction)) continue;
+          var outward = (Cell)(rotation * (Vector3)direction).Round();
+          var neighbor = anchor + (Cell)(rotation * (Vector3)local).Round() + outward;
           if (!cells.TryGetValue(neighbor, out var tile) || !tile.Walkable) continue;
-          int amount = prop.Cover[side];
+          int amount = cover[side];
           if (outward.Z == 1) tile.CoverNorth = Math.Max(tile.CoverNorth, amount);
           if (outward.X == -1) tile.CoverEast = Math.Max(tile.CoverEast, amount);
           if (outward.Z == -1) tile.CoverSouth = Math.Max(tile.CoverSouth, amount);
           if (outward.X == 1) tile.CoverWest = Math.Max(tile.CoverWest, amount);
         }
+    }
     return new BattleMapData { Dimensions = dimensions, Tiles = cells };
   }
 
-  private static void OwnVisual(Node node, Node owner)
-  {
-    node.Owner = owner;
-    // Layer 1 remains terrain-only for tactical ground picking.
-    switch (node)
-    {
-      case CollisionObject3D collider: collider.CollisionLayer = 2; break;
-      case CsgShape3D csg: csg.CollisionLayer = 2; break;
-      case GridMap grid: grid.CollisionLayer = 2; break;
-    }
-    foreach (var child in node.GetChildren()) OwnVisual(child, owner);
-  }
 }

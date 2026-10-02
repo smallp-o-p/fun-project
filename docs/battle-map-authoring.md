@@ -1,28 +1,30 @@
 # Battle map authoring
 
-Open `scenes/battle/authoring/BattleMapAuthoring.tscn` in Godot 4.7.2 .NET. Paint terrain using the GridMap and its `BattleTilePalette`. Palette brushes describe independent movement, line-of-sight, vertical sight blocking, four directional cover strengths and optional spawn slots.
+Open `scenes/battle/authoring/BattleMapAuthoring.tscn` in Godot 4.7.2 .NET. Paint terrain on the root GridMap and props on its **Props** child GridMap. Both layers use the same `MeshLibrary` and existing `BattleTilePalette`; setting the palette library automatically adds a brush for each named mesh item.
 
 For a ready-to-export example, open `scenes/battle/authoring/PropExample.tscn`. Its output is `resources/maps/prop_example_map.tscn`.
 
 ## Reusable props
 
-Instance `scenes/battle/props/ExampleCar.tscn` as a **direct child** of the authoring GridMap. Its root is `BattlePropAuthoring`; its children are the visual model. Drag and rotate with the standard editor gizmo, then press **Snap to grid** to align the root pivot to the nearest supporting ground and a 90-degree Y rotation. The scene transform is the placement; there is no separate anchor/rotation state. Press **Refresh footprint preview** after editing footprint or cover values.
+Add a static prop mesh to the shared MeshLibrary, then set its palette brush's `PropFootprint`, `PropBlocksMovement`, `BlocksLineOfSight` and `PropCoverNorth/East/South/West`. Select **Props**, choose that mesh in the GridMap palette and paint one anchor cell per prop. Use the GridMap's rotation controls for upright 90-degree turns around Y. The painted cell and its orientation are the only placement state; no separate prop scenes or snapping tools are required.
 
-The prop scene root holds a flat set of local footprint cells, separate movement/LOS flags, and four outward cover strengths (North/East/South/West, 0–100). Each strength applies along that side’s exposed footprint boundaries; internal boundaries are skipped. The origin must be in the footprint. Reuse the scene itself; no separate prop definition or edge resources are needed. The example occupies `(0,0,0)` and `(0,0,1)`; it blocks walking, allows sight and provides 40 cover around its six exterior edges. This is a simple placeholder, not physical projectile collision.
+`PropFootprint` is a flat set of local cells including `(0,0,0)`. The four **Prop Cover** strengths (0–100) describe outward cover along exposed footprint boundaries; internal boundaries are skipped. They are separate from **Cover North/East/South/West**, which describe cover received by a unit standing on a terrain tile. `BlocksLineOfSight` is shared brush metadata; prop movement blocking is independently controlled by `PropBlocksMovement`.
 
-The model's root pivot contacts the ground at the anchor cell center. Offset visual children once to fit the footprint. Terrain brushes supply `GroundSurfaceOffset` relative to their integer level; the debug floor's 0.1-high centered box uses **0.05**. Every supporting tile must be walkable, at the same level and have the same surface offset. Props do not create new terrain.
+`PropExampleMeshLibrary.tres` preserves the debug terrain items and adds **ExampleCar**, one merged mesh with five material surfaces and box collisions. Its footprint is `(0,0,0)` plus `(0,0,1)`; it blocks walking, allows sight and provides **40** cover around all six exterior edges. `PropExample.tscn` paints it at `(2,0,2)` on the Props layer.
 
-Footprint outlines and outward cover marks are editor-only. Placement and data are checked at export, not continuously while editing. Only axis-aligned, unscaled, untilted placements are supported. The GridMap uses one-unit cells, X/Z centered, Y uncentered, and an identity transform. Nonblocking decorations may overlap; two movement-blocking props may not.
+Author each mesh around a ground-contact pivot at the anchor cell center. Both GridMaps use one-unit cells, X/Z centered and Y uncentered; the terrain root is identity-transformed. Props is a direct child bound to the root's **Props** property, with no X/Z offset, rotation, scaling or cell scaling. Its Y offset must match `GroundSurfaceOffset` on every supporting terrain tile. The debug floor's centered 0.1-high box uses **0.05**, so the example Props layer sits at Y **0.05**. All supporting cells must be walkable, at the anchor's integer level and have the same surface offset. A single Props layer therefore supports one shared ground-surface offset; props do not create terrain.
+
+Export checks placement and metadata. Tilted/upside-down cell orientations and overlapping movement-blocking footprints are rejected. Nonblocking decorations may overlap footprints.
 
 ## Export
 
-Set **Target Path** to a `.tscn` or `.scn`, then click **Export BattleMap**. Export validates painted cells, metadata, transforms, support, solid overlaps and blocked spawns before saving anything. It creates a `BattleMap` scene with fresh per-cell gameplay data, the painted GridMap and owned prop visuals. Palette resources remain unchanged. Open the exported scene to inspect it, then use that PackedScene in the battle type's map pool.
+Set **Target Path** to a `.tscn` or `.scn`, then click **Export BattleMap**. Export validates painted cells, metadata, transforms, support, solid overlaps and blocked spawns before saving anything. It creates a `BattleMap` scene with fresh per-cell gameplay data, the terrain GridMap and a plain child Props GridMap retaining its library, cells and orientations. Palette resources remain unchanged. Open the exported scene to inspect it, then use that PackedScene in the battle type's map pool.
 
 Coordinates are preserved, including maps starting away from zero. Dimensions are maximum coordinates plus one; missing cells remain holes. Negative coordinates are unsupported.
 
 Cover belongs to the unit's **standing tile**, facing the obstacle. A car east of a unit stamps East cover into that unit's tile. Rotating the car rotates its footprint and four cover sides. Only existing, ultimately walkable neighbors receive cover. Contributions merge by maximum **per side**, so North 20 and East 60 stay distinct. A diagonal shot uses the strongest of its two approach sides (the existing either-component rule); amounts do not add. Height differences retain the existing horizontal cover rule.
 
-Terrain collision is layer 1 for mouse ground picking. Exported prop collisions use layer 2 so a roof cannot select a false ground level. Logical movement and visibility use baked tile data, independently of physics geometry. Authoring metadata and previews are not shipped as runtime prop systems.
+Terrain collision is layer 1 for mouse ground picking. Props collision is layer 2 so a roof cannot select a false ground level. Logical movement, sight and cover use baked tile data, independently of MeshLibrary collision shapes. These props are static meshes, not runtime entities: they cannot be targeted, damaged, destroyed or moved independently in battle.
 
 ## Spawning from a baked map
 

@@ -14,17 +14,17 @@ public partial class BattlePropBakeTest
   [TestCase(true, 3, 2, 3)]
   [TestCase(true, -1, 2, 3)]
   [TestCase(true, 5, 4, 3)]
-  public void FourIndependentSideStrengthsRotateWithTheThreeCellFootprint(bool blocksMovement, int turns, int secondX, int secondZ)
+  public void FourIndependentSideStrengthsRotateWithTheThreeCellPropFootprint(bool blocksMovement, int turns, int secondX, int secondZ)
   {
     var cells = TestData.MakeOpenBattleMap(7, 7).Tiles;
-    var prop = new BattlePropAuthoring
+    var prop = new BattleMapTileData
     {
-      Footprint = [Cell.Zero, new(0, 0, 1), new(0, 0, 2)],
-      BlocksMovement = blocksMovement,
-      CoverNorth = 10,
-      CoverEast = 20,
-      CoverSouth = 30,
-      CoverWest = 40
+      PropFootprint = [Cell.Zero, new(0, 0, 1), new(0, 0, 2)],
+      PropBlocksMovement = blocksMovement,
+      PropCoverNorth = 10,
+      PropCoverEast = 20,
+      PropCoverSouth = 30,
+      PropCoverWest = 40
     };
     var anchor = new Cell(3, 0, 3);
     var baked = Bake(cells, (prop, anchor, turns));
@@ -94,8 +94,8 @@ public partial class BattlePropBakeTest
     var cells = TestData.MakeOpenBattleMap(3, 3).Tiles;
     cells[new Cell(1, 0, 1)].CoverNorth = 80;
     cells[new Cell(1, 0, 1)].CoverEast = 20;
-    var eastEdge = new BattlePropAuthoring { CoverEast = 45 };
-    var southEdge = new BattlePropAuthoring { CoverSouth = 55 };
+    var eastEdge = new BattleMapTileData { PropFootprint = [Cell.Zero], PropCoverEast = 45 };
+    var southEdge = new BattleMapTileData { PropFootprint = [Cell.Zero], PropCoverSouth = 55 };
 
     BattleMapTileData tile = Bake(cells,
       (eastEdge, new Cell(0, 0, 1), 0), (southEdge, new Cell(1, 0, 0), 0)).Tiles[new Cell(1, 0, 1)];
@@ -111,8 +111,8 @@ public partial class BattlePropBakeTest
   public void CoverSkipsMissingAndMovementBlockedNeighborsRegardlessOfOrder(bool blockerFirst)
   {
     var cells = TestData.MakeOpenBattleMap(2, 1).Tiles;
-    var cover = new BattlePropAuthoring { CoverNorth = 50, CoverEast = 50 };
-    var blocker = new BattlePropAuthoring { BlocksMovement = true };
+    var cover = new BattleMapTileData { PropFootprint = [Cell.Zero], PropCoverNorth = 50, PropCoverEast = 50 };
+    var blocker = new BattleMapTileData { PropFootprint = [Cell.Zero], PropBlocksMovement = true };
     var props = new[] { (cover, Cell.Zero, 0), (blocker, new Cell(1, 0, 0), 0) };
     if (blockerFirst) System.Array.Reverse(props);
 
@@ -127,10 +127,10 @@ public partial class BattlePropBakeTest
   [TestCase(true)]
   public void OnlyMovementBlockingFootprintsCannotOverlap(bool blocksMovement)
   {
-    var cells = TestData.MakeOpenBattleMap().Tiles;
-    var solid = new BattlePropAuthoring { BlocksMovement = true };
-    var overlapping = new BattlePropAuthoring { BlocksMovement = blocksMovement };
-    var props = new[] { (solid, Cell.Zero, 0), (overlapping, Cell.Zero, 0), (overlapping, Cell.Zero, 0) };
+    var cells = TestData.MakeOpenBattleMap(3, 1).Tiles;
+    var solid = new BattleMapTileData { PropFootprint = [Cell.Zero, new(1, 0, 0)], PropBlocksMovement = true };
+    var overlapping = new BattleMapTileData { PropFootprint = [Cell.Zero, new(-1, 0, 0)], PropBlocksMovement = blocksMovement };
+    var props = new[] { (solid, Cell.Zero, 0), (overlapping, new Cell(1, 0, 0), 0) };
 
     if (blocksMovement) Assert.Throws<InvalidOperationException>(() => Bake(cells, props));
     else Assert.False(Bake(cells, props).Tiles[Cell.Zero].Walkable);
@@ -150,7 +150,7 @@ public partial class BattlePropBakeTest
       cells[new Cell(1, 0, 0)].Walkable = walkable;
       cells[new Cell(1, 0, 0)].GroundSurfaceOffset = surfaceOffset;
     }
-    var prop = new BattlePropAuthoring { Footprint = [Cell.Zero, new(1, 0, 0)] };
+    var prop = new BattleMapTileData { PropFootprint = [Cell.Zero, new(1, 0, 0)] };
 
     Assert.Throws<InvalidOperationException>(() => Bake(cells, (prop, Cell.Zero, turns)));
   }
@@ -168,7 +168,7 @@ public partial class BattlePropBakeTest
   public void SpawnsAllowSightBlockingDecorationButNotMovementBlockers(bool blocksMovement)
   {
     var cells = TestData.MakeMapData(new(1, 1, 1), (Vector3I.Zero, TestData.SpawnTile(0))).Tiles;
-    var prop = new BattlePropAuthoring { BlocksMovement = blocksMovement, BlocksLineOfSight = true };
+    var prop = new BattleMapTileData { PropFootprint = [Cell.Zero], PropBlocksMovement = blocksMovement, BlocksLineOfSight = true };
     if (blocksMovement) Assert.Throws<InvalidOperationException>(() => Bake(cells, (prop, Cell.Zero, 0)));
     else
     {
@@ -186,11 +186,11 @@ public partial class BattlePropBakeTest
   [TestCase(1, TestName = "A footprint without its anchor is invalid")]
   [TestCase(2, TestName = "A duplicate footprint cell is invalid")]
   [TestCase(3, TestName = "A footprint spanning Y levels is invalid")]
-  public void InvalidFootprintIsRejected(int scenario)
+  public void InvalidPropFootprintIsRejected(int scenario)
   {
-    var prop = new BattlePropAuthoring
+    var prop = new BattleMapTileData
     {
-      Footprint = scenario switch
+      PropFootprint = scenario switch
       {
         0 => [],
         1 => [new(1, 0, 0)],
@@ -205,30 +205,17 @@ public partial class BattlePropBakeTest
   [TestCase(101)]
   public void InvalidCoverStrengthIsRejected(int strength)
   {
-    var prop = new BattlePropAuthoring { CoverNorth = strength };
+    var prop = new BattleMapTileData { PropFootprint = [Cell.Zero], PropCoverNorth = strength };
     Assert.Throws<InvalidOperationException>(() => Bake(TestData.MakeOpenBattleMap().Tiles, (prop, Cell.Zero, 0)));
   }
 
   private static BattleMapData Bake(Godot.Collections.Dictionary<Cell, BattleMapTileData> cells,
-    params (BattlePropAuthoring Prop, Cell Anchor, int Turns)[] props)
+    params (BattleMapTileData Prop, Cell Anchor, int Turns)[] props)
   {
-    var map = TestData.MakeMapAuthoring(cells);
-    try
-    {
-      foreach (var (source, anchor, turns) in props)
-      {
-        // Repeated metadata still needs distinct scene instances.
-        var prop = source.GetParent() == null ? source : (BattlePropAuthoring)source.Duplicate();
-        map.AddChild(prop);
-        prop.Position = map.MapToLocal(anchor) + Godot.Vector3.Up * cells[anchor].GroundSurfaceOffset;
-        prop.Rotation = new(0, turns * Godot.Mathf.Pi / 2, 0);
-      }
-      using var scene = map.BuildScene();
-      var exported = scene.Instantiate<BattleMap>();
-      var result = exported.MapData;
-      exported.Free();
-      return result;
-    }
-    finally { map.Free(); }
+    var map = GdUnit4.Assertions.AutoFree(TestData.MakeMapAuthoring(cells))!;
+    foreach (var (source, anchor, turns) in props)
+      TestData.PaintProp(map, source, anchor, turns);
+    using var scene = map.BuildScene();
+    return GdUnit4.Assertions.AutoFree(scene.Instantiate<BattleMap>())!.MapData;
   }
 }

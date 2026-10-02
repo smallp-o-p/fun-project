@@ -27,5 +27,15 @@ public partial class BattleMapTileData : Resource
   [Export(PropertyHint.Range, "0,100")]
   public int CoverWest { get; set => field = Math.Clamp(value, 0, 100); }
 
+  // Props use the same palette, but outward cover is not cover received by an occupant.
+  [ExportGroup("Props")]
+  [Export] public Godot.Collections.Array<Godot.Vector3I> PropFootprint { get; set; } = [];
+  [Export] public bool PropBlocksMovement { get; set; }
+  [Export(PropertyHint.Range, "0,100")] public int PropCoverNorth { get; set; }
+  [Export(PropertyHint.Range, "0,100")] public int PropCoverEast { get; set; }
+  [Export(PropertyHint.Range, "0,100")] public int PropCoverSouth { get; set; }
+  [Export(PropertyHint.Range, "0,100")] public int PropCoverWest { get; set; }
+
+  [ExportGroup("")]
   [Export] public int SpawnFactionSlot { get; set; } = -1;
 }

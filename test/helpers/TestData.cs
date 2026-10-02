@@ -350,7 +350,9 @@ internal static class TestData
   {
     var library = new MeshLibrary();
     var palette = new BattleTilePalette { MeshLibrary = library };
-    var map = new BattleMapAuthoring { Palette = palette, MeshLibrary = library, CellSize = Vector3.One, CellCenterY = false };
+    var props = new GridMap { Name = "Props", MeshLibrary = library, CellSize = Vector3.One, CellCenterY = false };
+    var map = new BattleMapAuthoring { Palette = palette, MeshLibrary = library, CellSize = Vector3.One, CellCenterY = false, Props = props };
+    map.AddChild(props);
     int item = 0;
     foreach (var (cell, tile) in cells)
     {
@@ -361,6 +363,17 @@ internal static class TestData
       map.SetCellItem(cell, item++);
     }
     return map;
+  }
+
+  public static void PaintProp(BattleMapAuthoring map, BattleMapTileData brush, Godot.Vector3I anchor, int turns = 0)
+  {
+    int item = map.MeshLibrary.GetLastUnusedItemId();
+    string name = $"Prop{item}";
+    map.MeshLibrary.CreateItem(item);
+    map.MeshLibrary.SetItemName(item, name);
+    map.MeshLibrary.SetItemMesh(item, new BoxMesh());
+    map.Palette!.Brushes[name] = brush;
+    map.Props!.SetCellItem(anchor, item, map.Props.GetOrthogonalIndexFromBasis(new Basis(Vector3.Up, turns * Mathf.Pi / 2)));
   }
 
   // Takes runtime Vector3I coordinates (X = width, Y = levels/height, Z = depth) and converts

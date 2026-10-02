@@ -9,72 +9,71 @@ using Cell = Godot.Vector3I;
 [RequireGodotRuntime]
 public partial class BattlePropAuthoringTest
 {
-  [TestCase]
-  public void ExportPreservesCellsVisualOwnershipAndColliderLayersAfterReload()
+  [TestCase(0)]
+  [TestCase(1)]
+  [TestCase(2)]
+  [TestCase(3)]
+  public void ExportPreservesPaintedPropsGridMapAfterReload(int turns)
   {
-    var map = AutoFree(MakeMap())!;
-    var prop = map.GetNode<BattlePropAuthoring>("Car");
-    prop.AddChild(new CsgBox3D { Name = "Csg", UseCollision = true });
-    prop.AddChild(new GridMap { Name = "Grid", CollisionLayer = 1 });
-    prop.AddChild(new StaticBody3D { Name = "BodyCollider", CollisionLayer = 1 });
+    var map = AutoFree(TestData.MakeMapAuthoring(TestData.MakeOpenBattleMap(5, 5).Tiles))!;
+    TestData.PaintProp(map, new() { PropFootprint = [Cell.Zero, new(0, 0, 1)], PropBlocksMovement = true }, new(2, 0, 2), turns);
+    var props = map.Props!;
+    var item = props.GetCellItem(new(2, 0, 2));
+    props.MeshLibrary.SetItemShapes(item, [new BoxShape3D(), Transform3D.Identity]);
     using var packed = map.BuildScene();
-    string path = "user://battle_prop_roundtrip.tscn";
+    const string path = "user://battle_prop_roundtrip.tscn";
     Assert.Equal(Error.Ok, ResourceSaver.Save(packed, path));
-    var reloaded = AutoFree(ResourceLoader.Load<PackedScene>(path, cacheMode: ResourceLoader.CacheMode.Ignore).Instantiate<BattleMap>())!;
-    Assert.Equal(new Cell(4, 1, 5), reloaded.MapData.Dimensions);
-    Assert.False(reloaded.MapData.Tiles[new(3, 0, 4)].Walkable);
-    Assert.True(reloaded.GetNode("Car/Body") is MeshInstance3D);
-    Assert.True(reloaded.GetNode("Car") is not BattlePropAuthoring);
-    Assert.Equal(2u, reloaded.GetNode<CsgBox3D>("Car/Csg").CollisionLayer);
-    Assert.Equal(2u, reloaded.GetNode<GridMap>("Car/Grid").CollisionLayer);
-    Assert.Equal(2u, reloaded.GetNode<StaticBody3D>("Car/BodyCollider").CollisionLayer);
+    var baked = AutoFree(ResourceLoader.Load<PackedScene>(path, cacheMode: ResourceLoader.CacheMode.Ignore).Instantiate<BattleMap>())!;
+    var layer = baked.GetNode<GridMap>("Props");
+    Assert.Equal(new Cell(5, 1, 5), baked.MapData.Dimensions);
+    Assert.False(baked.MapData.Tiles[new(2, 0, 2)].Walkable);
+    Assert.Equal(25, baked.GetUsedCells().Count);
+    Assert.Equal(1, layer.GetUsedCells().Count);
+    Assert.Equal(item, layer.GetCellItem(new(2, 0, 2)));
+    Assert.Equal(props.GetCellItemOrientation(new(2, 0, 2)), layer.GetCellItemOrientation(new(2, 0, 2)));
+    Assert.Equal(2u, layer.CollisionLayer);
+    Assert.Equal(2, layer.MeshLibrary.GetItemShapes(item).Count);
+    Assert.Equal(1u, props.CollisionLayer);
   }
 
-  [TestCase(0.05f, 0.2f, 0.05f)]
-  [TestCase(-0.05f, 0.95f, 0.95f)]
-  public void SnappingUsesNearestAuthoredSurfaceAndQuarterTurns(float offset, float inputY, float expectedY)
+  [TestCase(0, TestName = "Props cannot tilt")]
+  [TestCase(1, TestName = "Props grid cannot scale")]
+  [TestCase(2, TestName = "Props grid cannot shift horizontally")]
+  [TestCase(3, TestName = "Props height must match ground")]
+  [TestCase(4, TestName = "Props cell scale must be one")]
+  [TestCase(5, TestName = "Props grid must share the palette library")]
+  public void ExportRejectsUnsupportedPaintedTransforms(int scenario)
   {
-    var map = AutoFree(MakeMap())!;
-    map.Palette!.Brushes["0"].GroundSurfaceOffset = offset;
-    map.SetCellItem(new(3, 1, 4), 0);
-    var prop = map.GetNode<BattlePropAuthoring>("Car");
-    prop.Position = new(3.7f, inputY, 4.4f);
-    prop.Rotation = new(0, 1.6f, 0);
-    prop.SnapToGrid();
-
-    Assert.True(Mathf.IsEqualApprox(Mathf.Pi / 2, prop.Rotation.Y));
-    Assert.True(prop.Position.IsEqualApprox(new(3.5f, expectedY, 4.5f)));
-  }
-
-  [TestCase(0.1f, 0f, 1f)]
-  [TestCase(0f, 0.1f, 1f)]
-  [TestCase(0f, 0f, 2f)]
-  public void ExportRejectsUnsnappedOrScaledVisuals(float offset, float yaw, float scale)
-  {
-    var map = AutoFree(MakeMap())!;
-    var prop = map.GetNode<BattlePropAuthoring>("Car");
-    prop.Position += Vector3.Right * offset;
-    prop.Rotation = new(0, yaw, 0);
-    prop.Scale = new(scale, 1, 1);
+    var map = AutoFree(TestData.MakeMapAuthoring(new() { [Cell.Zero] = new BattleMapTileData() }))!;
+    TestData.PaintProp(map, new() { PropFootprint = [Cell.Zero] }, Cell.Zero);
+    var props = map.Props!;
+    switch (scenario)
+    {
+      case 0: props.SetCellItem(Cell.Zero, props.GetCellItem(Cell.Zero), props.GetOrthogonalIndexFromBasis(new Basis(Vector3.Right, Mathf.Pi / 2))); break;
+      case 1: props.Scale = new(2, 1, 1); break;
+      case 2: props.Position = Vector3.Right * 0.1f; break;
+      case 3: props.Position = Vector3.Up * 0.05f; break;
+      case 4: props.CellScale = 2; break;
+      case 5: props.MeshLibrary = new MeshLibrary(); break;
+    }
     Assert.Throws<InvalidOperationException>(() => map.BuildScene());
   }
 
   [TestCase]
   public void SavedExampleSourceCanBeReexportedWithItsVisuals()
   {
-    var authoring = AutoFree(ResourceLoader.Load<PackedScene>("res://scenes/battle/authoring/PropExample.tscn").Instantiate<BattleMapAuthoring>())!;
+    var source = ResourceLoader.Load<PackedScene>("res://scenes/battle/authoring/PropExample.tscn");
+    var authoring = AutoFree(source.Instantiate<BattleMapAuthoring>())!;
     using var packed = authoring.BuildScene();
-    var reloaded = AutoFree(packed.Instantiate<BattleMap>())!;
-    Assert.True(reloaded.HasNode("ExampleCar/Body"));
-    Assert.False(reloaded.MapData.Tiles[new(2, 0, 2)].Walkable);
-  }
-
-  private static BattleMapAuthoring MakeMap()
-  {
-    var map = TestData.MakeMapAuthoring(new() { [new(3, 0, 4)] = new BattleMapTileData { GroundSurfaceOffset = 0.05f } });
-    var prop = new BattlePropAuthoring { Name = "Car", BlocksMovement = true, Position = new(3.5f, 0.05f, 4.5f) };
-    map.AddChild(prop);
-    prop.AddChild(new MeshInstance3D { Name = "Body", Mesh = new BoxMesh() });
-    return map;
+    var baked = AutoFree(packed.Instantiate<BattleMap>())!;
+    Assert.Equal(new Vector3(0, 0.05f, 0), baked.GetNode<GridMap>("Props").Position);
+    Assert.False(baked.MapData.Tiles[new(2, 0, 2)].Walkable);
+    Assert.False(baked.MapData.Tiles[new(2, 0, 3)].Walkable);
+    Assert.True(authoring.Palette!.Brushes["DebugFloor"].Walkable);
+    Assert.Equal(40, authoring.Palette.Brushes["ExampleCar"].PropCoverNorth);
+    Assert.Equal(0, authoring.Palette.Brushes["ExampleCar"].CoverNorth);
+    using var again = authoring.BuildScene();
+    var second = AutoFree(again.Instantiate<BattleMap>())!;
+    Assert.Equal(40, second.MapData.Tiles[new(2, 0, 1)].CoverSouth);
   }
 }
