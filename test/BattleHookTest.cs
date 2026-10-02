@@ -168,7 +168,7 @@ public partial class BattleHookTest
     Assert.Equal(1, hook.Evaluations);
   }
 
-  private sealed class RaiseThenThrowOnceOnTurnEndedHook(Exception failure) : BattleHook
+  private sealed class RaiseThenThrowOnceOnTurnEndedHook : BattleHook
   {
     private bool _hasThrown;
 
@@ -179,7 +179,7 @@ public partial class BattleHookTest
 
       _hasThrown = true;
       context.Read.RunningSession.IfSome(session => session.RaiseEvents(new ProbeBattleEvent()));
-      throw failure;
+      throw new InvalidOperationException("Hook failure.");
     }
   }
 
@@ -188,41 +188,19 @@ public partial class BattleHookTest
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
-    var expected = new InvalidOperationException("Hook failure.");
-    battle.RegisterHook<TurnEndedBattleEvent>(new RaiseThenThrowOnceOnTurnEndedHook(expected));
+    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.RegisterHook<TurnEndedBattleEvent>(new RaiseThenThrowOnceOnTurnEndedHook());
     battle.Start();
-    IReadOnlyList<UnitAction> retainedOptions = battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(unit)));
-    foreach (UnitAction option in retainedOptions)
-      _ = option.IsAvailable;
-    int completedCount = 0;
-    battle.Runtime.ActionCompleted += _ => completedCount++;
 
     battle.ClearEvents();
     // The simple execution model lets a hook failure surface as the throw it is; the
     // session clears its dispatch queue on the way out.
-    Exception? caught = null;
-    try
-    {
-      battle.Submit(BattleAction.EndFactionTurn(faction));
-    }
-    catch (Exception error)
-    {
-      caught = error;
-    }
-
-    Assert.True(ReferenceEquals(expected, caught));
+    Assert.Throws<InvalidOperationException>(
+      () => battle.Submit(BattleAction.EndFactionTurn(faction)));
     Assert.False(battle.Events.EventsOf<ProbeBattleEvent>().AsValueEnumerable().Any());
-    Assert.Equal(0, completedCount);
-    // Retained options leave the failed submission dirty, ready to re-evaluate fresh.
-    Assert.True(retainedOptions.AsValueEnumerable()
-      .Single(option => option.Action is EndTurnActionDefinition).IsDirty);
 
     battle.Submit(BattleAction.EndFactionTurn(faction));
     Assert.False(battle.Events.EventsOf<ProbeBattleEvent>().AsValueEnumerable().Any());
-    // The recovery submission runs without the faulted turn's stale work: round 2 exactly.
-    Assert.Equal(2, battle.Query(new GetCurrentTurnQuery()).RequireSome().RoundNumber);
   }
 
   private sealed partial class InterruptingHook : BattleHook

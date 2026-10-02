@@ -244,15 +244,15 @@ public sealed class BattleUnitState
   }
 
   // Evaluates every grant in source order; each grant completes its flag update, health
-  // clamp, owner reconciliation, and event enqueue before the next grant is evaluated —
+  // clamp, visibility reconciliation, and event enqueue before the next grant is evaluated —
   // the buff-event path resolves pending visibility before returning, so the next grant's
-  // condition reads the reconciled world. Notification itself may remain deferred while an
-  // outer dispatch runs (the shared dispatcher broadcasts in FIFO order). The callback
-  // receives consciousness and effective vision as of before this grant's flag update and
-  // clamp, so owners can skip reconciliation for flips that changed neither.
-  internal void EvaluateBuffs(BattleReadContext context, Action<BattleUnitState, bool, int> onChanged)
+  // condition reads the reconciled world. A flip that changed the effective vision or
+  // consciousness marks the unit affected; a new knockout runs the running receiver's
+  // knockout policy (preparation contexts carry no receiver). Notification itself may
+  // remain deferred while an outer dispatch runs (the shared dispatcher broadcasts in FIFO
+  // order).
+  internal void EvaluateBuffs(BattleReadContext context)
   {
-    ArgumentNullException.ThrowIfNull(onChanged);
     for (int i = 0; i < _buffs.Count; i++)
     {
       (Buff buff, bool wasActive) = _buffs[i];
@@ -265,7 +265,12 @@ public sealed class BattleUnitState
       _buffs[i] = (buff, isActive);
 
       ClampCurrentHealthToMax();
-      onChanged(this, wasConscious, priorVision);
+      // wasConscious is the pre-flip consciousness flag, so equality here means it did not
+      // flip: mark only when the effective vision or consciousness actually changed.
+      if (priorVision != Vision || wasConscious == IsUnconscious)
+        context.State.MarkVisibilityAffected(this);
+      if (wasConscious && IsUnconscious)
+        context.RunningSession.IfSome(session => session.ReconcileBuffKnockout(this));
       context.State.RaiseBuffEvent(isActive
         ? new UnitBuffActivatedBattleEvent(this, buff)
         : new UnitBuffDeactivatedBattleEvent(this, buff));

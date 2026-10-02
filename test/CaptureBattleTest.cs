@@ -77,29 +77,44 @@ public class CaptureBattleTest
   [TestCase]
   public void DrawCapturesNobodyEvenWithAnUnconsciousEnemy()
   {
-    // No designated player: every side knocked out draws at the turn end, with an
-    // unconscious enemy present at the capture boundary.
-    using var battle = BattleFixture.Duel();
-    var support = battle.Spawn(MakeCombatant("Support", battle.EnemyFaction), new Vector3I(0, 0, 0));
-    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
-    battle.ApplyDamage(support, 999, DamageKind.Stun);
-    battle.ApplyDamage(battle.PlayerUnit, 999, DamageKind.Stun);
-    battle.AdvanceTurn();
+    // The designated player draws by objective at the turn end while an unconscious enemy
+    // is present at the capture boundary: capture membership is victory-only.
+    using var battle = BattleFixture.Duel(playerControlled: true, start: false);
+    battle.AddObjective(battle.PlayerFaction, new FakeObjective(new FakeObjectiveData
+    {
+      Complete = true,
+      Observe = typeof(TurnEndedBattleEvent),
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Draw },
+    }));
+    battle.Start();
+    Assert.True(battle.Query(new GetPlayerFactionQuery()).IsSome);
 
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+    Assert.True(battle.EnemyUnit.IsUnconscious);
+    battle.EndFactionTurn(battle.PlayerFaction);
+
+    Assert.Equal(BattleOutcome.Draw, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     Assert.Equal(0, battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[battle.PlayerFaction].CapturedEnemies.Count);
   }
 
   [TestCase]
   public void NoDesignatedPlayerCapturesNobodyOnVictory()
   {
+    // The survive objective completes on round 2 — the unconscious enemy body is eligible
+    // at that boundary, but without a designated player nobody is ever captured.
     using var battle = BattleFixture.Duel(start: false);
     battle.AddObjective(battle.PlayerFaction, new SurviveUntilTurnObjectiveData
     {
-      TargetTurn = 1,
+      TargetTurn = 2,
       OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
     }.Instantiate());
     battle.Start();
 
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+    Assert.True(battle.EnemyUnit.IsUnconscious);
+    battle.EndFactionTurn(battle.PlayerFaction);
+
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetCompletedBattleQuery()).RequireSome().Outcome);
     Assert.Equal(0, battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[battle.PlayerFaction].CapturedEnemies.Count);
     Assert.Equal(0, battle.Query(new GetCompletedBattleQuery()).RequireSome().FactionSummaries[battle.EnemyFaction].CapturedEnemies.Count);
   }

@@ -15,7 +15,7 @@ public sealed class ArmorRegenSystem : BattleHook<TurnEndedBattleEvent>
   protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TurnEndedBattleEvent turnEnded)
   {
     Faction faction = turnEnded.Faction;
-    foreach (BattleUnitState unit in context.Read.State.GetFactionAliveUnits(faction).AsValueEnumerable().ToList())
+    foreach (BattleUnitState unit in context.Read.State.GetFactionAliveUnits(faction))
     {
       unit.EquippedArmor.IfSome(armor =>
       {

@@ -5,8 +5,8 @@ namespace FunProject.Battle;
 /// <summary>
 /// Buff condition-mirror (no durations): re-evaluates every buff's activation condition.
 /// Activation flags belong to each unit's grants (BattleUnitState.EvaluateBuffs completes
-/// each grant's flag update, health clamp, owner reconciliation, and event enqueue before
-/// the next grant is evaluated; reconciliation marks the unit affected only when its
+/// each grant's flag update, health clamp, per-grant reconciliation, and event enqueue
+/// before the next grant is evaluated; a flip marks the unit affected only when its
 /// effective vision or consciousness actually changed, and visibility resolves before the
 /// next condition read, while notification may remain deferred until the shared dispatcher
 /// drains). Both hooks are
@@ -21,15 +21,11 @@ internal sealed class TurnStartBuffHook : BattleHook<TurnStartedBattleEvent>
   {
     // No snapshot of AliveUnits: conditions are read-only over battle state and a flip
     // cannot kill (ClampCurrentHealthToMax floors at 1), so the set cannot change mid-pass.
-    return context.Read.RunningSession.Match(
-      Some: session => EvaluateAll(context.Read, session),
-      None: () => []);
-  }
+    if (context.Read.RunningSession.IsNone)
+      return [];
 
-  private static IReadOnlyList<BattleAction> EvaluateAll(BattleReadContext read, BattleSession session)
-  {
-    foreach (BattleUnitState unit in read.State.AliveUnits)
-      unit.EvaluateBuffs(read, session.ReconcileBuffFlip);
+    foreach (BattleUnitState unit in context.Read.State.AliveUnits)
+      unit.EvaluateBuffs(context.Read);
     return [];
   }
 }
@@ -38,11 +34,9 @@ internal sealed class UnitSpawnedBuffHook : BattleHook<UnitAddedBattleEvent>
 {
   protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitAddedBattleEvent evt)
   {
-    // Spawn buff evaluation is synchronous bookkeeping of the reinforcement step through
-    // the running owner's reconciliation; preparation performs the same evaluation for
-    // initial units through its own context.
-    context.Read.RunningSession.IfSome(session =>
-      evt.Unit.EvaluateBuffs(context.Read, session.ReconcileBuffFlip));
+    // Spawn buff evaluation is synchronous bookkeeping of the reinforcement step; preparation
+    // performs the same evaluation for initial units through its own context.
+    context.Read.RunningSession.IfSome(_ => evt.Unit.EvaluateBuffs(context.Read));
     return [];
   }
 }

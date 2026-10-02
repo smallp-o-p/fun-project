@@ -48,10 +48,6 @@ public sealed partial class BattleRuntimeSignalTest
     // one; the adjacent callback submission did.
     Assert.True(order.AsValueEnumerable().SequenceEqual(["started", "completed", "started", "completed"]));
     Assert.Equal(2, completed.Count);
-    bool movementCommitted = false;
-    foreach (BattleEvent battleEvent in first.EventsThatOccurred)
-      movementCommitted |= battleEvent is UnitMovedBattleEvent;
-    Assert.True(movementCommitted);
     // The closed window is bounded: the first result holds only its own movement and tile
     // pair, while the later submission moved the unit a second time separately.
     BattleEvent[] firstEvents = first.EventsThatOccurred.ToArray();

@@ -19,7 +19,6 @@ namespace FunProject.Battle;
 internal sealed class BattlePreparation
 {
   private readonly BattleReadContext _readContext;
-  private readonly Action<BattleEvent> _routeObjectives;
 
   internal BattleState State { get; }
 
@@ -35,8 +34,7 @@ internal sealed class BattlePreparation
 
     State = new BattleState(board, factions, hitChanceCalculator, randomSeed, playerFaction);
     _readContext = new BattleReadContext(State, None, None, None);
-    _routeObjectives = RoutePreparationObjectives;
-    State.Committed += _routeObjectives;
+    State.Committed += RoutePreparationObjectives;
   }
 
   internal BattleUnitState AddUnit(
@@ -53,7 +51,7 @@ internal sealed class BattlePreparation
     State.RaiseEvents(new UnitAddedBattleEvent(unit, position));
     // The runtime path evaluates spawn buffs inside the UnitAdded dispatch (executor
     // default hook); preparation owns that bookkeeping itself, committing the same order.
-    unit.EvaluateBuffs(_readContext, ReconcileBuffFlip);
+    unit.EvaluateBuffs(_readContext);
     ReconcileParticipant(unit);
     return unit;
   }
@@ -90,19 +88,9 @@ internal sealed class BattlePreparation
     State.RefreshVisibility();
   }
 
-  // Per-grant buff bookkeeping at the initial-placement mutation boundary: the running
-  // owner's visibility marking without scheduler or outcome work (a spawn's stun is zero,
-  // so the shared clamp cannot knock the unit out here). Only an actual vision or
-  // consciousness change marks the unit affected; the buff event's own dispatch resolves
-  // the mark and queues genuine first spots before broadcasting — nothing is consumed
-  // silently.
-  private void ReconcileBuffFlip(BattleUnitState unit, bool wasConscious, int priorVision)
-  {
-    ArgumentNullException.ThrowIfNull(unit);
-    // wasConscious is the pre-flip consciousness flag, so equality here means it flipped.
-    if (priorVision != unit.Vision || wasConscious == unit.IsUnconscious)
-      State.MarkVisibilityAffected(unit);
-  }
+  // Per-grant buff bookkeeping at the initial-placement mutation boundary lives in
+  // EvaluateBuffs: a spawn's stun is zero, so the shared clamp cannot knock the unit out
+  // here and no running receiver exists to notify.
 
   // Initial objective insertion shares the objective-owned addition routine (registration
   // plus the ObjectiveAdded notification).
@@ -133,39 +121,30 @@ internal sealed class BattlePreparation
       unit.RefreshForNewTurn();
     State.InvalidateVisibility();
 
-    State.Committed -= _routeObjectives;
+    State.Committed -= RoutePreparationObjectives;
     return Right<BattleSetupFailure, BattleState>(State);
   }
 
   // Preparation objectives evaluate against the placement stream so placement-counting
   // objectives (e.g. bomb defusal tallies) never miss an initial object. Flips record and
   // raise through the shared history operations; an end directive has no receiver here —
-  // preparation cannot end a battle that does not exist yet — so only history is kept.
+  // preparation cannot end a battle that does not exist yet — so only history is kept and
+  // only follow-up queueing applies.
   private void RoutePreparationObjectives(BattleEvent battleEvent)
   {
     foreach ((Faction owner, Objective objective) in ObjectiveHistory.SnapshotCandidates(State, battleEvent))
     {
       ObjectiveResult result = objective.Check(owner, battleEvent, _readContext);
-      switch (result)
-      {
-        case ObjectiveResult.Ongoing:
-          continue;
-        case ObjectiveResult.Passed:
-          ObjectiveHistory.RecordFlip(State, owner, objective, passed: true);
-          ApplyPreparationDirective(owner, objective.Data.OnComplete);
-          break;
-        default:
-          ObjectiveHistory.RecordFlip(State, owner, objective, passed: false);
-          ApplyPreparationDirective(owner, objective.Data.OnFail);
-          break;
-      }
-    }
-  }
+      if (result == ObjectiveResult.Ongoing)
+        continue;
 
-  private void ApplyPreparationDirective(Faction owner, ObjectiveDirectiveData? directive)
-  {
-    if (directive is QueueDirectiveData queue)
-      foreach (ObjectiveData followUp in queue.FollowUps)
-        AddObjective(owner, followUp.Instantiate());
+      ObjectiveHistory.RecordFlip(State, owner, objective, result == ObjectiveResult.Passed);
+      ObjectiveDirectiveData? directive = result == ObjectiveResult.Passed
+        ? objective.Data.OnComplete
+        : objective.Data.OnFail;
+      if (directive is QueueDirectiveData queue)
+        foreach (ObjectiveData followUp in queue.FollowUps)
+          AddObjective(owner, followUp.Instantiate());
+    }
   }
 }

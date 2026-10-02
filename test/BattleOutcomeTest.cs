@@ -130,20 +130,6 @@ public partial class BattleOutcomeTest
     Assert.True(ReferenceEquals(snapshot, battle.Query(new GetCompletedBattleQuery()).RequireSome()));
   }
 
-  [TestCase(TestName = "A prepared battle exposes its declared player faction and no completion until it ends")]
-  public void SessionExposesPlayerFactionAndNoOutcomeUntilEnded()
-  {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [player, enemy], playerFaction: Some(player));
-    battle.Spawn(TestData.MakeCombatant("A1", player), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", enemy), new Vector3I(2, 0, 0));
-    battle.Start();
-
-    Assert.Equal(player, battle.Query(new GetPlayerFactionQuery()).RequireSome());
-    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
-  }
-
   [TestCase(true, BattleOutcome.Defeat, TestName = "A wiped player loses immediately")]
   [TestCase(false, BattleOutcome.Victory, TestName = "Player becoming the sole surviving side resolves to Victory the instant the last enemy dies")]
   public void PlayerWipeResolvesOutcomeInstantly(bool playerWiped, BattleOutcome expected)

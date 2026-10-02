@@ -9,14 +9,14 @@ public sealed class StunRecoverySystem : BattleHook<TurnEndedBattleEvent>
 
   protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TurnEndedBattleEvent evt)
   {
+    // Turn-end upkeep belongs to the current running step: a running receiver is
+    // required, but a pending terminal decision inside that step does not cancel the
+    // residual recovery of conscious survivors. RecoverStun gates dead/unconscious units.
+    if (context.Read.RunningSession.IsNone)
+      return [];
+
     foreach (var unit in context.Read.State.GetFactionAliveUnits(evt.Faction))
     {
-      // Turn-end upkeep belongs to the current running step: a running receiver is
-      // required, but a pending terminal decision inside that step does not cancel the
-      // residual recovery of conscious survivors. RecoverStun gates dead/unconscious units.
-      if (context.Read.RunningSession.IsNone)
-        break;
-
       uint recovered = unit.RecoverStun(RecoveryPerTurn);
       if (recovered > 0)
         context.Read.State.RaiseEvents(new UnitStunRecoveredBattleEvent(unit, recovered, unit.CurrentStun));

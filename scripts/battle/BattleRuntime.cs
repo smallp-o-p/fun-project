@@ -4,11 +4,8 @@ namespace FunProject.Battle;
 
 /// <summary>
 /// The stable battle facade: owns one internal running-or-completed representation for the
-/// runtime's whole lifetime. Lifecycle-dependent reads go through <see cref="Query{T}"/>
-/// with total queries (<see cref="GetCurrentTurnQuery"/>, <see cref="GetCompletedBattleQuery"/>);
-/// gameplay submissions run only while running. Construction and opening dispatch belong to
-/// the factory owner; presentation and ordinary callers never retain or construct the
-/// running receiver.
+/// runtime's whole lifetime; total lifecycle queries and gameplay submissions derive their
+/// answers from it. Construction and opening dispatch belong to the factory owner.
 /// </summary>
 public sealed class BattleRuntime : IDisposable
 {
@@ -63,11 +60,8 @@ public sealed class BattleRuntime : IDisposable
   internal static BattleRuntime Create(BattleState preparedState)
   {
     ArgumentNullException.ThrowIfNull(preparedState);
-    var scheduler = new TurnScheduler(
-      preparedState.Factions,
-      preparedState.HasConsciousUnits,
-      preparedState.GetFactionConsciousUnits);
-    return new BattleRuntime(preparedState, new BattleSession(preparedState, scheduler));
+    return new BattleRuntime(
+      preparedState, new BattleSession(preparedState, new TurnScheduler(preparedState)));
   }
 
   // Factory-owned dispatch door: registers are done; the opening step reuses the ordinary
@@ -125,11 +119,9 @@ public sealed class BattleRuntime : IDisposable
     return query.Execute(GetReadContext());
   }
 
-  // The interaction door for scene code holding a raw BattleUnitState: mints an aliveness proof
-  // (Some iff the unit is alive in this battle). The None path is what used to surface as a
-  // query Left for a dead/foreign unit.
-  // Proof mint doors route through the lifetime-owned state, so they keep working against
-  // a completed battle without any running receiver.
+  // Mints an aliveness proof for scene code holding a raw BattleUnitState (Some iff the
+  // unit is alive in this battle). Proof mint doors route through the lifetime-owned state,
+  // so they keep working against a completed battle without any running receiver.
   public Option<AliveUnit> TryGetAlive(BattleUnitState unit)
   {
     ThrowIfDisposed();
@@ -177,18 +169,18 @@ public sealed class BattleRuntime : IDisposable
     // bounded range. An observer fault after ActionCompleted begins is a notification
     // failure — the committed submission stands.
     _actions.BeginSubmission();
+    BattleActionExecResult result;
     try
     {
       ActionStarted.Invoke(action);
-      BattleActionExecResult result = _actions.Execute(action);
-      _actions.EndSubmission();
-      ActionCompleted.Invoke(result);
-      return Some(result);
+      result = _actions.Execute(action);
     }
     finally
     {
       _actions.EndSubmission();
     }
+    ActionCompleted.Invoke(result);
+    return Some(result);
   }
 
   public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0)

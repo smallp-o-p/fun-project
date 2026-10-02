@@ -40,13 +40,11 @@ internal static class ObjectiveHistory
       : new ObjectiveFailedBattleEvent(owner, objective));
   }
 
-  // Adds the objective, registering a first-seen faction for turns, and raises
+  // Adds the objective (the state registers a first-seen faction for turns) and raises
   // ObjectiveAdded. Instance-bound follow-ups become visible from the next event.
   internal static void AddFollowUp(BattleState state, Faction faction, Objective objective)
   {
-    if (state.AddObjective(faction, objective))
-      state.RegisterFaction(faction);
-
+    state.AddObjective(faction, objective);
     state.RaiseEvents(new ObjectiveAddedBattleEvent(faction, objective));
   }
 }

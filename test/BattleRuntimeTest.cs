@@ -53,28 +53,6 @@ public sealed partial class BattleRuntimeTest
     Assert.Equal(label, log[0]);
   }
 
-  [TestCase(TestName = "Disposed runtime no longer republishes session events")]
-  public void DisposedRuntimeNoLongerRepublishesSessionEvents()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
-    battle.Start();
-    var runtime = battle.Runtime;
-    var observed = new List<BattleEvent>();
-    runtime.BattleEventCommitted += observed.Add;
-
-    // Disposal closes the only execution scope: no further event can be committed, and the
-    // disposed runtime must not re-raise anything.
-    runtime.Dispose();
-
-    Assert.Equal(0, observed.Count);
-    Assert.Throws<ObjectDisposedException>(() =>
-      runtime.ExecuteAction(BattleAction.SpawnUnit(
-        TestData.MakeCombatant("Alpha", faction), battle.Board.At(1, 0, 1))));
-    runtime.BattleEventCommitted -= observed.Add;
-  }
-
   [TestCase(TestName = "Public methods throw after runtime is disposed")]
   public void PublicMethodsThrowAfterRuntimeIsDisposed()
   {

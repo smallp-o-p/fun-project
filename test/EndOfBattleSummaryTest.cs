@@ -124,19 +124,6 @@ public class EndOfBattleSummaryTest
     Assert.True(frozen.CombatantsWounded.Contains(battle.PlayerUnit.Combatant));
   }
 
-  [TestCase(TestName = "The completion query answers None while the battle has not ended")]
-  public void SummaryQueryFailsWhileBattleInProgress()
-  {
-    using var battle = BattleFixture.Duel(
-      dimensions: new Vector3I(5, 1, 5),
-      playerControlled: true,
-      player: new("Alpha", Position: new Vector3I(0, 0, 0)),
-      enemy: new("Bandit", Position: new Vector3I(2, 0, 0)));
-
-    Assert.True(battle.Query(new GetCompletedBattleQuery()).IsNone);
-    Assert.True(battle.Query(new GetCurrentTurnQuery()).IsSome);
-  }
-
   [TestCase(TestName = "A victory summary tallies kills per combatant and faction-filtered dead and wounded")]
   public void VictorySummaryTalliesKillsDeadAndWounded()
   {

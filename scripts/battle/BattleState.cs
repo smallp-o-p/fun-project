@@ -9,11 +9,8 @@ using System.Collections.Generic;
 namespace FunProject.Battle;
 
 // Lifecycle-independent tactical storage shared by preparation, running combat, completion
-// capture, and cross-lifecycle reads: the ordered faction list, unit/object pools,
-// per-faction objectives, the kill ledger, board occupancy, visibility memory, the battle
-// RNG/hit calculation, the shared event dispatcher, and per-unit action-option storage.
-// It deliberately holds no scheduler, turn number, or outcome — preparation and the running
-// receiver layer those on around it.
+// capture, and cross-lifecycle reads. It deliberately holds no scheduler, turn number, or
+// outcome — preparation and the running receiver layer those on around it.
 internal sealed class BattleState
 {
   private readonly List<Faction> _factions = [];
@@ -350,22 +347,18 @@ internal sealed class BattleState
     return firstSpottings;
   }
 
-  // Adds the objective to the faction's list, creating the list on first use; returns true
-  // iff the faction was new to the objective ledger (the caller registers it for turns).
-  internal bool AddObjective(Faction faction, Objective objective)
+  // Adds the objective to the faction's list, creating the list on first use, and registers
+  // the faction for turns (idempotent).
+  internal void AddObjective(Faction faction, Objective objective)
   {
     ArgumentNullException.ThrowIfNull(faction);
     ArgumentNullException.ThrowIfNull(objective);
 
-    bool newFaction = false;
     if (!_objectives.TryGetValue(faction, out var list))
-    {
       _objectives[faction] = list = [];
-      newFaction = true;
-    }
 
     list.Add(objective);
-    return newFaction;
+    RegisterFaction(faction);
   }
 
   internal IReadOnlyList<Objective> GetObjectives(Faction faction)

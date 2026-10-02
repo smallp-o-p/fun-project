@@ -93,22 +93,13 @@ public partial class BattleSessionTest
     var unitA = preparation.AddUnit(TestData.MakeCombatant("A1", factionA), state.Board.At(0, 0, 0), None, None);
     var unitB = preparation.AddUnit(TestData.MakeCombatant("B1", factionB), state.Board.At(1, 0, 0), None, None);
 
-    var scheduler = new TurnScheduler(state.Factions, state.HasConsciousUnits, state.GetFactionConsciousUnits);
+    var scheduler = new TurnScheduler(state);
 
     BattleTurn turn = scheduler.CurrentTurn;
     Assert.Equal(factionA, turn.ActiveFaction);
     Assert.Equal(1, turn.RoundNumber);
     Assert.True(scheduler.IsUnitAvailable(unitA));
     Assert.False(scheduler.IsUnitAvailable(unitB));
-  }
-
-  [TestCase(TestName = "Construction rejects preparations without factions")]
-  public void ConstructorRejectsSessionsWithoutFactions()
-  {
-    var board = new BattleBoardState(new Vector3I(3, 1, 3));
-    var preparation = new BattlePreparation(board, []);
-
-    Assert.Throws<ArgumentException>(() => preparation.Complete());
   }
 
   [TestCase(TestName = "Preparation can use a prebuilt board state")]
@@ -123,6 +114,15 @@ public partial class BattleSessionTest
       preparation.AddUnit(TestData.MakeCombatant("A1", faction), board.At(1, 0, 0), None, None));
 
     Assert.True(ReferenceEquals(board, preparation.State.Board));
+  }
+
+  [TestCase(TestName = "Construction rejects preparations without factions")]
+  public void ConstructorRejectsSessionsWithoutFactions()
+  {
+    var board = new BattleBoardState(new Vector3I(3, 1, 3));
+    var preparation = new BattlePreparation(board, []);
+
+    Assert.Throws<ArgumentException>(() => preparation.Complete());
   }
 
   [TestCase(TestName = "A prepared unit keeps its equipped weapon")]
@@ -437,7 +437,7 @@ public partial class BattleSessionTest
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
     var state = battle.Read.State;
-    var scheduler = new TurnScheduler(state.Factions, state.HasConsciousUnits, state.GetFactionConsciousUnits);
+    var scheduler = new TurnScheduler(state);
 
     scheduler.RegisterReinforcement(battle.PlayerUnit);
 
@@ -692,8 +692,6 @@ public partial class BattleSessionTest
     var faction = TestData.MakeFaction("Player");
     var first = new BattlePreparation(new BattleBoardState(new Vector3I(2, 1, 2)), [faction], randomSeed: 1234);
     var second = new BattlePreparation(new BattleBoardState(new Vector3I(2, 1, 2)), [faction], randomSeed: 1234);
-    first.Complete();
-    second.Complete();
 
     for (int i = 0; i < 20; i++)
     {

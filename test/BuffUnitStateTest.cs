@@ -50,7 +50,7 @@ public partial class BuffUnitStateTest
     battle.Start();
 
     battle.ApplyDamage(buffed, 11); // 9/20: condition holds
-    buffed.EvaluateBuffs(battle.Read, battle.Session.ReconcileBuffFlip);
+    buffed.EvaluateBuffs(battle.Read);
 
     Assert.Equal(75f, buffed.EffectiveStat<AimStat>());
     Assert.Equal(1, buffed.ActiveBuffs.AsValueEnumerable().Count());

@@ -5,10 +5,7 @@ namespace FunProject.Battle;
 /// <summary>
 /// The one read side of a battle: shared tactical state plus lifecycle facts. Preparation
 /// contexts carry only their state; runtime contexts derive the turn and completion answers
-/// from the runtime's single internal running-or-completed representation. Inspection code
-/// composes reads through <see cref="Query{TDirect}"/>; trusted engine code uses the internal
-/// accessors. A completed context answers turn questions with None, availability with false,
-/// and keeps state-backed inspection (positions, visibility, hit previews) usable.
+/// from the runtime's single internal running-or-completed representation.
 /// </summary>
 public sealed class BattleReadContext
 {

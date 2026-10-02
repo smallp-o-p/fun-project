@@ -1,6 +1,5 @@
 using FunProject.Combatants;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 
 namespace FunProject.Battle;
 
@@ -17,17 +16,13 @@ public sealed class StatusEffectSystem : BattleHook<TurnEndedBattleEvent>
 {
   protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TurnEndedBattleEvent turnEnded)
   {
-    Faction faction = turnEnded.Faction;
     // Status effects tick through the running receiver: they are synchronous upkeep of the
     // ending turn's step, and completed event contexts carry no receiver by contract.
-    return context.Read.RunningSession.Match(
-      Some: session => TickAll(session, faction),
-      None: () => []);
-  }
+    if (context.Read.RunningSession.IsNone)
+      return [];
+    BattleSession session = context.Read.RunningSession.RequireSome();
 
-  private static IReadOnlyList<BattleAction> TickAll(BattleSession session, Faction faction)
-  {
-    foreach (BattleUnitState unit in session.State.GetFactionAliveUnits(faction).ToImmutableList()) // snapshot: a lethal tick removes the unit from AliveUnits mid-iteration
+    foreach (BattleUnitState unit in session.State.GetFactionAliveUnits(turnEnded.Faction)) // snapshot: a lethal tick removes the unit from AliveUnits mid-iteration
     {
       foreach (ActiveStatusEffect active in unit.ActiveStatusEffects.AsValueEnumerable().ToList())
       {

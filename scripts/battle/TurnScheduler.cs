@@ -6,35 +6,27 @@ namespace FunProject.Battle;
 
 // Owns the turn/round scheduling state: the live round queue, the sides that already acted
 // this round, the active faction's available units, and the current turn (active faction +
-// round number together). Constructed once from the complete prepared state against the
-// authoritative ordered faction list and live consciousness sources, and valid on return:
-// round 1, every supplied faction queued in order, first faction active, its conscious-unit
-// availability populated. It deliberately knows nothing about events, outcomes, or death
-// side-effects — the running receiver keeps that orchestration. Advancement owns the queue,
-// round, current turn, and availability together; absence (None) retains the outgoing
-// current turn so the receiver can settle Draw against it.
+// round number together). Constructed once from the complete prepared state; consciousness
+// and availability read the shared state directly. It deliberately knows nothing about
+// events, outcomes, or death side-effects — the running receiver keeps that orchestration.
+// Advancement owns the queue, round, current turn, and availability together; absence (None)
+// retains the outgoing current turn so the receiver can settle Draw against it.
 internal sealed class TurnScheduler
 {
-  private readonly IList<Faction> _orderedFactions;
-  private readonly Func<Faction, bool> _hasConsciousUnits;
-  private readonly Func<Faction, IEnumerable<BattleUnitState>> _consciousUnitsOf;
+  private readonly BattleState _state;
 
   private Queue<Faction> _turnQueue;
   private readonly SysColGeneric.HashSet<Faction> _sidesActedThisRound = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _activeFactionUnitsAvailable = [];
 
-  internal TurnScheduler(
-    IList<Faction> orderedFactions,
-    Func<Faction, bool> hasConsciousUnits,
-    Func<Faction, IEnumerable<BattleUnitState>> consciousUnitsOf)
+  internal TurnScheduler(BattleState state)
   {
-    _orderedFactions = orderedFactions ?? throw new ArgumentNullException(nameof(orderedFactions));
-    _hasConsciousUnits = hasConsciousUnits ?? throw new ArgumentNullException(nameof(hasConsciousUnits));
-    _consciousUnitsOf = consciousUnitsOf ?? throw new ArgumentNullException(nameof(consciousUnitsOf));
-    if (orderedFactions.Count == 0)
-      throw new ArgumentException("The scheduler requires at least one faction.", nameof(orderedFactions));
+    ArgumentNullException.ThrowIfNull(state);
+    if (state.Factions.Count == 0)
+      throw new ArgumentException("The scheduler requires at least one faction.", nameof(state));
 
-    _turnQueue = new Queue<Faction>(orderedFactions);
+    _state = state;
+    _turnQueue = new Queue<Faction>(state.Factions);
     ActiveSide = _turnQueue.Peek();
     RoundNumber = 1;
     RefreshActiveFactionAvailability();
@@ -51,21 +43,18 @@ internal sealed class TurnScheduler
   // the next side, and establish its availability.
   internal Option<BattleTurn> AdvanceTurn()
   {
-    if (!_orderedFactions.AsValueEnumerable().Any(_hasConsciousUnits))
+    if (!_state.Factions.AsValueEnumerable().Any(_state.HasConsciousUnits))
       return None;
 
     _sidesActedThisRound.Add(ActiveSide);
     _turnQueue.Dequeue();
-    _turnQueue = new Queue<Faction>(_turnQueue.AsValueEnumerable().Where(_hasConsciousUnits).ToArray());
+    _turnQueue = new Queue<Faction>(_turnQueue.AsValueEnumerable().Where(_state.HasConsciousUnits).ToArray());
 
     if (_turnQueue.Count == 0)
     {
-      if (!_orderedFactions.AsValueEnumerable().Any(_hasConsciousUnits))
-        return None;
-
       RoundNumber++;
       _sidesActedThisRound.Clear();
-      _turnQueue = new Queue<Faction>(_orderedFactions.AsValueEnumerable().Where(_hasConsciousUnits).ToArray());
+      _turnQueue = new Queue<Faction>(_state.Factions.AsValueEnumerable().Where(_state.HasConsciousUnits).ToArray());
     }
 
     ActiveSide = _turnQueue.Peek();
@@ -82,8 +71,7 @@ internal sealed class TurnScheduler
   {
     ArgumentNullException.ThrowIfNull(unit);
     Faction side = unit.Side;
-    if (!_orderedFactions.Contains(side))
-      _orderedFactions.Add(side);
+    _state.RegisterFaction(side);
 
     if (!unit.IsAlive || unit.IsUnconscious)
       return;
@@ -114,7 +102,7 @@ internal sealed class TurnScheduler
   internal void ReconcileConsciousness(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
-    if (_hasConsciousUnits(unit.Side))
+    if (_state.HasConsciousUnits(unit.Side))
       return;
 
     if (unit.Side == ActiveSide)
@@ -132,7 +120,7 @@ internal sealed class TurnScheduler
   private void RefreshActiveFactionAvailability()
   {
     _activeFactionUnitsAvailable.Clear();
-    foreach (BattleUnitState unit in _consciousUnitsOf(ActiveSide))
+    foreach (BattleUnitState unit in _state.GetFactionConsciousUnits(ActiveSide))
       _activeFactionUnitsAvailable.Add(unit);
   }
 }
