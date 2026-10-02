@@ -44,24 +44,13 @@ public partial class CharacterModel : Node3D
   private Godot.AnimationTree? _animationTree;
   private bool _initialized;
 
-  public override void _Ready()
-  {
-    // Face axes must be sampled after the native AnimationTree applies its pose.
-    // ProcessPriority orders the mixer's internal process (idle mode, priority 0)
-    // and this root's regular _Process together, lower first, so without
-    // priority 1 tree order alone would run this root first and the shader
-    // uniforms would lag the mixer by a frame.
-    ProcessPriority = 1;
-    Initialize();
-  }
-
-  public override void _Process(double delta) => UpdateFaceAxes();
+  public override void _Ready() => Initialize();
 
   private const string AnimationTreeChildName = "ModelAnimationTree";
 
   /// <summary>
   /// First-time initialization: resolve the animation tree child and the
-  /// attachments path, bind the imported face-lighting slots, then initialize
+  /// attachments path, then initialize
   /// the mask setups, the wardrobe, and the attachments. A missing <c>ModelAnimationTree</c>
   /// child leaves that component unconfigured; a wrong-type child is an authoring
   /// error, and any failure fails initialization, so a repeated Initialize (or
@@ -73,7 +62,6 @@ public partial class CharacterModel : Node3D
       return;
     _animationTree = ResolveAnimationTree();
     _attachments = ResolveAttachmentContainer();
-    InitializeAppearance();
     InitializeMasks();
     InitializeWardrobe();
     ApplyAttachmentsVisibility();

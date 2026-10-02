@@ -1,6 +1,5 @@
 #nullable disable warnings
 using System;
-using System.Threading.Tasks;
 using FunProject.Models;
 using GdUnit4;
 using Godot;
@@ -15,135 +14,12 @@ public class CharacterModelAnimationAssetTest
   private const double FirstWeight = 0.5;
   private const double SecondWeight = 0.25;
   private const double ValueEpsilon = 1e-3;
-  private const int OrderingBoundFrames = 240;
-  private const int RequiredPoseChanges = 3;
 
   // One preset contribution discovered from the authored graph: its Add2 weight
   // parameter plus the facial target and neutral-relative endpoint pair its clip
   // drives.
   private sealed record PresetTarget(
     string Parameter, string MeshPath, string Shape, double Neutral, double Endpoint);
-
-  // ------------------------------------------------------------------
-  // Face-lighting integration: after the native mixer rotated the head via
-  // the HeadTurn branch and one frame elapsed, the isolated face material's
-  // world axes must match the live head-bone basis — the appearance's
-  // _Process runs on its own, no test calls UpdateFaceAxes directly.
-  // ------------------------------------------------------------------
-
-  [TestCase(ZhuYuanScene)]
-  [TestCase(TriggerScene)]
-  public async Task FaceAxesFollowTheNativeHeadPose(string scene)
-  {
-    using var fixture = ModelFixture.FromScene(scene);
-    var tree = fixture.Model.AnimationTree;
-    tree.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual;
-    tree.Active = true;
-    tree.Advance(0);
-    tree.Set("parameters/HeadTurn/blend_amount", 1.0);
-    tree.Advance(0.25);
-
-    var skeleton = fixture.Root.GetNode<Skeleton3D>("Model/rig_D/GeneralSkeleton");
-    int head = RequireBone(skeleton, "Head", scene);
-    // process_frame emits before the frame's node _Process callbacks run, so the
-    // first await resumes the test before the model root sampled the new pose;
-    // the second await guarantees one complete sample pass has happened.
-    await fixture.Model.GetTree().ToSignal(
-      fixture.Model.GetTree(), SceneTree.SignalName.ProcessFrame);
-    await fixture.Model.GetTree().ToSignal(
-      fixture.Model.GetTree(), SceneTree.SignalName.ProcessFrame);
-
-    (MeshInstance3D faceMesh, int faceSurface) = FindFaceSurface(fixture.Root);
-    var face = (ShaderMaterial)faceMesh.GetSurfaceOverrideMaterial(faceSurface)!;
-    Basis axes = skeleton.GlobalBasis
-      * skeleton.GetBoneGlobalPose(head).Basis
-      * skeleton.GetBoneGlobalRest(head).Basis.Inverse();
-    Vector3 forward = (axes * Vector3.Back).Normalized();
-    Vector3 right = (axes * Vector3.Right).Normalized();
-    Assert.True(face.GetShaderParameter(CharacterModel.HeadForwardParameter).AsVector3()
-        .DistanceTo(forward) < 1e-3,
-      $"The '{scene}' face material's head_forward_world did not follow the native head pose.");
-    Assert.True(face.GetShaderParameter(CharacterModel.HeadRightParameter).AsVector3()
-        .DistanceTo(right) < 1e-3,
-      $"The '{scene}' face material's head_right_world did not follow the native head pose.");
-  }
-
-  // ------------------------------------------------------------------
-  // Automatic ordering coverage: a test-owned looping clip drives the tracked
-  // face bone through an automatically processed, continuously changing head
-  // pose (default idle callback mode — no manual Advance). The model root sits
-  // earlier in tree order than its animation tree child, so equal priority
-  // would run its _Process first and sample the stale pose; priority 1
-  // schedules it after the mixer's priority-0 internal process
-  // (process_priority orders NOTIFICATION_PROCESS and
-  // NOTIFICATION_INTERNAL_PROCESS together, lower first). Each await resumes
-  // at the next process_frame — before that frame's node processing — so the
-  // sampled state is the previous completed frame's; whenever the pose changed
-  // across that boundary, the uniforms must already match this frame's pose.
-  // ------------------------------------------------------------------
-
-  [TestCase]
-  public async Task AutomaticHeadMotionUpdatesFaceAxesAtCompletedFrames()
-  {
-    using var fixture = ModelFixture.WithAppearance(start: false);
-    fixture.Player.GetAnimationLibrary("").AddAnimation("head_turn_loop", MakeLoopingHeadTurnClip());
-    var tree = new AnimationTree
-    {
-      Name = "AnimationTree",
-      AnimPlayer = "../AnimationPlayer",
-      TreeRoot = new AnimationNodeAnimation { Animation = "head_turn_loop" },
-      CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Idle,
-      Active = true,
-    };
-    fixture.Model.AddChild(tree);
-    fixture.Start();
-
-    var skeleton = fixture.FaceSkeleton!;
-    int head = skeleton.FindBone(CharacterModel.FaceBoneName);
-    var face = (ShaderMaterial)fixture.Body.GetSurfaceOverrideMaterial(0)!;
-    var sceneTree = fixture.Model.GetTree();
-
-    Quaternion previousPose = skeleton.GetBoneGlobalPose(head).Basis.GetRotationQuaternion();
-    int verifiedChanges = 0;
-    for (int frame = 0; frame < OrderingBoundFrames && verifiedChanges < RequiredPoseChanges; frame++)
-    {
-      await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
-      Quaternion pose = skeleton.GetBoneGlobalPose(head).Basis.GetRotationQuaternion();
-      if (pose.IsEqualApprox(previousPose))
-        continue;
-      Basis axes = skeleton.GlobalBasis
-        * skeleton.GetBoneGlobalPose(head).Basis
-        * skeleton.GetBoneGlobalRest(head).Basis.Inverse();
-      Vector3 expectedForward = (axes * Vector3.Back).Normalized();
-      Vector3 expectedRight = (axes * Vector3.Right).Normalized();
-      Vector3 uniformForward = face.GetShaderParameter(CharacterModel.HeadForwardParameter).AsVector3();
-      Vector3 uniformRight = face.GetShaderParameter(CharacterModel.HeadRightParameter).AsVector3();
-      Assert.True(uniformForward.DistanceTo(expectedForward) < 1e-3,
-        $"The face uniforms lagged the automatically applied head pose at a completed-frame boundary: " +
-        $"forward {uniformForward} instead of {expectedForward}.");
-      Assert.True(uniformRight.DistanceTo(expectedRight) < 1e-3,
-        $"The face uniforms lagged the automatically applied head pose at a completed-frame boundary: " +
-        $"right {uniformRight} instead of {expectedRight}.");
-      verifiedChanges++;
-      previousPose = pose;
-    }
-
-    Assert.True(verifiedChanges >= RequiredPoseChanges,
-      $"The tracked head pose never changed in {OrderingBoundFrames} awaited frames; " +
-      "the automatic mixer did not drive the face bone.");
-  }
-
-  // A test-owned looping clip rotating the tracked face bone, so consecutive
-  // completed frames always sample a different head pose.
-  private static Animation MakeLoopingHeadTurnClip()
-  {
-    var clip = new Animation { Length = 1.0, LoopMode = Animation.LoopModeEnum.Linear };
-    int track = clip.AddTrack(Animation.TrackType.Rotation3D);
-    clip.TrackSetPath(track, $"Model/FaceSkeleton:{CharacterModel.FaceBoneName}");
-    clip.TrackInsertKey(track, 0.0, Quaternion.Identity);
-    clip.TrackInsertKey(track, 1.0, Quaternion.FromEuler(new Vector3(0, MathF.PI / 4, 0)));
-    return clip;
-  }
 
   // ------------------------------------------------------------------
   // Clothing with the graph active: a wardrobe derivation must neither
@@ -386,29 +262,6 @@ public class CharacterModelAnimationAssetTest
     }
     throw new InvalidOperationException(
       $"'{clip.ResourcePath}' has no rotation track; the head-turn endpoint is not authored.");
-  }
-
-  // Finds the sole face SDF surface whose material carries the face-axis uniforms.
-  private static (MeshInstance3D Mesh, int Surface) FindFaceSurface(Node root)
-  {
-    foreach (Node child in root.GetChildren())
-    {
-      if (child is MeshInstance3D mesh && mesh.Mesh is not null)
-      {
-        for (int surface = 0; surface < mesh.Mesh.GetSurfaceCount(); surface++)
-        {
-          if (mesh.GetSurfaceOverrideMaterial(surface) is ShaderMaterial material
-            && material.GetShaderParameter(CharacterModel.UseFaceSdfParameter).AsBool())
-            return (mesh, surface);
-        }
-      }
-
-      (MeshInstance3D, int) descendant = FindFaceSurface(child);
-      if (descendant.Item1 is not null)
-        return descendant;
-    }
-
-    return (null, -1);
   }
 
   // Picks the first two Add2 preset layers (sorted node order) whose selected

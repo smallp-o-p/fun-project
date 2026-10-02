@@ -782,26 +782,20 @@ internal static class TestData
     return configuration;
   }
 
-  // The fixture's base face material over a synthetic face-and-outline shader
-  // carrying every parameter the isolated materials use: use_face_sdf on the base,
-  // outline toggles and weights on the NextPass.
-  public static ShaderMaterial MakeModelFaceMaterial()
+  // Scene-local fixture materials with authored outline toggles and weights.
+  public static ShaderMaterial MakeModelMaterial()
   {
     const string code = """
       shader_type spatial;
 
       uniform bool enabled = true;
       uniform float width_scale = 1.0;
-      uniform bool use_face_sdf = false;
-      uniform vec3 head_forward_world = vec3(0.0, 0.0, 1.0);
-      uniform vec3 head_right_world = vec3(1.0, 0.0, 0.0);
       uniform sampler2D vertex_weights : filter_nearest;
       """;
     var shader = new Shader { Code = code };
     var outline = new ShaderMaterial { Shader = shader, ResourceLocalToScene = true };
     outline.SetMeta("source_weights", new float[] { 1, 1, 1, 1, 1, 1 });
     var material = new ShaderMaterial { Shader = shader, NextPass = outline, ResourceLocalToScene = true };
-    material.SetShaderParameter("use_face_sdf", true);
     return material;
   }
 

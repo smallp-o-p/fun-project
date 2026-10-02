@@ -81,7 +81,6 @@ static func _apply_surfaces(scene: Node, key: String, manifest: Resource) -> Str
 	var rows_variant: Variant = manifest.get_meta("surfaces", null)
 	if not (rows_variant is Array):
 		return key + "/surfaces: missing or not an Array"
-	var faces: Array[Dictionary] = []
 	for row_variant: Variant in rows_variant as Array:
 		var row: Dictionary = row_variant as Dictionary
 		var old_path: String = str(row.get("node_path", ""))
@@ -99,21 +98,6 @@ static func _apply_surfaces(scene: Node, key: String, manifest: Resource) -> Str
 		if material == null:
 			return label + ": material missing or not a Material"
 		mesh_instance.set_surface_override_material(index, material)
-		if material is ShaderMaterial and material.get_shader_parameter("use_face_sdf") == true:
-			var skeleton := mesh_instance.get_node_or_null(mesh_instance.skeleton) as Skeleton3D
-			if skeleton == null:
-				return label + ": face skeleton is missing"
-			var head: int = skeleton.find_bone("Head")
-			if head < 0:
-				return label + ": face skeleton has no Head bone"
-			faces.append({
-				"mesh_path": NodePath(instance_path), "surface_index": index,
-				"skeleton_path": scene.get_path_to(skeleton), "head_bone": head,
-				"inverse_rest": skeleton.get_bone_global_rest(head).basis.inverse(),
-			})
-	# Paths and bone indices belong to this repaired import, so reimport rebuilds
-	# them together. Runtime resolves exact instance slots, never shared materials.
-	scene.set_meta("face_lighting", faces)
 	return ""
 
 static func _apply_defaults(scene: Node, key: String, manifest: Resource) -> String:

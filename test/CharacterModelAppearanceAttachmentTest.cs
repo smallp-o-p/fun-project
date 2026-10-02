@@ -11,32 +11,17 @@ public class CharacterModelAppearanceAttachmentTest
   // Per-instance material isolation
   // ------------------------------------------------------------------
 
-  // Isolation serves per-instance copies and feeds the face axes: only the
-  // per-instance copies carry the runtime face axes while the authored material
-  // keeps its default axes and its own outline pass untouched.
   [TestCase]
-  public void IsolationCarriesFaceAxesAndLeavesAuthoredMaterialsUntouched()
+  public void IsolationLeavesAuthoredMaterialsUntouchedWithoutRuntimeProcessing()
   {
-    using var fixture = ModelFixture.WithAppearance(headRest: new Basis(Vector3.Up, 0.4f));
-    fixture.Model.Rotation = new Vector3(0, MathF.PI / 2, 0);
-    fixture.Model.UpdateFaceAxes();
-
-    Assert.Equal(1.0, ((ShaderMaterial)fixture.SharedMaterial!.NextPass!)
+    using var fixture = ModelFixture.WithAppearance();
+    var material = (ShaderMaterial)fixture.Body.GetSurfaceOverrideMaterial(0)!;
+    Assert.False(ModelFixture.SameNative(material, fixture.SharedMaterial));
+    Assert.False(ModelFixture.SameNative(fixture.Outline, fixture.SharedMaterial!.NextPass));
+    fixture.Outline.SetShaderParameter("width_scale", 2.5);
+    Assert.Equal(1.0, ((ShaderMaterial)fixture.SharedMaterial.NextPass!)
       .GetShaderParameter("width_scale").AsDouble());
-    Assert.True(fixture.SharedMaterial.GetShaderParameter("head_forward_world").AsVector3()
-      .DistanceTo(Vector3.Back) < 1e-6);
-    var face = (ShaderMaterial)fixture.Body.GetSurfaceOverrideMaterial(0)!;
-    Assert.False(ModelFixture.SameNative(face, fixture.SharedMaterial));
-    Assert.False(ModelFixture.SameNative(fixture.Outline, fixture.SharedMaterial.NextPass));
-    Assert.True(face.GetShaderParameter("head_forward_world").AsVector3()
-      .DistanceTo(new Vector3(1, 0, 0)) < 1e-4);
-    Assert.True(face.GetShaderParameter("head_right_world").AsVector3()
-      .DistanceTo(new Vector3(0, 0, -1)) < 1e-4);
-
-    fixture.FaceSkeleton!.SetBonePoseRotation(0, Quaternion.FromEuler(new Vector3(0, MathF.PI + 0.4f, 0)));
-    fixture.Model.UpdateFaceAxes();
-    Assert.True(face.GetShaderParameter("head_forward_world").AsVector3()
-      .DistanceTo(new Vector3(-1, 0, 0)) < 1e-4);
+    Assert.False(fixture.Model.IsProcessing());
   }
 
   // Isolation carries authored outline settings per instance: a non-default
@@ -84,7 +69,7 @@ public class CharacterModelAppearanceAttachmentTest
     fixture.Model.MaskSetups = new Godot.Collections.Array<ModelMeshMaskSetup> { setup };
     Assert.Equal(surfaceId, fixture.Body.GetSurfaceOverrideMaterial(0)!.GetInstanceId());
     Assert.Equal(outlineId, fixture.Outline.GetInstanceId());
-    Assert.Equal(1, fixture.Model.ProcessPriority, "A recovered model must still sample after the native mixer.");
+    Assert.False(fixture.Model.IsProcessing());
   }
 
   // ------------------------------------------------------------------

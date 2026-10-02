@@ -116,7 +116,7 @@ public class CharacterModelAssetTest
   // ------------------------------------------------------------------
   // Static materials: the authored outline settings (enabled, width 1)
   // and NextPass wiring survive per-instance isolation without any
-  // runtime outline writer, and the face materials keep their SDF flag.
+  // runtime outline writer.
   // ------------------------------------------------------------------
 
   [TestCase(ZhuYuanScene)]
@@ -151,7 +151,6 @@ public class CharacterModelAssetTest
     var meshes = new SysColGeneric.List<MeshInstance3D>();
     CollectDescendants(fixture.Root, meshes);
     int outlinedSurfaces = 0;
-    int faceSurfaces = 0;
     foreach (MeshInstance3D mesh in meshes)
     {
       if (mesh.Mesh is null)
@@ -160,8 +159,6 @@ public class CharacterModelAssetTest
       {
         if (mesh.GetSurfaceOverrideMaterial(surface) is not ShaderMaterial baseMaterial)
           continue;
-        if (baseMaterial.GetShaderParameter(CharacterModel.UseFaceSdfParameter).AsBool())
-          faceSurfaces++;
         if (baseMaterial.NextPass is not ShaderMaterial outline)
           continue;
         outlinedSurfaces++;
@@ -173,8 +170,6 @@ public class CharacterModelAssetTest
     }
     Assert.True(outlinedSurfaces > 0,
       $"The '{scene}' surfaces carry no outline passes; the authored outlines were lost.");
-    Assert.True(faceSurfaces > 0,
-      $"The '{scene}' surfaces carry no face SDF materials; the face lighting setup was lost.");
   }
 
   // ------------------------------------------------------------------
@@ -436,13 +431,13 @@ public class CharacterModelAssetTest
 
   [TestCase(ZhuYuanScene, "res://scenes/models/ZhuYuan/ZhuYuan.blend")]
   [TestCase(TriggerScene, "res://scenes/models/Trigger/Trigger4.2.blend")]
-  public void SceneLocalMaterialsKeepMasksAndFaceAxesIndependent(string scene, string importedScene)
+  public void SceneLocalMaterialsKeepMasksAndOutlinesIndependent(string scene, string importedScene)
   {
     using var first = ModelFixture.FromScene(scene, start: false);
     using var second = ModelFixture.FromScene(scene, start: false);
     SceneState source = ResourceLoader.Load<PackedScene>(importedScene).GetState();
     var surfaces = new SysColGeneric.List<(ShaderMaterial Source, ShaderMaterial First, ShaderMaterial Second,
-      Variant Forward, Variant Right, Variant Weights)>();
+      Variant Weights)>();
     var outlines = new SysColGeneric.HashSet<ulong>();
     for (int node = 0; node < source.GetNodeCount(); node++)
     {
@@ -464,8 +459,6 @@ public class CharacterModelAssetTest
           Assert.True(outlines.Add(a.NextPass.GetInstanceId()), "Independently masked surfaces must not alias an outline pass.");
         }
         surfaces.Add((authored, a, b,
-          authored.GetShaderParameter(CharacterModel.HeadForwardParameter),
-          authored.GetShaderParameter(CharacterModel.HeadRightParameter),
           (authored.NextPass as ShaderMaterial)?.GetShaderParameter("vertex_weights") ?? default));
       }
     }
@@ -482,23 +475,9 @@ public class CharacterModelAssetTest
         < TestData.VisibleTriangles(second.Model.MaskRenderMesh(setup.MeshPath)),
         "Different mask selections must retain independent rendered geometry.");
     }
-    first.Model.Rotation = new Vector3(0, 0.7f, 0);
-    second.Model.Rotation = new Vector3(0, -0.4f, 0);
-    first.Model.UpdateFaceAxes();
-    second.Model.UpdateFaceAxes();
-    int faces = 0;
     int outlinedSurfaces = 0;
     foreach (var item in surfaces)
     {
-      Assert.Equal(item.Forward, item.Source.GetShaderParameter(CharacterModel.HeadForwardParameter));
-      Assert.Equal(item.Right, item.Source.GetShaderParameter(CharacterModel.HeadRightParameter));
-      if (item.Source.GetShaderParameter(CharacterModel.UseFaceSdfParameter).AsBool())
-      {
-        faces++;
-        Vector3 a = item.First.GetShaderParameter(CharacterModel.HeadForwardParameter).AsVector3();
-        Vector3 b = item.Second.GetShaderParameter(CharacterModel.HeadForwardParameter).AsVector3();
-        Assert.True(a.DistanceTo(b) > 0.5f, "Different instance poses must produce independent face axes.");
-      }
       if (item.Source.NextPass is not ShaderMaterial sourceOutline)
         continue;
       Assert.True(SameTextureParameter(item.Weights, sourceOutline.GetShaderParameter("vertex_weights")),
@@ -512,7 +491,7 @@ public class CharacterModelAssetTest
       Assert.Equal(width, sourceOutline.GetShaderParameter("width_scale").AsDouble());
       Assert.Equal(otherWidth, secondOutline.GetShaderParameter("width_scale").AsDouble());
     }
-    Assert.True(faces > 0 && outlinedSurfaces > 0, "Both face lighting and mutable outlines must be exercised.");
+    Assert.True(outlinedSurfaces > 0, "Mutable outlines must be exercised.");
   }
 
   // Resource property reads can create new managed wrappers for the same native texture.

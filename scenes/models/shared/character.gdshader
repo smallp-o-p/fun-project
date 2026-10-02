@@ -36,16 +36,8 @@ uniform vec4 rim_color_2 : source_color = vec4(0.0);
 uniform vec3 rim_settings_0 = vec3(0.0);
 uniform vec3 rim_settings_1 = vec3(0.0);
 uniform vec3 rim_settings_2 = vec3(0.0);
-uniform bool use_face_sdf = false;
-uniform sampler2D face_sdf : source_color, filter_linear_mipmap, repeat_enable;
-uniform vec3 head_forward_world = vec3(0.0, 0.0, 1.0);
-uniform vec3 head_right_world = vec3(1.0, 0.0, 0.0);
-
 varying vec3 glossy_normal;
 varying vec3 packed_values;
-varying vec2 face_samples;
-varying vec3 head_forward_view;
-varying vec3 head_right_view;
 varying vec3 highlight_color;
 
 // Compatibility samples color textures in sRGB, whereas Forward+/Mobile use
@@ -87,11 +79,6 @@ float source_rim(vec3 n, vec3 v, vec3 settings) {
     float aa=max(fwidth(mask),0.002);
     return smoothstep(0.1-aa, 0.1+aa, mask);
 }
-float sdf_ramp(float x) {
-    if (x < 0.3625) return mix(0.0, 0.0840517, clamp(x/0.3625,0.0,1.0));
-    if (x < 0.6659088) return mix(0.0840517,0.5497862,(x-0.3625)/0.3034088);
-    return mix(0.5497862,1.0,clamp((x-0.6659088)/0.3340912,0.0,1.0));
-}
 void fragment() {
     vec3 n = normalize(NORMAL);
     vec3 base = to_linear(texture(albedo_texture, UV).rgb)*to_linear(base_color.rgb);
@@ -121,13 +108,6 @@ void fragment() {
     if (rim_count>1) rim += to_linear(rim_color_1.rgb)*source_rim(n,VIEW,rim_settings_1);
     if (rim_count>2) rim += to_linear(rim_color_2.rgb)*source_rim(n,VIEW,rim_settings_2);
     EMISSION = to_output(to_linear(EMISSION)+rim*rim_strength);
-    face_samples=vec2(0.0);
-    head_forward_view=normalize((VIEW_MATRIX*vec4(head_forward_world,0.0)).xyz);
-    head_right_view=normalize((VIEW_MATRIX*vec4(head_right_world,0.0)).xyz);
-    if (use_face_sdf) {
-        float a=clamp((texture(face_sdf,UV).a-0.681818)/0.318182,0.0,1.0);
-        face_samples=vec2(to_linear(texture(face_sdf,UV).rgb).r,to_linear(texture(face_sdf,vec2(-UV.x,UV.y)).rgb).r)*a;
-    }
 }
 void light() {
     float ndl = max(dot(NORMAL,LIGHT),0.0);
@@ -136,16 +116,7 @@ void light() {
     float irradiance = gray(LIGHT_COLOR)/PI;
     float diffuse_input = ndl*packed_values.x*irradiance/PI;
     float shade = use_packed_maps ? source_diffuse(diffuse_input) : smoothstep(0.16-shadow_softness,0.16+shadow_softness,ndl*packed_values.x);
-    if (use_face_sdf) {
-        // Evaluated Blender SUN points toward the light. Its named FRONT
-        // attribute points backward, opposite our visual head-forward axis.
-        float sample_value = dot(head_right_view,LIGHT)>0.0 ? face_samples.x : face_samples.y;
-        shade = sdf_ramp(sample_value / max(dot(head_forward_view,-LIGHT)*0.47+0.5,0.03));
-    }
-    // Source face lighting is driven by SUN orientation, then emitted at full
-    // palette intensity. Keep the light's hue without washing out its shadows.
     vec3 palette_light=LIGHT_COLOR/PI;
-    if (use_face_sdf) palette_light/=max(irradiance,0.0001);
     DIFFUSE_LIGHT += to_output(mix(to_linear(shadow_tint.rgb),vec3(1.0),shade))*ATTENUATION*palette_light;
     float h=pow(max(dot(glossy_normal,normalize(LIGHT+VIEW)),0.0),max(2.0,2.0/(highlight_roughness*highlight_roughness)-2.0));
     float aa=max(fwidth(h),0.015);
