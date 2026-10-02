@@ -97,16 +97,23 @@ public partial class BattleFixtureTest
     Assert.Throws<ObjectDisposedException>(() => battle.ClearEvents());
   }
 
-  [TestCase(TestName = "A failed preparation keeps its recorded events inspectable through disposal")]
+  [TestCase(TestName = "A failed preparation keeps recording and its recorded events through disposal")]
   public void FailedPreparationKeepsRecordedEventsThroughDisposal()
   {
     var faction = TestData.MakeFaction("Player");
-    var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
+    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
     battle.Spawn(TestData.MakeCombatant("Fallen", faction, health: 0), new Vector3I(0, 0, 0));
     Assert.Throws<InvalidOperationException>(() => battle.Start()); // no living, conscious unit
+    Assert.Equal(1, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
 
-    Assert.Equal(1, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
+    // The recorder must stay attached across the failed Start: later placement events are
+    // still captured with the failing preparation, not just the pre-failure ones.
+    BattleUnitState late = battle.Spawn(TestData.MakeCombatant("Riser", faction), new Vector3I(2, 0, 0));
+    var added = battle.Events.EventsOf<UnitAddedBattleEvent>();
+    Assert.Equal(2, added.Length);
+    Assert.True(ReferenceEquals(late, added[1].Unit));
+
     battle.Dispose();
-    Assert.Equal(1, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
+    Assert.Equal(2, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
   }
 }
