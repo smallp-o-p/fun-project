@@ -345,6 +345,10 @@ public partial class GeoscapeBattleHandoffTest
       runtime.TryGetAlive(GruntAt(runtime)).RequireSome(), 999));
     DrainDirector(battle);
 
+    // Captured before the swap: MapEventMarkers filters by the export's resource path, so
+    // after substituting the wrong-root scene its count could not see the original markers.
+    var markersBeforeReturn = MapEventMarkers(scene);
+
     // The router's own close-path refresh throws after the return was consumed, so the close
     // event never finishes reaching the scene router; cleanup must still run.
     scene.GetNode<GeoscapeMapControl>("%Map").EventMarkerScene =
@@ -367,10 +371,12 @@ public partial class GeoscapeBattleHandoffTest
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
 
-    // The throwing close-path refresh cleared every marker before its failed
+    // The throwing close-path refresh detached every original marker before its failed
     // instantiation: the guaranteed cleanup must not resurrect the consumed mission's
-    // marker from campaign truth.
-    Assert.Equal(0, MapEventMarkers(scene).Length);
+    // marker from campaign truth. Asserted by node identity — the path-filtered count is
+    // vacuous once the export was swapped.
+    foreach (var marker in markersBeforeReturn)
+      Assert.True(marker.GetParent() is null);
 
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
     Assert.False(GodotObject.IsInstanceValid(squad));
