@@ -131,6 +131,21 @@ internal static class GeoscapeTestScenes
     return AddToTree(viewport);
   }
 
+  // Exercise the same logical canvas scaling as the real root window, rather than
+  // treating physical pixel dimensions as an unscaled UI SubViewport.
+  public static Window CreateScaledWindow(Control content, Vector2I size)
+  {
+    var window = new Window
+    {
+      Size = size,
+      ContentScaleSize = new Vector2I(800, 600),
+      ContentScaleMode = Window.ContentScaleModeEnum.CanvasItems,
+      ContentScaleAspect = Window.ContentScaleAspectEnum.Expand,
+    };
+    window.AddChild(content);
+    return AddToTree(window);
+  }
+
   public static async Task WaitForLayout(Node node)
   {
     for (int i = 0; i < 10; i++)

@@ -19,11 +19,6 @@ public partial class GeoscapeScene : Control
   private CampaignGameState _state = null!;
   private GeoscapeSession _session = null!;
   private GeoscapeMapControl _map = null!;
-  private GeoscapeCameraRig _camera = null!;
-  private Viewport _mapViewport = null!;
-  private SubViewportContainer _mapViewportContainer = null!;
-  private Control _bottomHud = null!;
-  private Control _topHud = null!;
   private GeoscapeHud _hud = null!;
   private PackedScene _resolutionViewScene = null!;
   private PackedScene _dialogueViewScene = null!;
@@ -43,20 +38,10 @@ public partial class GeoscapeScene : Control
     _map = GetNode<GeoscapeMapControl>("%Map");
     _map.Setup(_session, start.Map.Size);
 
-    // The camera stays in the full map SubViewport so it never transforms other
-    // screens. Its framing keeps map markers between both HUD rows in viewport space.
     _hud = GetNode<GeoscapeHud>("%GeoscapeHud");
-    _bottomHud = _hud.GetNode<Control>("BottomBar");
-    _topHud = _hud.GetNode<Control>("TimePanel");
-    _mapViewport = _map.GetViewport();
-    _mapViewportContainer = (SubViewportContainer)_mapViewport.GetParent();
-    _camera = new GeoscapeCameraRig { Name = "Camera" };
-    _mapViewport.AddChild(_camera);
-    _camera.Setup(start.Map.Size); // authored map bounds are a presentation concern
-    _mapViewport.SizeChanged += ReframeMapCamera;
-    _bottomHud.ItemRectChanged += ReframeMapCamera;
-    _topHud.ItemRectChanged += ReframeMapCamera;
-    ReframeMapCamera();
+    // Fit once after the HUD/container's deferred layout. Native window scaling
+    // handles supported resolutions; the geoscape has no player camera controls.
+    CallDeferred(MethodName.FrameMapCamera, start.Map.Size);
 
     _map.RegionClicked += region => GD.Print(region.FlavorText);
 
@@ -77,33 +62,24 @@ public partial class GeoscapeScene : Control
     _viewManager.RootView.Present(_state, _session);
   }
 
-  public override void _ExitTree()
+  private void FrameMapCamera(Vector2I mapSize)
   {
-    if (IsInstanceValid(_mapViewport))
-      _mapViewport.SizeChanged -= ReframeMapCamera;
-    if (IsInstanceValid(_bottomHud))
-      _bottomHud.ItemRectChanged -= ReframeMapCamera;
-    if (IsInstanceValid(_topHud))
-      _topHud.ItemRectChanged -= ReframeMapCamera;
-  }
-
-  private void ReframeMapCamera()
-  {
-    if (!_camera.IsInsideTree() || _mapViewportContainer.Size.Y <= 0)
-      return;
-
-    // Both HUD and container are in the outer canvas; convert to container-local
-    // coordinates before accounting for the inner viewport's render size. This keeps
-    // root content scaling and SubViewport stretch out of the camera's world math.
-    Transform2D toContainer = _mapViewportContainer.GetGlobalTransformWithCanvas().AffineInverse();
-    Vector2 bottomHudTop = toContainer * _bottomHud.GetGlobalTransformWithCanvas().Origin;
+    var viewport = _map.GetViewport();
+    var container = (SubViewportContainer)viewport.GetParent();
+    var bottomHud = _hud.GetNode<Control>("BottomBar");
+    var topHud = _hud.GetNode<Control>("TimePanel");
+    // The HUD lives outside the map viewport; express its edges in map pixels.
+    Transform2D toContainer = container.GetGlobalTransformWithCanvas().AffineInverse();
+    Vector2 bottomHudTop = toContainer * bottomHud.GetGlobalTransformWithCanvas().Origin;
     Vector2 topHudBottom = toContainer
-      * (_topHud.GetGlobalTransformWithCanvas() * new Vector2(0, _topHud.Size.Y));
-    Vector2 viewportSize = _mapViewport.GetVisibleRect().Size;
-    float ratio = viewportSize.Y / _mapViewportContainer.Size.Y;
+      * (topHud.GetGlobalTransformWithCanvas() * new Vector2(0, topHud.Size.Y));
+    Vector2 viewportSize = viewport.GetVisibleRect().Size;
+    float ratio = viewportSize.Y / container.Size.Y;
     float top = Mathf.Clamp(topHudBottom.Y * ratio, 0, viewportSize.Y);
     float bottom = Mathf.Clamp(bottomHudTop.Y * ratio, top, viewportSize.Y);
-    _camera.FitToArea(new Rect2(new Vector2(0, top), new Vector2(viewportSize.X, bottom - top)));
+    var camera = new GeoscapeCameraRig { Name = "Camera" };
+    viewport.AddChild(camera);
+    camera.Setup(mapSize, new Rect2(new Vector2(0, top), new Vector2(viewportSize.X, bottom - top)));
   }
 
   // Construction hook for derived scenes (debug playtests): the state exists before the

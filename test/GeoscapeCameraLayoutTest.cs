@@ -11,86 +11,101 @@ public class GeoscapeCameraLayoutTest
 {
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
+  [TestCase(1600, 900)]
   [TestCase(1920, 1080)]
-  public async Task InitialFrameFitsTheWholeMapBetweenHudRows(int width, int height)
+  [TestCase(1920, 1200)]
+  [TestCase(2560, 1440)]
+  [TestCase(3440, 1440)]
+  public async Task InitialFrameFitsTheWholeMapWithNativeWindowScaling(int width, int height)
   {
     var scene = CreateGeoscapeScene(TestData.MakeStart());
-    var viewport = CreateUiViewport(scene, new Vector2I(width, height));
-    await WaitForLayout(viewport);
+    var window = CreateScaledWindow(scene, new Vector2I(width, height));
+    await WaitForLayout(window);
 
     AssertMapFitsOperationalArea(scene);
-    Assert.Equal(new Vector2(width, height), MapCamera(scene).GetViewport().GetVisibleRect().Size);
+    Assert.Equal(600f, MapCamera(scene).GetViewport().GetVisibleRect().Size.Y);
   }
 
   [TestCase]
-  public async Task LiveResizeRefitsTheSameMapInBothDirections()
+  public async Task FixedFrameSurvivesNativeWindowResizesAndViewNavigation()
   {
+    await using var cleanup = new DeferredNodeCleanup();
     var scene = CreateGeoscapeScene(TestData.MakeStart());
-    var viewport = CreateUiViewport(scene, new Vector2I(1920, 1080));
-    await WaitForLayout(viewport);
+    var window = CreateScaledWindow(scene, new Vector2I(1600, 900));
+    await WaitForLayout(window);
     var camera = MapCamera(scene);
+    Vector2 position = camera.Position;
+    Vector2 zoom = camera.Zoom;
+    var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
 
-    foreach (var size in new[] { new Vector2I(800, 600), new Vector2I(1280, 720), new Vector2I(1920, 1080) })
+    foreach (var size in new[] { new Vector2I(800, 600), new Vector2I(1920, 1200),
+      new Vector2I(3440, 1440), new Vector2I(1280, 720), new Vector2I(1920, 1080) })
     {
-      viewport.Size = size;
-      await WaitForLayout(viewport);
-      Assert.True(ReferenceEquals(camera, MapCamera(scene)));
+      manager.Push(CreateBaseView());
+      window.Size = size;
+      await WaitForLayout(window);
+      manager.Pop();
+      await WaitForLayout(window);
+      Assert.Equal(position, camera.Position);
+      Assert.Equal(zoom, camera.Zoom);
       AssertMapFitsOperationalArea(scene);
     }
   }
 
   [TestCase]
-  public async Task HudGeometryChangeRefitsWithoutAViewportResize()
+  public async Task HudChangesDoNotTakeControlOfTheFixedCamera()
   {
     var scene = CreateGeoscapeScene(TestData.MakeStart());
-    var viewport = CreateUiViewport(scene, new Vector2I(1280, 720));
-    await WaitForLayout(viewport);
-    var bottomHud = scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Control>("BottomBar");
-
-    bottomHud.OffsetTop -= 80;
-    await WaitForLayout(viewport);
-
-    AssertMapFitsOperationalArea(scene);
-  }
-
-  [TestCase]
-  public async Task ResizeWhileCoveredRefitsBeforeReturningToTheMap()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var scene = CreateGeoscapeScene(TestData.MakeStart());
-    var viewport = CreateUiViewport(scene, new Vector2I(1920, 1080));
-    var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
-    await WaitForLayout(viewport);
-    manager.Push(CreateBaseView());
-
-    viewport.Size = new Vector2I(800, 600);
-    await WaitForLayout(viewport);
-    manager.Pop();
-    await WaitForLayout(viewport);
-
-    AssertMapFitsOperationalArea(scene);
-  }
-
-  [TestCase]
-  public async Task ManualCameraPositionAndZoomSurviveFramesAndLiveResize()
-  {
-    var scene = CreateGeoscapeScene(TestData.MakeStart());
-    var viewport = CreateUiViewport(scene, new Vector2I(1920, 1080));
-    await WaitForLayout(viewport);
+    var window = CreateScaledWindow(scene, new Vector2I(1600, 900));
+    await WaitForLayout(window);
     var camera = MapCamera(scene);
-    var position = new Vector2(1234, 567);
-    var zoom = new Vector2(2, 2);
-    camera.Position = position;
-    camera.Zoom = zoom;
-    await WaitForLayout(viewport);
-    Assert.Equal(position, camera.Position);
-    Assert.Equal(zoom, camera.Zoom);
+    Vector2 position = camera.Position;
+    Vector2 zoom = camera.Zoom;
 
-    viewport.Size = new Vector2I(800, 600);
-    await WaitForLayout(viewport);
+    scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Control>("BottomBar").OffsetTop -= 80;
+    await WaitForLayout(window);
 
     Assert.Equal(position, camera.Position);
     Assert.Equal(zoom, camera.Zoom);
+  }
+
+  [TestCase]
+  public async Task MouseAndKeyboardCameraInputCannotMoveOrZoomTheMap()
+  {
+    var scene = CreateGeoscapeScene(TestData.MakeStart());
+    var window = CreateScaledWindow(scene, new Vector2I(1600, 900));
+    await WaitForLayout(window);
+    var camera = MapCamera(scene);
+    Vector2 position = camera.Position;
+    Vector2 zoom = camera.Zoom;
+    var viewport = camera.GetViewport();
+    viewport.NotifyMouseEntered();
+    foreach (var button in new[] { MouseButton.WheelUp, MouseButton.WheelDown, MouseButton.Middle, MouseButton.Right })
+    {
+      viewport.PushInput(new InputEventMouseButton { ButtonIndex = button, Pressed = true, Position = new(400, 300) }, true);
+      viewport.PushInput(new InputEventMouseMotion { Position = new(500, 350), Relative = new(100, 50), ButtonMask = MouseButtonMask.Middle | MouseButtonMask.Right }, true);
+      await WaitForLayout(window);
+      viewport.PushInput(new InputEventMouseButton { ButtonIndex = button, Pressed = false }, true);
+    }
+    foreach (var action in new[] { "camera_up", "camera_down", "camera_forward", "camera_back", "camera_left", "camera_right", "camera_zoom_in", "camera_zoom_out" })
+    {
+      Input.ActionPress(action);
+      await WaitForLayout(window);
+      Input.ActionRelease(action);
+    }
+    Assert.Equal(position, camera.Position);
+    Assert.Equal(zoom, camera.Zoom);
+  }
+
+  [TestCase]
+  [GodotExceptionMonitor]
+  public async Task ClosingBeforeInitialLayoutCancelsFraming()
+  {
+    var scene = CreateGeoscapeScene(TestData.MakeStart());
+    var viewport = CreateUiViewport(scene, new Vector2I(800, 600));
+    scene.Free();
+    await WaitForLayout(viewport);
+    Assert.False(GodotObject.IsInstanceValid(scene));
   }
 
   [TestCase(8)]
