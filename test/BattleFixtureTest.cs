@@ -96,4 +96,17 @@ public partial class BattleFixtureTest
     Assert.Throws<ObjectDisposedException>(() => battle.Query(new GetCurrentTurnQuery()));
     Assert.Throws<ObjectDisposedException>(() => battle.ClearEvents());
   }
+
+  [TestCase(TestName = "A failed preparation keeps its recorded events inspectable through disposal")]
+  public void FailedPreparationKeepsRecordedEventsThroughDisposal()
+  {
+    var faction = TestData.MakeFaction("Player");
+    var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
+    battle.Spawn(TestData.MakeCombatant("Fallen", faction, health: 0), new Vector3I(0, 0, 0));
+    Assert.Throws<InvalidOperationException>(() => battle.Start()); // no living, conscious unit
+
+    Assert.Equal(1, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
+    battle.Dispose();
+    Assert.Equal(1, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
+  }
 }

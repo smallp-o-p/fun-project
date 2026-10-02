@@ -154,7 +154,7 @@ public sealed class BattleActionExecutor : IDisposable
 
       // Successful settlement happens only after the primitive returned and the synchronous
       // event queue drained: capture once, install Completed, broadcast exactly one end event.
-      if (step.TryTakeOutcome(out BattleOutcome outcome))
+      if (step.TryGetOutcome(out BattleOutcome outcome))
         Settle(session, outcome);
     }
     catch (Exception primary)
@@ -198,7 +198,7 @@ public sealed class BattleActionExecutor : IDisposable
     // A settled-then-faulted submission already installed its completion (only the end-event
     // broadcast failed); recapturing would replace the frozen report the end callback saw,
     // so the first install always wins.
-    if (!_runtime.IsRunning || !step.TryTakeOutcome(out BattleOutcome outcome))
+    if (!_runtime.IsRunning || !step.TryGetOutcome(out BattleOutcome outcome))
       return;
 
     try
@@ -274,7 +274,7 @@ internal sealed class BattleStep
 
   internal void RequestEnd(BattleOutcome outcome) => _outcome ??= outcome;
 
-  internal bool TryTakeOutcome(out BattleOutcome outcome)
+  internal bool TryGetOutcome(out BattleOutcome outcome)
   {
     if (_outcome is not BattleOutcome pending)
     {

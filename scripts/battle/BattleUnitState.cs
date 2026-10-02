@@ -247,8 +247,10 @@ public sealed class BattleUnitState
   // clamp, owner reconciliation, and event enqueue before the next grant is evaluated —
   // the buff-event path resolves pending visibility before returning, so the next grant's
   // condition reads the reconciled world. Notification itself may remain deferred while an
-  // outer dispatch runs (the shared dispatcher broadcasts in FIFO order).
-  internal void EvaluateBuffs(BattleReadContext context, Action<BattleUnitState, bool> onChanged)
+  // outer dispatch runs (the shared dispatcher broadcasts in FIFO order). The callback
+  // receives consciousness and effective vision as of before this grant's flag update and
+  // clamp, so owners can skip reconciliation for flips that changed neither.
+  internal void EvaluateBuffs(BattleReadContext context, Action<BattleUnitState, bool, int> onChanged)
   {
     ArgumentNullException.ThrowIfNull(onChanged);
     for (int i = 0; i < _buffs.Count; i++)
@@ -259,10 +261,11 @@ public sealed class BattleUnitState
         continue;
 
       bool wasConscious = !IsUnconscious;
+      int priorVision = Vision;
       _buffs[i] = (buff, isActive);
 
       ClampCurrentHealthToMax();
-      onChanged(this, wasConscious);
+      onChanged(this, wasConscious, priorVision);
       context.State.RaiseBuffEvent(isActive
         ? new UnitBuffActivatedBattleEvent(this, buff)
         : new UnitBuffDeactivatedBattleEvent(this, buff));

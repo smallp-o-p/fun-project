@@ -84,7 +84,10 @@ public sealed class BattleFixture : IDisposable
     // instances must reach both the fixture and the preparation.
     Factions = factions.AsValueEnumerable().ToArray();
     _preparation = new BattlePreparation(board, Factions, hitChanceCalculator, randomSeed, playerFaction);
-    _preparation.Prepared += RecordEvent;
+    // Direct recording from the shared dispatcher (the preparation's objective route stays
+    // subscribed first). Detached after a successful Complete; a failed preparation keeps
+    // recording until disposal.
+    _preparation.State.Committed += RecordEvent;
   }
 
   // Raw submission door: deliberately invalid or stale actions reach the executor unchanged,
@@ -138,7 +141,7 @@ public sealed class BattleFixture : IDisposable
 
   // Where a pooled unit currently stands (None once it is dead and off the board).
   public Option<BattleBoardState.ValidatedPoint> PositionOf(BattleUnitState unit)
-    => Query(new GetUnitPosition(unit));
+    => ReadState.TryGetAlive(unit).Map(alive => alive.Position);
 
   public AliveUnit SingleAliveUnit(Faction faction)
     => Query(new GetFactionAliveUnits(faction)).AsValueEnumerable().Single();
@@ -346,6 +349,9 @@ public sealed class BattleFixture : IDisposable
       Right: prepared => prepared,
       Left: failure => throw new InvalidOperationException(failure.Message));
 
+    // Recording moves to the runtime's committed stream: detach the direct state recorder
+    // before the runtime binds so no event is ever recorded twice.
+    _preparation.State.Committed -= RecordEvent;
     _runtime = BattleRuntime.Create(state);
     _runtime.BattleEventCommitted += RecordEvent;
     foreach (Action<BattleRuntime> registration in _deferredRegistrations)
@@ -501,6 +507,7 @@ public sealed class BattleFixture : IDisposable
     }
     finally
     {
+      _preparation.State.Committed -= RecordEvent;
       if (_started)
         _runtime.BattleEventCommitted -= RecordEvent;
       _runtime?.Dispose();

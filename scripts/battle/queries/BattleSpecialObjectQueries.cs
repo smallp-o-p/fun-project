@@ -48,12 +48,3 @@ public sealed class GetPlayerFactionQuery : IBattleSessionQuery<Option<Faction>>
 {
   public Option<Faction> Execute(BattleReadContext context) => context.State.PlayerFaction;
 }
-
-// Where a pooled unit currently stands: None once it is dead and off the board.
-public sealed class GetUnitPosition(BattleUnitState unit) : IBattleSessionQuery<Option<BattleBoardState.ValidatedPoint>>
-{
-  public Option<BattleBoardState.ValidatedPoint> Execute(BattleReadContext context)
-  {
-    return context.State.GetUnitPosition(unit);
-  }
-}

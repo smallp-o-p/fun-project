@@ -1,6 +1,5 @@
 using FunProject.Combatants;
 using System;
-using System.Collections.Frozen;
 using System.Collections.Generic;
 
 namespace FunProject.Battle;
@@ -38,13 +37,13 @@ public sealed class ObjectiveSystem : BattleHook
           None: () => false))
       return [];
 
-    foreach (var (owner, objective) in SnapshotCandidates(read.State, battleEvent))
+    foreach (var (owner, objective) in ObjectiveHistory.SnapshotCandidates(read.State, battleEvent))
     {
       ObjectiveResult result = objective.Check(owner, battleEvent, read);
       if (result == ObjectiveResult.Ongoing)
         continue;
 
-      RecordFlip(read.State, owner, objective, result == ObjectiveResult.Passed);
+      ObjectiveHistory.RecordFlip(read.State, owner, objective, result == ObjectiveResult.Passed);
       ObjectiveDirectiveData? directive = result == ObjectiveResult.Passed
         ? objective.Data.OnComplete
         : objective.Data.OnFail;
@@ -54,34 +53,6 @@ public sealed class ObjectiveSystem : BattleHook
     }
 
     return [];
-  }
-
-  // Snapshot before iterating: a directive may add objectives mid-dispatch, and a
-  // follow-up must be evaluated from the next event, never the one that queued it.
-  // The faction-order × objective-add-order traversal is the determinism contract.
-  internal static (Faction Owner, Objective Objective)[] SnapshotCandidates(BattleState state, BattleEvent battleEvent)
-  {
-    FrozenSet<Type> eventKeys = battleEvent.EventKeys;
-    List<(Faction Owner, Objective Objective)> candidates = [];
-
-    foreach (Faction faction in state.Factions)
-      foreach (Objective objective in state.GetObjectives(faction))
-        if (objective.State == ObjectiveResult.Ongoing
-            && objective.ObservedEventKeys.AsValueEnumerable().Any(eventKeys.Contains))
-          candidates.Add((faction, objective));
-
-    return [.. candidates];
-  }
-
-  private static void RecordFlip(BattleState state, Faction owner, Objective objective, bool passed)
-  {
-    if (objective.State != ObjectiveResult.Ongoing)
-      throw new InvalidOperationException($"Objective {objective.Data.Name} is already {objective.State}.");
-
-    objective.State = passed ? ObjectiveResult.Passed : ObjectiveResult.Failed;
-    state.RaiseEvents(passed
-      ? new ObjectiveCompletedBattleEvent(owner, objective)
-      : new ObjectiveFailedBattleEvent(owner, objective));
   }
 
   // Returns true when the directive was terminal (the battle is ending or already ended),
@@ -107,21 +78,11 @@ public sealed class ObjectiveSystem : BattleHook
         return true;
       case QueueDirectiveData queue:
         foreach (ObjectiveData followUp in queue.FollowUps)
-          AddFollowUp(read, owner, followUp.Instantiate());
+          ObjectiveHistory.AddFollowUp(read.State, owner, followUp.Instantiate());
         return false;
       default:
         throw new InvalidOperationException(
           $"Unknown objective directive type {directive.GetType().Name}.");
     }
-  }
-
-  // History operation: valid while running and after settlement alike. While running the
-  // objective routes through the receiver; after settlement only history grows.
-  private static void AddFollowUp(BattleReadContext read, Faction faction, Objective objective)
-  {
-    if (read.State.AddObjective(faction, objective))
-      read.State.RegisterFaction(faction);
-
-    read.State.RaiseEvents(new ObjectiveAddedBattleEvent(faction, objective));
   }
 }
