@@ -2,7 +2,6 @@ using FunProject.Battle;
 using Godot;
 using System;
 using Godot.Collections;
-using Cell = Godot.Vector3I;
 
 /// <summary>
 /// A tool to create maps to be used in a tactical battle via the Godot editor.
@@ -11,7 +10,7 @@ using Cell = Godot.Vector3I;
 [Tool]
 public partial class BattleMapAuthoring : GridMap
 {
-  private static readonly Cell[] Directions = [new(0, 0, -1), new(1, 0, 0), new(0, 0, 1), new(-1, 0, 0)];
+  private static readonly Godot.Vector3I[] Directions = [new(0, 0, -1), new(1, 0, 0), new(0, 0, 1), new(-1, 0, 0)];
   [Export] public GridMap? Props { get; set; }
   private BattleTilePalette? _palette;
   [Export]
@@ -127,9 +126,9 @@ public partial class BattleMapAuthoring : GridMap
     return painted;
   }
 
-  private BattleMapData BuildMap(Dictionary<Cell, BattleMapTileData> cells)
+  private BattleMapData BuildMap(Dictionary<Godot.Vector3I, BattleMapTileData> cells)
   {
-    Cell dimensions = Cell.Zero;
+    Godot.Vector3I dimensions = Godot.Vector3I.Zero;
     foreach (var (cell, tile) in cells)
     {
       if (tile.SpawnFactionSlot >= 0 && !tile.Walkable)
@@ -146,22 +145,22 @@ public partial class BattleMapAuthoring : GridMap
         !CellCenterX || CellCenterY || !CellCenterZ || !Props.CellCenterX || Props.CellCenterY || !Props.CellCenterZ)
       throw new InvalidOperationException("Props must be a direct, unscaled GridMap using this palette, unit cells, X/Z centered, Y uncentered, and only a vertical surface offset.");
 
-    var props = new SysColGeneric.List<(BattleMapTileData Brush, Cell Anchor, Basis Rotation)>();
+    var props = new SysColGeneric.List<(BattleMapTileData Brush, Godot.Vector3I Anchor, Basis Rotation)>();
     foreach (var (anchor, prop) in GetPaintedCells(Props))
     {
       var name = $"Prop at {anchor}";
       var rotation = Props.GetBasisWithOrthogonalIndex(Props.GetCellItemOrientation(anchor));
       if (!rotation.Y.IsEqualApprox(Vector3.Up))
         throw new InvalidOperationException($"{name}: props only support upright Y quarter-turns.");
-      var footprint = new SysColGeneric.HashSet<Cell>(prop.PropFootprint);
-      if (!footprint.Contains(Cell.Zero) || footprint.Count != prop.PropFootprint.Count)
+      var footprint = new SysColGeneric.HashSet<Godot.Vector3I>(prop.PropFootprint);
+      if (!footprint.Contains(Godot.Vector3I.Zero) || footprint.Count != prop.PropFootprint.Count)
         throw new InvalidOperationException($"{name}: footprint must include the origin without duplicate cells.");
       foreach (int amount in new[] { prop.PropCoverNorth, prop.PropCoverEast, prop.PropCoverSouth, prop.PropCoverWest })
         if (amount < 0 || amount > 100)
           throw new InvalidOperationException($"{name}: cover must be between 0 and 100.");
       foreach (var local in footprint)
       {
-        var cell = anchor + (Cell)(rotation * (Vector3)local).Round();
+        var cell = anchor + (Godot.Vector3I)(rotation * (Vector3)local).Round();
         if (local.Y != 0 || !cells.TryGetValue(cell, out var tile) ||
             !Palette!.Brushes[MeshLibrary.GetItemName(GetCellItem(cell))].Walkable ||
             !Mathf.IsEqualApprox(tile.GroundSurfaceOffset, Props.Position.Y))
@@ -182,8 +181,8 @@ public partial class BattleMapAuthoring : GridMap
         {
           var direction = Directions[side];
           if (prop.PropFootprint.Contains(local + direction)) continue;
-          var outward = (Cell)(rotation * (Vector3)direction).Round();
-          var neighbor = anchor + (Cell)(rotation * (Vector3)local).Round() + outward;
+          var outward = (Godot.Vector3I)(rotation * (Vector3)direction).Round();
+          var neighbor = anchor + (Godot.Vector3I)(rotation * (Vector3)local).Round() + outward;
           if (!cells.TryGetValue(neighbor, out var tile) || !tile.Walkable) continue;
           int amount = cover[side];
           if (outward.Z == 1) tile.CoverNorth = Math.Max(tile.CoverNorth, amount);
