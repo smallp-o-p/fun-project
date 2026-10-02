@@ -1,6 +1,7 @@
 extends SceneTree
 # Run without importing assets: godot --headless --path . --script res://test/model_import_regression.gd
 
+const MASK_VALIDATION = preload("res://scenes/models/import/ModelImportValidation.cs")
 const STRUCTURE = preload("res://scenes/models/import/humanoid_structure.gd")
 const PRESENTATION = preload("res://scenes/models/import/humanoid_presentation.gd")
 const FORMAT: int = Mesh.ARRAY_FORMAT_VERTEX | Mesh.ARRAY_FORMAT_NORMAL | Mesh.ARRAY_FORMAT_TANGENT
@@ -15,6 +16,7 @@ func _initialize() -> void:
 	_test_recipes()
 	_test_role_surfaces()
 	_test_mask_import_geometry()
+	_test_mask_import_presentation()
 	_test_wardrobe_compiler()
 	_test_imported_wardrobes()
 	print("MODEL IMPORT REGRESSION: %d checks, %d failures" % [checks, failures])
@@ -241,6 +243,15 @@ func _test_wardrobe_compiler() -> void:
 	_expect(scene.has_meta("wardrobe_catalog"), true, "publishes generated resource")
 	if scene.has_meta("wardrobe_catalog"):
 		var catalog: Resource = scene.get_meta("wardrobe_catalog")
+		var setups: Variant = catalog.get("_maskSetups")
+		_expect(setups is Array, true, "compiler owns fixed mask bindings")
+		if setups is Array:
+			_expect(setups.size(), 2, "every fixed mask compiled even without wardrobe rules")
+			for setup: Resource in setups:
+				var mesh_path := str(setup.get("MeshPath")).trim_prefix("Model/")
+				var mesh_node := scene.get_node_or_null(NodePath(mesh_path)) as MeshInstance3D
+				_expect(mesh_node != null, true, "compiled mask path resolves")
+				_expect(MASK_VALIDATION.new().call("ValidateMaskGeometry", setup.get("Configuration"), mesh_node.mesh), "", "compiled pairing validated")
 		_expect(catalog.get("_variants"), PackedStringArray(["Original", "Alternate"]), "preserves ordered outfit IDs")
 		_expect(catalog.get("_defaultVariant"), 1, "preserves default outfit")
 		var component: Resource = catalog.get("_components")["UpperBody"]
@@ -272,18 +283,15 @@ func _test_wardrobe_compiler() -> void:
 
 func _test_mask_import_geometry() -> void:
 	var config: Resource = load("res://scenes/models/ModelMaskConfiguration.cs").new()
-	_expect(config.has_method("ValidateImportGeometry"), true, "mask configuration exposes import geometry validation")
-	if not config.has_method("ValidateImportGeometry"):
-		return
-	_expect(config.call("ValidateImportGeometry", null).is_empty(), false, "rejects null mask source mesh")
+	_expect(MASK_VALIDATION.new().call("ValidateMaskGeometry", config, null).is_empty(), false, "rejects null mask source mesh")
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _source_arrays())
-	_expect(config.call("ValidateImportGeometry", mesh).is_empty(), false, "rejects stale mask geometry")
+	_expect(MASK_VALIDATION.new().call("ValidateMaskGeometry", config, mesh).is_empty(), false, "rejects stale mask geometry")
 	var real_scene: Node = (load("res://scenes/models/Trigger/Trigger4.2.blend") as PackedScene).instantiate()
 	var real_mesh: ArrayMesh = real_scene.get_node("rig_D/GeneralSkeleton/ZZZ_Size02_C").mesh
 	var real_config: Resource = load("res://resources/models/trigger/presentation/body_mask.res")
-	_expect(real_config.call("ValidateImportGeometry", real_mesh), "", "valid real mask source")
-	for kind: String in ["mask count", "default bits", "triangle flags"]:
+	_expect(MASK_VALIDATION.new().call("ValidateMaskGeometry", real_config, real_mesh), "", "valid real mask source")
+	for kind: String in ["mask count", "default bits", "triangle flags", "default mesh", "default remap", "default primitive"]:
 		var broken: Resource = _copy_mask_config(real_config)
 		if kind == "mask count":
 			var names: Dictionary = broken.get("Masks")
@@ -291,13 +299,53 @@ func _test_mask_import_geometry() -> void:
 				names["extra_" + str(i)] = false
 		elif kind == "default bits":
 			broken.set("DefaultBits", 1 << 62)
+		elif kind == "default mesh":
+			broken.set("DefaultMesh", real_mesh)
+		elif kind == "default primitive":
+			var original: ArrayMesh = real_config.get("DefaultMesh")
+			var points := ArrayMesh.new()
+			points.blend_shape_mode = original.blend_shape_mode
+			for i: int in original.get_blend_shape_count():
+				points.add_blend_shape(original.get_blend_shape_name(i))
+			for i: int in original.get_surface_count():
+				points.add_surface_from_arrays(Mesh.PRIMITIVE_POINTS, original.surface_get_arrays(i), original.surface_get_blend_shape_arrays(i), {}, original.surface_get_format(i))
+				points.surface_set_material(i, original.surface_get_material(i))
+			points.set_meta("source_vertex_indices", original.get_meta("source_vertex_indices"))
+			broken.set("DefaultMesh", points)
+		elif kind == "default remap":
+			var default_mesh: ArrayMesh = (real_config.get("DefaultMesh") as ArrayMesh).duplicate()
+			default_mesh.remove_meta("source_vertex_indices")
+			broken.set("DefaultMesh", default_mesh)
 		else:
 			var surfaces: Array = broken.get("TriangleMasks")
 			var flags: PackedInt64Array = surfaces[0]
 			flags[0] = 1 << 62
 			surfaces[0] = flags
-		_expect(broken.call("ValidateImportGeometry", real_mesh).is_empty(), false, "rejects invalid " + kind)
+		_expect(MASK_VALIDATION.new().call("ValidateMaskGeometry", broken, real_mesh).is_empty(), false, "rejects invalid " + kind)
 	real_scene.free()
+
+
+func _test_mask_import_presentation() -> void:
+	var validator = MASK_VALIDATION.new()
+	_expect(validator.has_method("ValidateMaskPresentation"), true, "import checks outline data before runtime")
+	if not validator.has_method("ValidateMaskPresentation"):
+		return
+	var body := MeshInstance3D.new()
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _source_arrays())
+	body.mesh = mesh
+	var material := ShaderMaterial.new()
+	var outline := ShaderMaterial.new()
+	material.resource_local_to_scene = true
+	outline.resource_local_to_scene = true
+	material.next_pass = outline
+	body.set_surface_override_material(0, material)
+	for weights: Variant in ["wrong type", PackedFloat32Array([1]), PackedFloat32Array([1, 1, 1, 1, 1, 1])]:
+		outline.set_meta("source_weights", weights)
+		_expect(validator.call("ValidateMaskPresentation", body).is_empty(), weights is PackedFloat32Array and weights.size() == 6, "outline weights match source vertices")
+	outline.resource_local_to_scene = false
+	_expect(validator.call("ValidateMaskPresentation", body).is_empty(), false, "mutable outline must be instance local")
+	body.free()
 
 
 func _test_imported_wardrobes() -> void:
@@ -313,6 +361,7 @@ func _test_imported_wardrobes() -> void:
 			continue
 		var data: Dictionary = JSON.parse_string(compiler._extras(rig)["wardrobe_catalog"])
 		var catalog: Resource = scene.get_meta("wardrobe_catalog")
+		_expect((catalog.get("_maskSetups") as Array).size(), compiler.MASKS[source].size(), key + " packed import owns all mask setups")
 		var components: Dictionary = catalog.get("_components")
 		var masks: Array = catalog.get("_masks")
 		_expect(components.size(), 5 if key == "trigger" else 7, key + " migrated component count")
@@ -348,25 +397,25 @@ func _test_imported_wardrobes() -> void:
 			var sources := {}
 			_expect(compiler._collect_sources(scene, scene, sources), "", key + " indexes source identities")
 			var mesh: ArrayMesh = sources[source_id].mesh
-			_expect(config.call("ValidateImportGeometry", mesh), "", key + " mask geometry matches")
+			_expect(MASK_VALIDATION.new().call("ValidateMaskGeometry", config, mesh), "", key + " mask geometry matches")
 			var too_many: Resource = _copy_mask_config(config)
 			var names: Dictionary = too_many.get("Masks")
 			for i: int in 65:
 				names["extra_" + str(i)] = false
-			_expect(too_many.call("ValidateImportGeometry", mesh).is_empty(), false, key + " rejects more than 64 masks")
+			_expect(MASK_VALIDATION.new().call("ValidateMaskGeometry", too_many, mesh).is_empty(), false, key + " rejects more than 64 masks")
 			var bad_default: Resource = _copy_mask_config(config)
 			bad_default.set("DefaultBits", 1 << 62)
-			_expect(bad_default.call("ValidateImportGeometry", mesh).is_empty(), false, key + " rejects unknown default bits")
+			_expect(MASK_VALIDATION.new().call("ValidateMaskGeometry", bad_default, mesh).is_empty(), false, key + " rejects unknown default bits")
 			var bad_flags: Resource = _copy_mask_config(config)
 			var surfaces: Array = bad_flags.get("TriangleMasks")
 			var flags: PackedInt64Array = surfaces[0]
 			flags[0] = 1 << 62
 			surfaces[0] = flags
-			_expect(bad_flags.call("ValidateImportGeometry", mesh).is_empty(), false, key + " rejects unknown triangle flags")
+			_expect(MASK_VALIDATION.new().call("ValidateMaskGeometry", bad_flags, mesh).is_empty(), false, key + " rejects unknown triangle flags")
 			var bad_count: Resource = _copy_mask_config(config)
 			var bad_surfaces: Array = bad_count.get("TriangleMasks")
 			bad_surfaces[0] = PackedInt64Array()
-			_expect(bad_count.call("ValidateImportGeometry", mesh).is_empty(), false, key + " rejects wrong triangle count")
+			_expect(MASK_VALIDATION.new().call("ValidateMaskGeometry", bad_count, mesh).is_empty(), false, key + " rejects wrong triangle count")
 
 		for patch: Dictionary in [{"name": "missing"}, {"index": 999}, {"component": "missing"}, {"variant": 99}, {"source": "missing"}]:
 			var bad: Dictionary = data.duplicate(true)

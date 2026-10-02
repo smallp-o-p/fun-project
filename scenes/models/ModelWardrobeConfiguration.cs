@@ -9,10 +9,14 @@ namespace FunProject.Models;
 public partial class ModelWardrobeConfiguration : Resource
 {
   // Storage-only fields are populated by the importer/ResourceLoader, never the Inspector.
+  [Export] private Godot.Collections.Array<ModelMeshMaskSetup> _maskSetups = [];
   [Export] private string[] _variants = [];
   [Export] private int _defaultVariant;
   [Export] private Godot.Collections.Dictionary<string, ModelWardrobeComponent> _components = new();
   [Export] private Godot.Collections.Array<ModelWardrobeMaskRule> _masks = [];
+
+  internal SysColGeneric.IReadOnlyList<ModelMeshMaskSetup> MaskSetups
+    => new ReadOnlyCollection<ModelMeshMaskSetup>(_maskSetups);
 
   public SysColGeneric.IReadOnlyList<string> Variants => System.Array.AsReadOnly(_variants);
   public int DefaultVariant => _defaultVariant;

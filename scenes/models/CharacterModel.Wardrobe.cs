@@ -30,11 +30,7 @@ public partial class CharacterModel
         _catalogProvisional = true;
         return new ModelWardrobeConfiguration();
       }
-      return imported.HasMeta("wardrobe_catalog")
-        && imported.GetMeta("wardrobe_catalog").AsGodotObject() is ModelWardrobeConfiguration catalog
-        ? catalog
-        : throw new InvalidOperationException(
-          $"The character model '{Name}' has no imported wardrobe catalog; reimport its Blender source.");
+      return (ModelWardrobeConfiguration)imported.GetMeta("wardrobe_catalog").AsGodotObject();
     }
   }
 
@@ -70,6 +66,7 @@ public partial class CharacterModel
   private ModelWardrobeConfiguration? _boundWardrobe;
   private SysColGeneric.IReadOnlyDictionary<string, ModelWardrobeComponent> Components => _boundWardrobe!.Components;
   private SysColGeneric.List<(ModelWardrobeMaskRule Rule, MaskRuntime.Region Region)> _maskRules = [];
+  private SysColGeneric.Dictionary<NodePath, Node3D> _garments = [];
   private readonly SysColGeneric.List<ModelClothingPiece> _pieces = [];
   private readonly SysColGeneric.List<ModelOutfit> _outfits = [];
   private bool _wardrobeInitialized;
@@ -83,13 +80,6 @@ public partial class CharacterModel
   {
     if (_wardrobeInitialized)
       return;
-    // Pre-ready selections may precede attachment of the imported child.
-    // Only an absent-source placeholder is discarded, never imported controls.
-    if (_catalogProvisional)
-    {
-      _boundWardrobe = null;
-      _catalogProvisional = false;
-    }
     EnsureWardrobeEntries();
     BindRequiredData();
     ApplySelection(null, null);
@@ -252,7 +242,7 @@ public partial class CharacterModel
     }
   }
 
-  // Validates one raw selection write and returns its stored form.
+  // Raw caller/saved selection values remain dynamic inputs, unlike definitions.
   private Variant ValidateSelection(string key, Variant value)
   {
     switch (key)
@@ -285,8 +275,8 @@ public partial class CharacterModel
   private bool ReadSelectionBool(string key, bool fallback)
     => Selections.TryGetValue(key, out Variant stored) ? stored.AsBool() : fallback;
 
-  // One coordinated write: derive the complete proposed state and resolve its
-  // garment nodes before anything is stored or written, so a rejection leaves
+  // One coordinated write: derive the complete proposed state and preflight its
+  // live targets before anything is stored or written, so a rejection leaves
   // the stored selections, the garments, and the masks untouched; then store
   // the selection (initialized writes), materialize the authored piece defaults
   // for the inspector (initialization and whole-dictionary replacements), and
@@ -294,6 +284,13 @@ public partial class CharacterModel
   private void ApplySelection(string? key, Variant? selection)
   {
     var (garments, masks) = DeriveChanges(key, selection);
+    // Scene lifetime can change after import. Reject a freed live target before
+    // touching selections or any other node; this is not authored-data validation.
+    foreach ((Node node, _) in garments)
+    {
+      if (!GodotObject.IsInstanceValid(node))
+        throw new InvalidOperationException("A wardrobe garment was freed while its model is still in use.");
+    }
     if (key is not null)
       Selections[key] = selection!.Value;
     else
@@ -354,7 +351,7 @@ public partial class CharacterModel
       foreach (ModelWardrobeGarment piece in Components[affected].Pieces)
       {
         bool visible = enabled && (piece.Variant == -1 || piece.Variant == outfit);
-        garments.Add((ResolveGarment(piece.Path), visible));
+        garments.Add((_garments[piece.Path], visible));
       }
     }
 
@@ -392,29 +389,19 @@ public partial class CharacterModel
   internal bool ComponentActive(string component)
     => ClothingEnabled && GetPiece(component) && HasGarmentForOutfit(component, OutfitIndex);
 
-  // Garment pieces are required data: a missing node is invalid authored data and
-  // must reject before any selection is stored or visibility applied.
-  private Node ResolveGarment(NodePath path)
-    => GetNodeOrNull<Node>(path)
-      ?? throw new InvalidOperationException(
-        $"The character model '{Name}' garment piece path '{path}' does not resolve to a node.");
-
-  // Setup-time required-data binding: every garment node resolves, and every
-  // rule binds to a region entry minted by its mask's resolved runtime (path,
-  // name, and index validate there) before the first derivation runs. The
-  // bindings publish only after every rule resolved, and a retried Initialize
-  // rebinds to the newly created runtimes.
+  // The importer checks every garment and mask rule. Bind instance references
+  // once; selections do not repeatedly resolve or validate fixed topology.
   private void BindRequiredData()
   {
     foreach (ModelWardrobeComponent component in Components.Values)
     {
       foreach (ModelWardrobeGarment piece in component.Pieces)
-        ResolveGarment(piece.Path);
+        _garments[piece.Path] = GetNode<Node3D>(piece.Path);
     }
 
     var bindings = new SysColGeneric.List<(ModelWardrobeMaskRule Rule, MaskRuntime.Region Region)>();
     foreach (ModelWardrobeMaskRule rule in _boundWardrobe!.Masks)
-      bindings.Add((rule, ResolveMask(rule.Path).BindRegion(rule.Name, rule.Index)));
+      bindings.Add((rule, ResolveMask(rule.Path).BindRegion(rule.Index)));
     _maskRules = bindings;
   }
 
@@ -423,8 +410,7 @@ public partial class CharacterModel
   {
     if (_boundWardrobe is not null)
       return;
-    ModelWardrobeConfiguration configuration = WardrobeConfiguration
-      ?? throw new InvalidOperationException($"The character model '{Name}' has no wardrobe configuration.");
+    ModelWardrobeConfiguration configuration = WardrobeConfiguration;
     _pieces.Clear();
     foreach (string component in configuration.Components.Keys)
       _pieces.Add(new ModelClothingPiece(this, component));

@@ -116,10 +116,10 @@ public sealed class ModelFixture : IDisposable
     fixture.Model.AddChild(fixture.Body);
     fixture.MaskPath = new NodePath("Body");
     fixture.MaskConfiguration = configuration;
-    fixture.Model.MaskSetups = new Godot.Collections.Array<ModelMeshMaskSetup>
+    SetMaskSetups(fixture.Model, new Godot.Collections.Array<ModelMeshMaskSetup>
     {
       new() { MeshPath = fixture.MaskPath, Configuration = configuration },
-    };
+    });
     if (start)
       fixture.Start();
     return fixture;
@@ -142,9 +142,10 @@ public sealed class ModelFixture : IDisposable
   {
     ArrayMesh source = TestData.MakeMaskedSourceMesh(maskCount);
     var fixture = WithMask(source, TestData.MakeModelMaskConfiguration(source, maskCount), start: false);
-    var imported = new Node3D { Name = "Model" };
+    Node imported = fixture.Model.GetNode("Model");
+    var setups = new Godot.Collections.Array<ModelMeshMaskSetup>(fixture.Model.MaskSetups);
     imported.SetMeta("wardrobe_catalog", configuration ?? TestData.MakeWardrobeConfiguration());
-    fixture.Model.AddChild(imported);
+    SetMaskSetups(fixture.Model, setups);
     AddGarmentPair(fixture);
     if (accessoryMaskConfiguration is not null)
     {
@@ -152,7 +153,7 @@ public sealed class ModelFixture : IDisposable
       { Name = "AccessoryBody", Mesh = TestData.MakeMaskedSourceMesh(maskCount) };
       fixture.Model.AddChild(body);
       fixture.AccessoryMaskPath = new NodePath("AccessoryBody");
-      fixture.Model.MaskSetups.Add(new ModelMeshMaskSetup
+      setups.Add(new ModelMeshMaskSetup
       {
         MeshPath = fixture.AccessoryMaskPath,
         Configuration = accessoryMaskConfiguration,
@@ -162,6 +163,19 @@ public sealed class ModelFixture : IDisposable
     if (start)
       fixture.Start();
     return fixture;
+  }
+
+  // Synthetic imports use the same storage-only catalog as real packed imports.
+  internal static void SetMaskSetups(CharacterModel model, Godot.Collections.Array<ModelMeshMaskSetup> setups)
+  {
+    Node? imported = model.GetNodeOrNull("Model");
+    if (imported is null)
+    {
+      imported = new Node3D { Name = "Model" };
+      imported.SetMeta("wardrobe_catalog", new ModelWardrobeConfiguration());
+      model.AddChild(imported);
+    }
+    imported.GetMeta("wardrobe_catalog").AsGodotObject().Set("_maskSetups", setups);
   }
 
   private static void AddGarmentPair(ModelFixture fixture)
@@ -217,10 +231,10 @@ public sealed class ModelFixture : IDisposable
     {
       fixture.MaskPath = new NodePath("Model/Body");
       fixture.MaskConfiguration = TestData.MakeModelMaskConfiguration(fixture.SourceMesh, 2);
-      fixture.Model.MaskSetups = new Godot.Collections.Array<ModelMeshMaskSetup>
+      SetMaskSetups(fixture.Model, new Godot.Collections.Array<ModelMeshMaskSetup>
       {
         new() { MeshPath = fixture.MaskPath, Configuration = fixture.MaskConfiguration },
-      };
+      });
     }
     if (start)
       fixture.Start();

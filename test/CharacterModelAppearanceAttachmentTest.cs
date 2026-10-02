@@ -53,20 +53,12 @@ public class CharacterModelAppearanceAttachmentTest
   }
 
   [TestCase]
-  public void InitializeRetryReusesIsolatedMaterials()
+  public void RepeatedInitializationKeepsIsolatedMaterials()
   {
-    // Failed initialization and its late-assignment retry must keep the same
-    // native resources that PackedScene already localized.
-    using var fixture = ModelFixture.WithAppearance(withMask: true, start: false);
-    ModelMeshMaskSetup setup = fixture.Model.MaskSetups[0];
-    NodePath meshPath = setup.MeshPath;
-    setup.MeshPath = "MissingBody";
-    fixture.Start();
+    using var fixture = ModelFixture.WithAppearance(withMask: true);
     ulong surfaceId = fixture.Body.GetSurfaceOverrideMaterial(0)!.GetInstanceId();
     ulong outlineId = fixture.Outline.GetInstanceId();
-
-    setup.MeshPath = meshPath;
-    fixture.Model.MaskSetups = new Godot.Collections.Array<ModelMeshMaskSetup> { setup };
+    fixture.Model.Initialize();
     Assert.Equal(surfaceId, fixture.Body.GetSurfaceOverrideMaterial(0)!.GetInstanceId());
     Assert.Equal(outlineId, fixture.Outline.GetInstanceId());
     Assert.False(fixture.Model.IsProcessing());
@@ -91,24 +83,4 @@ public class CharacterModelAppearanceAttachmentTest
       .GetShaderParameter("vertex_weights").VariantType == Variant.Type.Object);
   }
 
-  // ------------------------------------------------------------------
-  // Attachment path authoring errors (empty paths stay valid — covered on
-  // the real Trigger scene).
-  // ------------------------------------------------------------------
-
-  // Nonempty attachment paths are authoring-checked at initialization: a path
-  // that misses rejects, as does one resolving to a non-container. (Empty paths
-  // stay valid — covered on the real Trigger scene.)
-  [TestCase]
-  public void AttachmentsPathAuthoringErrors()
-  {
-    using var missing = new ModelFixture(start: false);
-    missing.Model.AttachmentsPath = "../Missing";
-    Assert.Throws<InvalidOperationException>(() => missing.Model.Initialize());
-
-    using var wrongType = new ModelFixture(start: false);
-    wrongType.Model.AddChild(new Node { Name = "NotAContainer" });
-    wrongType.Model.AttachmentsPath = "NotAContainer";
-    Assert.Throws<InvalidOperationException>(() => wrongType.Model.Initialize());
-  }
 }

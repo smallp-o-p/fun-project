@@ -256,39 +256,6 @@ public class ModelClothingTest
   }
 
   // ------------------------------------------------------------------
-  // Setup-time required-data failures
-  // ------------------------------------------------------------------
-
-  [TestCase]
-  public void RequiredWardrobeBindingsRejectSetupBeforeAnyWrite()
-  {
-    void AssertRejectedSetup(ModelWardrobeConfiguration configuration)
-    {
-      using var fixture = ModelFixture.WithWardrobe(start: false, configuration: configuration);
-      Assert.Throws<InvalidOperationException>(() => fixture.Model.Initialize());
-      Assert.True(fixture.GarmentA!.Visible);
-      Assert.True(fixture.GarmentB!.Visible);
-      Assert.Equal(0, fixture.Model.Selections.Count);
-    }
-
-    var missingGarment = TestData.MakeOverlappingWardrobeConfiguration();
-    missingGarment.Components["shirt"].Pieces[0].Set("_path", new NodePath("MissingGarment"));
-    AssertRejectedSetup(missingGarment);
-
-    var missingMask = TestData.MakeOverlappingWardrobeConfiguration();
-    missingMask.Masks[0].Set("_path", new NodePath("MissingMask"));
-    AssertRejectedSetup(missingMask);
-
-    var outOfRangeIndex = TestData.MakeOverlappingWardrobeConfiguration();
-    outOfRangeIndex.Masks[0].Set("_index", 5);
-    AssertRejectedSetup(outOfRangeIndex);
-
-    var mismatchedName = TestData.MakeOverlappingWardrobeConfiguration();
-    mismatchedName.Masks[0].Set("_name", new StringName("Mask1"));
-    AssertRejectedSetup(mismatchedName);
-  }
-
-  // ------------------------------------------------------------------
   // Preflight of live writes after initialization
   // ------------------------------------------------------------------
 
@@ -311,4 +278,18 @@ public class ModelClothingTest
     Assert.MaskRegions(model, fixture.MaskPath, "Mask0");
     Assert.True(ModelFixture.SameNative(model.MaskRenderMesh(fixture.MaskPath), authoredRender));
   }
+  [TestCase]
+  public void FreedMaskBodyRejectsSelectionBeforeAnyWrites()
+  {
+    using var fixture = ModelFixture.WithWardrobe();
+    CharacterModel model = fixture.Model;
+    fixture.Body.Free();
+    Assert.Throws<InvalidOperationException>(() => model.Outfits[1].Select());
+    Assert.Equal(0, model.OutfitIndex);
+    Assert.False(model.Selections.ContainsKey(CharacterModel.OutfitKey));
+    Assert.True(fixture.GarmentA!.Visible);
+    Assert.False(fixture.GarmentB!.Visible);
+    Assert.MaskRegions(model, fixture.MaskPath, "Mask0");
+  }
+
 }

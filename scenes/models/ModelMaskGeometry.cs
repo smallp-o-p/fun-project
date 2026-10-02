@@ -4,7 +4,7 @@ using Godot;
 namespace FunProject.Models;
 
 /// <summary>
-/// Stateless mask geometry generation: SHA-256 source-mesh hashing, per-bit
+/// Stateless mask geometry generation: per-bit
 /// triangle filtering with per-vertex channel compaction, and outline weight
 /// textures. Generated meshes are immutable; callers share them through the
 /// mask's variant cache.
@@ -17,28 +17,6 @@ internal static class ModelMaskGeometry
 
   /// <summary>Row width of the outline vertex-weight texture.</summary>
   internal const int WeightTextureWidth = 256;
-
-  /// <summary>
-  /// Hash of everything the mask geometry depends on: blend shape mode and names,
-  /// every surface's arrays, blend shape arrays, and material names.
-  /// </summary>
-  internal static string GeometryHash(ArrayMesh mesh)
-  {
-    var context = new HashingContext();
-    context.Start(HashingContext.HashType.Sha256);
-    context.Update(GD.VarToBytes(Variant.From(mesh.GetBlendShapeMode())));
-    for (int i = 0; i < mesh.GetBlendShapeCount(); i++)
-      context.Update(GD.VarToBytes(Variant.From(mesh.GetBlendShapeName(i))));
-    for (int s = 0; s < mesh.GetSurfaceCount(); s++)
-    {
-      context.Update(GD.VarToBytes(mesh.SurfaceGetArrays(s)));
-      context.Update(GD.VarToBytes(mesh.SurfaceGetBlendShapeArrays(s)));
-      Material? material = mesh.SurfaceGetMaterial(s);
-      context.Update(GD.VarToBytes(Variant.From(material?.ResourceName ?? string.Empty)));
-    }
-
-    return Convert.ToHexString(context.Finish()).ToLowerInvariant();
-  }
 
   /// <summary>
   /// Builds one mask variant: for every surface, triangles whose flag does not
@@ -138,15 +116,12 @@ internal static class ModelMaskGeometry
       Variant.Type.PackedInt32Array => CopyChannel(channel.AsInt32Array(), kept, vertexCount),
       Variant.Type.PackedInt64Array => CopyChannel(channel.AsInt64Array(), kept, vertexCount),
       Variant.Type.PackedByteArray => CopyChannel(channel.AsByteArray(), kept, vertexCount),
-      _ => throw new InvalidOperationException(
-        $"Mask mesh channels of type {channel.VariantType} cannot be compacted."),
+      // The importer accepts exactly the supported channel types.
+      _ => default,
     };
 
   private static Variant CopyChannel<T>(T[] input, SysColGeneric.IReadOnlyList<int> kept, int vertexCount)
   {
-    if (input.Length % vertexCount != 0)
-      throw new InvalidOperationException(
-        $"Mask mesh channel holds {input.Length} entries for {vertexCount} vertices; channels compact per whole vertex.");
     int stride = input.Length / vertexCount;
     var output = new T[kept.Count * stride];
     for (int i = 0; i < kept.Count; i++)

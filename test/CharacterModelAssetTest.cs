@@ -81,36 +81,15 @@ public class CharacterModelAssetTest
     Assert.True(wardrobe.Outfits.Count > 0, $"The '{scene}' wardrobe discovered no outfits.");
   }
 
-  // ------------------------------------------------------------------
-  // Fixed-child authoring errors on a minimal synthetic root: a
-  // ModelAnimationTree child of the wrong type rejects initialization,
-  // while a root without that named child stays valid and simply leaves
-  // the component unconfigured.
-  // ------------------------------------------------------------------
-
-  // Fixed-child authoring on a minimal synthetic root: a ModelAnimationTree
-  // child of the wrong type rejects initialization, a root without the named
-  // child stays valid with the component unconfigured, and a valid child does
-  // not rescue a failed initialization — the tree field resolves before the
-  // mask/wardrobe stages, so the getter keeps rejecting until a retry succeeds.
   [TestCase]
-  public void FixedAnimationTreeChildAuthoringContract()
+  public void AnimationTreeGetterRequiresReadyConfiguredModel()
   {
-    using var wrongType = new ModelFixture(start: false);
-    wrongType.Model.AddChild(new Node3D { Name = "ModelAnimationTree" });
-    Assert.Throws<InvalidOperationException>(() => wrongType.Model.Initialize());
-
-    using var missing = new ModelFixture();
-    Assert.Throws<InvalidOperationException>(() => _ = missing.Model.AnimationTree);
-    Assert.Equal(0, missing.Model.Pieces.Count);
-
-    using var failedInit = ModelFixture.WithAnimations(start: false);
-    failedInit.Model.MaskSetups = new Godot.Collections.Array<ModelMeshMaskSetup>
-    {
-      new() { MeshPath = new NodePath("Face"), Configuration = null },
-    };
-    Assert.Throws<InvalidOperationException>(() => failedInit.Model.Initialize());
-    Assert.Throws<InvalidOperationException>(() => _ = failedInit.Model.AnimationTree);
+    using var fixture = ModelFixture.WithAnimations(start: false);
+    Assert.Throws<InvalidOperationException>(() => _ = fixture.Model.AnimationTree);
+    fixture.Start();
+    Assert.True(ModelFixture.SameNative(fixture.AnimationTree, fixture.Model.AnimationTree));
+    using var unconfigured = new ModelFixture();
+    Assert.Throws<InvalidOperationException>(() => _ = unconfigured.Model.AnimationTree);
   }
 
   // ------------------------------------------------------------------
@@ -468,8 +447,8 @@ public class CharacterModelAssetTest
     {
       CharacterModel.MaskRuntime a = first.Model.ResolveMask(setup.MeshPath);
       CharacterModel.MaskRuntime b = second.Model.ResolveMask(setup.MeshPath);
-      a.SetRegions(a.Regions);
-      b.SetRegions([]);
+      a.PrepareSelection(a.Regions, a.Regions)();
+      b.PrepareSelection(b.Regions, [])();
       Assert.True(TestData.VisibleTriangles(first.Model.MaskRenderMesh(setup.MeshPath))
         < TestData.VisibleTriangles(second.Model.MaskRenderMesh(setup.MeshPath)),
         "Different mask selections must retain independent rendered geometry.");

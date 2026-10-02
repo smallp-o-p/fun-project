@@ -693,19 +693,18 @@ internal static class TestData
       TriangleMasks = triangleMasks,
       DefaultBits = defaultBits,
       DefaultMesh = ModelMaskGeometry.BuildMesh(source, [triangleFlags], defaultBits),
-      GeometryHash = ModelMaskGeometry.GeometryHash(source),
+      GeometryHash = ModelImportValidation.GeometryHash(source),
     };
   }
 
-  // The former numeric bit writes, translated into region-entry selections for
-  // tests: production mutation never accepts bits, only owned region entries.
+  // Exercise the same bound-rule selection operation used by the wardrobe.
   public static void SelectMaskRegions(CharacterModel model, NodePath meshPath, params string[] enabled)
   {
     CharacterModel.MaskRuntime mask = model.ResolveMask(meshPath);
     var selected = new SysColGeneric.List<CharacterModel.MaskRuntime.Region>();
     foreach (string name in enabled)
-      selected.Add(mask.RegionOf(name));
-    mask.SetRegions(selected);
+      selected.Add(mask.Regions.AsValueEnumerable().First(region => region.Name == name));
+    mask.PrepareSelection(mask.Regions, selected)();
   }
 
   // Counts the generated triangles a render mesh draws per surface, skipping

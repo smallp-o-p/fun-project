@@ -51,15 +51,20 @@ public partial class CharacterModel : Node3D
   /// <summary>
   /// First-time initialization: resolve the animation tree child and the
   /// attachments path, then initialize
-  /// the mask setups, the wardrobe, and the attachments. A missing <c>ModelAnimationTree</c>
-  /// child leaves that component unconfigured; a wrong-type child is an authoring
-  /// error, and any failure fails initialization, so a repeated Initialize (or
-  /// the <see cref="MaskSetups"/> late-assignment retry) retries it.
+  /// the imported masks, wardrobe, and attachments. A missing
+  /// <c>ModelAnimationTree</c> child leaves that component unconfigured.
   /// </summary>
   internal void Initialize()
   {
     if (_initialized)
       return;
+    // Pre-ready selections may precede attachment of the imported child.
+    // Only an absent-source placeholder is discarded, never imported controls.
+    if (_catalogProvisional)
+    {
+      _boundWardrobe = null;
+      _catalogProvisional = false;
+    }
     _animationTree = ResolveAnimationTree();
     _attachments = ResolveAttachmentContainer();
     InitializeMasks();
@@ -75,27 +80,13 @@ public partial class CharacterModel : Node3D
       "The character model is not initialized; the animation tree becomes available "
       + "once it enters the scene tree and resolves its ModelAnimationTree child.");
 
+  // Native wrapper children are bound once. Optional absence is meaningful;
+  // typed GetNode performs binding without a second authoring validation layer.
   private Godot.AnimationTree? ResolveAnimationTree()
-  {
-    if (GetNodeOrNull(AnimationTreeChildName) is not { } child)
-      return null;
-    if (child is not Godot.AnimationTree tree)
-      throw new InvalidOperationException(
-        $"The character model '{Name}' animation tree child '{AnimationTreeChildName}' is not a AnimationTree.");
-    return tree;
-  }
+    => (Godot.AnimationTree?)GetNodeOrNull(AnimationTreeChildName);
 
-  // An empty AttachmentsPath means the model has no attachment set; a nonempty
-  // path that misses or mis-types its container is an authoring error.
   private Node3D? ResolveAttachmentContainer()
-  {
-    if (AttachmentsPath.IsEmpty)
-      return null;
-    if (GetNodeOrNull(AttachmentsPath) is not Node3D container)
-      throw new InvalidOperationException(
-        $"The character model '{Name}' attachment container path '{AttachmentsPath}' does not resolve to a Node3D.");
-    return container;
-  }
+    => AttachmentsPath.IsEmpty ? null : GetNode<Node3D>(AttachmentsPath);
 
   private void ApplyAttachmentsVisibility()
   {

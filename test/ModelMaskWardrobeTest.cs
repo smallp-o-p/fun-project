@@ -90,52 +90,6 @@ public class ModelMaskWardrobeTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void LateMaskSetupsAssignmentRecoversInitializationAndToggles()
-  {
-    // The dead editor state: startup assigns the exported setups before the C#
-    // class can instantiate, so the model root fails its _Ready and nothing
-    // retries. A later MaskSetups assignment heals it: stored selections apply
-    // and live toggles work again.
-    using var fixture = ModelFixture.WithWardrobe(start: false);
-    Godot.Collections.Array<ModelMeshMaskSetup> setups = fixture.Model.MaskSetups;
-    fixture.Model.MaskSetups = new Godot.Collections.Array<ModelMeshMaskSetup>();
-    fixture.Start();
-
-    // Selections store without applying; the garments keep their authored
-    // visibility because the derivation never ran. The late assignment heals
-    // the model root: the stored clothing_enabled=false now derives, and live
-    // toggles work again.
-    fixture.Model.ClothingEnabled = false;
-    Assert.True(fixture.GarmentA!.Visible);
-    Assert.True(fixture.GarmentB!.Visible);
-
-    fixture.Model.MaskSetups = setups;
-    Assert.False(fixture.GarmentA!.Visible);
-    Assert.False(fixture.GarmentB!.Visible);
-    Assert.MaskRegions(fixture.Model, fixture.MaskPath);
-
-    fixture.Model.ClothingEnabled = true;
-    Assert.True(fixture.GarmentA!.Visible);
-    Assert.False(fixture.GarmentB!.Visible);
-    Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
-    Assert.Equal(1, TestData.VisibleTriangles(fixture.Model.MaskRenderMesh(fixture.MaskPath)));
-  }
-
-  [TestCase]
-  public void MissingImportedCatalogRejectsInitializationBeforeSelections()
-  {
-    using var fixture = ModelFixture.WithWardrobe(start: false);
-    fixture.Model.GetNode("Model").RemoveMeta("wardrobe_catalog");
-    Assert.Throws<InvalidOperationException>(() => fixture.Model.Initialize());
-    Assert.True(fixture.GarmentA!.Visible);
-    Assert.True(fixture.GarmentB!.Visible);
-    Assert.Equal(0, fixture.Model.Selections.Count);
-  }
-
-  // Whole-dictionary Selections replacements follow the lifecycle: once
-  // initialized they preflight, apply, and re-materialize the pieces/<name>
-  // entries; before initialization they store as-is and derive on Initialize.
-  [TestCase]
   public void SelectionsReplacementsApplyByLifecycle()
   {
     using var attached = ModelFixture.WithWardrobe();
@@ -443,101 +397,33 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void InvalidMaskAuthoringRejectsInitialization()
+  public void ImportedMaskGeometryRejectsCorruptionBeforeRuntimeBinding()
   {
-    // Each inconsistent mask setup or configuration rejects initialization
-    // before any render, and no usable handle is published.
-    void AssertRejected(ArrayMesh source, ModelMaskConfiguration configuration)
-    {
-      using var fixture = ModelFixture.WithMask(source, configuration, start: false);
-      Assert.Throws<InvalidOperationException>(() => fixture.Model.Initialize());
-      Assert.Throws<InvalidOperationException>(() => fixture.Model.ResolveMask(fixture.MaskPath));
-    }
-
-    var hashSource = TestData.MakeMaskedSourceMesh();
-    var hashConfiguration = TestData.MakeModelMaskConfiguration(hashSource);
-    hashConfiguration.GeometryHash = "deadbeef";
-    AssertRejected(hashSource, hashConfiguration);
-
-    var flagsSource = TestData.MakeMaskedSourceMesh();
-    var flagsConfiguration = TestData.MakeModelMaskConfiguration(flagsSource);
-    flagsConfiguration.TriangleMasks[0] = [1, 6];
-    AssertRejected(flagsSource, flagsConfiguration);
-
-    // The mask bitset is 64 wide; a configuration defining more regions than
-    // that is invalid authored data.
-    ArrayMesh source = TestData.MakeMaskedSourceMesh();
-    var masks = new Godot.Collections.Dictionary<string, bool>();
-    for (int i = 0; i < 65; i++)
-      masks[$"Mask{i}"] = false;
-    AssertRejected(source, new ModelMaskConfiguration
-    {
-      Masks = masks,
-      TriangleMasks = new Godot.Collections.Array<long[]> { new long[2] },
-      DefaultMesh = ModelMaskGeometry.BuildMesh(source, [new long[2]], 0),
-      GeometryHash = ModelMaskGeometry.GeometryHash(source),
-    });
-
-    var bitsSource = TestData.MakeMaskedSourceMesh();
-    var bitsConfiguration = TestData.MakeModelMaskConfiguration(bitsSource);
-    bitsConfiguration.DefaultBits = 4;
-    AssertRejected(bitsSource, bitsConfiguration);
-
-    // Two MaskSetups over one mesh would silently fight over the render base.
-    var duplicateSource = TestData.MakeMaskedSourceMesh();
-    using var duplicate = ModelFixture.WithMask(
-      duplicateSource, TestData.MakeModelMaskConfiguration(duplicateSource), start: false);
-    duplicate.Model.MaskSetups.Add(new ModelMeshMaskSetup
-    {
-      MeshPath = duplicate.MaskPath,
-      Configuration = TestData.MakeModelMaskConfiguration(TestData.MakeMaskedSourceMesh()),
-    });
-    Assert.Throws<InvalidOperationException>(() => duplicate.Model.Initialize());
-  }
-
-  [TestCase]
-  public void MalformedTriangleMaskDataRejectsInitializationAndRetriesAfterCorrection()
-  {
-    // One flag short of the surface's triangles: the mesh/configuration pair is
-    // inconsistent and must reject before any render, while correcting the
-    // authored data and retrying Initialize succeeds.
     ArrayMesh source = TestData.MakeMaskedSourceMesh();
     ModelMaskConfiguration configuration = TestData.MakeModelMaskConfiguration(source);
+    Assert.Equal("", new ModelImportValidation().ValidateMaskGeometry(configuration, source));
+    configuration.GeometryHash = "stale";
+    Assert.True(new ModelImportValidation().ValidateMaskGeometry(configuration, source).Length > 0);
+    configuration.GeometryHash = ModelImportValidation.GeometryHash(source);
     long[] flags = configuration.TriangleMasks[0];
     configuration.TriangleMasks[0] = flags[1..];
-    using var fixture = ModelFixture.WithMask(source, configuration, start: false);
-    Assert.Throws<InvalidOperationException>(() => fixture.Model.Initialize());
-    Assert.Throws<InvalidOperationException>(() => fixture.Model.ResolveMask(fixture.MaskPath));
-
+    Assert.True(new ModelImportValidation().ValidateMaskGeometry(configuration, source).Length > 0);
     configuration.TriangleMasks[0] = flags;
-    fixture.Model.Initialize();
-    fixture.Start();
-    Assert.MaskRegions(fixture.Model, fixture.MaskPath);
-    Assert.True(ModelFixture.SameNative(
-      fixture.Model.MaskRenderMesh(fixture.MaskPath), fixture.SourceMesh));
-    Assert.Equal(2, TestData.VisibleTriangles(fixture.Model.MaskRenderMesh(fixture.MaskPath)));
+    Assert.Equal("", new ModelImportValidation().ValidateMaskGeometry(configuration, source));
+    using var fixture = ModelFixture.WithMask(source, configuration);
     TestData.SelectMaskRegions(fixture.Model, fixture.MaskPath, "Mask1");
     Assert.Equal(1, TestData.VisibleTriangles(fixture.Model.MaskRenderMesh(fixture.MaskPath)));
   }
 
-  // ------------------------------------------------------------------
-  // Configuration recovery
-  // ------------------------------------------------------------------
-
   [TestCase]
-  public void WardrobeBindingRetriesAfterRequiredNodeIsRestored()
+  public void WardrobeUsesBoundInstanceNodesAfterInitialization()
   {
-    using var fixture = ModelFixture.WithWardrobe(start: false);
-    fixture.Body.Name = "MissingBody";
-    Assert.Throws<InvalidOperationException>(() => fixture.Model.Initialize());
-    fixture.Body.Name = "Body";
-    fixture.Model.Initialize();
-    Assert.True(fixture.GarmentA!.Visible);
-    Assert.False(fixture.GarmentB!.Visible);
-    Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
-    fixture.Start();
-    fixture.Model.OutfitIndex = 1;
-    Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask1");
+    using var fixture = ModelFixture.WithWardrobe();
+    fixture.GarmentA!.Name = "RenamedGarment";
+    fixture.Model.ClothingEnabled = false;
+    Assert.False(fixture.GarmentA.Visible);
+    fixture.Model.ClothingEnabled = true;
+    Assert.True(fixture.GarmentA.Visible);
   }
 
   [TestCase]
@@ -594,34 +480,6 @@ public class ModelMaskWardrobeTest
     // The next oldest entry is evicted on the following rebuild.
     TestData.SelectMaskRegions(fixture.Model, fixture.MaskPath, "Mask2");
     Assert.False(ReferenceEquals(secondVariant, fixture.Model.MaskRenderMesh(fixture.MaskPath)));
-  }
-
-  [TestCase]
-  public void ForeignMaskRegionsRejectWithoutChangingStoredState()
-  {
-    using var first = ModelFixture.WithMask(TestData.MakeMaskedSourceMesh(2),
-      TestData.MakeModelMaskConfiguration(TestData.MakeMaskedSourceMesh(2)));
-    using var second = ModelFixture.WithMask(TestData.MakeMaskedSourceMesh(2),
-      TestData.MakeModelMaskConfiguration(TestData.MakeMaskedSourceMesh(2)));
-    var mask = first.Model.ResolveMask(first.MaskPath);
-    mask.SetRegions([mask.RegionOf("Mask0")]);
-    var foreign = second.Model.ResolveMask(second.MaskPath).RegionOf("Mask1");
-    Assert.Throws<InvalidOperationException>(() => mask.SetRegions([foreign]));
-    Assert.Throws<InvalidOperationException>(() => mask.PrepareSelection([], [foreign]));
-    Assert.Throws<InvalidOperationException>(() => mask.PrepareSelection([foreign], []));
-    Assert.MaskRegions(first.Model, first.MaskPath, "Mask0");
-  }
-
-  [TestCase]
-  public void FabricatedMaskRegionRejectsDespiteMatchingOwnerNameAndIndex()
-  {
-    using var fixture = ModelFixture.WithWardrobe();
-    var mask = fixture.Model.ResolveMask(fixture.MaskPath);
-    var fabricated = new CharacterModel.MaskRuntime.Region(mask, "Mask0", 0);
-    Assert.Throws<InvalidOperationException>(() => mask.SetRegions([fabricated]));
-    Assert.Throws<InvalidOperationException>(() => mask.PrepareSelection([fabricated], []));
-    Assert.Throws<InvalidOperationException>(() => mask.PrepareSelection([], [fabricated]));
-    Assert.MaskRegions(fixture.Model, fixture.MaskPath, "Mask0");
   }
 
   [TestCase]

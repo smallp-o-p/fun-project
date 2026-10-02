@@ -1,8 +1,22 @@
 # Character model controls simplification and component report
 
-Reviewed 2 October 2026 in the Linux cloud clone. The latest pass makes wardrobe membership Blender-owned and import-validated, removes Godot catalog authoring and foreign-piece ownership guards, and preserves the preceding normal-based toon shading simplification. Material isolation, clothing selections, poses, and coordinated mask writes remain intact. Earlier verification below is historical; each later pass records its own verification.
+Reviewed 2 October 2026 in the Linux cloud clone. The latest pass moves fixed model validation to the enforced import boundary, compiles mask bindings with the Blender-owned wardrobe catalog, and removes repeated runtime checks. It preserves the preceding normal-based toon shading simplification. Material isolation, clothing selections, poses, and coordinated mask writes remain intact. Earlier verification below is historical; each later pass records its own verification.
 
 This report covers the **whole character-model-controls feature**, followed by the original simplification/rebase history and the consolidated author-time ownership pass below. The authoring guide remains [model-controls.md](model-controls.md).
+
+## Fixed validation at import (2 October 2026)
+
+Baseline: `beb946ca2c37d2591a16c3e97bc90c98512d6874`.
+
+- Removed runtime mask schema/bit/count/hash checks, rule name/index checks, foreign/fabricated region proofs, and repeated garment path resolution. Runtime model C# is about 200 lines smaller; the geometry renderer remains in place
+- The actual Blender post-import callback now compiles fixed mesh/configuration bindings into the shared catalog. The root's editable `MaskSetups` slot and three redundant setup resources are removed. Godot ResourceSaver semantic comparisons verified that both wrappers retain every other stored node property, instance reference, ownership/group value, connection, editable-instance flag and UID
+- `import/ModelImportValidation.cs` owns source geometry hashing and validation: indexed triangles, surface/triangle counts, supported whole-vertex channels and blend shapes, bit ranges, default mesh topology/content/remap, outline weight type/count, and scene-local mutable outline materials. The runtime resource no longer validates itself
+- Runtime retains raw selection coercion/lookup checks, uninitialized component access, optional-component behavior, and live target teardown preflight. Garments bind once. A freed mask body now rejects before selections, other garments or mask bits change. Pre-ready access before the imported child arrives resets its provisional catalog before mask binding
+- Native wrapper animation/attachment children use direct typed binding. Wrapper authoring remains Godot-owned; this is not described as Blender import validation. No body splitting, all-outfit baking, SDF lighting, or separate HUD/UI work was introduced
+- Independent review found the default-primitive, outline-data and freed-body gaps; those were addressed and re-reviewed with no remaining blocking findings
+- Validation: both exact Blender sources fresh-imported successfully in separate processes. Deliberately corrupting Trigger's mask hash caused the real post-import callback to reject the asset; the resource was restored byte-for-byte and the next import succeeded. Import regressions pass **453 checks**; all **66 model runtime tests** pass. Six obsolete runtime authoring/ownership cases were removed or moved to import/lifecycle coverage
+- Final formatting/format verification, Debug and ExportRelease builds passed (11 / 2 existing nullable warnings outside model code). Full GdUnit: **1,034 passed, 1 failed, 0 skipped**; the sole failure remains the pre-existing `DialogueViewTest.PhysicsProcessDrivesReveal` timing assertion at line 87. No dialogue code or assertions changed
+- One initial combined two-model import process ended with signal 137; separate-process imports succeeded. Expected corrupt-import diagnostics, existing imported-resource UID fallbacks, and the prior malformed-recipe test diagnostics remain visible in verification logs
 
 ## Import-owned wardrobe (2 October 2026)
 

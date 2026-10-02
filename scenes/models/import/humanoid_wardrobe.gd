@@ -4,6 +4,7 @@ extends RefCounted
 # owns the compiled storage-only Resource. Source IDs are explicit Blender
 # properties, never inferred from collection names or sanitized object names.
 const STRUCTURE = preload("res://scenes/models/import/humanoid_structure.gd")
+const MASK_VALIDATION = preload("res://scenes/models/import/ModelImportValidation.cs")
 const ROOT := "res://scenes/models/"
 const MASKS := {
 	"res://scenes/models/ZhuYuan/ZhuYuan.blend": {
@@ -38,6 +39,12 @@ static func apply(scene: Node, source_file: String) -> String:
 	if not error.is_empty():
 		return error
 	var catalog: Resource = load(ROOT + "ModelWardrobeConfiguration.cs").new()
+	var setups: Array = catalog.get("_maskSetups")
+	for id: String in resolved["mask_configs"]:
+		var setup: Resource = load(ROOT + "ModelMeshMaskSetup.cs").new()
+		setup.set("MeshPath", _path(resolved, {"source": id}))
+		setup.set("Configuration", resolved["mask_configs"][id])
+		setups.append(setup)
 	catalog.set("_variants", PackedStringArray(data["variants"]))
 	catalog.set("_defaultVariant", int(data["default_variant"]))
 	var components: Dictionary = catalog.get("_components")
@@ -184,12 +191,15 @@ static func _validate_mask_sources(ctx: Dictionary) -> String:
 		if node == null or not node.mesh is ArrayMesh:
 			return "wardrobe: fixed mask source requires an ArrayMesh: " + id
 		var config: Resource = load(paths[id])
-		if config == null or not config.has_method("ValidateImportGeometry"):
+		if config == null:
 			return "wardrobe: mask configuration lacks import geometry validation: " + id
-		var result: Variant = config.call("ValidateImportGeometry", node.mesh)
+		var result: Variant = MASK_VALIDATION.new().call("ValidateMaskGeometry", config, node.mesh)
 		if typeof(result) != TYPE_STRING:
 			return "wardrobe: mask geometry validation did not return a result: " + id
 		if not result.is_empty():
 			return "wardrobe: " + id + ": " + result
+		result = MASK_VALIDATION.new().call("ValidateMaskPresentation", node)
+		if typeof(result) != TYPE_STRING or not result.is_empty():
+			return "wardrobe: " + id + ": invalid mask presentation: " + str(result)
 		ctx["mask_configs"][id] = config
 	return ""
