@@ -1,64 +1,44 @@
-# Authoring battle maps
+# Battle map authoring
 
-Battle maps are authored in the Godot editor on a **`GridMap`** and baked to a `BattleMapData`
-`.tres` that `BattleMapData.CreateBoardState()` turns into a `BattleBoardState`. The GridMap is
-Godot's native 3D tiler, so its cells line up 1:1 with the board's `Vector3I` grid and you see
-the real meshes in 3D while you author.
+Open `scenes/battle/authoring/BattleMapAuthoring.tscn` in Godot 4.7.2 .NET. This ready-to-export example contains floor instances and a two-cell car in one scene. `DebugMap.tscn` and `DefusalMap.tscn` in the same folder are the editable sources for the existing battle-pool maps.
 
-## Pieces
+## Reusable typed pieces
 
-- **`TileBrushData`** (`scripts/battle/map`) — per-tile gameplay template: `Walkable`,
-  `BlocksLineOfSight`, `CoverDirections` + `CoverAmount` (amount editable only when a direction
-  is set), `SpawnFactionSlot` (-1 = none). All independent — a wall with no cover, or walkable
-  smoke that blocks LOS, are both legal. Cover is never inferred.
-- **`BattleMapAuthoring`** (`scenes/battle/authoring`) — a `[Tool]` node that **extends
-  `GridMap`**; you paint terrain directly on it. Its `MeshLibrary` supplies the terrain meshes;
-  the `Brushes` palette (`Dictionary<StringName, TileBrushData>`) maps each MeshLibrary item
-  **name** to a gameplay brush. The **Bake to BattleMapData** button reads the painted cells and
-  writes `TargetPath`.
-- **`BattleMapBaker` / `MapDeployment` / `MapSpawnZoneData`** — pure C# (`scripts/battle/map`),
-  no Godot loading, unit-tested.
+Create a `BattleFloor` or `BattleProp` Node3D root and put its visual model below it. Both expose the same `BattleFootprintData` resource. Its `Cells` dictionary maps local integer cell offsets to `BattleFootprintCellData` resources. Each cell is one tile-sized box; compose them to describe a car, an L-shaped object or stacked volumes. An empty definition is an explicitly decorative prop.
 
-## Coordinate mapping
+A piece's origin is a local grid corner. Cell `(0,0,0)` spans one cell width/depth from that corner, with its bottom on the level plane. The model can be independently positioned/scaled beneath the piece. Move and rotate the typed root to place the complete asset. Only upright 90-degree turns and unscaled gameplay transforms are supported; inherited transforms must obey the same rule.
 
-A `GridMap` cell `Vector3I(x, y, z)` is already board space: **X = width** (East = +X),
-**Y = elevation/level**, **Z = depth** (South = +Z), consistent with the engine's `North = -Z`.
-The baker normalizes painted cells to a `(0,0,0)` origin and sets `AuthoredTilesAreComplete =
-true`, so any unpainted cell is a hole.
+The **Battle footprint outlines** plugin draws editor-only wireframes for typed assets. It reads the definitions directly; there are no persistent box nodes or rectangle-painting tools. Edit the resource dictionary in the Inspector, and use ordinary scene instancing and transform snapping for placement. Shared resource edits update the reusable definition; use Godot's **Make Unique** when an instance needs its own data.
 
-## Editor setup (one-time)
+Lights, cameras and organizational nodes can remain ordinary nodes. Visual geometry must be inside a typed floor/prop asset. Nested typed assets are each baked once.
 
-1. Build a **`MeshLibrary`** with one item per terrain type; name items meaningfully
-   (e.g. `floor`, `wall`, `cover_n`, `spawn_a`).
-2. Author a `TileBrushData` `.tres` for each meaning:
-   - floor = `Walkable`
-   - wall = `!Walkable` + `BlocksLineOfSight` (cover stays `None` ⇒ zero cover)
-   - cover = `Walkable` + `CoverDirections` + `CoverAmount`
-   - spawn = a floor brush + `SpawnFactionSlot = N`
-3. Create a scene with a **`BattleMapAuthoring`** (GridMap) node; assign the `MeshLibrary`;
-   fill `Brushes` (item name → brush `.tres`); set `TargetPath`.
+## Cell properties
 
-## Workflow
+- `HasFloor` explicitly contributes a standing surface at the bottom of this cell
+- `BlocksMovement` prevents standing in this volume, independently of LOS and cover
+- `BlocksLineOfSight` blocks sight through the cell's volume
+- `BlocksVerticalLineOfSight` blocks crossing the cell's bottom boundary
+- `WalkableTop` contributes a standing surface one logical level above this cell
+- `TopBlocksVerticalLineOfSight` independently blocks crossing that upper boundary
+- `CoverDirections` and `CoverAmount` describe outward cover on exposed horizontal sides; rotating the piece rotates those sides
+- `SpawnFactionSlot` applies to this cell's `HasFloor` surface; leave it at -1 for no spawn. For a roof spawn, use an explicit floor cell there rather than also marking a duplicate top face
 
-- **Create:** paint the 3D grid, click **Bake**.
-- **Edit:** reopen the scene, repaint, re-bake.
+An upper box can block space without having a floor beneath it. A visible flat roof never creates a floor by itself. A marked top keeps the object interior blocked and creates the floor at `Y+1`. Duplicate floor claims are errors, including an explicit floor and a top face that claim the same surface.
 
-The `.tscn` is the source of truth; the baked `.tres` is a build artifact. A painted cell whose
-MeshLibrary item name isn't in `Brushes` bakes as a plain walkable floor.
+The baker suppresses internal cover edges between cells of the same asset. Contributions on the same receiving side merge by maximum. Until PR #4's independent side-strength extension lands, different nonzero strengths on separate sides of one standing cell produce a diagnostic instead of being flattened into the current single-strength backend representation.
 
-## Spawning from a baked map
+## Shared grid metrics
 
-`BattleSetupResolver.Resolve(type, seed?, playerDeployment?)` chooses the map and
-builds ordered sides. `MapDeployment.AssignSpawns(map, slot, loadouts)` pairs each
-side's roster directly with that slot's cells, sorted X/Y/Z. The slot is the
-side's index in `BattleTypeData.Factions`; roster order is preserved.
+Set `GridOrigin`, `CellWidth` and `LevelHeight` on the map root. X/Z cells are square; width and height default to 1. Definitions use these metrics. Asset placement must be snapped/aligned to the chosen map grid; changing the grid does not guess how to refit imported art. Adjust placements and visual-child transforms as appropriate for the new metric.
 
-The resolved `BattleSetup` groups each faction with its objectives and positioned
-units. `BattleFactory.Start(setup)` creates a fresh board, checks all placements,
-registers systems, and submits the spawn, object-placement, and start actions.
-An out-of-bounds or blocked cell is a cell failure; insufficient slot capacity
-is `SpawnSlotShortfall`.
+Export subtracts the origin and divides by cell size before flooring a box center to its integer cell. Floor surfaces lie on level planes, while volume centers are half a level above them. The exported map persists the metrics for picking, unit positions/size, playback, path overlays, highlights and camera framing. Gameplay ranges still count integer cells.
 
-A supplied `PlayerDeployment` retains its campaign faction and combatants. It
-replaces the player roster while keeping that side's authored objectives and
-spawn slot. Startup never reassigns a combatant's owning faction.
+## Export and verification
+
+Set `TargetPath`, then click **Export BattleMap** on the root. The gameplay baker receives only footprint resources and transforms. Scene export separately preserves visual nodes, nested scenes and overrides. It adds collision-layer-1 picking surfaces only for explicit floors/top faces; authored model colliders are copied onto non-ground layers so an unmarked roof cannot become mouse-pickable ground. Source nodes/resources are unchanged.
+
+The exporter rejects invalid dimensions/transforms, misaligned cells, negative coordinates, duplicate floors, solid overlaps and blocked spawns. Nonblocking contributions may overlap. Missing floors are nonwalkable but do not automatically block sight. Bounds include volume-only cells and roof floors; nonzero starting coordinates are preserved.
+
+Save and reload the authoring scene, export, reload the baked scene and re-export after modifying an asset. The example output is `resources/maps/prop_example_map.tscn`.
+
+Existing movement rules are unchanged: adjacent walkable, unoccupied cells directly above/below one another already connect. A solid van cell blocks the direct step through its interior, but declaring a roof surface does not itself implement ladders, climbing or a new clearance model. Those features and rectangle authoring are deferred.

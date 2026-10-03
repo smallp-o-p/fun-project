@@ -17,6 +17,7 @@ public sealed partial class BattleScene : Node3D
   private BattleUiController _ui = null!;
   private EventPlaybackDirector _director = null!;
   private BattleUI _view = null!;
+  private BoardCoordinates _coordinates = null!;
   private Faction _playerFaction = null!;
 
   public void Present(BattleRuntime runtime, BattleSetup setup)
@@ -42,21 +43,22 @@ public sealed partial class BattleScene : Node3D
     InstantiateMap();
     GameCamera rig = ConfigureGameCamera();
 
-    var director = new EventPlaybackDirector { Name = "EventPlaybackDirector" };
+    var director = new EventPlaybackDirector { Name = "EventPlaybackDirector", Coordinates = _coordinates };
     AddChild(director);
     director.Bind(_runtime);
     _director = director;
 
-    var unitMeshes = new BattleUnitMeshes { Name = "UnitMeshes" };
+    var unitMeshes = new BattleUnitMeshes { Name = "UnitMeshes", Coordinates = _coordinates };
     AddChild(unitMeshes);
     unitMeshes.Initialize(_runtime, _director, _playerFaction);
 
     _ui = new BattleUiController(_runtime, _playerFaction, () => _director.Busy);
 
-    var input = new BattleInputController { Name = "BattleInputController" };
+    var input = new BattleInputController { Name = "BattleInputController", Coordinates = _coordinates };
     AddChild(input);
     input.Initialize(rig);
     _view = GetNode<BattleUI>("%BattleUI");
+    _view.Coordinates = _coordinates;
     _view.ConfirmRequested += () => _ui.Confirm();
     _view.CancelRequested += _ui.Cancel;
     _view.VerbSelected += _ui.BeginAction;
@@ -93,13 +95,18 @@ public sealed partial class BattleScene : Node3D
     var map = scene.Instantiate<BattleMap>();
     map.Name = "Map";
     AddChild(map);
+    _coordinates = new BoardCoordinates(map.MapData, map.GlobalTransform);
   }
 
   private GameCamera ConfigureGameCamera()
   {
     var rig = GetNode<GameCamera>("%GameCamera");
-    var center = new Vector3(_setup.Map.Dimensions.X / 2f, 0f, _setup.Map.Dimensions.Z / 2f);
-    rig.GlobalPosition = center + new Vector3(0f, 10f, 0f);
+    var center = _coordinates.MapToWorld(_coordinates.Origin + new Vector3(_setup.Map.Dimensions.X / 2f, 0, _setup.Map.Dimensions.Z / 2f) * _coordinates.CellSize);
+    rig.GlobalPosition = center + _coordinates.Up * (10f * _coordinates.CellSize.X);
+    rig.SetOrbitRadius(rig.PathRadius * _coordinates.CellSize.X);
+    rig.ScrollCameraStep *= _coordinates.CellSize.Y;
+    rig.CameraStep = _coordinates.CellSize.X;
+    rig.CameraMoveSpeed = 30 * _coordinates.CellSize.X;
     return rig;
   }
 

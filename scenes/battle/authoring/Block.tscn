@@ -1,0 +1,28 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleProp.cs" id="1_oviq3"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintCellData.cs" id="2_um0pc"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="3_6dmgb"]
+
+[sub_resource type="Resource" id="Resource_vesj4"]
+script = ExtResource("2_um0pc")
+BlocksMovement = true
+BlocksLineOfSight = true
+CoverDirections = 15
+CoverAmount = 60
+
+[sub_resource type="Resource" id="Resource_gfsst"]
+script = ExtResource("3_6dmgb")
+Cells = Dictionary[Vector3i, ExtResource("2_um0pc")]({
+Vector3i(0, 0, 0): SubResource("Resource_vesj4")
+})
+
+[sub_resource type="BoxMesh" id="BoxMesh_emol3"]
+
+[node name="Block" type="Node3D" unique_id=1021311450]
+script = ExtResource("1_oviq3")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" type="MeshInstance3D" parent="." unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")

@@ -1,108 +1,1490 @@
-[gd_scene format=3 uid="uid://c0q5leqoor3ai"]
+[gd_scene format=3]
 
-[ext_resource type="MeshLibrary" path="res://scenes/debug/DebugMeshLib.meshlib" id="1_6er48"]
-[ext_resource type="Script" uid="uid://b0jcy8d61hswr" path="res://scenes/battle/authoring/BattleMap.cs" id="2_a0h6r"]
-[ext_resource type="Script" uid="uid://o0p1pxi51jff" path="res://scripts/battle/map/BattleMapTileData.cs" id="3_qjsg6"]
-[ext_resource type="Script" uid="uid://dj8hhawgr6bh" path="res://scripts/battle/map/BattleMapData.cs" id="4_7w3e4"]
-[ext_resource type="Script" uid="uid://djtekemlaytk4" path="res://scenes/battle/authoring/BattleTilePalette.cs" id="5_gvjw1"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleMap.cs" id="1_gvjw1"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapTileData.cs" id="2_tqmtf"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapData.cs" id="3_gwf6a"]
+[ext_resource type="PackedScene" path="res://scenes/battle/authoring/FloorTile.tscn" id="4_gv1rf"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFloor.cs" id="5_xpr8u"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintCellData.cs" id="6_q5tjr"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="7_hent3"]
+[ext_resource type="PackedScene" path="res://scenes/battle/authoring/Block.tscn" id="8_uok1d"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleProp.cs" id="9_rhf4r"]
 
-[sub_resource type="Resource" id="Resource_tqmtf"]
-script = ExtResource("3_qjsg6")
+[sub_resource type="Resource" id="Resource_fq4fy"]
+script = ExtResource("2_tqmtf")
 
-[sub_resource type="Resource" id="Resource_gv1rf"]
-script = ExtResource("3_qjsg6")
+[sub_resource type="Resource" id="Resource_ec4wv"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_vc63v"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_ve18x"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_c6k20"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_xdr6u"]
+script = ExtResource("2_tqmtf")
 SpawnFactionSlot = 0
 
-[sub_resource type="Resource" id="Resource_gwf6a"]
-script = ExtResource("3_qjsg6")
+[sub_resource type="Resource" id="Resource_qxanc"]
+script = ExtResource("2_tqmtf")
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_5gghy"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_ebh6m"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_tcpcx"]
+script = ExtResource("2_tqmtf")
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_u18a0"]
+script = ExtResource("2_tqmtf")
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_siq5e"]
+script = ExtResource("2_tqmtf")
 Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_vgkt2"]
+script = ExtResource("2_tqmtf")
+Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_3yu03"]
+script = ExtResource("2_tqmtf")
+Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_set0q"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_ud5eb"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_snfbw"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_1ql7b"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_dovnn"]
+script = ExtResource("2_tqmtf")
+Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_mu212"]
+script = ExtResource("2_tqmtf")
+Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_2ybpl"]
+script = ExtResource("2_tqmtf")
+Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_7xesk"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_qb5nn"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_gbmxe"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_svv6h"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_tc1mw"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_ydige"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_g1k37"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_4l7bq"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_khl52"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_j45ep"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_htqga"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_s556i"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_aliqd"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_snm73"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_sc0tp"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_ovuxx"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_dv38j"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_goyyr"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_86x3l"]
+script = ExtResource("2_tqmtf")
+Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_6sf6m"]
+script = ExtResource("2_tqmtf")
+Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_y45qb"]
+script = ExtResource("2_tqmtf")
+Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_3nl2w"]
+script = ExtResource("2_tqmtf")
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_edy0t"]
+script = ExtResource("2_tqmtf")
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_56pny"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_aihdj"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_erew7"]
+script = ExtResource("2_tqmtf")
+Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_7p0it"]
+script = ExtResource("2_tqmtf")
+Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_po3gt"]
+script = ExtResource("2_tqmtf")
+Walkable = false
+BlocksLineOfSight = true
+
+[sub_resource type="Resource" id="Resource_f6nli"]
+script = ExtResource("2_tqmtf")
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_vsp58"]
+script = ExtResource("2_tqmtf")
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_wn8x1"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_5bp6y"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_0ylwx"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_s3p7e"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_kdx76"]
+script = ExtResource("2_tqmtf")
+
+[sub_resource type="Resource" id="Resource_u3jox"]
+script = ExtResource("3_gwf6a")
+Dimensions = Vector3i(8, 2, 7)
+Tiles = Dictionary[Vector3i, ExtResource("2_tqmtf")]({
+Vector3i(0, 0, 0): SubResource("Resource_fq4fy"),
+Vector3i(0, 0, 1): SubResource("Resource_ec4wv"),
+Vector3i(0, 0, 2): SubResource("Resource_vc63v"),
+Vector3i(0, 0, 3): SubResource("Resource_ve18x"),
+Vector3i(0, 0, 4): SubResource("Resource_c6k20"),
+Vector3i(0, 0, 5): SubResource("Resource_xdr6u"),
+Vector3i(0, 0, 6): SubResource("Resource_qxanc"),
+Vector3i(1, 0, 0): SubResource("Resource_5gghy"),
+Vector3i(1, 0, 1): SubResource("Resource_ebh6m"),
+Vector3i(1, 0, 5): SubResource("Resource_tcpcx"),
+Vector3i(1, 0, 6): SubResource("Resource_u18a0"),
+Vector3i(1, 1, 2): SubResource("Resource_siq5e"),
+Vector3i(1, 1, 3): SubResource("Resource_vgkt2"),
+Vector3i(1, 1, 4): SubResource("Resource_3yu03"),
+Vector3i(2, 0, 0): SubResource("Resource_set0q"),
+Vector3i(2, 0, 1): SubResource("Resource_ud5eb"),
+Vector3i(2, 0, 5): SubResource("Resource_snfbw"),
+Vector3i(2, 0, 6): SubResource("Resource_1ql7b"),
+Vector3i(2, 1, 2): SubResource("Resource_dovnn"),
+Vector3i(2, 1, 3): SubResource("Resource_mu212"),
+Vector3i(2, 1, 4): SubResource("Resource_2ybpl"),
+Vector3i(3, 0, 0): SubResource("Resource_7xesk"),
+Vector3i(3, 0, 1): SubResource("Resource_qb5nn"),
+Vector3i(3, 0, 2): SubResource("Resource_gbmxe"),
+Vector3i(3, 0, 3): SubResource("Resource_svv6h"),
+Vector3i(3, 0, 4): SubResource("Resource_tc1mw"),
+Vector3i(3, 0, 5): SubResource("Resource_ydige"),
+Vector3i(3, 0, 6): SubResource("Resource_g1k37"),
+Vector3i(4, 0, 0): SubResource("Resource_4l7bq"),
+Vector3i(4, 0, 1): SubResource("Resource_khl52"),
+Vector3i(4, 0, 2): SubResource("Resource_j45ep"),
+Vector3i(4, 0, 3): SubResource("Resource_htqga"),
+Vector3i(4, 0, 4): SubResource("Resource_s556i"),
+Vector3i(4, 0, 5): SubResource("Resource_aliqd"),
+Vector3i(4, 0, 6): SubResource("Resource_snm73"),
+Vector3i(5, 0, 0): SubResource("Resource_sc0tp"),
+Vector3i(5, 0, 1): SubResource("Resource_ovuxx"),
+Vector3i(5, 0, 5): SubResource("Resource_dv38j"),
+Vector3i(5, 0, 6): SubResource("Resource_goyyr"),
+Vector3i(5, 1, 2): SubResource("Resource_86x3l"),
+Vector3i(5, 1, 3): SubResource("Resource_6sf6m"),
+Vector3i(5, 1, 4): SubResource("Resource_y45qb"),
+Vector3i(6, 0, 0): SubResource("Resource_3nl2w"),
+Vector3i(6, 0, 1): SubResource("Resource_edy0t"),
+Vector3i(6, 0, 5): SubResource("Resource_56pny"),
+Vector3i(6, 0, 6): SubResource("Resource_aihdj"),
+Vector3i(6, 1, 2): SubResource("Resource_erew7"),
+Vector3i(6, 1, 3): SubResource("Resource_7p0it"),
+Vector3i(6, 1, 4): SubResource("Resource_po3gt"),
+Vector3i(7, 0, 0): SubResource("Resource_f6nli"),
+Vector3i(7, 0, 1): SubResource("Resource_vsp58"),
+Vector3i(7, 0, 2): SubResource("Resource_wn8x1"),
+Vector3i(7, 0, 3): SubResource("Resource_5bp6y"),
+Vector3i(7, 0, 4): SubResource("Resource_0ylwx"),
+Vector3i(7, 0, 5): SubResource("Resource_s3p7e"),
+Vector3i(7, 0, 6): SubResource("Resource_kdx76")
+})
+
+[sub_resource type="Resource" id="Resource_x5mc6"]
+script = ExtResource("6_q5tjr")
+HasFloor = true
+
+[sub_resource type="Resource" id="Resource_lrn7m"]
+script = ExtResource("7_hent3")
+Cells = Dictionary[Vector3i, ExtResource("6_q5tjr")]({
+Vector3i(0, 0, 0): SubResource("Resource_x5mc6")
+})
+
+[sub_resource type="BoxMesh" id="BoxMesh_ghfdu"]
+size = Vector3(1, 0.1, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_esmve"]
+size = Vector3(1, 0.1, 1)
+
+[sub_resource type="Resource" id="Resource_gt48f"]
+script = ExtResource("6_q5tjr")
+HasFloor = true
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_dmt32"]
+script = ExtResource("7_hent3")
+Cells = Dictionary[Vector3i, ExtResource("6_q5tjr")]({
+Vector3i(0, 0, 0): SubResource("Resource_gt48f")
+})
+
+[sub_resource type="Resource" id="Resource_elujj"]
+script = ExtResource("6_q5tjr")
+HasFloor = true
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_b7sbx"]
+script = ExtResource("7_hent3")
+Cells = Dictionary[Vector3i, ExtResource("6_q5tjr")]({
+Vector3i(0, 0, 0): SubResource("Resource_elujj")
+})
+
+[sub_resource type="Resource" id="Resource_l8hdh"]
+script = ExtResource("6_q5tjr")
+HasFloor = true
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_cejyj"]
+script = ExtResource("7_hent3")
+Cells = Dictionary[Vector3i, ExtResource("6_q5tjr")]({
+Vector3i(0, 0, 0): SubResource("Resource_l8hdh")
+})
+
+[sub_resource type="Resource" id="Resource_n3ebb"]
+script = ExtResource("6_q5tjr")
+HasFloor = true
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_3qgim"]
+script = ExtResource("7_hent3")
+Cells = Dictionary[Vector3i, ExtResource("6_q5tjr")]({
+Vector3i(0, 0, 0): SubResource("Resource_n3ebb")
+})
+
+[sub_resource type="Resource" id="Resource_vesj4"]
+script = ExtResource("6_q5tjr")
+BlocksMovement = true
 BlocksLineOfSight = true
 CoverDirections = 15
 CoverAmount = 60
 
-[sub_resource type="Resource" id="Resource_xpr8u"]
-script = ExtResource("4_7w3e4")
-Dimensions = Vector3i(8, 2, 7)
-Tiles = Dictionary[Vector3i, ExtResource("3_qjsg6")]({
-Vector3i(0, 0, 0): SubResource("Resource_tqmtf"),
-Vector3i(0, 0, 1): SubResource("Resource_tqmtf"),
-Vector3i(0, 0, 2): SubResource("Resource_tqmtf"),
-Vector3i(0, 0, 3): SubResource("Resource_tqmtf"),
-Vector3i(0, 0, 4): SubResource("Resource_tqmtf"),
-Vector3i(0, 0, 5): SubResource("Resource_gv1rf"),
-Vector3i(0, 0, 6): SubResource("Resource_gv1rf"),
-Vector3i(1, 0, 0): SubResource("Resource_tqmtf"),
-Vector3i(1, 0, 1): SubResource("Resource_tqmtf"),
-Vector3i(1, 0, 5): SubResource("Resource_gv1rf"),
-Vector3i(1, 0, 6): SubResource("Resource_gv1rf"),
-Vector3i(1, 1, 2): SubResource("Resource_gwf6a"),
-Vector3i(1, 1, 3): SubResource("Resource_gwf6a"),
-Vector3i(1, 1, 4): SubResource("Resource_gwf6a"),
-Vector3i(2, 0, 0): SubResource("Resource_tqmtf"),
-Vector3i(2, 0, 1): SubResource("Resource_tqmtf"),
-Vector3i(2, 0, 5): SubResource("Resource_tqmtf"),
-Vector3i(2, 0, 6): SubResource("Resource_tqmtf"),
-Vector3i(2, 1, 2): SubResource("Resource_gwf6a"),
-Vector3i(2, 1, 3): SubResource("Resource_gwf6a"),
-Vector3i(2, 1, 4): SubResource("Resource_gwf6a"),
-Vector3i(3, 0, 0): SubResource("Resource_tqmtf"),
-Vector3i(3, 0, 1): SubResource("Resource_tqmtf"),
-Vector3i(3, 0, 2): SubResource("Resource_tqmtf"),
-Vector3i(3, 0, 3): SubResource("Resource_tqmtf"),
-Vector3i(3, 0, 4): SubResource("Resource_tqmtf"),
-Vector3i(3, 0, 5): SubResource("Resource_tqmtf"),
-Vector3i(3, 0, 6): SubResource("Resource_tqmtf"),
-Vector3i(4, 0, 0): SubResource("Resource_tqmtf"),
-Vector3i(4, 0, 1): SubResource("Resource_tqmtf"),
-Vector3i(4, 0, 2): SubResource("Resource_tqmtf"),
-Vector3i(4, 0, 3): SubResource("Resource_tqmtf"),
-Vector3i(4, 0, 4): SubResource("Resource_tqmtf"),
-Vector3i(4, 0, 5): SubResource("Resource_tqmtf"),
-Vector3i(4, 0, 6): SubResource("Resource_tqmtf"),
-Vector3i(5, 0, 0): SubResource("Resource_tqmtf"),
-Vector3i(5, 0, 1): SubResource("Resource_tqmtf"),
-Vector3i(5, 0, 5): SubResource("Resource_tqmtf"),
-Vector3i(5, 0, 6): SubResource("Resource_tqmtf"),
-Vector3i(5, 1, 2): SubResource("Resource_gwf6a"),
-Vector3i(5, 1, 3): SubResource("Resource_gwf6a"),
-Vector3i(5, 1, 4): SubResource("Resource_gwf6a"),
-Vector3i(6, 0, 0): SubResource("Resource_gv1rf"),
-Vector3i(6, 0, 1): SubResource("Resource_gv1rf"),
-Vector3i(6, 0, 5): SubResource("Resource_tqmtf"),
-Vector3i(6, 0, 6): SubResource("Resource_tqmtf"),
-Vector3i(6, 1, 2): SubResource("Resource_gwf6a"),
-Vector3i(6, 1, 3): SubResource("Resource_gwf6a"),
-Vector3i(6, 1, 4): SubResource("Resource_gwf6a"),
-Vector3i(7, 0, 0): SubResource("Resource_gv1rf"),
-Vector3i(7, 0, 1): SubResource("Resource_gv1rf"),
-Vector3i(7, 0, 2): SubResource("Resource_tqmtf"),
-Vector3i(7, 0, 3): SubResource("Resource_tqmtf"),
-Vector3i(7, 0, 4): SubResource("Resource_tqmtf"),
-Vector3i(7, 0, 5): SubResource("Resource_tqmtf"),
-Vector3i(7, 0, 6): SubResource("Resource_tqmtf")
+[sub_resource type="Resource" id="Resource_gfsst"]
+script = ExtResource("7_hent3")
+Cells = Dictionary[Vector3i, ExtResource("6_q5tjr")]({
+Vector3i(0, 0, 0): SubResource("Resource_vesj4")
 })
 
-[sub_resource type="Resource" id="Resource_q5tjr"]
-script = ExtResource("3_qjsg6")
-SpawnFactionSlot = 1
+[sub_resource type="BoxMesh" id="BoxMesh_emol3"]
 
-[sub_resource type="Resource" id="Resource_hent3"]
-script = ExtResource("5_gvjw1")
-MeshLibrary = ExtResource("1_6er48")
-Brushes = Dictionary[StringName, ExtResource("3_qjsg6")]({
-&"DebugBox": SubResource("Resource_gwf6a"),
-&"DebugFloor": SubResource("Resource_tqmtf"),
-&"DebugSpawnFloor": SubResource("Resource_gv1rf"),
-&"DebugSpawnFloorB": SubResource("Resource_q5tjr")
+[sub_resource type="Resource" id="Resource_2qk0d"]
+script = ExtResource("6_q5tjr")
+HasFloor = true
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_7u3fj"]
+script = ExtResource("7_hent3")
+Cells = Dictionary[Vector3i, ExtResource("6_q5tjr")]({
+Vector3i(0, 0, 0): SubResource("Resource_2qk0d")
 })
 
-[node name="Map" type="GridMap" unique_id=1093384905]
-mesh_library = ExtResource("1_6er48")
-cell_size = Vector3(1, 1, 1)
-cell_center_y = false
-data = {
-"cells": PackedInt32Array(0, 0, 524288, 0, 1, 524288, 1, 1, 524288, 3, 2, 524288, 3, 1, 524288, 3, 0, 524288, 2, 0, 524288, 1, 0, 524288, 2, 1, 524288, 0, 2, 524288, 0, 3, 524288, 0, 4, 524288, 2, 6, 524288, 3, 6, 524288, 3, 5, 524288, 3, 4, 524288, 3, 3, 524288, 2, 5, 524288, 4, 5, 524288, 4, 4, 524288, 4, 3, 524288, 7, 3, 524288, 7, 4, 524288, 7, 5, 524288, 7, 6, 524288, 6, 6, 524288, 5, 6, 524288, 4, 6, 524288, 5, 5, 524288, 6, 5, 524288, 7, 2, 524288, 5, 0, 524288, 4, 0, 524288, 4, 1, 524288, 4, 2, 524288, 5, 1, 524288, 65542, 4, 524289, 65542, 3, 524289, 65541, 4, 524289, 65541, 3, 524289, 65541, 2, 524289, 65542, 2, 524289, 65538, 3, 524289, 65538, 4, 524289, 65537, 4, 524289, 65537, 3, 524289, 65537, 2, 524289, 65538, 2, 524289, 0, 5, 524290, 0, 6, 524290, 1, 6, 524290, 1, 5, 524290, 7, 1, 524290, 7, 0, 524290, 6, 0, 524290, 6, 1, 524290)
-}
-script = ExtResource("2_a0h6r")
-MapData = SubResource("Resource_xpr8u")
-UsedPalette = SubResource("Resource_hent3")
+[sub_resource type="Resource" id="Resource_ad1vn"]
+script = ExtResource("6_q5tjr")
+HasFloor = true
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_v65si"]
+script = ExtResource("7_hent3")
+Cells = Dictionary[Vector3i, ExtResource("6_q5tjr")]({
+Vector3i(0, 0, 0): SubResource("Resource_ad1vn")
+})
+
+[sub_resource type="Resource" id="Resource_3wh22"]
+script = ExtResource("6_q5tjr")
+HasFloor = true
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_sridt"]
+script = ExtResource("7_hent3")
+Cells = Dictionary[Vector3i, ExtResource("6_q5tjr")]({
+Vector3i(0, 0, 0): SubResource("Resource_3wh22")
+})
+
+[sub_resource type="Resource" id="Resource_ej34s"]
+script = ExtResource("6_q5tjr")
+HasFloor = true
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_gds7x"]
+script = ExtResource("7_hent3")
+Cells = Dictionary[Vector3i, ExtResource("6_q5tjr")]({
+Vector3i(0, 0, 0): SubResource("Resource_ej34s")
+})
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0dgbg"]
+size = Vector3(1, 0.02, 1)
+
+[node name="Map" type="Node3D" unique_id=27151324]
+script = ExtResource("1_gvjw1")
+MapData = SubResource("Resource_u3jox")
+
+[node name="Cell_0_0_0" parent="." unique_id=1583490562 instance=ExtResource("4_gv1rf")]
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_0_0_0" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_0_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_0_0_0/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_0_0_1" parent="." unique_id=121052500 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_0_0_1" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_0_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_0_0_1/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_0_0_2" parent="." unique_id=1271034114 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_0_0_2" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_0_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_0_0_2/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_0_0_3" parent="." unique_id=1357879818 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_0_0_3" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_0_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_0_0_3/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_0_0_4" parent="." unique_id=1291200476 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_0_0_4" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_0_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_0_0_4/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_0_0_5" parent="." unique_id=278030433 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_dmt32")
+
+[node name="Model" parent="Cell_0_0_5" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_0_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_0_0_5/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_0_0_6" parent="." unique_id=1985062191 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 6)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_b7sbx")
+
+[node name="Model" parent="Cell_0_0_6" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_0_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_0_0_6/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_1_0_0" parent="." unique_id=1048970934 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_1_0_0" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_1_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_1_0_0/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_1_0_1" parent="." unique_id=1260175583 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_1_0_1" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_1_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_1_0_1/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_1_0_5" parent="." unique_id=20997830 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 5)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_cejyj")
+
+[node name="Model" parent="Cell_1_0_5" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_1_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_1_0_5/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_1_0_6" parent="." unique_id=261270120 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 6)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_3qgim")
+
+[node name="Model" parent="Cell_1_0_6" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_1_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_1_0_6/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_1_1_2" parent="." unique_id=1021311450 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 2)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_1_1_2" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_1_1_3" parent="." unique_id=312039901 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 3)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_1_1_3" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_1_1_4" parent="." unique_id=855445437 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 4)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_1_1_4" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_2_0_0" parent="." unique_id=2097784491 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 0)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_2_0_0" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_2_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_2_0_0/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_2_0_1" parent="." unique_id=17823102 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 1)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_2_0_1" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_2_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_2_0_1/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_2_0_5" parent="." unique_id=1579527984 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 5)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_2_0_5" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_2_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_2_0_5/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_2_0_6" parent="." unique_id=275651114 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 6)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_2_0_6" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_2_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_2_0_6/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_2_1_2" parent="." unique_id=744856325 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1, 2)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_2_1_2" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_2_1_3" parent="." unique_id=1935648321 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1, 3)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_2_1_3" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_2_1_4" parent="." unique_id=742289488 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1, 4)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_2_1_4" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_3_0_0" parent="." unique_id=1756694514 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 0)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_3_0_0" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_3_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_3_0_0/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_3_0_1" parent="." unique_id=977852941 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 1)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_3_0_1" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_3_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_3_0_1/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_3_0_2" parent="." unique_id=174232081 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 2)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_3_0_2" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_3_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_3_0_2/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_3_0_3" parent="." unique_id=1390571101 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 3)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_3_0_3" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_3_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_3_0_3/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_3_0_4" parent="." unique_id=1082637300 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 4)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_3_0_4" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_3_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_3_0_4/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_3_0_5" parent="." unique_id=1023150296 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 5)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_3_0_5" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_3_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_3_0_5/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_3_0_6" parent="." unique_id=852381572 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 6)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_3_0_6" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_3_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_3_0_6/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_4_0_0" parent="." unique_id=457425236 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 0)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_4_0_0" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_4_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_4_0_0/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_4_0_1" parent="." unique_id=1246661328 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 1)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_4_0_1" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_4_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_4_0_1/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_4_0_2" parent="." unique_id=1844710390 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 2)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_4_0_2" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_4_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_4_0_2/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_4_0_3" parent="." unique_id=46254712 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 3)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_4_0_3" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_4_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_4_0_3/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_4_0_4" parent="." unique_id=959441222 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 4)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_4_0_4" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_4_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_4_0_4/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_4_0_5" parent="." unique_id=1934451882 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 5)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_4_0_5" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_4_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_4_0_5/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_4_0_6" parent="." unique_id=1808432501 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 6)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_4_0_6" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_4_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_4_0_6/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_5_0_0" parent="." unique_id=93143090 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 0)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_5_0_0" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_5_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_5_0_0/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_5_0_1" parent="." unique_id=291252632 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 1)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_5_0_1" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_5_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_5_0_1/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_5_0_5" parent="." unique_id=1634920709 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 5)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_5_0_5" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_5_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_5_0_5/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_5_0_6" parent="." unique_id=447939124 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 6)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_5_0_6" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_5_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_5_0_6/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_5_1_2" parent="." unique_id=1862611151 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, 2)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_5_1_2" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_5_1_3" parent="." unique_id=795706469 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, 3)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_5_1_3" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_5_1_4" parent="." unique_id=1325172568 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, 4)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_5_1_4" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_6_0_0" parent="." unique_id=888424196 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 0)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_7u3fj")
+
+[node name="Model" parent="Cell_6_0_0" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_6_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_6_0_0/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_6_0_1" parent="." unique_id=2032988866 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 1)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_v65si")
+
+[node name="Model" parent="Cell_6_0_1" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_6_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_6_0_1/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_6_0_5" parent="." unique_id=1331475630 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 5)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_6_0_5" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_6_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_6_0_5/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_6_0_6" parent="." unique_id=1410707518 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 6)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_6_0_6" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_6_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_6_0_6/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_6_1_2" parent="." unique_id=1415189034 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, 2)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_6_1_2" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_6_1_3" parent="." unique_id=1842267577 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, 3)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_6_1_3" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_6_1_4" parent="." unique_id=566701332 instance=ExtResource("8_uok1d")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, 4)
+script = ExtResource("9_rhf4r")
+Footprint = SubResource("Resource_gfsst")
+
+[node name="Model" parent="Cell_6_1_4" index="0" unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Cell_7_0_0" parent="." unique_id=86601458 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 0)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_sridt")
+
+[node name="Model" parent="Cell_7_0_0" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_7_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_7_0_0/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_7_0_1" parent="." unique_id=1883055602 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 1)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_gds7x")
+
+[node name="Model" parent="Cell_7_0_1" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_7_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_7_0_1/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_7_0_2" parent="." unique_id=58170679 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 2)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_7_0_2" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_7_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_7_0_2/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_7_0_3" parent="." unique_id=1926155050 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 3)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_7_0_3" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_7_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_7_0_3/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_7_0_4" parent="." unique_id=386903219 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 4)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_7_0_4" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_7_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_7_0_4/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_7_0_5" parent="." unique_id=14326809 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 5)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_7_0_5" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_7_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_7_0_5/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Cell_7_0_6" parent="." unique_id=322528138 instance=ExtResource("4_gv1rf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 6)
+script = ExtResource("5_xpr8u")
+Footprint = SubResource("Resource_lrn7m")
+
+[node name="Model" parent="Cell_7_0_6" index="0" unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" parent="Cell_7_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" parent="Cell_7_0_6/Surface" index="0" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="FloorPicking" type="StaticBody3D" parent="." unique_id=280745043]
+collision_mask = 0
+
+[node name="@CollisionShape3D@3" type="CollisionShape3D" parent="FloorPicking" unique_id=957472322]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@4" type="CollisionShape3D" parent="FloorPicking" unique_id=511416605]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@5" type="CollisionShape3D" parent="FloorPicking" unique_id=1576095710]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@6" type="CollisionShape3D" parent="FloorPicking" unique_id=1009300364]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@7" type="CollisionShape3D" parent="FloorPicking" unique_id=309647100]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@8" type="CollisionShape3D" parent="FloorPicking" unique_id=1154915918]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@9" type="CollisionShape3D" parent="FloorPicking" unique_id=172066766]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@10" type="CollisionShape3D" parent="FloorPicking" unique_id=540600398]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@11" type="CollisionShape3D" parent="FloorPicking" unique_id=1627287402]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@12" type="CollisionShape3D" parent="FloorPicking" unique_id=582794629]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@13" type="CollisionShape3D" parent="FloorPicking" unique_id=843478125]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@14" type="CollisionShape3D" parent="FloorPicking" unique_id=875666623]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@15" type="CollisionShape3D" parent="FloorPicking" unique_id=1472367013]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@16" type="CollisionShape3D" parent="FloorPicking" unique_id=1371543260]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@17" type="CollisionShape3D" parent="FloorPicking" unique_id=1478582903]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@18" type="CollisionShape3D" parent="FloorPicking" unique_id=1619122911]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@19" type="CollisionShape3D" parent="FloorPicking" unique_id=1756996657]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@20" type="CollisionShape3D" parent="FloorPicking" unique_id=1448466225]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@21" type="CollisionShape3D" parent="FloorPicking" unique_id=486910321]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@22" type="CollisionShape3D" parent="FloorPicking" unique_id=1364346142]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@23" type="CollisionShape3D" parent="FloorPicking" unique_id=893457255]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@24" type="CollisionShape3D" parent="FloorPicking" unique_id=1431930748]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@25" type="CollisionShape3D" parent="FloorPicking" unique_id=547553470]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@26" type="CollisionShape3D" parent="FloorPicking" unique_id=332382048]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@27" type="CollisionShape3D" parent="FloorPicking" unique_id=1134045219]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@28" type="CollisionShape3D" parent="FloorPicking" unique_id=1367490501]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@29" type="CollisionShape3D" parent="FloorPicking" unique_id=1645718202]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@30" type="CollisionShape3D" parent="FloorPicking" unique_id=1062997166]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@31" type="CollisionShape3D" parent="FloorPicking" unique_id=780741476]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@32" type="CollisionShape3D" parent="FloorPicking" unique_id=1826496877]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@33" type="CollisionShape3D" parent="FloorPicking" unique_id=60867719]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@34" type="CollisionShape3D" parent="FloorPicking" unique_id=269505504]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@35" type="CollisionShape3D" parent="FloorPicking" unique_id=615761811]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@36" type="CollisionShape3D" parent="FloorPicking" unique_id=157121113]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@37" type="CollisionShape3D" parent="FloorPicking" unique_id=1645559781]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@38" type="CollisionShape3D" parent="FloorPicking" unique_id=808550454]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@39" type="CollisionShape3D" parent="FloorPicking" unique_id=1857736487]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@40" type="CollisionShape3D" parent="FloorPicking" unique_id=193341803]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@41" type="CollisionShape3D" parent="FloorPicking" unique_id=582987092]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@42" type="CollisionShape3D" parent="FloorPicking" unique_id=1058869899]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@43" type="CollisionShape3D" parent="FloorPicking" unique_id=712133148]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@44" type="CollisionShape3D" parent="FloorPicking" unique_id=1652394449]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@45" type="CollisionShape3D" parent="FloorPicking" unique_id=1234924310]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[node name="@CollisionShape3D@46" type="CollisionShape3D" parent="FloorPicking" unique_id=1610284559]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_0dgbg")
+
+[editable path="Cell_0_0_0"]
+[editable path="Cell_0_0_1"]
+[editable path="Cell_0_0_2"]
+[editable path="Cell_0_0_3"]
+[editable path="Cell_0_0_4"]
+[editable path="Cell_0_0_5"]
+[editable path="Cell_0_0_6"]
+[editable path="Cell_1_0_0"]
+[editable path="Cell_1_0_1"]
+[editable path="Cell_1_0_5"]
+[editable path="Cell_1_0_6"]
+[editable path="Cell_1_1_2"]
+[editable path="Cell_1_1_3"]
+[editable path="Cell_1_1_4"]
+[editable path="Cell_2_0_0"]
+[editable path="Cell_2_0_1"]
+[editable path="Cell_2_0_5"]
+[editable path="Cell_2_0_6"]
+[editable path="Cell_2_1_2"]
+[editable path="Cell_2_1_3"]
+[editable path="Cell_2_1_4"]
+[editable path="Cell_3_0_0"]
+[editable path="Cell_3_0_1"]
+[editable path="Cell_3_0_2"]
+[editable path="Cell_3_0_3"]
+[editable path="Cell_3_0_4"]
+[editable path="Cell_3_0_5"]
+[editable path="Cell_3_0_6"]
+[editable path="Cell_4_0_0"]
+[editable path="Cell_4_0_1"]
+[editable path="Cell_4_0_2"]
+[editable path="Cell_4_0_3"]
+[editable path="Cell_4_0_4"]
+[editable path="Cell_4_0_5"]
+[editable path="Cell_4_0_6"]
+[editable path="Cell_5_0_0"]
+[editable path="Cell_5_0_1"]
+[editable path="Cell_5_0_5"]
+[editable path="Cell_5_0_6"]
+[editable path="Cell_5_1_2"]
+[editable path="Cell_5_1_3"]
+[editable path="Cell_5_1_4"]
+[editable path="Cell_6_0_0"]
+[editable path="Cell_6_0_1"]
+[editable path="Cell_6_0_5"]
+[editable path="Cell_6_0_6"]
+[editable path="Cell_6_1_2"]
+[editable path="Cell_6_1_3"]
+[editable path="Cell_6_1_4"]
+[editable path="Cell_7_0_0"]
+[editable path="Cell_7_0_1"]
+[editable path="Cell_7_0_2"]
+[editable path="Cell_7_0_3"]
+[editable path="Cell_7_0_4"]
+[editable path="Cell_7_0_5"]
+[editable path="Cell_7_0_6"]
