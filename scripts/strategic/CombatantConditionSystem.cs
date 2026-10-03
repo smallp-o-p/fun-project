@@ -42,6 +42,14 @@ public sealed class CombatantConditionSystem
   public Option<FatigueState> GetFatigue(Combatant combatant)
     => _fatigues.TryGetValue(combatant, out var fatigue) ? Some(fatigue) : None;
 
+  /// <summary>Drops both condition records for a combatant removed from the roster by death:
+  /// records exist only while a condition is active, and a removed member can never recover.</summary>
+  internal void Forget(Combatant combatant)
+  {
+    _injuries.Remove(combatant);
+    _fatigues.Remove(combatant);
+  }
+
   public string InjuryName(int position)
     => position == 0 ? "Healthy" : InjuryTierAt(position).Name;
 

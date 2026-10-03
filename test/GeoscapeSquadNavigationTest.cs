@@ -217,6 +217,24 @@ public class GeoscapeSquadNavigationTest
     Assert.Equal(0, MapEventMarkers(scene).Length);
   }
 
+  [TestCase(TestName = "Engage preparation offers Deploy for the pending mission")]
+  public async Task EngagePreparationOffersDeploy()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (scene, manager) = TacticalScene([MakeEntry("Alpha")]);
+    OpenResolutionViaMapEvent(scene);
+    var dialog = (GeoscapeEventResolution)manager.Current;
+
+    DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
+    var squad = (SquadLoadoutView)manager.Current;
+
+    var deploy = SquadDeployButton(squad);
+    Assert.True(deploy.Visible); // configured tactical mission
+    Assert.True(deploy.Disabled); // empty selection
+    ChooseSquadUnit(squad, 0, "Alpha");
+    Assert.False(deploy.Disabled); // selection readies the launch intent
+  }
+
   [TestCase(TestName = "Broken squad exports inside the scene preserve the pending mission")]
   public async Task BrokenSceneExportsPreserveThePendingMission()
   {

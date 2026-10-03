@@ -44,7 +44,7 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
       var button = new Button { Text = txt, CustomMinimumSize = new Vector2(120, 44) };
       if (outcome == ResolutionOutcome.Engaged)
       {
-        button.Pressed += () => RequestSquadView(pending.Event.Definition);
+        button.Pressed += () => RequestSquadView(pending);
       }
       else
       {
@@ -54,10 +54,10 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
     }
   }
 
-  private void RequestSquadView(GeoscapeEventDefinition mission)
+  private void RequestSquadView(PendingResolution pending)
   {
     var view = SquadViewScene!.InstantiateAs<SquadLoadoutView>();
-    view.Configure(mission.Title, 3, allowEquipmentEditing: true, mission: mission);
+    view.ConfigureMission(pending.Event); // the whole event: heading, gate, capacity, launch context
     RequestView(view);
   }
 

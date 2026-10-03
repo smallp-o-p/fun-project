@@ -425,20 +425,31 @@ internal static class TestData
 
   // Two-faction duel on a 2x1x1 map: one spawn cell per side, one unit per side (health 20,
   // aim 65, damage-1 range-10 weapon), one inert objective each.
-  public static BattleTypeData MakeDuelBattleType()
+  public static BattleTypeData MakeDuelBattleType() => MakeTacticalBattleType(name: "Setup duel");
+
+  // One map row of spawn cells — the first playerCells feed the player slot, the rest feed
+  // the enemy slot — with one standard roster entry and objective per side. Mission tests
+  // size squads and enemy forces against the cell counts.
+  public static BattleTypeData MakeTacticalBattleType(int playerCells = 1, int enemyCells = 1,
+    string name = "Setup duel")
   {
-    var type = new BattleTypeData { Name = "Setup duel" };
-    type.MapPool.Add(MakeMapScene(MakeMapData(new Vector3I(2, 1, 1),
-      (new Vector3I(0, 0, 0), SpawnTile(0)),
-      (new Vector3I(1, 0, 0), SpawnTile(1)))));
+    var type = new BattleTypeData { Name = name };
+    List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
+    for (int x = 0; x < playerCells + enemyCells; x++)
+      tiles.Add((new Vector3I(x, 0, 0), SpawnTile(x < playerCells ? 0 : 1)));
+    type.MapPool.Add(MakeMapScene(MakeMapData(
+      new Vector3I(playerCells + enemyCells, 1, 1), [.. tiles])));
     string[] names = ["Player", "Enemy"];
-    foreach (string name in names)
+    foreach (string sideName in names)
     {
-      var side = new FactionDeploymentData { Faction = new FactionData { Name = name } };
+      var side = new FactionDeploymentData { Faction = new FactionData { Name = sideName } };
       side.Roster.Add(new FunProject.Battle.RosterEntryData
       {
-        Combatant = MakeCombatantData(name, health: 20, aim: 65),
-        Weapon = MakeWeaponData(damage: 1, critChance: 0, range: 10),
+        Loadout = new UnitLoadoutData
+        {
+          Combatant = MakeCombatantData(sideName, health: 20, aim: 65),
+          Weapon = MakeWeaponData(damage: 1, critChance: 0, range: 10),
+        },
       });
       side.Objectives.Add(new FakeObjectiveData());
       type.Factions.Add(side);
@@ -461,7 +472,8 @@ internal static class TestData
     string targetRegionName = "",
     int expiresAfterTicks = -1,
     bool allowUnfitDeployment = false,
-    DialogueSequenceData? dialogue = null)
+    DialogueSequenceData? dialogue = null,
+    TacticalMissionData? tacticalMission = null)
   {
     return new GeoscapeEventDefinition
     {
@@ -472,7 +484,33 @@ internal static class TestData
       TargetRegionName = targetRegionName,
       AllowUnfitDeployment = allowUnfitDeployment,
       Dialogue = dialogue,
+      TacticalMission = tacticalMission ?? (kind == GeoscapeEventKind.TacticalBattle ? MakeTacticalMission() : null),
     };
+  }
+
+  // Valid tactical-mission default over the duel battle type. The ordinary pool entry is
+  // only present when a positive maximum can draw from it, so zero-range (specials-only)
+  // missions stay pool-less; tests add specials or shrink bounds explicitly.
+  public static TacticalMissionData MakeTacticalMission(
+    BattleTypeData? type = null, int maxPlayerUnits = 3, int minEnemyUnits = 1, int maxEnemyUnits = 1)
+  {
+    var mission = new TacticalMissionData
+    {
+      BattleType = type ?? MakeDuelBattleType(),
+      Size = new BattleSizeData
+      {
+        MaxPlayerUnits = maxPlayerUnits,
+        MinEnemyUnits = minEnemyUnits,
+        MaxEnemyUnits = maxEnemyUnits,
+      },
+      EnemyFactionIndex = 1,
+    };
+    if (maxEnemyUnits > 0)
+      mission.OrdinaryEnemies.Add(new UnitLoadoutData
+      {
+        Combatant = MakeCombatantData("Grunt", health: 20, aim: 65),
+      });
+    return mission;
   }
 
   public static ScheduledEventData MakeScheduled(int atTick, GeoscapeEventDefinition evt)

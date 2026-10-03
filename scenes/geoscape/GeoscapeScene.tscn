@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="5_view"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeEventMarker.tscn" id="6_marker"]
 [ext_resource type="PackedScene" path="res://scenes/dialogue/DialogueView.tscn" id="7_dialogueview"]
+[ext_resource type="PackedScene" uid="uid://c6xooggmjjd16" path="res://scenes/battle/BattleScene.tscn" id="8_battle"]
 
 [node name="GeoscapeScene" type="Control" unique_id=1401687055]
 layout_mode = 3
@@ -19,6 +20,7 @@ grow_vertical = 2
 script = ExtResource("1")
 ResolutionViewScene = ExtResource("3_y8l5f")
 DialogueViewScene = ExtResource("7_dialogueview")
+BattleScene = ExtResource("8_battle")
 
 [node name="ViewManager" type="Control" parent="." node_paths=PackedStringArray("RootView")]
 unique_name_in_owner = true

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="TacticalMissionData" format=3]
+
+[ext_resource type="Script" path="res://scripts/strategic/TacticalMissionData.cs" id="1_mission"]
+[ext_resource type="Resource" path="res://resources/battle_types/mission_skirmish.tres" id="2_type"]
+[ext_resource type="Resource" path="res://resources/battle_sizes/small.tres" id="3_size"]
+[ext_resource type="Script" path="res://scripts/battle/types/UnitLoadoutData.cs" id="4_loadout"]
+[ext_resource type="Resource" uid="uid://bcwpute5bjeiv" path="res://resources/combatants/grunt.tres" id="5_grunt"]
+
+[sub_resource type="Resource" id="Resource_grunt_loadout"]
+script = ExtResource("4_loadout")
+Combatant = ExtResource("5_grunt")
+
+[resource]
+script = ExtResource("1_mission")
+Name = "Standard Mission"
+Description = "A small generated alien detachment; ordinary grunts drawn from the fixed pool."
+BattleType = ExtResource("2_type")
+Size = ExtResource("3_size")
+EnemyFactionIndex = 1
+OrdinaryEnemies = Array[ExtResource("4_loadout")]([SubResource("Resource_grunt_loadout")])
+SpecialEnemies = Array[ExtResource("4_loadout")]([])

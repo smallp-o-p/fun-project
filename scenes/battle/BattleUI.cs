@@ -17,6 +17,7 @@ public sealed partial class BattleUI : Node
   public event Action? ConfirmRequested;
   public event Action? CancelRequested;
   public event Action<UnitActionOption>? VerbSelected;
+  public event Action? ReturnRequested;
 
   public override void _Ready()
   {
@@ -27,6 +28,7 @@ public sealed partial class BattleUI : Node
     _hud.ConfirmRequested += () => ConfirmRequested?.Invoke();
     _hud.CancelRequested += () => CancelRequested?.Invoke();
     _hud.VerbSelected += option => VerbSelected?.Invoke(option);
+    _hud.ReturnRequested += () => ReturnRequested?.Invoke();
   }
 
   public void ShowUnits(IReadOnlyList<BattleUnitState> units)
@@ -37,6 +39,9 @@ public sealed partial class BattleUI : Node
 
   public void ShowBattleOver(string bannerText)
     => _hud.ShowBattleOver(bannerText);
+
+  public void ShowReturn(bool available)
+    => _hud.ShowReturn(available);
 
   public void ShowTargeting(IReadOnlyCollection<Vector3I> candidateCells, Option<ActionPreview> preview)
   {

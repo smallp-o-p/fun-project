@@ -11,6 +11,7 @@ namespace FunProject.GameState;
 /// <summary>
 /// The campaign truth container: everything that holds for the life of the campaign —
 /// clock position, the baked event timeline, active events, the pending resolution, the
+/// active mission association, the
 /// region binding, the roster, the player faction, and the condition registry
 /// (<see cref="Conditions"/>). <see cref="Strategic.GeoscapeSession"/> is the ephemeral runtime
 /// constructed over this state (the BattleSession-over-BattleBoardState pattern);
@@ -163,6 +164,25 @@ public sealed class GameState
 
   internal Option<PendingResolution> Pending { get; set; }
 
+  /// <summary>The launched-mission association: campaign truth, so a rebuilt session observes
+  /// the same active mission and cannot permit a second launch. Cleared by the mission return
+  /// or by AbortMissionPresentation (host presentation failure recovery).</summary>
+  internal Option<MissionDeployment> ActiveMission { get; set; }
+
+  /// <summary>Removes exactly the reported deployed deaths from the roster — never unrelated
+  /// members — and drops their condition records, because a removed member can never recover.
+  /// The dead keep their equipment; nothing is returned to the Armory.</summary>
+  internal void RemoveRosterParticipants(IReadOnlySet<Combatant> dead)
+  {
+    ArgumentNullException.ThrowIfNull(dead);
+
+    foreach (Combatant combatant in _roster.AsValueEnumerable().Where(dead.Contains).ToArray())
+    {
+      _roster.Remove(combatant);
+      Conditions.Forget(combatant);
+    }
+  }
+
   // Bakes one authored entry into an immutable firing. Unset events and out-of-range expiry
   // are authoring mistakes: they fail the load instead of being silently dropped.
   private ScheduledFire BakeEntry(ScheduledEventData entry)
@@ -174,6 +194,22 @@ public sealed class GameState
     if (entry.Event.ExpiresAfterTicks < -1)
       throw new InvalidOperationException(
         $"Event '{entry.Event.Title}' has ExpiresAfterTicks {entry.Event.ExpiresAfterTicks}; -1 means never, otherwise a non-negative tick count is required.");
+
+    if (entry.Event.Kind == GeoscapeEventKind.TacticalBattle)
+    {
+      if (entry.Event.TacticalMission is null)
+        throw new InvalidOperationException(
+          $"Tactical event '{entry.Event.Title}' has no TacticalMission assigned in GeoscapeMapData.Timeline.");
+      try
+      {
+        entry.Event.TacticalMission.Validate();
+      }
+      catch (InvalidOperationException broken)
+      {
+        throw new InvalidOperationException(
+          $"Event '{entry.Event.Title}' carries an invalid TacticalMission: {broken.Message}", broken);
+      }
+    }
 
     return new ScheduledFire(
       entry.Event,

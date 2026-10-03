@@ -1,0 +1,7 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" uid="uid://jdkumfovnam8" path="res://scenes/geoscape/GeoscapeScene.tscn" id="1_base"]
+[ext_resource type="Script" uid="uid://fqo31h8g607m" path="res://test/GeoscapeBattleHandoffScene.cs" id="2_capture"]
+
+[node name="GeoscapeScene" instance=ExtResource("1_base")]
+script = ExtResource("2_capture")

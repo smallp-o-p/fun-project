@@ -59,6 +59,9 @@ public sealed class GeoscapeSession
 
   public Option<PendingResolution> PendingResolution => _state.Pending;
 
+  /// <summary>Campaign-held association for the currently launched mission, if any.</summary>
+  public Option<MissionDeployment> ActiveMission => _state.ActiveMission;
+
   public Option<ManufacturingJob> ActiveManufacturing => _state.Engineering.ActiveJob;
 
   public Option<ResearchJob> ActiveResearch => _state.Research.ActiveJob;
@@ -107,6 +110,9 @@ public sealed class GeoscapeSession
   {
     if (_state.Pending.IsNone)
       throw new InvalidOperationException("CompleteResolution called with no resolution pending.");
+    if (_state.ActiveMission.IsSome)
+      throw new InvalidOperationException(
+        "The active mission must complete before its resolution closes.");
 
     // Clear before committing: synchronous subscribers (HUD/map refreshes) must observe the
     // resolution as already closed — the battle layer's "hooks act on post-state" convention.
@@ -121,6 +127,198 @@ public sealed class GeoscapeSession
   public void ChangeSpeed(TimeSpeed speed)
   {
     Speed = speed;
+  }
+
+  /// <summary>Launches the pending tactical event with the selected live squad: validates the
+  /// campaign selection, deploys explicit condition penalties only, resolves the seeded enemy
+  /// side, and starts the battle. The association is stored only after startup succeeds and
+  /// nothing is broadcast for the launch itself; the returned runtime belongs to the host.</summary>
+  public Either<MissionLaunchFailure, MissionBattle> LaunchMission(
+    GeoscapeEvent mission, IReadOnlyList<Combatant> squad)
+  {
+    ArgumentNullException.ThrowIfNull(mission);
+    ArgumentNullException.ThrowIfNull(squad);
+
+    if (_state.ActiveMission.IsSome)
+      return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
+        MissionLaunchFailureReason.AlreadyLaunched,
+        "A mission is already active; it must complete before another launches."));
+    if (_state.Pending.IsNone)
+      return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
+        MissionLaunchFailureReason.NoPendingMission,
+        "No resolution is pending; open the mission's event before launching."));
+    PendingResolution pending = _state.Pending.Match(
+      value => value,
+      () => throw new InvalidOperationException("Expected a pending resolution."));
+    if (!ReferenceEquals(pending.Event, mission))
+      return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
+        MissionLaunchFailureReason.WrongPendingMission,
+        "The requested event is not the currently pending mission."));
+
+    // Captured once, before any validation or startup callback runs: every check, the
+    // loadouts, and the association membership share this snapshot, so a startup callback
+    // mutating the caller's list cannot desynchronize the battle from the association.
+    var deployment = new MissionDeployment(mission, squad);
+
+    if (deployment.Participants.Count == 0)
+      return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
+        MissionLaunchFailureReason.EmptySquad, "The squad is empty."));
+
+    var seen = new SysColGeneric.HashSet<Combatant>();
+    foreach (Combatant combatant in deployment.Participants)
+    {
+      ArgumentNullException.ThrowIfNull(combatant);
+      if (!seen.Add(combatant))
+        return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
+          MissionLaunchFailureReason.DuplicateCombatant,
+          $"Combatant {combatant.Name} appears twice in the squad."));
+    }
+
+    TacticalMissionData authored = MissionContract(mission);
+    if (deployment.Participants.Count > authored.Size.MaxPlayerUnits)
+      return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
+        MissionLaunchFailureReason.SquadTooLarge,
+        $"Squad of {deployment.Participants.Count} exceeds the mission capacity of {authored.Size.MaxPlayerUnits}."));
+
+    foreach (Combatant combatant in deployment.Participants)
+    {
+      if (!ReferenceEquals(combatant.OwningFaction, _state.PlayerFaction))
+        return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
+          MissionLaunchFailureReason.FactionMismatch,
+          $"Combatant {combatant.Name} does not belong to the player faction."));
+      if (!_state.Roster.AsValueEnumerable().Any(member => ReferenceEquals(member, combatant)))
+        return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
+          MissionLaunchFailureReason.NotInRoster,
+          $"Combatant {combatant.Name} is not part of the campaign roster."));
+      if (!_state.Conditions.CanDeploy(combatant, mission.Definition.AllowUnfitDeployment))
+        return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
+          MissionLaunchFailureReason.UnitUnavailable,
+          $"Combatant {combatant.Name} is not fit to deploy on this mission."));
+    }
+
+    int seed = mission.BattleSeed.Match(
+      value => value,
+      () => throw new InvalidOperationException(
+        $"Event '{mission.Definition.Title}' carries no battle seed; only scheduler-fired tactical events can launch."));
+
+    // Battle stats compose inside the battle; the loadout carries only the campaign's
+    // deployment-time condition penalties.
+    var player = new PlayerDeployment(_state.PlayerFaction,
+      [.. deployment.Participants.AsValueEnumerable().Select(combatant => new UnitLoadout(
+        combatant, combatant.EquippedWeapon, combatant.EquippedArmor)
+      {
+        StatMods = _state.Conditions.StatContributions(combatant),
+      })]);
+    SideDeployment side = MissionEnemyResolver.Resolve(authored, seed);
+
+    return BattleSetupResolver.Resolve(authored.BattleType, seed, Some(player), Some(side))
+      .Bind(setup => BattleFactory.Start(setup).Map(runtime => (Setup: setup, Runtime: runtime)))
+      .MapLeft(failure => new MissionLaunchFailure(
+        MissionLaunchFailureReason.SetupFailed, failure.Message, Some(failure)))
+      .Map(launched =>
+      {
+        _state.ActiveMission = Some(deployment);
+        return new MissionBattle(deployment, launched.Setup, launched.Runtime);
+      });
+  }
+
+  /// <summary>Host failure recovery only: detaches a battle presentation that cannot proceed
+  /// from the campaign association. The pending event and its seed stay pending for a retry;
+  /// the host-owned runtime and any committed tactical effects are not touched.</summary>
+  public void AbortMissionPresentation(MissionBattle battle)
+  {
+    ArgumentNullException.ThrowIfNull(battle);
+
+    MissionDeployment active = _state.ActiveMission.Match(
+      value => value,
+      () => throw new InvalidOperationException("No mission is active; there is nothing to abort."));
+    if (!ReferenceEquals(active, battle.Deployment))
+      throw new InvalidOperationException(
+        "The aborted battle is not the active mission association.");
+
+    _state.ActiveMission = Option<MissionDeployment>.None;
+  }
+
+  // A launchable event always carries the authored mission contract; anything else reaching
+  // this door is a caller bug (baked tactical events are validated at campaign construction).
+  private static TacticalMissionData MissionContract(GeoscapeEvent mission)
+  {
+    if (mission.Definition.Kind != GeoscapeEventKind.TacticalBattle
+        || mission.Definition.TacticalMission is null)
+      throw new InvalidOperationException(
+        $"Event '{mission.Definition.Title}' does not carry a tactical mission contract.");
+    return mission.Definition.TacticalMission;
+  }
+
+  /// <summary>Applies the terminal return of the associated mission battle exactly once:
+  /// queries the player summary from the handle's live runtime, verifies the association,
+  /// the player faction, and exact participant membership, then lands every campaign effect
+  /// — survivor conditions, roster removal of the reported deaths, captivity of the reported
+  /// captures, and consumption of the mission, its pending resolution, and the association —
+  /// before the first notification. Survivors are notified per reported identity and the
+  /// resolution closes as Engaged. A throwing subscriber propagates without replay or
+  /// rollback, and the host-owned runtime is never disposed here.</summary>
+  public void CompleteMission(MissionBattle battle)
+  {
+    ArgumentNullException.ThrowIfNull(battle);
+
+    // Query while the runtime is live; a battle that has not ended carries no return yet.
+    FactionBattleSummary summary = battle.Runtime
+      .Query(new GetFactionEndOfBattleSummary(_state.PlayerFaction))
+      .Match(
+        Right: value => value,
+        Left: failure => throw new InvalidOperationException(
+          $"The mission battle has no terminal return: {failure.Message}."));
+    if (!ReferenceEquals(summary.Faction, _state.PlayerFaction))
+      throw new InvalidOperationException(
+        "The queried battle return is not the campaign player's.");
+
+    MissionDeployment active = _state.ActiveMission.Match(
+      value => value,
+      () => throw new InvalidOperationException(
+        "No mission is active; there is nothing to complete."));
+    if (!ReferenceEquals(active, battle.Deployment))
+      throw new InvalidOperationException(
+        "The completed battle is not the active mission association.");
+    VerifyReturnedParticipants(summary, battle.Deployment);
+
+    // The pending resolution outlives the association everywhere else, so an associated
+    // mission always has one; extraction first keeps every later mutation unconditional.
+    PendingResolution pending = _state.Pending.Match(
+      value => value,
+      () => throw new InvalidOperationException(
+        "The active mission lost its pending resolution."));
+
+    foreach ((Combatant combatant, BattleHealthSummary health) in summary.HealthByCombatant)
+      _state.Conditions.ApplyMissionReturn(combatant, health.HealthDamageTaken, health.MaxHealth, Tick);
+    _state.RemoveRosterParticipants(summary.CombatantsDead);
+    foreach (Combatant captured in summary.CapturedEnemies)
+      _state.Captivity.Add(captured);
+
+    // Consumed before any broadcast: synchronous subscribers observe the post-state, and a
+    // reentrant completion finds no association left to apply.
+    _state.ActiveMission = Option<MissionDeployment>.None;
+    _state.Pending = Option<PendingResolution>.None;
+    _state.ActiveEvents.Remove(pending.Event);
+
+    foreach (Combatant combatant in summary.HealthByCombatant.Keys)
+      Commit(new CombatantConditionsChanged(combatant));
+    Commit(new ResolutionEventClosed(pending, ResolutionOutcome.Engaged));
+  }
+
+  // The return must cover exactly the captured deployment — no foreign or partial summary
+  // may touch the roster. Present membership spans alive and dead units.
+  private static void VerifyReturnedParticipants(
+    FactionBattleSummary summary, MissionDeployment deployment)
+  {
+    if (summary.CombatantsPresent.Count != deployment.Participants.Count)
+      throw new InvalidOperationException(
+        $"The battle returned {summary.CombatantsPresent.Count} participants; "
+        + $"the deployment captured {deployment.Participants.Count}.");
+    foreach (Combatant combatant in deployment.Participants)
+      if (!summary.CombatantsPresent.Contains(combatant))
+        throw new InvalidOperationException(
+          $"Combatant {combatant.Name} deployed but is absent from the battle return.");
   }
 
   public void ApplyMissionReturn(FactionBattleSummary summary)
@@ -196,7 +394,12 @@ public sealed class GeoscapeSession
         fire.Definition,
         fire.TargetRegionIndex >= 0 ? Some(fire.TargetRegionIndex) : Option<int>.None,
         Tick,
-        fire.ExpiresAtTick);
+        fire.ExpiresAtTick)
+      {
+        BattleSeed = fire.Definition.Kind == GeoscapeEventKind.TacticalBattle
+          ? Some(Random.Shared.Next())
+          : Option<int>.None,
+      };
       _state.ActiveEvents.Add(active);
       Commit(new ScheduledEventFired(active));
     }

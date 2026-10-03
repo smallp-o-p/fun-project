@@ -213,6 +213,7 @@ public class CaptivityViewTest
     Assert.Equal(title, squad.GetNode<Label>("%Title").TooltipText); // inspectable when clipped
     Assert.Equal(2, squad.GetNode<BoxContainer>("%Slots").GetChildCount());
     Assert.Equal("Squad: 0/2", squad.GetNode<Label>("%SquadCount").Text);
+    Assert.False(SquadDeployButton(squad).Visible); // interrogation carries no launch context
   }
 
   [TestCase(false, TestName = "Interrogation preparation leaves campaign truth untouched")]

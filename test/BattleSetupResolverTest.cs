@@ -1,6 +1,8 @@
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Strategic;
 using FunProject.Stats;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 using System;
@@ -261,17 +263,20 @@ public class BattleSetupResolverTest
     Assert.False(ReferenceEquals(firstEnemy, secondEnemy));
   }
 
-  [TestCase(TestName = "Authored quantity expands with fresh combatant, weapon, and armor identities")]
-  public void QuantityAndEquipmentExpansion()
+  [TestCase(TestName = "Authored loadouts expand into fresh combatant, weapon, and armor instances per unit")]
+  public void AuthoredLoadoutsCreateIndependentInstances()
   {
     var type = TestData.MakeDuelBattleType();
     type.Factions[0].Roster.Clear();
     type.Factions[0].Roster.Add(new FunProject.Battle.RosterEntryData
     {
-      Combatant = TestData.MakeCombatantData("Trooper", health: 20, aim: 65),
-      Quantity = 3,
-      Weapon = TestData.MakeWeaponData(damage: 3, range: 8),
-      Armor = TestData.MakeArmorData("Vest", armor: 4),
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Trooper", health: 20, aim: 65),
+        Weapon = TestData.MakeAmmoWeaponData("Rifle", magazine: 4, damage: 3, range: 8),
+        Armor = TestData.MakeArmorData("Vest", armor: 4),
+      },
+      Quantity = 2,
     });
     type.MapPool.Clear();
     type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(4, 1, 1),
@@ -282,26 +287,64 @@ public class BattleSetupResolverTest
 
     BattleSetup setup = BattleSetupResolver.Resolve(type, seed: 7).RequireRight();
     BattleSideSetup playerSide = setup.Sides[0];
-    Assert.Equal(3, playerSide.Units.Count);
-    for (int i = 0; i < playerSide.Units.Count; i++)
-    {
-      UnitLoadout loadout = playerSide.Units[i].Loadout;
-      Assert.True(loadout.Weapon.IsSome);
-      Assert.True(loadout.Armor.IsSome);
-      Assert.True(ReferenceEquals(loadout.Combatant.OwningFaction, playerSide.Faction));
-      for (int j = i + 1; j < playerSide.Units.Count; j++)
-      {
-        UnitLoadout other = playerSide.Units[j].Loadout;
-        Assert.False(ReferenceEquals(loadout.Combatant, other.Combatant));
-        Assert.False(ReferenceEquals(loadout.Weapon.RequireSome(), other.Weapon.RequireSome()));
-        Assert.False(ReferenceEquals(loadout.Armor.RequireSome().Item, other.Armor.RequireSome().Item));
-      }
-    }
+    Assert.Equal(2, playerSide.Units.Count);
+    UnitLoadout first = playerSide.Units[0].Loadout;
+    UnitLoadout second = playerSide.Units[1].Loadout;
+    Assert.True(ReferenceEquals(first.Combatant.OwningFaction, playerSide.Faction));
+    Assert.True(ReferenceEquals(second.Combatant.OwningFaction, playerSide.Faction));
+    Assert.False(ReferenceEquals(first.Combatant, second.Combatant));
+    Assert.False(ReferenceEquals(first.Weapon.RequireSome(), second.Weapon.RequireSome()));
+    Assert.False(ReferenceEquals(first.Armor.RequireSome().Item, second.Armor.RequireSome().Item));
+
+    // Spent ammunition and damaged armor on one instance leave the sibling untouched.
+    var spent = (AmmunitionedWeapon)first.Weapon.RequireSome();
+    spent.TrySpendShot();
+    Assert.Equal(3, spent.CurrentAmmo);
+    Assert.Equal(4, ((AmmunitionedWeapon)second.Weapon.RequireSome()).CurrentAmmo);
+    first.Armor.RequireSome().Capability.Reduce(2);
+    Assert.Equal(2, first.Armor.RequireSome().Capability.Current);
+    Assert.Equal(4, second.Armor.RequireSome().Capability.Current);
 
     // Authored quantity floors at one.
     type.Factions[0].Roster[0].Quantity = 0;
     BattleSetup floored = BattleSetupResolver.Resolve(type, seed: 7).RequireRight();
     Assert.Equal(1, floored.Sides[0].Units.Count);
+  }
+
+  [TestCase(TestName = "Equipment authored as armor without an armor capability throws at resolution")]
+  public void MalformedArmorThrows()
+  {
+    var type = TestData.MakeDuelBattleType();
+    type.Factions[0].Roster.Clear();
+    type.Factions[0].Roster.Add(new FunProject.Battle.RosterEntryData
+    {
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Trooper", health: 20, aim: 65),
+        Armor = TestData.MakeWeaponData(damage: 3, range: 8),
+      },
+    });
+
+    Assert.Throws<InvalidOperationException>(() => BattleSetupResolver.Resolve(type, seed: 7));
+  }
+
+  [TestCase(TestName = "A loadout without authored gear stays unarmed and unarmored")]
+  public void MissingGearRemainsUnequipped()
+  {
+    var type = TestData.MakeDuelBattleType();
+    type.Factions[0].Roster.Clear();
+    type.Factions[0].Roster.Add(new FunProject.Battle.RosterEntryData
+    {
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Trooper", health: 20, aim: 65),
+      },
+    });
+
+    BattleSetup setup = BattleSetupResolver.Resolve(type, seed: 7).RequireRight();
+    UnitLoadout loadout = setup.Sides[0].Units[0].Loadout;
+    Assert.True(loadout.Weapon.IsNone);
+    Assert.True(loadout.Armor.IsNone);
   }
 
   [TestCase(TestName = "Resolved output keeps collection membership independent of the authored lists")]
@@ -340,6 +383,188 @@ public class BattleSetupResolverTest
     Assert.Equal(1, setup.Objects.Count);
     Assert.True(ReferenceEquals(retainedObject.Data, objectData));
     Assert.Equal(new Vector3I(1, 0, 0), retainedObject.Position);
+  }
+
+  [TestCase(TestName = "A side deployment replaces only its designated non-player slot")]
+  public void SideDeploymentReplacesOnlyItsDesignatedSlot()
+  {
+    var type = MissionStageType();
+    var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 2);
+    mission.SpecialEnemies.Add(new UnitLoadoutData
+    {
+      Combatant = TestData.MakeCombatantData("Special", health: 30),
+    });
+
+    SideDeployment force = MissionEnemyResolver.Resolve(mission, seed: 7);
+    BattleSetup setup = BattleSetupResolver.Resolve(type, seed: 7,
+      sideDeployment: Some(force)).RequireRight();
+
+    Assert.Equal(2, setup.Sides.Count);
+    // The designated slot deploys the generated force by reference, in order.
+    Assert.True(ReferenceEquals(force.Faction, setup.Sides[1].Faction));
+    Assert.Equal(force.Loadouts.Count, setup.Sides[1].Units.Count);
+    for (int index = 0; index < force.Loadouts.Count; index++)
+    {
+      Assert.True(ReferenceEquals(force.Loadouts[index], setup.Sides[1].Units[index].Loadout));
+      Assert.True(ReferenceEquals(force.Faction,
+        setup.Sides[1].Units[index].Loadout.Combatant.OwningFaction));
+    }
+    // The other slot keeps its authored roster and its own fresh faction.
+    Assert.Equal(1, setup.Sides[0].Units.Count);
+    Assert.False(ReferenceEquals(force.Faction, setup.Sides[0].Faction));
+  }
+
+  [TestCase(7, TestName = "Seed 7: a side deployment never changes the seeded map choice")]
+  [TestCase(-7, TestName = "Seed -7: a side deployment never changes the seeded map choice")]
+  public void SideDeploymentPreservesSeededMapChoice(int seed)
+  {
+    var type = MissionStageType();
+    type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(5, 1, 1),
+      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(1, 0, 0), TestData.SpawnTile(1)),
+      (new Vector3I(2, 0, 0), TestData.SpawnTile(1)),
+      (new Vector3I(3, 0, 0), TestData.SpawnTile(1)),
+      (new Vector3I(4, 0, 0), TestData.SpawnTile(1)))));
+    var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 2);
+
+    SideDeployment force = MissionEnemyResolver.Resolve(mission, seed: seed);
+    PackedScene expected = type.MapPool[new Random(seed).Next(type.MapPool.Count)];
+
+    BattleSetup withForce = BattleSetupResolver.Resolve(type, seed: seed,
+      sideDeployment: Some(force)).RequireRight();
+    BattleSetup authored = BattleSetupResolver.Resolve(type, seed: seed).RequireRight();
+
+    Assert.True(ReferenceEquals(expected, withForce.MapScene.RequireSome()));
+    Assert.True(ReferenceEquals(expected, authored.MapScene.RequireSome()));
+  }
+
+  [TestCase(7, TestName = "Seed 7: same-seed resolutions of a generated force repeat the layout with fresh identities")]
+  [TestCase(-7, TestName = "Seed -7: same-seed resolutions of a generated force repeat the layout with fresh identities")]
+  public void GeneratedForcesRepeatLayoutWithFreshIdentities(int seed)
+  {
+    var type = MissionStageType();
+    var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 3);
+    mission.OrdinaryEnemies.Add(new UnitLoadoutData
+    {
+      Combatant = TestData.MakeCombatantData("Heavy", health: 25, aim: 55),
+    });
+    mission.SpecialEnemies.Add(new UnitLoadoutData
+    {
+      Combatant = TestData.MakeCombatantData("Special", health: 30),
+    });
+
+    BattleSetup first = BattleSetupResolver.Resolve(type, seed: seed,
+      sideDeployment: Some(MissionEnemyResolver.Resolve(mission, seed: seed))).RequireRight();
+    BattleSetup second = BattleSetupResolver.Resolve(type, seed: seed,
+      sideDeployment: Some(MissionEnemyResolver.Resolve(mission, seed: seed))).RequireRight();
+
+    int enemyCount = first.Sides[1].Units.Count;
+    Assert.True(enemyCount >= 3 && enemyCount <= 4,
+      $"Expected an ordinary draw in [2, 3] plus the special, found {enemyCount} units.");
+    Assert.Equal("Special", first.Sides[1].Units[enemyCount - 1].Loadout.Combatant.Name);
+    Assert.True(ReferenceEquals(first.MapScene.RequireSome(), second.MapScene.RequireSome()));
+    Assert.False(ReferenceEquals(first.Sides[1].Faction, second.Sides[1].Faction));
+    Assert.Equal(first.Sides.Count, second.Sides.Count);
+    for (int side = 0; side < first.Sides.Count; side++)
+    {
+      Assert.Equal(first.Sides[side].Units.Count, second.Sides[side].Units.Count);
+      for (int unit = 0; unit < first.Sides[side].Units.Count; unit++)
+      {
+        Assert.Equal(first.Sides[side].Units[unit].Position, second.Sides[side].Units[unit].Position);
+        Assert.Equal(first.Sides[side].Units[unit].Loadout.Combatant.Name,
+          second.Sides[side].Units[unit].Loadout.Combatant.Name);
+        Assert.False(ReferenceEquals(first.Sides[side].Units[unit].Loadout.Combatant,
+          second.Sides[side].Units[unit].Loadout.Combatant));
+      }
+    }
+  }
+
+  [TestCase(TestName = "Generated ordinary draws span the pool and the count range across seeds 1 through 32")]
+  public void GeneratedOrdinaryDrawsSpanPoolAndCountAcrossSeeds()
+  {
+    var type = MissionStageType();
+    var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 4);
+    mission.OrdinaryEnemies.Add(new UnitLoadoutData
+    {
+      Combatant = TestData.MakeCombatantData("Heavy", health: 25, aim: 55),
+    });
+
+    var names = new SysColGeneric.HashSet<string>();
+    var counts = new SysColGeneric.HashSet<int>();
+    for (int seed = 1; seed <= 32; seed++)
+    {
+      SideDeployment force = MissionEnemyResolver.Resolve(mission, seed);
+      counts.Add(force.Loadouts.Count);
+      foreach (UnitLoadout loadout in force.Loadouts)
+        names.Add(loadout.Combatant.Name);
+    }
+
+    Assert.True(names.Contains("Grunt") && names.Contains("Heavy"),
+      $"Expected both pool entries across seeds 1..32, saw [{string.Join(", ", names)}].");
+    Assert.True(counts.Count >= 2,
+      $"Expected divergent ordinary counts across seeds 1..32, saw [{string.Join(", ", counts)}].");
+    foreach (int count in counts)
+      Assert.True(count >= 2 && count <= 4, $"Ordinary count {count} outside [2, 4].");
+  }
+
+  [TestCase(TestName = "Side deployments guard index, player slot, membership, and required inputs")]
+  public void SideDeploymentGuards()
+  {
+    var type = TestData.MakeDuelBattleType();
+    var campaign = TestData.MakeFaction("Campaign");
+    var foreign = TestData.MakeFaction("Foreign");
+
+    BattleSetupFailure outOfRange = BattleSetupResolver.Resolve(type, seed: 7,
+      sideDeployment: Some(new SideDeployment(2, campaign,
+        [new UnitLoadout(TestData.MakeCombatant("Vet", campaign))]))).RequireLeft();
+    Assert.Equal(BattleSetupFailureReason.UnknownFaction, outOfRange.Reason);
+
+    BattleSetupFailure playerSlot = BattleSetupResolver.Resolve(type, seed: 7,
+      sideDeployment: Some(new SideDeployment(0, campaign,
+        [new UnitLoadout(TestData.MakeCombatant("Vet", campaign))]))).RequireLeft();
+    Assert.Equal(BattleSetupFailureReason.FactionMismatch, playerSlot.Reason);
+
+    BattleSetupFailure mismatch = BattleSetupResolver.Resolve(type, seed: 7,
+      sideDeployment: Some(new SideDeployment(1, campaign,
+        [new UnitLoadout(TestData.MakeCombatant("Outsider", foreign))]))).RequireLeft();
+    Assert.Equal(BattleSetupFailureReason.FactionMismatch, mismatch.Reason);
+
+    Assert.Throws<ArgumentNullException>(() => BattleSetupResolver.Resolve(type, seed: 7,
+      sideDeployment: Some(new SideDeployment(1, null!, []))));
+    Assert.Throws<ArgumentNullException>(() => BattleSetupResolver.Resolve(type, seed: 7,
+      sideDeployment: Some(new SideDeployment(1, campaign, null!))));
+    Assert.Throws<ArgumentNullException>(() => BattleSetupResolver.Resolve(type, seed: 7,
+      sideDeployment: Some(new SideDeployment(1, campaign, [null!]))));
+    Assert.Throws<ArgumentNullException>(() => BattleSetupResolver.Resolve(type, seed: 7,
+      sideDeployment: Some(new SideDeployment(1, campaign, [new UnitLoadout(null!)]))));
+  }
+
+  [TestCase(TestName = "A generated force larger than its slot's spawn capacity fails with SpawnSlotShortfall")]
+  public void OversizedGeneratedForceFailsWithShortfall()
+  {
+    var type = TestData.MakeDuelBattleType(); // 2x1x1 map: one spawn cell per side
+    var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 2);
+
+    SideDeployment force = MissionEnemyResolver.Resolve(mission, seed: 7);
+    BattleSetupFailure failure = BattleSetupResolver.Resolve(type, seed: 7,
+      sideDeployment: Some(force)).RequireLeft();
+
+    Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall, failure.Reason);
+  }
+
+  // Two-faction duel on a one-map pool with one player cell and four enemy cells, enough for
+  // the largest force the mission tests generate (two ordinary draws plus one special).
+  private static BattleTypeData MissionStageType()
+  {
+    var type = TestData.MakeDuelBattleType();
+    type.MapPool.Clear();
+    type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(5, 1, 1),
+      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
+      (new Vector3I(1, 0, 0), TestData.SpawnTile(1)),
+      (new Vector3I(2, 0, 0), TestData.SpawnTile(1)),
+      (new Vector3I(3, 0, 0), TestData.SpawnTile(1)),
+      (new Vector3I(4, 0, 0), TestData.SpawnTile(1)))));
+    return type;
   }
 
   [TestCase(TestName = "Campaign equipment slots are never read; only loadout equipment equips")]

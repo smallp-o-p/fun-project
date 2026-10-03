@@ -1,7 +1,10 @@
 using System;
 using System.Threading.Tasks;
+using CampaignGameState = global::FunProject.GameState.GameState;
+using FunProject.Battle;
 using FunProject.GameState;
 using FunProject.Geoscape;
+using FunProject.Strategic;
 using Godot;
 using static GdUnit4.Assertions;
 
@@ -13,8 +16,46 @@ namespace FunProject.Tests;
 // suite packs small synthetic scenes locally for polymorphic/invalid-root contracts only.
 // Cleanup stays with the callers and shared conventions: AddToTree marks the instance for
 // AutoFree; layout/deletion waits and screen-space queries live here too.
-internal static class GeoscapeTestScenes
+internal static partial class GeoscapeTestScenes
 {
+  // Battle-system doubles exercising the production registration door: one captures the
+  // launched runtime for ownership/disposal proofs, one fails startup, so scene-boundary
+  // tests need no production test seams.
+  public sealed partial class RuntimeCaptureSystemData : BattleTypeSystemData
+  {
+    public BattleRuntime? Captured { get; private set; }
+
+    public override void Register(BattleRuntime runtime) => Captured = runtime;
+  }
+
+  public sealed partial class ThrowingSystemData : BattleTypeSystemData
+  {
+    public override void Register(BattleRuntime runtime)
+      => throw new InvalidOperationException("The startup system registration failed.");
+  }
+
+  // Momentary capture of the composition root's live session at the production Present
+  // boundary: the manager presents every pushed view with its session, so a capture view
+  // records it without any production seam. Callers pop it back before asserting.
+  public sealed partial class SessionCaptureView : GeoscapeView
+  {
+    public GeoscapeSession? Captured { get; private set; }
+
+    public override void Present(CampaignGameState state, GeoscapeSession session)
+      => Captured = session;
+  }
+
+  // Pushes a capture view over the stack top and pops it back via RequestBack (which
+  // frees the temporary view); valid at any stack depth, so mission flows stay untouched.
+  public static GeoscapeSession CaptureSceneSession(GeoscapeViewManager manager)
+  {
+    var capture = new SessionCaptureView();
+    manager.RootView.RequestView(capture);
+    GeoscapeSession session = capture.Captured
+      ?? throw new InvalidOperationException("The capture view was never presented.");
+    capture.RequestBack();
+    return session;
+  }
   public static GeoscapeHud CreateHud()
     => GD.Load<PackedScene>("res://scenes/geoscape/GeoscapeHud.tscn").Instantiate<GeoscapeHud>();
 
@@ -44,6 +85,9 @@ internal static class GeoscapeTestScenes
   public static GeoscapeEventResolution CreateResolutionView()
     => GD.Load<PackedScene>("res://scenes/geoscape/resolutions/GeoscapeEventResolution.tscn")
       .Instantiate<GeoscapeEventResolution>();
+
+  public static BattleScene CreateBattleScene()
+    => GD.Load<PackedScene>("res://scenes/battle/BattleScene.tscn").Instantiate<BattleScene>();
 
   public static DialogueView CreateDialogueView()
     => GD.Load<PackedScene>("res://scenes/dialogue/DialogueView.tscn").Instantiate<DialogueView>();
@@ -86,6 +130,26 @@ internal static class GeoscapeTestScenes
       .AsValueEnumerable().OfType<Button>()
       .Single(button => button.Text.Contains(itemName));
 
+  public static Button SquadDeployButton(SquadLoadoutView view)
+    => view.GetNode<Button>("%DeployButton");
+
+  public static Label SquadDeploymentFailure(SquadLoadoutView view)
+    => view.GetNode<Label>("%DeploymentFailure");
+
+  public static Button DialogButton(GeoscapeEventResolution dialog, string text)
+    => dialog.GetNode<HBoxContainer>("%Buttons").GetChildren()
+      .AsValueEnumerable().OfType<Button>()
+      .Single(button => button.Text == text);
+
+  public static Button ReturnButton(BattleScene battle)
+    => battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Button>("%ReturnButton");
+
+  public static EventPlaybackDirector Director(BattleScene battle)
+    => battle.GetNode<EventPlaybackDirector>("EventPlaybackDirector");
+
+  public static Label Clock(GeoscapeScene scene)
+    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Label>("%ClockLabel");
+
   // Integration shell for manager suites: an authored root under a manager whose
   // ViewChanged presents every pushed/popped view. It never Configures, Pushes, Pops, or
   // clears selection itself; callers drive the stack and own its assertions.
@@ -115,6 +179,14 @@ internal static class GeoscapeTestScenes
   // Press the actual marker so its EventClicked signal reaches the composition root.
   public static void OpenResolutionViaMapEvent(GeoscapeScene scene, int eventIndex = 0)
     => MapEventMarkers(scene)[eventIndex].EmitSignal(BaseButton.SignalName.Pressed);
+
+  // Drains the director's playback queue synchronously (instant v1 visuals only).
+  public static void DrainDirector(BattleScene battle)
+  {
+    EventPlaybackDirector director = Director(battle);
+    while (director.Busy)
+      director.Tick();
+  }
 
   public static Node3D AddBackdrop(GeoscapeView view, Node3D backdrop)
   {
