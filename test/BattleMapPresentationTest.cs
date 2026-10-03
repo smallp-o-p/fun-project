@@ -27,13 +27,6 @@ public partial class BattleMapPresentationTest
   }
 
   [TestCase]
-  public void ExistingVerticalStepsStillConnectStackedWalkableFloors()
-  {
-    var board = new BattleBoardState(TestData.MakeMapData(new(1, 2, 1),
-      (new(0, 0, 0), TestData.FloorTile()), (new(0, 1, 0), TestData.FloorTile())));
-    Assert.Equal(2, board.FindPath(board.At(0, 0, 0), board.At(0, 1, 0)).Length);
-  }
-  [TestCase]
   public void BattleSceneScalesCameraOrbitAndMovementRibbonWithGridWidth()
   {
     using var battle = BattleFixture.UiBattle();

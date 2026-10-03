@@ -397,16 +397,8 @@ internal static class TestData
   // Packs the map into a BattleMap-rooted scene, the authored pool's storage shape; the
   // prototype node is freed after packing so only the scene survives. Runs under the Godot
   // runtime covered by the RequireGodotRuntime suites.
-  public static PackedScene MakeMapScene(BattleMapData map)
-  {
-    var battleMap = new BattleMap { MapData = map };
-    var scene = new PackedScene();
-    Error error = scene.Pack(battleMap);
-    battleMap.Free();
-    if (error != Error.Ok)
-      throw new System.InvalidOperationException($"Test map scene packing failed: {error}");
-    return scene;
-  }
+  public static PackedScene MakeMapScene(BattleMapData map) =>
+    GeoscapeTestScenes.Pack(new BattleMap { MapData = map });
 
   // Concrete setup for direct factory tests: fresh open 4x1x4 board, one unit per side at
   // (0,0,0)/(3,0,3), fixed seed 7, optional designated player faction. Pure: callers add

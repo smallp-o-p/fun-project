@@ -122,7 +122,7 @@ public partial class BattleMapAuthoring : Node3D
   private static Transform3D WorldTransform(Node3D node) =>
     !node.TopLevel && node.GetParent() is Node3D parent ? WorldTransform(parent) * node.Transform : node.Transform;
 
-  private static bool IsUpright(Basis basis)
+  internal static bool IsUpright(Basis basis)
   {
     for (int turn = 0; turn < 4; turn++)
       if (basis.IsEqualApprox(new Basis(Vector3.Up, turn * Mathf.Pi / 2))) return true;

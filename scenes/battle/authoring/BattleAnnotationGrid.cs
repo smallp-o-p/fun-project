@@ -72,10 +72,8 @@ public partial class BattleAnnotationGrid : GridMap
     foreach (var cell in GetUsedCells())
     {
       if (GetCellItem(cell) != 0) return "Only annotation-box marker item 0 is supported.";
-      var basis = GetCellItemBasis(cell);
-      bool upright = false;
-      for (int turn = 0; turn < 4; turn++) upright |= basis.IsEqualApprox(new Basis(Vector3.Up, turn * Mathf.Pi / 2));
-      if (!upright) return $"Box {cell} has pitch or roll. Only upright Y quarter-turns are supported.";
+      if (!BattleMapAuthoring.IsUpright(GetCellItemBasis(cell)))
+        return $"Box {cell} has pitch or roll. Only upright Y quarter-turns are supported.";
     }
     if (Baseline.Count > 0 && !LayoutMatches())
       return "Layout changed: undo the paint/move/rotation, or reset annotations. Editing and export are blocked; flags do not follow moved boxes.";

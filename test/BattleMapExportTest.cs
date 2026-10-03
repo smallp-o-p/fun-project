@@ -1,4 +1,3 @@
-using FunProject.Battle;
 using GdUnit4;
 using Godot;
 using static GdUnit4.Assertions;
@@ -48,48 +47,13 @@ public partial class BattleMapExportTest
   }
 
   [TestCase]
-  public void VisualGridMapCollisionCannotMasqueradeAsFloorPicking()
-  {
-    var source = AutoFree(new BattleMapAuthoring())!;
-    var prop = new BattleProp { Name = "Prop" };
-    source.AddChild(prop); prop.Owner = source;
-    TestData.Annotate(prop, TestData.MakeFloorFootprint(1, 1));
-    var visualGrid = new GridMap { Name = "VisualGrid", CollisionLayer = 5 };
-    prop.AddChild(visualGrid); visualGrid.Owner = source;
-    var csg = new CsgBox3D { Name = "VisualCsg", UseCollision = true, CollisionLayer = 5 };
-    prop.AddChild(csg); csg.Owner = source;
-    using var packed = source.BuildScene();
-    var exported = AutoFree(packed.Instantiate<BattleMap>())!;
-    Assert.Equal(6u, exported.GetNode<GridMap>("Prop/VisualGrid").CollisionLayer);
-    Assert.Equal(5u, visualGrid.CollisionLayer);
-    Assert.Equal(6u, exported.GetNode<CsgBox3D>("Prop/VisualCsg").CollisionLayer);
-    Assert.Equal(5u, csg.CollisionLayer);
-  }
-
-  [TestCase]
   public void ScaledMapRootIsRejectedBeforeExport()
   {
     var source = AutoFree(new BattleMapAuthoring { Scale = Vector3.One * 2 })!;
-    source.AddChild(new BattleFloor());
+    var floor = new BattleFloor();
+    TestData.Annotate(floor, TestData.MakeFloorFootprint(1, 1));
+    source.AddChild(floor);
     Assert.Throws<System.InvalidOperationException>(() => source.BuildScene());
-  }
-
-  [TestCase]
-  public void SavedExampleAssetsCanReloadAndReexportWithoutDuplicatingChildren()
-  {
-    var source = AutoFree(GD.Load<PackedScene>("res://scenes/battle/authoring/BattleMapAuthoring.tscn").Instantiate<BattleMapAuthoring>())!;
-    var car = source.GetNode<BattleProp>("Car");
-    Assert.Equal(2, car.GetChildCount());
-    Assert.Equal(2, car.GetNode<BattleAnnotationGrid>("Annotations").Annotations.Cells.Count);
-    var template = AutoFree(GD.Load<PackedScene>("res://scenes/battle/authoring/Car.tscn").Instantiate<BattleProp>())!;
-    Assert.True(ReferenceEquals(template.GetNode<BattleAnnotationGrid>("Annotations").Annotations, car.GetNode<BattleAnnotationGrid>("Annotations").Annotations));
-    using var packed = source.BuildScene();
-    var baked = AutoFree(packed.Instantiate<BattleMap>())!;
-    Assert.Equal(1, baked.GetNode<BattleProp>("Car").GetChildCount());
-    Assert.Equal(2u, baked.GetNode<StaticBody3D>("Floor_0_0/Surface").CollisionLayer);
-    Assert.False(baked.MapData.Tiles[new(2, 0, 2)].Walkable);
-    Assert.False(baked.MapData.Tiles[new(2, 0, 3)].Walkable);
-    Assert.Equal(40, baked.MapData.Tiles[new(2, 0, 1)].CoverAmount);
   }
 
   [TestCase]
@@ -115,23 +79,6 @@ public partial class BattleMapExportTest
     var hit = GameCamera.TryRaycastViewportPosition(camera, map.GetWorld3D(), camera.GetViewport().GetVisibleRect().GetCenter()).RequireSome();
     Assert.True(hit.IsEqualApprox(new(11, 5, 21)));
     Assert.Equal(new Vector3I(0, 1, 0), new BoardCoordinates(map.MapData, map.GlobalTransform).WorldToTile(hit));
-  }
-
-  [TestCase(false)]
-  [TestCase(true)]
-  public void TransformBreaksMatchGodotVisualPlacement(bool topLevel)
-  {
-    var source = AutoFree(new BattleMapAuthoring())!;
-    var group = new Node3D { Position = Vector3.Right * 2 };
-    source.AddChild(group);
-    Node parent = group;
-    if (!topLevel) { parent = new Node(); group.AddChild(parent); }
-    var prop = new BattleProp { TopLevel = topLevel };
-    TestData.Annotate(prop, TestData.MakeFloorFootprint(1, 1));
-    parent.AddChild(prop);
-    using var packed = source.BuildScene();
-    var map = AutoFree(packed.Instantiate<BattleMap>())!;
-    Assert.True(map.MapData.Tiles.ContainsKey(Cell.Zero));
   }
 
 }

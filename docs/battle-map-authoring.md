@@ -48,7 +48,3 @@ The shared coordinate contract drives picking, unit presentation, playback, path
 Export preserves visual children and overrides, strips annotation GridMaps, and generates explicit floor-picking surfaces on collision layer 1. Art collision is moved off that layer. Annotated branches are localized in the exported scene so reloading cannot recreate markers; nested source-scene links in those branches are not retained. Scene-unique `%Name` nodes in such branches are rejected. This workflow is intended for static visual assets.
 
 Use `proof/AnnotationBox.tscn` and `proof/AnnotationProofMap.tscn` for a minimal paint/select/annotate/reset/export exercise. Test the saved export after reloading it, not only its in-memory scene.
-
-## Editor lifecycle regression check
-
-Keep an asset and its dependent map open. Inspect a cell, save the asset, close/reopen its tab, and switch back to the map. Repeat after Reset → Undo and after a rejected layout-change export → Undo. Native GridMap tools must follow the active asset, and closing the saved asset must reload its dependent map without stale-node errors. The plugin pauses polling during scene teardown because Godot's dependent-scene progress updates can re-enter the editor loop.

@@ -4,7 +4,6 @@ using Godot;
 [Tool]
 public partial class BattleAnnotationEditor : EditorPlugin
 {
-  private VBoxContainer _panel = null!;
   private EditorDock _dock = null!;
   private bool _dockOpen;
   private Label _status = null!;
@@ -21,21 +20,19 @@ public partial class BattleAnnotationEditor : EditorPlugin
   {
     _annotationInspector = new AnnotationInspector(this);
     AddInspectorPlugin(_annotationInspector);
-    _panel = new VBoxContainer { Name = "Box annotations", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+    var panel = new VBoxContainer { Name = "Box annotations", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
     _status = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new(200, 0) };
-    _panel.AddChild(_status);
-    var buttons = new VBoxContainer();
-    _panel.AddChild(buttons);
+    panel.AddChild(_status);
     _inspect = new Button { Text = "Inspect selected box" };
     _inspect.Pressed += InspectSelectedBox;
-    buttons.AddChild(_inspect);
+    panel.AddChild(_inspect);
     _reset = new Button { Text = "Reset annotations…" };
     _reset.Pressed += () =>
     {
       _resetTarget = _grid;
       _confirmReset.PopupCentered();
     };
-    buttons.AddChild(_reset);
+    panel.AddChild(_reset);
     _confirmReset = new ConfirmationDialog
     {
       Title = "Reset box annotations?",
@@ -44,7 +41,7 @@ public partial class BattleAnnotationEditor : EditorPlugin
     _confirmReset.Confirmed += ResetAnnotations;
     AddChild(_confirmReset);
     _dock = new EditorDock { Title = "Box annotations", DefaultSlot = EditorDock.DockSlot.RightBl, Global = false, Transient = true };
-    _dock.AddChild(_panel);
+    _dock.AddChild(panel);
     AddDock(_dock);
     _dock.Close();
     SceneChanged += TrackScene;

@@ -45,25 +45,22 @@ public partial class GameCamera : AnimatableBody3D
 
     CollisionShape3D shape = GetNodeOrNull<CollisionShape3D>("RadiusObject") ?? throw new InvalidOperationException("Missing radius object");
 
-    if (shape.Shape is not CylinderShape3D circle)
+    if (shape.Shape is not CylinderShape3D)
     {
       throw new InvalidOperationException("RadiusObject isn't a CylinderShape3D");
     }
-    circle.Radius = PathRadius;
 
     cameraPath = GetNodeOrNull<Path3D>("CameraPath") ?? throw new InvalidOperationException("Missing CameraPath");
-    cameraPath.Curve = BuildCircleCurve(PathRadius);
 
     pathFollow = GetNodeOrNull<PathFollow3D>("CameraPath/PathFollow3D") ?? throw new InvalidOperationException("Missing CameraPath/PathFollow3D");
     pathFollow.Loop = true;
     pathFollow.RotationMode = PathFollow3D.RotationModeEnum.None;
-    pathFollow.Progress = GetQuarterTurnDistance(cameraPath.Curve);
 
 
     camera = GetNodeOrNull<Camera3D>("CameraPath/PathFollow3D/Camera") ?? throw new InvalidOperationException("Missing CameraPath/PathFollow3D/Camera");
     camera.Position = Vector3.Zero;
 
-    UpdateCameraOrientation();
+    SetOrbitRadius(PathRadius);
   }
 
   public void SetOrbitRadius(float radius)

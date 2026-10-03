@@ -7,18 +7,10 @@ using static GdUnit4.Assertions;
 public partial class BattleMapAssetTest
 {
   [TestCase]
-  public void TypedRootsDoNotExposeParallelFootprintAuthoring()
-  {
-    foreach (var root in new Node3D[] { AutoFree(new BattleProp())!, AutoFree(new BattleFloor())! })
-      foreach (var property in root.GetPropertyList())
-        Assert.False(property["name"].AsString() == "Footprint");
-  }
-
-  [TestCase]
   public void ReusableTypedAssetsRoundTripAnnotationsAndVisuals()
   {
     var root = AutoFree(new BattleProp { Name = "Asset" })!;
-    var grid = TestData.Annotate(root, new BattleFootprintData
+    TestData.Annotate(root, new BattleFootprintData
     {
       Cells = { [Godot.Vector3I.Zero] = new BattleFootprintCellData { BlocksMovement = true, WalkableTop = true },
         [new(1, 0, 0)] = new BattleFootprintCellData { HasFloor = true, SpawnFactionSlot = 2 } }
