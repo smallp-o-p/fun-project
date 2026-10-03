@@ -1,29 +1,7 @@
 [gd_scene format=4]
 
-[ext_resource type="Script" path="res://scenes/battle/authoring/BattleProp.cs" id="1_d4fxs"]
-[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintCellData.cs" id="2_cq8w2"]
-[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="3_mqh08"]
-
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="2_cq8w2"]
 [ext_resource type="Script" path="res://scenes/battle/authoring/BattleAnnotationGrid.cs" id="4_annotations"]
-
-[sub_resource type="Resource" id="Resource_cjpar"]
-script = ExtResource("2_cq8w2")
-BlocksMovement = true
-CoverDirections = 15
-CoverAmount = 40
-
-[sub_resource type="Resource" id="Resource_p31vv"]
-script = ExtResource("2_cq8w2")
-BlocksMovement = true
-CoverDirections = 15
-CoverAmount = 40
-
-[sub_resource type="Resource" id="Resource_q66qy"]
-script = ExtResource("3_mqh08")
-Cells = Dictionary[Vector3i, ExtResource("2_cq8w2")]({
-Vector3i(0, 0, 0): SubResource("Resource_cjpar"),
-Vector3i(0, 0, 1): SubResource("Resource_p31vv")
-})
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jis0o"]
 albedo_color = Color(0.14509805, 0.5254902, 0.54901963, 1)
@@ -104,20 +82,55 @@ _surfaces = [{
 "vertex_data": PackedByteArray("pHC9vs3MDD8RWNm+XI9Cvs3MDD/dJOa+XI9Cvs3MDD8RWNm+pHC9vs3MDD/dJOa+pHC9vvYo3D4RWNm+XI9CvvYo3D7dJOa+XI9CvvYo3D4RWNm+pHC9vvYo3D7dJOa+XI9Cvs3MDD8RWNm+pHC9vs3MDD/dJOa+XI9Cvs3MDD/dJOa+pHC9vs3MDD8RWNm+XI9CvvYo3D4RWNm+pHC9vvYo3D7dJOa+XI9CvvYo3D7dJOa+pHC9vvYo3D4RWNm+XI9Cvs3MDD8RWNm+pHC9vvYo3D4RWNm+pHC9vs3MDD8RWNm+XI9CvvYo3D4RWNm+XI9Cvs3MDD/dJOa+pHC9vvYo3D7dJOa+pHC9vs3MDD/dJOa+XI9CvvYo3D7dJOa+XI9CPs3MDD8RWNm+pHC9Ps3MDD/dJOa+pHC9Ps3MDD8RWNm+XI9CPs3MDD/dJOa+XI9CPvYo3D4RWNm+pHC9PvYo3D7dJOa+pHC9PvYo3D4RWNm+XI9CPvYo3D7dJOa+pHC9Ps3MDD8RWNm+XI9CPs3MDD/dJOa+pHC9Ps3MDD/dJOa+XI9CPs3MDD8RWNm+pHC9PvYo3D4RWNm+XI9CPvYo3D7dJOa+pHC9PvYo3D7dJOa+XI9CPvYo3D4RWNm+pHC9Ps3MDD8RWNm+XI9CPvYo3D4RWNm+XI9CPs3MDD8RWNm+pHC9PvYo3D4RWNm+pHC9Ps3MDD/dJOa+XI9CPvYo3D7dJOa+XI9CPs3MDD/dJOa+pHC9PvYo3D7dJOa+/3//f////7//////AAD/v/9//3////+//////wAA/7//f/9/////v/////8AAP+//3//f////7//////AAD/v///AID/////AAAAgP9//7///wCA/////wAAAID/f/+///8AgP////8AAACA/3//v///AID/////AAAAgP9//78AgP//AAD/vwCAAAD///+/AID//wAA/78AgAAA////vwCA//8AAP+/AIAAAP///78AgP//AAD/vwCAAAD///+//3//f////7//////AAD/v/9//3////+//////wAA/7//f/9/////v/////8AAP+//3//f////7//////AAD/v///AID/////AAAAgP9//7///wCA/////wAAAID/f/+///8AgP////8AAACA/3//v///AID/////AAAAgP9//78AgP//AAD/vwCAAAD///+/AID//wAA/78AgAAA////vwCA//8AAP+/AIAAAP///78AgP//AAD/vwCAAAD///+/")
 }]
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_e55g3"]
+render_priority = 1
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.15, 0.85, 0.75, 0.28)
+
+[sub_resource type="BoxMesh" id="BoxMesh_d4fxs"]
+material = SubResource("StandardMaterial3D_e55g3")
+size = Vector3(0.96, 0.96, 0.96)
+
+[sub_resource type="MeshLibrary" id="MeshLibrary_cq8w2"]
+item/0/name = "Annotation box"
+item/0/mesh = SubResource("BoxMesh_d4fxs")
+item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/mesh_cast_shadow = 1
+item/0/shapes = []
+item/0/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/navigation_layers = 1
+
+[sub_resource type="Resource" id="Resource_cjpar"]
+script = ExtResource("2_cq8w2")
+BlocksMovement = true
+CoverDirections = 15
+CoverAmount = 40
+
+[sub_resource type="Resource" id="Resource_p31vv"]
+script = ExtResource("2_cq8w2")
+BlocksMovement = true
+CoverDirections = 15
+CoverAmount = 40
+
 [node name="Car" type="Node3D" unique_id=187248391]
-script = ExtResource("1_d4fxs")
 
 [node name="Model" type="MeshInstance3D" parent="." unique_id=2019039007]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 0.5)
 mesh = SubResource("ArrayMesh_domug")
 
-[node name="Annotations" type="GridMap" parent="."]
+[node name="Annotations" type="GridMap" parent="." unique_id=1979555061]
+mesh_library = SubResource("MeshLibrary_cq8w2")
 cell_size = Vector3(1, 1, 1)
 data = {
 "cells": PackedInt32Array(0, 0, 0, 0, 1, 0)
 }
 script = ExtResource("4_annotations")
-Annotations = SubResource("Resource_q66qy")
+Annotations = Dictionary[Vector3i, ExtResource("2_cq8w2")]({
+Vector3i(0, 0, 0): SubResource("Resource_cjpar"),
+Vector3i(0, 0, 1): SubResource("Resource_p31vv")
+})
 Baseline = Dictionary[Vector3i, Vector2i]({
 Vector3i(0, 0, 0): Vector2i(0, 0),
 Vector3i(0, 0, 1): Vector2i(0, 0)

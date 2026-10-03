@@ -1,9 +1,30 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFloor.cs" id="2"]
-[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="3"]
-[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintCellData.cs" id="4"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="4"]
 [ext_resource type="Script" path="res://scenes/battle/authoring/BattleAnnotationGrid.cs" id="6"]
+
+[sub_resource type="PlaneMesh" id="FloorMesh"]
+size = Vector2(4, 3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_a4ipy"]
+render_priority = 1
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.15, 0.85, 0.75, 0.28)
+
+[sub_resource type="BoxMesh" id="BoxMesh_te0qu"]
+material = SubResource("StandardMaterial3D_a4ipy")
+size = Vector3(0.96, 0.96, 0.96)
+
+[sub_resource type="MeshLibrary" id="MeshLibrary_p7ye0"]
+item/0/name = "Annotation box"
+item/0/mesh = SubResource("BoxMesh_te0qu")
+item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/mesh_cast_shadow = 1
+item/0/shapes = []
+item/0/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/navigation_layers = 1
 
 [sub_resource type="Resource" id="FloorCell_0_0"]
 script = ExtResource("4")
@@ -53,9 +74,20 @@ HasFloor = true
 script = ExtResource("4")
 HasFloor = true
 
-[sub_resource type="Resource" id="FloorFootprint"]
-script = ExtResource("3")
-Cells = Dictionary[Vector3i, ExtResource("4")]({
+[node name="AnnotationProofFloor" type="Node3D" unique_id=2052059100]
+
+[node name="FloorVisual" type="MeshInstance3D" parent="." unique_id=55556990]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 1.5)
+mesh = SubResource("FloorMesh")
+
+[node name="Annotations" type="GridMap" parent="." unique_id=854056637]
+mesh_library = SubResource("MeshLibrary_p7ye0")
+cell_size = Vector3(1, 1, 1)
+data = {
+"cells": PackedInt32Array(0, 0, 0, 0, 1, 0, 0, 2, 0, 1, 0, 0, 1, 1, 0, 1, 2, 0, 2, 0, 0, 2, 1, 0, 2, 2, 0, 3, 0, 0, 3, 1, 0, 3, 2, 0)
+}
+script = ExtResource("6")
+Annotations = Dictionary[Vector3i, ExtResource("4")]({
 Vector3i(0, 0, 0): SubResource("FloorCell_0_0"),
 Vector3i(0, 0, 1): SubResource("FloorCell_0_1"),
 Vector3i(0, 0, 2): SubResource("FloorCell_0_2"),
@@ -69,23 +101,6 @@ Vector3i(3, 0, 0): SubResource("FloorCell_3_0"),
 Vector3i(3, 0, 1): SubResource("FloorCell_3_1"),
 Vector3i(3, 0, 2): SubResource("FloorCell_3_2")
 })
-[sub_resource type="PlaneMesh" id="FloorMesh"]
-size = Vector2(4, 3)
-
-[node name="AnnotationProofFloor" type="Node3D"]
-script = ExtResource("2")
-
-[node name="FloorVisual" type="MeshInstance3D" parent="."]
-position = Vector3(2, 0, 1.5)
-mesh = SubResource("FloorMesh")
-
-[node name="Annotations" type="GridMap" parent="."]
-cell_size = Vector3(1, 1, 1)
-data = {
-"cells": PackedInt32Array(0, 0, 0, 0, 1, 0, 0, 2, 0, 1, 0, 0, 1, 1, 0, 1, 2, 0, 2, 0, 0, 2, 1, 0, 2, 2, 0, 3, 0, 0, 3, 1, 0, 3, 2, 0)
-}
-script = ExtResource("6")
-Annotations = SubResource("FloorFootprint")
 Baseline = Dictionary[Vector3i, Vector2i]({
 Vector3i(0, 0, 0): Vector2i(0, 0),
 Vector3i(0, 0, 1): Vector2i(0, 0),

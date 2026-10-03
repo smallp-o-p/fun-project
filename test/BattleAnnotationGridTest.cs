@@ -2,7 +2,6 @@ using GdUnit4;
 using Godot;
 using System;
 using static GdUnit4.Assertions;
-using Cell = Godot.Vector3I;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -12,16 +11,16 @@ public partial class BattleAnnotationGridTest
   public void PaintingAndOrientationChangesInvalidateSnapshotUntilRestored()
   {
     var grid = AutoFree(new BattleAnnotationGrid())!;
-    grid.SetCellItem(Cell.Zero, 0);
+    grid.SetCellItem(Godot.Vector3I.Zero, 0);
     grid.Baseline = grid.CaptureLayout();
     Assert.True(grid.LayoutMatches());
-    grid.SetCellItem(Cell.Right, 0);
+    grid.SetCellItem(Godot.Vector3I.Right, 0);
     Assert.False(grid.LayoutMatches());
-    grid.SetCellItem(Cell.Right, -1);
+    grid.SetCellItem(Godot.Vector3I.Right, -1);
     Assert.True(grid.LayoutMatches());
-    grid.SetCellItem(Cell.Zero, 0, 10);
+    grid.SetCellItem(Godot.Vector3I.Zero, 0, 10);
     Assert.False(grid.LayoutMatches());
-    grid.SetCellItem(Cell.Zero, 0);
+    grid.SetCellItem(Godot.Vector3I.Zero, 0);
     Assert.True(grid.LayoutMatches());
   }
 
@@ -29,54 +28,75 @@ public partial class BattleAnnotationGridTest
   public void ExactlyOneOccupiedCellIsRequired()
   {
     var grid = AutoFree(new BattleAnnotationGrid())!;
-    grid.SetCellItem(Cell.Zero, 0);
+    grid.SetCellItem(Godot.Vector3I.Zero, 0);
     Assert.False(grid.TrySelectedCell([], out _));
-    Assert.False(grid.TrySelectedCell([Cell.Zero, Cell.Right], out _));
-    Assert.False(grid.TrySelectedCell([Cell.Right], out _));
-    Assert.True(grid.TrySelectedCell([Cell.Zero], out var cell));
-    Assert.Equal(Cell.Zero, cell);
+    Assert.False(grid.TrySelectedCell([Godot.Vector3I.Zero, Godot.Vector3I.Right], out _));
+    Assert.False(grid.TrySelectedCell([Godot.Vector3I.Right], out _));
+    Assert.True(grid.TrySelectedCell([Godot.Vector3I.Zero], out var cell));
+    Assert.Equal(Godot.Vector3I.Zero, cell);
+  }
+
+  [TestCase]
+  public void BakingRequiresAnnotationsWhileEditingAllowsAnUnsnapshottedLayout()
+  {
+    var root = AutoFree(new Node3D())!;
+    var grid = TestData.Annotate(root, new()
+    {
+      [Godot.Vector3I.Zero] = new() { HasFloor = true }
+    });
+    grid.Baseline = [];
+    Assert.True(grid.Validate(Vector3.One).IsSome);
+    Assert.True(grid.Validate(Vector3.One, requireAnnotations: false).IsNone);
+    Assert.Throws<InvalidOperationException>(() => grid.BuildFootprint(Vector3.One));
+
+    grid.Baseline = grid.CaptureLayout();
+    Assert.True(grid.Validate(Vector3.One).IsNone);
+    grid.SetCellItem(Godot.Vector3I.Right, 0);
+    Assert.True(grid.Validate(Vector3.One).IsSome);
+    Assert.True(grid.Validate(Vector3.One, requireAnnotations: false).IsSome);
   }
 
   [TestCase]
   public void SavedAnnotationsAndLayoutRoundTripAndRejectLaterLayoutChange()
   {
-    var root = AutoFree(new BattleProp { Name = "Asset" })!;
-    TestData.Annotate(root, new BattleFootprintData
+    var root = AutoFree(new Node3D { Name = "Asset" })!;
+    TestData.Annotate(root, new()
     {
-      Cells = { [Cell.Zero] = new() { BlocksMovement = true, CoverAmount = 45 } }
+      [Godot.Vector3I.Zero] = new() { BlocksMovement = true, CoverAmount = 45 }
     });
     using var packed = new PackedScene();
     Assert.Equal(Error.Ok, packed.Pack(root));
     const string path = "user://annotation_roundtrip.tscn";
     Assert.Equal(Error.Ok, ResourceSaver.Save(packed, path));
-    var restored = AutoFree(ResourceLoader.Load<PackedScene>(path, cacheMode: ResourceLoader.CacheMode.Ignore).Instantiate<BattleProp>())!;
+    var restored = AutoFree(ResourceLoader.Load<PackedScene>(path, cacheMode: ResourceLoader.CacheMode.Ignore).Instantiate<Node3D>())!;
     var loaded = restored.GetNode<BattleAnnotationGrid>("Annotations");
     Assert.True(loaded.LayoutMatches());
     var footprint = loaded.BuildFootprint(Vector3.One);
-    Assert.True(footprint.Cells[Cell.Zero].BlocksMovement);
-    Assert.Equal(45, footprint.Cells[Cell.Zero].CoverAmount);
-    loaded.SetCellItem(Cell.Right, 0);
+    Assert.True(footprint[Godot.Vector3I.Zero].BlocksMovement);
+    Assert.Equal(45, footprint[Godot.Vector3I.Zero].CoverAmount);
+    loaded.SetCellItem(Godot.Vector3I.Right, 0);
     Assert.Throws<InvalidOperationException>(() => loaded.BuildFootprint(Vector3.One));
   }
+
   [TestCase(false)]
   [TestCase(true)]
-  public void AnnotationExportUsesOneFootprintStripsMarkersAndKeepsModel(bool solid)
+  public void BakedMapUsesOneFootprintStripsRuntimeMarkersAndKeepsModel(bool solid)
   {
     var source = AutoFree(new BattleMapAuthoring())!;
-    var floor = new BattleFloor { Name = "Floor" };
+    var floor = new Node3D { Name = "Floor" };
     TestData.Annotate(floor, TestData.MakeFloorFootprint(4, 3));
     source.AddChild(floor); floor.Owner = source;
-    var prop = new BattleProp { Name = "Prop", Position = new(1, 0, 1) };
+    var prop = new Node3D { Name = "Prop", Position = new(1, 0, 1) };
     source.AddChild(prop); prop.Owner = source;
     var art = new MeshInstance3D { Name = "Model", Mesh = new BoxMesh() };
     prop.AddChild(art); art.Owner = source;
-    var footprint = new BattleFootprintData();
-    foreach (var cell in new Cell[] { Cell.Zero, Cell.Right })
-      footprint.Cells[cell] = new() { BlocksMovement = solid, CoverDirections = FunProject.Battle.CoverDirections.North | FunProject.Battle.CoverDirections.East | FunProject.Battle.CoverDirections.South | FunProject.Battle.CoverDirections.West, CoverAmount = 40 };
+    Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> footprint = [];
+    foreach (var cell in new Godot.Vector3I[] { Godot.Vector3I.Zero, Godot.Vector3I.Right })
+      footprint[cell] = new() { BlocksMovement = solid, CoverDirections = FunProject.Battle.CoverDirections.North | FunProject.Battle.CoverDirections.East | FunProject.Battle.CoverDirections.South | FunProject.Battle.CoverDirections.West, CoverAmount = 40 };
     var grid = TestData.Annotate(prop, footprint);
     grid.Owner = source;
-    using var packed = source.BuildScene();
-    var result = AutoFree(packed.Instantiate<BattleMap>())!;
+    using var packed = TestData.BakeMapScene(source);
+    var result = FunProject.Tests.GeoscapeTestScenes.AddToTree(packed.Instantiate<BattleMap>());
     Assert.False(result.GetNode("Prop").HasNode("Annotations"));
     Assert.True(result.GetNode("Prop").HasNode("Model"));
     Assert.Equal(!solid, result.MapData.Tiles[new(1, 0, 1)].Walkable);
@@ -84,28 +104,62 @@ public partial class BattleAnnotationGridTest
     Assert.Equal(40, result.MapData.Tiles[new(1, 0, 0)].CoverAmount);
     Assert.Equal(0, result.MapData.Tiles[new(2, 0, 1)].CoverAmount);
     Assert.True(prop.HasNode("Annotations"));
-    grid.SetCellItem(Cell.Back, 0);
-    Assert.Throws<InvalidOperationException>(() => source.BuildScene());
+    grid.SetCellItem(Godot.Vector3I.Back, 0);
+    Assert.Throws<InvalidOperationException>(() => source.Bake());
   }
-  [TestCase(0)]
-  [TestCase(1)]
-  [TestCase(3)]
-  public void AmbiguousOrMisplacedAnnotationSourcesAreRejected(int scenario)
+
+  [TestCase]
+  public void NestedAnnotatedNodesUseTheirInheritedPlacement()
   {
     var map = AutoFree(new BattleMapAuthoring())!;
-    var floor = new BattleFloor { Position = Vector3.Right * 2 };
-    TestData.Annotate(floor, TestData.MakeFloorFootprint(1, 1));
-    map.AddChild(floor);
-    var prop = new BattleProp(); map.AddChild(prop);
-    Node3D parent = prop;
-    if (scenario == 0) { parent = new Node3D(); prop.AddChild(parent); }
-    TestData.Annotate(parent, TestData.MakeFloorFootprint(1, 1));
-    if (scenario == 1) prop.AddChild(new BattleAnnotationGrid());
-    if (scenario == 3)
-    {
-      var named = new Node3D { Name = "SceneUniqueVisual" };
-      prop.AddChild(named); named.Owner = prop; named.UniqueNameInOwner = true;
-    }
-    Assert.Throws<InvalidOperationException>(() => map.BuildScene());
+    var outer = new Node3D { Name = "Outer", Position = new(1, 0, 1) };
+    map.AddChild(outer);
+    TestData.Annotate(outer, TestData.MakeFloorFootprint(1, 1));
+    var inner = new Node3D { Name = "Inner", Position = Vector3.Right };
+    outer.AddChild(inner);
+    TestData.Annotate(inner, TestData.MakeFloorFootprint(1, 1));
+
+    using var packed = TestData.BakeMapScene(map);
+    var result = FunProject.Tests.GeoscapeTestScenes.AddToTree(packed.Instantiate<BattleMap>());
+    Assert.Equal(2, result.MapData.Tiles.Count);
+    Assert.True(result.MapData.Tiles[new(1, 0, 1)].Walkable);
+    Assert.True(result.MapData.Tiles[new(2, 0, 1)].Walkable);
+    Assert.False(result.GetNode("Outer").HasNode("Annotations"));
+    Assert.False(result.GetNode("Outer/Inner").HasNode("Annotations"));
+  }
+
+  [TestCase]
+  public void AnnotationsBelongToReusableAssetsRatherThanTheMapRoot()
+  {
+    var map = AutoFree(new BattleMapAuthoring())!;
+    var grid = TestData.Annotate(map, TestData.MakeFloorFootprint(1, 1));
+    Assert.True(grid.Validate(Vector3.One, requireAnnotations: false).IsSome);
+    Assert.Throws<InvalidOperationException>(() => map.Bake());
+  }
+
+  [TestCase]
+  public void MultipleAnnotationGridsInOneAssetAreRejected()
+  {
+    var map = AutoFree(new BattleMapAuthoring())!;
+    var asset = new Node3D();
+    map.AddChild(asset);
+    TestData.Annotate(asset, TestData.MakeFloorFootprint(1, 1));
+    asset.AddChild(new BattleAnnotationGrid());
+    Assert.Throws<InvalidOperationException>(() => map.Bake());
+  }
+
+  [TestCase]
+  public void SceneUniqueVisualsKeepTheirIdentityDuringBake()
+  {
+    var map = AutoFree(new BattleMapAuthoring())!;
+    var asset = new Node3D();
+    map.AddChild(asset);
+    TestData.Annotate(asset, TestData.MakeFloorFootprint(1, 1));
+    var named = new Node3D { Name = "SceneUniqueVisual" };
+    asset.AddChild(named); named.Owner = asset; named.UniqueNameInOwner = true;
+    map.Bake();
+    Assert.True(named.UniqueNameInOwner);
+    Assert.True(named.Owner == asset);
+    Assert.True(asset.GetNode("%SceneUniqueVisual") == named);
   }
 }

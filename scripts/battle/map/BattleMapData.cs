@@ -2,7 +2,7 @@ using Godot;
 
 namespace FunProject.Battle;
 
-[GlobalClass]
+[Tool, GlobalClass]
 public partial class BattleMapData : Resource
 {
   [Export] public Vector3 GridOrigin { get; set; }

@@ -3,9 +3,7 @@ using System;
 
 namespace FunProject.Battle;
 
-// Authored gameplay for a single map cell. Used both as a reusable brush in the editor palette
-// and as the per-cell value in BattleMapData.Tiles — position comes from the dictionary key, so
-// this type carries no Coordinates. Walkable/BlocksLineOfSight/cover/spawn are all independent.
+// Baked gameplay for one map cell; position comes from the MapData dictionary key.
 [Tool]
 [GlobalClass]
 public partial class BattleMapTileData : Resource

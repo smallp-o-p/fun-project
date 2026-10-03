@@ -1,13 +1,12 @@
 using Godot;
 using System;
-using Cell = Godot.Vector3I;
 
 // A fixed-layout authoring aid inside one reusable asset, never runtime map geometry.
 [Tool, GlobalClass]
 public partial class BattleAnnotationGrid : GridMap
 {
-  [Export] public BattleFootprintData Annotations { get; set; } = new();
-  [Export] public Godot.Collections.Dictionary<Cell, Vector2I> Baseline { get; set; } = [];
+  [Export] public Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> Annotations { get; set; } = [];
+  [Export] public Godot.Collections.Dictionary<Godot.Vector3I, Vector2I> Baseline { get; set; } = [];
 
   public BattleAnnotationGrid()
   {
@@ -31,15 +30,20 @@ public partial class BattleAnnotationGrid : GridMap
     });
   }
 
+  public override void _EnterTree()
+  {
+    if (!Engine.IsEditorHint()) Hide();
+  }
+
   public override void _ValidateProperty(Godot.Collections.Dictionary property)
   {
     if (property["name"].AsString() is nameof(Annotations) or nameof(Baseline))
       property["usage"] = (int)PropertyUsageFlags.Storage;
   }
 
-  public Godot.Collections.Dictionary<Cell, Vector2I> CaptureLayout()
+  public Godot.Collections.Dictionary<Godot.Vector3I, Vector2I> CaptureLayout()
   {
-    Godot.Collections.Dictionary<Cell, Vector2I> result = [];
+    Godot.Collections.Dictionary<Godot.Vector3I, Vector2I> result = [];
     foreach (var cell in GetUsedCells()) result[cell] = new(GetCellItem(cell), GetCellItemOrientation(cell));
     return result;
   }
@@ -52,15 +56,16 @@ public partial class BattleAnnotationGrid : GridMap
     return true;
   }
 
-  public bool TrySelectedCell(Godot.Collections.Array selected, out Cell cell)
+  public bool TrySelectedCell(Godot.Collections.Array selected, out Godot.Vector3I cell)
   {
     cell = selected.Count == 1 ? selected[0].AsVector3I() : default;
     return selected.Count == 1 && GetCellItem(cell) == 0;
   }
 
-  public string AuthoringProblem(Vector3 expectedSize)
+  public Option<string> Validate(Vector3 expectedSize, bool requireAnnotations = true)
   {
-    if (GetParent() is not (BattleProp or BattleFloor)) return "Put the annotation GridMap directly inside a BattleProp or BattleFloor asset.";
+    if (GetParent() is not Node3D || GetParent() is BattleMap)
+      return "Put the annotation GridMap directly inside a reusable Node3D asset, not the map root.";
     if (!Transform.IsEqualApprox(Transform3D.Identity) || TopLevel || !CellCenterX || !CellCenterY || !CellCenterZ || !Mathf.IsEqualApprox(CellScale, 1))
       return "Annotation boxes need an identity transform, centered cells and Cell Scale 1.";
     if (!CellSize.IsEqualApprox(expectedSize)) return $"Cell Size must match the grid metrics {expectedSize}. Standalone assets use unit metrics.";
@@ -76,19 +81,18 @@ public partial class BattleAnnotationGrid : GridMap
         return $"Box {cell} has pitch or roll. Only upright Y quarter-turns are supported.";
     }
     if (Baseline.Count > 0 && !LayoutMatches())
-      return "Layout changed: undo the paint/move/rotation, or reset annotations. Editing and export are blocked; flags do not follow moved boxes.";
-    return "";
+      return "Layout changed: undo the paint/move/rotation, or reset annotations. Editing and baking are blocked; flags do not follow moved boxes.";
+    if (requireAnnotations && GetUsedCells().Count > 0 && Baseline.Count == 0)
+      return "Inspect a selected box to begin annotations before baking.";
+    return None;
   }
 
-  public BattleFootprintData BuildFootprint(Vector3 size)
+  public Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> BuildFootprint(Vector3 size)
   {
-    var problem = AuthoringProblem(size);
-    if (problem != "") throw new InvalidOperationException($"{Name}: {problem}");
-    if (GetUsedCells().Count > 0 && Baseline.Count == 0)
-      throw new InvalidOperationException($"{Name}: inspect a selected box to begin annotations before exporting.");
-    var result = new BattleFootprintData();
+    Validate(size).IfSome(problem => throw new InvalidOperationException($"{Name}: {problem}"));
+    Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> result = [];
     foreach (var cell in GetUsedCells())
-      result.Cells[cell] = Annotations.Cells.TryGetValue(cell, out var data) ? data : new BattleFootprintCellData();
+      result[cell] = Annotations.TryGetValue(cell, out var data) ? data : new BattleFootprintData();
     return result;
   }
 }

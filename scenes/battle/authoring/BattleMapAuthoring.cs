@@ -2,121 +2,101 @@ using FunProject.Battle;
 using Godot;
 using System;
 using System.Collections.Generic;
-using Cell = Godot.Vector3I;
 
 [Tool]
-public partial class BattleMapAuthoring : Node3D
+public partial class BattleMapAuthoring : BattleMap
 {
-  private static readonly Cell[] Directions = [new(0, 0, -1), new(1, 0, 0), new(0, 0, 1), new(-1, 0, 0)];
+  private static readonly Godot.Vector3I[] Directions = [new(0, 0, -1), new(1, 0, 0), new(0, 0, 1), new(-1, 0, 0)];
   private static readonly CoverDirections[] Sides = [CoverDirections.North, CoverDirections.East, CoverDirections.South, CoverDirections.West];
   [Export] public Vector3 GridOrigin { get; set; }
   [Export] public float CellWidth { get; set; } = 1;
   [Export] public float LevelHeight { get; set; } = 1;
-  [Export(PropertyHint.File, "*.tscn,*.scn")] public string TargetPath { get; set; } = "res://resources/maps/untitled_map.tscn";
-  [ExportToolButton("Export BattleMap")] private Callable BakeButton => Callable.From(Bake);
+  [Export] public Godot.Collections.Dictionary<Godot.Vector3I, int> SpawnSlots { get; set; } = [];
+  [ExportToolButton("Bake BattleMap")] private Callable BakeButton => Callable.From(Bake);
 
-  private void Bake()
-  {
-    using var packed = BuildScene();
-    if (ResourceSaver.Save(packed, TargetPath) != Error.Ok)
-      throw new InvalidOperationException($"Could not save map to {TargetPath}.");
-    GD.Print($"Saved battle map to {TargetPath}.");
-  }
+  [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+  public BattleMapAuthoring() => MapData = new();
 
-  public PackedScene BuildScene()
+  // Bake explicitly, then save this same editable scene. Runtime reads the stored data.
+  public void Bake()
   {
     var rootPlacement = WorldTransform(this);
     if (!IsUpright(rootPlacement.Basis) || !rootPlacement.Origin.IsFinite())
       throw new InvalidOperationException("Map root requires finite placement, upright quarter-turn rotation and unit scale.");
-    var pieces = new List<(BattleFootprintData, Transform3D)>();
+    var pieces = new List<(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>, Transform3D)>();
     var rootInverse = rootPlacement.AffineInverse();
-    Collect(this, false);
+    Collect(this);
     var metrics = new BattleMapData { GridOrigin = GridOrigin, CellWidth = CellWidth, LevelHeight = LevelHeight };
     var data = BuildMap(pieces, metrics, out var floors);
-    var map = new BattleMap { Name = "Map", Transform = rootPlacement, MapData = data };
-    try
+    foreach (var (cell, slot) in SpawnSlots)
     {
-      foreach (var child in GetChildren())
+      if (slot < 0 || !data.Tiles.TryGetValue(cell, out var tile) || !tile.Walkable)
+        throw new InvalidOperationException($"Spawn at {cell} requires a walkable floor and nonnegative faction slot.");
+      tile.SpawnFactionSlot = slot;
+    }
+    MapData = data;
+    GetNodeOrNull("FloorPicking")?.Free();
+    var picking = new StaticBody3D { Name = "FloorPicking", CollisionLayer = 1, CollisionMask = 0 };
+    AddChild(picking);
+    picking.Owner = this;
+    var grid = new BoardCoordinates(data, Transform3D.Identity);
+    var shape = new BoxShape3D { Size = new(CellWidth, 0.02f * LevelHeight, CellWidth) };
+    foreach (var cell in floors)
+    {
+      var collider = new CollisionShape3D
       {
-        bool localize = HasAnnotations(child);
-        if (localize)
+        Shape = shape,
+        Position = grid.TileToWorldCenter(new(cell.X, cell.Y, cell.Z)) - Vector3.Up * (0.01f * LevelHeight)
+      };
+      picking.AddChild(collider);
+      collider.Owner = this;
+    }
+    PrepareVisualCollision(this);
+#if TOOLS
+    if (Engine.IsEditorHint()) EditorInterface.Singleton.MarkSceneAsUnsaved();
+#endif
+
+    void Collect(Node node)
+    {
+      BattleAnnotationGrid? annotations = null;
+      foreach (var child in node.GetChildren())
+        if (child is BattleAnnotationGrid grid)
         {
-          var branch = new List<Node> { child };
-          branch.AddRange(child.FindChildren("*", "", true, false));
-          foreach (var node in branch)
-            if (node.UniqueNameInOwner)
-              throw new InvalidOperationException($"{node.Name}: annotation export cannot localize scene-unique (%Name) nodes. Use a static visual branch.");
+          if (annotations is not null) throw new InvalidOperationException($"{node.Name}: use one annotation GridMap per asset.");
+          annotations = grid;
         }
-        var copy = localize
-          ? child.Duplicate((int)(Node.DuplicateFlags.Signals | Node.DuplicateFlags.Groups | Node.DuplicateFlags.Scripts))
-          : child.Duplicate();
-        map.AddChild(copy);
-        Prepare(copy, localize);
-      }
-      var picking = new StaticBody3D { Name = "FloorPicking", CollisionLayer = 1, CollisionMask = 0 };
-      map.AddChild(picking);
-      picking.Owner = map;
-      var grid = new BoardCoordinates(data, Transform3D.Identity);
-      var shape = new BoxShape3D { Size = new(CellWidth, 0.02f * LevelHeight, CellWidth) };
-      foreach (var cell in floors)
+      if (annotations is not null)
       {
-        var collider = new CollisionShape3D
-        {
-          Shape = shape,
-          Position = grid.TileToWorldCenter(new(cell.X, cell.Y, cell.Z)) - Vector3.Up * (0.01f * LevelHeight)
-        };
-        picking.AddChild(collider);
-        collider.Owner = map;
+        if (node is not Node3D asset) throw new InvalidOperationException($"{node.Name}: annotation assets require a Node3D root.");
+        pieces.Add((annotations.BuildFootprint(new(CellWidth, LevelHeight, CellWidth)), rootInverse * WorldTransform(asset)));
       }
-      var packed = new PackedScene();
-      if (packed.Pack(map) != Error.Ok) { packed.Dispose(); throw new InvalidOperationException("Could not pack battle map."); }
-      return packed;
-    }
-    finally { map.Free(); }
-
-    void Collect(Node node, bool insideAsset)
-    {
-      if (node is BattleAnnotationGrid && node.GetParent() is not (BattleProp or BattleFloor))
-        throw new InvalidOperationException($"{node.Name}: annotation GridMaps must be direct children of reusable assets.");
-      if (node is BattleProp or BattleFloor)
-      {
-        BattleAnnotationGrid? annotations = null;
-        foreach (var child in node.GetChildren())
-          if (child is BattleAnnotationGrid grid)
-          {
-            if (annotations is not null) throw new InvalidOperationException($"{node.Name}: use one annotation GridMap per asset.");
-            annotations = grid;
-          }
-        if (annotations is not null)
-          pieces.Add((annotations.BuildFootprint(new(CellWidth, LevelHeight, CellWidth)),
-            rootInverse * WorldTransform((Node3D)node)));
-        insideAsset = true;
-      }
-      if (node is GeometryInstance3D or GridMap && !insideAsset)
-        throw new InvalidOperationException($"{node.Name}: map geometry must belong to a BattleFloor or BattleProp.");
-      foreach (var child in node.GetChildren()) Collect(child, insideAsset);
-    }
-
-    void Prepare(Node node, bool localize)
-    {
-      if (node is BattleAnnotationGrid) { node.Free(); return; }
-      // Flatten only annotated export branches. Otherwise an instance source can recreate
-      // removed markers, or freshly duplicated children can double up on scene reload.
-      if (localize) { node.SceneFilePath = ""; node.Owner = map; }
-      else if (node.Owner is null) node.Owner = map;
-      if (!string.IsNullOrEmpty(node.SceneFilePath)) map.SetEditableInstance(node, true);
-      if (node is CollisionObject3D collision) collision.CollisionLayer = (collision.CollisionLayer & ~1u) | 2u;
-      if (node is GridMap visualGrid) visualGrid.CollisionLayer = (visualGrid.CollisionLayer & ~1u) | 2u;
-      if (node is CsgShape3D csg) csg.CollisionLayer = (csg.CollisionLayer & ~1u) | 2u;
-      foreach (var child in node.GetChildren()) Prepare(child, localize);
+      foreach (var child in node.GetChildren()) Collect(child);
     }
   }
 
-  private static bool HasAnnotations(Node node)
+  public override void _Ready()
   {
-    if (node is BattleAnnotationGrid) return true;
-    foreach (var child in node.GetChildren()) if (HasAnnotations(child)) return true;
-    return false;
+    if (!Engine.IsEditorHint()) RemoveAnnotations(this);
+  }
+
+  private static void RemoveAnnotations(Node node)
+  {
+    foreach (var child in node.GetChildren())
+      if (child is BattleAnnotationGrid) child.Free();
+      else RemoveAnnotations(child);
+  }
+
+  private void PrepareVisualCollision(Node node)
+  {
+    foreach (var child in node.GetChildren())
+    {
+      if (node == this && child.Name == "FloorPicking") continue;
+      if (!string.IsNullOrEmpty(child.SceneFilePath)) SetEditableInstance(child, true);
+      if (child is CollisionObject3D collision) collision.CollisionLayer = (collision.CollisionLayer & ~1u) | 2u;
+      if (child is GridMap visualGrid) visualGrid.CollisionLayer = (visualGrid.CollisionLayer & ~1u) | 2u;
+      if (child is CsgShape3D csg) csg.CollisionLayer = (csg.CollisionLayer & ~1u) | 2u;
+      PrepareVisualCollision(child);
+    }
   }
 
   private static Transform3D WorldTransform(Node3D node) =>
@@ -129,30 +109,30 @@ public partial class BattleMapAuthoring : Node3D
     return false;
   }
 
-  public static BattleMapData BuildMap(IEnumerable<(BattleFootprintData Footprint, Transform3D Placement)> pieces, BattleMapData metrics) =>
+  public static BattleMapData BuildMap(IEnumerable<(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> Footprint, Transform3D Placement)> pieces, BattleMapData metrics) =>
     BuildMap(pieces, metrics, out _);
 
-  private static BattleMapData BuildMap(IEnumerable<(BattleFootprintData Footprint, Transform3D Placement)> pieces,
-    BattleMapData metrics, out SysColGeneric.HashSet<Cell> floors)
+  private static BattleMapData BuildMap(IEnumerable<(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> Footprint, Transform3D Placement)> pieces,
+    BattleMapData metrics, out SysColGeneric.HashSet<Godot.Vector3I> floors)
   {
     if (!metrics.GridOrigin.IsFinite() || !float.IsFinite(metrics.CellWidth) || metrics.CellWidth <= 0 ||
         !float.IsFinite(metrics.LevelHeight) || metrics.LevelHeight <= 0)
       throw new InvalidOperationException("Grid origin must be finite and cell dimensions positive and finite.");
     var data = new BattleMapData { GridOrigin = metrics.GridOrigin, CellWidth = metrics.CellWidth, LevelHeight = metrics.LevelHeight };
     var grid = new BoardCoordinates(data, Transform3D.Identity);
-    var floorCells = new SysColGeneric.HashSet<Cell>();
+    var floorCells = new SysColGeneric.HashSet<Godot.Vector3I>();
     floors = floorCells;
-    var blocked = new SysColGeneric.HashSet<Cell>();
-    var cover = new Dictionary<(Cell Cell, int Side), int>();
+    var blocked = new SysColGeneric.HashSet<Godot.Vector3I>();
+    var cover = new Dictionary<(Godot.Vector3I Cell, int Side), int>();
     foreach (var (footprint, placement) in pieces)
     {
       if (!IsUpright(placement.Basis) || !placement.Origin.IsFinite())
         throw new InvalidOperationException("Gameplay assets require finite placement, upright quarter-turn rotation and unit scale.");
-      foreach (var (local, source) in footprint.Cells)
+      foreach (var (local, source) in footprint)
       {
         var center = placement * (((Vector3)local + Vector3.One / 2) * grid.CellSize);
         var raw = grid.WorldVolumeToTile(center);
-        var cell = new Cell(raw.X, raw.Y, raw.Z);
+        var cell = new Godot.Vector3I(raw.X, raw.Y, raw.Z);
         if (!center.IsEqualApprox(grid.TileToWorldVolumeCenter(raw)))
           throw new InvalidOperationException($"Gameplay cell {local} is not aligned with the map grid.");
         if (source is null || source.CoverAmount < 0 || source.CoverAmount > 100 ||
@@ -161,20 +141,19 @@ public partial class BattleMapAuthoring : Node3D
         var tile = Tile(cell);
         tile.BlocksLineOfSight |= source.BlocksLineOfSight;
         tile.BlocksVerticalLineOfSight |= source.BlocksVerticalLineOfSight;
-        if (source.HasFloor) AddFloor(cell, source.SpawnFactionSlot);
-        else if (source.SpawnFactionSlot >= 0) throw new InvalidOperationException($"Spawn at {cell} requires an explicit floor.");
+        if (source.HasFloor) AddFloor(cell);
         if (source.BlocksMovement && !blocked.Add(cell))
           throw new InvalidOperationException($"Solid gameplay cells overlap at {cell}.");
         if (source.WalkableTop || source.TopBlocksVerticalLineOfSight)
         {
-          var top = cell + Cell.Up;
-          if (source.WalkableTop) AddFloor(top, -1);
+          var top = cell + Godot.Vector3I.Up;
+          if (source.WalkableTop) AddFloor(top);
           Tile(top).BlocksVerticalLineOfSight |= source.TopBlocksVerticalLineOfSight;
         }
         for (int side = 0; side < 4; side++)
         {
-          if ((source.CoverDirections & Sides[side]) == 0 || source.CoverAmount == 0 || footprint.Cells.ContainsKey(local + Directions[side])) continue;
-          var outward = (Cell)(placement.Basis * (Vector3)Directions[side]).Round();
+          if ((source.CoverDirections & Sides[side]) == 0 || source.CoverAmount == 0 || footprint.ContainsKey(local + Directions[side])) continue;
+          var outward = (Godot.Vector3I)(placement.Basis * (Vector3)Directions[side]).Round();
           var neighbor = cell + outward;
           int facing = System.Array.IndexOf(Directions, -outward);
           var key = (neighbor, facing);
@@ -185,8 +164,6 @@ public partial class BattleMapAuthoring : Node3D
     foreach (var (cell, tile) in data.Tiles)
     {
       tile.Walkable = floorCells.Contains(cell) && !blocked.Contains(cell);
-      if (tile.SpawnFactionSlot >= 0 && !tile.Walkable)
-        throw new InvalidOperationException($"Spawn at {cell} is blocked.");
     }
     foreach (var ((cell, side), amount) in cover)
     {
@@ -199,17 +176,16 @@ public partial class BattleMapAuthoring : Node3D
     if (data.Tiles.Count == 0) throw new InvalidOperationException("Map contains no gameplay cells.");
     return data;
 
-    BattleMapTileData Tile(Cell cell)
+    BattleMapTileData Tile(Godot.Vector3I cell)
     {
       if (cell.X < 0 || cell.Y < 0 || cell.Z < 0) throw new InvalidOperationException($"Negative map coordinate {cell}.");
       data.Dimensions = new(Math.Max(data.Dimensions.X, cell.X + 1), Math.Max(data.Dimensions.Y, cell.Y + 1), Math.Max(data.Dimensions.Z, cell.Z + 1));
       if (!data.Tiles.TryGetValue(cell, out var tile)) data.Tiles[cell] = tile = new() { Walkable = false };
       return tile;
     }
-    void AddFloor(Cell cell, int spawn)
+    void AddFloor(Godot.Vector3I cell)
     {
       if (!floorCells.Add(cell)) throw new InvalidOperationException($"Duplicate floor at {cell}.");
-      Tile(cell).SpawnFactionSlot = spawn;
     }
   }
 }

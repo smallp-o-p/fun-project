@@ -1,14 +1,254 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scenes/battle/authoring/BattleMapAuthoring.cs" id="1"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapTileData.cs" id="2_33nc4"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapData.cs" id="3_q3qkq"]
 [ext_resource type="PackedScene" path="res://scenes/battle/authoring/proof/AnnotationBox.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/battle/authoring/proof/AnnotationProofFloor.tscn" id="6"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="6_vlemw"]
 
-[node name="AnnotationProofMap" type="Node3D"]
+[sub_resource type="Resource" id="Resource_p317f"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_33nc4"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_q3qkq"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_g6krx"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_vlemw"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_1ujrb"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_iddkb"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_accu8"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_4eefb"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_ke6vx"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_8aibe"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_o4hyi"]
+script = ExtResource("2_33nc4")
+
+[sub_resource type="Resource" id="Resource_fiekm"]
+script = ExtResource("3_q3qkq")
+Dimensions = Vector3i(4, 1, 3)
+Tiles = Dictionary[Vector3i, ExtResource("2_33nc4")]({
+Vector3i(0, 0, 0): SubResource("Resource_p317f"),
+Vector3i(0, 0, 1): SubResource("Resource_33nc4"),
+Vector3i(0, 0, 2): SubResource("Resource_q3qkq"),
+Vector3i(1, 0, 0): SubResource("Resource_g6krx"),
+Vector3i(1, 0, 1): SubResource("Resource_vlemw"),
+Vector3i(1, 0, 2): SubResource("Resource_1ujrb"),
+Vector3i(2, 0, 0): SubResource("Resource_iddkb"),
+Vector3i(2, 0, 1): SubResource("Resource_accu8"),
+Vector3i(2, 0, 2): SubResource("Resource_4eefb"),
+Vector3i(3, 0, 0): SubResource("Resource_ke6vx"),
+Vector3i(3, 0, 1): SubResource("Resource_8aibe"),
+Vector3i(3, 0, 2): SubResource("Resource_o4hyi")
+})
+
+[sub_resource type="PlaneMesh" id="FloorMesh"]
+size = Vector2(4, 3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cmped"]
+render_priority = 1
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.15, 0.85, 0.75, 0.28)
+
+[sub_resource type="BoxMesh" id="BoxMesh_bcvpl"]
+material = SubResource("StandardMaterial3D_cmped")
+size = Vector3(0.96, 0.96, 0.96)
+
+[sub_resource type="MeshLibrary" id="MeshLibrary_86644"]
+item/0/name = "Annotation box"
+item/0/mesh = SubResource("BoxMesh_bcvpl")
+item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/mesh_cast_shadow = 1
+item/0/shapes = []
+item/0/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/navigation_layers = 1
+
+[sub_resource type="Resource" id="FloorCell_0_0"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_0_1"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_0_2"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_1_0"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_1_1"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_1_2"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_2_0"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_2_1"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_2_2"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_3_0"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_3_1"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_3_2"]
+script = ExtResource("6_vlemw")
+HasFloor = true
+
+[sub_resource type="StandardMaterial3D" id="Material"]
+albedo_color = Color(0.65, 0.35, 0.18, 1)
+
+[sub_resource type="BoxMesh" id="Box"]
+material = SubResource("Material")
+size = Vector3(1, 1, 2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_22002"]
+render_priority = 1
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.15, 0.85, 0.75, 0.28)
+
+[sub_resource type="BoxMesh" id="BoxMesh_xgbw6"]
+material = SubResource("StandardMaterial3D_22002")
+size = Vector3(0.96, 0.96, 0.96)
+
+[sub_resource type="MeshLibrary" id="MeshLibrary_26g2o"]
+item/0/name = "Annotation box"
+item/0/mesh = SubResource("BoxMesh_xgbw6")
+item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/mesh_cast_shadow = 1
+item/0/shapes = []
+item/0/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/navigation_layers = 1
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_lhh8d"]
+size = Vector3(1, 0.02, 1)
+
+[node name="AnnotationProofMap" type="Node3D" unique_id=1142410031]
 script = ExtResource("1")
-TargetPath = "res://scenes/battle/authoring/proof/AnnotationProofMap.exported.tscn"
+MapData = SubResource("Resource_fiekm")
 
-[node name="Floor" parent="." instance=ExtResource("6")]
+[node name="Floor" parent="." unique_id=1436083307 instance=ExtResource("6")]
 
-[node name="Box" parent="." instance=ExtResource("5")]
-position = Vector3(1, 0, 1)
+[node name="FloorVisual" parent="Floor" index="0" unique_id=55556990]
+mesh = SubResource("FloorMesh")
+
+[node name="Annotations" parent="Floor" index="1" unique_id=854056637]
+mesh_library = SubResource("MeshLibrary_86644")
+collision_layer = 2
+Annotations = Dictionary[Vector3i, ExtResource("6_vlemw")]({
+Vector3i(0, 0, 0): SubResource("FloorCell_0_0"),
+Vector3i(0, 0, 1): SubResource("FloorCell_0_1"),
+Vector3i(0, 0, 2): SubResource("FloorCell_0_2"),
+Vector3i(1, 0, 0): SubResource("FloorCell_1_0"),
+Vector3i(1, 0, 1): SubResource("FloorCell_1_1"),
+Vector3i(1, 0, 2): SubResource("FloorCell_1_2"),
+Vector3i(2, 0, 0): SubResource("FloorCell_2_0"),
+Vector3i(2, 0, 1): SubResource("FloorCell_2_1"),
+Vector3i(2, 0, 2): SubResource("FloorCell_2_2"),
+Vector3i(3, 0, 0): SubResource("FloorCell_3_0"),
+Vector3i(3, 0, 1): SubResource("FloorCell_3_1"),
+Vector3i(3, 0, 2): SubResource("FloorCell_3_2")
+})
+
+[node name="Box" parent="." unique_id=1011718195 instance=ExtResource("5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1)
+
+[node name="VisualModel" parent="Box" index="0" unique_id=199404574]
+mesh = SubResource("Box")
+
+[node name="Annotations" parent="Box" index="1" unique_id=950849817]
+mesh_library = SubResource("MeshLibrary_26g2o")
+collision_layer = 2
+
+[node name="FloorPicking" type="StaticBody3D" parent="." unique_id=1292428477]
+collision_mask = 0
+
+[node name="@CollisionShape3D@280" type="CollisionShape3D" parent="FloorPicking" unique_id=1777990399]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[node name="@CollisionShape3D@281" type="CollisionShape3D" parent="FloorPicking" unique_id=88236135]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[node name="@CollisionShape3D@282" type="CollisionShape3D" parent="FloorPicking" unique_id=1063751605]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[node name="@CollisionShape3D@283" type="CollisionShape3D" parent="FloorPicking" unique_id=541323619]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[node name="@CollisionShape3D@284" type="CollisionShape3D" parent="FloorPicking" unique_id=50221597]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[node name="@CollisionShape3D@285" type="CollisionShape3D" parent="FloorPicking" unique_id=386151629]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[node name="@CollisionShape3D@286" type="CollisionShape3D" parent="FloorPicking" unique_id=342217396]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[node name="@CollisionShape3D@287" type="CollisionShape3D" parent="FloorPicking" unique_id=681838423]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[node name="@CollisionShape3D@288" type="CollisionShape3D" parent="FloorPicking" unique_id=38055233]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[node name="@CollisionShape3D@289" type="CollisionShape3D" parent="FloorPicking" unique_id=1910450977]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[node name="@CollisionShape3D@290" type="CollisionShape3D" parent="FloorPicking" unique_id=412425471]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[node name="@CollisionShape3D@291" type="CollisionShape3D" parent="FloorPicking" unique_id=2059339684]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_lhh8d")
+
+[editable path="Floor"]
+[editable path="Box"]

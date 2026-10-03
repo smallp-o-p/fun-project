@@ -20,28 +20,18 @@ public partial class BattleAnnotationEditor : EditorPlugin
   {
     _annotationInspector = new AnnotationInspector(this);
     AddInspectorPlugin(_annotationInspector);
-    var panel = new VBoxContainer { Name = "Box annotations", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-    _status = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new(200, 0) };
-    panel.AddChild(_status);
-    _inspect = new Button { Text = "Inspect selected box" };
+    _dock = GD.Load<PackedScene>("res://addons/battle_authoring/BattleAnnotationDock.tscn").Instantiate<EditorDock>();
+    _status = _dock.GetNode<Label>("Panel/Status");
+    _inspect = _dock.GetNode<Button>("Panel/Inspect");
+    _reset = _dock.GetNode<Button>("Panel/Reset");
+    _confirmReset = _dock.GetNode<ConfirmationDialog>("ConfirmReset");
     _inspect.Pressed += InspectSelectedBox;
-    panel.AddChild(_inspect);
-    _reset = new Button { Text = "Reset annotations…" };
     _reset.Pressed += () =>
     {
       _resetTarget = _grid;
       _confirmReset.PopupCentered();
     };
-    panel.AddChild(_reset);
-    _confirmReset = new ConfirmationDialog
-    {
-      Title = "Reset box annotations?",
-      DialogText = "Clear all box flags and unlock painting? The painted shape stays.\nThis reset can be undone with Godot's native Undo."
-    };
     _confirmReset.Confirmed += ResetAnnotations;
-    AddChild(_confirmReset);
-    _dock = new EditorDock { Title = "Box annotations", DefaultSlot = EditorDock.DockSlot.RightBl, Global = false, Transient = true };
-    _dock.AddChild(panel);
     AddDock(_dock);
     _dock.Close();
     SceneChanged += TrackScene;
@@ -54,7 +44,6 @@ public partial class BattleAnnotationEditor : EditorPlugin
     RemoveInspectorPlugin(_annotationInspector);
     RemoveDock(_dock);
     _dock.QueueFree();
-    _confirmReset.QueueFree();
   }
 
   // Dependent-scene reload pumps editor frames during teardown. Resume only when
@@ -91,7 +80,7 @@ public partial class BattleAnnotationEditor : EditorPlugin
       if (showDock) _dock.Open();
       else _dock.Close();
     }
-    if (EditorInterface.Singleton.GetInspector().GetEditedObject() is BattleFootprintCellData inspected &&
+    if (EditorInterface.Singleton.GetInspector().GetEditedObject() is BattleFootprintData inspected &&
         _knownCells.Contains(inspected.GetInstanceId()) && !CanEditCell(inspected))
     {
       // Node history must dispatch native editors when leaving annotation inspection.
@@ -101,31 +90,31 @@ public partial class BattleAnnotationEditor : EditorPlugin
     var problem = EditingProblem(_grid);
     bool nativeSelection = _nativeGridEditor?.GetCurrentGridMap() == _grid &&
       _grid.TrySelectedCell(_nativeGridEditor.GetSelectedCells(), out _);
-    _inspect.Disabled = problem != "" || !nativeSelection;
+    _inspect.Disabled = problem.IsSome || !nativeSelection;
     _reset.Disabled = EditorInterface.Singleton.GetEditedSceneRoot() != _grid.GetParent() || _grid.Baseline.Count == 0;
-    _status.Text = problem != "" ? problem : $"Boxes: {_grid.GetUsedCells().Count} · Cell size {_grid.CellSize} (standalone unit grid)\n" +
-      (_grid.Baseline.Count > 0 ? "Layout locked. Select one occupied box to edit flags." : "Paint with Godot's GridMap tools, then select one occupied box.");
+    _status.Text = problem.Match(message => message, () => $"Boxes: {_grid.GetUsedCells().Count} · Cell size {_grid.CellSize} (standalone unit grid)\n" +
+      (_grid.Baseline.Count > 0 ? "Layout locked. Select one occupied box to edit flags." : "Paint with Godot's GridMap tools, then select one occupied box."));
     // Close an already-open cell resource as soon as native painting invalidates its coordinates.
-    if (problem != "" && EditorInterface.Singleton.GetInspector().GetEditedObject() is BattleFootprintCellData)
+    if (problem.IsSome && EditorInterface.Singleton.GetInspector().GetEditedObject() is BattleFootprintData)
       EditorInterface.Singleton.InspectObject(_grid);
   }
 
-  private static string EditingProblem(BattleAnnotationGrid grid)
+  private static Option<string> EditingProblem(BattleAnnotationGrid grid)
   {
     if (EditorInterface.Singleton.GetEditedSceneRoot() != grid.GetParent())
-      return "Open the reusable BattleProp/BattleFloor scene to annotate; instance overrides are not supported.";
-    return grid.AuthoringProblem(Vector3.One);
+      return Some("Open the reusable asset scene to annotate; instance overrides are not supported.");
+    return grid.Validate(Vector3.One, requireAnnotations: false);
   }
 
   private void InspectSelectedBox()
   {
-    if (_grid is null || EditingProblem(_grid) != "" || _nativeGridEditor?.GetCurrentGridMap() != _grid ||
+    if (_grid is null || EditingProblem(_grid).IsSome || _nativeGridEditor?.GetCurrentGridMap() != _grid ||
         !_grid.TrySelectedCell(_nativeGridEditor.GetSelectedCells(), out var cell)) return;
-    if (!_grid.Annotations.Cells.TryGetValue(cell, out var data))
+    if (!_grid.Annotations.TryGetValue(cell, out var data))
     {
-      var next = new BattleFootprintData { Cells = _grid.Annotations.Cells.Duplicate() };
-      data = new BattleFootprintCellData { ResourceName = $"Box {cell}" };
-      next.Cells[cell] = data;
+      var next = _grid.Annotations.Duplicate();
+      data = new BattleFootprintData { ResourceName = $"Box {cell}" };
+      next[cell] = data;
       var history = GetUndoRedo();
       history.CreateAction("Annotate selected box", customContext: _grid);
       history.AddDoProperty(_grid, BattleAnnotationGrid.PropertyName.Annotations, next);
@@ -141,21 +130,21 @@ public partial class BattleAnnotationEditor : EditorPlugin
     EditorInterface.Singleton.InspectObject(data, inspectorOnly: true);
   }
 
-  private bool CanEditCell(BattleFootprintCellData cell) =>
-    _grid is not null && EditingProblem(_grid) == "" && _nativeGridEditor?.GetCurrentGridMap() == _grid &&
+  private bool CanEditCell(BattleFootprintData cell) =>
+    _grid is not null && EditingProblem(_grid).IsNone && _nativeGridEditor?.GetCurrentGridMap() == _grid &&
     _grid.TrySelectedCell(_nativeGridEditor.GetSelectedCells(), out var coordinate) &&
-    _grid.Annotations.Cells.TryGetValue(coordinate, out var current) && current == cell;
+    _grid.Annotations.TryGetValue(coordinate, out var current) && current == cell;
 
   private partial class AnnotationInspector(BattleAnnotationEditor editor) : EditorInspectorPlugin
   {
-    public override bool _CanHandle(GodotObject obj) => obj is BattleFootprintCellData && editor._knownCells.Contains(obj.GetInstanceId());
+    public override bool _CanHandle(GodotObject obj) => obj is BattleFootprintData && editor._knownCells.Contains(obj.GetInstanceId());
     public override void _ParseBegin(GodotObject obj)
     {
-      if (!editor.CanEditCell((BattleFootprintCellData)obj))
+      if (!editor.CanEditCell((BattleFootprintData)obj))
         AddCustomControl(new Label { Text = "Box editing is locked. Select its occupied cell in the reusable asset; undo layout changes or reset annotations.", AutowrapMode = TextServer.AutowrapMode.WordSmart });
     }
     public override bool _ParseProperty(GodotObject obj, Variant.Type type, string name, PropertyHint hintType,
-      string hintString, PropertyUsageFlags usageFlags, bool wide) => !editor.CanEditCell((BattleFootprintCellData)obj);
+      string hintString, PropertyUsageFlags usageFlags, bool wide) => !editor.CanEditCell((BattleFootprintData)obj);
   }
 
   private void ResetAnnotations()
@@ -165,7 +154,7 @@ public partial class BattleAnnotationEditor : EditorPlugin
     if (!GodotObject.IsInstanceValid(grid) || EditorInterface.Singleton.GetEditedSceneRoot() != grid!.GetParent()) return;
     var history = GetUndoRedo();
     history.CreateAction("Reset box annotations", customContext: grid);
-    history.AddDoProperty(grid, BattleAnnotationGrid.PropertyName.Annotations, new BattleFootprintData());
+    history.AddDoProperty(grid, BattleAnnotationGrid.PropertyName.Annotations, new Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>());
     history.AddUndoProperty(grid, BattleAnnotationGrid.PropertyName.Annotations, grid.Annotations);
     history.AddDoProperty(grid, BattleAnnotationGrid.PropertyName.Baseline, new Godot.Collections.Dictionary<Godot.Vector3I, Vector2I>());
     history.AddUndoProperty(grid, BattleAnnotationGrid.PropertyName.Baseline, grid.Baseline);

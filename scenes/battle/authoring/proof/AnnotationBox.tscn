@@ -1,6 +1,5 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3]
 
-[ext_resource type="Script" path="res://scenes/battle/authoring/BattleProp.cs" id="1"]
 [ext_resource type="Script" path="res://scenes/battle/authoring/BattleAnnotationGrid.cs" id="2"]
 
 [sub_resource type="StandardMaterial3D" id="Material"]
@@ -10,12 +9,33 @@ albedo_color = Color(0.65, 0.35, 0.18, 1)
 material = SubResource("Material")
 size = Vector3(1, 1, 2)
 
-[node name="AnnotationBox" type="Node3D"]
-script = ExtResource("1")
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6cgbd"]
+render_priority = 1
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.15, 0.85, 0.75, 0.28)
 
-[node name="VisualModel" type="MeshInstance3D" parent="."]
-position = Vector3(0.5, 0.5, 1)
+[sub_resource type="BoxMesh" id="BoxMesh_j1lf3"]
+material = SubResource("StandardMaterial3D_6cgbd")
+size = Vector3(0.96, 0.96, 0.96)
+
+[sub_resource type="MeshLibrary" id="MeshLibrary_6dgk4"]
+item/0/name = "Annotation box"
+item/0/mesh = SubResource("BoxMesh_j1lf3")
+item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/mesh_cast_shadow = 1
+item/0/shapes = []
+item/0/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/navigation_layers = 1
+
+[node name="AnnotationBox" type="Node3D" unique_id=1023506240]
+
+[node name="VisualModel" type="MeshInstance3D" parent="." unique_id=199404574]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 1)
 mesh = SubResource("Box")
 
-[node name="Annotations" type="GridMap" parent="."]
+[node name="Annotations" type="GridMap" parent="." unique_id=950849817]
+mesh_library = SubResource("MeshLibrary_6dgk4")
+cell_size = Vector3(1, 1, 1)
 script = ExtResource("2")

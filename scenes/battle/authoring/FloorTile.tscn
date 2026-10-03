@@ -1,20 +1,7 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFloor.cs" id="1_a1fi2"]
-[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintCellData.cs" id="2_se5mc"]
-[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="3_jm618"]
-
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="2_se5mc"]
 [ext_resource type="Script" path="res://scenes/battle/authoring/BattleAnnotationGrid.cs" id="4_annotations"]
-
-[sub_resource type="Resource" id="Resource_x5mc6"]
-script = ExtResource("2_se5mc")
-HasFloor = true
-
-[sub_resource type="Resource" id="Resource_lrn7m"]
-script = ExtResource("3_jm618")
-Cells = Dictionary[Vector3i, ExtResource("2_se5mc")]({
-Vector3i(0, 0, 0): SubResource("Resource_x5mc6")
-})
 
 [sub_resource type="BoxMesh" id="BoxMesh_ghfdu"]
 size = Vector3(1, 0.1, 1)
@@ -22,8 +9,31 @@ size = Vector3(1, 0.1, 1)
 [sub_resource type="BoxShape3D" id="BoxShape3D_esmve"]
 size = Vector3(1, 0.1, 1)
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_at2es"]
+render_priority = 1
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.15, 0.85, 0.75, 0.28)
+
+[sub_resource type="BoxMesh" id="BoxMesh_a1fi2"]
+material = SubResource("StandardMaterial3D_at2es")
+size = Vector3(0.96, 0.96, 0.96)
+
+[sub_resource type="MeshLibrary" id="MeshLibrary_se5mc"]
+item/0/name = "Annotation box"
+item/0/mesh = SubResource("BoxMesh_a1fi2")
+item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/mesh_cast_shadow = 1
+item/0/shapes = []
+item/0/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/navigation_layers = 1
+
+[sub_resource type="Resource" id="Resource_x5mc6"]
+script = ExtResource("2_se5mc")
+HasFloor = true
+
 [node name="FloorTile" type="Node3D" unique_id=1583490562]
-script = ExtResource("1_a1fi2")
 
 [node name="Model" type="MeshInstance3D" parent="." unique_id=588247182]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
@@ -36,13 +46,16 @@ collision_mask = 0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
 shape = SubResource("BoxShape3D_esmve")
 
-[node name="Annotations" type="GridMap" parent="."]
+[node name="Annotations" type="GridMap" parent="." unique_id=654888892]
+mesh_library = SubResource("MeshLibrary_se5mc")
 cell_size = Vector3(1, 1, 1)
 data = {
 "cells": PackedInt32Array(0, 0, 0)
 }
 script = ExtResource("4_annotations")
-Annotations = SubResource("Resource_lrn7m")
+Annotations = Dictionary[Vector3i, ExtResource("2_se5mc")]({
+Vector3i(0, 0, 0): SubResource("Resource_x5mc6")
+})
 Baseline = Dictionary[Vector3i, Vector2i]({
 Vector3i(0, 0, 0): Vector2i(0, 0)
 })
