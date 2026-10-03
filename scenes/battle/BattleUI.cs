@@ -10,9 +10,13 @@ using System.Collections.Generic;
 /// </summary>
 public sealed partial class BattleUI : Node
 {
+  public BoardCoordinates Coordinates { get; set; } = BoardCoordinates.UnitGrid;
+
   private BattleHud _hud = null!;
   private MovementLine _movementLine = null!;
   private ReachableTileHighlighter _highlighter = null!;
+  private float _lineWidth;
+  private float _cornerRadius;
 
   public event Action? ConfirmRequested;
   public event Action? CancelRequested;
@@ -22,6 +26,8 @@ public sealed partial class BattleUI : Node
   {
     _hud = GetNode<BattleHud>("%BattleHud");
     _movementLine = GetNode<MovementLine>("%MovementLine");
+    _lineWidth = _movementLine.Width;
+    _cornerRadius = _movementLine.CornerRadius;
     _highlighter = GetNode<ReachableTileHighlighter>("%ReachableTileHighlighter");
 
     _hud.ConfirmRequested += () => ConfirmRequested?.Invoke();
@@ -40,6 +46,7 @@ public sealed partial class BattleUI : Node
 
   public void ShowTargeting(IReadOnlyCollection<Vector3I> candidateCells, Option<ActionPreview> preview)
   {
+    _highlighter.Coordinates = Coordinates;
     _highlighter.Show(candidateCells);
     preview.Match(ShowPreview, HidePreview);
   }
@@ -79,8 +86,10 @@ public sealed partial class BattleUI : Node
       return;
     }
 
+    _movementLine.Width = _lineWidth * Coordinates.CellSize.X;
+    _movementLine.CornerRadius = _cornerRadius * Coordinates.CellSize.X;
     _movementLine.ShowPath(path.AsValueEnumerable()
-      .Select(tile => BoardCoordinates.TileToWorldCenter(tile) + new Vector3(0f, 0.05f, 0f))
+      .Select(tile => _movementLine.ToLocal(Coordinates.TileToWorldCenter(tile) + Coordinates.Up * (0.05f * Coordinates.CellSize.Y)))
       .ToArray());
   }
 }

@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleMapAuthoring.cs" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/battle/authoring/proof/AnnotationBox.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/battle/authoring/proof/AnnotationProofFloor.tscn" id="6"]
+
+[node name="AnnotationProofMap" type="Node3D"]
+script = ExtResource("1")
+TargetPath = "res://scenes/battle/authoring/proof/AnnotationProofMap.exported.tscn"
+
+[node name="Floor" parent="." instance=ExtResource("6")]
+
+[node name="Box" parent="." instance=ExtResource("5")]
+position = Vector3(1, 0, 1)

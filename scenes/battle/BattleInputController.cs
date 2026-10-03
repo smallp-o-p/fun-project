@@ -6,6 +6,8 @@ using System;
 // through the camera rig; no UI knowledge.
 public sealed partial class BattleInputController : Node
 {
+  public BoardCoordinates Coordinates { get; set; } = BoardCoordinates.UnitGrid;
+
   private GameCamera _cameraRig = null!;
 
   public event Action<Vector3I>? TileClicked;
@@ -63,7 +65,7 @@ public sealed partial class BattleInputController : Node
     Option<Vector3> hit = _cameraRig.TryRaycastViewportPosition(mousePosition);
     if (hit.IsNone)
       return false;
-    tile = BoardCoordinates.WorldToTile(hit.Match(v => v, () => Vector3.Zero));
+    tile = Coordinates.WorldToTile(hit.Match(v => v, () => Vector3.Zero));
     return true;
   }
 }

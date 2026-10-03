@@ -6,9 +6,11 @@ using System.Collections.Generic;
 /// <summary>Presents alive units as capsule meshes and registers them with the playback director.</summary>
 public sealed partial class BattleUnitMeshes : Node3D
 {
+  public BoardCoordinates Coordinates { get; set; } = BoardCoordinates.UnitGrid;
+
   public void Initialize(BattleRuntime runtime, EventPlaybackDirector director, Faction playerFaction)
   {
-    var capsule = new CapsuleMesh { Radius = 0.3f, Height = 1.0f };
+    var capsule = new CapsuleMesh { Radius = Mathf.Min(0.3f * Coordinates.CellSize.X, Coordinates.CellSize.Y / 2), Height = Coordinates.CellSize.Y };
 
     foreach (Faction faction in runtime.Query(new GetGlobalFactionTurnOrderQuery()))
     {
@@ -27,9 +29,9 @@ public sealed partial class BattleUnitMeshes : Node3D
         {
           Mesh = capsule,
           MaterialOverride = material,
-          Position = BoardCoordinates.TileToWorldCenter(tile) + new Vector3(0f, 0.5f, 0f),
         };
         AddChild(mesh);
+        mesh.GlobalTransform = new Transform3D(Coordinates.MapTransform.Basis, Coordinates.TileToWorldVolumeCenter(tile));
         director.RegisterUnitMesh(unit.State, mesh);
       }
     }

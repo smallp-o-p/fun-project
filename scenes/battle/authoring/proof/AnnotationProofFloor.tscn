@@ -1,0 +1,102 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFloor.cs" id="2"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="3"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintCellData.cs" id="4"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleAnnotationGrid.cs" id="6"]
+
+[sub_resource type="Resource" id="FloorCell_0_0"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_0_1"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_0_2"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_1_0"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_1_1"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_1_2"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_2_0"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_2_1"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_2_2"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_3_0"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_3_1"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorCell_3_2"]
+script = ExtResource("4")
+HasFloor = true
+
+[sub_resource type="Resource" id="FloorFootprint"]
+script = ExtResource("3")
+Cells = Dictionary[Vector3i, ExtResource("4")]({
+Vector3i(0, 0, 0): SubResource("FloorCell_0_0"),
+Vector3i(0, 0, 1): SubResource("FloorCell_0_1"),
+Vector3i(0, 0, 2): SubResource("FloorCell_0_2"),
+Vector3i(1, 0, 0): SubResource("FloorCell_1_0"),
+Vector3i(1, 0, 1): SubResource("FloorCell_1_1"),
+Vector3i(1, 0, 2): SubResource("FloorCell_1_2"),
+Vector3i(2, 0, 0): SubResource("FloorCell_2_0"),
+Vector3i(2, 0, 1): SubResource("FloorCell_2_1"),
+Vector3i(2, 0, 2): SubResource("FloorCell_2_2"),
+Vector3i(3, 0, 0): SubResource("FloorCell_3_0"),
+Vector3i(3, 0, 1): SubResource("FloorCell_3_1"),
+Vector3i(3, 0, 2): SubResource("FloorCell_3_2")
+})
+[sub_resource type="PlaneMesh" id="FloorMesh"]
+size = Vector2(4, 3)
+
+[node name="AnnotationProofFloor" type="Node3D"]
+script = ExtResource("2")
+
+[node name="FloorVisual" type="MeshInstance3D" parent="."]
+position = Vector3(2, 0, 1.5)
+mesh = SubResource("FloorMesh")
+
+[node name="Annotations" type="GridMap" parent="."]
+cell_size = Vector3(1, 1, 1)
+data = {
+"cells": PackedInt32Array(0, 0, 0, 0, 1, 0, 0, 2, 0, 1, 0, 0, 1, 1, 0, 1, 2, 0, 2, 0, 0, 2, 1, 0, 2, 2, 0, 3, 0, 0, 3, 1, 0, 3, 2, 0)
+}
+script = ExtResource("6")
+Annotations = SubResource("FloorFootprint")
+Baseline = Dictionary[Vector3i, Vector2i]({
+Vector3i(0, 0, 0): Vector2i(0, 0),
+Vector3i(0, 0, 1): Vector2i(0, 0),
+Vector3i(0, 0, 2): Vector2i(0, 0),
+Vector3i(1, 0, 0): Vector2i(0, 0),
+Vector3i(1, 0, 1): Vector2i(0, 0),
+Vector3i(1, 0, 2): Vector2i(0, 0),
+Vector3i(2, 0, 0): Vector2i(0, 0),
+Vector3i(2, 0, 1): Vector2i(0, 0),
+Vector3i(2, 0, 2): Vector2i(0, 0),
+Vector3i(3, 0, 0): Vector2i(0, 0),
+Vector3i(3, 0, 1): Vector2i(0, 0),
+Vector3i(3, 0, 2): Vector2i(0, 0)
+})

@@ -1,0 +1,49 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFloor.cs" id="1_a1fi2"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintCellData.cs" id="2_se5mc"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="3_jm618"]
+
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleAnnotationGrid.cs" id="4_annotations"]
+
+[sub_resource type="Resource" id="Resource_x5mc6"]
+script = ExtResource("2_se5mc")
+HasFloor = true
+SpawnFactionSlot = 1
+
+[sub_resource type="Resource" id="Resource_lrn7m"]
+script = ExtResource("3_jm618")
+Cells = Dictionary[Vector3i, ExtResource("2_se5mc")]({
+Vector3i(0, 0, 0): SubResource("Resource_x5mc6")
+})
+
+[sub_resource type="BoxMesh" id="BoxMesh_ghfdu"]
+size = Vector3(1, 0.1, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_esmve"]
+size = Vector3(1, 0.1, 1)
+
+[node name="SpawnFloorSlot1" type="Node3D" unique_id=1583490562]
+script = ExtResource("1_a1fi2")
+
+[node name="Model" type="MeshInstance3D" parent="." unique_id=588247182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+mesh = SubResource("BoxMesh_ghfdu")
+
+[node name="Surface" type="StaticBody3D" parent="." unique_id=1320368123]
+collision_mask = 0
+
+[node name="@CollisionShape3D@2" type="CollisionShape3D" parent="Surface" unique_id=675447007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.05, 0.5)
+shape = SubResource("BoxShape3D_esmve")
+
+[node name="Annotations" type="GridMap" parent="."]
+cell_size = Vector3(1, 1, 1)
+data = {
+"cells": PackedInt32Array(0, 0, 0)
+}
+script = ExtResource("4_annotations")
+Annotations = SubResource("Resource_lrn7m")
+Baseline = Dictionary[Vector3i, Vector2i]({
+Vector3i(0, 0, 0): Vector2i(0, 0)
+})

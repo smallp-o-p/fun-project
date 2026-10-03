@@ -341,6 +341,26 @@ internal static class TestData
     return buff;
   }
 
+  public static BattleAnnotationGrid Annotate(Node3D asset, BattleFootprintData footprint, Vector3? cellSize = null)
+  {
+    var grid = new BattleAnnotationGrid { Name = "Annotations", Annotations = footprint, CellSize = cellSize ?? Vector3.One };
+    ((BoxMesh)grid.MeshLibrary.GetItemMesh(0)).Size = grid.CellSize * 0.96f;
+    asset.AddChild(grid);
+    grid.Owner = asset;
+    foreach (var cell in footprint.Cells.Keys) grid.SetCellItem(cell, 0);
+    grid.Baseline = grid.CaptureLayout();
+    return grid;
+  }
+
+  public static BattleFootprintData MakeFloorFootprint(int width, int depth)
+  {
+    var footprint = new BattleFootprintData();
+    for (int x = 0; x < width; x++)
+      for (int z = 0; z < depth; z++)
+        footprint.Cells[new(x, 0, z)] = new() { HasFloor = true };
+    return footprint;
+  }
+
   public static BattleMapTileData FloorTile() => new() { Walkable = true };
 
   public static BattleMapTileData WallTile() => new() { Walkable = false, BlocksLineOfSight = true };
@@ -379,7 +399,7 @@ internal static class TestData
   // runtime covered by the RequireGodotRuntime suites.
   public static PackedScene MakeMapScene(BattleMapData map)
   {
-    var battleMap = new BattleMap { MapData = map, UsedPalette = new BattleTilePalette { MeshLibrary = null } };
+    var battleMap = new BattleMap { MapData = map };
     var scene = new PackedScene();
     Error error = scene.Pack(battleMap);
     battleMap.Free();
