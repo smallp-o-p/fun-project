@@ -351,10 +351,9 @@ internal static class TestData
     return packed;
   }
 
-  public static BattleAnnotationGrid Annotate(Node3D asset, Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> footprint, Vector3? cellSize = null)
+  public static BattleAnnotationGrid Annotate(Node3D asset, Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> footprint)
   {
-    var grid = new BattleAnnotationGrid { Name = "Annotations", Annotations = footprint, CellSize = cellSize ?? Vector3.One };
-    ((BoxMesh)grid.MeshLibrary.GetItemMesh(0)).Size = grid.CellSize * 0.96f;
+    var grid = new BattleAnnotationGrid { Name = "Annotations", Annotations = footprint };
     asset.AddChild(grid);
     grid.Owner = asset;
     foreach (var cell in footprint.Keys) grid.SetCellItem(cell, 0);

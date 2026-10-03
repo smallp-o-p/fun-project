@@ -41,7 +41,7 @@ public sealed partial class EventPlaybackDirectorTest
     director.PlaybackIdle += () => idleCount++;
     var mesh = battle.OwnNode(new Node3D
     {
-      Position = BoardCoordinates.UnitGrid.TileToWorldCenter(new Vector3I(1, 0, 1)),
+      Position = BoardCoordinates.TileToWorldCenter(new Vector3I(1, 0, 1)),
     });
     director.RegisterUnitMesh(battle.Unit, mesh);
 
@@ -92,7 +92,7 @@ public sealed partial class EventPlaybackDirectorTest
   {
     using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1));
     var director = battle.OwnNode(new BareDirector()); // unbound: steps are driven directly
-    var mesh = battle.OwnNode(new Node3D { Position = BoardCoordinates.UnitGrid.TileToWorldCenter(new Vector3I(1, 0, 1)) });
+    var mesh = battle.OwnNode(new Node3D { Position = BoardCoordinates.TileToWorldCenter(new Vector3I(1, 0, 1)) });
     director.RegisterUnitMesh(battle.Unit, mesh);
     var unconscious = new UnitUnconsciousBattleEvent(battle.Unit, battle.At(1, 0, 1), None);
 
@@ -143,7 +143,7 @@ public sealed partial class EventPlaybackDirectorTest
   {
     using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1), unitName: "Mover");
     var director = battle.OwnNode(new BareDirector()); // unbound: directly exercises PlayMoveStep
-    var mesh = battle.OwnNode(new Node3D { Position = BoardCoordinates.UnitGrid.TileToWorldCenter(new Vector3I(1, 0, 1)) });
+    var mesh = battle.OwnNode(new Node3D { Position = BoardCoordinates.TileToWorldCenter(new Vector3I(1, 0, 1)) });
     director.RegisterUnitMesh(battle.Unit, mesh);
     mesh.Visible = false; // killed units hide their mesh; their pending steps must not tween
 
@@ -155,7 +155,7 @@ public sealed partial class EventPlaybackDirectorTest
     director.MoveStepPublic(run, () => done = true);
 
     Assert.True(done); // synchronous completion: no tween started
-    Assert.Equal(BoardCoordinates.UnitGrid.TileToWorldCenter(new Vector3I(1, 0, 1)), mesh.Position);
+    Assert.Equal(BoardCoordinates.TileToWorldCenter(new Vector3I(1, 0, 1)), mesh.Position);
   }
 
   // Interrupts with a damage action once the mover reaches the trigger tile.

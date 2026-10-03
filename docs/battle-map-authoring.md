@@ -8,7 +8,7 @@ Restart Godot after updating this plugin to discard the previous editor session'
 ## Reusable assets: paint, select, annotate
 
 1. Create a plain `Node3D` asset scene. Put its visual model below that root, independently positioned/scaled as needed.
-2. Add one direct `BattleAnnotationGrid` child. Its native GridMap palette contains one translucent box marker. Standalone assets use unit-sized, centered cells and an identity grid transform.
+2. Add one direct `BattleAnnotationGrid` child. Its native GridMap palette contains one translucent box marker. Annotation grids use unit-sized, centered cells and an identity grid transform.
 3. Paint the asset's gameplay shape using Godot's native GridMap tools. Cell `(0,0,0)` spans the unit box starting at the asset's local origin. Visual geometry does not infer any gameplay properties.
 4. Finish the shape, select exactly one occupied box with native GridMap selection, and click **Inspect selected box** in the **Box annotations** dock.
 5. Edit that cell's flags in Godot's Inspector. Repeat for other individual cells, then save the reusable asset scene. Painted cells you have not annotated have no gameplay claims.
@@ -40,11 +40,11 @@ One transient footprint is built per annotation grid. Internal cover edges withi
 
 Asset roots must have unit scale and upright Y quarter-turn rotation; their inherited gameplay transforms obey the same rule. Pitch, roll and unsnapped placements are rejected. Unannotated visual geometry, lights, cameras and organizational nodes are decorative.
 
-`GridOrigin`, square `CellWidth` and `LevelHeight` on the map root define the map-local grid. Defaults are zero origin and unit dimensions. Annotation grids must match those dimensions; the current standalone annotation editor supports unit metrics. Baking never guesses how to refit art or gameplay after metric changes.
+The board uses fixed unit cells at world origin. Keep the map root at identity transform; place and rotate reusable assets beneath it. Annotation grids use unit Cell Size.
 
-The shared coordinate contract drives picking, unit presentation, playback, path overlays, highlights and camera framing. Floor centers lie on level planes, while volume centers are half a level above them. Gameplay still uses integer cells.
+Floor centers follow the existing board convention `(x + 0.5, y, z + 0.5)`. Annotation volume centers are half a unit above their floor.
 
-**Bake BattleMap** updates the stored `MapData` and replaces the generated `FloorPicking` child in place. It preserves visual instances and scene-unique names, saves art-collision overrides off picking layer 1, and generates explicit picking surfaces on that layer. `FloorPicking` is reserved for generated geometry. Save the scene after baking. After changing assets, placements, metrics or spawn assignments, bake again before saving/running; there is no automatic bake or runtime recomputation.
+**Bake BattleMap** updates the stored `MapData` and replaces the generated `FloorPicking` child in place. It preserves visual instances and scene-unique names, saves art-collision overrides off picking layer 1, and generates explicit picking surfaces on that layer. `FloorPicking` is reserved for generated geometry. Save the scene after baking. After changing assets, placements or spawn assignments, bake again before saving/running; there is no automatic bake or runtime recomputation.
 
 At runtime, the map reads its stored data and removes annotation GridMaps. Reusable asset scenes retain their annotations for later editing.
 

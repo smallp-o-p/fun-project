@@ -45,15 +45,15 @@ public partial class BattleAnnotationGridTest
       [Godot.Vector3I.Zero] = new() { HasFloor = true }
     });
     grid.Baseline = [];
-    Assert.True(grid.Validate(Vector3.One).IsSome);
-    Assert.True(grid.Validate(Vector3.One, requireAnnotations: false).IsNone);
-    Assert.Throws<InvalidOperationException>(() => grid.BuildFootprint(Vector3.One));
+    Assert.True(grid.Validate().IsSome);
+    Assert.True(grid.Validate(requireAnnotations: false).IsNone);
+    Assert.Throws<InvalidOperationException>(() => grid.BuildFootprint());
 
     grid.Baseline = grid.CaptureLayout();
-    Assert.True(grid.Validate(Vector3.One).IsNone);
+    Assert.True(grid.Validate().IsNone);
     grid.SetCellItem(Godot.Vector3I.Right, 0);
-    Assert.True(grid.Validate(Vector3.One).IsSome);
-    Assert.True(grid.Validate(Vector3.One, requireAnnotations: false).IsSome);
+    Assert.True(grid.Validate().IsSome);
+    Assert.True(grid.Validate(requireAnnotations: false).IsSome);
   }
 
   [TestCase]
@@ -71,11 +71,11 @@ public partial class BattleAnnotationGridTest
     var restored = AutoFree(ResourceLoader.Load<PackedScene>(path, cacheMode: ResourceLoader.CacheMode.Ignore).Instantiate<Node3D>())!;
     var loaded = restored.GetNode<BattleAnnotationGrid>("Annotations");
     Assert.True(loaded.LayoutMatches());
-    var footprint = loaded.BuildFootprint(Vector3.One);
+    var footprint = loaded.BuildFootprint();
     Assert.True(footprint[Godot.Vector3I.Zero].BlocksMovement);
     Assert.Equal(45, footprint[Godot.Vector3I.Zero].CoverAmount);
     loaded.SetCellItem(Godot.Vector3I.Right, 0);
-    Assert.Throws<InvalidOperationException>(() => loaded.BuildFootprint(Vector3.One));
+    Assert.Throws<InvalidOperationException>(() => loaded.BuildFootprint());
   }
 
   [TestCase(false)]
@@ -133,7 +133,7 @@ public partial class BattleAnnotationGridTest
   {
     var map = AutoFree(new BattleMapAuthoring())!;
     var grid = TestData.Annotate(map, TestData.MakeFloorFootprint(1, 1));
-    Assert.True(grid.Validate(Vector3.One, requireAnnotations: false).IsSome);
+    Assert.True(grid.Validate(requireAnnotations: false).IsSome);
     Assert.Throws<InvalidOperationException>(() => map.Bake());
   }
 

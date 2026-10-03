@@ -62,13 +62,13 @@ public partial class BattleAnnotationGrid : GridMap
     return selected.Count == 1 && GetCellItem(cell) == 0;
   }
 
-  public Option<string> Validate(Vector3 expectedSize, bool requireAnnotations = true)
+  public Option<string> Validate(bool requireAnnotations = true)
   {
     if (GetParent() is not Node3D || GetParent() is BattleMap)
       return "Put the annotation GridMap directly inside a reusable Node3D asset, not the map root.";
     if (!Transform.IsEqualApprox(Transform3D.Identity) || TopLevel || !CellCenterX || !CellCenterY || !CellCenterZ || !Mathf.IsEqualApprox(CellScale, 1))
       return "Annotation boxes need an identity transform, centered cells and Cell Scale 1.";
-    if (!CellSize.IsEqualApprox(expectedSize)) return $"Cell Size must match the grid metrics {expectedSize}. Standalone assets use unit metrics.";
+    if (!CellSize.IsEqualApprox(Vector3.One)) return "Annotation boxes require unit Cell Size.";
     if (MeshLibrary is null || MeshLibrary.GetItemList().Length != 1 || MeshLibrary.GetItemList()[0] != 0)
       return "Use the single annotation-box marker (item 0).";
     if (MeshLibrary.GetItemMesh(0) is not BoxMesh marker || !marker.Size.IsEqualApprox(CellSize * 0.96f) ||
@@ -87,9 +87,9 @@ public partial class BattleAnnotationGrid : GridMap
     return None;
   }
 
-  public Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> BuildFootprint(Vector3 size)
+  public Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> BuildFootprint()
   {
-    Validate(size).IfSome(problem => throw new InvalidOperationException($"{Name}: {problem}"));
+    Validate().IfSome(problem => throw new InvalidOperationException($"{Name}: {problem}"));
     Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> result = [];
     foreach (var cell in GetUsedCells())
       result[cell] = Annotations.TryGetValue(cell, out var data) ? data : new BattleFootprintData();

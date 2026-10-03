@@ -9,13 +9,12 @@ public partial class BattleMapBakeTest
   [TestCase]
   public void AssetsRetainNestedVisualsAndFloorPickingThroughReload()
   {
-    var source = AutoFree(new BattleMapAuthoring { GridOrigin = new(10, 2, 20), CellWidth = 2, LevelHeight = 3 })!;
+    var source = AutoFree(new BattleMapAuthoring())!;
     var footprint = TestData.MakeFloorFootprint(2, 1);
     source.SpawnSlots[Godot.Vector3I.Zero] = 1;
     var piece = new Node3D();
-    TestData.Annotate(piece, footprint, new(2, 3, 2));
+    TestData.Annotate(piece, footprint);
     piece.Name = "Floor";
-    piece.Position = source.GridOrigin;
     source.AddChild(piece); piece.Owner = source;
     var nested = new Node3D { Name = "Nested", Scale = new(2, 3, 4) };
     piece.AddChild(nested); nested.Owner = source;
@@ -37,17 +36,29 @@ public partial class BattleMapBakeTest
     var picking = map.GetNode<StaticBody3D>("FloorPicking");
     Assert.Equal(1u, picking.CollisionLayer);
     Assert.Equal(2, picking.GetChildCount());
-    Assert.True(picking.GetChild<CollisionShape3D>(0).Position.IsEqualApprox(new(11, 1.97f, 21)));
+    Assert.True(picking.GetChild<CollisionShape3D>(0).Position.IsEqualApprox(new(0.5f, -0.01f, 0.5f)));
     Assert.Equal(2u, collision.CollisionLayer);
     Assert.True(footprint[Godot.Vector3I.Zero].HasFloor);
     using var again = TestData.BakeMapScene(source);
     Assert.Equal(2, AutoFree(again.Instantiate<BattleMap>())!.MapData.Tiles.Count);
   }
 
-  [TestCase]
-  public void ScaledMapRootIsRejectedBeforeBake()
+  [TestCase(0)]
+  [TestCase(1)]
+  [TestCase(2)]
+  [TestCase(3)]
+  public void MapRootMustUseTheFixedBoardConvention(int scenario)
   {
-    var source = AutoFree(new BattleMapAuthoring { Scale = Vector3.One * 2 })!;
+    var source = AutoFree(new BattleMapAuthoring())!;
+    if (scenario == 0) source.Scale = Vector3.One * 2;
+    if (scenario == 1) source.Position = Vector3.Right;
+    if (scenario == 2) source.RotateY(Mathf.Pi / 2);
+    if (scenario == 3)
+    {
+      var parent = AutoFree(new Node3D { Position = Vector3.Right })!;
+      parent.AddChild(source);
+      source.Position = Vector3.Left;
+    }
     var floor = new Node3D();
     TestData.Annotate(floor, TestData.MakeFloorFootprint(1, 1));
     source.AddChild(floor);
@@ -57,11 +68,11 @@ public partial class BattleMapBakeTest
   [TestCase]
   public async System.Threading.Tasks.Task PickingHitsExplicitRoofAndIgnoresHigherVisualCollider()
   {
-    var source = AutoFree(new BattleMapAuthoring { GridOrigin = new(10, 2, 20), CellWidth = 2, LevelHeight = 3 })!;
-    var prop = new Node3D { Position = source.GridOrigin };
-    TestData.Annotate(prop, new Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> { [Godot.Vector3I.Zero] = new() { HasFloor = true, BlocksMovement = true, WalkableTop = true } }, new(2, 3, 2));
+    var source = AutoFree(new BattleMapAuthoring())!;
+    var prop = new Node3D();
+    TestData.Annotate(prop, new Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> { [Godot.Vector3I.Zero] = new() { HasFloor = true, BlocksMovement = true, WalkableTop = true } });
     source.AddChild(prop);
-    var art = new StaticBody3D { Position = new(1, 8, 1), CollisionLayer = 1 };
+    var art = new StaticBody3D { Position = new(0.5f, 8, 0.5f), CollisionLayer = 1 };
     prop.AddChild(art);
     art.AddChild(new CollisionShape3D { Shape = new BoxShape3D() });
     using var packed = TestData.BakeMapScene(source);
@@ -69,11 +80,11 @@ public partial class BattleMapBakeTest
     var tree = (SceneTree)Engine.GetMainLoop();
     await tree.ToSignal(tree, SceneTree.SignalName.PhysicsFrame);
     await tree.ToSignal(tree, SceneTree.SignalName.PhysicsFrame);
-    var camera = FunProject.Tests.GeoscapeTestScenes.AddToTree(new Camera3D { Position = new(11, 20, 21) });
-    camera.LookAt(new(11, 5, 21), Vector3.Forward);
+    var camera = FunProject.Tests.GeoscapeTestScenes.AddToTree(new Camera3D { Position = new(0.5f, 20, 0.5f) });
+    camera.LookAt(new(0.5f, 1, 0.5f), Vector3.Forward);
     var hit = GameCamera.TryRaycastViewportPosition(camera, map.GetWorld3D(), camera.GetViewport().GetVisibleRect().GetCenter()).RequireSome();
-    Assert.True(hit.IsEqualApprox(new(11, 5, 21)));
-    Assert.Equal(new Vector3I(0, 1, 0), new BoardCoordinates(map.MapData, map.GlobalTransform).WorldToTile(hit));
+    Assert.True(hit.IsEqualApprox(new(0.5f, 1, 0.5f)));
+    Assert.Equal(new Vector3I(0, 1, 0), BoardCoordinates.WorldToTile(hit));
   }
 
   [TestCase]

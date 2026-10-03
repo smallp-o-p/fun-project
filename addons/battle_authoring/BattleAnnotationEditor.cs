@@ -92,7 +92,7 @@ public partial class BattleAnnotationEditor : EditorPlugin
       _grid.TrySelectedCell(_nativeGridEditor.GetSelectedCells(), out _);
     _inspect.Disabled = problem.IsSome || !nativeSelection;
     _reset.Disabled = EditorInterface.Singleton.GetEditedSceneRoot() != _grid.GetParent() || _grid.Baseline.Count == 0;
-    _status.Text = problem.Match(message => message, () => $"Boxes: {_grid.GetUsedCells().Count} · Cell size {_grid.CellSize} (standalone unit grid)\n" +
+    _status.Text = problem.Match(message => message, () => $"Boxes: {_grid.GetUsedCells().Count} · Cell size {_grid.CellSize} (unit grid)\n" +
       (_grid.Baseline.Count > 0 ? "Layout locked. Select one occupied box to edit flags." : "Paint with Godot's GridMap tools, then select one occupied box."));
     // Close an already-open cell resource as soon as native painting invalidates its coordinates.
     if (problem.IsSome && EditorInterface.Singleton.GetInspector().GetEditedObject() is BattleFootprintData)
@@ -103,7 +103,7 @@ public partial class BattleAnnotationEditor : EditorPlugin
   {
     if (EditorInterface.Singleton.GetEditedSceneRoot() != grid.GetParent())
       return Some("Open the reusable asset scene to annotate; instance overrides are not supported.");
-    return grid.Validate(Vector3.One, requireAnnotations: false);
+    return grid.Validate(requireAnnotations: false);
   }
 
   private void InspectSelectedBox()

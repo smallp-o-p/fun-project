@@ -5,8 +5,6 @@ using System.Collections.Generic;
 // child MeshInstance3D nodes recreated on each Show.
 public sealed partial class ReachableTileHighlighter : Node3D
 {
-  public BoardCoordinates Coordinates { get; set; } = BoardCoordinates.UnitGrid;
-
   [Export] public Color HighlightColor { get; set; } = new(0.2f, 0.8f, 1.0f, 0.35f);
 
   public void Show(IEnumerable<Vector3I> tiles)
@@ -18,14 +16,14 @@ public sealed partial class ReachableTileHighlighter : Node3D
       Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
       ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
     };
-    var mesh = new PlaneMesh { Size = Vector2.One * (0.9f * Coordinates.CellSize.X) };
+    var mesh = new PlaneMesh { Size = new Vector2(0.9f, 0.9f) };
 
     foreach (Vector3I tile in tiles)
     {
       var marker = new MeshInstance3D { Mesh = mesh, MaterialOverride = material };
-      Vector3 center = Coordinates.TileToWorldCenter(tile);
+      Vector3 center = BoardCoordinates.TileToWorldCenter(tile);
+      marker.Position = new Vector3(center.X, center.Y + 0.02f, center.Z);
       AddChild(marker);
-      marker.GlobalTransform = new Transform3D(Coordinates.MapTransform.Basis, center + Coordinates.Up * (0.02f * Coordinates.CellSize.Y));
     }
   }
 

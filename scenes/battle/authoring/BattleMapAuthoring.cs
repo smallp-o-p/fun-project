@@ -8,9 +8,6 @@ public partial class BattleMapAuthoring : BattleMap
 {
   private static readonly Godot.Vector3I[] Directions = [new(0, 0, -1), new(1, 0, 0), new(0, 0, 1), new(-1, 0, 0)];
   private static readonly CoverDirections[] Sides = [CoverDirections.North, CoverDirections.East, CoverDirections.South, CoverDirections.West];
-  [Export] public Vector3 GridOrigin { get; set; }
-  [Export] public float CellWidth { get; set; } = 1;
-  [Export] public float LevelHeight { get; set; } = 1;
   [Export] public Godot.Collections.Dictionary<Godot.Vector3I, int> SpawnSlots { get; set; } = [];
   [ExportToolButton("Bake BattleMap")] private Callable BakeButton => Callable.From(Bake);
 
@@ -21,13 +18,11 @@ public partial class BattleMapAuthoring : BattleMap
   public void Bake()
   {
     var rootPlacement = WorldTransform(this);
-    if (!IsUpright(rootPlacement.Basis) || !rootPlacement.Origin.IsFinite())
-      throw new InvalidOperationException("Map root requires finite placement, upright quarter-turn rotation and unit scale.");
+    if (!Transform.IsEqualApprox(Transform3D.Identity) || !rootPlacement.IsEqualApprox(Transform3D.Identity))
+      throw new InvalidOperationException("Map root must use the fixed board origin, rotation and unit scale. Place reusable assets beneath it.");
     var pieces = new List<(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>, Transform3D)>();
-    var rootInverse = rootPlacement.AffineInverse();
     Collect(this);
-    var metrics = new BattleMapData { GridOrigin = GridOrigin, CellWidth = CellWidth, LevelHeight = LevelHeight };
-    var data = BuildMap(pieces, metrics, out var floors);
+    var data = BuildMap(pieces, out var floors);
     foreach (var (cell, slot) in SpawnSlots)
     {
       if (slot < 0 || !data.Tiles.TryGetValue(cell, out var tile) || !tile.Walkable)
@@ -39,14 +34,13 @@ public partial class BattleMapAuthoring : BattleMap
     var picking = new StaticBody3D { Name = "FloorPicking", CollisionLayer = 1, CollisionMask = 0 };
     AddChild(picking);
     picking.Owner = this;
-    var grid = new BoardCoordinates(data, Transform3D.Identity);
-    var shape = new BoxShape3D { Size = new(CellWidth, 0.02f * LevelHeight, CellWidth) };
+    var shape = new BoxShape3D { Size = new(1, 0.02f, 1) };
     foreach (var cell in floors)
     {
       var collider = new CollisionShape3D
       {
         Shape = shape,
-        Position = grid.TileToWorldCenter(new(cell.X, cell.Y, cell.Z)) - Vector3.Up * (0.01f * LevelHeight)
+        Position = BoardCoordinates.TileToWorldCenter(new(cell.X, cell.Y, cell.Z)) - Vector3.Up * 0.01f
       };
       picking.AddChild(collider);
       collider.Owner = this;
@@ -68,7 +62,7 @@ public partial class BattleMapAuthoring : BattleMap
       if (annotations is not null)
       {
         if (node is not Node3D asset) throw new InvalidOperationException($"{node.Name}: annotation assets require a Node3D root.");
-        pieces.Add((annotations.BuildFootprint(new(CellWidth, LevelHeight, CellWidth)), rootInverse * WorldTransform(asset)));
+        pieces.Add((annotations.BuildFootprint(), WorldTransform(asset)));
       }
       foreach (var child in node.GetChildren()) Collect(child);
     }
@@ -109,17 +103,13 @@ public partial class BattleMapAuthoring : BattleMap
     return false;
   }
 
-  public static BattleMapData BuildMap(IEnumerable<(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> Footprint, Transform3D Placement)> pieces, BattleMapData metrics) =>
-    BuildMap(pieces, metrics, out _);
+  public static BattleMapData BuildMap(IEnumerable<(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> Footprint, Transform3D Placement)> pieces) =>
+    BuildMap(pieces, out _);
 
   private static BattleMapData BuildMap(IEnumerable<(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> Footprint, Transform3D Placement)> pieces,
-    BattleMapData metrics, out SysColGeneric.HashSet<Godot.Vector3I> floors)
+    out SysColGeneric.HashSet<Godot.Vector3I> floors)
   {
-    if (!metrics.GridOrigin.IsFinite() || !float.IsFinite(metrics.CellWidth) || metrics.CellWidth <= 0 ||
-        !float.IsFinite(metrics.LevelHeight) || metrics.LevelHeight <= 0)
-      throw new InvalidOperationException("Grid origin must be finite and cell dimensions positive and finite.");
-    var data = new BattleMapData { GridOrigin = metrics.GridOrigin, CellWidth = metrics.CellWidth, LevelHeight = metrics.LevelHeight };
-    var grid = new BoardCoordinates(data, Transform3D.Identity);
+    var data = new BattleMapData();
     var floorCells = new SysColGeneric.HashSet<Godot.Vector3I>();
     floors = floorCells;
     var blocked = new SysColGeneric.HashSet<Godot.Vector3I>();
@@ -130,10 +120,9 @@ public partial class BattleMapAuthoring : BattleMap
         throw new InvalidOperationException("Gameplay assets require finite placement, upright quarter-turn rotation and unit scale.");
       foreach (var (local, source) in footprint)
       {
-        var center = placement * (((Vector3)local + Vector3.One / 2) * grid.CellSize);
-        var raw = grid.WorldVolumeToTile(center);
-        var cell = new Godot.Vector3I(raw.X, raw.Y, raw.Z);
-        if (!center.IsEqualApprox(grid.TileToWorldVolumeCenter(raw)))
+        var center = placement * ((Vector3)local + Vector3.One / 2);
+        var cell = (Godot.Vector3I)center.Floor();
+        if (!center.IsEqualApprox((Vector3)cell + Vector3.One / 2))
           throw new InvalidOperationException($"Gameplay cell {local} is not aligned with the map grid.");
         if (source is null || source.CoverAmount < 0 || source.CoverAmount > 100 ||
             (source.CoverDirections & ~(CoverDirections.North | CoverDirections.East | CoverDirections.South | CoverDirections.West)) != 0)
