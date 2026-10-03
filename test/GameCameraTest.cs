@@ -27,6 +27,7 @@ public partial class GameCameraTest
 
     Assert.True(query.From.IsEqualApprox(expectedOrigin));
     Assert.True(query.To.IsEqualApprox(expectedEnd));
+    Assert.Equal(1u, query.CollisionMask);
     Assert.False(query.CollideWithAreas);
     Assert.True(query.CollideWithBodies);
   }

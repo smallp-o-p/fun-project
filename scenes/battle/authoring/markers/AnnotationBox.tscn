@@ -1,0 +1,30 @@
+[gd_scene format=4]
+
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleAnnotationMarker.cs" id="1_marker"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="2_defaults"]
+
+[sub_resource type="StandardMaterial3D" id="Material"]
+render_priority = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.15, 0.85, 0.75, 1)
+
+[sub_resource type="Resource" id="Defaults"]
+script = ExtResource("2_defaults")
+
+[sub_resource type="ArrayMesh" id="Mesh"]
+_surfaces = [{
+"aabb": AABB(-0.48, -0.48, -0.48, 0.96, 0.96, 0.96),
+"format": 34359738369,
+"material": SubResource("Material"),
+"primitive": 1,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 24,
+"vertex_data": PackedByteArray("j8L1vo/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvW+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9T6PwvU+")
+}]
+metadata/footprint_data = SubResource("Defaults")
+
+[node name="Annotation box" type="MeshInstance3D" unique_id=705194331]
+mesh = SubResource("Mesh")
+script = ExtResource("1_marker")
+Defaults = SubResource("Defaults")

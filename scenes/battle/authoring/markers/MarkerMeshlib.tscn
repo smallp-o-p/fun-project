@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://btfduo8wirht7"]
+
+[ext_resource type="PackedScene" path="res://scenes/battle/authoring/markers/Floor.tscn" id="1_lqofv"]
+[ext_resource type="PackedScene" path="res://scenes/battle/authoring/markers/AnnotationBox.tscn" id="2_jpg3p"]
+[ext_resource type="PackedScene" path="res://scenes/battle/authoring/markers/Solid.tscn" id="3_yx2mu"]
+
+[node name="MarkerMeshlib" type="Node3D" unique_id=202489806]
+
+[node name="Floor" parent="." unique_id=475127568 instance=ExtResource("1_lqofv")]
+
+[node name="Annotation box" parent="." unique_id=1465014563 instance=ExtResource("2_jpg3p")]
+
+[node name="Solid" parent="." unique_id=617952866 instance=ExtResource("3_yx2mu")]
