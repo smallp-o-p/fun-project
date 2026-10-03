@@ -61,19 +61,7 @@ func _post_import(scene: Node) -> Object:
 	var clip_error := _unsupported_skeletal_clip(scene, skeleton)
 	if not clip_error.is_empty():
 		return _fail(clip_error)
-	# Capture composed transforms under the original hierarchy, move the linked
-	# bones, then re-derive their locals so global transforms are unchanged.
-	var rests: Array[Transform3D] = []
-	var poses: Array[Transform3D] = []
-	for i in skeleton.get_bone_count():
-		rests.append(skeleton.get_bone_global_rest(i))
-		poses.append(skeleton.get_bone_global_pose(i))
-	for i in repairs:
-		skeleton.set_bone_parent(i, repairs[i])
-	for i in repairs:
-		var parent_index: int = repairs[i]
-		skeleton.set_bone_rest(i, rests[parent_index].affine_inverse() * rests[i])
-		skeleton.set_bone_pose(i, poses[parent_index].affine_inverse() * poses[i])
+	_repair_hierarchy(skeleton, repairs)
 	print("Humanoid repair %s: bones=%d links=%d" % [get_source_file(), skeleton.get_bone_count(), repairs.size()])
 	var structure_error: String = STRUCTURE.apply(scene, get_source_file())
 	if not structure_error.is_empty():
@@ -90,6 +78,29 @@ func _post_import(scene: Node) -> Object:
 	if not catalog is Resource or catalog.get_script() != load("res://scenes/models/ModelWardrobeConfiguration.cs"):
 		return _fail("Wardrobe compiler did not publish a typed catalog")
 	return scene
+
+static func _repair_hierarchy(skeleton: Skeleton3D, repairs: Dictionary) -> void:
+	# Capture composed transforms under the original hierarchy, move the linked
+	# bones, then re-derive their locals so global transforms are unchanged.
+	var rests: Array[Transform3D] = []
+	var poses: Array[Transform3D] = []
+	for i in skeleton.get_bone_count():
+		rests.append(skeleton.get_bone_global_rest(i))
+		# Retargeting updates local poses outside the scene tree, where Godot
+		# does not invalidate its global pose cache. Compose the current locals
+		# instead of baking stale pre-retarget transforms into repaired bones.
+		var pose := skeleton.get_bone_pose(i)
+		var parent := skeleton.get_bone_parent(i)
+		while parent >= 0:
+			pose = skeleton.get_bone_pose(parent) * pose
+			parent = skeleton.get_bone_parent(parent)
+		poses.append(pose)
+	for i in repairs:
+		skeleton.set_bone_parent(i, repairs[i])
+	for i in repairs:
+		var parent_index: int = repairs[i]
+		skeleton.set_bone_rest(i, rests[parent_index].affine_inverse() * rests[i])
+		skeleton.set_bone_pose(i, poses[parent_index].affine_inverse() * poses[i])
 
 func _unsupported_skeletal_clip(scene: Node, skeleton: Skeleton3D) -> String:
 	for node in scene.find_children("*", "AnimationPlayer", true, false):

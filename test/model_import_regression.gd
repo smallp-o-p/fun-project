@@ -4,6 +4,7 @@ extends SceneTree
 const MASK_VALIDATION = preload("res://scenes/models/import/ModelImportValidation.cs")
 const STRUCTURE = preload("res://scenes/models/import/humanoid_structure.gd")
 const PRESENTATION = preload("res://scenes/models/import/humanoid_presentation.gd")
+const POST_IMPORT = preload("res://scenes/models/import/humanoid_post_import.gd")
 const FORMAT: int = Mesh.ARRAY_FORMAT_VERTEX | Mesh.ARRAY_FORMAT_NORMAL | Mesh.ARRAY_FORMAT_TANGENT
 var source_vertex_roles := PackedByteArray([1, 2, 1, 2, 1, 2])
 var source_indices := PackedInt32Array([0, 2, 4, 5, 3, 1])
@@ -19,6 +20,8 @@ func _initialize() -> void:
 	_test_mask_import_presentation()
 	_test_wardrobe_compiler()
 	_test_imported_wardrobes()
+	_test_imported_rest_poses()
+	_test_hierarchy_repair_with_stale_pose_cache()
 	print("MODEL IMPORT REGRESSION: %d checks, %d failures" % [checks, failures])
 	quit(0 if failures == 0 else 1)
 
@@ -27,6 +30,90 @@ func _expect(actual: Variant, expected: Variant, label: String) -> void:
 	if actual != expected:
 		failures += 1
 		printerr("FAIL %s: expected %s, got %s" % [label, str(expected), str(actual)])
+
+func _test_imported_rest_poses() -> void:
+	for path: String in [
+		"res://scenes/models/ZhuYuan/ZhuYuan.blend",
+		"res://scenes/models/ZhuYuan/ZhuYuan.scn",
+		"res://scenes/models/Trigger/Trigger4.2.blend",
+		"res://scenes/models/Trigger/Trigger.scn",
+	]:
+		var scene: Node = (load(path) as PackedScene).instantiate()
+		var skeleton: Skeleton3D = scene.get_node("rig_D/GeneralSkeleton" if path.ends_with(".blend") else "Model/rig_D/GeneralSkeleton")
+		for i: int in skeleton.get_bone_count():
+			_expect(skeleton.get_bone_pose(i).is_equal_approx(skeleton.get_bone_rest(i)), true,
+				path + " imported rest pose " + skeleton.get_bone_name(i))
+		# Exercise the actual weighted geometry, including the unmapped deform
+		# bones that the mapped arm animation tests do not cover.
+		var max_displacement: float = 0.0
+		for node: Node in skeleton.find_children("*", "MeshInstance3D", false, false):
+			var mesh: MeshInstance3D = node as MeshInstance3D
+			if mesh.skin == null or mesh.mesh == null:
+				continue
+			var poses: Array[Transform3D] = []
+			var rests: Array[Transform3D] = []
+			for bind: int in mesh.skin.get_bind_count():
+				var bone: int = skeleton.find_bone(mesh.skin.get_bind_name(bind))
+				_expect(bone >= 0, true, path + " resolves skin bind " + str(bind))
+				poses.append(_composed_pose(skeleton, bone) * mesh.skin.get_bind_pose(bind))
+				rests.append(skeleton.get_bone_global_rest(bone) * mesh.skin.get_bind_pose(bind))
+			for surface: int in mesh.mesh.get_surface_count():
+				var arrays: Array = mesh.mesh.surface_get_arrays(surface)
+				var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+				var bones: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+				var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+				if bones.is_empty():
+					continue
+				var stride: int = bones.size() / vertices.size()
+				for v: int in vertices.size():
+					var posed := Vector3.ZERO
+					var rested := Vector3.ZERO
+					for slot: int in stride:
+						var index: int = v * stride + slot
+						posed += (poses[bones[index]] * vertices[v]) * weights[index]
+						rested += (rests[bones[index]] * vertices[v]) * weights[index]
+					max_displacement = maxf(max_displacement, posed.distance_to(rested))
+		_expect(max_displacement < 0.0001, true, path + " weighted rest deformation (max=" + str(max_displacement) + ")")
+		scene.free()
+
+func _composed_pose(skeleton: Skeleton3D, bone: int) -> Transform3D:
+	var pose: Transform3D = skeleton.get_bone_pose(bone)
+	var parent: int = skeleton.get_bone_parent(bone)
+	while parent >= 0:
+		pose = skeleton.get_bone_pose(parent) * pose
+		parent = skeleton.get_bone_parent(parent)
+	return pose
+
+func _test_hierarchy_repair_with_stale_pose_cache() -> void:
+	for resting: bool in [true, false]:
+		# Import callbacks receive a skeleton outside the scene tree. Retargeting
+		# reads global transforms, then changes local poses without invalidating
+		# that cache. Include a descendant and a parent with a higher bone index.
+		var skeleton := Skeleton3D.new()
+		for name: String in ["Deform", "Hand", "OldParent", "NewParent"]:
+			skeleton.add_bone(name)
+		skeleton.set_bone_parent(0, 2)
+		skeleton.set_bone_parent(1, 0)
+		for i: int in 4:
+			skeleton.set_bone_rest(i, Transform3D(Basis(Vector3.FORWARD, 0.1 * i), Vector3(0.1 * i, 0.3, 0)))
+			skeleton.set_bone_pose(i, Transform3D(Basis(Vector3.FORWARD, -0.3 * i), Vector3(0.2, 0.1 * i, 0)))
+		for i: int in 4:
+			skeleton.get_bone_global_rest(i)
+			skeleton.get_bone_global_pose(i)
+		if resting:
+			skeleton.reset_bone_poses()
+		else:
+			skeleton.set_bone_pose(2, Transform3D(Basis(Vector3.RIGHT, 0.5), Vector3(0.3, 0.2, 0.1)))
+		var expected_poses: Array[Transform3D] = []
+		var expected_rests: Array[Transform3D] = []
+		for i: int in 4:
+			expected_poses.append(_composed_pose(skeleton, i))
+			expected_rests.append(skeleton.get_bone_global_rest(i))
+		POST_IMPORT._repair_hierarchy(skeleton, {0: 3})
+		for i: int in 4:
+			_expect(_composed_pose(skeleton, i).is_equal_approx(expected_poses[i]), true, "repair preserves current global pose resting=%s bone=%d" % [resting, i])
+			_expect(skeleton.get_bone_global_rest(i).is_equal_approx(expected_rests[i]), true, "repair preserves global rest resting=%s bone=%d" % [resting, i])
+		skeleton.free()
 
 func _test_surface_materials() -> void:
 	var scene := Node3D.new()
