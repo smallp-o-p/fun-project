@@ -8,12 +8,16 @@ using Cell = Godot.Vector3I;
 [RequireGodotRuntime]
 public partial class BattleMapExportTest
 {
-  [TestCase]
-  public void TypedAssetsRetainNestedVisualsAndFloorPickingThroughReload()
+  [TestCase(false)]
+  [TestCase(true)]
+  public void TypedAssetsRetainNestedVisualsAndFloorPickingThroughReload(bool isProp)
   {
     var source = AutoFree(new BattleMapAuthoring { GridOrigin = new(10, 2, 20), CellWidth = 2, LevelHeight = 3 })!;
-    var footprint = new BattleFootprintData { Cells = { [Cell.Zero] = new() { HasFloor = true }, [new(1, 0, 0)] = new() { HasFloor = true } } };
-    var piece = new BattleFloor { Name = "Floor", Footprint = footprint, Position = source.GridOrigin };
+    var footprint = TestData.MakeFloorFootprint(2, 1);
+    footprint.Cells[Cell.Zero].SpawnFactionSlot = 1;
+    Node3D piece = isProp ? new BattleProp { Footprint = footprint } : new BattleFloor { Footprint = footprint };
+    piece.Name = "Floor";
+    piece.Position = source.GridOrigin;
     source.AddChild(piece); piece.Owner = source;
     var nested = new Node3D { Name = "Nested", Scale = new(2, 3, 4) };
     piece.AddChild(nested); nested.Owner = source;
@@ -25,6 +29,10 @@ public partial class BattleMapExportTest
     const string path = "user://map_export_roundtrip.tscn";
     Assert.Equal(Error.Ok, ResourceSaver.Save(packed, path));
     var map = AutoFree(ResourceLoader.Load<PackedScene>(path, cacheMode: ResourceLoader.CacheMode.Ignore).Instantiate<BattleMap>())!;
+    Assert.Equal(new Cell(2, 1, 1), map.MapData.Dimensions);
+    Assert.True(map.MapData.Tiles[Cell.Zero].Walkable);
+    Assert.True(map.MapData.Tiles[new(1, 0, 0)].Walkable);
+    Assert.Equal(1, map.MapData.Tiles[Cell.Zero].SpawnFactionSlot);
     Assert.Equal(new Vector3(2, 3, 4), map.GetNode<Node3D>("Floor/Nested").Scale);
     Assert.True(map.GetNode<MeshInstance3D>("Floor/Nested/Visual").Mesh is BoxMesh);
     Assert.Equal(2u, map.GetNode<StaticBody3D>("Floor/Nested/ArtCollision").CollisionLayer);
@@ -38,26 +46,6 @@ public partial class BattleMapExportTest
     Assert.Equal(2, AutoFree(again.Instantiate<BattleMap>())!.MapData.Tiles.Count);
   }
 
-  [TestCase]
-  public void VisualChangesDoNotChangeGameplayAndBothTypesUseTheSameFootprint()
-  {
-    var footprint = new BattleFootprintData { Cells = { [Cell.Zero] = new() { HasFloor = true, SpawnFactionSlot = 1 } } };
-    var source = AutoFree(new BattleMapAuthoring())!;
-    var piece = new BattleProp { Footprint = footprint };
-    source.AddChild(piece);
-    using var first = source.BuildScene();
-    piece.AddChild(new MeshInstance3D { Mesh = new SphereMesh(), Scale = Vector3.One * 5 });
-    using var second = source.BuildScene();
-    source.RemoveChild(piece); piece.Free();
-    source.AddChild(new BattleFloor { Footprint = footprint });
-    using var third = source.BuildScene();
-    foreach (var packed in new[] { first, second, third })
-    {
-      var map = AutoFree(packed.Instantiate<BattleMap>())!;
-      Assert.True(map.MapData.Tiles[Cell.Zero].Walkable);
-      Assert.Equal(1, map.MapData.Tiles[Cell.Zero].SpawnFactionSlot);
-    }
-  }
   [TestCase]
   public void ScaledMapRootIsRejectedBeforeExport()
   {

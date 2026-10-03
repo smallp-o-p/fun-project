@@ -34,9 +34,7 @@ public partial class BattleMapAuthoringTest
   [TestCase(3)]
   public void RotatedTwoCellObjectContributesOnlyExternalCover(int turn)
   {
-    var floors = new BattleFootprintData();
-    for (int x = 0; x < 7; x++) for (int z = 0; z < 7; z++)
-      floors.Cells[new(x, 0, z)] = new() { HasFloor = true };
+    var floors = TestData.MakeFloorFootprint(7, 7);
     var prop = new BattleFootprintData
     {
       Cells = {
@@ -59,7 +57,7 @@ public partial class BattleMapAuthoringTest
   public void NonzeroOriginAndDimensionsPreserveDistantCoordinates()
   {
     var metrics = new BattleMapData { GridOrigin = new(10, 2, 20), CellWidth = 2, LevelHeight = 3 };
-    var floor = new BattleFootprintData { Cells = { [Cell.Zero] = new() { HasFloor = true } } };
+    var floor = TestData.MakeFloorFootprint(1, 1);
     var result = BattleMapAuthoring.BuildMap([(floor, new(Basis.Identity, new(14, 5, 26)))], metrics);
     Assert.True(result.Tiles[new(2, 1, 3)].Walkable);
     Assert.Equal(new Cell(3, 2, 4), result.Dimensions);
@@ -81,16 +79,24 @@ public partial class BattleMapAuthoringTest
     Assert.Throws<InvalidOperationException>(() => BattleMapAuthoring.BuildMap([(piece, transform)], new()));
   }
 
-  [TestCase(false)]
-  [TestCase(true)]
-  public void CoverMergesSameSideButRejectsDifferentStrengthsAcrossSides(bool sameSide)
+  [TestCase(false, 0)]
+  [TestCase(true, 0)]
+  [TestCase(false, 1)]
+  [TestCase(false, 2)]
+  public void CoverMergesSameSideButRejectsDifferentStrengthsAcrossWalkableSides(bool sameSide, int receiver)
   {
     var floors = TestData.MakeFloorFootprint(3, 3);
+    if (receiver == 1) floors.Cells[new(1, 0, 1)].BlocksMovement = true;
+    if (receiver == 2) floors.Cells.Remove(new(1, 0, 1));
     var west = new BattleFootprintData { Cells = { [Cell.Zero] = new() { CoverDirections = CoverDirections.East, CoverAmount = 20 } } };
     var other = new BattleFootprintData { Cells = { [Cell.Zero] = new() { CoverDirections = sameSide ? CoverDirections.East : CoverDirections.South, CoverAmount = 60 } } };
-    (BattleFootprintData, Transform3D)[] pieces = [(floors, Transform3D.Identity),
-      (west, new(Basis.Identity, new(0, 0, 1))), (other, new(Basis.Identity, sameSide ? new(0, 0, 1) : new(1, 0, 0)))];
-    if (!sameSide) Assert.Throws<InvalidOperationException>(() => BattleMapAuthoring.BuildMap(pieces, new()));
+    (BattleFootprintData, Transform3D)[] pieces = [(west, new(Basis.Identity, new(0, 0, 1))),
+      (other, new(Basis.Identity, sameSide ? new(0, 0, 1) : new(1, 0, 0))), (floors, Transform3D.Identity)];
+    if (receiver != 0)
+    {
+      foreach (var tile in BattleMapAuthoring.BuildMap(pieces, new()).Tiles.Values) Assert.Equal(0, tile.CoverAmount);
+    }
+    else if (!sameSide) Assert.Throws<InvalidOperationException>(() => BattleMapAuthoring.BuildMap(pieces, new()));
     else
     {
       var tile = BattleMapAuthoring.BuildMap(pieces, new()).Tiles[new(1, 0, 1)];
@@ -102,7 +108,7 @@ public partial class BattleMapAuthoringTest
   [TestCase]
   public void DuplicateFloorsAreRejected()
   {
-    var floor = new BattleFootprintData { Cells = { [Cell.Zero] = new() { HasFloor = true } } };
+    var floor = TestData.MakeFloorFootprint(1, 1);
     Assert.Throws<InvalidOperationException>(() => BattleMapAuthoring.BuildMap([(floor, Transform3D.Identity), (floor, Transform3D.Identity)], new()));
   }
 }

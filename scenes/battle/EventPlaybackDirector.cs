@@ -150,7 +150,7 @@ public partial class EventPlaybackDirector : Node
     Tween tween = CreateTween();
     foreach (UnitMovedBattleEvent step in run)
     {
-      Vector3 destination = Coordinates.TileToWorldCenter(step.Position.Raw) + Coordinates.Up * Coordinates.CellSize.Y / 2;
+      Vector3 destination = Coordinates.TileToWorldVolumeCenter(step.Position.Raw);
       float segmentDuration = mesh.GlobalPosition.DistanceTo(destination) / WorldUnitsPerSecond;
       tween.TweenProperty(mesh, "global_position", destination, segmentDuration);
     }

@@ -29,7 +29,8 @@ public partial class BattleMapAuthoring : Node3D
     if (!IsUpright(rootPlacement.Basis) || !rootPlacement.Origin.IsFinite())
       throw new InvalidOperationException("Map root requires finite placement, upright quarter-turn rotation and unit scale.");
     var pieces = new List<(BattleFootprintData, Transform3D)>();
-    Collect(this, rootPlacement, false);
+    var rootInverse = rootPlacement.AffineInverse();
+    Collect(this, false);
     var metrics = new BattleMapData { GridOrigin = GridOrigin, CellWidth = CellWidth, LevelHeight = LevelHeight };
     var data = BuildMap(pieces, metrics, out var floors);
     var map = new BattleMap { Name = "Map", Transform = rootPlacement, MapData = data };
@@ -62,20 +63,18 @@ public partial class BattleMapAuthoring : Node3D
     }
     finally { map.Free(); }
 
-    void Collect(Node node, Transform3D placement, bool insideAsset)
+    void Collect(Node node, bool insideAsset)
     {
-      if (node != this && node is Node3D spatial)
-        placement = spatial.TopLevel || node.GetParent() is not Node3D ? spatial.Transform : placement * spatial.Transform;
       BattleFootprintData? footprint = node switch { BattleProp prop => prop.Footprint, BattleFloor floor => floor.Footprint, _ => null };
       if (node is BattleProp or BattleFloor)
       {
         if (footprint is null) throw new InvalidOperationException($"{node.Name}: footprint is required.");
-        pieces.Add((footprint, rootPlacement.AffineInverse() * placement));
+        pieces.Add((footprint, rootInverse * WorldTransform((Node3D)node)));
         insideAsset = true;
       }
       if (node is GeometryInstance3D or GridMap && !insideAsset)
         throw new InvalidOperationException($"{node.Name}: map geometry must belong to a BattleFloor or BattleProp.");
-      foreach (var child in node.GetChildren()) Collect(child, placement, insideAsset);
+      foreach (var child in node.GetChildren()) Collect(child, insideAsset);
     }
 
     void Prepare(Node node)
@@ -112,12 +111,10 @@ public partial class BattleMapAuthoring : Node3D
     floors = floorCells;
     var blocked = new SysColGeneric.HashSet<Cell>();
     var cover = new Dictionary<(Cell Cell, int Side), int>();
-    var placed = new List<(BattleFootprintData Footprint, Basis Rotation, Dictionary<Cell, Cell> Cells)>();
     foreach (var (footprint, placement) in pieces)
     {
       if (!IsUpright(placement.Basis) || !placement.Origin.IsFinite())
         throw new InvalidOperationException("Gameplay assets require finite placement, upright quarter-turn rotation and unit scale.");
-      var cells = new Dictionary<Cell, Cell>();
       foreach (var (local, source) in footprint.Cells)
       {
         var center = placement * (((Vector3)local + Vector3.One / 2) * grid.CellSize);
@@ -128,7 +125,6 @@ public partial class BattleMapAuthoring : Node3D
         if (source is null || source.CoverAmount < 0 || source.CoverAmount > 100 ||
             (source.CoverDirections & ~(CoverDirections.North | CoverDirections.East | CoverDirections.South | CoverDirections.West)) != 0)
           throw new InvalidOperationException($"Invalid gameplay data at {cell}.");
-        cells.Add(local, cell);
         var tile = Tile(cell);
         tile.BlocksLineOfSight |= source.BlocksLineOfSight;
         tile.BlocksVerticalLineOfSight |= source.BlocksVerticalLineOfSight;
@@ -142,8 +138,16 @@ public partial class BattleMapAuthoring : Node3D
           if (source.WalkableTop) AddFloor(top, -1);
           Tile(top).BlocksVerticalLineOfSight |= source.TopBlocksVerticalLineOfSight;
         }
+        for (int side = 0; side < 4; side++)
+        {
+          if ((source.CoverDirections & Sides[side]) == 0 || source.CoverAmount == 0 || footprint.Cells.ContainsKey(local + Directions[side])) continue;
+          var outward = (Cell)(placement.Basis * (Vector3)Directions[side]).Round();
+          var neighbor = cell + outward;
+          int facing = System.Array.IndexOf(Directions, -outward);
+          var key = (neighbor, facing);
+          cover[key] = Math.Max(cover.GetValueOrDefault(key), source.CoverAmount);
+        }
       }
-      placed.Add((footprint, placement.Basis, cells));
     }
     foreach (var (cell, tile) in data.Tiles)
     {
@@ -151,21 +155,9 @@ public partial class BattleMapAuthoring : Node3D
       if (tile.SpawnFactionSlot >= 0 && !tile.Walkable)
         throw new InvalidOperationException($"Spawn at {cell} is blocked.");
     }
-    foreach (var (footprint, rotation, cells) in placed)
-      foreach (var (local, source) in footprint.Cells)
-        for (int side = 0; side < 4; side++)
-        {
-          if ((source.CoverDirections & Sides[side]) == 0 || source.CoverAmount == 0 || footprint.Cells.ContainsKey(local + Directions[side])) continue;
-          var outward = (Cell)(rotation * (Vector3)Directions[side]).Round();
-          var neighbor = cells[local] + outward;
-          if (!data.Tiles.TryGetValue(neighbor, out var tile) || !tile.Walkable) continue;
-          int facing = System.Array.IndexOf(Directions, -outward);
-          var key = (neighbor, facing);
-          cover[key] = Math.Max(cover.GetValueOrDefault(key), source.CoverAmount);
-        }
     foreach (var ((cell, side), amount) in cover)
     {
-      var tile = data.Tiles[cell];
+      if (!data.Tiles.TryGetValue(cell, out var tile) || !tile.Walkable) continue;
       if (tile.CoverDirections != CoverDirections.None && tile.CoverAmount != amount)
         throw new InvalidOperationException($"Different cover strengths on separate sides of {cell} require the directional-cover extension.");
       tile.CoverDirections |= Sides[side];
