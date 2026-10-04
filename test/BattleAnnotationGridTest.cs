@@ -14,7 +14,43 @@ public partial class BattleAnnotationGridTest
     AssertOutlineMarker(grid.MeshLibrary.GetItemMesh(0));
   }
 
-  private static void AssertOutlineMarker(Mesh mesh)
+  [TestCase]
+  public void PaletteAddsFloorAndSolidOutlines()
+  {
+    var grid = AutoFree(new BattleAnnotationGrid())!;
+    Assert.Equal(3, grid.MeshLibrary.GetItemList().Length);
+    Assert.Equal("Floor", grid.MeshLibrary.GetItemName(1));
+    Assert.Equal("Solid", grid.MeshLibrary.GetItemName(2));
+    AssertOutlineMarker(grid.MeshLibrary.GetItemMesh(2), new Color(1, 0.55f, 0.15f, 1));
+
+    var mesh = grid.MeshLibrary.GetItemMesh(1);
+    Assert.True(mesh is ArrayMesh);
+    var marker = (ArrayMesh)mesh;
+    Assert.Equal(1, marker.GetSurfaceCount());
+    Assert.Equal(Mesh.PrimitiveType.Lines, marker.SurfaceGetPrimitiveType(0));
+    Assert.Equal(0, marker.SurfaceGetArrayIndexLen(0));
+    var vertices = marker.SurfaceGetArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+    Assert.Equal(8, vertices.Length);
+    var edges = new SysColGeneric.HashSet<(int, int)>();
+    for (int i = 0; i < vertices.Length; i += 2)
+    {
+      int start = Corner(vertices[i]), end = Corner(vertices[i + 1]);
+      Assert.True((start ^ end) is 1 or 2, "Each line must be a square edge, never a diagonal.");
+      Assert.True(edges.Add((Math.Min(start, end), Math.Max(start, end))));
+    }
+    Assert.Equal(4, edges.Count);
+    AssertMarkerMaterial(marker, new Color(0.3f, 0.9f, 0.35f, 1));
+
+    static int Corner(Vector3 vertex)
+    {
+      Assert.True(Mathf.IsEqualApprox(vertex.Y, -0.5f), "The floor outline sits at the cell bottom.");
+      Assert.True(Mathf.IsEqualApprox(Mathf.Abs(vertex.X), 0.48f));
+      Assert.True(Mathf.IsEqualApprox(Mathf.Abs(vertex.Z), 0.48f));
+      return (vertex.X > 0 ? 1 : 0) | (vertex.Z > 0 ? 2 : 0);
+    }
+  }
+
+  private static void AssertOutlineMarker(Mesh mesh, Color? color = null)
   {
     Assert.True(mesh is ArrayMesh, "Annotation markers must have edge geometry without filled faces.");
     var marker = (ArrayMesh)mesh;
@@ -32,18 +68,120 @@ public partial class BattleAnnotationGridTest
       Assert.True(edges.Add((Math.Min(start, end), Math.Max(start, end))), "Box edges must not repeat.");
     }
     Assert.Equal(12, edges.Count);
-    Assert.True(marker.SurfaceGetMaterial(0) is StandardMaterial3D);
-    var material = (StandardMaterial3D)marker.SurfaceGetMaterial(0);
-    Assert.Equal(new Color(0.15f, 0.85f, 0.75f, 1), material.AlbedoColor);
-    Assert.Equal(BaseMaterial3D.TransparencyEnum.Disabled, material.Transparency);
-    Assert.Equal(BaseMaterial3D.ShadingModeEnum.Unshaded, material.ShadingMode);
-    Assert.True(material.NoDepthTest);
+    AssertMarkerMaterial(marker, color ?? new Color(0.15f, 0.85f, 0.75f, 1));
 
     static int Corner(Vector3 vertex)
     {
       Assert.True(vertex.Abs().IsEqualApprox(Vector3.One * 0.48f), "Edges must meet at the inset box corners.");
       return (vertex.X > 0 ? 1 : 0) | (vertex.Y > 0 ? 2 : 0) | (vertex.Z > 0 ? 4 : 0);
     }
+  }
+
+  private static void AssertMarkerMaterial(ArrayMesh marker, Color color)
+  {
+    Assert.True(marker.SurfaceGetMaterial(0) is StandardMaterial3D);
+    var material = (StandardMaterial3D)marker.SurfaceGetMaterial(0);
+    Assert.Equal(color, material.AlbedoColor);
+    Assert.Equal(BaseMaterial3D.TransparencyEnum.Disabled, material.Transparency);
+    Assert.Equal(BaseMaterial3D.ShadingModeEnum.Unshaded, material.ShadingMode);
+    Assert.True(material.NoDepthTest);
+  }
+
+  [TestCase(0)]
+  [TestCase(1)]
+  [TestCase(2)]
+  public void PaintedItemSuppliesOnlyItsDefaultsAndEachCellGetsFreshFlags(int item)
+  {
+    var root = AutoFree(new Node3D())!;
+    var grid = TestData.Annotate(root, []);
+    grid.SetCellItem(Godot.Vector3I.Zero, item);
+    grid.SetCellItem(Godot.Vector3I.Right, item);
+    if (item == 0) grid.Baseline = grid.CaptureLayout();
+    var footprint = grid.BuildFootprint();
+    var first = footprint[Godot.Vector3I.Zero];
+    var second = footprint[Godot.Vector3I.Right];
+    Assert.Equal(item == 1, first.HasFloor);
+    Assert.Equal(item == 2, first.BlocksMovement);
+    Assert.Equal(item == 2, first.BlocksLineOfSight);
+    Assert.False(first.BlocksVerticalLineOfSight);
+    Assert.False(first.WalkableTop);
+    Assert.False(first.TopBlocksVerticalLineOfSight);
+    Assert.Equal(FunProject.Battle.CoverDirections.None, first.CoverDirections);
+    Assert.Equal(0, first.CoverAmount);
+    Assert.False(first == second);
+    first.HasFloor = !first.HasFloor;
+    Assert.Equal(item == 1, second.HasFloor);
+    Assert.Equal(item == 1, grid.BuildFootprint()[Godot.Vector3I.Zero].HasFloor);
+    Assert.Equal(0, grid.Annotations.Count);
+  }
+
+  [TestCase(1)]
+  [TestCase(2)]
+  public void ExplicitCellFlagsReplaceShortcutDefaultsIncludingFalse(int item)
+  {
+    var root = AutoFree(new Node3D())!;
+    var flags = new BattleFootprintData { CoverDirections = FunProject.Battle.CoverDirections.North, CoverAmount = 25 };
+    var grid = TestData.Annotate(root, new() { [Godot.Vector3I.Zero] = flags });
+    grid.SetCellItem(Godot.Vector3I.Zero, item);
+    grid.Baseline = grid.CaptureLayout();
+    var actual = grid.BuildFootprint()[Godot.Vector3I.Zero];
+    Assert.True(actual == flags);
+    Assert.False(actual.HasFloor);
+    Assert.False(actual.BlocksMovement);
+    Assert.False(actual.BlocksLineOfSight);
+    Assert.Equal(FunProject.Battle.CoverDirections.North, actual.CoverDirections);
+    Assert.Equal(25, actual.CoverAmount);
+  }
+
+  [TestCase]
+  public void PaintedShortcutsBakeWithoutInspectionOrLockingTheLayout()
+  {
+    var map = AutoFree(new BattleMapAuthoring())!;
+    var floor = new Node3D();
+    map.AddChild(floor);
+    var floorGrid = TestData.Annotate(floor, []);
+    floorGrid.SetCellItem(Godot.Vector3I.Zero, 1);
+    floorGrid.SetCellItem(Godot.Vector3I.Right, 1);
+    var solid = new Node3D { Position = Vector3.Right };
+    map.AddChild(solid);
+    var solidGrid = TestData.Annotate(solid, []);
+    solidGrid.SetCellItem(Godot.Vector3I.Zero, 2);
+
+    map.Bake();
+
+    Assert.Equal(2, map.MapData.Tiles.Count);
+    Assert.True(map.MapData.Tiles[Godot.Vector3I.Zero].Walkable);
+    Assert.False(map.MapData.Tiles[Godot.Vector3I.Zero].BlocksLineOfSight);
+    Assert.False(map.MapData.Tiles[Godot.Vector3I.Right].Walkable);
+    Assert.True(map.MapData.Tiles[Godot.Vector3I.Right].BlocksLineOfSight);
+    Assert.Equal(0, map.MapData.Tiles[Godot.Vector3I.Right].CoverAmount);
+    Assert.False(map.MapData.Tiles[Godot.Vector3I.Right].BlocksVerticalLineOfSight);
+    Assert.Equal(2, map.GetNode("FloorPicking").GetChildCount());
+    Assert.Equal(0, floorGrid.Annotations.Count);
+    Assert.Equal(0, floorGrid.Baseline.Count);
+    Assert.Equal(0, solidGrid.Annotations.Count);
+    Assert.Equal(0, solidGrid.Baseline.Count);
+    floorGrid.SetCellItem(new(2, 0, 0), 1);
+    map.Bake();
+    Assert.True(map.MapData.Tiles[new(2, 0, 0)].Walkable);
+  }
+
+  [TestCase]
+  public void ExplicitShortcutAnnotationLocksAllPaintedItemsUntilLayoutIsRestored()
+  {
+    var root = AutoFree(new Node3D())!;
+    var grid = TestData.Annotate(root, []);
+    grid.SetCellItem(Godot.Vector3I.Zero, 1);
+    grid.SetCellItem(Godot.Vector3I.Right, 2);
+    grid.Annotations[Godot.Vector3I.Zero] = grid.BuildFootprint()[Godot.Vector3I.Zero];
+    grid.Baseline = grid.CaptureLayout();
+    Assert.True(grid.Validate().IsNone);
+    grid.SetCellItem(Godot.Vector3I.Right, 1);
+    Assert.True(grid.Validate(requireAnnotations: false).IsSome);
+    Assert.Throws<InvalidOperationException>(() => grid.BuildFootprint());
+    grid.SetCellItem(Godot.Vector3I.Right, 2);
+    Assert.True(grid.Validate().IsNone);
+    Assert.True(grid.BuildFootprint()[Godot.Vector3I.Right].BlocksMovement);
   }
 
   [TestCase]
@@ -63,11 +201,13 @@ public partial class BattleAnnotationGridTest
     Assert.True(grid.LayoutMatches());
   }
 
-  [TestCase]
-  public void ExactlyOneOccupiedCellIsRequired()
+  [TestCase(0)]
+  [TestCase(1)]
+  [TestCase(2)]
+  public void ExactlyOneOccupiedCellIsRequired(int item)
   {
     var grid = AutoFree(new BattleAnnotationGrid())!;
-    grid.SetCellItem(Godot.Vector3I.Zero, 0);
+    grid.SetCellItem(Godot.Vector3I.Zero, item);
     Assert.False(grid.TrySelectedCell([], out _));
     Assert.False(grid.TrySelectedCell([Godot.Vector3I.Zero, Godot.Vector3I.Right], out _));
     Assert.False(grid.TrySelectedCell([Godot.Vector3I.Right], out _));

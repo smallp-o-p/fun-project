@@ -93,7 +93,7 @@ public partial class BattleAnnotationEditor : EditorPlugin
     _inspect.Disabled = problem.IsSome || !nativeSelection;
     _reset.Disabled = EditorInterface.Singleton.GetEditedSceneRoot() != _grid.GetParent() || _grid.Baseline.Count == 0;
     _status.Text = problem.Match(message => message, () => $"Boxes: {_grid.GetUsedCells().Count} · Cell size {_grid.CellSize} (unit grid)\n" +
-      (_grid.Baseline.Count > 0 ? "Layout locked. Select one occupied box to edit flags." : "Paint with Godot's GridMap tools, then select one occupied box."));
+      (_grid.Baseline.Count > 0 ? "Layout locked. Select one occupied box to edit flags." : "Paint Floor or Solid for defaults; inspect a cell to customize its flags."));
     // Close an already-open cell resource as soon as native painting invalidates its coordinates.
     if (problem.IsSome && EditorInterface.Singleton.GetInspector().GetEditedObject() is BattleFootprintData)
       EditorInterface.Singleton.InspectObject(_grid);
@@ -113,7 +113,8 @@ public partial class BattleAnnotationEditor : EditorPlugin
     if (!_grid.Annotations.TryGetValue(cell, out var data))
     {
       var next = _grid.Annotations.Duplicate();
-      data = new BattleFootprintData { ResourceName = $"Box {cell}" };
+      data = _grid.CreateDefaultAnnotation(cell);
+      data.ResourceName = $"Box {cell}";
       next[cell] = data;
       var history = GetUndoRedo();
       history.CreateAction("Annotate selected box", customContext: _grid);

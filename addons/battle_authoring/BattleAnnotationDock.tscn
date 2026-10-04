@@ -25,4 +25,4 @@ text = "Reset annotations…"
 
 [node name="ConfirmReset" type="ConfirmationDialog" parent="."]
 title = "Reset box annotations?"
-dialog_text = "Clear all box flags and unlock painting? The painted shape stays.\nThis reset can be undone with Godot's native Undo."
+dialog_text = "Clear per-cell overrides and unlock painting? The painted shape and Floor/Solid defaults stay.\nThis reset can be undone with Godot's native Undo."
