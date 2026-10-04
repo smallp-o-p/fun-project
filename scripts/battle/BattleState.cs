@@ -77,11 +77,14 @@ internal sealed class BattleState
   internal IHitChanceCalculator HitChanceCalculator => _hitChanceCalculator;
   internal UnitActionCache ActionOptions { get; } = new();
 
-  // Raw views: snapshot enumerables of plain unit/object state; proofs exist only as return
+  // Raw unit views: snapshot enumerables of plain unit state; proofs exist only as return
   // values (TryGetAlive, read-query results), never as stored collections.
   internal IEnumerable<BattleUnitState> AliveUnits => _units.AsValueEnumerable().Where(unit => unit.IsAlive).ToArray();
   internal IEnumerable<BattleUnitState> DeadUnits => _units.AsValueEnumerable().Where(unit => unit.IsDead).ToArray();
-  internal IEnumerable<BattleObjectState> Objects => _objects.AsValueEnumerable().ToArray();
+
+  // Read-only object view (matching Units): insertion is preparation-only; runtime changes
+  // touch status/occupancy only.
+  internal SysColGeneric.IReadOnlyList<BattleObjectState> Objects => _objects;
 
   // Read-only view over the same pool: completion capture needs the whole participant set in
   // one grouped pass, which the separate Alive/Dead snapshots cannot give. No second storage.

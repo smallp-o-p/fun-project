@@ -14,7 +14,7 @@ internal static class ObjectiveHistory
   // Snapshot before iterating: a directive may add objectives mid-dispatch, and a
   // follow-up must be evaluated from the next event, never the one that queued it.
   // The faction-order × objective-add-order traversal is the determinism contract.
-  internal static (Faction Owner, Objective Objective)[] SnapshotCandidates(BattleState state, BattleEvent battleEvent)
+  internal static IReadOnlyList<(Faction Owner, Objective Objective)> SnapshotCandidates(BattleState state, BattleEvent battleEvent)
   {
     FrozenSet<Type> eventKeys = battleEvent.EventKeys;
     List<(Faction Owner, Objective Objective)> candidates = [];
@@ -25,7 +25,7 @@ internal static class ObjectiveHistory
             && objective.ObservedEventKeys.AsValueEnumerable().Any(eventKeys.Contains))
           candidates.Add((faction, objective));
 
-    return [.. candidates];
+    return candidates;
   }
 
   // State first, then the flip event, so observers see the flip before anything it causes.

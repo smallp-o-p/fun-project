@@ -39,7 +39,6 @@ public sealed class BattleActionExecutor : IDisposable
   private readonly List<BattleAction> _capturedInterrupts = [];
   private Option<BattleAction> _inFlightAction = None;
   private bool _submissionOpen;
-  private bool _settling;
   private bool _disposed;
 
   // Engine-owned construction: the runtime mints its executor; there is one per runtime.
@@ -80,9 +79,12 @@ public sealed class BattleActionExecutor : IDisposable
     // The read context derives from the runtime per firing, so an event committed at or
     // after settlement observes the completed representation with no running receiver.
     var interrupts = _hooks.Fire(battleEvent, new HookContext(_runtime.GetReadContext(), _inFlightAction));
-    if (interrupts.Count == 0)
+
+    // Completed notifications inside the submission cannot schedule further combat: their
+    // hook interrupts are discarded here rather than captured only to be dropped later.
+    if (interrupts.Count == 0 || (_submissionOpen && !_runtime.IsRunning))
       return;
-    if (_inFlightAction.IsNone && !_settling)
+    if (_inFlightAction.IsNone)
       throw new InvalidOperationException(
         "A hook returned interrupt actions while no executor action was in flight.");
     _capturedInterrupts.AddRange(interrupts);
@@ -226,24 +228,15 @@ public sealed class BattleActionExecutor : IDisposable
 
   private void Settle(BattleSession session, BattleOutcome outcome)
   {
-    _settling = true;
-    try
-    {
-      _pendingActions.Clear();
-      _capturedInterrupts.Clear();
-      _inFlightAction = None;
+    _inFlightAction = None;
 
-      CompletedBattle completed = CompletedBattle.Capture(session.State, outcome, session.RoundNumber);
-      _runtime.InstallCompleted(completed);
+    CompletedBattle completed = CompletedBattle.Capture(session.State, outcome, session.RoundNumber);
+    _runtime.InstallCompleted(completed);
 
-      // End-event subscribers read frozen results and may record objective history; hook
-      // follow-ups dispatch linearly, and any interrupts they return are discarded here.
-      session.State.RaiseEvents(new SessionEndedBattleEvent(outcome));
-    }
-    finally
-    {
-      _settling = false;
-    }
+    // End-event subscribers read frozen results and may record objective history; hook
+    // follow-ups dispatch linearly, and any interrupts they return are discarded in the
+    // commit handler because the submission is open with no running receiver.
+    session.State.RaiseEvents(new SessionEndedBattleEvent(outcome));
   }
 
   public void Dispose()

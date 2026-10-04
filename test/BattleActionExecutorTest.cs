@@ -22,7 +22,7 @@ public partial class BattleActionExecutorTest
     using var battle = BattleFixture.Solo(twoSteps ? new Vector3I(4, 1, 4) : new Vector3I(3, 1, 3), start,
       health: reaction ? 10 : 20, actionPoints: 5);
     var unit = battle.Unit;
-    var reactionHook = new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(mid, unit, 3, oneShot: true);
+    var reactionHook = new DamageOnTileOccupiedHook(mid, unit, 3);
     if (reaction)
       battle.RegisterHook<TileOccupiedBattleEvent>(reactionHook);
 
@@ -264,7 +264,7 @@ public partial class BattleActionExecutorTest
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), start, health: 10, actionPoints: 5);
     var unit = battle.Unit;
     battle.RegisterHook<UnitMovedBattleEvent>(
-      new DamageOnTileOccupiedHook<UnitMovedBattleEvent>(mid, unit, 10, oneShot: true, kind: DamageKind.Stun));
+      new DamageOnTileOccupiedHook(mid, unit, 10, kind: DamageKind.Stun));
 
     BattleAction action = BattleAction.MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)]);
     BattleActionExecResult result = battle.Submit(action).RequireSome();
@@ -421,9 +421,9 @@ public partial class BattleActionExecutorTest
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), start, health: 10, actionPoints: 5);
     var unit = battle.Unit;
     battle.RegisterHook<UnitMovedBattleEvent>(
-      new DamageOnTileOccupiedHook<UnitMovedBattleEvent>(targetPosition, unit, 2, oneShot: true), priority: 10);
+      new DamageOnTileOccupiedHook(targetPosition, unit, 2), priority: 10);
     battle.RegisterHook<UnitMovedBattleEvent>(
-      new DamageOnTileOccupiedHook<UnitMovedBattleEvent>(targetPosition, unit, 1, oneShot: true), priority: 0);
+      new DamageOnTileOccupiedHook(targetPosition, unit, 1), priority: 0);
 
     battle.ClearEvents();
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)]));
@@ -446,9 +446,9 @@ public partial class BattleActionExecutorTest
     // aggregate-reverse-once contract: the FIRST event's interrupt resolves first. A per-event
     // reverse would flip this to [2, 1].
     battle.RegisterHook<UnitMovedBattleEvent>(
-      new DamageOnTileOccupiedHook<UnitMovedBattleEvent>(targetPosition, unit, 1, oneShot: true));
+      new DamageOnTileOccupiedHook(targetPosition, unit, 1));
     battle.RegisterHook<TileOccupiedBattleEvent>(
-      new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(targetPosition, unit, 2, oneShot: true));
+      new DamageOnTileOccupiedHook(targetPosition, unit, 2));
 
     battle.ClearEvents();
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)]));
@@ -466,7 +466,7 @@ public partial class BattleActionExecutorTest
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), health: 10);
     var unit = battle.Unit;
     var targetPosition = new Vector3I(2, 0, 0);
-    battle.RegisterHook<TileOccupiedBattleEvent>(new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(targetPosition, unit, 3, oneShot: true));
+    battle.RegisterHook<TileOccupiedBattleEvent>(new DamageOnTileOccupiedHook(targetPosition, unit, 3));
 
     // (2, 0, 0) is not adjacent to (0, 0, 0): the malformed route rejects, which the
     // executor surfaces as an invariant-break throw.
@@ -490,9 +490,9 @@ public partial class BattleActionExecutorTest
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), start, health: 10, actionPoints: 5);
     var unit = battle.Unit;
     battle.RegisterHook<TileOccupiedBattleEvent>(
-      new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(firstTrap, unit, 2, oneShot: true));
+      new DamageOnTileOccupiedHook(firstTrap, unit, 2));
     battle.RegisterHook<TileOccupiedBattleEvent>(
-      new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(secondTrap, unit, 3, oneShot: true));
+      new DamageOnTileOccupiedHook(secondTrap, unit, 3));
 
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(firstTrap), battle.At(secondTrap)]));
 
@@ -535,7 +535,7 @@ public partial class BattleActionExecutorTest
     var unit = battle.Unit;
 
     var action = new MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)]);
-    battle.RegisterHook<TileOccupiedBattleEvent>(new DamageOnTileOccupiedHook<TileOccupiedBattleEvent>(mid, unit, 3, oneShot: true));
+    battle.RegisterHook<TileOccupiedBattleEvent>(new DamageOnTileOccupiedHook(mid, unit, 3));
 
     BattleActionExecResult result = battle.Submit(action).RequireSome();
 
@@ -578,21 +578,16 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "EndFactionTurn emits turn transition events after commit")]
   public void EndFactionTurnEmitsTurnTransitionEventsAfterCommit()
   {
-    var factionA = TestData.MakeFaction("A");
-    var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
-    battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Start();
+    using var battle = BattleFixture.Duel();
 
     battle.ClearEvents();
-    battle.Submit(BattleAction.EndFactionTurn(factionA));
+    battle.Submit(BattleAction.EndFactionTurn(battle.PlayerFaction));
 
     Assert.True(battle.Events.EventsOf<TurnEndedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
-      battleEvent.Faction == factionA &&
+      battleEvent.Faction == battle.PlayerFaction &&
       battleEvent.TurnNumber == 1));
     Assert.True(battle.Events.EventsOf<TurnStartedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
-      battleEvent.Faction == factionB &&
+      battleEvent.Faction == battle.EnemyFaction &&
       battleEvent.TurnNumber == 1));
   }
 
@@ -654,29 +649,22 @@ public partial class BattleActionExecutorTest
   [TestCase(TestName = "Executor rejects stale end faction turn action after auto-advance")]
   public void ExecutorRejectsStaleEndFactionTurnActionAfterAutoAdvance()
   {
-    var factionA = TestData.MakeFaction("A");
-    var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
-    var unitA = battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Start();
+    using var battle = BattleFixture.Duel();
 
-    battle.Submit(BattleAction.PassUnit(battle.Alive(unitA)));
-    Assert.Equal(factionB, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
+    battle.Submit(BattleAction.PassUnit(battle.Alive(battle.PlayerUnit)));
+    Assert.Equal(battle.EnemyFaction, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
 
     // Faction A's turn already auto-advanced; the stale submission is an invariant break.
     Assert.Throws<InvalidOperationException>(
-      () => battle.Submit(BattleAction.EndFactionTurn(factionA)));
-    Assert.Equal(factionB, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
+      () => battle.Submit(BattleAction.EndFactionTurn(battle.PlayerFaction)));
+    Assert.Equal(battle.EnemyFaction, battle.Query(new GetCurrentTurnQuery()).RequireSome().ActiveFaction);
   }
 
-  private sealed partial class DamageOnTileOccupiedHook<TEventKey> : BattleHook
-    where TEventKey : BattleEventTag
+  private sealed partial class DamageOnTileOccupiedHook : BattleHook
   {
     private readonly Vector3I _position;
     private readonly BattleUnitState _targetUnit;
     private readonly int _damage;
-    private readonly bool _oneShot;
     private readonly DamageKind _kind;
     private bool _spent;
 
@@ -686,13 +674,11 @@ public partial class BattleActionExecutorTest
       Vector3I position,
       BattleUnitState targetUnit,
       int damage,
-      bool oneShot,
       DamageKind kind = DamageKind.Health)
     {
       _position = position;
       _targetUnit = targetUnit;
       _damage = damage;
-      _oneShot = oneShot;
       _kind = kind;
     }
 
@@ -706,8 +692,7 @@ public partial class BattleActionExecutorTest
       ObservedTargetPositionDuringEvaluation = context.Read.State.GetUnitPosition(_targetUnit)
         .Match(point => Some(point.Raw), () => None);
 
-      if (_oneShot)
-        _spent = true;
+      _spent = true;
 
       System.Collections.Generic.List<BattleAction> interrupts = [];
       context.Read.State.TryGetAlive(_targetUnit)

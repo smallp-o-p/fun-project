@@ -50,16 +50,10 @@ public partial class BattleSessionTest
   [TestCase(TestName = "Start activates the first prepared faction at round 1")]
   public void StartBattleActivatesFirstParticipatingFaction()
   {
-    var playerFaction = TestData.MakeFaction("Player");
-    var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [playerFaction, enemyFaction]);
-
-    battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("Bandit", enemyFaction), new Vector3I(1, 0, 0));
-    battle.Start();
+    using var battle = BattleFixture.Duel();
 
     BattleTurn turn = battle.Query(new GetCurrentTurnQuery()).RequireSome();
-    Assert.Equal(playerFaction, turn.ActiveFaction);
+    Assert.Equal(battle.PlayerFaction, turn.ActiveFaction);
     Assert.Equal(1, turn.RoundNumber);
   }
 
