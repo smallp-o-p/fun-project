@@ -1,4 +1,4 @@
-[gd_scene format=3]
+[gd_scene format=4]
 
 [ext_resource type="Script" path="res://scenes/battle/authoring/BattleMapAuthoring.cs" id="1"]
 [ext_resource type="Script" path="res://scripts/battle/map/BattleMapTileData.cs" id="2_33nc4"]
@@ -64,20 +64,26 @@ Vector3i(3, 0, 2): SubResource("Resource_o4hyi")
 [sub_resource type="PlaneMesh" id="FloorMesh"]
 size = Vector2(4, 3)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cmped"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_p317f"]
 render_priority = 1
-transparency = 1
 no_depth_test = true
 shading_mode = 0
-albedo_color = Color(0.15, 0.85, 0.75, 0.28)
+albedo_color = Color(0.15, 0.85, 0.75, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_bcvpl"]
-material = SubResource("StandardMaterial3D_cmped")
-size = Vector3(0.96, 0.96, 0.96)
+[sub_resource type="ArrayMesh" id="ArrayMesh_33nc4"]
+_surfaces = [{
+"aabb": AABB(-0.48, -0.48, -0.48, 0.96, 0.96, 0.96),
+"format": 34359738369,
+"material": SubResource("StandardMaterial3D_p317f"),
+"primitive": 1,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 24,
+"vertex_data": PackedByteArray("j8L1vo/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvW+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9T6PwvU+")
+}]
 
 [sub_resource type="MeshLibrary" id="MeshLibrary_86644"]
 item/0/name = "Annotation box"
-item/0/mesh = SubResource("BoxMesh_bcvpl")
+item/0/mesh = SubResource("ArrayMesh_33nc4")
 item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 item/0/mesh_cast_shadow = 1
 item/0/shapes = []
@@ -139,20 +145,26 @@ albedo_color = Color(0.65, 0.35, 0.18, 1)
 material = SubResource("Material")
 size = Vector3(1, 1, 2)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_22002"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_q3qkq"]
 render_priority = 1
-transparency = 1
 no_depth_test = true
 shading_mode = 0
-albedo_color = Color(0.15, 0.85, 0.75, 0.28)
+albedo_color = Color(0.15, 0.85, 0.75, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_xgbw6"]
-material = SubResource("StandardMaterial3D_22002")
-size = Vector3(0.96, 0.96, 0.96)
+[sub_resource type="ArrayMesh" id="ArrayMesh_g6krx"]
+_surfaces = [{
+"aabb": AABB(-0.48, -0.48, -0.48, 0.96, 0.96, 0.96),
+"format": 34359738369,
+"material": SubResource("StandardMaterial3D_q3qkq"),
+"primitive": 1,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 24,
+"vertex_data": PackedByteArray("j8L1vo/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvW+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9T6PwvU+")
+}]
 
 [sub_resource type="MeshLibrary" id="MeshLibrary_26g2o"]
 item/0/name = "Annotation box"
-item/0/mesh = SubResource("BoxMesh_xgbw6")
+item/0/mesh = SubResource("ArrayMesh_g6krx")
 item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 item/0/mesh_cast_shadow = 1
 item/0/shapes = []

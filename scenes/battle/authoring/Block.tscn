@@ -1,4 +1,4 @@
-[gd_scene format=3]
+[gd_scene format=4]
 
 [ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="2_um0pc"]
 [ext_resource type="Script" path="res://scenes/battle/authoring/BattleAnnotationGrid.cs" id="4_annotations"]
@@ -7,18 +7,24 @@
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fi2jq"]
 render_priority = 1
-transparency = 1
 no_depth_test = true
 shading_mode = 0
-albedo_color = Color(0.15, 0.85, 0.75, 0.28)
+albedo_color = Color(0.15, 0.85, 0.75, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_oviq3"]
-material = SubResource("StandardMaterial3D_fi2jq")
-size = Vector3(0.96, 0.96, 0.96)
+[sub_resource type="ArrayMesh" id="ArrayMesh_oviq3"]
+_surfaces = [{
+"aabb": AABB(-0.48, -0.48, -0.48, 0.96, 0.96, 0.96),
+"format": 34359738369,
+"material": SubResource("StandardMaterial3D_fi2jq"),
+"primitive": 1,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 24,
+"vertex_data": PackedByteArray("j8L1vo/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvW+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9T6PwvU+")
+}]
 
 [sub_resource type="MeshLibrary" id="MeshLibrary_um0pc"]
 item/0/name = "Annotation box"
-item/0/mesh = SubResource("BoxMesh_oviq3")
+item/0/mesh = SubResource("ArrayMesh_oviq3")
 item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 item/0/mesh_cast_shadow = 1
 item/0/shapes = []

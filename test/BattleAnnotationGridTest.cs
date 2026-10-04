@@ -8,6 +8,45 @@ using static GdUnit4.Assertions;
 public partial class BattleAnnotationGridTest
 {
   [TestCase]
+  public void PaletteMarkerDrawsOnlyTheTwelveBoxEdges()
+  {
+    var grid = AutoFree(new BattleAnnotationGrid())!;
+    AssertOutlineMarker(grid.MeshLibrary.GetItemMesh(0));
+  }
+
+  private static void AssertOutlineMarker(Mesh mesh)
+  {
+    Assert.True(mesh is ArrayMesh, "Annotation markers must have edge geometry without filled faces.");
+    var marker = (ArrayMesh)mesh;
+    Assert.Equal(1, marker.GetSurfaceCount());
+    Assert.Equal(Mesh.PrimitiveType.Lines, marker.SurfaceGetPrimitiveType(0));
+    Assert.Equal(0, marker.SurfaceGetArrayIndexLen(0));
+    var vertices = marker.SurfaceGetArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+    Assert.Equal(24, vertices.Length);
+    var edges = new SysColGeneric.HashSet<(int, int)>();
+    for (int i = 0; i < vertices.Length; i += 2)
+    {
+      int start = Corner(vertices[i]), end = Corner(vertices[i + 1]);
+      int changedAxes = start ^ end;
+      Assert.True(changedAxes is 1 or 2 or 4, "Each line must be one box edge, never a face diagonal.");
+      Assert.True(edges.Add((Math.Min(start, end), Math.Max(start, end))), "Box edges must not repeat.");
+    }
+    Assert.Equal(12, edges.Count);
+    Assert.True(marker.SurfaceGetMaterial(0) is StandardMaterial3D);
+    var material = (StandardMaterial3D)marker.SurfaceGetMaterial(0);
+    Assert.Equal(new Color(0.15f, 0.85f, 0.75f, 1), material.AlbedoColor);
+    Assert.Equal(BaseMaterial3D.TransparencyEnum.Disabled, material.Transparency);
+    Assert.Equal(BaseMaterial3D.ShadingModeEnum.Unshaded, material.ShadingMode);
+    Assert.True(material.NoDepthTest);
+
+    static int Corner(Vector3 vertex)
+    {
+      Assert.True(vertex.Abs().IsEqualApprox(Vector3.One * 0.48f), "Edges must meet at the inset box corners.");
+      return (vertex.X > 0 ? 1 : 0) | (vertex.Y > 0 ? 2 : 0) | (vertex.Z > 0 ? 4 : 0);
+    }
+  }
+
+  [TestCase]
   public void PaintingAndOrientationChangesInvalidateSnapshotUntilRestored()
   {
     var grid = AutoFree(new BattleAnnotationGrid())!;
@@ -70,6 +109,7 @@ public partial class BattleAnnotationGridTest
     Assert.Equal(Error.Ok, ResourceSaver.Save(packed, path));
     var restored = AutoFree(ResourceLoader.Load<PackedScene>(path, cacheMode: ResourceLoader.CacheMode.Ignore).Instantiate<Node3D>())!;
     var loaded = restored.GetNode<BattleAnnotationGrid>("Annotations");
+    AssertOutlineMarker(loaded.MeshLibrary.GetItemMesh(0));
     Assert.True(loaded.LayoutMatches());
     var footprint = loaded.BuildFootprint();
     Assert.True(footprint[Godot.Vector3I.Zero].BlocksMovement);

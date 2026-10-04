@@ -8,7 +8,7 @@ Restart Godot after updating this plugin to discard the previous editor session'
 ## Reusable assets: paint, select, annotate
 
 1. Create a plain `Node3D` asset scene. Put its visual model below that root, independently positioned/scaled as needed.
-2. Add one direct `BattleAnnotationGrid` child. Its native GridMap palette contains one translucent box marker. Annotation grids use unit-sized, centered cells and an identity grid transform.
+2. Add one direct `BattleAnnotationGrid` child. Its native GridMap palette contains one outline-only box marker with no filled faces. Annotation grids use unit-sized, centered cells and an identity grid transform.
 3. Paint the asset's gameplay shape using Godot's native GridMap tools. Cell `(0,0,0)` spans the unit box starting at the asset's local origin. Visual geometry does not infer any gameplay properties.
 4. Finish the shape, select exactly one occupied box with native GridMap selection, and click **Inspect selected box** in the **Box annotations** dock.
 5. Edit that cell's flags in Godot's Inspector. Repeat for other individual cells, then save the reusable asset scene. Painted cells you have not annotated have no gameplay claims.

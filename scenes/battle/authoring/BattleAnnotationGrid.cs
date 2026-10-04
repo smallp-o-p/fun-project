@@ -16,18 +16,35 @@ public partial class BattleAnnotationGrid : GridMap
     MeshLibrary = new MeshLibrary();
     MeshLibrary.CreateItem(0);
     MeshLibrary.SetItemName(0, "Annotation box");
-    MeshLibrary.SetItemMesh(0, new BoxMesh
+    const float halfSize = 0.48f;
+    Vector3[] edges =
+    [
+      new(-halfSize, -halfSize, -halfSize), new(halfSize, -halfSize, -halfSize),
+      new(halfSize, -halfSize, -halfSize), new(halfSize, -halfSize, halfSize),
+      new(halfSize, -halfSize, halfSize), new(-halfSize, -halfSize, halfSize),
+      new(-halfSize, -halfSize, halfSize), new(-halfSize, -halfSize, -halfSize),
+      new(-halfSize, halfSize, -halfSize), new(halfSize, halfSize, -halfSize),
+      new(halfSize, halfSize, -halfSize), new(halfSize, halfSize, halfSize),
+      new(halfSize, halfSize, halfSize), new(-halfSize, halfSize, halfSize),
+      new(-halfSize, halfSize, halfSize), new(-halfSize, halfSize, -halfSize),
+      new(-halfSize, -halfSize, -halfSize), new(-halfSize, halfSize, -halfSize),
+      new(halfSize, -halfSize, -halfSize), new(halfSize, halfSize, -halfSize),
+      new(halfSize, -halfSize, halfSize), new(halfSize, halfSize, halfSize),
+      new(-halfSize, -halfSize, halfSize), new(-halfSize, halfSize, halfSize)
+    ];
+    Godot.Collections.Array arrays = [];
+    arrays.Resize((int)Mesh.ArrayType.Max);
+    arrays[(int)Mesh.ArrayType.Vertex] = edges;
+    var marker = new ArrayMesh();
+    marker.AddSurfaceFromArrays(Mesh.PrimitiveType.Lines, arrays);
+    marker.SurfaceSetMaterial(0, new StandardMaterial3D
     {
-      Size = Vector3.One * 0.96f,
-      Material = new StandardMaterial3D
-      {
-        AlbedoColor = new Color(0.15f, 0.85f, 0.75f, 0.28f),
-        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-        NoDepthTest = true,
-        RenderPriority = 1,
-        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded
-      }
+      AlbedoColor = new Color(0.15f, 0.85f, 0.75f, 1),
+      NoDepthTest = true,
+      RenderPriority = 1,
+      ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded
     });
+    MeshLibrary.SetItemMesh(0, marker);
   }
 
   public override void _EnterTree()
@@ -71,9 +88,12 @@ public partial class BattleAnnotationGrid : GridMap
     if (!CellSize.IsEqualApprox(Vector3.One)) return "Annotation boxes require unit Cell Size.";
     if (MeshLibrary is null || MeshLibrary.GetItemList().Length != 1 || MeshLibrary.GetItemList()[0] != 0)
       return "Use the single annotation-box marker (item 0).";
-    if (MeshLibrary.GetItemMesh(0) is not BoxMesh marker || !marker.Size.IsEqualApprox(CellSize * 0.96f) ||
+    if (MeshLibrary.GetItemMesh(0) is not ArrayMesh marker || marker.GetSurfaceCount() != 1 ||
+        marker.SurfaceGetPrimitiveType(0) != Mesh.PrimitiveType.Lines || marker.SurfaceGetArrayLen(0) != 24 ||
+        marker.SurfaceGetArrayIndexLen(0) != 0 || !marker.GetAabb().Position.IsEqualApprox(-CellSize * 0.48f) ||
+        !marker.GetAabb().Size.IsEqualApprox(CellSize * 0.96f) ||
         !MeshLibrary.GetItemMeshTransform(0).IsEqualApprox(Transform3D.Identity))
-      return "The marker must be a centered box sized to 96% of Cell Size, with an identity mesh transform.";
+      return "The marker must be a centered 12-edge box outline sized to 96% of Cell Size, with an identity mesh transform.";
     foreach (var cell in GetUsedCells())
     {
       if (GetCellItem(cell) != 0) return "Only annotation-box marker item 0 is supported.";
