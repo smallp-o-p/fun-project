@@ -1,143 +1,180 @@
 using FunProject.Battle;
 using Godot;
 using System;
-using Godot.Collections;
+using System.Collections.Generic;
 
-/// <summary>
-/// A tool to create maps to be used in a tactical battle via the Godot editor.
-/// All tiles should have X, Y, Z >= 0.
-/// </summary>
 [Tool]
-public partial class BattleMapAuthoring : GridMap
+public partial class BattleMapAuthoring : BattleMap
 {
-  private BattleTilePalette? _palette;
-  [Export]
-  public BattleTilePalette? Palette
+  private static readonly Godot.Vector3I[] Directions = [new(0, 0, -1), new(1, 0, 0), new(0, 0, 1), new(-1, 0, 0)];
+  private static readonly CoverDirections[] Sides = [CoverDirections.North, CoverDirections.East, CoverDirections.South, CoverDirections.West];
+  [Export] public Godot.Collections.Dictionary<Godot.Vector3I, int> SpawnSlots { get; set; } = [];
+  [ExportToolButton("Bake BattleMap")] private Callable BakeButton => Callable.From(Bake);
+
+  [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+  public BattleMapAuthoring() => MapData = new();
+
+  // Bake explicitly, then save this same editable scene. Runtime reads the stored data.
+  public void Bake()
   {
-    get => _palette;
-    set
+    var rootPlacement = WorldTransform(this);
+    if (!Transform.IsEqualApprox(Transform3D.Identity) || !rootPlacement.IsEqualApprox(Transform3D.Identity))
+      throw new InvalidOperationException("Map root must use the fixed board origin, rotation and unit scale. Place reusable assets beneath it.");
+    var pieces = new List<(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>, Transform3D)>();
+    Collect(this);
+    var data = BuildMap(pieces, out var floors);
+    foreach (var (cell, slot) in SpawnSlots)
     {
-      _palette = value;
-      NotifyPropertyListChanged();
+      if (slot < 0 || !data.Tiles.TryGetValue(cell, out var tile) || !tile.Walkable)
+        throw new InvalidOperationException($"Spawn at {cell} requires a walkable floor and nonnegative faction slot.");
+      tile.SpawnFactionSlot = slot;
+    }
+    MapData = data;
+    GetNodeOrNull("FloorPicking")?.Free();
+    var picking = new StaticBody3D { Name = "FloorPicking", CollisionLayer = 1, CollisionMask = 0 };
+    AddChild(picking);
+    picking.Owner = this;
+    var shape = new BoxShape3D { Size = new(1, 0.02f, 1) };
+    foreach (var cell in floors)
+    {
+      var collider = new CollisionShape3D
+      {
+        Shape = shape,
+        Position = BoardCoordinates.TileToWorldCenter(new(cell.X, cell.Y, cell.Z)) - Vector3.Up * 0.01f
+      };
+      picking.AddChild(collider);
+      collider.Owner = this;
+    }
+    PrepareVisualCollision(this);
+#if TOOLS
+    if (Engine.IsEditorHint()) EditorInterface.Singleton.MarkSceneAsUnsaved();
+#endif
+
+    void Collect(Node node)
+    {
+      BattleAnnotationGrid? annotations = null;
+      foreach (var child in node.GetChildren())
+        if (child is BattleAnnotationGrid grid)
+        {
+          if (annotations is not null) throw new InvalidOperationException($"{node.Name}: use one annotation GridMap per asset.");
+          annotations = grid;
+        }
+      if (annotations is not null)
+      {
+        if (node is not Node3D asset) throw new InvalidOperationException($"{node.Name}: annotation assets require a Node3D root.");
+        pieces.Add((annotations.BuildFootprint(), WorldTransform(asset)));
+      }
+      foreach (var child in node.GetChildren()) Collect(child);
     }
   }
 
-  [Export] public string TargetPath { get; set; } = "res://resources/maps/untitled_map.tres";
-
-  [ExportToolButton("Export BattleMap")]
-  private Callable BakeButton => Callable.From(Bake);
-
-  public override void _ValidateProperty(Dictionary property)
+  public override void _Ready()
   {
-    if (property["name"].AsStringName() == PropertyName.Palette)
+    if (!Engine.IsEditorHint()) RemoveAnnotations(this);
+  }
+
+  private static void RemoveAnnotations(Node node)
+  {
+    foreach (var child in node.GetChildren())
+      if (child is BattleAnnotationGrid) child.Free();
+      else RemoveAnnotations(child);
+  }
+
+  private void PrepareVisualCollision(Node node)
+  {
+    foreach (var child in node.GetChildren())
     {
-      MeshLibrary = Palette?.MeshLibrary;
+      if (node == this && child.Name == "FloorPicking") continue;
+      if (!string.IsNullOrEmpty(child.SceneFilePath)) SetEditableInstance(child, true);
+      if (child is CollisionObject3D collision) collision.CollisionLayer = (collision.CollisionLayer & ~1u) | 2u;
+      if (child is GridMap visualGrid) visualGrid.CollisionLayer = (visualGrid.CollisionLayer & ~1u) | 2u;
+      if (child is CsgShape3D csg) csg.CollisionLayer = (csg.CollisionLayer & ~1u) | 2u;
+      PrepareVisualCollision(child);
     }
   }
 
-  private void Bake()
+  private static Transform3D WorldTransform(Node3D node) =>
+    !node.TopLevel && node.GetParent() is Node3D parent ? WorldTransform(parent) * node.Transform : node.Transform;
+
+  internal static bool IsUpright(Basis basis)
   {
-    if (Palette is null)
-    {
-      GD.PushError("Palette is not set!");
-      return;
-    }
-
-    if (MeshLibrary is null)
-    {
-      GD.PushError("Mesh Library is required!");
-      return;
-    }
-
-    var cells = GetPaintedCells();
-
-    if (cells.Count == 0)
-    {
-      GD.PushError("BattleMapAuthoring: no painted cells found on the GridMap.");
-      return;
-    }
-
-    BattleMapData data = BuildMap(cells);
-
-    var map = new BattleMap
-    {
-      MeshLibrary = MeshLibrary,
-      MapData = data,
-      UsedPalette = Palette!,
-      CellOctantSize = CellOctantSize,
-      CellSize = CellSize,
-      CellCenterX = CellCenterX,
-      CellCenterY = CellCenterY,
-      CellCenterZ = CellCenterZ,
-      Scale = Scale,
-      Name = "Map"
-    };
-
-    foreach (var c in GetUsedCells())
-    {
-      var item = GetCellItem(c);
-      var orientation = GetCellItemOrientation(c);
-      map.SetCellItem(c, item, orientation);
-    }
-
-    var scene = new PackedScene();
-    var res = scene.Pack(map);
-
-    if (res != Error.Ok)
-      throw new InvalidOperationException("Failed to pack map");
-
-    var saveRes = ResourceSaver.Save(scene, TargetPath);
-
-    if (saveRes != Error.Ok)
-      throw new InvalidOperationException($"Failed to save map at {TargetPath}");
-
-    GD.Print($"Successfully saved map to {TargetPath}");
+    for (int turn = 0; turn < 4; turn++)
+      if (basis.IsEqualApprox(new Basis(Vector3.Up, turn * Mathf.Pi / 2))) return true;
+    return false;
   }
 
-  private Dictionary<Godot.Vector3I, BattleMapTileData> GetPaintedCells()
+  public static BattleMapData BuildMap(IEnumerable<(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> Footprint, Transform3D Placement)> pieces) =>
+    BuildMap(pieces, out _);
+
+  private static BattleMapData BuildMap(IEnumerable<(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> Footprint, Transform3D Placement)> pieces,
+    out SysColGeneric.HashSet<Godot.Vector3I> floors)
   {
-    var painted = new Dictionary<Godot.Vector3I, BattleMapTileData>();
-
-    foreach (Godot.Vector3I cell in GetUsedCells())
+    var data = new BattleMapData();
+    var floorCells = new SysColGeneric.HashSet<Godot.Vector3I>();
+    floors = floorCells;
+    var blocked = new SysColGeneric.HashSet<Godot.Vector3I>();
+    var cover = new Dictionary<(Godot.Vector3I Cell, int Side), int>();
+    foreach (var (footprint, placement) in pieces)
     {
-      if (cell.X < 0 || cell.Y < 0 || cell.Z < 0)
-        throw new InvalidOperationException("Map has cells that have negative dimensions.");
-
-      var itemId = GetCellItem(cell);
-      if (itemId == InvalidCellItem)
-        continue;
-
-      StringName itemName = MeshLibrary.GetItemName(itemId);
-
-      if (Palette!.Brushes.TryGetValue(itemName, out var value))
-        painted[cell] = value;
-      else
-        throw new InvalidOperationException($"There is no data associated with tile {itemName}");
+      if (!IsUpright(placement.Basis) || !placement.Origin.IsFinite())
+        throw new InvalidOperationException("Gameplay assets require finite placement, upright quarter-turn rotation and unit scale.");
+      foreach (var (local, source) in footprint)
+      {
+        var center = placement * ((Vector3)local + Vector3.One / 2);
+        var cell = (Godot.Vector3I)center.Floor();
+        if (!center.IsEqualApprox((Vector3)cell + Vector3.One / 2))
+          throw new InvalidOperationException($"Gameplay cell {local} is not aligned with the map grid.");
+        if (source is null || source.CoverAmount < 0 || source.CoverAmount > 100 ||
+            (source.CoverDirections & ~(CoverDirections.North | CoverDirections.East | CoverDirections.South | CoverDirections.West)) != 0)
+          throw new InvalidOperationException($"Invalid gameplay data at {cell}.");
+        var tile = Tile(cell);
+        tile.BlocksLineOfSight |= source.BlocksLineOfSight;
+        tile.BlocksVerticalLineOfSight |= source.BlocksVerticalLineOfSight;
+        if (source.HasFloor) AddFloor(cell);
+        if (source.BlocksMovement && !blocked.Add(cell))
+          throw new InvalidOperationException($"Solid gameplay cells overlap at {cell}.");
+        if (source.WalkableTop || source.TopBlocksVerticalLineOfSight)
+        {
+          var top = cell + Godot.Vector3I.Up;
+          if (source.WalkableTop) AddFloor(top);
+          Tile(top).BlocksVerticalLineOfSight |= source.TopBlocksVerticalLineOfSight;
+        }
+        for (int side = 0; side < 4; side++)
+        {
+          if ((source.CoverDirections & Sides[side]) == 0 || source.CoverAmount == 0 || footprint.ContainsKey(local + Directions[side])) continue;
+          var outward = (Godot.Vector3I)(placement.Basis * (Vector3)Directions[side]).Round();
+          var neighbor = cell + outward;
+          int facing = System.Array.IndexOf(Directions, -outward);
+          var key = (neighbor, facing);
+          cover[key] = Math.Max(cover.GetValueOrDefault(key), source.CoverAmount);
+        }
+      }
     }
-
-    return painted;
-  }
-
-  private static BattleMapData BuildMap(Dictionary<Godot.Vector3I, BattleMapTileData> cells)
-  {
-    int minX = int.MaxValue, minZ = int.MaxValue;
-    int maxX = int.MinValue, maxZ = int.MinValue, maxLevel = int.MinValue;
-
-    foreach (var (cell, _) in cells)
+    foreach (var (cell, tile) in data.Tiles)
     {
-      minX = Math.Min(minX, cell.X);
-      maxX = Math.Max(maxX, cell.X);
-      minZ = Math.Min(minZ, cell.Z);
-      maxZ = Math.Max(maxZ, cell.Z);
-      maxLevel = Math.Max(maxLevel, cell.Y);
+      tile.Walkable = floorCells.Contains(cell) && !blocked.Contains(cell);
     }
-
-    var dimensions = new Godot.Vector3I(maxX - minX + 1, maxLevel + 1, maxZ - minZ + 1);
-
-    return new BattleMapData
+    foreach (var ((cell, side), amount) in cover)
     {
-      Dimensions = dimensions,
-      Tiles = cells,
-    };
+      if (!data.Tiles.TryGetValue(cell, out var tile) || !tile.Walkable) continue;
+      if (tile.CoverDirections != CoverDirections.None && tile.CoverAmount != amount)
+        throw new InvalidOperationException($"Different cover strengths on separate sides of {cell} require the directional-cover extension.");
+      tile.CoverDirections |= Sides[side];
+      tile.CoverAmount = amount;
+    }
+    if (data.Tiles.Count == 0) throw new InvalidOperationException("Map contains no gameplay cells.");
+    return data;
+
+    BattleMapTileData Tile(Godot.Vector3I cell)
+    {
+      if (cell.X < 0 || cell.Y < 0 || cell.Z < 0) throw new InvalidOperationException($"Negative map coordinate {cell}.");
+      data.Dimensions = new(Math.Max(data.Dimensions.X, cell.X + 1), Math.Max(data.Dimensions.Y, cell.Y + 1), Math.Max(data.Dimensions.Z, cell.Z + 1));
+      if (!data.Tiles.TryGetValue(cell, out var tile)) data.Tiles[cell] = tile = new() { Walkable = false };
+      return tile;
+    }
+    void AddFloor(Godot.Vector3I cell)
+    {
+      if (!floorCells.Add(cell)) throw new InvalidOperationException($"Duplicate floor at {cell}.");
+    }
   }
 }

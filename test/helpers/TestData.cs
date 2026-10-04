@@ -341,6 +341,35 @@ internal static class TestData
     return buff;
   }
 
+  public static PackedScene BakeMapScene(BattleMapAuthoring source)
+  {
+    source.Bake();
+    foreach (var child in source.FindChildren("*", "", true, false))
+      if (child.Owner is null) child.Owner = source;
+    var packed = new PackedScene();
+    Assert.Equal(Error.Ok, packed.Pack(source));
+    return packed;
+  }
+
+  public static BattleAnnotationGrid Annotate(Node3D asset, Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> footprint)
+  {
+    var grid = new BattleAnnotationGrid { Name = "Annotations", Annotations = footprint };
+    asset.AddChild(grid);
+    grid.Owner = asset;
+    foreach (var cell in footprint.Keys) grid.SetCellItem(cell, 0);
+    grid.Baseline = grid.CaptureLayout();
+    return grid;
+  }
+
+  public static Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> MakeFloorFootprint(int width, int depth)
+  {
+    var footprint = new Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>();
+    for (int x = 0; x < width; x++)
+      for (int z = 0; z < depth; z++)
+        footprint[new(x, 0, z)] = new() { HasFloor = true };
+    return footprint;
+  }
+
   public static BattleMapTileData FloorTile() => new() { Walkable = true };
 
   public static BattleMapTileData WallTile() => new() { Walkable = false, BlocksLineOfSight = true };
@@ -377,16 +406,8 @@ internal static class TestData
   // Packs the map into a BattleMap-rooted scene, the authored pool's storage shape; the
   // prototype node is freed after packing so only the scene survives. Runs under the Godot
   // runtime covered by the RequireGodotRuntime suites.
-  public static PackedScene MakeMapScene(BattleMapData map)
-  {
-    var battleMap = new BattleMap { MapData = map, UsedPalette = new BattleTilePalette { MeshLibrary = null } };
-    var scene = new PackedScene();
-    Error error = scene.Pack(battleMap);
-    battleMap.Free();
-    if (error != Error.Ok)
-      throw new System.InvalidOperationException($"Test map scene packing failed: {error}");
-    return scene;
-  }
+  public static PackedScene MakeMapScene(BattleMapData map) =>
+    GeoscapeTestScenes.Pack(new BattleMap { MapData = map });
 
   // Concrete setup for direct factory tests: fresh open 4x1x4 board, one unit per side at
   // (0,0,0)/(3,0,3), fixed seed 7, optional designated player faction. Pure: callers add

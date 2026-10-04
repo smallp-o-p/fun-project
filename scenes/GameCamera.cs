@@ -124,7 +124,7 @@ public partial class GameCamera : AnimatableBody3D
     Vector3 rayOrigin = activeCamera.ProjectRayOrigin(viewportPosition);
     Vector3 rayDirection = activeCamera.ProjectRayNormal(viewportPosition);
     Vector3 rayEnd = rayOrigin + (rayDirection * rayLength);
-    PhysicsRayQueryParameters3D query = PhysicsRayQueryParameters3D.Create(rayOrigin, rayEnd);
+    PhysicsRayQueryParameters3D query = PhysicsRayQueryParameters3D.Create(rayOrigin, rayEnd, 1);
     query.CollideWithAreas = false;
     query.CollideWithBodies = true;
 

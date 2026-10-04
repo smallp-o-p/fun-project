@@ -1,116 +1,1188 @@
-[gd_scene format=3 uid="uid://drqx7j7mdambi"]
+[gd_scene format=3]
 
-[ext_resource type="MeshLibrary" path="res://scenes/debug/DebugMeshLib.meshlib" id="1_tb46l"]
-[ext_resource type="Script" uid="uid://b0jcy8d61hswr" path="res://scenes/battle/authoring/BattleMap.cs" id="2_yum8o"]
-[ext_resource type="Script" uid="uid://o0p1pxi51jff" path="res://scripts/battle/map/BattleMapTileData.cs" id="3_e4gu4"]
-[ext_resource type="Script" uid="uid://dj8hhawgr6bh" path="res://scripts/battle/map/BattleMapData.cs" id="4_0qut4"]
-[ext_resource type="Script" uid="uid://djtekemlaytk4" path="res://scenes/battle/authoring/BattleTilePalette.cs" id="5_40t88"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleMapAuthoring.cs" id="1_sqta8"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapTileData.cs" id="2_dsqxk"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapData.cs" id="3_tb46l"]
+[ext_resource type="PackedScene" path="res://scenes/battle/authoring/FloorTile.tscn" id="spawn_1"]
 
-[sub_resource type="Resource" id="Resource_spawn_a"]
-script = ExtResource("3_e4gu4")
+[sub_resource type="Resource" id="Resource_yum8o"]
+script = ExtResource("2_dsqxk")
 SpawnFactionSlot = 0
 
-[sub_resource type="Resource" id="Resource_floor"]
-script = ExtResource("3_e4gu4")
+[sub_resource type="Resource" id="Resource_e4gu4"]
+script = ExtResource("2_dsqxk")
 
-[sub_resource type="Resource" id="Resource_spawn_b"]
-script = ExtResource("3_e4gu4")
-SpawnFactionSlot = 1
+[sub_resource type="Resource" id="Resource_0qut4"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_40t88"]
+script = ExtResource("2_dsqxk")
 
 [sub_resource type="Resource" id="Resource_15x0o"]
-script = ExtResource("4_0qut4")
-Dimensions = Vector3i(8, 1, 8)
-Tiles = Dictionary[Vector3i, ExtResource("3_e4gu4")]({
-Vector3i(0, 0, 0): SubResource("Resource_spawn_a"),
-Vector3i(0, 0, 1): SubResource("Resource_floor"),
-Vector3i(0, 0, 2): SubResource("Resource_floor"),
-Vector3i(0, 0, 3): SubResource("Resource_floor"),
-Vector3i(0, 0, 4): SubResource("Resource_floor"),
-Vector3i(0, 0, 5): SubResource("Resource_floor"),
-Vector3i(0, 0, 6): SubResource("Resource_floor"),
-Vector3i(0, 0, 7): SubResource("Resource_floor"),
-Vector3i(1, 0, 0): SubResource("Resource_spawn_a"),
-Vector3i(1, 0, 1): SubResource("Resource_floor"),
-Vector3i(1, 0, 2): SubResource("Resource_floor"),
-Vector3i(1, 0, 3): SubResource("Resource_floor"),
-Vector3i(1, 0, 4): SubResource("Resource_floor"),
-Vector3i(1, 0, 5): SubResource("Resource_floor"),
-Vector3i(1, 0, 6): SubResource("Resource_floor"),
-Vector3i(1, 0, 7): SubResource("Resource_floor"),
-Vector3i(2, 0, 0): SubResource("Resource_spawn_a"),
-Vector3i(2, 0, 1): SubResource("Resource_floor"),
-Vector3i(2, 0, 2): SubResource("Resource_floor"),
-Vector3i(2, 0, 3): SubResource("Resource_floor"),
-Vector3i(2, 0, 4): SubResource("Resource_floor"),
-Vector3i(2, 0, 5): SubResource("Resource_floor"),
-Vector3i(2, 0, 6): SubResource("Resource_floor"),
-Vector3i(2, 0, 7): SubResource("Resource_floor"),
-Vector3i(3, 0, 0): SubResource("Resource_floor"),
-Vector3i(3, 0, 1): SubResource("Resource_floor"),
-Vector3i(3, 0, 2): SubResource("Resource_floor"),
-Vector3i(3, 0, 3): SubResource("Resource_floor"),
-Vector3i(3, 0, 4): SubResource("Resource_floor"),
-Vector3i(3, 0, 5): SubResource("Resource_floor"),
-Vector3i(3, 0, 6): SubResource("Resource_floor"),
-Vector3i(3, 0, 7): SubResource("Resource_floor"),
-Vector3i(4, 0, 0): SubResource("Resource_floor"),
-Vector3i(4, 0, 1): SubResource("Resource_floor"),
-Vector3i(4, 0, 2): SubResource("Resource_floor"),
-Vector3i(4, 0, 3): SubResource("Resource_floor"),
-Vector3i(4, 0, 4): SubResource("Resource_floor"),
-Vector3i(4, 0, 5): SubResource("Resource_floor"),
-Vector3i(4, 0, 6): SubResource("Resource_floor"),
-Vector3i(4, 0, 7): SubResource("Resource_floor"),
-Vector3i(5, 0, 0): SubResource("Resource_floor"),
-Vector3i(5, 0, 1): SubResource("Resource_floor"),
-Vector3i(5, 0, 2): SubResource("Resource_floor"),
-Vector3i(5, 0, 3): SubResource("Resource_floor"),
-Vector3i(5, 0, 4): SubResource("Resource_floor"),
-Vector3i(5, 0, 5): SubResource("Resource_floor"),
-Vector3i(5, 0, 6): SubResource("Resource_floor"),
-Vector3i(5, 0, 7): SubResource("Resource_spawn_b"),
-Vector3i(6, 0, 0): SubResource("Resource_floor"),
-Vector3i(6, 0, 1): SubResource("Resource_floor"),
-Vector3i(6, 0, 2): SubResource("Resource_floor"),
-Vector3i(6, 0, 3): SubResource("Resource_floor"),
-Vector3i(6, 0, 4): SubResource("Resource_floor"),
-Vector3i(6, 0, 5): SubResource("Resource_floor"),
-Vector3i(6, 0, 6): SubResource("Resource_floor"),
-Vector3i(6, 0, 7): SubResource("Resource_spawn_b"),
-Vector3i(7, 0, 0): SubResource("Resource_floor"),
-Vector3i(7, 0, 1): SubResource("Resource_floor"),
-Vector3i(7, 0, 2): SubResource("Resource_floor"),
-Vector3i(7, 0, 3): SubResource("Resource_floor"),
-Vector3i(7, 0, 4): SubResource("Resource_floor"),
-Vector3i(7, 0, 5): SubResource("Resource_floor"),
-Vector3i(7, 0, 6): SubResource("Resource_floor"),
-Vector3i(7, 0, 7): SubResource("Resource_spawn_b")
-})
+script = ExtResource("2_dsqxk")
 
 [sub_resource type="Resource" id="Resource_x5so7"]
-script = ExtResource("3_e4gu4")
-Walkable = false
-BlocksLineOfSight = true
-CoverDirections = 15
-CoverAmount = 60
+script = ExtResource("2_dsqxk")
 
 [sub_resource type="Resource" id="Resource_n2luj"]
-script = ExtResource("5_40t88")
-MeshLibrary = ExtResource("1_tb46l")
-Brushes = Dictionary[StringName, ExtResource("3_e4gu4")]({
-&"DebugBox": SubResource("Resource_x5so7"),
-&"DebugFloor": SubResource("Resource_floor"),
-&"DebugSpawnFloor": SubResource("Resource_spawn_a"),
-&"DebugSpawnFloorB": SubResource("Resource_spawn_b")
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_rm6eh"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_3wd6p"]
+script = ExtResource("2_dsqxk")
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_73mg1"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_qd2ng"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_4o25m"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_0cnvo"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_7bhof"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_7umha"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_ack4i"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_1q0h4"]
+script = ExtResource("2_dsqxk")
+SpawnFactionSlot = 0
+
+[sub_resource type="Resource" id="Resource_ahclj"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_syqox"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_qi77q"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_u6182"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_7uero"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_u15ca"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_odqyq"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_kl3kc"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_36mdy"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_hnh8g"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_e06nv"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_rhqvk"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_evt6k"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_3yeg8"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_yts6u"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_d8dq2"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_06sa8"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_st0vu"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_t24as"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_p2unn"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_1dd75"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_pcdbo"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_unnqa"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_1tuvc"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_rsu50"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_ylywe"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_ukoh7"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_8lho1"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_g87gu"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_krogu"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_cvtx3"]
+script = ExtResource("2_dsqxk")
+SpawnFactionSlot = 1
+
+[sub_resource type="Resource" id="Resource_78xvf"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_8spdj"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_62qcv"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_r5lap"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_7ka66"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_1wlu5"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_rob00"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_ssfhh"]
+script = ExtResource("2_dsqxk")
+SpawnFactionSlot = 1
+
+[sub_resource type="Resource" id="Resource_kf3v4"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_ws41n"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_sy31y"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_3v0ux"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_75vnj"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_egeg3"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_oxy55"]
+script = ExtResource("2_dsqxk")
+
+[sub_resource type="Resource" id="Resource_til8c"]
+script = ExtResource("2_dsqxk")
+SpawnFactionSlot = 1
+
+[sub_resource type="Resource" id="Resource_tlk0m"]
+script = ExtResource("3_tb46l")
+Dimensions = Vector3i(8, 1, 8)
+Tiles = Dictionary[Vector3i, ExtResource("2_dsqxk")]({
+Vector3i(0, 0, 0): SubResource("Resource_yum8o"),
+Vector3i(0, 0, 1): SubResource("Resource_e4gu4"),
+Vector3i(0, 0, 2): SubResource("Resource_0qut4"),
+Vector3i(0, 0, 3): SubResource("Resource_40t88"),
+Vector3i(0, 0, 4): SubResource("Resource_15x0o"),
+Vector3i(0, 0, 5): SubResource("Resource_x5so7"),
+Vector3i(0, 0, 6): SubResource("Resource_n2luj"),
+Vector3i(0, 0, 7): SubResource("Resource_rm6eh"),
+Vector3i(1, 0, 0): SubResource("Resource_3wd6p"),
+Vector3i(1, 0, 1): SubResource("Resource_73mg1"),
+Vector3i(1, 0, 2): SubResource("Resource_qd2ng"),
+Vector3i(1, 0, 3): SubResource("Resource_4o25m"),
+Vector3i(1, 0, 4): SubResource("Resource_0cnvo"),
+Vector3i(1, 0, 5): SubResource("Resource_7bhof"),
+Vector3i(1, 0, 6): SubResource("Resource_7umha"),
+Vector3i(1, 0, 7): SubResource("Resource_ack4i"),
+Vector3i(2, 0, 0): SubResource("Resource_1q0h4"),
+Vector3i(2, 0, 1): SubResource("Resource_ahclj"),
+Vector3i(2, 0, 2): SubResource("Resource_syqox"),
+Vector3i(2, 0, 3): SubResource("Resource_qi77q"),
+Vector3i(2, 0, 4): SubResource("Resource_u6182"),
+Vector3i(2, 0, 5): SubResource("Resource_7uero"),
+Vector3i(2, 0, 6): SubResource("Resource_u15ca"),
+Vector3i(2, 0, 7): SubResource("Resource_odqyq"),
+Vector3i(3, 0, 0): SubResource("Resource_kl3kc"),
+Vector3i(3, 0, 1): SubResource("Resource_36mdy"),
+Vector3i(3, 0, 2): SubResource("Resource_hnh8g"),
+Vector3i(3, 0, 3): SubResource("Resource_e06nv"),
+Vector3i(3, 0, 4): SubResource("Resource_rhqvk"),
+Vector3i(3, 0, 5): SubResource("Resource_evt6k"),
+Vector3i(3, 0, 6): SubResource("Resource_3yeg8"),
+Vector3i(3, 0, 7): SubResource("Resource_yts6u"),
+Vector3i(4, 0, 0): SubResource("Resource_d8dq2"),
+Vector3i(4, 0, 1): SubResource("Resource_06sa8"),
+Vector3i(4, 0, 2): SubResource("Resource_st0vu"),
+Vector3i(4, 0, 3): SubResource("Resource_t24as"),
+Vector3i(4, 0, 4): SubResource("Resource_p2unn"),
+Vector3i(4, 0, 5): SubResource("Resource_1dd75"),
+Vector3i(4, 0, 6): SubResource("Resource_pcdbo"),
+Vector3i(4, 0, 7): SubResource("Resource_unnqa"),
+Vector3i(5, 0, 0): SubResource("Resource_1tuvc"),
+Vector3i(5, 0, 1): SubResource("Resource_rsu50"),
+Vector3i(5, 0, 2): SubResource("Resource_ylywe"),
+Vector3i(5, 0, 3): SubResource("Resource_ukoh7"),
+Vector3i(5, 0, 4): SubResource("Resource_8lho1"),
+Vector3i(5, 0, 5): SubResource("Resource_g87gu"),
+Vector3i(5, 0, 6): SubResource("Resource_krogu"),
+Vector3i(5, 0, 7): SubResource("Resource_cvtx3"),
+Vector3i(6, 0, 0): SubResource("Resource_78xvf"),
+Vector3i(6, 0, 1): SubResource("Resource_8spdj"),
+Vector3i(6, 0, 2): SubResource("Resource_62qcv"),
+Vector3i(6, 0, 3): SubResource("Resource_r5lap"),
+Vector3i(6, 0, 4): SubResource("Resource_7ka66"),
+Vector3i(6, 0, 5): SubResource("Resource_1wlu5"),
+Vector3i(6, 0, 6): SubResource("Resource_rob00"),
+Vector3i(6, 0, 7): SubResource("Resource_ssfhh"),
+Vector3i(7, 0, 0): SubResource("Resource_kf3v4"),
+Vector3i(7, 0, 1): SubResource("Resource_ws41n"),
+Vector3i(7, 0, 2): SubResource("Resource_sy31y"),
+Vector3i(7, 0, 3): SubResource("Resource_3v0ux"),
+Vector3i(7, 0, 4): SubResource("Resource_75vnj"),
+Vector3i(7, 0, 5): SubResource("Resource_egeg3"),
+Vector3i(7, 0, 6): SubResource("Resource_oxy55"),
+Vector3i(7, 0, 7): SubResource("Resource_til8c")
 })
 
-[node name="Map" type="GridMap" unique_id=1126601032]
-mesh_library = ExtResource("1_tb46l")
-cell_size = Vector3(1, 1, 1)
-cell_center_y = false
-data = {
-"cells": PackedInt32Array(0, 0, 2, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 0, 5, 0, 0, 6, 0, 0, 7, 0, 1, 0, 2, 1, 1, 0, 1, 2, 0, 1, 3, 0, 1, 4, 0, 1, 5, 0, 1, 6, 0, 1, 7, 0, 2, 0, 2, 2, 1, 0, 2, 2, 0, 2, 3, 0, 2, 4, 0, 2, 5, 0, 2, 6, 0, 2, 7, 0, 3, 0, 0, 3, 1, 0, 3, 2, 0, 3, 3, 0, 3, 4, 0, 3, 5, 0, 3, 6, 0, 3, 7, 0, 4, 0, 0, 4, 1, 0, 4, 2, 0, 4, 3, 0, 4, 4, 0, 4, 5, 0, 4, 6, 0, 4, 7, 0, 5, 0, 0, 5, 1, 0, 5, 2, 0, 5, 3, 0, 5, 4, 0, 5, 5, 0, 5, 6, 0, 5, 7, 3, 6, 0, 0, 6, 1, 0, 6, 2, 0, 6, 3, 0, 6, 4, 0, 6, 5, 0, 6, 6, 0, 6, 7, 3, 7, 0, 0, 7, 1, 0, 7, 2, 0, 7, 3, 0, 7, 4, 0, 7, 5, 0, 7, 6, 0, 7, 7, 3)
-}
-script = ExtResource("2_yum8o")
-MapData = SubResource("Resource_15x0o")
-UsedPalette = SubResource("Resource_n2luj")
+[sub_resource type="BoxShape3D" id="BoxShape3D_gekci"]
+size = Vector3(1, 0.02, 1)
+
+[node name="MapAuthoring" type="Node3D" unique_id=1930804911]
+script = ExtResource("1_sqta8")
+SpawnSlots = Dictionary[Vector3i, int]({
+Vector3i(0, 0, 0): 0,
+Vector3i(1, 0, 0): 0,
+Vector3i(2, 0, 0): 0,
+Vector3i(5, 0, 7): 1,
+Vector3i(6, 0, 7): 1,
+Vector3i(7, 0, 7): 1
+})
+MapData = SubResource("Resource_tlk0m")
+
+[node name="Cell_0_0_0" parent="." unique_id=1583490562 instance=ExtResource("spawn_1")]
+
+[node name="Surface" parent="Cell_0_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_0_0_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_0_0_1" parent="." unique_id=1154907965 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
+
+[node name="Surface" parent="Cell_0_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_0_0_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_0_0_2" parent="." unique_id=590030152 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+
+[node name="Surface" parent="Cell_0_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_0_0_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_0_0_3" parent="." unique_id=1955652257 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3)
+
+[node name="Surface" parent="Cell_0_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_0_0_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_0_0_4" parent="." unique_id=1381004796 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4)
+
+[node name="Surface" parent="Cell_0_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_0_0_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_0_0_5" parent="." unique_id=1609411791 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5)
+
+[node name="Surface" parent="Cell_0_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_0_0_5" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_0_0_6" parent="." unique_id=1418358330 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 6)
+
+[node name="Surface" parent="Cell_0_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_0_0_6" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_0_0_7" parent="." unique_id=334725995 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 7)
+
+[node name="Surface" parent="Cell_0_0_7" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_0_0_7" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_1_0_0" parent="." unique_id=537154357 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
+
+[node name="Surface" parent="Cell_1_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_1_0_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_1_0_1" parent="." unique_id=420173502 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1)
+
+[node name="Surface" parent="Cell_1_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_1_0_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_1_0_2" parent="." unique_id=1093791139 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 2)
+
+[node name="Surface" parent="Cell_1_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_1_0_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_1_0_3" parent="." unique_id=1371643857 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 3)
+
+[node name="Surface" parent="Cell_1_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_1_0_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_1_0_4" parent="." unique_id=1046709729 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 4)
+
+[node name="Surface" parent="Cell_1_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_1_0_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_1_0_5" parent="." unique_id=1722660472 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 5)
+
+[node name="Surface" parent="Cell_1_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_1_0_5" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_1_0_6" parent="." unique_id=278099474 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 6)
+
+[node name="Surface" parent="Cell_1_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_1_0_6" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_1_0_7" parent="." unique_id=199373381 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 7)
+
+[node name="Surface" parent="Cell_1_0_7" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_1_0_7" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_2_0_0" parent="." unique_id=1623382781 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 0)
+
+[node name="Surface" parent="Cell_2_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_2_0_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_2_0_1" parent="." unique_id=1687973687 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 1)
+
+[node name="Surface" parent="Cell_2_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_2_0_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_2_0_2" parent="." unique_id=1238960761 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 2)
+
+[node name="Surface" parent="Cell_2_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_2_0_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_2_0_3" parent="." unique_id=247776503 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 3)
+
+[node name="Surface" parent="Cell_2_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_2_0_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_2_0_4" parent="." unique_id=478740037 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 4)
+
+[node name="Surface" parent="Cell_2_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_2_0_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_2_0_5" parent="." unique_id=1498745799 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 5)
+
+[node name="Surface" parent="Cell_2_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_2_0_5" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_2_0_6" parent="." unique_id=1272288394 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 6)
+
+[node name="Surface" parent="Cell_2_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_2_0_6" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_2_0_7" parent="." unique_id=322753204 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 7)
+
+[node name="Surface" parent="Cell_2_0_7" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_2_0_7" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_3_0_0" parent="." unique_id=1402338186 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 0)
+
+[node name="Surface" parent="Cell_3_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_3_0_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_3_0_1" parent="." unique_id=1684854071 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 1)
+
+[node name="Surface" parent="Cell_3_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_3_0_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_3_0_2" parent="." unique_id=1199636313 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 2)
+
+[node name="Surface" parent="Cell_3_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_3_0_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_3_0_3" parent="." unique_id=1015010253 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 3)
+
+[node name="Surface" parent="Cell_3_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_3_0_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_3_0_4" parent="." unique_id=360119010 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 4)
+
+[node name="Surface" parent="Cell_3_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_3_0_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_3_0_5" parent="." unique_id=604281238 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 5)
+
+[node name="Surface" parent="Cell_3_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_3_0_5" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_3_0_6" parent="." unique_id=510695130 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 6)
+
+[node name="Surface" parent="Cell_3_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_3_0_6" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_3_0_7" parent="." unique_id=2033131559 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 7)
+
+[node name="Surface" parent="Cell_3_0_7" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_3_0_7" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_4_0_0" parent="." unique_id=1332064954 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 0)
+
+[node name="Surface" parent="Cell_4_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_4_0_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_4_0_1" parent="." unique_id=2143300603 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 1)
+
+[node name="Surface" parent="Cell_4_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_4_0_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_4_0_2" parent="." unique_id=799354607 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 2)
+
+[node name="Surface" parent="Cell_4_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_4_0_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_4_0_3" parent="." unique_id=34711631 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 3)
+
+[node name="Surface" parent="Cell_4_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_4_0_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_4_0_4" parent="." unique_id=636127605 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 4)
+
+[node name="Surface" parent="Cell_4_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_4_0_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_4_0_5" parent="." unique_id=633264006 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 5)
+
+[node name="Surface" parent="Cell_4_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_4_0_5" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_4_0_6" parent="." unique_id=1028758549 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 6)
+
+[node name="Surface" parent="Cell_4_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_4_0_6" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_4_0_7" parent="." unique_id=493522007 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 7)
+
+[node name="Surface" parent="Cell_4_0_7" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_4_0_7" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_5_0_0" parent="." unique_id=2140099172 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 0)
+
+[node name="Surface" parent="Cell_5_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_5_0_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_5_0_1" parent="." unique_id=1787936020 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 1)
+
+[node name="Surface" parent="Cell_5_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_5_0_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_5_0_2" parent="." unique_id=745920453 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 2)
+
+[node name="Surface" parent="Cell_5_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_5_0_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_5_0_3" parent="." unique_id=1719687474 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 3)
+
+[node name="Surface" parent="Cell_5_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_5_0_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_5_0_4" parent="." unique_id=189120218 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 4)
+
+[node name="Surface" parent="Cell_5_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_5_0_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_5_0_5" parent="." unique_id=1652358327 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 5)
+
+[node name="Surface" parent="Cell_5_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_5_0_5" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_5_0_6" parent="." unique_id=1615923828 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 6)
+
+[node name="Surface" parent="Cell_5_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_5_0_6" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_5_0_7" parent="." unique_id=1928297123 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 7)
+
+[node name="Surface" parent="Cell_5_0_7" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_5_0_7" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_6_0_0" parent="." unique_id=1487476939 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 0)
+
+[node name="Surface" parent="Cell_6_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_6_0_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_6_0_1" parent="." unique_id=76428021 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 1)
+
+[node name="Surface" parent="Cell_6_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_6_0_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_6_0_2" parent="." unique_id=365999532 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 2)
+
+[node name="Surface" parent="Cell_6_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_6_0_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_6_0_3" parent="." unique_id=1470536617 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 3)
+
+[node name="Surface" parent="Cell_6_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_6_0_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_6_0_4" parent="." unique_id=423932536 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 4)
+
+[node name="Surface" parent="Cell_6_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_6_0_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_6_0_5" parent="." unique_id=1941364010 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 5)
+
+[node name="Surface" parent="Cell_6_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_6_0_5" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_6_0_6" parent="." unique_id=1214083926 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 6)
+
+[node name="Surface" parent="Cell_6_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_6_0_6" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_6_0_7" parent="." unique_id=822591069 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 7)
+
+[node name="Surface" parent="Cell_6_0_7" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_6_0_7" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_7_0_0" parent="." unique_id=735628986 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 0)
+
+[node name="Surface" parent="Cell_7_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_7_0_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_7_0_1" parent="." unique_id=904225984 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 1)
+
+[node name="Surface" parent="Cell_7_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_7_0_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_7_0_2" parent="." unique_id=1982705029 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 2)
+
+[node name="Surface" parent="Cell_7_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_7_0_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_7_0_3" parent="." unique_id=1618125332 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 3)
+
+[node name="Surface" parent="Cell_7_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_7_0_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_7_0_4" parent="." unique_id=1835682720 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 4)
+
+[node name="Surface" parent="Cell_7_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_7_0_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_7_0_5" parent="." unique_id=1128383192 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 5)
+
+[node name="Surface" parent="Cell_7_0_5" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_7_0_5" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_7_0_6" parent="." unique_id=259800142 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 6)
+
+[node name="Surface" parent="Cell_7_0_6" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_7_0_6" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Cell_7_0_7" parent="." unique_id=670883221 instance=ExtResource("spawn_1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 7)
+
+[node name="Surface" parent="Cell_7_0_7" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Cell_7_0_7" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="FloorPicking" type="StaticBody3D" parent="." unique_id=1464905452]
+collision_mask = 0
+
+[node name="@CollisionShape3D@154" type="CollisionShape3D" parent="FloorPicking" unique_id=2032225615]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@155" type="CollisionShape3D" parent="FloorPicking" unique_id=1989849719]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@156" type="CollisionShape3D" parent="FloorPicking" unique_id=344059561]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@157" type="CollisionShape3D" parent="FloorPicking" unique_id=203721242]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@158" type="CollisionShape3D" parent="FloorPicking" unique_id=1133059522]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@159" type="CollisionShape3D" parent="FloorPicking" unique_id=1679787533]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@160" type="CollisionShape3D" parent="FloorPicking" unique_id=86008004]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@161" type="CollisionShape3D" parent="FloorPicking" unique_id=455187523]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 7.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@162" type="CollisionShape3D" parent="FloorPicking" unique_id=490548053]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@163" type="CollisionShape3D" parent="FloorPicking" unique_id=82531163]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@164" type="CollisionShape3D" parent="FloorPicking" unique_id=1331049561]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@165" type="CollisionShape3D" parent="FloorPicking" unique_id=879581704]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@166" type="CollisionShape3D" parent="FloorPicking" unique_id=1390920600]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@167" type="CollisionShape3D" parent="FloorPicking" unique_id=1825085061]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@168" type="CollisionShape3D" parent="FloorPicking" unique_id=5535961]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@169" type="CollisionShape3D" parent="FloorPicking" unique_id=1766867778]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 7.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@170" type="CollisionShape3D" parent="FloorPicking" unique_id=178052104]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@171" type="CollisionShape3D" parent="FloorPicking" unique_id=295762275]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@172" type="CollisionShape3D" parent="FloorPicking" unique_id=1009548768]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@173" type="CollisionShape3D" parent="FloorPicking" unique_id=355348564]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@174" type="CollisionShape3D" parent="FloorPicking" unique_id=1172042249]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@175" type="CollisionShape3D" parent="FloorPicking" unique_id=449688386]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@176" type="CollisionShape3D" parent="FloorPicking" unique_id=1170364979]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@177" type="CollisionShape3D" parent="FloorPicking" unique_id=567053424]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 7.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@178" type="CollisionShape3D" parent="FloorPicking" unique_id=399578179]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@179" type="CollisionShape3D" parent="FloorPicking" unique_id=2082281612]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@180" type="CollisionShape3D" parent="FloorPicking" unique_id=67879321]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@181" type="CollisionShape3D" parent="FloorPicking" unique_id=1635092751]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@182" type="CollisionShape3D" parent="FloorPicking" unique_id=967017266]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@183" type="CollisionShape3D" parent="FloorPicking" unique_id=1909411608]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@184" type="CollisionShape3D" parent="FloorPicking" unique_id=1963939141]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@185" type="CollisionShape3D" parent="FloorPicking" unique_id=2045902645]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 7.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@186" type="CollisionShape3D" parent="FloorPicking" unique_id=1620696359]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@187" type="CollisionShape3D" parent="FloorPicking" unique_id=66418655]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@188" type="CollisionShape3D" parent="FloorPicking" unique_id=579871258]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@189" type="CollisionShape3D" parent="FloorPicking" unique_id=1877227304]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@190" type="CollisionShape3D" parent="FloorPicking" unique_id=827476237]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@191" type="CollisionShape3D" parent="FloorPicking" unique_id=1621551282]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@192" type="CollisionShape3D" parent="FloorPicking" unique_id=720001968]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@193" type="CollisionShape3D" parent="FloorPicking" unique_id=12887641]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 7.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@194" type="CollisionShape3D" parent="FloorPicking" unique_id=461235056]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@195" type="CollisionShape3D" parent="FloorPicking" unique_id=615306089]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@196" type="CollisionShape3D" parent="FloorPicking" unique_id=288485076]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@197" type="CollisionShape3D" parent="FloorPicking" unique_id=1328017358]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@198" type="CollisionShape3D" parent="FloorPicking" unique_id=601455762]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@199" type="CollisionShape3D" parent="FloorPicking" unique_id=330418024]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@200" type="CollisionShape3D" parent="FloorPicking" unique_id=1823028265]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@201" type="CollisionShape3D" parent="FloorPicking" unique_id=549847215]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, -0.01, 7.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@202" type="CollisionShape3D" parent="FloorPicking" unique_id=1545463506]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@203" type="CollisionShape3D" parent="FloorPicking" unique_id=757093409]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@204" type="CollisionShape3D" parent="FloorPicking" unique_id=469240125]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@205" type="CollisionShape3D" parent="FloorPicking" unique_id=1161595518]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@206" type="CollisionShape3D" parent="FloorPicking" unique_id=206579012]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@207" type="CollisionShape3D" parent="FloorPicking" unique_id=555066114]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@208" type="CollisionShape3D" parent="FloorPicking" unique_id=1284995021]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@209" type="CollisionShape3D" parent="FloorPicking" unique_id=1667620054]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, -0.01, 7.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@210" type="CollisionShape3D" parent="FloorPicking" unique_id=1204101056]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@211" type="CollisionShape3D" parent="FloorPicking" unique_id=1298435076]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@212" type="CollisionShape3D" parent="FloorPicking" unique_id=231825693]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@213" type="CollisionShape3D" parent="FloorPicking" unique_id=1841405630]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@214" type="CollisionShape3D" parent="FloorPicking" unique_id=116483918]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@215" type="CollisionShape3D" parent="FloorPicking" unique_id=2025198285]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 5.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@216" type="CollisionShape3D" parent="FloorPicking" unique_id=779288380]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 6.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[node name="@CollisionShape3D@217" type="CollisionShape3D" parent="FloorPicking" unique_id=1538060526]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.01, 7.5)
+shape = SubResource("BoxShape3D_gekci")
+
+[editable path="Cell_0_0_0"]
+[editable path="Cell_0_0_1"]
+[editable path="Cell_0_0_2"]
+[editable path="Cell_0_0_3"]
+[editable path="Cell_0_0_4"]
+[editable path="Cell_0_0_5"]
+[editable path="Cell_0_0_6"]
+[editable path="Cell_0_0_7"]
+[editable path="Cell_1_0_0"]
+[editable path="Cell_1_0_1"]
+[editable path="Cell_1_0_2"]
+[editable path="Cell_1_0_3"]
+[editable path="Cell_1_0_4"]
+[editable path="Cell_1_0_5"]
+[editable path="Cell_1_0_6"]
+[editable path="Cell_1_0_7"]
+[editable path="Cell_2_0_0"]
+[editable path="Cell_2_0_1"]
+[editable path="Cell_2_0_2"]
+[editable path="Cell_2_0_3"]
+[editable path="Cell_2_0_4"]
+[editable path="Cell_2_0_5"]
+[editable path="Cell_2_0_6"]
+[editable path="Cell_2_0_7"]
+[editable path="Cell_3_0_0"]
+[editable path="Cell_3_0_1"]
+[editable path="Cell_3_0_2"]
+[editable path="Cell_3_0_3"]
+[editable path="Cell_3_0_4"]
+[editable path="Cell_3_0_5"]
+[editable path="Cell_3_0_6"]
+[editable path="Cell_3_0_7"]
+[editable path="Cell_4_0_0"]
+[editable path="Cell_4_0_1"]
+[editable path="Cell_4_0_2"]
+[editable path="Cell_4_0_3"]
+[editable path="Cell_4_0_4"]
+[editable path="Cell_4_0_5"]
+[editable path="Cell_4_0_6"]
+[editable path="Cell_4_0_7"]
+[editable path="Cell_5_0_0"]
+[editable path="Cell_5_0_1"]
+[editable path="Cell_5_0_2"]
+[editable path="Cell_5_0_3"]
+[editable path="Cell_5_0_4"]
+[editable path="Cell_5_0_5"]
+[editable path="Cell_5_0_6"]
+[editable path="Cell_5_0_7"]
+[editable path="Cell_6_0_0"]
+[editable path="Cell_6_0_1"]
+[editable path="Cell_6_0_2"]
+[editable path="Cell_6_0_3"]
+[editable path="Cell_6_0_4"]
+[editable path="Cell_6_0_5"]
+[editable path="Cell_6_0_6"]
+[editable path="Cell_6_0_7"]
+[editable path="Cell_7_0_0"]
+[editable path="Cell_7_0_1"]
+[editable path="Cell_7_0_2"]
+[editable path="Cell_7_0_3"]
+[editable path="Cell_7_0_4"]
+[editable path="Cell_7_0_5"]
+[editable path="Cell_7_0_6"]
+[editable path="Cell_7_0_7"]

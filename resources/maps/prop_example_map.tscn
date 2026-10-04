@@ -1,0 +1,494 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleMapAuthoring.cs" id="1_nl48v"]
+[ext_resource type="PackedScene" path="res://scenes/battle/authoring/FloorTile.tscn" id="2_i1m1x"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapTileData.cs" id="2_j8m5l"]
+[ext_resource type="PackedScene" path="res://scenes/battle/authoring/Car.tscn" id="3_gbl4c"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapData.cs" id="3_trocc"]
+
+[sub_resource type="Resource" id="Resource_s0ehm"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_4gyde"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_48klr"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_op7b2"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_bx20s"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_2mqbu"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_or0wh"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_ifbrf"]
+script = ExtResource("2_j8m5l")
+CoverDirections = 4
+CoverAmount = 40
+
+[sub_resource type="Resource" id="Resource_e3iu4"]
+script = ExtResource("2_j8m5l")
+CoverDirections = 4
+CoverAmount = 40
+
+[sub_resource type="Resource" id="Resource_a4ehy"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_gun07"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_ibscg"]
+script = ExtResource("2_j8m5l")
+CoverDirections = 2
+CoverAmount = 40
+
+[sub_resource type="Resource" id="Resource_jerx2"]
+script = ExtResource("2_j8m5l")
+Walkable = false
+
+[sub_resource type="Resource" id="Resource_h2iqk"]
+script = ExtResource("2_j8m5l")
+Walkable = false
+
+[sub_resource type="Resource" id="Resource_ixx2g"]
+script = ExtResource("2_j8m5l")
+CoverDirections = 1
+CoverAmount = 40
+
+[sub_resource type="Resource" id="Resource_txynn"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_aed0w"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_l1lxj"]
+script = ExtResource("2_j8m5l")
+CoverDirections = 8
+CoverAmount = 40
+
+[sub_resource type="Resource" id="Resource_irpw0"]
+script = ExtResource("2_j8m5l")
+CoverDirections = 8
+CoverAmount = 40
+
+[sub_resource type="Resource" id="Resource_6lyj0"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_twdig"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_v5tlb"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_tljmi"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_ibal5"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_houem"]
+script = ExtResource("2_j8m5l")
+
+[sub_resource type="Resource" id="Resource_rc78i"]
+script = ExtResource("3_trocc")
+Dimensions = Vector3i(5, 1, 5)
+Tiles = Dictionary[Vector3i, ExtResource("2_j8m5l")]({
+Vector3i(0, 0, 0): SubResource("Resource_s0ehm"),
+Vector3i(0, 0, 1): SubResource("Resource_4gyde"),
+Vector3i(0, 0, 2): SubResource("Resource_48klr"),
+Vector3i(0, 0, 3): SubResource("Resource_op7b2"),
+Vector3i(0, 0, 4): SubResource("Resource_bx20s"),
+Vector3i(1, 0, 0): SubResource("Resource_2mqbu"),
+Vector3i(1, 0, 1): SubResource("Resource_or0wh"),
+Vector3i(1, 0, 2): SubResource("Resource_ifbrf"),
+Vector3i(1, 0, 3): SubResource("Resource_e3iu4"),
+Vector3i(1, 0, 4): SubResource("Resource_a4ehy"),
+Vector3i(2, 0, 0): SubResource("Resource_gun07"),
+Vector3i(2, 0, 1): SubResource("Resource_ibscg"),
+Vector3i(2, 0, 2): SubResource("Resource_jerx2"),
+Vector3i(2, 0, 3): SubResource("Resource_h2iqk"),
+Vector3i(2, 0, 4): SubResource("Resource_ixx2g"),
+Vector3i(3, 0, 0): SubResource("Resource_txynn"),
+Vector3i(3, 0, 1): SubResource("Resource_aed0w"),
+Vector3i(3, 0, 2): SubResource("Resource_l1lxj"),
+Vector3i(3, 0, 3): SubResource("Resource_irpw0"),
+Vector3i(3, 0, 4): SubResource("Resource_6lyj0"),
+Vector3i(4, 0, 0): SubResource("Resource_twdig"),
+Vector3i(4, 0, 1): SubResource("Resource_v5tlb"),
+Vector3i(4, 0, 2): SubResource("Resource_tljmi"),
+Vector3i(4, 0, 3): SubResource("Resource_ibal5"),
+Vector3i(4, 0, 4): SubResource("Resource_houem")
+})
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4tyq5"]
+size = Vector3(1, 0.02, 1)
+
+[node name="BattleMapAuthoring" type="Node3D" unique_id=1673945919]
+script = ExtResource("1_nl48v")
+MapData = SubResource("Resource_rc78i")
+
+[node name="Floor_0_0" parent="." unique_id=1583490562 instance=ExtResource("2_i1m1x")]
+
+[node name="Surface" parent="Floor_0_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_0_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_0_1" parent="." unique_id=32762546 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
+
+[node name="Surface" parent="Floor_0_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_0_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_0_2" parent="." unique_id=1201096179 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+
+[node name="Surface" parent="Floor_0_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_0_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_0_3" parent="." unique_id=439557378 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3)
+
+[node name="Surface" parent="Floor_0_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_0_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_0_4" parent="." unique_id=1410673687 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4)
+
+[node name="Surface" parent="Floor_0_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_0_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_1_0" parent="." unique_id=423898670 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
+
+[node name="Surface" parent="Floor_1_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_1_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_1_1" parent="." unique_id=491964595 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1)
+
+[node name="Surface" parent="Floor_1_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_1_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_1_2" parent="." unique_id=1883634593 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 2)
+
+[node name="Surface" parent="Floor_1_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_1_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_1_3" parent="." unique_id=1429242784 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 3)
+
+[node name="Surface" parent="Floor_1_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_1_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_1_4" parent="." unique_id=1291852655 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 4)
+
+[node name="Surface" parent="Floor_1_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_1_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_2_0" parent="." unique_id=586223656 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 0)
+
+[node name="Surface" parent="Floor_2_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_2_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_2_1" parent="." unique_id=1359268637 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 1)
+
+[node name="Surface" parent="Floor_2_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_2_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_2_2" parent="." unique_id=1995076846 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 2)
+
+[node name="Surface" parent="Floor_2_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_2_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_2_3" parent="." unique_id=1906286080 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 3)
+
+[node name="Surface" parent="Floor_2_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_2_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_2_4" parent="." unique_id=1072163023 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 4)
+
+[node name="Surface" parent="Floor_2_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_2_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_3_0" parent="." unique_id=773024380 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 0)
+
+[node name="Surface" parent="Floor_3_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_3_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_3_1" parent="." unique_id=1826626149 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 1)
+
+[node name="Surface" parent="Floor_3_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_3_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_3_2" parent="." unique_id=1034860873 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 2)
+
+[node name="Surface" parent="Floor_3_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_3_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_3_3" parent="." unique_id=1242671803 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 3)
+
+[node name="Surface" parent="Floor_3_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_3_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_3_4" parent="." unique_id=637264672 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 4)
+
+[node name="Surface" parent="Floor_3_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_3_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_4_0" parent="." unique_id=1605122337 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 0)
+
+[node name="Surface" parent="Floor_4_0" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_4_0" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_4_1" parent="." unique_id=855296652 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 1)
+
+[node name="Surface" parent="Floor_4_1" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_4_1" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_4_2" parent="." unique_id=1819825002 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 2)
+
+[node name="Surface" parent="Floor_4_2" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_4_2" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_4_3" parent="." unique_id=632742732 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 3)
+
+[node name="Surface" parent="Floor_4_3" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_4_3" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Floor_4_4" parent="." unique_id=1141641274 instance=ExtResource("2_i1m1x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 4)
+
+[node name="Surface" parent="Floor_4_4" index="1" unique_id=1320368123]
+collision_layer = 2
+
+[node name="Annotations" parent="Floor_4_4" index="2" unique_id=654888892]
+collision_layer = 2
+
+[node name="Car" parent="." unique_id=187248391 instance=ExtResource("3_gbl4c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 2)
+
+[node name="Annotations" parent="Car" index="1" unique_id=1979555061]
+collision_layer = 2
+
+[node name="FloorPicking" type="StaticBody3D" parent="." unique_id=931840933]
+collision_mask = 0
+
+[node name="@CollisionShape3D@243" type="CollisionShape3D" parent="FloorPicking" unique_id=2092281996]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@244" type="CollisionShape3D" parent="FloorPicking" unique_id=1454206867]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@245" type="CollisionShape3D" parent="FloorPicking" unique_id=1827895720]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@246" type="CollisionShape3D" parent="FloorPicking" unique_id=1836781944]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@247" type="CollisionShape3D" parent="FloorPicking" unique_id=1058431346]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@248" type="CollisionShape3D" parent="FloorPicking" unique_id=1738762998]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@249" type="CollisionShape3D" parent="FloorPicking" unique_id=1740747625]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@250" type="CollisionShape3D" parent="FloorPicking" unique_id=1115379523]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@251" type="CollisionShape3D" parent="FloorPicking" unique_id=1879014346]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@252" type="CollisionShape3D" parent="FloorPicking" unique_id=820552260]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@253" type="CollisionShape3D" parent="FloorPicking" unique_id=318576978]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@254" type="CollisionShape3D" parent="FloorPicking" unique_id=2121163520]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@255" type="CollisionShape3D" parent="FloorPicking" unique_id=1369134775]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@256" type="CollisionShape3D" parent="FloorPicking" unique_id=896002318]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@257" type="CollisionShape3D" parent="FloorPicking" unique_id=1698039475]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@258" type="CollisionShape3D" parent="FloorPicking" unique_id=1506668309]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@259" type="CollisionShape3D" parent="FloorPicking" unique_id=1827430334]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@260" type="CollisionShape3D" parent="FloorPicking" unique_id=146212567]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@261" type="CollisionShape3D" parent="FloorPicking" unique_id=599111966]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@262" type="CollisionShape3D" parent="FloorPicking" unique_id=803521672]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@263" type="CollisionShape3D" parent="FloorPicking" unique_id=569965982]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 0.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@264" type="CollisionShape3D" parent="FloorPicking" unique_id=209512429]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 1.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@265" type="CollisionShape3D" parent="FloorPicking" unique_id=238486445]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 2.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@266" type="CollisionShape3D" parent="FloorPicking" unique_id=1680808937]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 3.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[node name="@CollisionShape3D@267" type="CollisionShape3D" parent="FloorPicking" unique_id=371146803]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, -0.01, 4.5)
+shape = SubResource("BoxShape3D_4tyq5")
+
+[editable path="Floor_0_0"]
+[editable path="Floor_0_1"]
+[editable path="Floor_0_2"]
+[editable path="Floor_0_3"]
+[editable path="Floor_0_4"]
+[editable path="Floor_1_0"]
+[editable path="Floor_1_1"]
+[editable path="Floor_1_2"]
+[editable path="Floor_1_3"]
+[editable path="Floor_1_4"]
+[editable path="Floor_2_0"]
+[editable path="Floor_2_1"]
+[editable path="Floor_2_2"]
+[editable path="Floor_2_3"]
+[editable path="Floor_2_4"]
+[editable path="Floor_3_0"]
+[editable path="Floor_3_1"]
+[editable path="Floor_3_2"]
+[editable path="Floor_3_3"]
+[editable path="Floor_3_4"]
+[editable path="Floor_4_0"]
+[editable path="Floor_4_1"]
+[editable path="Floor_4_2"]
+[editable path="Floor_4_3"]
+[editable path="Floor_4_4"]
+[editable path="Car"]

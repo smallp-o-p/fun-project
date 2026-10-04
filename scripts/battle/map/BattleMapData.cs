@@ -2,7 +2,7 @@ using Godot;
 
 namespace FunProject.Battle;
 
-[GlobalClass]
+[Tool, GlobalClass]
 public partial class BattleMapData : Resource
 {
   [Export] public Godot.Vector3I Dimensions { get; set; }

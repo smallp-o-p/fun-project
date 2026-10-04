@@ -1,0 +1,107 @@
+[gd_scene format=4]
+
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="2_um0pc"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleAnnotationGrid.cs" id="4_annotations"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_emol3"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fi2jq"]
+render_priority = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.15, 0.85, 0.75, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_oviq3"]
+_surfaces = [{
+"aabb": AABB(-0.48, -0.48, -0.48, 0.96, 0.96, 0.96),
+"format": 34359738369,
+"material": SubResource("StandardMaterial3D_fi2jq"),
+"primitive": 1,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 24,
+"vertex_data": PackedByteArray("j8L1vo/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvW+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9T6PwvU+")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_oviq3"]
+render_priority = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.3, 0.9, 0.35, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_um0pc"]
+_surfaces = [{
+"aabb": AABB(-0.48, -0.5, -0.48, 0.96, 1e-05, 0.96),
+"format": 34359738369,
+"material": SubResource("StandardMaterial3D_oviq3"),
+"primitive": 1,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 8,
+"vertex_data": PackedByteArray("j8L1vgAAAL+PwvW+j8L1PgAAAL+PwvW+j8L1PgAAAL+PwvW+j8L1PgAAAL+PwvU+j8L1PgAAAL+PwvU+j8L1vgAAAL+PwvU+j8L1vgAAAL+PwvU+j8L1vgAAAL+PwvW+")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6dmgb"]
+render_priority = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(1, 0.55, 0.15, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_vesj4"]
+_surfaces = [{
+"aabb": AABB(-0.48, -0.48, -0.48, 0.96, 0.96, 0.96),
+"format": 34359738369,
+"material": SubResource("StandardMaterial3D_6dmgb"),
+"primitive": 1,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 24,
+"vertex_data": PackedByteArray("j8L1vo/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9T6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvU+j8L1vo/C9T6PwvW+j8L1vo/C9b6PwvW+j8L1vo/C9T6PwvW+j8L1Po/C9b6PwvW+j8L1Po/C9T6PwvW+j8L1Po/C9b6PwvU+j8L1Po/C9T6PwvU+j8L1vo/C9b6PwvU+j8L1vo/C9T6PwvU+")
+}]
+
+[sub_resource type="MeshLibrary" id="MeshLibrary_um0pc"]
+item/0/name = "Annotation box"
+item/0/mesh = SubResource("ArrayMesh_oviq3")
+item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/mesh_cast_shadow = 1
+item/0/shapes = []
+item/0/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/navigation_layers = 1
+item/1/name = "Floor"
+item/1/mesh = SubResource("ArrayMesh_um0pc")
+item/1/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/1/mesh_cast_shadow = 1
+item/1/shapes = []
+item/1/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/1/navigation_layers = 1
+item/2/name = "Solid"
+item/2/mesh = SubResource("ArrayMesh_vesj4")
+item/2/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/2/mesh_cast_shadow = 1
+item/2/shapes = []
+item/2/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/2/navigation_layers = 1
+
+[sub_resource type="Resource" id="Resource_vesj4"]
+script = ExtResource("2_um0pc")
+BlocksMovement = true
+BlocksLineOfSight = true
+CoverDirections = 15
+CoverAmount = 60
+
+[node name="Block" type="Node3D" unique_id=1021311450]
+
+[node name="Model" type="MeshInstance3D" parent="." unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Annotations" type="GridMap" parent="." unique_id=59814809]
+mesh_library = SubResource("MeshLibrary_um0pc")
+cell_size = Vector3(1, 1, 1)
+data = {
+"cells": PackedInt32Array(0, 0, 0)
+}
+script = ExtResource("4_annotations")
+Annotations = Dictionary[Vector3i, ExtResource("2_um0pc")]({
+Vector3i(0, 0, 0): SubResource("Resource_vesj4")
+})
+Baseline = Dictionary[Vector3i, Vector2i]({
+Vector3i(0, 0, 0): Vector2i(0, 0)
+})
