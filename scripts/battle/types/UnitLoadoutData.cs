@@ -22,7 +22,7 @@ public partial class UnitLoadoutData : Resource
   {
     if (Combatant is null)
       throw new InvalidOperationException($"{nameof(UnitLoadoutData)} requires a {nameof(Combatant)}.");
-    if (Armor is not null && !HasArmorCapability(Armor))
+    if (Armor is not null && !Armor.Capabilities.AsValueEnumerable().Any(capability => capability is ArmorCapabilityData))
       throw new InvalidOperationException(
         $"Loadout armor '{Armor.Name}' carries no {nameof(ArmorCapabilityData)}; only armor-capable items can be equipped as armor.");
   }
@@ -39,11 +39,4 @@ public partial class UnitLoadoutData : Resource
     return new UnitLoadout(new Combatant(Combatant, faction), weapon, armor);
   }
 
-  private static bool HasArmorCapability(EquippableItemData item)
-  {
-    foreach (ItemCapabilityData capability in item.Capabilities)
-      if (capability is ArmorCapabilityData)
-        return true;
-    return false;
-  }
 }

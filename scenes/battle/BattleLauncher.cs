@@ -4,8 +4,8 @@ using Godot;
 
 /// <summary>
 /// Standalone host that resolves the exported battle type and presents BattleScene; the geoscape
-/// handoff presents with allowReturn true instead. The runtime is caller-owned until Present
-/// succeeds, so load/instantiation/binding failures free it here; afterwards the host owns it.
+/// handoff presents with allowReturn true instead. Validate the fresh host before starting
+/// the runtime, then bind it immediately. The host owns all presentation-failure cleanup.
 /// </summary>
 public sealed partial class BattleLauncher : Node
 {
@@ -18,33 +18,25 @@ public sealed partial class BattleLauncher : Node
     BattleSetup setup = BattleSetupResolver.Resolve(type).Match(
       Right: resolved => resolved,
       Left: failure => throw new System.InvalidOperationException($"Battle setup failed: {failure.Message}"));
-    BattleRuntime runtime = BattleFactory.Start(setup).Match(
-      Right: started => started,
-      Left: failure => throw new System.InvalidOperationException($"Battle start failed: {failure.Message}"));
-    BattleScene? battle = null;
-    bool presented = false;
+    PackedScene scene = ResourceLoader.Load<PackedScene>("res://scenes/battle/BattleScene.tscn")
+      ?? throw new System.InvalidOperationException("Could not load the battle scene.");
+    var battle = scene.InstantiateAs<BattleScene>("The battle scene");
     try
     {
-      PackedScene scene = ResourceLoader.Load<PackedScene>("res://scenes/battle/BattleScene.tscn")
-        ?? throw new System.InvalidOperationException("Could not load the battle scene.");
-      battle = scene.InstantiateAs<BattleScene>("The battle scene");
+      BattleRuntime runtime = BattleFactory.Start(setup).Match(
+        Right: started => started,
+        Left: failure => throw new System.InvalidOperationException($"Battle start failed: {failure.Message}"));
+      // Binding only assigns this fresh host's guaranteed runtime/setup.
       battle.Present(runtime, setup); // allowReturn stays false: standalone battles end here
-      presented = true; // the host owns the runtime once Present succeeds
       AddChild(battle);
       battle.InitializePresentation();
     }
     catch
     {
-      if (presented)
-        battle!.Dispose(); // host-owned runtime; idempotent across the removal below
-      else
-        runtime.Dispose(); // never bound to a host
-      if (battle is not null)
-      {
-        if (battle.IsInsideTree())
-          RemoveChild(battle);
-        battle.QueueFree(); // a failed installation leaves no instantiated host behind
-      }
+      battle.Dispose();
+      if (battle.IsInsideTree())
+        RemoveChild(battle);
+      battle.QueueFree();
       throw;
     }
   }

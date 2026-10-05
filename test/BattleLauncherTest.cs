@@ -2,6 +2,7 @@ using FunProject.Battle;
 using Godot;
 using GdUnit4;
 using System;
+using System.Threading.Tasks;
 using static FunProject.Tests.GeoscapeTestScenes;
 using static GdUnit4.Assertions;
 
@@ -32,8 +33,9 @@ public partial class BattleLauncherTest
   }
 
   [TestCase(TestName = "A failing standalone startup leaves no host and a disposed runtime")]
-  public void FailingStartupLeavesNoHostAndDisposedRuntime()
+  public async Task FailingStartupLeavesNoHostAndDisposedRuntime()
   {
+    await using var cleanup = new DeferredNodeCleanup();
     var capture = new HookCaptureSystemData();
     var type = TestData.MakeDuelBattleType();
     type.Systems.Add(capture);

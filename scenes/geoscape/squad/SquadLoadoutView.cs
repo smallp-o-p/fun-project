@@ -99,7 +99,7 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     // the previous failure: the next attempt starts from fresh presentation state.
     var deploy = GetNode<Button>("%DeployButton");
     deploy.Visible = _launchMission.IsSome;
-    deploy.Disabled = GetSelectedCombatants().Count == 0;
+    deploy.Disabled = !_slots.AsValueEnumerable().Any(slot => slot.IsSome);
     GetNode<Label>("%DeploymentFailure").Visible = false;
 
     RebuildSlots();

@@ -388,7 +388,7 @@ public class BattleSetupResolverTest
   [TestCase(TestName = "A side deployment replaces only its designated non-player slot")]
   public void SideDeploymentReplacesOnlyItsDesignatedSlot()
   {
-    var type = MissionStageType();
+    var type = TestData.MakeTacticalBattleType(enemyCells: 4);
     var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 2);
     mission.SpecialEnemies.Add(new UnitLoadoutData
     {
@@ -418,7 +418,7 @@ public class BattleSetupResolverTest
   [TestCase(-7, TestName = "Seed -7: a side deployment never changes the seeded map choice")]
   public void SideDeploymentPreservesSeededMapChoice(int seed)
   {
-    var type = MissionStageType();
+    var type = TestData.MakeTacticalBattleType(enemyCells: 4);
     type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(5, 1, 1),
       (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
       (new Vector3I(1, 0, 0), TestData.SpawnTile(1)),
@@ -442,7 +442,7 @@ public class BattleSetupResolverTest
   [TestCase(-7, TestName = "Seed -7: same-seed resolutions of a generated force repeat the layout with fresh identities")]
   public void GeneratedForcesRepeatLayoutWithFreshIdentities(int seed)
   {
-    var type = MissionStageType();
+    var type = TestData.MakeTacticalBattleType(enemyCells: 4);
     var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 3);
     mission.OrdinaryEnemies.Add(new UnitLoadoutData
     {
@@ -482,7 +482,7 @@ public class BattleSetupResolverTest
   [TestCase(TestName = "Generated ordinary draws span the pool and the count range across seeds 1 through 32")]
   public void GeneratedOrdinaryDrawsSpanPoolAndCountAcrossSeeds()
   {
-    var type = MissionStageType();
+    var type = TestData.MakeTacticalBattleType(enemyCells: 4);
     var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 4);
     mission.OrdinaryEnemies.Add(new UnitLoadoutData
     {
@@ -550,21 +550,6 @@ public class BattleSetupResolverTest
       sideDeployment: Some(force)).RequireLeft();
 
     Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall, failure.Reason);
-  }
-
-  // Two-faction duel on a one-map pool with one player cell and four enemy cells, enough for
-  // the largest force the mission tests generate (two ordinary draws plus one special).
-  private static BattleTypeData MissionStageType()
-  {
-    var type = TestData.MakeDuelBattleType();
-    type.MapPool.Clear();
-    type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(5, 1, 1),
-      (new Vector3I(0, 0, 0), TestData.SpawnTile(0)),
-      (new Vector3I(1, 0, 0), TestData.SpawnTile(1)),
-      (new Vector3I(2, 0, 0), TestData.SpawnTile(1)),
-      (new Vector3I(3, 0, 0), TestData.SpawnTile(1)),
-      (new Vector3I(4, 0, 0), TestData.SpawnTile(1)))));
-    return type;
   }
 
   [TestCase(TestName = "Campaign equipment slots are never read; only loadout equipment equips")]

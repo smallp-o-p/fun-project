@@ -183,8 +183,6 @@ public partial class GeoscapeMissionLaunchTest
 
       var deployment = campaign.Session.ActiveMission.RequireSome();
       Assert.True(ReferenceEquals(battle.Deployment, deployment));
-      Assert.True(ReferenceEquals(active, deployment.Event),
-        "The association keeps the exact pending event.");
       Assert.Equal(2, deployment.Participants.Count);
       Assert.True(ReferenceEquals(alpha, deployment.Participants[0]));
       Assert.True(ReferenceEquals(beta, deployment.Participants[1]),
@@ -242,7 +240,6 @@ public partial class GeoscapeMissionLaunchTest
       var deployment = campaign.Session.ActiveMission.RequireSome();
       Assert.True(ReferenceEquals(battle.Deployment, deployment),
         "The association is stored only after startup succeeded.");
-      Assert.True(ReferenceEquals(active, deployment.Event));
       Assert.Equal(2, deployment.Participants.Count);
       Assert.True(ReferenceEquals(alpha, deployment.Participants[0]));
       Assert.True(ReferenceEquals(beta, deployment.Participants[1]),

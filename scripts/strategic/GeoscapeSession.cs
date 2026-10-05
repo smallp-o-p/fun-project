@@ -143,13 +143,10 @@ public sealed class GeoscapeSession
       return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
         MissionLaunchFailureReason.AlreadyLaunched,
         "A mission is already active; it must complete before another launches."));
-    if (_state.Pending.IsNone)
+    if (_state.Pending.Case is not PendingResolution pending)
       return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
         MissionLaunchFailureReason.NoPendingMission,
         "No resolution is pending; open the mission's event before launching."));
-    PendingResolution pending = _state.Pending.Match(
-      value => value,
-      () => throw new InvalidOperationException("Expected a pending resolution."));
     if (!ReferenceEquals(pending.Event, mission))
       return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
         MissionLaunchFailureReason.WrongPendingMission,
@@ -158,7 +155,7 @@ public sealed class GeoscapeSession
     // Captured once, before any validation or startup callback runs: every check, the
     // loadouts, and the association membership share this snapshot, so a startup callback
     // mutating the caller's list cannot desynchronize the battle from the association.
-    var deployment = new MissionDeployment(mission, squad);
+    var deployment = new MissionDeployment(squad);
 
     if (deployment.Participants.Count == 0)
       return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(

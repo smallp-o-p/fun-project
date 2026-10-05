@@ -507,15 +507,14 @@ internal static class TestData
 
   // Two-faction duel on a 2x1x1 map: one spawn cell per side, one unit per side (health 20,
   // aim 65, damage-1 range-10 weapon), one inert objective each.
-  public static BattleTypeData MakeDuelBattleType() => MakeTacticalBattleType(name: "Setup duel");
+  public static BattleTypeData MakeDuelBattleType() => MakeTacticalBattleType();
 
   // One map row of spawn cells — the first playerCells feed the player slot, the rest feed
   // the enemy slot — with one standard roster entry and objective per side. Mission tests
   // size squads and enemy forces against the cell counts.
-  public static BattleTypeData MakeTacticalBattleType(int playerCells = 1, int enemyCells = 1,
-    string name = "Setup duel")
+  public static BattleTypeData MakeTacticalBattleType(int playerCells = 1, int enemyCells = 1)
   {
-    var type = new BattleTypeData { Name = name };
+    var type = new BattleTypeData { Name = "Setup duel" };
     List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
     for (int x = 0; x < playerCells + enemyCells; x++)
       tiles.Add((new Vector3I(x, 0, 0), SpawnTile(x < playerCells ? 0 : 1)));

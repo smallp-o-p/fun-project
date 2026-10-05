@@ -115,15 +115,13 @@ public sealed partial class BattleScene : Node3D
     Dispose();
   }
 
-  // The intent is re-gated at the host: only a terminal, drained battle may request the
-  // campaign return.
+  private bool CanReturn => _allowReturn && !_disposed
+    && _runtime.Query(new GetBattleOutcomeQuery()).IsSome && !_director.Busy;
+
   private void OnReturnIntent()
   {
-    if (!_allowReturn || _disposed)
-      return;
-    if (_runtime.Query(new GetBattleOutcomeQuery()).IsNone || _director.Busy)
-      return;
-    ReturnRequested?.Invoke();
+    if (CanReturn)
+      ReturnRequested?.Invoke();
   }
 
   private void RefreshView()
@@ -139,18 +137,7 @@ public sealed partial class BattleScene : Node3D
     else
       _view.HideTargeting();
 
-    UpdateReturnAvailability();
-  }
-
-  // Availability is a fact of phase plus an idle playback queue — computed at initial
-  // presentation and after every refresh (results and playback drain included), never
-  // dependent on a later BattleOver transition.
-  private void UpdateReturnAvailability()
-  {
-    bool available = _allowReturn && !_disposed
-      && _runtime.Query(new GetBattleOutcomeQuery()).IsSome
-      && !_director.Busy;
-    _view.ShowReturn(available);
+    _view.ShowReturn(CanReturn);
   }
 
   private void InstantiateMap()
