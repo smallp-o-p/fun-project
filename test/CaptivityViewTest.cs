@@ -322,8 +322,9 @@ public class CaptivityViewTest
     Assert.True(received[0].GetParent() is null); // emitted live and unparented
   }
 
-  [TestCase(TestName = "Missing and wrong-root SquadViewScene are authoring errors")]
-  public async Task MissingAndWrongRootSquadViewSceneAreAuthoringErrors()
+  [TestCase(false, TestName = "A missing SquadViewScene is an authoring error")]
+  [TestCase(true, TestName = "A wrong-root SquadViewScene is an authoring error")]
+  public async Task MissingAndWrongRootSquadViewSceneAreAuthoringErrors(bool wrongRoot)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var captive = MakeCombatant("Alpha", MakeFaction("Cult"));
@@ -335,7 +336,7 @@ public class CaptivityViewTest
     SysColGeneric.List<GeoscapeView> requested = [];
     view.ViewRequested += requested.Add;
 
-    view.SquadViewScene = Pack(new Label { Name = "NotASquadLoadoutView" });
+    view.SquadViewScene = wrongRoot ? Pack(new Label { Name = "NotASquadLoadoutView" }) : null;
 
     // Free (not QueueFree) leaves no orphan behind the synchronous throw.
     long orphansBefore = (long)Performance.Singleton.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);
