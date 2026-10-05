@@ -160,6 +160,25 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
+  public void CompletionDisablesRetainedOptions()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    var query = new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit));
+    IReadOnlyList<UnitAction> actions = battle.Query(query);
+    EvaluateAll(actions);
+
+    battle.ApplyDamage(battle.EnemyUnit, 999); // the player's eliminate-all objective wins the battle
+
+    Assert.False(battle.Query(new CanUnitActNow(battle.PlayerUnit)));
+    foreach (UnitAction action in actions)
+      Assert.False(action.IsAvailable);
+
+    IReadOnlyList<UnitAction> afterWin = battle.Query(query);
+    Assert.True(ReferenceEquals(actions, afterWin));
+    Assert.True(ReferenceEquals(Row<MoveActionDefinition>(actions), Row<MoveActionDefinition>(afterWin)));
+  }
+
+  [TestCase]
   public void AttackAndReloadTrackRetainedMagazineState()
   {
     var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 1);

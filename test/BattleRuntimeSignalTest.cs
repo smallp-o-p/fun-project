@@ -1,6 +1,7 @@
 using FunProject.Battle;
 using GdUnit4;
 using Godot;
+using System;
 using System.Collections.Generic;
 
 [TestSuite]
@@ -57,5 +58,26 @@ public sealed partial class BattleRuntimeSignalTest
     // must never fire for a failed submission — spec: "no reaction runs".
     Assert.Equal(2, started);
     Assert.Equal(1, completed);
+  }
+
+  [TestCase(TestName = "A completed battle rejects a new submission before either action signal fires")]
+  public void CompletedBattleRejectsSubmissionBeforeActionSignals()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    battle.ApplyDamage(battle.EnemyUnit, 999); // the player's eliminate-all objective ends the battle
+    battle.ClearEvents();
+    int started = 0;
+    int completed = 0;
+    battle.Runtime.ActionStarted += _ => started++;
+    battle.Runtime.ActionCompleted += _ => completed++;
+    var action = BattleAction.SpawnUnit(
+      TestData.MakeCombatant("Reinforcement", battle.PlayerFaction), battle.At(0, 0, 0));
+
+    Assert.Throws<InvalidOperationException>(() => battle.Submit(action));
+
+    Assert.Equal(0, started);
+    Assert.Equal(0, completed);
+    Assert.Equal(0, battle.Events.Count);
+    Assert.True(battle.Query(new GetUnitAtTile(battle.At(0, 0, 0))).IsNone);
   }
 }

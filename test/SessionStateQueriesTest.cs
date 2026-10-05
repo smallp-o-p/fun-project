@@ -18,4 +18,16 @@ public sealed partial class SessionStateQueriesTest
 
     Assert.Equal(battle.EnemyFaction, battle.Query(new GetActiveSideQuery()));
   }
+
+  [TestCase(TestName = "Outcome query reads absence during play and the decided outcome after completion")]
+  public void BattleOutcomeQueryReadsPlayAndCompletion()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+
+    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsNone);
+
+    battle.ApplyDamage(battle.EnemyUnit, 999); // the player's eliminate-all objective ends the battle
+
+    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetBattleOutcomeQuery()).RequireSome());
+  }
 }

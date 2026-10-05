@@ -53,6 +53,8 @@ The current executor API is:
 
 There are no executor-level lifecycle events and no `LastResult`: outcomes are observed through the returned `BattleActionExecResult` (carrying the committed `BattleEvent` stream) and through committed session state.
 
+Submitting to a battle whose outcome is already decided is a caller error: both submission doors — `BattleRuntime.ExecuteAction` (before its `ActionStarted` signal) and a direct executor `Submit` — reject it with an `InvalidOperationException` through one shared internal admission guard, before any queue mutation, action signal, or committed event. Completion during a submission is the other case: it finishes the current step's atomic effect and causal event delivery, then the executor drops queued interrupts and remaining composite steps, and the original submission still returns its committed events and completes normally unless an actual failure occurred.
+
 The hook registry lives on the executor: its constructor registers the default systems — status effects, armor regen, stun recovery, capability effects, buff evaluation, and `ObjectiveSystem` — directly. `ObjectiveSystem` is registered once under the `BattleEventTag` catch-all at priority +100, receives every event, and filters objectives by their declared observed keys internally; it has no self-registration or executor back-reference. An objective flips mid-dispatch when a committed event makes its `Check` return Passed or Failed, and the authored directive then interprets the flip. The `RegisterHook`/`UnregisterHook` methods above are the registration surface. `BattleRuntime.RegisterHook` is the facade door delegating to the executor — the session no longer knows hooks exist; it only announces events. Disposing the executor detaches its `BattleEventCommitted` subscription from the session.
 
 ## One Executor Per Session
@@ -73,7 +75,7 @@ The current happy-path flow is:
 8. the executor closes the action window once the step's execution path returns, whether it completed, failed, or threw
 9. a failed step's collected interrupts are discarded; nothing is enqueued (and a `Result.Rejected` throws out of `Submit`)
 10. on success, the executor aggregates the window's interrupt actions and reverses that combined list once (never per event), then inserts the result ahead of paused work — so an earlier-raised event's interrupts still run before a later event's
-11. if the battle ended during the step's dispatch, the executor clears remaining queued work instead: unexecuted composite steps and queued interrupts are dropped
+11. if the battle's outcome was decided during the step's dispatch, the executor clears remaining queued work instead: unexecuted composite steps and queued interrupts are dropped
 12. otherwise, the executor continues until the submitted action and its interrupts settle
 13. `Submit` returns exactly one `BattleActionExecResult`: the submitted action and every event committed during its resolution
 

@@ -47,6 +47,12 @@ public sealed class GetActiveSideQuery : IBattleSessionQuery<Faction>
   public Faction Execute(BattleSession session) => session.ActiveSide;
 }
 
+// The battle's single authoritative completion value: None while the battle is live.
+public sealed class GetBattleOutcomeQuery : IBattleSessionQuery<Option<BattleOutcome>>
+{
+  public Option<BattleOutcome> Execute(BattleSession session) => session.Outcome;
+}
+
 // The battle's lifecycle phase. Total by construction.
 public sealed class GetBattlePhaseQuery : IBattleSessionQuery<BattlePhase>
 {

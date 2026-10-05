@@ -70,6 +70,26 @@ public class ObjectiveBattleTest
     Assert.Equal(targetTurn, battle.Session.TurnNumber);
   }
 
+  [TestCase(TestName = "An activation-ended objective win stops the turn continuation")]
+  public void ActivationCompletionStopsTurnContinuation()
+  {
+    using var battle = BattleFixture.Duel();
+    battle.Session.AddObjective(battle.PlayerFaction, new FakeObjective(new FakeObjectiveData
+    {
+      Complete = true,
+      Observe = typeof(UnitActivationEndedBattleEvent),
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    }));
+    battle.ClearEvents();
+
+    battle.Pass(battle.PlayerUnit);
+
+    Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
+    Assert.Equal(1, battle.Events.EventsOf<SessionEndedBattleEvent>().Length);
+    Assert.Equal(0, battle.Events.EventsOf<TurnEndedBattleEvent>().Length);
+    Assert.Equal(0, battle.Events.EventsOf<TurnStartedBattleEvent>().Length);
+  }
+
   [TestCase(TestName = "A failed objective can queue a follow-up whose own outcome decides the battle")]
   public void FailedObjectiveQueuesFollowUpWithInstanceBoundOutcome()
   {

@@ -469,6 +469,11 @@ public sealed class BattleSession
 
     RaiseEvents(new UnitActivationEndedBattleEvent(unit, unitPoint));
 
+    // The activation-ended event itself may decide the outcome (objective directive); its
+    // completion owns the stop — no turn continuation runs after it.
+    if (Outcome.IsSome)
+      return;
+
     if (!GetFactionAliveUnits(activeSide).AsValueEnumerable().Any(CanUnitActNow))
       EndFactionTurn(activeSide);
   }
@@ -602,10 +607,14 @@ public sealed class BattleSession
 
   internal bool CanUnitActNow(BattleUnitState unit)
   {
-    if (Phase != BattlePhase.InProgress)
+    if (Phase == BattlePhase.Setup)
       throw new InvalidOperationException("Trying to check unit while the battle is not in progress.");
 
-    return unit.Side == ActiveSide && _scheduler.IsUnitAvailable(unit) && unit.CanAct();
+    // A completed battle exposes a total availability answer: nothing can act.
+    return Outcome.IsNone
+      && unit.Side == ActiveSide
+      && _scheduler.IsUnitAvailable(unit)
+      && unit.CanAct();
   }
 
   internal static double GetGridDistance(Vector3I source, Vector3I destination)

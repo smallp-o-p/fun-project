@@ -66,6 +66,7 @@ public sealed class BattleRuntime : IDisposable
   public BattleActionExecResult ExecuteAction(BattleAction action)
   {
     ThrowIfDisposed();
+    _actions.EnsureCanSubmit();
     ActionStarted.Invoke(action);
     BattleActionExecResult result = _actions.Submit(action);
     ActionCompleted.Invoke(result);
