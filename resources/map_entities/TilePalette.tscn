@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://b7qghi6jn3psv"]
+
+[ext_resource type="PackedScene" path="res://resources/map_entities/FloorTile.tscn" id="1_g7aw0"]
+[ext_resource type="PackedScene" path="res://resources/map_entities/Block.tscn" id="4_p4raq"]
+[ext_resource type="PackedScene" path="res://resources/map_entities/Car.tscn" id="5_ipbke"]
+
+[node name="TilePalette" type="Node3D" unique_id=760079746]
+
+[node name="FloorTile" parent="." unique_id=1826370727 instance=ExtResource("1_g7aw0")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.55, 0)
+
+[node name="Block" parent="." unique_id=736389376 instance=ExtResource("4_p4raq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="Car" parent="." unique_id=1072632633 instance=ExtResource("5_ipbke")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)

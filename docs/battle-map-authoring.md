@@ -1,64 +1,91 @@
-# Authoring battle maps
+# Battle map authoring
 
-Battle maps are authored in the Godot editor on a **`GridMap`** and baked to a `BattleMapData`
-`.tres` that `BattleMapData.CreateBoardState()` turns into a `BattleBoardState`. The GridMap is
-Godot's native 3D tiler, so its cells line up 1:1 with the board's `Vector3I` grid and you see
-the real meshes in 3D while you author.
+Use Godot 4.7.2 .NET with the **Battle box annotations** plugin enabled.
 
-## Pieces
+## Brushes
 
-- **`TileBrushData`** (`scripts/battle/map`) — per-tile gameplay template: `Walkable`,
-  `BlocksLineOfSight`, `CoverDirections` + `CoverAmount` (amount editable only when a direction
-  is set), `SpawnFactionSlot` (-1 = none). All independent — a wall with no cover, or walkable
-  smoke that blocks LOS, are both legal. Cover is never inferred.
-- **`BattleMapAuthoring`** (`scenes/battle/authoring`) — a `[Tool]` node that **extends
-  `GridMap`**; you paint terrain directly on it. Its `MeshLibrary` supplies the terrain meshes;
-  the `Brushes` palette (`Dictionary<StringName, TileBrushData>`) maps each MeshLibrary item
-  **name** to a gameplay brush. The **Bake to BattleMapData** button reads the painted cells and
-  writes `TargetPath`.
-- **`BattleMapBaker` / `MapDeployment` / `MapSpawnZoneData`** — pure C# (`scripts/battle/map`),
-  no Godot loading, unit-tested.
+`scenes/battle/authoring/markers/MarkerMeshlib.tscn` contains the brush meshes.
+Each `BattleAnnotationMarker` is one MeshInstance3D with a `Defaults`
+BattleFootprintData resource. The same resource is stored on its **Mesh** as
+`footprint_data` metadata, so edits to default fields survive native export.
+Save the brush scenes before updating the MeshLibrary.
 
-## Coordinate mapping
+`MarkerPalette.tres` is an ordinary MeshLibrary assigned to an annotator's
+**Markers** property. Use Godot's MeshLibrary **Update from Scene** with transforms
+applied. Existing entries are matched by node name: preserve names/IDs used by
+painted cells. The supplied IDs remain 0 (Annotation box), 1 (Floor), and 2 (Solid),
+even when their order in the source scene changes. Do not clear and rebuild a
+palette that already has painted users.
 
-A `GridMap` cell `Vector3I(x, y, z)` is already board space: **X = width** (East = +X),
-**Y = elevation/level**, **Z = depth** (South = +Z), consistent with the engine's `North = -Z`.
-The baker normalizes painted cells to a `(0,0,0)` origin and sets `AuthoredTilesAreComplete =
-true`, so any unpainted cell is a hole.
+## Annotate and export an entity
 
-## Editor setup (one-time)
+1. Open `scenes/battle/authoring/BattleEntityAnnotator.tscn` and save a copy.
+2. Assign one mesh to **Model**, a MeshInstance3D. Its transform and active materials
+   are preserved at export. The tool does not compile branches of meshes.
+3. Assign the brush MeshLibrary on the root. Paint unit cells in the native
+   **Annotations** GridMap. Cell `(0,0,0)` spans the box from `(0,0,0)` to `(1,1,1)`.
+4. Select one painted cell and choose **Inspect selected box** in **Box annotations**.
+   First inspection copies the brush's authored footprint resource; explicit flags replace all brush flags,
+   including false values. Erased cells retain stored overrides but are excluded
+   from export. Repainting their coordinates applies the overrides again.
+   **Reset annotations** clears overrides with confirmation and supports Undo.
+5. Choose a separate **Export Path** and click **Export BattleProp**. Save the editable
+   source too. Exported props contain the finished mesh and a resolved
+   Vector3I-to-BattleFootprintData dictionary in the Mesh's `battle_footprint`
+   metadata. Native export strips custom node properties, so the Mesh owns this data.
 
-1. Build a **`MeshLibrary`** with one item per terrain type; name items meaningfully
-   (e.g. `floor`, `wall`, `cover_n`, `spawn_a`).
-2. Author a `TileBrushData` `.tres` for each meaning:
-   - floor = `Walkable`
-   - wall = `!Walkable` + `BlocksLineOfSight` (cover stays `None` ⇒ zero cover)
-   - cover = `Walkable` + `CoverDirections` + `CoverAmount`
-   - spawn = a floor brush + `SpawnFactionSlot = N`
-3. Create a scene with a **`BattleMapAuthoring`** (GridMap) node; assign the `MeshLibrary`;
-   fill `Brushes` (item name → brush `.tres`); set `TargetPath`.
+Uninspected cells export the footprint resource authored on their brush mesh.
+Missing brush metadata is an authoring error; no empty footprint resource is
+invented. Inspector visits are only needed to create per-cell overrides.
 
-## Workflow
+The supplied Floor and Solid brushes set only HasFloor and movement/sight blocking
+respectively. Geometry never infers flags. Cover directions/amount, bottom and top
+vertical sight blocking, and other cell flags remain explicit. Current maps reject
+WalkableTop and elevated HasFloor because there is one walkable ground layer.
 
-- **Create:** paint the 3D grid, click **Bake**.
-- **Edit:** reopen the scene, repaint, re-bake.
+## Tile palette
 
-The `.tscn` is the source of truth; the baked `.tres` is a build artifact. A painted cell whose
-MeshLibrary item name isn't in `Brushes` bakes as a plain walkable floor.
+`resources/map_entities/TilePalette.tscn` instances the finished props as mesh
+children of a Node3D. Each instance subtracts `(0.5,0.5,0.5)` from the exported model
+position to align the entity's corner-based annotation coordinates with GridMap's
+centered cells. Keep that placement when replacing a finished model.
 
-## Spawning from a baked map
+`resources/map_entities/MapPalette.tres` is an ordinary MeshLibrary. Use its native
+**Update from Scene**, applying transforms, after re-exporting entities. This keeps
+existing item names/IDs (FloorTile 0, Block 1, Car 2). Material slots, mesh transforms,
+footprint metadata and explicitly authored collision travel through native export.
+There are no custom ItemId fields, folder scans, or recursive mesh compiler.
 
-`BattleSetupResolver.Resolve(type, seed?, playerDeployment?)` chooses the map and
-builds ordered sides. `MapDeployment.AssignSpawns(map, slot, loadouts)` pairs each
-side's roster directly with that slot's cells, sorted X/Y/Z. The slot is the
-side's index in `BattleTypeData.Factions`; roster order is preserved.
+## Paint and bake a map
 
-The resolved `BattleSetup` groups each faction with its objectives and positioned
-units. `BattleFactory.Start(setup)` creates a fresh board, checks all placements,
-registers systems, and submits the spawn, object-placement, and start actions.
-An out-of-bounds or blocked cell is a cell failure; insufficient slot capacity
-is `SpawnSlotShortfall`.
+1. Open `scenes/battle/authoring/BattleMapAuthoring.tscn` and save a copy.
+2. Assign the tile MeshLibrary to **Palette**. Floors and Props immediately use it.
+3. Paint ground items in **Floors** and obstacles/decorations in **Props**. Each
+   placement expands the item's whole footprint. Both anchor layers remain at Y=0;
+   upright Y quarter-turns rotate the mesh and cover directions together.
+4. Set **Spawn Slots** (cell to faction slot); each spawn needs a walkable floor.
+5. Click **Bake BattleMap** and save to retain data in the editable scene. To make a
+   separate runtime scene, select **Export Path** and click **Export BattleMap**.
+   Export includes owned Floors/Props GridMaps and their serialized palette.
 
-A supplied `PlayerDeployment` retains its campaign faction and combatants. It
-replaces the player roster while keeping that side's authored objectives and
-spawn slot. Startup never reassigns a combatant's owning faction.
+Bake reads the assigned palette only. After editing an entity, export it, update
+its native palette, then rebake affected maps. Missing footprint metadata produces
+an authoring error rather than silently discarding gameplay data.
+
+Every prop volume cell, including elevated volumes, needs floor support at its
+projected X/Z coordinate. Duplicate floor claims and overlapping prop volumes are
+rejected even when their blocking flags are false. At ground level, prop flags
+replace floor flags while preserving the floor's existence. Higher prop volumes
+never become additional walkable floors. Internal cover edges are suppressed;
+external cover rotates with placement. Conflicting cover strengths on different
+sides still require the separate directional-cover extension.
+
+Map roots and GridMaps use identity transforms, centered unit cells and Cell Scale 1.
+Floors use collision layer 1 for native picking; Props use layer 2 so they do not
+intercept floor rays. HasFloor is gameplay data; entity export does not generate
+collision. For floor picking, add a StaticBody3D with CollisionShape3D children
+under the finished prop mesh in the palette source scene, then update the native
+MeshLibrary. Place the shapes at the intended walkable surface and leave holes
+uncovered. Re-exporting an entity replaces its finished scene, so keep additional
+collision in the palette source scene when it must survive entity re-export.
+Runtime uses saved MapData and native GridMaps without palette loading or rebaking.

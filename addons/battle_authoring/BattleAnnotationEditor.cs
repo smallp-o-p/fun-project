@@ -1,0 +1,173 @@
+#if TOOLS
+using Godot;
+
+[Tool]
+public partial class BattleAnnotationEditor : EditorPlugin
+{
+  private EditorDock _dock = null!;
+  private bool _dockOpen;
+  private Label _status = null!;
+  private Button _inspect = null!;
+  private Button _reset = null!;
+  private ConfirmationDialog _confirmReset = null!;
+  private GridMapEditorPlugin? _nativeGridEditor;
+  private GridMap? _grid;
+  private BattleEntityAnnotator? _annotator;
+  private BattleEntityAnnotator? _resetTarget;
+  private Node? _sceneRoot;
+  private readonly SysColGeneric.HashSet<ulong> _knownCells = [];
+  private AnnotationInspector _annotationInspector = null!;
+  public override void _EnterTree()
+  {
+    _annotationInspector = new AnnotationInspector { Editor = this };
+    AddInspectorPlugin(_annotationInspector);
+    _dock = GD.Load<PackedScene>("res://addons/battle_authoring/BattleAnnotationDock.tscn").Instantiate<EditorDock>();
+    _status = _dock.GetNode<Label>("Panel/Status");
+    _inspect = _dock.GetNode<Button>("Panel/Inspect");
+    _reset = _dock.GetNode<Button>("Panel/Reset");
+    _confirmReset = _dock.GetNode<ConfirmationDialog>("ConfirmReset");
+    // Method-name callables survive C# reload without retaining stale delegates.
+    _inspect.Connect(Button.SignalName.Pressed, new Callable(this, MethodName.InspectSelectedBox));
+    _reset.Connect(Button.SignalName.Pressed, new Callable(this, MethodName.RequestReset));
+    _confirmReset.Connect(ConfirmationDialog.SignalName.Confirmed, new Callable(this, MethodName.ResetAnnotations));
+    AddDock(_dock);
+    _dock.Close();
+    Connect(SignalName.SceneChanged, new Callable(this, MethodName.TrackScene));
+    TrackScene(EditorInterface.Singleton.GetEditedSceneRoot());
+  }
+  public override void _ExitTree()
+  {
+    Disconnect(SignalName.SceneChanged, new Callable(this, MethodName.TrackScene));
+    if (GodotObject.IsInstanceValid(_sceneRoot) && _sceneRoot!.IsConnected(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene)))
+      _sceneRoot.Disconnect(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene));
+    RemoveInspectorPlugin(_annotationInspector);
+    _annotationInspector.Dispose();
+    RemoveDock(_dock);
+    _dock.QueueFree();
+  }
+
+  // Dependent-scene reload pumps editor frames during teardown. Resume only when
+  // selection and Inspector history belong to the newly active scene.
+  private void PauseScene() => SetProcess(false);
+  private void TrackScene(Node? root)
+  {
+    if (GodotObject.IsInstanceValid(_sceneRoot) && _sceneRoot!.IsConnected(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene)))
+      _sceneRoot.Disconnect(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene));
+    _sceneRoot = root;
+    if (_sceneRoot is not null) _sceneRoot.Connect(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene));
+    SetProcess(true);
+  }
+
+  public override bool _Handles(GodotObject obj) => obj is GridMap grid && GodotObject.IsInstanceValid(grid) &&
+    grid.Name == "Annotations" && grid.GetParent() is BattleEntityAnnotator;
+  public override void _Edit(GodotObject obj)
+  {
+    // Root deletion/Undo does not emit SceneChanged. Native selection dispatch
+    // resumes annotation polling only after a restored grid is back in the tree.
+    if (obj is GridMap grid && GodotObject.IsInstanceValid(grid) && grid.IsInsideTree() && _Handles(grid))
+      TrackScene(EditorInterface.Singleton.GetEditedSceneRoot());
+  }
+
+  public override void _Process(double delta)
+  {
+    if (!GodotObject.IsInstanceValid(_nativeGridEditor))
+      foreach (var plugin in GetTree().Root.FindChildren("*", "GridMapEditorPlugin", true, false))
+        if (plugin is GridMapEditorPlugin native) { _nativeGridEditor = native; break; }
+    var nodes = EditorInterface.Singleton.GetSelection().GetSelectedNodes();
+    _grid = nodes.Count == 1 && nodes[0] is GridMap grid && _Handles(grid) ? grid : null;
+    _annotator = _grid?.GetParent() as BattleEntityAnnotator;
+    bool showDock = _annotator is not null;
+    if (showDock != _dockOpen)
+    {
+      _dockOpen = showDock;
+      if (showDock) _dock.Open();
+      else _dock.Close();
+    }
+    if (EditorInterface.Singleton.GetInspector().GetEditedObject() is BattleFootprintData inspected &&
+        _knownCells.Contains(inspected.GetInstanceId()) && !CanEditCell(inspected))
+    {
+      // Node history must dispatch native editors when leaving annotation inspection.
+      EditorInterface.Singleton.InspectObject(_grid ?? (GodotObject)EditorInterface.Singleton.GetEditedSceneRoot(), inspectorOnly: false);
+    }
+    if (_annotator is null || _grid is null) return;
+    var problem = EditingProblem(_annotator);
+    bool nativeSelection = _nativeGridEditor?.GetCurrentGridMap() == _grid &&
+      _annotator.TrySelectedCell(_nativeGridEditor.GetSelectedCells(), out _);
+    _inspect.Disabled = problem.IsSome || !nativeSelection;
+    _reset.Disabled = EditorInterface.Singleton.GetEditedSceneRoot() != _annotator || _annotator.Annotations.Count == 0;
+    _status.Text = problem.Match(message => message, () => $"Boxes: {_grid.GetUsedCells().Count} · Cell size {_grid.CellSize} (unit grid)\n" +
+      "Paint brushes for their flags; inspect a cell to override them.");
+    // Close an already-open cell resource as soon as native painting invalidates its coordinates.
+    if (problem.IsSome && EditorInterface.Singleton.GetInspector().GetEditedObject() is BattleFootprintData)
+      EditorInterface.Singleton.InspectObject(_grid);
+  }
+
+  private static Option<string> EditingProblem(BattleEntityAnnotator annotator)
+  {
+    if (EditorInterface.Singleton.GetEditedSceneRoot() != annotator)
+      return Some("Open the entity source scene to annotate; instance overrides are not supported.");
+    return annotator.Validate();
+  }
+
+  private void InspectSelectedBox()
+  {
+    if (_annotator is null || _grid is null || EditingProblem(_annotator).IsSome || _nativeGridEditor?.GetCurrentGridMap() != _grid ||
+        !_annotator.TrySelectedCell(_nativeGridEditor.GetSelectedCells(), out var cell)) return;
+    if (!_annotator.Annotations.TryGetValue(cell, out var data))
+    {
+      var next = _annotator.Annotations.Duplicate();
+      var mesh = _grid.MeshLibrary.GetItemMesh(_grid.GetCellItem(cell));
+      var defaults = (BattleFootprintData)mesh.GetMeta(BattleAnnotationMarker.FootprintMeta).AsGodotObject();
+      data = (BattleFootprintData)defaults.Duplicate();
+      data.ResourceName = $"Box {cell}";
+      next[cell] = data;
+      var history = GetUndoRedo();
+      history.CreateAction("Annotate selected box", customContext: _annotator);
+      history.AddDoProperty(_annotator, BattleEntityAnnotator.PropertyName.Annotations, next);
+      history.AddUndoProperty(_annotator, BattleEntityAnnotator.PropertyName.Annotations, _annotator.Annotations);
+      history.CommitAction();
+    }
+    _knownCells.Add(data.GetInstanceId());
+    EditorInterface.Singleton.InspectObject(data, inspectorOnly: true);
+  }
+
+  private bool CanEditCell(BattleFootprintData cell) =>
+    _annotator is not null && _grid is not null && EditingProblem(_annotator).IsNone && _nativeGridEditor?.GetCurrentGridMap() == _grid &&
+    _annotator.TrySelectedCell(_nativeGridEditor.GetSelectedCells(), out var coordinate) &&
+    _annotator.Annotations.TryGetValue(coordinate, out var current) && current == cell;
+
+  [Tool]
+  private partial class AnnotationInspector : EditorInspectorPlugin
+  {
+    public BattleAnnotationEditor Editor { get; set; } = null!;
+
+    public override bool _CanHandle(GodotObject obj) => obj is BattleFootprintData && Editor._knownCells.Contains(obj.GetInstanceId());
+    public override void _ParseBegin(GodotObject obj)
+    {
+      if (!Editor.CanEditCell((BattleFootprintData)obj))
+        AddCustomControl(new Label { Text = "Select this occupied cell in the entity source to edit its flags.", AutowrapMode = TextServer.AutowrapMode.WordSmart });
+    }
+    public override bool _ParseProperty(GodotObject obj, Variant.Type type, string name, PropertyHint hintType,
+      string hintString, PropertyUsageFlags usageFlags, bool wide) => !Editor.CanEditCell((BattleFootprintData)obj);
+  }
+
+  private void RequestReset()
+  {
+    _resetTarget = _annotator;
+    _confirmReset.PopupCentered();
+  }
+
+  private void ResetAnnotations()
+  {
+    var annotator = _resetTarget;
+    _resetTarget = null;
+    if (!GodotObject.IsInstanceValid(annotator) || EditorInterface.Singleton.GetEditedSceneRoot() != annotator) return;
+    var history = GetUndoRedo();
+    history.CreateAction("Reset box annotations", customContext: annotator);
+    history.AddDoProperty(annotator, BattleEntityAnnotator.PropertyName.Annotations, new Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>());
+    history.AddUndoProperty(annotator, BattleEntityAnnotator.PropertyName.Annotations, annotator!.Annotations);
+    history.CommitAction();
+    EditorInterface.Singleton.InspectObject(annotator.Grid);
+  }
+}
+#endif
