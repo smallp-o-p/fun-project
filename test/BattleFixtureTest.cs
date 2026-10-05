@@ -72,14 +72,13 @@ public partial class BattleFixtureTest
     Assert.Equal(new Vector3I(0, 0, 0), battle.Alive(battle.Unit).Position.Raw);
   }
 
-  [TestCase(TestName = "A startup reinforcement cannot steal an authored fixture role")]
-  public void StartupReinforcementKeepsAuthoredRoles()
-  {
-    var playerFaction = TestData.MakeFaction("Player");
-    var enemyFaction = TestData.MakeFaction("Enemy");
-    var authoredEnemy = TestData.MakeCombatant("Authored", enemyFaction, health: 30);
-    var reinforcement = TestData.MakeCombatant("Interloper", enemyFaction);
-    var setup = new BattleSetup(
+  // Two inert-objective sides with no designated player faction: a startup hook can wipe and
+  // refill a side mid-startup without any objective directive or player-wipe backstop ending
+  // the battle, so both reinforcement scenarios run to completion inside the factory call.
+  private static BattleSetup TwoSideInertObjectiveSetup(
+    Faction playerFaction, Faction enemyFaction, Combatant authoredEnemy,
+    params BattleTypeSystemData[] startupSystems)
+    => new BattleSetup(
       TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
       [
         new BattleSideSetup(playerFaction, [new FakeObjectiveData()],
@@ -88,12 +87,23 @@ public partial class BattleFixtureTest
           [new UnitPlacement(new UnitLoadout(authoredEnemy), new Vector3I(4, 0, 4))]),
       ],
       Seed: 7) with
-    {
-      Systems = [new SetupSystemData { OnRegister = runtime =>
-        runtime.RegisterHook<UnitAddedBattleEvent>(new ReinforceOnceOnFirstUnitAdded(reinforcement, new Vector3I(7, 0, 7))) }],
-    };
+    { Systems = [.. startupSystems] };
 
-    using var battle = new BattleFixture(setup);
+  [TestCase(TestName = "A startup reinforcement cannot steal an authored fixture role")]
+  public void StartupReinforcementKeepsAuthoredRoles()
+  {
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    var authoredEnemy = TestData.MakeCombatant("Authored", enemyFaction, health: 30);
+    var reinforcement = TestData.MakeCombatant("Interloper", enemyFaction);
+
+    using var battle = new BattleFixture(TwoSideInertObjectiveSetup(
+      playerFaction, enemyFaction, authoredEnemy,
+      new SetupSystemData
+      {
+        OnRegister = runtime =>
+        runtime.RegisterHook<UnitAddedBattleEvent>(new ReinforceOnceOnFirstUnitAdded(reinforcement, new Vector3I(7, 0, 7)))
+      }));
 
     // The interrupt actually spawned between the initial placements...
     var interloper = battle.UnitAt(new Vector3I(7, 0, 7));
@@ -102,6 +112,41 @@ public partial class BattleFixtureTest
     Assert.True(ReferenceEquals(battle.EnemyUnit.Combatant, authoredEnemy));
     Assert.False(ReferenceEquals(battle.EnemyUnit, interloper));
     Assert.Equal("Alpha", battle.PlayerUnit.Combatant.Name);
+  }
+
+  [TestCase(TestName = "A startup replacement reusing the authored combatant and cell cannot steal the authored raw unit")]
+  public void StartupReplacementRetainsAuthoredRawUnit()
+  {
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    var authoredEnemy = TestData.MakeCombatant("Authored", enemyFaction, health: 30);
+    var authoredCell = new Vector3I(4, 0, 4);
+
+    using var battle = new BattleFixture(TwoSideInertObjectiveSetup(
+      playerFaction, enemyFaction, authoredEnemy,
+      new SetupSystemData
+      {
+        OnRegister = runtime =>
+        runtime.RegisterHook<TurnStartedBattleEvent>(new ReplaceAuthoredEnemyOnFirstTurnStart(authoredEnemy, authoredCell))
+      }));
+
+    BattleUnitState[] adds = battle.Events.EventsOf<UnitAddedBattleEvent>()
+      .AsValueEnumerable()
+      .Where(added => ReferenceEquals(added.Unit.Combatant, authoredEnemy) && added.Position.Raw == authoredCell)
+      .Select(added => added.Unit)
+      .ToArray();
+
+    // The replacement actually committed on the authored lookup key and the battle survived
+    // the mid-startup wipe, so the role contract below is exercised, not vacuous.
+    Assert.Equal(2, adds.Length);
+    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    // The authored role stays the originally recorded unit: dead but retained...
+    Assert.True(ReferenceEquals(battle.EnemyUnit, adds[0]));
+    Assert.True(battle.EnemyUnit.IsDead);
+    // ...while the replacement occupies the cell, alive and distinct.
+    BattleUnitState replacement = battle.UnitAt(authoredCell);
+    Assert.True(replacement.IsAlive);
+    Assert.False(ReferenceEquals(battle.EnemyUnit, replacement));
   }
 
   private sealed class ReinforceOnceOnFirstUnitAdded(Combatant reinforcement, Vector3I where)
@@ -115,6 +160,28 @@ public partial class BattleFixtureTest
         return [];
       _fired = true;
       return [BattleAction.SpawnUnit(reinforcement, context.Session.Board.At(where))];
+    }
+  }
+
+  // Kills the authored enemy at the first turn start and respawns its exact combatant at the
+  // same cell, so the replacement's unit-added record reuses the authored role's lookup key.
+  private sealed class ReplaceAuthoredEnemyOnFirstTurnStart(Combatant authored, Vector3I cell)
+    : BattleHook<TurnStartedBattleEvent>
+  {
+    private bool _fired;
+
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TurnStartedBattleEvent evt)
+    {
+      if (_fired)
+        return [];
+      _fired = true;
+      BattleUnitState target = context.Session.AliveUnits.AsValueEnumerable()
+        .Single(unit => ReferenceEquals(unit.Combatant, authored));
+      return
+      [
+        BattleAction.ApplyDamage(context.Session.TryGetAlive(target).RequireSome(), 999),
+        BattleAction.SpawnUnit(authored, context.Session.Board.At(cell)),
+      ];
     }
   }
 
