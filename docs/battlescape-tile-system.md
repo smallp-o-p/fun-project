@@ -1,264 +1,66 @@
 # Battlescape Tile System Design
 
-This document defines how tactical tiles should work in the battlescape.
+The tactical board is tile-authoritative. Gameplay truth lives in board state, not in meshes or scene nodes. Presentation becomes richer without changing movement, line of sight, or occupancy.
 
-It describes the intended split between authoritative gameplay state, static map data, presentation, and player input. It also defines the first proof-of-concept scope: flat ground only.
-
-## Goals
-
-- Keep the tactical board tile-authoritative.
-- Avoid splitting gameplay truth across meshes, scene hierarchy, and runtime state.
-- Let presentation become richer over time without changing how movement, line of sight, and occupancy work.
-- Support a simple flat-ground proof of concept first.
-- Preserve a clean path to ramps, stacked floors, walls, cover, hazards, and destructible props later.
+Runtime ownership: [battlescape-architecture.md](battlescape-architecture.md). Map authoring: [battle-map-authoring.md](battle-map-authoring.md).
 
 ## Core Decision
 
-The project should be tile-first.
+The project is tile-first:
 
-That means:
+- the board is the authoritative gameplay model;
+- environment visuals are generated from or attached to tiles;
+- large props declare a tile footprint instead of becoming a second source of truth.
 
-- the board is the authoritative gameplay model
-- environment visuals are generated from or attached to tiles
-- larger environment props declare a tile footprint instead of becoming a separate source of tactical truth
-
-The project should not be environment-first with a separate gameplay grid projected onto arbitrary geometry.
-
-## Why Tile-First Fits This Repo
-
-The current runtime already treats the battlescape as a 3D tile board:
-
-- `BattleBoardState` owns a `BattleTileState` for every `Vector3I` coordinate
-- `BattleTileState` already owns walkability, line-of-sight blocking, hazard state, and occupancy
-- visibility scans a 3D bounding box within Euclidean vision range and raytraces line of sight to each candidate tile
-
-This means the tile system is not a new abstraction. It is an extension of the runtime model that already exists.
+The project is not environment-first with a gameplay grid projected onto arbitrary geometry.
 
 ## Ownership Model
 
-### Authoritative Runtime
+### Authoritative runtime
 
-The authoritative tactical state stays in runtime classes such as:
+`BattleSession`, `BattleBoardState`, `BattleTileState`, and `BattleUnitState` own:
 
-- `BattleSession`
-- `BattleBoardState`
-- `BattleTileState`
-- `BattleUnitState`
+- which cells exist and which are in bounds
+- walkability, LOS blocking, and cover per tile
+- unit and object occupancy, placement, movement, and removal
+- board-local pathfinding
 
-These classes own:
+`BattleTileState` carries `IsWalkable`, `BlocksLineOfSight`, `BlocksVerticalLineOfSight`, and `Cover` (direction + amount). These fields are independent; cover is never inferred. Authored `BattleMapTileData` mirrors the same fields per map cell.
 
-- which cells exist
-- whether a cell is in bounds
-- whether a cell is walkable
-- whether a cell blocks line of sight
-- which unit occupies a cell
-- how occupants are placed, moved, and removed
-- board-local pathfinding queries across traversable cells
-- hazard state and future tactical modifiers
+### Authored map data
 
-### Static Map Data
-
-Static map definitions should eventually live in Godot `Resource` classes.
-
-They should describe:
-
-- board dimensions
-- base floor type per cell
-- elevation per cell or per layer
-- whether a cell is present or absent
-- optional prop placement metadata
-- optional tactical overrides such as walkability or LOS blocking
-
-These resources are authoring inputs, not runtime truth.
+`BattleMapData` is the authored map: `Dimensions` plus a `Tiles` dictionary keyed by `Vector3I`. It is an authoring input, not runtime truth. `new BattleBoardState(mapData)` derives the board: all cells start unwalkable, then authored tiles apply. Unpainted cells are holes. Detail: [battle-map-authoring.md](battle-map-authoring.md).
 
 ### Presentation
 
-Scene nodes own:
-
-- floor meshes
-- prop meshes
-- tile highlights
-- hover feedback
-- selection feedback
-- animations and VFX
-
-Presentation reads board and map data. It does not decide gameplay truth.
+Scene nodes own floor and prop meshes, tile highlights, hover and selection feedback, animations, and VFX. They read board and map data. They never decide gameplay truth.
 
 ### Input
 
-Input should resolve the mouse or cursor to a cell coordinate, then hand that `Vector3I` to controller code.
-
-The input layer should not own tactical meaning beyond identifying the targeted cell.
-
-## Recommended Structure
-
-The tile system should evolve toward these responsibilities:
-
-- `BattleMapData`
-  - static resource describing a map layout
-- `BattleMapTileData`
-  - static per-cell authoring data
-- `BattleBoardState`
-  - authoritative runtime tile state derived from setup and mutations
-  - board-local occupancy mutation and pathfinding
-- `BattleBoardPresenter`
-  - scene-side builder that instantiates visuals from map or board data
-- `BattleSceneController`
-  - translates selected or hovered cells into mutations
+Input resolves the cursor to a cell coordinate and hands that `Vector3I` to controller code. It owns no tactical meaning beyond identifying the targeted cell.
 
 ## Coordinate Conventions
 
-Board coordinates are the engine-agnostic `FunProject.Core.Vector3I` (axis-compatible with Godot's `Vector3I`):
+Board coordinates are the engine-agnostic `FunProject.Core.Vector3I` (X = width, Y = levels, Z = depth). Authored resources use Godot's `Vector3I`; the runtime boundary converts explicitly. One tile is one cell; cell centers sit at `(x + 0.5, y + 0.5, z + 0.5)` in board-local space. Keep one shared set of world-to-cell and cell-to-world rules; do not duplicate them across selection, LOS, movement preview, and rendering.
 
-- `X` = width
-- `Y` = levels / height
-- `Z` = length / depth
+## Adjacency and Pathfinding
 
-For the initial proof of concept:
+Adjacency is eight-way: orthogonal plus same-level diagonals. A diagonal step needs at least one open flank, so sealed corners cannot be cut. Pathfinding lives in `BattleBoardState` as a pure-C# breadth-first search with a fixed direction order, so tie-breaks are deterministic. It is exposed as `FindPath`.
 
-- one tile is one gameplay cell
-- tile size is `1.0`
-- the playable surface is flat ground at `Y = 0`
-- board cell centers are at `(x + 0.5, y + 0.5, z + 0.5)` in board-local space
+Battle legality — whether a unit may act, AP spending, turn checks — stays with the session and actions. Controllers preview routes through `FindPathForUnit` and `GetPossibleMoveTilesForUnit`, then submit destination steps to `MoveUnit`. That action validates the whole route once (total AP, adjacency, occupancy), caches it, and re-checks only liveness, incapacity, and next-cell occupancy on each later step. If pathfinding later becomes heavily unit-specific, it can move behind a movement-query strategy without changing that contract.
 
-The project should keep one shared set of world-to-cell and cell-to-world conversion rules. Those rules should not be duplicated across selection, LOS, movement preview, and rendering code.
+## Picking
 
-## Selection and Hover Model
+Tile picking is board-level raycast-to-cell, not one `Area3D` per tile. Per-tile collision nodes scale poorly: more nodes, more synchronization between visuals and cells. `BattleInputController` reads the mouse, builds a ray from the `GameCamera` rig, and converts the hit to a cell for hover, selection, and action targeting.
 
-The recommended long-term picking model is board-level raycast-to-cell, not one `Area3D` per tile.
-
-### Why
-
-Per-tile `Area3D` nodes are simple for a prototype, but they scale poorly as the board grows:
-
-- more scene nodes
-- more collision objects
-- more per-tile interaction plumbing
-- more synchronization work between visual tiles and runtime cells
-
-Board-level picking keeps the gameplay target as a cell coordinate from the start.
-
-### Flat-Ground POC
-
-For flat ground, tile picking should work like this:
-
-1. Read mouse position from the viewport.
-2. Use the active `Camera3D` to produce a world-space ray.
-3. Intersect that ray with the flat ground plane.
-4. Convert the hit point into board-local space.
-5. Convert the board-local hit point into a `Vector3I` cell.
-6. Reject the result if the cell is out of bounds.
-7. Use that cell for hover highlight, selection, or action targeting.
-
-This allows a proof of concept without creating a separate interactable node for every tile.
-
-## Pathfinding Ownership
-
-For the current runtime, pathfinding should live in `BattleBoardState`.
-
-That keeps all board-local spatial rules together:
-
-- which cells can be traversed
-- which neighbors connect
-- which occupied cells block movement
-- how a path between two cells is resolved
-
-`BattleActionExecutor` and `BattleSession` should still own battle legality such as:
-
-- whether the unit may act right now
-- action point spending
-- faction and turn checks
-
-The current implementation path is an in-board breadth-first path search exposing a board query such as `FindPath(...)`. Presentation and controller code can use that query to preview a route to the player, then submit the route's destination steps to `MoveUnit` through `BattleActionExecutor` for legality checks before the action applies the chosen route as a composition of explicit steps. If pathfinding later becomes heavily unit-specific or expensive to rebuild, it can be extracted behind a separate service without changing that contract.
-
-### Future Picking
-
-When the environment becomes more complex, the system can move to either:
-
-- physics raycasts against floor and prop colliders, then convert hit position to a cell
-- full grid traversal along the mouse ray, similar to voxel DDA, to determine the first targeted cell or face
-
-The first option is simpler. The second option becomes more attractive once the board has vertical stacks, bridges, overhangs, or layered targeting rules.
+The long-term model for complex environments stays raycast-based: intersect floor and prop colliders, or traverse the grid along the ray, then convert the hit to a cell.
 
 ## Relationship to `Interactable`
 
-`Interactable` and `IInteractable` can still be useful for scene objects such as:
-
-- buttons in the 3D world
-- props that need direct hover or click behavior
-- quick prototypes of tile selection
-
-They should not become the primary representation of tactical tiles.
-
-The tactical tile should remain a board cell, not a scene node.
-
-If a temporary `BattleTileView : Interactable` prototype is used, it should be treated as a presentation helper only. It should not own walkability, LOS blocking, occupancy, hazards, or cover state.
-
-## Flat-Ground Proof of Concept Scope
-
-The first tile proof of concept should intentionally stay small.
-
-### Included
-
-- rectangular board dimensions
-- flat floor at `Y = 0`
-- simple generated floor visuals
-- board-level cell picking
-- hover highlight for the current cell
-- selection of a clicked cell
-- conversion between cell coordinates and world positions
-
-### Excluded
-
-- ramps
-- multiple vertical floors
-- partial cover
-- doors
-- destructible props
-- non-rectangular maps
-- tile materials with tactical meaning beyond simple walkability and LOS blocking
-
-## Recommended Implementation Order
-
-1. Add a dedicated tile-system document and keep the vocabulary aligned with the battlescape architecture.
-2. Add shared grid math helpers for:
-   - `CellToWorldCenter`
-   - `WorldToCell`
-3. Add a minimal `BattleMapData` resource for flat ground maps.
-4. Add a `BattleBoardPresenter` scene node that renders a simple flat board.
-5. Add board-level raycast-to-cell input.
-6. Add hover and selected-cell presentation.
-7. Only after that, add richer tile metadata and environment props.
-
-## Future Extensions
-
-Once the flat-ground slice works, the next extensions should be:
-
-- cell materials or themes
-- per-cell tactical metadata
-- multi-tile props with declared footprints
-- raised tiles and stacked floors
-- ramps and climb transitions
-- cover evaluation
-- destructible environment pieces that stamp changes back into board state
-- fog-of-war overlays driven from faction visibility
+`Interactable`/`IInteractable` remain useful for world-space buttons and props that need direct hover or click behavior. They must not become the representation of tactical tiles: a tile is a board cell, not a scene node. A presentation helper may render a tile, but it never owns walkability, LOS, occupancy, or cover state.
 
 ## Non-Goals
 
-The tile system should not:
+The tile system does not infer gameplay state from environment meshes, does not make decorative meshes authoritative for movement or LOS, and does not duplicate coordinate conversion across systems.
 
-- infer gameplay state from arbitrary environment meshes
-- make decorative meshes authoritative for movement or LOS
-- rely on one permanent scene node per gameplay tile as the only supported interaction model
-- duplicate coordinate conversion rules in multiple systems
-
-## Summary
-
-The tactical tile is a board cell, not a mesh.
-
-Map data describes tiles.
-Runtime state owns tiles.
-Presentation renders tiles.
-Input resolves to tiles.
-
-That separation fits the current runtime, keeps the first proof of concept small, and leaves room for richer environment art later without rewriting the tactical foundation.
+Ramps, stacked floors, and multi-tile props are future work. When they arrive, they extend the authored tile data and this board model; they do not move gameplay truth into scene nodes.

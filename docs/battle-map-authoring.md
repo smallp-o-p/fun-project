@@ -1,64 +1,42 @@
 # Authoring battle maps
 
-Battle maps are authored in the Godot editor on a **`GridMap`** and baked to a `BattleMapData`
-`.tres` that `BattleMapData.CreateBoardState()` turns into a `BattleBoardState`. The GridMap is
-Godot's native 3D tiler, so its cells line up 1:1 with the board's `Vector3I` grid and you see
-the real meshes in 3D while you author.
+Battle maps are authored in the Godot editor on a `GridMap` and exported as a `PackedScene` rooting a `BattleMap` node. The scene stores the painted cells, the `MeshLibrary`, a `BattleTilePalette`, and a `BattleMapData` resource. `BattleSetupResolver` reads the `MapData` from pooled scenes; `BattleFactory.Start` builds the runtime board from it.
 
 ## Pieces
 
-- **`TileBrushData`** (`scripts/battle/map`) — per-tile gameplay template: `Walkable`,
-  `BlocksLineOfSight`, `CoverDirections` + `CoverAmount` (amount editable only when a direction
-  is set), `SpawnFactionSlot` (-1 = none). All independent — a wall with no cover, or walkable
-  smoke that blocks LOS, are both legal. Cover is never inferred.
-- **`BattleMapAuthoring`** (`scenes/battle/authoring`) — a `[Tool]` node that **extends
-  `GridMap`**; you paint terrain directly on it. Its `MeshLibrary` supplies the terrain meshes;
-  the `Brushes` palette (`Dictionary<StringName, TileBrushData>`) maps each MeshLibrary item
-  **name** to a gameplay brush. The **Bake to BattleMapData** button reads the painted cells and
-  writes `TargetPath`.
-- **`BattleMapBaker` / `MapDeployment` / `MapSpawnZoneData`** — pure C# (`scripts/battle/map`),
-  no Godot loading, unit-tested.
+- **`BattleMapTileData`** (`scripts/battle/map`) — the per-tile gameplay template: `Walkable` (default true), `BlocksLineOfSight`, `BlocksVerticalLineOfSight`, `CoverDirections` plus `CoverAmount` (editable only when a direction is set), and `SpawnFactionSlot` (-1 = none). All fields are independent; cover is never inferred.
+- **`BattleTilePalette`** (`scenes/battle/authoring`) — a `Resource` mapping each `MeshLibrary` item **name** to a `BattleMapTileData` brush. Assigning a `MeshLibrary` auto-fills `Brushes` with a default brush per item name. Do not invent names the library lacks; the editor reports them as errors.
+- **`BattleMapAuthoring`** (`scenes/battle/authoring`) — a `[Tool]` node that extends `GridMap`; paint terrain on it directly. Its `Palette` export supplies the mesh library.
+- **`BattleMap`** — a `GridMap` subclass with `MapData` and `UsedPalette` exports; the root of the exported scene.
+- **`BattleMapData`** (`scripts/battle/map`) — a `Resource` with `Dimensions` and a `Tiles` dictionary (`Vector3I` → `BattleMapTileData`).
+- **`MapDeployment`** (`scripts/battle/map`) — pure C# spawn pairing, unit-tested.
+
+## Export
+
+Set the `TargetPath` export and click **Export BattleMap**. The button packs and saves a `PackedScene` whose root is one `BattleMap` node named `Map`, carrying:
+
+- the authored `MeshLibrary` and grid settings (`CellSize`, `CellCenterX/Y/Z`, `Scale`)
+- the painted cells and their orientations
+- the built `MapData` and the `UsedPalette`
+
+The default `TargetPath` ends in `.tres`, but the output is a scene. Set a scene path such as `res://resources/maps/my_map.tscn`.
+
+Export rules:
+
+1. Every painted cell must have non-negative X, Y, and Z. Export stops otherwise.
+2. Every painted cell's mesh item name must exist in `Brushes`. A missing mapping stops the export; there is no default floor fallback.
+3. Dimensions are computed from the painted X/Z range (`max − min + 1`) and height (`maxLevel + 1`). Tile keys keep their painted coordinates. Paint from X = 0 and Z = 0 so tiles align with the computed dimensions.
 
 ## Coordinate mapping
 
-A `GridMap` cell `Vector3I(x, y, z)` is already board space: **X = width** (East = +X),
-**Y = elevation/level**, **Z = depth** (South = +Z), consistent with the engine's `North = -Z`.
-The baker normalizes painted cells to a `(0,0,0)` origin and sets `AuthoredTilesAreComplete =
-true`, so any unpainted cell is a hole.
+A `GridMap` cell `Vector3I(x, y, z)` is already board space: X = width (east is +X), Y = elevation, Z = depth (south is +Z). This matches the engine's `North = -Z`.
 
-## Editor setup (one-time)
+## Board conversion
 
-1. Build a **`MeshLibrary`** with one item per terrain type; name items meaningfully
-   (e.g. `floor`, `wall`, `cover_n`, `spawn_a`).
-2. Author a `TileBrushData` `.tres` for each meaning:
-   - floor = `Walkable`
-   - wall = `!Walkable` + `BlocksLineOfSight` (cover stays `None` ⇒ zero cover)
-   - cover = `Walkable` + `CoverDirections` + `CoverAmount`
-   - spawn = a floor brush + `SpawnFactionSlot = N`
-3. Create a scene with a **`BattleMapAuthoring`** (GridMap) node; assign the `MeshLibrary`;
-   fill `Brushes` (item name → brush `.tres`); set `TargetPath`.
-
-## Workflow
-
-- **Create:** paint the 3D grid, click **Bake**.
-- **Edit:** reopen the scene, repaint, re-bake.
-
-The `.tscn` is the source of truth; the baked `.tres` is a build artifact. A painted cell whose
-MeshLibrary item name isn't in `Brushes` bakes as a plain walkable floor.
+`new BattleBoardState(mapData)` builds the runtime board. Every cell starts unwalkable, then each authored tile applies its data. A cell without an authored tile is a hole: unwalkable and unreachable. An authored tile outside `Dimensions` logs an error and is skipped. Tile semantics: [battlescape-tile-system.md](battlescape-tile-system.md).
 
 ## Spawning from a baked map
 
-`BattleSetupResolver.Resolve(type, seed?, playerDeployment?)` chooses the map and
-builds ordered sides. `MapDeployment.AssignSpawns(map, slot, loadouts)` pairs each
-side's roster directly with that slot's cells, sorted X/Y/Z. The slot is the
-side's index in `BattleTypeData.Factions`; roster order is preserved.
+`BattleSetupResolver.Resolve(type, seed?, playerDeployment?)` picks a map from `BattleTypeData.MapPool` with the seed. Pool entries are `PackedScene`s rooting a `BattleMap`; a wrong root or missing `MapData` fails with `MapSceneInvalid`. `MapDeployment.AssignSpawns(map, slot, loadouts)` pairs loadouts with that slot's cells in X/Y/Z order. The slot is the side's index in the faction order; roster order is preserved. Too few cells fail with `SpawnSlotShortfall`. Cell validity is checked later, in `BattleFactory.Start`.
 
-The resolved `BattleSetup` groups each faction with its objectives and positioned
-units. `BattleFactory.Start(setup)` creates a fresh board, checks all placements,
-registers systems, and submits the spawn, object-placement, and start actions.
-An out-of-bounds or blocked cell is a cell failure; insufficient slot capacity
-is `SpawnSlotShortfall`.
-
-A supplied `PlayerDeployment` retains its campaign faction and combatants. It
-replaces the player roster while keeping that side's authored objectives and
-spawn slot. Startup never reassigns a combatant's owning faction.
+The resolved `BattleSetup` groups each faction with its objectives and positioned units. `BattleFactory.Start(setup)` builds a fresh board, validates every placement, registers declared systems, and submits the spawn, object-placement, and start actions. A supplied `PlayerDeployment` replaces the player roster with the campaign faction and combatants, and keeps that side's authored objectives and spawn slot. Startup never reassigns a combatant's owning faction; a mismatch is a typed failure. Startup detail: [battlescape-architecture.md](battlescape-architecture.md).
