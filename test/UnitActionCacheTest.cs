@@ -300,12 +300,19 @@ public class UnitActionCacheTest
       statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-15)] }]);
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    battle.Spawn(TestData.MakeCombatant("Lead", playerFaction), new Vector3I(1, 0, 1));
-    BattleUnitState support = battle.Spawn(
-      TestData.MakeCombatant("Support", playerFaction, buffs: [collapse]), new Vector3I(2, 0, 1));
-    battle.Spawn(TestData.MakeCombatant("Durable", enemyFaction, health: 100), new Vector3I(1, 0, 5));
-    battle.Start();
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
+      [
+        new BattleSideSetup(playerFaction, [new FakeObjectiveData()],
+          [
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Lead", playerFaction)), new Vector3I(1, 0, 1)),
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Support", playerFaction, buffs: [collapse])), new Vector3I(2, 0, 1)),
+          ]),
+        new BattleSideSetup(enemyFaction, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Durable", enemyFaction, health: 100)), new Vector3I(1, 0, 5))]),
+      ],
+      Seed: 7));
+    BattleUnitState support = battle.UnitAt(new Vector3I(2, 0, 1));
     IReadOnlyList<UnitAction> actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(support)));
     UnitAction move = Row<MoveActionDefinition>(actions);
     UnitAction endTurn = Row<EndTurnActionDefinition>(actions);
@@ -585,10 +592,20 @@ public class UnitActionCacheTest
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    BattleUnitState player = battle.Spawn(TestData.MakeCombatant("Player", playerFaction), new Vector3I(1, 0, 1));
-    BattleUnitState support = battle.Spawn(TestData.MakeCombatant("Support", playerFaction), new Vector3I(2, 0, 1));
-    battle.Spawn(TestData.MakeCombatant("Enemy", enemyFaction), new Vector3I(1, 0, 5));
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
+      [
+        new BattleSideSetup(playerFaction, [new FakeObjectiveData()],
+          [
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Player", playerFaction)), new Vector3I(1, 0, 1)),
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Support", playerFaction)), new Vector3I(2, 0, 1)),
+          ]),
+        new BattleSideSetup(enemyFaction, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Enemy", enemyFaction)), new Vector3I(1, 0, 5))]),
+      ],
+      Seed: 7));
+    BattleUnitState player = battle.UnitAt(new Vector3I(1, 0, 1));
+    BattleUnitState support = battle.UnitAt(new Vector3I(2, 0, 1));
     player.TrySpendActionPoints(player.CurrentActionPoints);
     support.TrySpendActionPoints(support.CurrentActionPoints);
     IReadOnlyList<UnitAction> existing = battle.Query(
@@ -600,7 +617,7 @@ public class UnitActionCacheTest
     bool createdDuringCallbackValue = true;
     battle.Session.BattleEventCommitted += battleEvent =>
     {
-      if (battleEvent is not TurnStartedBattleEvent)
+      if (battleEvent is not TurnStartedBattleEvent startedBattleEvent || startedBattleEvent.Faction != playerFaction)
         return;
       existingDuringCallback = existingMove.IsAvailable;
       createdDuringCallback = battle.Query(
@@ -610,7 +627,10 @@ public class UnitActionCacheTest
       Assert.True(Row<MoveActionDefinition>(createdDuringCallback).IsDirty);
     };
 
-    battle.Start();
+    // Round-rollover continuation reaches the player's next TurnStarted; reads inside that
+    // dispatch observe pre-refresh availability exactly as the startup dispatch used to.
+    battle.EndFactionTurn(playerFaction);
+    battle.EndFactionTurn(enemyFaction);
 
     Assert.False(existingDuringCallback);
     Assert.False(createdDuringCallbackValue);

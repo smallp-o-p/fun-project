@@ -16,19 +16,24 @@ public class BattleObjectSessionTest
     return data;
   }
 
-  [TestCase(TestName = "PlaceObject during setup occupies the tile and mints a live proof")]
+  [TestCase(TestName = "Startup object placement occupies the tile and mints a live proof")]
   public void PlacementBlocksOccupancy()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(4, 1, 4)),
+      [
+        new BattleSideSetup(player, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0))]),
+        new BattleSideSetup(enemy, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
+      ],
+      Seed: 7) with
+    { Objects = [new ObjectPlacement(MakeBombData(), new Vector3I(2, 0, 2))] });
     var session = battle.Session;
-    battle.Spawn(TestData.MakeCombatant("A", player), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B", enemy), new Vector3I(3, 0, 3));
 
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 2));
-    battle.Submit(BattleAction.PlaceObject(MakeBombData(), point));
-
     BattleObjectState[] objects = [.. session.Objects];
     Assert.Equal(1, objects.Length);
     BattleObjectState bomb = objects[0];
@@ -37,13 +42,10 @@ public class BattleObjectSessionTest
     Assert.Equal(point.Raw, bomb.Position);
 
     // Occupancy: a unit cannot spawn onto the object tile (a rejected SpawnUnit surfaces
-    // from Submit as an InvalidOperationException — trusted parameters).
+    // from Submit as an InvalidOperationException — trusted parameters). The duplicate-
+    // placement validation matrix lives at the factory boundary (BattleFactoryTest).
     var spawn = new SpawnUnit(TestData.MakeCombatant("X", player), point);
     Assert.Throws<System.InvalidOperationException>(() => battle.Submit(spawn));
-
-    // A second object cannot take the same tile.
-    Assert.Throws<System.InvalidOperationException>(() => battle.Submit(
-      BattleAction.PlaceObject(MakeBombData(), point)));
   }
 
   [TestCase(TestName = "PlaceObject is rejected once the battle is in progress")]

@@ -54,8 +54,12 @@ public class GeoscapeConditionsTest
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [campaign.State.PlayerFaction]);
-    var unit = battle.Spawn(alpha, Vector3I.Zero, armor: TestData.MakeArmor("Vest", armor: 10));
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(5, 1, 5)),
+      [new BattleSideSetup(campaign.State.PlayerFaction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(alpha, Armor: TestData.MakeArmor("Vest", armor: 10)), Vector3I.Zero)])],
+      Seed: 7));
+    var unit = battle.Unit;
     battle.ApplyDamage(unit, 5);
     battle.Session.EndBattle(BattleOutcome.Victory);
     var summary = battle.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
@@ -140,9 +144,12 @@ public class GeoscapeConditionsTest
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [campaign.State.PlayerFaction]);
-    battle.Session.EndBattle(BattleOutcome.Victory);
-    var empty = battle.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
+    // Direct zero-participant lifecycle: no deployed roster, ended before start like the old
+    // fixture; the shared fixture cannot express a rosterless started battle.
+    var session = new BattleSession(new BattleBoardState(new Vector3I(5, 1, 5)), [campaign.State.PlayerFaction]);
+    using var runtime = new BattleRuntime(session);
+    session.EndBattle(BattleOutcome.Victory);
+    var empty = runtime.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
 
     campaign.ClearEvents();
     campaign.Session.ApplyMissionReturn(empty);

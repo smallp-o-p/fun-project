@@ -201,11 +201,9 @@ public sealed partial class BattleUiControllerTest
   [TestCase(TestName = "A boxed-in available move can enter empty targeting and cancel")]
   public void BoxedInAvailableMoveCanCancelEmptyTargeting()
   {
-    var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    Vector3I[] walls = [new(4, 0, 0), new(4, 0, 2), new(3, 0, 1), new(5, 0, 1)];
-    foreach (Vector3I wall in walls)
-      board.SetTileWalkable(board.ValidatePoint(wall).RequireSome(), false);
-    using var battle = BattleFixture.Duel(board: board, playerControlled: true);
+    using var battle = BattleFixture.Duel(map: TestData.MakeMapWithWalls(new Vector3I(8, 1, 8),
+      new Vector3I(4, 0, 0), new Vector3I(4, 0, 2), new Vector3I(3, 0, 1), new Vector3I(5, 0, 1)),
+      playerControlled: true);
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
     MoveActionOption move = battle.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single();
 

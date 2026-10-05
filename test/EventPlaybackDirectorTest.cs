@@ -13,7 +13,11 @@ public sealed partial class EventPlaybackDirectorTest
   public void EventsPlayInOrderAndIdleFiresOnce()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(3, 1, 3)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Seed", faction)), new Vector3I(0, 0, 0))])],
+      Seed: 7));
     int idleCount = 0;
     var director = battle.AttachDirector(new CaptureDirector()); // bound before the spawn
     director.PlaybackIdle += () => idleCount++;
@@ -24,9 +28,10 @@ public sealed partial class EventPlaybackDirectorTest
 
     Assert.True(director.Busy); // queued but not yet ticked
     director.Tick();
-    Assert.False(director.Busy);
-    Assert.Equal(1, director.Played.Count);
-    Assert.True(director.Played[0] is UnitAddedBattleEvent);
+    Assert.True(director.Played[0] is UnitAddedBattleEvent); // commit order
+    Assert.True(director.Busy); // one step per Tick: the spawn's spotting follow-ups are still queued
+    while (director.Busy)
+      director.Tick();
     Assert.Equal(1, idleCount);
     director.Tick(); // idle fires only once
     Assert.Equal(1, idleCount);

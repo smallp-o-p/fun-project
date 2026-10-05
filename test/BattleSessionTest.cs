@@ -11,6 +11,20 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public class BattleSessionTest
 {
+  // Factory-ready multi-side fixture: units grouped into sides by faction in
+  // first-appearance order, one inert objective and one named unit per entry.
+  private static BattleFixture FixtureFromSides(Vector3I dimensions,
+    params (Faction Faction, string UnitName, Vector3I Position, int Health)[] sides)
+  {
+    Faction[] factions = sides.AsValueEnumerable().Select(side => side.Faction).Distinct().ToArray();
+    BattleSideSetup[] sideSetups = factions.AsValueEnumerable().Select(faction => new BattleSideSetup(
+      faction, [new FakeObjectiveData()],
+      sides.AsValueEnumerable().Where(side => ReferenceEquals(side.Faction, faction))
+        .Select(side => new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(side.UnitName, side.Faction,
+          health: side.Health)), side.Position)).ToArray())).ToArray();
+    return new BattleFixture(new BattleSetup(TestData.MakeOpenBattleMap(dimensions), sideSetups, Seed: 7));
+  }
+
   [TestCase(TestName = "Board dimensions follow Vector3I axis order")]
   public void BoardDimensionsFollowVector3IAxisOrder()
   {
@@ -28,7 +42,7 @@ public class BattleSessionTest
   public void SpawnUnitOccupiesItsTile()
   {
     var faction = TestData.MakeFaction("City Guard");
-    using var battle = new BattleFixture(new Vector3I(4, 2, 4), [faction]);
+    using var battle = FixtureFromSides(new Vector3I(4, 2, 4), (faction, "Seed", new Vector3I(0, 0, 0), 20));
     var session = battle.Session;
     var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
 
@@ -41,9 +55,8 @@ public class BattleSessionTest
   public void SpawnUnitRejectsOccupiedTile()
   {
     var faction = TestData.MakeFaction("City Guard");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    using var battle = FixtureFromSides(new Vector3I(4, 1, 4), (faction, "Alpha", new Vector3I(1, 0, 1), 20));
 
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
     Assert.Throws<System.InvalidOperationException>(
       () => battle.Submit(BattleAction.SpawnUnit(TestData.MakeCombatant("Bravo", faction), battle.At(1, 0, 1))));
   }
@@ -53,12 +66,10 @@ public class BattleSessionTest
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [playerFaction, enemyFaction]);
+    using var battle = FixtureFromSides(new Vector3I(4, 1, 4),
+      (playerFaction, "Alpha", new Vector3I(0, 0, 0), 20),
+      (enemyFaction, "Bandit", new Vector3I(1, 0, 0), 20));
     var session = battle.Session;
-
-    battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("Bandit", enemyFaction), new Vector3I(1, 0, 0));
-    battle.Start();
 
     Assert.Equal(playerFaction, session.ActiveSide);
     Assert.Equal(1, session.TurnNumber);
@@ -69,10 +80,9 @@ public class BattleSessionTest
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA]);
+    using var battle = FixtureFromSides(new Vector3I(4, 1, 4), (factionA, "A1", new Vector3I(0, 0, 0), 20));
     var session = battle.Session;
 
-    battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
     battle.Spawn(TestData.MakeCombatant("A2", factionA), new Vector3I(1, 0, 0));
     battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(2, 0, 0));
 
@@ -134,7 +144,7 @@ public class BattleSessionTest
   public void SpawnUnitAcceptsEquippedWeaponOption()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    using var battle = FixtureFromSides(new Vector3I(4, 1, 4), (faction, "Seed", new Vector3I(3, 0, 3), 20));
     var weapon = new MeleeWeapon(TestData.MakeWeaponData(damage: 10, critChance: 5, range: 1));
 
     battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0), weapon);
@@ -148,13 +158,11 @@ public class BattleSessionTest
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
     var factionC = TestData.MakeFaction("C");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [factionA, factionB, factionC]);
+    using var battle = FixtureFromSides(new Vector3I(5, 1, 5),
+      (factionA, "A1", new Vector3I(0, 0, 0), 20),
+      (factionB, "B1", new Vector3I(1, 0, 0), 20),
+      (factionC, "C1", new Vector3I(2, 0, 0), 20));
     var session = battle.Session;
-
-    battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("C1", factionC), new Vector3I(2, 0, 0));
-    battle.Start();
 
     Assert.Equal(factionA, session.ActiveSide);
 
@@ -176,11 +184,12 @@ public class BattleSessionTest
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
+    using var battle = FixtureFromSides(new Vector3I(4, 1, 4),
+      (factionA, "A1", new Vector3I(0, 0, 0), 20),
+      (factionB, "B1", new Vector3I(1, 0, 0), 20));
     var session = battle.Session;
-    var unitA = battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    var unitB = battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Start();
+    var unitA = battle.UnitAt(new Vector3I(0, 0, 0));
+    var unitB = battle.UnitAt(new Vector3I(1, 0, 0));
 
     Assert.Equal(1, session.TurnNumber);
     Assert.Equal(factionA, session.ActiveSide);
@@ -200,13 +209,12 @@ public class BattleSessionTest
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
     var factionC = TestData.MakeFaction("C");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [factionA, factionB, factionC]);
+    using var battle = FixtureFromSides(new Vector3I(5, 1, 5),
+      (factionA, "A1", new Vector3I(0, 0, 0), 20),
+      (factionB, "B1", new Vector3I(1, 0, 0), 20),
+      (factionC, "C1", new Vector3I(2, 0, 0), 10));
     var session = battle.Session;
-
-    battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    var unitC = battle.Spawn(TestData.MakeCombatant("C1", factionC, health: 10), new Vector3I(2, 0, 0));
-    battle.Start();
+    var unitC = battle.UnitAt(new Vector3I(2, 0, 0));
 
     battle.ApplyDamage(unitC, 10);
     Assert.False(session.TurnQueue.AsValueEnumerable().Contains(factionC));
@@ -226,12 +234,10 @@ public class BattleSessionTest
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
     var factionC = TestData.MakeFaction("C");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [factionA, factionB]);
+    using var battle = FixtureFromSides(new Vector3I(5, 1, 5),
+      (factionA, "A1", new Vector3I(0, 0, 0), 20),
+      (factionB, "B1", new Vector3I(1, 0, 0), 20));
     var session = battle.Session;
-
-    battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Start();
 
     battle.Spawn(TestData.MakeCombatant("C1", factionC), new Vector3I(2, 0, 0));
 
@@ -256,12 +262,10 @@ public class BattleSessionTest
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [factionA, factionB]);
+    using var battle = FixtureFromSides(new Vector3I(5, 1, 5),
+      (factionA, "A1", new Vector3I(0, 0, 0), 20),
+      (factionB, "B1", new Vector3I(1, 0, 0), 20));
     var session = battle.Session;
-
-    battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Start();
 
     battle.AdvanceTurn();
     Assert.Equal(factionB, session.ActiveSide);
@@ -280,12 +284,10 @@ public class BattleSessionTest
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
     var factionC = TestData.MakeFaction("C");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [factionA, factionB]);
+    using var battle = FixtureFromSides(new Vector3I(5, 1, 5),
+      (factionA, "A1", new Vector3I(0, 0, 0), 20),
+      (factionB, "B1", new Vector3I(1, 0, 0), 20));
     var session = battle.Session;
-
-    battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Start();
 
     battle.Spawn(TestData.MakeCombatant("C1", factionC), new Vector3I(2, 0, 0));
 
@@ -380,11 +382,12 @@ public class BattleSessionTest
   public void PassingAUnitEndsItsActivationWhileKeepingTheNextAllyAvailable()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    using var battle = FixtureFromSides(new Vector3I(4, 1, 4),
+      (faction, "Alpha", new Vector3I(0, 0, 0), 20),
+      (faction, "Bravo", new Vector3I(1, 0, 0), 20));
     var session = battle.Session;
-    var unitA = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
-    var unitB = battle.Spawn(TestData.MakeCombatant("Bravo", faction), new Vector3I(1, 0, 0));
-    battle.Start();
+    var unitA = battle.UnitAt(new Vector3I(0, 0, 0));
+    var unitB = battle.UnitAt(new Vector3I(1, 0, 0));
 
     battle.Pass(unitA);
 
@@ -459,32 +462,47 @@ public class BattleSessionTest
     Assert.False(scheduler.IsUnitAvailable(battle.PlayerUnit));
   }
 
+  // The no-conscious-start invariants below are the direct-session predecessors of the
+  // scheduler-construction coverage their Task 3 owner will hold; they stay local to these
+  // constructor/lifecycle tests instead of the shared fixture.
   [TestCase]
   public void SetupSkipsUnconsciousFactions()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 1), [player, enemy]);
-    var body = battle.Spawn(TestData.MakeCombatant("Observer", player), Vector3I.Zero);
-    battle.Spawn(TestData.MakeCombatant("Enemy", enemy), new Vector3I(2, 0, 0));
-    battle.ApplyDamage(body, 20, DamageKind.Stun);
+    var session = new BattleSession(new BattleBoardState(new Vector3I(3, 1, 1)), [player, enemy]);
+    using var executor = new BattleActionExecutor(session);
+    session.AddObjective(player, new FakeObjectiveData().Instantiate());
+    session.AddObjective(enemy, new FakeObjectiveData().Instantiate());
+    var body = executor.Submit(BattleAction.SpawnUnit(
+      TestData.MakeCombatant("Observer", player), session.Board.At(0, 0, 0))).EventsThatOccurred
+      .ToArray().SingleEvent<UnitAddedBattleEvent>().Unit;
+    executor.Submit(BattleAction.SpawnUnit(
+      TestData.MakeCombatant("Enemy", enemy), session.Board.At(2, 0, 0)));
+    executor.Submit(BattleAction.ApplyDamage(
+      session.TryGetAlive(body).RequireSome(), 20, DamageKind.Stun));
 
-    battle.Start();
+    executor.Submit(BattleAction.StartBattle());
 
-    Assert.Equal(enemy, battle.Session.ActiveSide);
-    Assert.Equal(1, battle.Session.TurnQueue.Count);
+    Assert.Equal(enemy, session.ActiveSide);
+    Assert.Equal(1, session.TurnQueue.Count);
   }
 
   [TestCase]
   public void SetupRejectsOnlyUnconsciousForces()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(2, 1, 1), [faction]);
-    var unit = battle.Spawn(TestData.MakeCombatant("Observer", faction), Vector3I.Zero);
-    battle.ApplyDamage(unit, 20, DamageKind.Stun);
+    var session = new BattleSession(new BattleBoardState(new Vector3I(2, 1, 1)), [faction]);
+    using var executor = new BattleActionExecutor(session);
+    session.AddObjective(faction, new FakeObjectiveData().Instantiate());
+    var unit = executor.Submit(BattleAction.SpawnUnit(
+      TestData.MakeCombatant("Observer", faction), session.Board.At(0, 0, 0))).EventsThatOccurred
+      .ToArray().SingleEvent<UnitAddedBattleEvent>().Unit;
+    executor.Submit(BattleAction.ApplyDamage(
+      session.TryGetAlive(unit).RequireSome(), 20, DamageKind.Stun));
 
-    Assert.Throws<InvalidOperationException>(() => battle.Start());
-    Assert.Equal(BattlePhase.Setup, battle.Session.Phase);
+    Assert.Throws<InvalidOperationException>(() => executor.Submit(BattleAction.StartBattle()));
+    Assert.Equal(BattlePhase.Setup, session.Phase);
   }
 
   [TestCase(TestName = "Killing the only active unit on an eliminated faction does not auto-advance")]
@@ -492,11 +510,11 @@ public class BattleSessionTest
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
+    using var battle = FixtureFromSides(new Vector3I(4, 1, 4),
+      (factionA, "A1", new Vector3I(0, 0, 0), 10),
+      (factionB, "B1", new Vector3I(1, 0, 0), 10));
     var session = battle.Session;
-    var unitA = battle.Spawn(TestData.MakeCombatant("A1", factionA, health: 10), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB, health: 10), new Vector3I(1, 0, 0));
-    battle.Start();
+    var unitA = battle.UnitAt(new Vector3I(0, 0, 0));
 
     Assert.Equal(factionA, session.ActiveSide);
 
@@ -520,12 +538,13 @@ public class BattleSessionTest
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
+    using var battle = FixtureFromSides(new Vector3I(4, 1, 4),
+      (factionA, "A1", new Vector3I(0, 0, 0), 10),
+      (factionA, "A2", new Vector3I(1, 0, 0), 10),
+      (factionB, "B1", new Vector3I(2, 0, 0), 10));
     var session = battle.Session;
-    var unitA1 = battle.Spawn(TestData.MakeCombatant("A1", factionA, health: 10), new Vector3I(0, 0, 0));
-    var unitA2 = battle.Spawn(TestData.MakeCombatant("A2", factionA, health: 10), new Vector3I(1, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB, health: 10), new Vector3I(2, 0, 0));
-    battle.Start();
+    var unitA1 = battle.UnitAt(new Vector3I(0, 0, 0));
+    var unitA2 = battle.UnitAt(new Vector3I(1, 0, 0));
 
     battle.ApplyDamage(unitA1, 10);
 
@@ -538,12 +557,11 @@ public class BattleSessionTest
   [TestCase(TestName = "Unit can throw a grenade in battle session")]
   public void UnitCanThrowAGrenadeInBattleSession()
   {
-    using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1), actionPoints: 4, start: false);
+    using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1), actionPoints: 4);
     var unit = battle.Unit;
     var grenade = TestData.MakeGrenade("Practice Grenade", throwRange: 4);
     unit.AddInventoryItem(grenade.Item);
 
-    battle.Start();
     battle.Throw(unit, grenade, new Vector3I(3, 0, 1));
 
     Assert.False(unit.HasInventoryItem(grenade.Item));
@@ -572,11 +590,11 @@ public class BattleSessionTest
   public void EndUnitActivationThrowsWhenTheUnitIsAlreadyUnavailable()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    using var battle = FixtureFromSides(new Vector3I(4, 1, 4),
+      (faction, "Alpha", new Vector3I(0, 0, 0), 20),
+      (faction, "Bravo", new Vector3I(1, 0, 0), 20));
     var session = battle.Session;
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("Bravo", faction), new Vector3I(1, 0, 0));
-    battle.Start();
+    var unit = battle.UnitAt(new Vector3I(0, 0, 0));
 
     session.EndUnitActivation(unit);
 
@@ -589,11 +607,11 @@ public class BattleSessionTest
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
+    using var battle = FixtureFromSides(new Vector3I(4, 1, 4),
+      (factionA, "A1", new Vector3I(0, 0, 0), 20),
+      (factionB, "B1", new Vector3I(1, 0, 0), 20));
     var session = battle.Session;
-    var unitA = battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Start();
+    var unitA = battle.UnitAt(new Vector3I(0, 0, 0));
 
     session.EndUnitActivation(unitA);
 
@@ -607,12 +625,10 @@ public class BattleSessionTest
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
+    using var battle = FixtureFromSides(new Vector3I(4, 1, 4),
+      (factionA, "A1", new Vector3I(0, 0, 0), 20),
+      (factionB, "B1", new Vector3I(1, 0, 0), 20));
     var session = battle.Session;
-
-    battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Start();
 
     Assert.Throws<InvalidOperationException>(() => session.EndFactionTurn(factionB));
     Assert.Equal(factionA, session.ActiveSide);

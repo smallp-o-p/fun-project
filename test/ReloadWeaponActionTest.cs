@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
@@ -33,10 +34,13 @@ public class ReloadWeaponActionTest
   public void FullMagazineReloadRejected()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
     var weapon = TestData.MakeAmmoWeapon("SMG");
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(0, 0, 0), weapon);
-    battle.Start();
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(4, 1, 4)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", faction), Some<Weapon>(weapon)), new Vector3I(0, 0, 0))])],
+      Seed: 7));
+    var unit = battle.Unit;
 
     int actionPointsBefore = unit.CurrentActionPoints;
 

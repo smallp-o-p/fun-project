@@ -127,16 +127,28 @@ public class DefuseAllBombsObjectiveTest
   [TestCase]
   public void DestroyingTimedObjectsFailsButDestroyingCratesDoesNot()
   {
-    using var battle = BattleFixture.Duel(start: false, playerControlled: true,
-      player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 5)));
-    battle.Session.AddObjective(battle.PlayerFaction, new DefuseAllBombsObjectiveData
-    {
-      OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
-    }.Instantiate());
-    var bomb = battle.PlaceObject(TestData.MakeObject("Bomb", 5,
-      new TimedEffectCapabilityData { FireAfterTurns = 5 }), new Vector3I(3, 0, 2));
-    var crate = battle.PlaceObject(TestData.MakeObject("Crate", 5), new Vector3I(2, 0, 2));
-    battle.Start();
+    using var battle = BattleFixture.Duel(playerControlled: true,
+      player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 5)),
+      configure: setup => setup with
+      {
+        Objects =
+        [
+          new ObjectPlacement(TestData.MakeObject("Bomb", 5,
+            new TimedEffectCapabilityData { FireAfterTurns = 5 }), new Vector3I(3, 0, 2)),
+          new ObjectPlacement(TestData.MakeObject("Crate", 5), new Vector3I(2, 0, 2)),
+        ],
+        Sides =
+        [
+          setup.Sides[0] with { Objectives = [new DefuseAllBombsObjectiveData
+          {
+            OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
+          }] },
+          setup.Sides[1],
+        ],
+      });
+    var objects = battle.Query(new GetBattleSpecialObjectsQuery());
+    var bomb = objects.AsValueEnumerable().Single(o => o.Name == "Bomb");
+    var crate = objects.AsValueEnumerable().Single(o => o.Name == "Crate");
     battle.Attack(battle.PlayerUnit, crate);
     Assert.Equal(BattlePhase.InProgress, battle.Query(new GetBattlePhaseQuery()));
     battle.ClearEvents();
@@ -151,15 +163,23 @@ public class DefuseAllBombsObjectiveTest
   [TestCase]
   public void GrenadeDestructionFailsTheObjectiveAndFinishesResolution()
   {
-    using var battle = BattleFixture.Duel(start: false, playerControlled: true);
-    battle.Session.AddObjective(battle.PlayerFaction, new DefuseAllBombsObjectiveData
-    {
-      OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
-    }.Instantiate());
+    using var battle = BattleFixture.Duel(playerControlled: true,
+      configure: setup => setup with
+      {
+        Objects = [new ObjectPlacement(TestData.MakeObject("Bomb", 5,
+          new TimedEffectCapabilityData { FireAfterTurns = 5 }), new Vector3I(3, 0, 2))],
+        Sides =
+        [
+          setup.Sides[0] with { Objectives = [new DefuseAllBombsObjectiveData
+          {
+            OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
+          }] },
+          setup.Sides[1],
+        ],
+      });
     var cell = new Vector3I(3, 0, 2);
-    var bomb = battle.PlaceObject(TestData.MakeObject("Bomb", 5,
-      new TimedEffectCapabilityData { FireAfterTurns = 5 }), cell);
-    battle.Start();
+    var bomb = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable()
+      .Single(o => o.Name == "Bomb");
     var grenade = TestData.MakeGrenade("Frag", throwRange: 10, blastRadius: 0,
       effects: [new DamageEffectData { BaseDamage = 5 }]);
     battle.PlayerUnit.AddInventoryItem(grenade.Item);

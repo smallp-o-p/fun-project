@@ -93,10 +93,8 @@ public class GetAvailableActionsForUnitTest
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
-    var board = new BattleBoardState(new Vector3I(5, 1, 5));
-    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(), false);
-    board.SetTileWalkable(board.ValidatePoint(new Vector3I(0, 0, 1)).RequireSome(), false);
-    using var battle = BattleFixture.Started(board,
+    using var battle = BattleFixture.Started(
+      TestData.MakeMapWithWalls(new Vector3I(5, 1, 5), new Vector3I(1, 0, 0), new Vector3I(0, 0, 1)),
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Hero", player)), new Vector3I(0, 0, 0)),
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Goon", enemy)), new Vector3I(3, 0, 3)));
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
@@ -157,9 +155,8 @@ public class GetAvailableActionsForUnitTest
     var enemy = TestData.MakeFaction("Enemy");
     // 2x2x1 board. Hero's only horizontal neighbor is walled off; the tile directly above is
     // open — the same vertical adjacency the pathfinder connects, so it must be reachable.
-    var board = new BattleBoardState(new Vector3I(2, 2, 1));
-    board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(), false);
-    using var battle = BattleFixture.Started(board,
+    using var battle = BattleFixture.Started(
+      TestData.MakeMapWithWalls(new Vector3I(2, 2, 1), new Vector3I(1, 0, 0)),
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Hero", player)), new Vector3I(0, 0, 0)),
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Goon", enemy)), new Vector3I(1, 1, 0)));
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);

@@ -11,9 +11,8 @@ public sealed partial class BattleRuntimeSignalTest
   [TestCase(TestName = "ExecuteAction raises ActionStarted then ActionCompleted with events attached")]
   public void ExecuteActionRaisesLifecycleSignalsInOrder()
   {
-    var faction = TestData.MakeFaction("Player");
-    var session = new BattleSession(new BattleBoardState(new Vector3I(3, 1, 3)), [faction]);
-    using var runtime = new BattleRuntime(session);
+    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
+    var runtime = battle.Runtime;
 
     List<string> order = [];
     List<BattleActionExecResult> completed = [];
@@ -24,9 +23,10 @@ public sealed partial class BattleRuntimeSignalTest
       completed.Add(result);
     };
 
+    // The same spawn operation as any other action, as an ordinary reinforcement.
     runtime.ExecuteAction(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Alpha", faction),
-      session.Board.At(1, 0, 1)));
+      TestData.MakeCombatant("Reinforcement", battle.PlayerFaction),
+      battle.Board.At(1, 0, 1)));
 
     Assert.Equal(2, order.Count);
     Assert.Equal("started", order[0]);
@@ -41,18 +41,17 @@ public sealed partial class BattleRuntimeSignalTest
   [TestCase(TestName = "Completed never fires when Submit throws; Started marks the attempt")]
   public void NoCompletedSignalWhenSubmitThrows()
   {
-    var faction = TestData.MakeFaction("Player");
-    var session = new BattleSession(new BattleBoardState(new Vector3I(3, 1, 3)), [faction]);
-    using var runtime = new BattleRuntime(session);
+    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
+    var runtime = battle.Runtime;
     int started = 0;
     int completed = 0;
     runtime.ActionStarted += _ => started++;
     runtime.ActionCompleted += _ => completed++;
 
     runtime.ExecuteAction(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("A", faction), session.Board.At(1, 0, 1)));
+      TestData.MakeCombatant("Reinforcement", battle.PlayerFaction), battle.Board.At(1, 0, 1)));
     Assert.Throws<System.InvalidOperationException>(() => runtime.ExecuteAction(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("B", faction), session.Board.At(1, 0, 1))));
+      TestData.MakeCombatant("Second", battle.PlayerFaction), battle.Board.At(1, 0, 1))));
 
     // Started marks the attempt (fires before Submit); Completed is the reaction signal and
     // must never fire for a failed submission — spec: "no reaction runs".
