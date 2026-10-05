@@ -37,15 +37,17 @@ internal sealed partial class SetupSystemData : BattleTypeSystemData
 // factory call, so its catch-all hook is registered before factory startup and records every
 // committed event — including all startup events — into the fixture's assertion window. It
 // also captures the session from the first event for the fixture's test-only Session handle
-// and the initial unit-added records for role resolution. The hook lives in the registered
-// executor, so it is tied to that executor: a replacement executor over the same session
-// never reaches it.
+// and indexes unit-added records by (combatant identity, event placement point) for
+// authored-role resolution — startup hook reinforcements carry unauthored combatants or
+// cells, so they can never satisfy an authored placement's lookup. The hook lives in the
+// registered executor, so it is tied to that executor: a replacement executor over the same
+// session never reaches it.
 internal sealed partial class FixtureRecordingSystem : BattleTypeSystemData
 {
   private readonly List<BattleEvent> _events;
 
   public Option<BattleSession> Session { get; private set; } = None;
-  public List<BattleUnitState> InitialUnits { get; } = [];
+  public Dictionary<(Combatant, Vector3I), BattleUnitState> AddedUnits { get; } = [];
 
   public FixtureRecordingSystem(List<BattleEvent> events) => _events = events;
 
@@ -59,7 +61,7 @@ internal sealed partial class FixtureRecordingSystem : BattleTypeSystemData
       if (owner.Session.IsNone)
         owner.Session = Some(context.Session);
       if (battleEvent is UnitAddedBattleEvent added)
-        owner.InitialUnits.Add(added.Unit);
+        owner.AddedUnits[(added.Unit.Combatant, added.Position.Raw)] = added.Unit;
       owner._events.Add(battleEvent);
       return [];
     }

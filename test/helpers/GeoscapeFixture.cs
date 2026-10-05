@@ -82,15 +82,6 @@ public sealed class GeoscapeFixture : IDisposable
     params (Combatant Combatant, int Damage, int Stun)[] squad)
   {
     ThrowIfDisposed();
-    if (squad.Length == 0)
-    {
-      // Direct rosterless lifecycle: no deployed combatants to start a battle from.
-      var emptySession = new BattleSession(new BattleBoardState(new Vector3I(5, 1, 5)), [State.PlayerFaction]);
-      using var runtime = new BattleRuntime(emptySession);
-      emptySession.EndBattle(outcome);
-      return runtime.Query(new GetFactionEndOfBattleSummary(State.PlayerFaction)).RequireRight();
-    }
-
     // Squad deployments are factory setup: one placement per member in deployment order,
     // carrying each combatant's own equipment and the condition registry's stat mods.
     UnitPlacement[] placements = squad.AsValueEnumerable().Select((member, slot) =>

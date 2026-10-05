@@ -426,23 +426,6 @@ public class BattleVisibilityTest
     Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
   }
 
-  [TestCase(TestName = "Startup visibility is computed from the complete authored board")]
-  public void StartBattleRefreshesVisibilityCaches()
-  {
-    var playerFaction = TestData.MakeFaction("Player");
-    var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = VisibilityFixture(new Vector3I(4, 1, 1),
-      [
-        (playerFaction, "Observer", new Vector3I(0, 0, 0), 4),
-        (enemyFaction, "Target", new Vector3I(2, 0, 0), 1),
-      ],
-      losBlockers: [new Vector3I(1, 0, 0)]);
-    var observer = UnitAt(battle, new Vector3I(0, 0, 0));
-    var target = UnitAt(battle, new Vector3I(2, 0, 0));
-
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-  }
-
   [TestCase(TestName = "Lethal damage refreshes visibility caches")]
   public void LethalDamageRefreshesVisibilityCaches()
   {

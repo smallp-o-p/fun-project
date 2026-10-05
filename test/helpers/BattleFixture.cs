@@ -62,14 +62,24 @@ public sealed class BattleFixture : IDisposable
           $"Fixture setup failed ({failure.Reason}): {failure.Message}"));
     Session = recorder.Session.RequireSome("A factory-started fixture must have recorded a startup event.");
 
-    // Player/enemy/support roles come from the initial unit-added records in final setup
-    // placement order (sides, then units within each side). Raw units are retained even if
-    // they die or move during startup.
-    if (recorder.InitialUnits.Count > 0)
+    // Player/enemy/support roles come from unit-added records matched to the final setup's
+    // authored placements by combatant identity and authored placement point (never live
+    // position/liveness or the raw event order): a startup hook spawning a reinforcement
+    // cannot steal an authored role. Raw units are retained even if they die or move during
+    // startup.
+    List<BattleUnitState> authored = [];
+    foreach (BattleSideSetup side in setup.Sides)
+      foreach (UnitPlacement placement in side.Units)
+        authored.Add(recorder.AddedUnits.TryGetValue(
+          (placement.Loadout.Combatant, placement.Position), out BattleUnitState added)
+          ? added
+          : throw new InvalidOperationException(
+            $"No unit-added record matched authored placement {placement.Loadout.Combatant.Name} at {placement.Position}."));
+    if (authored.Count > 0)
     {
-      BattleUnitState player = recorder.InitialUnits[0];
+      BattleUnitState player = authored[0];
       _playerUnit = Some(player);
-      foreach (BattleUnitState candidate in recorder.InitialUnits.AsValueEnumerable().Skip(1))
+      foreach (BattleUnitState candidate in authored.AsValueEnumerable().Skip(1))
       {
         if (ReferenceEquals(candidate.Side, player.Side))
         {

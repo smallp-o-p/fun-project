@@ -4,6 +4,7 @@ using FunProject.Core;
 using FunProject.Items.Capabilities;
 using GdUnit4;
 using System;
+using System.Collections.Generic;
 
 namespace FunProject.Tests;
 
@@ -71,6 +72,52 @@ public partial class BattleFixtureTest
     Assert.Equal(new Vector3I(0, 0, 0), battle.Alive(battle.Unit).Position.Raw);
   }
 
+  [TestCase(TestName = "A startup reinforcement cannot steal an authored fixture role")]
+  public void StartupReinforcementKeepsAuthoredRoles()
+  {
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    var authoredEnemy = TestData.MakeCombatant("Authored", enemyFaction, health: 30);
+    var reinforcement = TestData.MakeCombatant("Interloper", enemyFaction);
+    var setup = new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
+      [
+        new BattleSideSetup(playerFaction, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", playerFaction)), new Vector3I(0, 0, 0))]),
+        new BattleSideSetup(enemyFaction, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(authoredEnemy), new Vector3I(4, 0, 4))]),
+      ],
+      Seed: 7) with
+    {
+      Systems = [new SetupSystemData { OnRegister = runtime =>
+        runtime.RegisterHook<UnitAddedBattleEvent>(new ReinforceOnceOnFirstUnitAdded(reinforcement, new Vector3I(7, 0, 7))) }],
+    };
+
+    using var battle = new BattleFixture(setup);
+
+    // The interrupt actually spawned between the initial placements...
+    var interloper = battle.UnitAt(new Vector3I(7, 0, 7));
+    Assert.Equal("Interloper", interloper.Combatant.Name);
+    // ...but the authored placement still owns the enemy role.
+    Assert.True(ReferenceEquals(battle.EnemyUnit.Combatant, authoredEnemy));
+    Assert.False(ReferenceEquals(battle.EnemyUnit, interloper));
+    Assert.Equal("Alpha", battle.PlayerUnit.Combatant.Name);
+  }
+
+  private sealed class ReinforceOnceOnFirstUnitAdded(Combatant reinforcement, Vector3I where)
+    : BattleHook<UnitAddedBattleEvent>
+  {
+    private bool _fired;
+
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitAddedBattleEvent evt)
+    {
+      if (_fired)
+        return [];
+      _fired = true;
+      return [BattleAction.SpawnUnit(reinforcement, context.Session.Board.At(where))];
+    }
+  }
+
   [TestCase]
   public void PresentationObjectsAreReusedAndOwnedNodesAreFreed()
   {
@@ -80,10 +127,17 @@ public partial class BattleFixtureTest
     var mesh = battle.OwnNode(new Godot.Node3D());
     var director = battle.AttachDirector(new EventPlaybackDirector());
     Assert.True(ReferenceEquals(director, battle.AttachDirector(director)));
-    battle.Spawn(TestData.MakeCombatant("Extra", battle.PlayerFaction), new Vector3I(0, 0, 1));
-    Assert.True(director.Busy); // one subscription queued the spawn's events
-    while (director.Busy)
+    BattleActionExecResult spawn = battle.Submit(BattleAction.SpawnUnit(
+      TestData.MakeCombatant("Extra", battle.PlayerFaction), battle.At(0, 0, 1)));
+    // Tick exactly once per committed event: a second Bind subscription would leave the
+    // duplicated copies queued after this loop and fail the idle assertion below.
+    int committed = spawn.EventsThatOccurred.Length;
+    Assert.True(committed > 0);
+    for (int step = 0; step < committed; step++)
+    {
+      Assert.True(director.Busy);
       director.Tick();
+    }
     Assert.False(director.Busy);
     battle.Dispose();
     battle.Dispose();

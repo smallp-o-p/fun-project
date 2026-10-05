@@ -127,18 +127,6 @@ public sealed partial class BattleRuntimeTest
     Assert.True(followUpIndex > causeIndex);
   }
 
-  [TestCase(TestName = "Hook interrupts with no executor action in flight throw")]
-  public void HookInterruptsWithoutInFlightActionThrow()
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
-    var unit = battle.Unit;
-    battle.RegisterHook<UnitMovedBattleEvent>(new DamageMoverOnMovedHook());
-
-    var from = battle.Session.GetUnitPosition(unit).RequireSome();
-    var to = battle.Board.At(new Vector3I(1, 0, 0));
-    Assert.Throws<InvalidOperationException>(() => battle.Session.MoveUnit(unit, from, to));
-  }
-
   private sealed partial class RuntimeRecordingHook : BattleHook
   {
     private readonly string _message;

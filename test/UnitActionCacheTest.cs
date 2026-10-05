@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Buffs;
+using FunProject.Combatants;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Stats;
@@ -587,23 +588,78 @@ public class UnitActionCacheTest
     Assert.True(supportActions.AsValueEnumerable().All(action => !action.IsDirty));
   }
 
-  [TestCase]
-  public void ReadsDuringTurnStartedObservePreRefreshWithoutCaching()
+  // The startup and continuation turn-start dispatches are separate orchestration bodies
+  // (StartBattle vs the round-rollover advance); both must observe pre-refresh availability
+  // from retained entries without caching stale results. The startup instance arranges and
+  // observes through declared setup systems, because fixture construction already runs the
+  // first turn; the continuation instance can arrange and subscribe after construction.
+  [TestCase(TestName = "Reads during the startup TurnStarted observe pre-refresh availability without caching")]
+  public void ReadsDuringStartupTurnStartedObservePreRefreshWithoutCaching()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new BattleSetup(
-      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
-      [
-        new BattleSideSetup(playerFaction, [new FakeObjectiveData()],
-          [
-            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Player", playerFaction)), new Vector3I(1, 0, 1)),
-            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Support", playerFaction)), new Vector3I(2, 0, 1)),
-          ]),
-        new BattleSideSetup(enemyFaction, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Enemy", enemyFaction)), new Vector3I(1, 0, 5))]),
-      ],
-      Seed: 7));
+    BattleRuntime runtime = null;
+    BattleUnitState support = null;
+    IReadOnlyList<UnitAction> existing = null;
+    IReadOnlyList<UnitAction> createdDuringCallback = null;
+    UnitAction existingMove = null;
+    bool existingDuringCallback = true;
+    bool createdDuringCallbackValue = true;
+    bool existingDirtyDuringCallback = true;
+    bool createdDirtyDuringCallback = true;
+
+    void ArrangeAtSessionStart(HookContext context)
+    {
+      BattleUnitState player = context.Session.GetFactionAliveUnits(playerFaction)
+        .AsValueEnumerable().Single(unit => unit.Combatant.Name == "Player");
+      support = context.Session.GetFactionAliveUnits(playerFaction)
+        .AsValueEnumerable().Single(unit => unit.Combatant.Name == "Support");
+      player.TrySpendActionPoints(player.CurrentActionPoints);
+      support.TrySpendActionPoints(support.CurrentActionPoints);
+      existing = runtime.Query(new GetAvailableActionsForUnit(
+        context.Session.TryGetAlive(player).RequireSome()));
+      existingMove = Row<MoveActionDefinition>(existing);
+    }
+
+    void ObserveAtFirstTurnStart(HookContext context)
+    {
+      if (context.Session.TurnNumber != 1)
+        return;
+      existingDuringCallback = existingMove.IsAvailable;
+      existingDirtyDuringCallback = existingMove.IsDirty;
+      createdDuringCallback = runtime.Query(new GetAvailableActionsForUnit(
+        context.Session.TryGetAlive(support).RequireSome()));
+      UnitAction createdMove = Row<MoveActionDefinition>(createdDuringCallback);
+      createdDuringCallbackValue = createdMove.IsAvailable;
+      createdDirtyDuringCallback = createdMove.IsDirty;
+    }
+
+    using var battle = new BattleFixture(ThreeUnitSetup(playerFaction, enemyFaction) with
+    {
+      Systems = [new SetupSystemData { OnRegister = registered =>
+      {
+        runtime = registered;
+        registered.RegisterHook<SessionStartedBattleEvent>(new HookBody<SessionStartedBattleEvent>(ArrangeAtSessionStart));
+        registered.RegisterHook<TurnStartedBattleEvent>(new HookBody<TurnStartedBattleEvent>(ObserveAtFirstTurnStart));
+      } }],
+    });
+
+    Assert.False(existingDuringCallback);
+    Assert.False(createdDuringCallbackValue);
+    Assert.True(existingDirtyDuringCallback);
+    Assert.True(createdDirtyDuringCallback);
+    Assert.True(existingMove.IsAvailable);
+    Assert.True(Row<MoveActionDefinition>(createdDuringCallback).IsAvailable);
+    Assert.False(existingMove.IsDirty);
+    Assert.False(Row<MoveActionDefinition>(createdDuringCallback).IsDirty);
+  }
+
+  [TestCase(TestName = "Reads during a continuation TurnStarted observe pre-refresh availability without caching")]
+  public void ReadsDuringContinuationTurnStartedObservePreRefreshWithoutCaching()
+  {
+    var playerFaction = TestData.MakeFaction("Player");
+    var enemyFaction = TestData.MakeFaction("Enemy");
+    using var battle = new BattleFixture(ThreeUnitSetup(playerFaction, enemyFaction));
     BattleUnitState player = battle.UnitAt(new Vector3I(1, 0, 1));
     BattleUnitState support = battle.UnitAt(new Vector3I(2, 0, 1));
     player.TrySpendActionPoints(player.CurrentActionPoints);
@@ -627,8 +683,7 @@ public class UnitActionCacheTest
       Assert.True(Row<MoveActionDefinition>(createdDuringCallback).IsDirty);
     };
 
-    // Round-rollover continuation reaches the player's next TurnStarted; reads inside that
-    // dispatch observe pre-refresh availability exactly as the startup dispatch used to.
+    // Round-rollover continuation reaches the player's next TurnStarted.
     battle.EndFactionTurn(playerFaction);
     battle.EndFactionTurn(enemyFaction);
 
@@ -638,6 +693,29 @@ public class UnitActionCacheTest
     Assert.True(Row<MoveActionDefinition>(createdDuringCallback).IsAvailable);
     Assert.False(existingMove.IsDirty);
     Assert.False(Row<MoveActionDefinition>(createdDuringCallback).IsDirty);
+  }
+
+  private static BattleSetup ThreeUnitSetup(Faction playerFaction, Faction enemyFaction) => new(
+    TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
+    [
+      new BattleSideSetup(playerFaction, [new FakeObjectiveData()],
+        [
+          new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Player", playerFaction)), new Vector3I(1, 0, 1)),
+          new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Support", playerFaction)), new Vector3I(2, 0, 1)),
+        ]),
+      new BattleSideSetup(enemyFaction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Enemy", enemyFaction)), new Vector3I(1, 0, 5))]),
+    ],
+    Seed: 7);
+
+  private sealed class HookBody<TEvent>(Action<HookContext> body) : BattleHook<TEvent>
+    where TEvent : BattleEvent
+  {
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TEvent evt)
+    {
+      body(context);
+      return [];
+    }
   }
 
   [TestCase]

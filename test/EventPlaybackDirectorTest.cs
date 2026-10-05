@@ -24,14 +24,18 @@ public sealed partial class EventPlaybackDirectorTest
 
     Assert.False(director.Busy);
 
-    battle.Spawn(TestData.MakeCombatant("Alpha", battle.PlayerFaction), new Vector3I(1, 0, 1));
+    BattleActionExecResult result = battle.Submit(BattleAction.SpawnUnit(
+      TestData.MakeCombatant("Alpha", battle.PlayerFaction), battle.At(1, 0, 1)));
+    BattleEvent[] committed = result.EventsThatOccurred.ToArray();
 
     Assert.True(director.Busy); // queued but not yet ticked
     director.Tick();
-    Assert.True(director.Played[0] is UnitAddedBattleEvent); // commit order
-    Assert.True(director.Busy); // one step per Tick: the spawn's spotting follow-ups are still queued
+    Assert.Equal(1, director.Played.Count); // one step per Tick
     while (director.Busy)
       director.Tick();
+    Assert.Equal(committed.Length, director.Played.Count);
+    for (int i = 0; i < committed.Length; i++)
+      Assert.True(ReferenceEquals(committed[i], director.Played[i])); // commit order
     Assert.Equal(1, idleCount);
     director.Tick(); // idle fires only once
     Assert.Equal(1, idleCount);

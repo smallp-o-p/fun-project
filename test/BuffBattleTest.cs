@@ -4,6 +4,7 @@ using FunProject.Buffs;
 using FunProject.Stats;
 using GdUnit4;
 using Godot;
+using System.Collections.Generic;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -39,6 +40,10 @@ public partial class BuffBattleTest
     Assert.Equal(1, unit.ActiveBuffs.AsValueEnumerable().Count());
     Assert.Equal(alwaysOn, battle.Events.SingleEvent<UnitBuffActivatedBattleEvent>().Buff);
     battle.Events.EventBefore<UnitAddedBattleEvent, UnitBuffActivatedBattleEvent>();
+    // The activation must happen in the spawn pass, before SessionStarted: the first
+    // turn-start pass re-evaluates every living unit and would otherwise mask a missing
+    // spawn evaluation.
+    battle.Events.EventBefore<UnitBuffActivatedBattleEvent, SessionStartedBattleEvent>();
   }
 
   [TestCase(TestName = "A condition met mid-turn activates at the NEXT turn start and shifts the hit-chance preview")]
@@ -135,6 +140,7 @@ public partial class BuffBattleTest
       "Intimidated",
       new AdjacentEnemyCondition(),
       statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-5)] }]);
+    var observeClamp = new HealthAtSessionStart(enemyFaction);
     using var battle = new BattleFixture(new BattleSetup(
       TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
       [
@@ -143,11 +149,31 @@ public partial class BuffBattleTest
         new BattleSideSetup(enemyFaction, [new FakeObjectiveData()],
           [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Hostile", enemyFaction, health: 20, buffs: [intimidation])), new Vector3I(4, 0, 4))]),
       ],
-      Seed: 7));
-    // Spawned adjacent to the player: its own startup evaluation sees the condition met.
+      Seed: 7) with
+    {
+      Systems = [new SetupSystemData { OnRegister = runtime =>
+        runtime.RegisterHook<SessionStartedBattleEvent>(observeClamp) }],
+    });
     var enemy = battle.UnitAt(new Vector3I(4, 0, 4));
 
+    // Observed at SessionStarted, before the first turn-start pass could repair a missing
+    // spawn clamp: the spawn evaluation must already have activated and clamped.
+    Assert.Equal((15, 15), observeClamp.Observed);
     Assert.Equal(15, enemy.MaxHealth);
     Assert.Equal(15, enemy.CurrentHealth);
+  }
+
+  // Records the side's single living unit's health at SessionStarted: after all initial
+  // placements and their spawn evaluations, before the first turn-start evaluation runs.
+  private sealed class HealthAtSessionStart(Faction side) : BattleHook<SessionStartedBattleEvent>
+  {
+    public (int Max, int Current) Observed { get; private set; }
+
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, SessionStartedBattleEvent evt)
+    {
+      BattleUnitState unit = context.Session.GetFactionAliveUnits(side).AsValueEnumerable().Single();
+      Observed = (unit.MaxHealth, unit.CurrentHealth);
+      return [];
+    }
   }
 }

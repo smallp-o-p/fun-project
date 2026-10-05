@@ -11,19 +11,15 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public class BattleSessionTest
 {
-  // Factory-ready multi-side fixture: units grouped into sides by faction in
-  // first-appearance order, one inert objective and one named unit per entry.
+  // Factory-ready multi-side fixture: domain tuples converted to placements, then built
+  // through the shared Started scenario (factions grouped by first appearance, one inert
+  // objective per faction).
   private static BattleFixture FixtureFromSides(Vector3I dimensions,
-    params (Faction Faction, string UnitName, Vector3I Position, int Health)[] sides)
-  {
-    Faction[] factions = sides.AsValueEnumerable().Select(side => side.Faction).Distinct().ToArray();
-    BattleSideSetup[] sideSetups = factions.AsValueEnumerable().Select(faction => new BattleSideSetup(
-      faction, [new FakeObjectiveData()],
-      sides.AsValueEnumerable().Where(side => ReferenceEquals(side.Faction, faction))
-        .Select(side => new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(side.UnitName, side.Faction,
-          health: side.Health)), side.Position)).ToArray())).ToArray();
-    return new BattleFixture(new BattleSetup(TestData.MakeOpenBattleMap(dimensions), sideSetups, Seed: 7));
-  }
+    params (Faction Faction, string UnitName, Vector3I Position, int Health)[] sides) =>
+    BattleFixture.Started(dimensions,
+      [.. sides.AsValueEnumerable().Select(side => new UnitPlacement(
+        new UnitLoadout(TestData.MakeCombatant(side.UnitName, side.Faction, health: side.Health)),
+        side.Position))]);
 
   [TestCase(TestName = "Board dimensions follow Vector3I axis order")]
   public void BoardDimensionsFollowVector3IAxisOrder()

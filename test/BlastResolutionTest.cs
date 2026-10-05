@@ -9,21 +9,15 @@ using Godot;
 [RequireGodotRuntime]
 public partial class BlastResolutionTest
 {
-  // Factory-ready fixture on the shared 8x1x8 blast board: factions in first-appearance
-  // order, one inert objective each, one unit per entry.
+  // Factory-ready fixture on the shared 8x1x8 blast board: domain tuples converted to
+  // placements, then built through the shared Started scenario (factions in first-appearance
+  // order, one inert objective per faction).
   private static BattleFixture BlastFixture(
-    params (Faction Faction, string UnitName, Vector3I Position, int Health)[] units)
-  {
-    Faction[] factions = units.AsValueEnumerable().Select(u => u.Faction).Distinct().ToArray();
-    BattleSideSetup[] sides = factions.AsValueEnumerable().Select(faction => new BattleSideSetup(
-      faction, [new FakeObjectiveData()],
-      units.AsValueEnumerable().Where(u => ReferenceEquals(u.Faction, faction))
-        .Select(u => new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(u.UnitName, u.Faction,
-          health: u.Health)), u.Position)).ToArray())).ToArray();
-    return new BattleFixture(new BattleSetup(TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)), sides, Seed: 7));
-  }
-
-  private static BattleUnitState UnitAt(BattleFixture battle, Vector3I position) => battle.UnitAt(position);
+    params (Faction Faction, string UnitName, Vector3I Position, int Health)[] units) =>
+    BattleFixture.Started(new Vector3I(8, 1, 8),
+      [.. units.AsValueEnumerable().Select(u => new UnitPlacement(
+        new UnitLoadout(TestData.MakeCombatant(u.UnitName, u.Faction, health: u.Health)),
+        u.Position))]);
 
   [TestCase(TestName = "Thrown grenade damages an enemy within the blast radius")]
   public void ThrownGrenadeDamagesEnemyWithinBlastRadius()
@@ -33,8 +27,8 @@ public partial class BlastResolutionTest
     using var battle = BlastFixture(
       (playerFaction, "Thrower", new Vector3I(1, 0, 1), 20),
       (enemyFaction, "Hostile", new Vector3I(3, 0, 1), 20));
-    var thrower = UnitAt(battle, new Vector3I(1, 0, 1));
-    var enemy = UnitAt(battle, new Vector3I(3, 0, 1));
+    var thrower = battle.UnitAt(new Vector3I(1, 0, 1));
+    var enemy = battle.UnitAt(new Vector3I(3, 0, 1));
 
     var grenade = TestData.MakeGrenade("Frag", throwRange: 6, blastRadius: 1, effects: [new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic }]);
     thrower.AddInventoryItem(grenade.Item);
@@ -55,9 +49,9 @@ public partial class BlastResolutionTest
       (playerFaction, "Thrower", new Vector3I(1, 0, 1), 20),
       (enemyFaction, "Near", new Vector3I(3, 0, 1), 20),
       (enemyFaction, "Far", new Vector3I(3, 0, 4), 20));
-    var thrower = UnitAt(battle, new Vector3I(1, 0, 1));
-    var nearEnemy = UnitAt(battle, new Vector3I(3, 0, 1));
-    var farEnemy = UnitAt(battle, new Vector3I(3, 0, 4));
+    var thrower = battle.UnitAt(new Vector3I(1, 0, 1));
+    var nearEnemy = battle.UnitAt(new Vector3I(3, 0, 1));
+    var farEnemy = battle.UnitAt(new Vector3I(3, 0, 4));
 
     var grenade = TestData.MakeGrenade("Frag", throwRange: 6, blastRadius: 1, effects: [new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic }]);
     thrower.AddInventoryItem(grenade.Item);
@@ -78,9 +72,9 @@ public partial class BlastResolutionTest
       (playerFaction, "Thrower", new Vector3I(1, 0, 1), 20),
       (playerFaction, "Ally", new Vector3I(3, 0, 1), 20),
       (enemyFaction, "Hostile", new Vector3I(4, 0, 1), 20));
-    var thrower = UnitAt(battle, new Vector3I(1, 0, 1));
-    var ally = UnitAt(battle, new Vector3I(3, 0, 1));
-    var enemy = UnitAt(battle, new Vector3I(4, 0, 1));
+    var thrower = battle.UnitAt(new Vector3I(1, 0, 1));
+    var ally = battle.UnitAt(new Vector3I(3, 0, 1));
+    var enemy = battle.UnitAt(new Vector3I(4, 0, 1));
 
     var grenade = TestData.MakeGrenade("Frag", throwRange: 6, blastRadius: 1, effects: [new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic }]);
     thrower.AddInventoryItem(grenade.Item);
@@ -101,8 +95,8 @@ public partial class BlastResolutionTest
     using var battle = BlastFixture(
       (playerFaction, "Thrower", new Vector3I(1, 0, 1), 20),
       (enemyFaction, "Hostile", new Vector3I(3, 0, 1), 20));
-    var thrower = UnitAt(battle, new Vector3I(1, 0, 1));
-    var enemy = UnitAt(battle, new Vector3I(3, 0, 1));
+    var thrower = battle.UnitAt(new Vector3I(1, 0, 1));
+    var enemy = battle.UnitAt(new Vector3I(3, 0, 1));
 
     var grenade = TestData.MakeGrenade(
       "Glue Bomb",
