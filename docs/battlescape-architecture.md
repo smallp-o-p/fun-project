@@ -8,7 +8,7 @@ Detail: [battle-action-executor.md](battle-action-executor.md) (execution rules)
 
 - `BattleSession` owns all live tactical state.
 - `BattleAction` values are the only gameplay-initiated writes. `BattleActionExecutor` resolves them.
-- Read-side questions are typed `IBattleSessionQuery<TResult>` objects run through `BattleRuntime.Query`.
+- `BattleRuntime.Query` runs typed `IBattleSessionQuery<TResult>` objects for read-side questions.
 - Scenes own presentation, input, and playback. They read through queries and react to committed events.
 - Board coordinates are the engine-agnostic `FunProject.Core.Vector3I` (X = width, Y = levels, Z = depth). Authored resources use Godot's `Vector3I`. The runtime boundary converts.
 
@@ -124,7 +124,7 @@ Recovery order at the ending faction's turn end: `StatusEffectSystem` and `Armor
 
 `BattleObjectState` is an immovable placed object. Attackable objects carry `ObjectHealthCapability`. `BattleEntity` carries a unit or object identity. `BattleRuntime.TryGetAttackTarget` creates its `AttackTarget` proof. The proof is `Some` only for a live unit or a live health-bearing object.
 
-Feasibility (weapon, self, ally, liveness, attackability, visibility, range) resolves once through `AttackContext.Resolve`. `AttackEntity` and the `GetHitChanceForAttack` preview share this check, so both callers use the same feasibility rules. Against a unit, the attack rolls through the session's `IHitChanceCalculator` (default `StandardHitChanceCalculator`: Aim − cover, clamped 0–100) with the seeded RNG. Against an object, the attack skips the calculator. A feasible object shot always connects. `weapon.TrySpendShot(attacker.ActiveBuffDamageMods)` spends ammo before the roll; a miss still consumes.
+Feasibility (weapon, self, ally, liveness, attackability, visibility, range) resolves once through `AttackContext.Resolve`. `AttackEntity` and the `GetHitChanceForAttack` preview share this check, so both callers use the same feasibility rules. Against a unit, the attack rolls through the session's `IHitChanceCalculator` (default `StandardHitChanceCalculator`: Aim − cover, clamped 0–100) with the seeded RNG. Against an object, the attack skips the calculator. A feasible object shot always connects. `weapon.TrySpendShot(attacker.ActiveBuffDamageMods)` spends ammo before the roll; a missed shot consumes ammunition.
 
 Object damage goes through `ApplyDamageTo`'s object overload. Health packets reduce the capability. The overload ignores stun and status payloads. Zero health is the terminal `Destroyed` transition. Occupancy clears before the broadcast. Objects emit `ObjectDamagedBattleEvent` and `ObjectDestroyedBattleEvent`.
 
@@ -155,9 +155,9 @@ The result shape is part of the contract:
 - `Option<T>` — absence is normal (`GetUnitAtTile`, `GetObjectivesForFaction`).
 - `Either<BattleQueryFailure, TResult>` — fallible (`GetHitChanceForAttack` for an out-of-range or unseen target, `GetFactionEndOfBattleSummary` before the battle ends).
 
-Scene code creates proofs at the runtime boundary: `TryGetAlive(unit)`, `TryGetAliveObject(obj)`, `TryGetAttackTarget(entity)`, and `TryGetTile(coordinates)`. Missing or dead units and off-board tiles return `None` as expected absence at the proof boundary. Invalid proof contexts (a proof used in a context that never accepted it) are caller bugs. The guarding exceptions stop execution by design, per the trusted-core convention. A `TryGetTile` proof remains valid because board bounds stay fixed.
+Scene code creates proofs at the runtime boundary: `TryGetAlive(unit)`, `TryGetAliveObject(obj)`, `TryGetAttackTarget(entity)`, and `TryGetTile(coordinates)`. Missing or dead units and off-board tiles return `None` as expected absence at the proof boundary. Passing a proof into an invalid context is a caller bug. Let the guarding exception propagate, per the trusted-core convention. A `TryGetTile` proof remains valid because board bounds stay fixed.
 
-Examples: `FindPathForUnit`, `GetPossibleMoveTilesForUnit`, `GetVisibleEnemiesForUnit`, `CanUnitActNow`, `GetHitChanceForAttack`, `GetAvailableActionsForUnit`, `GetPlayerFactionQuery`, `GetFactionEndOfBattleSummary`. Use one question per query and keep its algorithm in that query's implementation. Keep query classes single-purpose, without enum modes, nullable selector fields, or behavior controlled by unrelated properties. Put a complex or variable algorithm in a strategy behind that specific query. Keep each `BattleRuntime.Query` call mapped to one query implementation.
+Examples: `FindPathForUnit`, `GetPossibleMoveTilesForUnit`, `GetVisibleEnemiesForUnit`, `CanUnitActNow`, `GetHitChanceForAttack`, `GetAvailableActionsForUnit`, `GetPlayerFactionQuery`, `GetFactionEndOfBattleSummary`. Use one question per query. Keep the algorithm in that query's implementation. Keep query classes single-purpose, without enum modes, nullable selector fields, or behavior controlled by unrelated properties. Put a complex or variable algorithm in a strategy behind that specific query. Keep each `BattleRuntime.Query` call mapped to one query implementation.
 
 ### BattleBoardState
 
@@ -168,7 +168,7 @@ The board stores `BattleTileState[x,y,z]`, unit and object occupancy, and positi
 The session owns visibility because it derives from unit positions, tile state, and explored memory:
 
 - `VisionStat` is the sight range of each living conscious observer.
-- Visible tiles come from scanning a 3D bounding box within Euclidean range and raytracing line of sight per candidate. Whole-tile `BlocksLineOfSight` occludes. A diagonal between two blockers passes only when at least one flanking tile is open. Vertical passages through `BlocksVerticalLineOfSight` tiles are blocked.
+- Visible tiles come from scanning a 3D bounding box within Euclidean range and raytracing line of sight per candidate. Whole-tile `BlocksLineOfSight` occludes. A diagonal between two blockers passes only when at least one flanking tile is open. Tiles with `BlocksVerticalLineOfSight` block vertical passages.
 - A unit is visible when it stands on a visible tile. Each unit stores its visible tiles and visible units; each faction stores explored-tile memory.
 - A faction always knows its own living units. Conscious observers contribute faction vision and can see unconscious bodies. Exploration persists.
 - After each committed event, only units whose cell or consciousness changed recompute visible tiles. Every conscious observer rebuilds visible-unit membership wholesale.
@@ -237,13 +237,13 @@ sequenceDiagram
 - `EndFactionTurn` is the explicit faction-turn action.
 - Turn start follows the same dispatch-then-refresh shape at both invocation sites (the factory bootstrap's first turn and subsequent side turns). Both sites raise the turn-start events (`TurnStarted`, plus `ActiveSideChanged` on a side flip or `SessionStarted` on battle start). Then they refresh action points with `RefreshForNewTurn`.
   - The factory establishes the first turn's scheduling state (round queue, active side, availability) at construction. Each subsequent side turn runs one scheduler `Advance()` after the turn-end dispatch and its outcome check. Exhaustion clears availability and resolves the draw. A reported new round increments `TurnNumber` once.
-  - `ActiveSideChanged`/`TurnStarted` observers see the flipped-to side with its availability already established and the round number already applied.
+  - `ActiveSideChanged`/`TurnStarted` observers see the new active side with its availability already established and the round number already applied.
   - The initial AP refresh covers all living units. Later refreshes cover only the turning faction's living units. Both sites skip the AP refresh when the dispatch already decided the battle.
   - Buff evaluation is an ordinary hook on `TurnStartedBattleEvent` (`TurnStartBuffHook`) and on `UnitAddedBattleEvent` at spawn (`UnitSpawnedBuffHook`). The executor's constructor registers both hooks. Dispatch fires them after the event's broadcast. A buff flip applies during the dispatch. For turn start, the flip applies before the AP refresh. That refresh runs once the dispatch completes and reads (possibly buffed) `MaxActionPoints`.
   - Mid-dispatch observers of `SessionStarted`/`TurnStarted` see pre-refresh action points. This is deliberate. When the battle is still ongoing, the refresh always completes before the submission returns.
 - `PassUnit` ends a unit activation and currently advances the turn automatically if that side has no remaining actable units.
 - Unit death updates alive/dead storage, board occupancy, current-turn availability, and faction queue membership through session bookkeeping. Unconsciousness consumes availability and removes the faction from future turns when no conscious ally remains, while preserving the body and its occupancy. A disabled active faction keeps its current queue head until explicit turn end.
-- The designated player's loss of all conscious forces ends the battle as defeat. `ObjectiveSystem` suppresses directives on that final death or unconscious event, so the player-wipe defeat rule keeps priority over objective results. In a battle with no designated player, total force loss stays in progress until turn end resolves a draw.
+- The designated player's loss of all conscious units ends the battle as defeat. `ObjectiveSystem` suppresses directives on that death or unconscious event, so the player-wipe defeat rule keeps priority over objective results. In a battle with no designated player, the loss of all living conscious units stays in progress until turn end resolves a draw.
 
 ## Battle Events
 
