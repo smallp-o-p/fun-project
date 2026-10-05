@@ -84,7 +84,7 @@ public sealed class FakeObjective : Objective
 {
   public bool Complete { get; set; }
   public bool Failed { get; set; }
-  public Type Observe { get; set; }
+  public Type? Observe { get; set; }
   public int CheckCount { get; private set; }
 
   public FakeObjective() : this(new FakeObjectiveData())

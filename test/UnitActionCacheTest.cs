@@ -122,8 +122,10 @@ public class UnitActionCacheTest
   private static int MaterializedSetCount(UnitActionCache cache)
   {
     var field = typeof(UnitActionCache).GetField("_entries",
-      System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-    var entries = (System.Collections.IDictionary)field.GetValue(cache);
+      System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic) ??
+      throw new InvalidOperationException("UnitActionCache is missing the private _entries field.");
+    var entries = (System.Collections.IDictionary)(field.GetValue(cache) ??
+      throw new InvalidOperationException("UnitActionCache._entries was null."));
     return entries.Count;
   }
 
@@ -576,7 +578,7 @@ public class UnitActionCacheTest
       new GetAvailableActionsForUnit(battle.Alive(player)));
     UnitAction existingMove = Row<MoveActionDefinition>(existing);
     Assert.False(existingMove.IsAvailable);
-    IReadOnlyList<UnitAction> createdDuringCallback = null;
+    IReadOnlyList<UnitAction>? createdDuringCallback = null;
     bool existingDuringCallback = true;
     bool createdDuringCallbackValue = true;
     battle.Session.BattleEventCommitted += battleEvent =>
@@ -593,12 +595,14 @@ public class UnitActionCacheTest
 
     battle.Start();
 
+    IReadOnlyList<UnitAction> created = createdDuringCallback ??
+      throw new InvalidOperationException("the TurnStarted callback never queried the support unit");
     Assert.False(existingDuringCallback);
     Assert.False(createdDuringCallbackValue);
     Assert.True(existingMove.IsAvailable);
-    Assert.True(Row<MoveActionDefinition>(createdDuringCallback).IsAvailable);
+    Assert.True(Row<MoveActionDefinition>(created).IsAvailable);
     Assert.False(existingMove.IsDirty);
-    Assert.False(Row<MoveActionDefinition>(createdDuringCallback).IsDirty);
+    Assert.False(Row<MoveActionDefinition>(created).IsDirty);
   }
 
   [TestCase]
@@ -663,7 +667,7 @@ public class UnitActionCacheTest
     var failure = new ApplicationException("interrupt failed");
     battle.RegisterHook<UnitMovedBattleEvent>(new InterruptOnce(new SpendThenThrow(battle.PlayerUnit, failure)));
 
-    Exception caught = null;
+    Exception? caught = null;
     try
     {
       battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2), new Vector3I(4, 0, 3)]);
@@ -694,7 +698,7 @@ public class UnitActionCacheTest
     EvaluateAll(enemyActions);
     var failure = new ApplicationException("eventless failure");
 
-    Exception caught = null;
+    Exception? caught = null;
     try
     {
       battle.Submit(new SpendThenThrow(battle.PlayerUnit, failure));
@@ -756,7 +760,7 @@ public class UnitActionCacheTest
     var action = new UnitAction(battle.Session.ActionOptions, battle.PlayerUnit,
       new TestActionDefinition(condition));
 
-    Exception caught = null;
+    Exception? caught = null;
     try
     {
       _ = action.IsAvailable;
