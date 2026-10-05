@@ -26,24 +26,22 @@ public partial class BattleAnnotationEditor : EditorPlugin
     _inspect = _dock.GetNode<Button>("Panel/Inspect");
     _reset = _dock.GetNode<Button>("Panel/Reset");
     _confirmReset = _dock.GetNode<ConfirmationDialog>("ConfirmReset");
-    _inspect.Pressed += InspectSelectedBox;
-    _reset.Pressed += () =>
-    {
-      _resetTarget = _annotator;
-      _confirmReset.PopupCentered();
-    };
-    _confirmReset.Confirmed += ResetAnnotations;
+    // Method-name callables survive C# reload without retaining stale delegates.
+    _inspect.Connect(Button.SignalName.Pressed, new Callable(this, MethodName.InspectSelectedBox));
+    _reset.Connect(Button.SignalName.Pressed, new Callable(this, MethodName.RequestReset));
+    _confirmReset.Connect(ConfirmationDialog.SignalName.Confirmed, new Callable(this, MethodName.ResetAnnotations));
     AddDock(_dock);
     _dock.Close();
-    SceneChanged += TrackScene;
+    Connect(SignalName.SceneChanged, new Callable(this, MethodName.TrackScene));
     TrackScene(EditorInterface.Singleton.GetEditedSceneRoot());
   }
   public override void _ExitTree()
   {
-    SceneChanged -= TrackScene;
-    if (GodotObject.IsInstanceValid(_sceneRoot) && _sceneRoot!.IsConnected(Node.SignalName.TreeExiting, Callable.From(PauseScene)))
-      _sceneRoot.TreeExiting -= PauseScene;
+    Disconnect(SignalName.SceneChanged, new Callable(this, MethodName.TrackScene));
+    if (GodotObject.IsInstanceValid(_sceneRoot) && _sceneRoot!.IsConnected(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene)))
+      _sceneRoot.Disconnect(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene));
     RemoveInspectorPlugin(_annotationInspector);
+    _annotationInspector.Dispose();
     RemoveDock(_dock);
     _dock.QueueFree();
   }
@@ -53,10 +51,10 @@ public partial class BattleAnnotationEditor : EditorPlugin
   private void PauseScene() => SetProcess(false);
   private void TrackScene(Node? root)
   {
-    if (GodotObject.IsInstanceValid(_sceneRoot) && _sceneRoot!.IsConnected(Node.SignalName.TreeExiting, Callable.From(PauseScene)))
-      _sceneRoot.TreeExiting -= PauseScene;
+    if (GodotObject.IsInstanceValid(_sceneRoot) && _sceneRoot!.IsConnected(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene)))
+      _sceneRoot.Disconnect(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene));
     _sceneRoot = root;
-    if (_sceneRoot is not null) _sceneRoot.TreeExiting += PauseScene;
+    if (_sceneRoot is not null) _sceneRoot.Connect(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene));
     SetProcess(true);
   }
 
@@ -151,6 +149,12 @@ public partial class BattleAnnotationEditor : EditorPlugin
     }
     public override bool _ParseProperty(GodotObject obj, Variant.Type type, string name, PropertyHint hintType,
       string hintString, PropertyUsageFlags usageFlags, bool wide) => !Editor.CanEditCell((BattleFootprintData)obj);
+  }
+
+  private void RequestReset()
+  {
+    _resetTarget = _annotator;
+    _confirmReset.PopupCentered();
   }
 
   private void ResetAnnotations()
