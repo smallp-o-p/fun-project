@@ -261,7 +261,7 @@ public sealed class BattleSession
     MarkVisibilityAffected(unit);
 
     _units.Add(unit);
-    EnqueueFactionInGlobalOrder(unit.Side);
+    _scheduler.RegisterFaction(unit.Side);
     _scheduler.AddSpawnedUnit(unit);
 
     RaiseEvents(new UnitAddedBattleEvent(unit, position));
@@ -455,26 +455,41 @@ public sealed class BattleSession
       TurnNumber));
 
     // A turn-end DoT can wipe the player during the dispatch above, ending the
-    // battle immediately; bail before mutating the turn queue.
+    // battle immediately; no turn continuation runs after a decided outcome.
     if (Outcome.IsSome)
       return;
 
-    // With no player faction there is no backstop: if every faction is wiped, Draw.
-    if (!_scheduler.GlobalFactionTurnOrder.AsValueEnumerable().Any(HasConsciousUnits))
+    TurnScheduler.AdvanceResult advance = _scheduler.Advance();
+    if (advance.Exhausted)
     {
+      // With no player faction there is no backstop: if every faction is wiped, Draw.
       EndBattle(BattleOutcome.Draw);
       return;
     }
 
-    _scheduler.MarkActiveSideActed();
+    if (advance.NextRound)
+      TurnNumber++;
 
-    if (_scheduler.AdvanceToNextSide())
-    {
-      StartNextRound();
+    BeginNextSideTurn(advance.NextSide);
+  }
+
+  // The next side's availability was already established inside the scheduler's Advance, so
+  // no observer of these notifications sees the previous side's units as still available.
+  // Turn-start hooks (buffs) fire inside this dispatch, BEFORE the AP refresh below reads
+  // buffed MaxActionPoints — mid-dispatch observers see pre-refresh action points.
+  private void BeginNextSideTurn(Faction nextSide)
+  {
+    RaiseEvents(
+      new ActiveSideChangedBattleEvent(nextSide),
+      new TurnStartedBattleEvent(nextSide, TurnNumber));
+
+    // A turn-start objective flip (e.g. SurviveUntilTurn reaching its target) can end the
+    // battle inside that dispatch; skip the AP refresh for a decided battle.
+    if (Outcome.IsSome)
       return;
-    }
 
-    BeginNextQueuedSideTurn();
+    foreach (var unit in GetFactionAliveUnits(nextSide))
+      unit.RefreshForNewTurn();
   }
 
   internal void EndFactionTurn(Faction expectedActiveSide)
@@ -506,8 +521,7 @@ public sealed class BattleSession
       });
     _capturedEnemies = System.Array.AsReadOnly(captured.AsValueEnumerable().ToArray());
 
-    _scheduler.ClearActiveFactionAvailability();
-    _scheduler.ClearTurnQueue();
+    _scheduler.Stop();
     Outcome = Some(outcome);
 
     RaiseEvents(new SessionEndedBattleEvent(outcome));
@@ -683,11 +697,6 @@ public sealed class BattleSession
       _eventDispatchQueue.Enqueue(new UnitSpottedBattleEvent(observer, target));
   }
 
-  private void EnqueueFactionInGlobalOrder(Faction side)
-  {
-    _scheduler.RegisterFaction(side);
-  }
-
   private void HandleFactionLoss(Faction side)
   {
     if (HasConsciousUnits(side))
@@ -742,48 +751,6 @@ public sealed class BattleSession
   {
     ArgumentNullException.ThrowIfNull(faction);
     return _objectives.TryGetValue(faction, out var list) ? list : [];
-  }
-
-  private void StartNextRound()
-  {
-    TurnNumber++;
-    _scheduler.ClearSidesActedThisRound();
-    _scheduler.RebuildRoundQueueFromConsciousSides();
-
-    if (_scheduler.RoundQueueCount == 0)
-      throw new InvalidOperationException(
-        "StartNextRound reached with no conscious factions; AdvanceTurn should end the battle at the prior turn end.");
-
-    BeginNextQueuedSideTurn();
-  }
-
-  private void BeginNextQueuedSideTurn()
-  {
-    if (_scheduler.RoundQueueCount == 0)
-      throw new InvalidOperationException("Cannot begin a turn with an empty conscious-faction queue.");
-
-    var nextSide = _scheduler.AdvanceActiveSideToQueueHead();
-    if (!HasConsciousUnits(nextSide))
-      throw new InvalidOperationException("Cannot begin a turn for a faction without conscious units.");
-
-    // Refresh availability immediately after the active side flips: no observer may see the
-    // previous side's units as still available.
-    _scheduler.RefreshActiveFactionAvailability();
-
-    // Turn-start hooks (buffs) fire inside this dispatch, BEFORE the AP refresh below reads
-    // buffed MaxActionPoints — every side's turn start re-evaluates ALL alive units so
-    // conditions that changed during another faction's turn are fresh.
-    RaiseEvents(
-      new ActiveSideChangedBattleEvent(nextSide),
-      new TurnStartedBattleEvent(nextSide, TurnNumber));
-
-    // A turn-start objective flip (e.g. SurviveUntilTurn reaching its target) can end the
-    // battle inside that dispatch; skip the AP refresh for a decided battle.
-    if (Outcome.IsSome)
-      return;
-
-    foreach (var unit in GetFactionAliveUnits(nextSide))
-      unit.RefreshForNewTurn();
   }
 
   internal FactionBattleSummary GetFactionSummary(Faction faction)

@@ -430,9 +430,24 @@ public partial class BattleActionExecutorTest
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
     using var battle = DuelFixture(factionA, "A1", new Vector3I(0, 0, 0), factionB, "B1", new Vector3I(1, 0, 0));
+    var session = battle.Session;
+    var unitA = battle.UnitAt(new Vector3I(0, 0, 0));
+    var unitB = battle.UnitAt(new Vector3I(1, 0, 0));
+    var sideFlips = new List<(Faction FlippedTo, Faction ActiveSide, int TurnNumber, bool OutgoingAvailable, bool IncomingAvailable)>();
+    session.BattleEventCommitted += battleEvent =>
+    {
+      if (battleEvent is not ActiveSideChangedBattleEvent changed)
+        return;
+      BattleUnitState outgoing = changed.Faction == factionA ? unitB : unitA;
+      BattleUnitState incoming = changed.Faction == factionA ? unitA : unitB;
+      sideFlips.Add((changed.Faction, session.ActiveSide, session.TurnNumber,
+        session.IsUnitStillAvailableThisTurn(outgoing),
+        session.IsUnitStillAvailableThisTurn(incoming)));
+    };
 
     battle.ClearEvents();
     battle.Submit(BattleAction.EndFactionTurn(factionA));
+    battle.Submit(BattleAction.EndFactionTurn(factionB));
 
     Assert.True(battle.Events.EventsOf<TurnEndedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
       battleEvent.Faction == factionA &&
@@ -440,6 +455,19 @@ public partial class BattleActionExecutorTest
     Assert.True(battle.Events.EventsOf<TurnStartedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
       battleEvent.Faction == factionB &&
       battleEvent.TurnNumber == 1));
+    Assert.True(battle.Events.EventsOf<TurnEndedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
+      battleEvent.Faction == factionB &&
+      battleEvent.TurnNumber == 1));
+    Assert.True(battle.Events.EventsOf<TurnStartedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
+      battleEvent.Faction == factionA &&
+      battleEvent.TurnNumber == 2));
+
+    // The scheduling transition is complete before any event observer runs: the active
+    // identity is the flipped-to side, the outgoing side's availability is already cleared,
+    // the incoming side's is established, and the round increment precedes the notifications.
+    Assert.Equal(2, sideFlips.Count);
+    Assert.Equal((factionB, factionB, 1, false, true), sideFlips[0]);
+    Assert.Equal((factionA, factionA, 2, false, true), sideFlips[1]);
   }
 
   [TestCase(TestName = "Executor resolves queued actions in FIFO order")]

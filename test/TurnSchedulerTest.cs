@@ -88,4 +88,40 @@ public class TurnSchedulerTest
     Assert.Equal(battle.EnemyFaction, scheduler.GlobalFactionTurnOrder.AsValueEnumerable().Last());
     Assert.True(scheduler.IsUnitAvailable(battle.PlayerUnit));
   }
+
+  [TestCase(TestName = "Advance returns a complete turn or exhaustion")]
+  public void AdvanceReturnsACompleteTurnOrExhaustion()
+  {
+    using var battle = BattleFixture.Duel();
+    var scheduler = SchedulerFor(battle, battle.PlayerFaction, battle.EnemyFaction);
+
+    var nextSide = scheduler.Advance();
+
+    Assert.False(nextSide.Exhausted);
+    Assert.False(nextSide.NextRound);
+    Assert.Equal(battle.EnemyFaction, nextSide.NextSide);
+    Assert.Equal(battle.EnemyFaction, scheduler.ActiveSide);
+    Assert.False(scheduler.IsUnitAvailable(battle.PlayerUnit));
+    Assert.True(scheduler.IsUnitAvailable(battle.EnemyUnit));
+
+    var rollover = scheduler.Advance();
+
+    Assert.False(rollover.Exhausted);
+    Assert.True(rollover.NextRound);
+    Assert.Equal(battle.PlayerFaction, rollover.NextSide);
+    Assert.Equal(battle.PlayerFaction, scheduler.ActiveSide);
+    Assert.True(scheduler.IsUnitAvailable(battle.PlayerUnit));
+    Assert.False(scheduler.IsUnitAvailable(battle.EnemyUnit));
+
+    battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
+    battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
+
+    var exhausted = scheduler.Advance();
+
+    Assert.True(exhausted.Exhausted);
+    Assert.Equal(battle.PlayerFaction, scheduler.ActiveSide);
+    Assert.Equal(0, scheduler.TurnQueue.Count);
+    Assert.False(scheduler.IsUnitAvailable(battle.PlayerUnit));
+    Assert.False(scheduler.IsUnitAvailable(battle.EnemyUnit));
+  }
 }

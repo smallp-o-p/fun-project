@@ -97,8 +97,8 @@ public class BattleOutcomeTest
     Assert.True(battle.Session.Outcome.IsNone);
     Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
 
-    // A lone survivor keeps taking turns across the round boundary — the path
-    // adjacent to StartNextRound's impossible-state guard — without ending.
+    // A lone survivor keeps taking turns across the round boundary — the path adjacent
+    // to the scheduler's exhaustion boundary — without ending.
     battle.AdvanceTurn();
 
     Assert.True(battle.Session.Outcome.IsNone);

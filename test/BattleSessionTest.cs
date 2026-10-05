@@ -45,6 +45,8 @@ public class BattleSessionTest
     var point = session.Board.At(1, 0, 1);
     Assert.True(session.Board.IsOccupied(point));
     Assert.Equal(unit.Id, session.Board.GetOccupant(point).RequireSome());
+    // An active-side reinforcement is immediately available this turn.
+    Assert.True(battle.Query(new IsUnitStillAvailableThisTurn(unit)));
   }
 
   [TestCase(TestName = "SpawnUnit rejects occupied tile")]
