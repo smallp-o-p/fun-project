@@ -1,46 +1,32 @@
 namespace FunProject.Battle;
 
-/// <summary>A live cell view. Copying this value preserves access to the same board cell.</summary>
-public readonly struct BattleTileState
+public struct BattleTileState
 {
-  private readonly BattleBoardState _board;
-  private readonly int _index;
+  private BattleTileFlags _flags;
 
-  internal BattleTileState(BattleBoardState board, int index) { _board = board; _index = index; }
+  public BattleTileState() => _flags = BattleTileFlags.Walkable;
 
+  // Walkability is authored at board construction and otherwise mutated only through
+  // BattleBoardState.SetTileWalkable.
   public bool IsWalkable
   {
-    get => Has(BattleTileIndex.Walkable);
-    internal set => Set(BattleTileIndex.Walkable, value);
+    get => (_flags & BattleTileFlags.Walkable) != 0;
+    internal set => Set(BattleTileFlags.Walkable, value);
   }
 
   public bool BlocksLineOfSight
   {
-    get => Has(BattleTileIndex.BlocksSight);
-    set => Set(BattleTileIndex.BlocksSight, value);
+    get => (_flags & BattleTileFlags.BlocksLineOfSight) != 0;
+    set => Set(BattleTileFlags.BlocksLineOfSight, value);
   }
 
   public bool BlocksVerticalLineOfSight
   {
-    get => Has(BattleTileIndex.BlocksVerticalSight);
-    set => Set(BattleTileIndex.BlocksVerticalSight, value);
+    get => (_flags & BattleTileFlags.BlocksVerticalLineOfSight) != 0;
+    set => Set(BattleTileFlags.BlocksVerticalLineOfSight, value);
   }
 
-  public TileCover Cover
-  {
-    get => new((CoverDirections)_board.TileCoverDirections[_index], _board.TileCoverAmounts[_index]);
-    set
-    {
-      // Gameplay uses the authored 0..100 cover domain. Reject unrepresentable values
-      // instead of silently wrapping when callers construct an invalid cover value.
-      byte directions = checked((byte)value.Directions);
-      byte amount = checked((byte)value.Amount);
-      _board.TileCoverDirections[_index] = directions;
-      _board.TileCoverAmounts[_index] = amount;
-    }
-  }
+  public TileCover Cover { get; set; }
 
-  private bool Has(byte mask) => (_board.TileFlags[_index] & mask) != 0;
-  private void Set(byte mask, bool value) => _board.TileFlags[_index] = value
-    ? (byte)(_board.TileFlags[_index] | mask) : (byte)(_board.TileFlags[_index] & ~mask);
+  private void Set(BattleTileFlags flag, bool value) => _flags = value ? _flags | flag : _flags & ~flag;
 }

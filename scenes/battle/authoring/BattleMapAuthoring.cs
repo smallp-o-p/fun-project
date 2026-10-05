@@ -121,7 +121,10 @@ public partial class BattleMapAuthoring : BattleMap
     var data = BuildMap(pieces);
     foreach (var (cell, slot) in SpawnSlots)
     {
-      if (slot < 0 || !data.Contains(cell) || !data.GetTile(cell).Walkable)
+      if (slot < 0 || !data.Contains(cell))
+        throw new InvalidOperationException($"Spawn at {cell} requires a walkable floor and nonnegative faction slot.");
+      using var tile = data.GetTile(cell);
+      if (!tile.Walkable)
         throw new InvalidOperationException($"Spawn at {cell} requires a walkable floor and nonnegative faction slot.");
       data.SpawnSlots[cell] = slot;
     }

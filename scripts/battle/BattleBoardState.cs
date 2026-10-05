@@ -50,9 +50,7 @@ public sealed class BattleBoardState
     }
   }
 
-  internal readonly byte[] TileFlags;
-  internal readonly byte[] TileCoverDirections;
-  internal readonly byte[] TileCoverAmounts;
+  private readonly BattleTileState[] _tiles;
   private readonly Dictionary<ValidatedPoint, int> _occupants = [];
   private readonly Dictionary<ValidatedPoint, int> _objectOccupants = [];
   private readonly Dictionary<int, ValidatedPoint> _positionByUnit = [];
@@ -75,20 +73,25 @@ public sealed class BattleBoardState
       throw new ArgumentOutOfRangeException(nameof(dim));
 
     Dimensions = dim;
-    int count = BattleTileIndex.Count(dim.X, dim.Y, dim.Z);
+    int count = checked(dim.X * dim.Z * dim.Y);
+    _tiles = new BattleTileState[count];
     if (map is null)
     {
-      TileFlags = new byte[count];
-      System.Array.Fill(TileFlags, BattleTileIndex.Walkable);
-      TileCoverDirections = new byte[count];
-      TileCoverAmounts = new byte[count];
+      System.Array.Fill(_tiles, new BattleTileState { IsWalkable = true });
     }
-    else
+    else if (map.TileFlags.Length != 0)
     {
-      map.ValidateStorage();
-      TileFlags = (byte[])map.TileFlags.Clone();
-      TileCoverDirections = (byte[])map.TileCoverDirections.Clone();
-      TileCoverAmounts = (byte[])map.TileCoverAmounts.Clone();
+      for (int i = 0; i < count; i++)
+      {
+        var flags = (BattleTileFlags)map.TileFlags[i];
+        _tiles[i] = new BattleTileState
+        {
+          IsWalkable = (flags & BattleTileFlags.Walkable) != 0,
+          BlocksLineOfSight = (flags & BattleTileFlags.BlocksLineOfSight) != 0,
+          BlocksVerticalLineOfSight = (flags & BattleTileFlags.BlocksVerticalLineOfSight) != 0,
+          Cover = new((CoverDirections)map.TileCoverDirections[i], map.TileCoverAmounts[i])
+        };
+      }
     }
   }
 
@@ -301,15 +304,16 @@ public sealed class BattleBoardState
     }
   }
 
-  public BattleTileState GetTile(ValidatedPoint point)
+  // Use ref locals when retaining a mutable cell; ordinary value assignment makes a snapshot.
+  public ref BattleTileState GetTile(ValidatedPoint point)
   {
-    return GetTileUnchecked(point.X, point.Y, point.Z);
+    return ref GetTileUnchecked(point.X, point.Y, point.Z);
   }
 
   // Unchecked Tile access, do NOT call this unless you've proven that the input is valid.
-  internal BattleTileState GetTileUnchecked(int x, int y, int z)
+  internal ref BattleTileState GetTileUnchecked(int x, int y, int z)
   {
-    return new BattleTileState(this, BattleTileIndex.Of(x, y, z, Dimensions.X, Dimensions.Z));
+    return ref _tiles[x + Dimensions.X * (z + Dimensions.Z * y)];
   }
 
   public bool IsBlockedByObject(ValidatedPoint point)

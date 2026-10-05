@@ -16,12 +16,15 @@ public partial class BattleMapAuthoringTest
       [new(1, 1, 0)] = new BattleFootprintData { BlocksLineOfSight = true }
     };
     var map = BattleMapAuthoring.BuildMap([(footprint, Transform3D.Identity)]);
-    Assert.False(map.GetTile(Godot.Vector3I.Zero).Walkable);
-    Assert.False(map.GetTile(new(0, 1, 0)).Walkable);
-    Assert.True(map.GetTile(new(0, 1, 0)).BlocksVerticalLineOfSight);
-    Assert.False(map.GetTile(Godot.Vector3I.Zero).BlocksVerticalLineOfSight);
-    Assert.True(map.GetTile(new(1, 1, 0)).BlocksLineOfSight);
-    Assert.False(map.GetTile(new(1, 1, 0)).Walkable);
+    using var ground = map.GetTile(Godot.Vector3I.Zero);
+    using var ceiling = map.GetTile(new(0, 1, 0));
+    using var upper = map.GetTile(new(1, 1, 0));
+    Assert.False(ground.Walkable);
+    Assert.False(ceiling.Walkable);
+    Assert.True(ceiling.BlocksVerticalLineOfSight);
+    Assert.False(ground.BlocksVerticalLineOfSight);
+    Assert.True(upper.BlocksLineOfSight);
+    Assert.False(upper.Walkable);
     Assert.Equal(new Godot.Vector3I(2, 2, 1), map.Dimensions);
     Assert.True(footprint[Godot.Vector3I.Zero].HasFloor);
   }
@@ -46,7 +49,7 @@ public partial class BattleMapAuthoringTest
     else if (!sameSide) Assert.Throws<InvalidOperationException>(() => BattleMapAuthoring.BuildMap(pieces));
     else
     {
-      var tile = BattleMapAuthoring.BuildMap(pieces).GetTile(new(1, 0, 1));
+      using var tile = BattleMapAuthoring.BuildMap(pieces).GetTile(new(1, 0, 1));
       Assert.Equal(CoverDirections.West, tile.CoverDirections);
       Assert.Equal(60, tile.CoverAmount);
     }
