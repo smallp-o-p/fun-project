@@ -7,7 +7,8 @@ namespace FunProject.Battle;
 public partial class BattleMapData : Resource
 {
   [Export] public Godot.Vector3I Dimensions { get; set; }
-  // Godot serializes byte[] as PackedByteArray; enum arrays are not Variant-compatible.
+  // PackedByteArray requires byte[]; enum[] exports are rejected with GD0102.
+  // Godot enum Arrays use Variants rather than packed bytes.
   [Export] internal byte[] TileFlags { get; set; } = [];
   [Export] internal byte[] TileCoverDirections { get; set; } = [];
   [Export] internal byte[] TileCoverAmounts { get; set; } = [];

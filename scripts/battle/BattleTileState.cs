@@ -4,8 +4,6 @@ public struct BattleTileState
 {
   private BattleTileFlags _flags;
 
-  public BattleTileState() => _flags = BattleTileFlags.Walkable;
-
   // Walkability is authored at board construction and otherwise mutated only through
   // BattleBoardState.SetTileWalkable.
   public bool IsWalkable

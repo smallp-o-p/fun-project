@@ -75,6 +75,7 @@ public sealed class BattleBoardState
     Dimensions = dim;
     int count = checked(dim.X * dim.Z * dim.Y);
     _tiles = new BattleTileState[count];
+    // Dimension-only boards are fully walkable; missing authored map cells remain holes.
     if (map is null)
     {
       System.Array.Fill(_tiles, new BattleTileState { IsWalkable = true });
