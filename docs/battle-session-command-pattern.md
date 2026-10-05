@@ -23,9 +23,9 @@ BattleUiController / HUD / AI
   -> hooks may return interrupt actions; the executor resolves them in the same submission
 ```
 
-`Submit` resolves the submitted action and every reaction it caused, then returns one `BattleActionExecResult`: the submitted action plus every `BattleEvent` committed during resolution, as a zero-copy `ReadOnlySpan<BattleEvent>` into the executor's append-only log. Composite actions such as `MoveUnit` commit one step per `Execute` (`Result.Incomplete` until the route drains); primitives such as `ThrowItem` apply one authoritative state change. The submission's result includes events from intermediate steps and interrupt actions.
+`Submit` resolves the submitted action and every reaction it caused, then returns one `BattleActionExecResult`: the submitted action plus every `BattleEvent` committed during resolution, as a zero-copy `ReadOnlySpan<BattleEvent>` into the executor's append-only log. Composite actions such as `MoveUnit` commit one step per `Execute` (`Result.Incomplete` until no steps remain); primitives such as `ThrowItem` apply one authoritative state change. The submission's result includes events from intermediate steps and interrupt actions.
 
-If a mid-dispatch objective directive or wipe backstop ends the battle, the executor drops remaining composite steps and queued interrupts and ends execution. Parameters are trusted: only a `Result.Rejected` step is converted to an `InvalidOperationException` from `Submit` because rejection is a caller bug. Arbitrary action or hook exceptions propagate unchanged after the queued work is cleared and availability is invalidated; committed state and events stay. Facts an earlier interrupt can invalidate (liveness, possession, equipment, charges) are re-checked at `Execute`; a stale action stops quietly as `Result.Interrupted`.
+A mid-dispatch objective directive or the player-wipe defeat rule can end the battle. The executor then drops remaining composite steps and queued interrupts and ends execution. Parameters are trusted: only a `Result.Rejected` step is converted to an `InvalidOperationException` from `Submit`, because rejection is a caller bug. Arbitrary action or hook exceptions propagate unchanged after the queued work is cleared and availability is invalidated; committed state and events stay. Facts an earlier interrupt can invalidate (liveness, possession, equipment, charges) are re-checked at `Execute`; a stale action stops without an exception as `Result.Interrupted`.
 
 ## Runtime Split
 
@@ -40,11 +40,11 @@ If a mid-dispatch objective directive or wipe backstop ends the battle, the exec
 - `RegisterHook<TEventKey>(BattleHook hook, int priority = 0)` and `UnregisterHook<TEventKey>(BattleHook hook)`
 - `Dispose()`
 
-The executor owns the `BattleHookRegistry`, registers the default systems in its constructor, subscribes to `session.BattleEventCommitted`, and fires matching hooks once per committed event, after the broadcast. It opens an executor-local action window around each primitive so hook-returned interrupts have somewhere to land; returning interrupts requires an in-flight action. Invalid returns throw. Hooks request queued actions through their return values; this convention relies on caller discipline.
+The executor owns the `BattleHookRegistry`, registers the default systems in its constructor, subscribes to `session.BattleEventCommitted`, and fires matching hooks once per committed event, after the broadcast. It opens an executor-local action window around each primitive. The window collects hook-returned interrupts; returning interrupts requires an in-flight action. Invalid returns throw. Hooks request queued actions through their return values; this convention relies on caller discipline.
 
-`BattleRuntime.RegisterHook` is the facade door delegating to the executor; the session announces events for the executor's hook dispatch. `BattleRuntime` owns the session's single executor; tests reuse it through `BattleFixture.Runtime`.
+`BattleRuntime.RegisterHook` is the facade method and delegates to the executor; the session announces events for the executor's hook dispatch. `BattleRuntime` owns the session's single executor; tests reuse it through `BattleFixture.Runtime`.
 
-Presentation code that needs committed state changes subscribes to `BattleRuntime.BattleEventCommitted` (the re-raise, subscribed before the executor is constructed, so cause events arrive before hook-born follow-ups) or adapts `EventPlaybackDirector` for playback. The callback runs after the state change, so graphics can query the session and see committed state.
+Presentation code that needs committed state changes subscribes to `BattleRuntime.BattleEventCommitted` (the re-raise, subscribed before the executor is constructed, so cause events arrive before follow-up events from hooks) or adapts `EventPlaybackDirector` for playback. The callback runs after the state change, so graphics can query the session and see committed state.
 
 ## Built-In Actions
 
@@ -60,9 +60,9 @@ The current built-in actions are:
 - `PassUnit`
 - `EndFactionTurn`
 
-Initial placement is construction, not gameplay: the factory materializes the complete roster and objects before the session exists and announces them through its private bootstrap operation, so there is no setup `StartBattle`/`PlaceObject` action. `SpawnUnit` is reinforcement only — it folds the new unit into live scheduling of an already-running battle.
+Initial placement is part of construction. The factory materializes the complete roster and objects before the session exists and announces them through its private bootstrap operation. `SpawnUnit` is the reinforcement action: it folds the new unit into live scheduling of an already-running battle.
 
-`MoveUnit` takes ordered, board-validated destination steps (`ValidatedPoint`s — in-bounds is proven at the mint door). Its first `Execute` validates the whole route once — total AP cost, adjacency, occupancy — and caches it. Each later `Execute` checks only mutable facts: the unit's liveness and incapacity, and the next cell's occupancy. Lost liveness or incapacity (unconsciousness and immobilization included) interrupts the remaining route quietly. A next cell that a reaction occupied is a rejected invariant and throws. Committed steps remain checkpoints where reactions fire inside the same submission.
+`MoveUnit` takes ordered, board-validated destination steps (`ValidatedPoint`s; the runtime boundary proves the in-bounds property when it creates the proof). Its first `Execute` validates the whole route once (total AP cost, adjacency, occupancy) and caches the route. Each later `Execute` checks only mutable facts: the unit's liveness and incapacity, and the next cell's occupancy. Lost liveness or incapacity (unconsciousness and immobilization included) interrupts the remaining route without an exception. A next cell that a reaction occupied is a rejected invariant and throws. Committed steps remain checkpoints where reactions fire inside the same submission.
 
 ## Read Side
 
@@ -74,6 +74,6 @@ runtime.Query(new FindPathForUnit(unit, destination));
 runtime.Query(new IsUnitStillAvailableThisTurn(unit));
 ```
 
-The result shape is contract: questions guaranteed an answer — usually through `AliveUnit`/`ValidatedPoint` proof inputs — return the bare result; absence-is-normal questions return `Option<T>`; genuinely fallible questions return `Either<BattleQueryFailure, TResult>`. Proofs are minted at the runtime boundary via `BattleRuntime.TryGetAlive` / `TryGetTile` / `TryGetAttackTarget`. Commands stay explicit `BattleAction` values executed through `Submit`.
+The result shape is part of the contract. Questions with a guaranteed answer, usually through `AliveUnit`/`ValidatedPoint` proof inputs, return the bare result. Questions with normal absence return `Option<T>`. Questions that can fail return `Either<BattleQueryFailure, TResult>`. Proofs are created at the runtime boundary via `BattleRuntime.TryGetAlive` / `TryGetTile` / `TryGetAttackTarget`. Commands stay explicit `BattleAction` values executed through `Submit`.
 
 `GetAvailableActionsForUnit` returns the session cache's persistent read-only list for that unit identity; the list and each `UnitAction` stay live and keep their identity across submissions. Availability is cached per option and dirtied only by committed events that can affect its conditions (`UnitActionCondition` declares the per-condition dependencies), or by a failed submission; invalidation runs before event subscribers. During a submission, reads evaluate current state and preserve cached values.
