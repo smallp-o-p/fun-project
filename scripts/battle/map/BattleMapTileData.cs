@@ -3,7 +3,8 @@ using System;
 
 namespace FunProject.Battle;
 
-// Baked gameplay for one map cell; position comes from the MapData dictionary key.
+// Temporary authoring cell and legacy Resource-per-cell deserialization support.
+// New BattleMapData saves store packed arrays, not these Resources.
 [Tool]
 [GlobalClass]
 public partial class BattleMapTileData : Resource

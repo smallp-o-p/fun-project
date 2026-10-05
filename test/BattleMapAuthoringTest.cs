@@ -16,12 +16,12 @@ public partial class BattleMapAuthoringTest
       [new(1, 1, 0)] = new BattleFootprintData { BlocksLineOfSight = true }
     };
     var map = BattleMapAuthoring.BuildMap([(footprint, Transform3D.Identity)]);
-    Assert.False(map.Tiles[Godot.Vector3I.Zero].Walkable);
-    Assert.False(map.Tiles[new(0, 1, 0)].Walkable);
-    Assert.True(map.Tiles[new(0, 1, 0)].BlocksVerticalLineOfSight);
-    Assert.False(map.Tiles[Godot.Vector3I.Zero].BlocksVerticalLineOfSight);
-    Assert.True(map.Tiles[new(1, 1, 0)].BlocksLineOfSight);
-    Assert.False(map.Tiles[new(1, 1, 0)].Walkable);
+    Assert.False(map.GetTile(Godot.Vector3I.Zero).Walkable);
+    Assert.False(map.GetTile(new(0, 1, 0)).Walkable);
+    Assert.True(map.GetTile(new(0, 1, 0)).BlocksVerticalLineOfSight);
+    Assert.False(map.GetTile(Godot.Vector3I.Zero).BlocksVerticalLineOfSight);
+    Assert.True(map.GetTile(new(1, 1, 0)).BlocksLineOfSight);
+    Assert.False(map.GetTile(new(1, 1, 0)).Walkable);
     Assert.Equal(new Godot.Vector3I(2, 2, 1), map.Dimensions);
     Assert.True(footprint[Godot.Vector3I.Zero].HasFloor);
   }
@@ -41,12 +41,12 @@ public partial class BattleMapAuthoringTest
       (other, new(Basis.Identity, sameSide ? new(0, 0, 1) : new(1, 0, 0))), (floors, Transform3D.Identity)];
     if (receiver != 0)
     {
-      foreach (var tile in BattleMapAuthoring.BuildMap(pieces).Tiles.Values) Assert.Equal(0, tile.CoverAmount);
+      foreach (var amount in BattleMapAuthoring.BuildMap(pieces).TileCoverAmounts) Assert.Equal(0, (int)amount);
     }
     else if (!sameSide) Assert.Throws<InvalidOperationException>(() => BattleMapAuthoring.BuildMap(pieces));
     else
     {
-      var tile = BattleMapAuthoring.BuildMap(pieces).Tiles[new(1, 0, 1)];
+      var tile = BattleMapAuthoring.BuildMap(pieces).GetTile(new(1, 0, 1));
       Assert.Equal(CoverDirections.West, tile.CoverDirections);
       Assert.Equal(60, tile.CoverAmount);
     }

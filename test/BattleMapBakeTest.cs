@@ -48,7 +48,7 @@ public partial class BattleMapBakeTest
     Assert.Equal(Error.Ok, ResourceSaver.Save(packed, path));
     var map = AutoFree(ResourceLoader.Load<PackedScene>(path, cacheMode: ResourceLoader.CacheMode.IgnoreDeep).Instantiate<BattleMapAuthoring>())!;
     Assert.Equal(new Godot.Vector3I(2, 1, 1), map.MapData.Dimensions);
-    Assert.Equal(1, map.MapData.Tiles[Godot.Vector3I.Right].SpawnFactionSlot);
+    Assert.Equal(1, map.MapData.GetTile(Godot.Vector3I.Right).SpawnFactionSlot);
     Assert.Equal(1, map.SpawnSlots[Godot.Vector3I.Right]);
     Assert.Equal(42, map.Floors.GetCellItem(Godot.Vector3I.Zero));
     Assert.True(BattleTilePalette.ReadFootprints(map.Palette)[42][Godot.Vector3I.Zero].HasFloor);
@@ -57,7 +57,7 @@ public partial class BattleMapBakeTest
     map.Export();
     var exported = AutoFree(ResourceLoader.Load<PackedScene>(map.ExportPath, cacheMode: ResourceLoader.CacheMode.IgnoreDeep).Instantiate<BattleMap>())!;
     Assert.Equal(42, exported.FloorTiles.GetCellItem(Godot.Vector3I.Zero));
-    Assert.Equal(1, exported.MapData.Tiles[Godot.Vector3I.Right].SpawnFactionSlot);
+    Assert.Equal(1, exported.MapData.GetTile(Godot.Vector3I.Right).SpawnFactionSlot);
     Assert.Equal(2, exported.GetChildCount());
     Assert.True(exported.PropTiles.MeshLibrary == exported.FloorTiles.MeshLibrary);
 

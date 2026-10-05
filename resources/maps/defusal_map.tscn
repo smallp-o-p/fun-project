@@ -1,276 +1,22 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scenes/battle/authoring/BattleMapAuthoring.cs" id="1_sqta8"]
-[ext_resource type="Script" path="res://scripts/battle/map/BattleMapTileData.cs" id="2_dsqxk"]
 [ext_resource type="Script" path="res://scripts/battle/map/BattleMapData.cs" id="3_tb46l"]
 [ext_resource type="MeshLibrary" path="res://resources/map_entities/MapPalette.tres" id="4_dsqxk"]
-
-[sub_resource type="Resource" id="Resource_dsqxk"]
-script = ExtResource("2_dsqxk")
-SpawnFactionSlot = 0
-
-[sub_resource type="Resource" id="Resource_tb46l"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_yum8o"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_e4gu4"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_0qut4"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_40t88"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_15x0o"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_x5so7"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_n2luj"]
-script = ExtResource("2_dsqxk")
-SpawnFactionSlot = 0
-
-[sub_resource type="Resource" id="Resource_rm6eh"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_3wd6p"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_73mg1"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_qd2ng"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_4o25m"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_0cnvo"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_7bhof"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_7umha"]
-script = ExtResource("2_dsqxk")
-SpawnFactionSlot = 0
-
-[sub_resource type="Resource" id="Resource_ack4i"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_1q0h4"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_ahclj"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_syqox"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_qi77q"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_u6182"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_7uero"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_u15ca"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_odqyq"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_kl3kc"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_36mdy"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_hnh8g"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_e06nv"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_rhqvk"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_evt6k"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_3yeg8"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_yts6u"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_d8dq2"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_06sa8"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_st0vu"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_t24as"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_p2unn"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_1dd75"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_pcdbo"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_unnqa"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_1tuvc"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_rsu50"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_ylywe"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_ukoh7"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_8lho1"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_g87gu"]
-script = ExtResource("2_dsqxk")
-SpawnFactionSlot = 1
-
-[sub_resource type="Resource" id="Resource_krogu"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_cvtx3"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_78xvf"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_8spdj"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_62qcv"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_r5lap"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_7ka66"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_1wlu5"]
-script = ExtResource("2_dsqxk")
-SpawnFactionSlot = 1
-
-[sub_resource type="Resource" id="Resource_rob00"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_ssfhh"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_kf3v4"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_ws41n"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_sy31y"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_3v0ux"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_75vnj"]
-script = ExtResource("2_dsqxk")
-
-[sub_resource type="Resource" id="Resource_egeg3"]
-script = ExtResource("2_dsqxk")
-SpawnFactionSlot = 1
 
 [sub_resource type="Resource" id="Resource_oxy55"]
 script = ExtResource("3_tb46l")
 Dimensions = Vector3i(8, 1, 8)
-Tiles = Dictionary[Vector3i, ExtResource("2_dsqxk")]({
-Vector3i(0, 0, 0): SubResource("Resource_dsqxk"),
-Vector3i(0, 0, 1): SubResource("Resource_tb46l"),
-Vector3i(0, 0, 2): SubResource("Resource_yum8o"),
-Vector3i(0, 0, 3): SubResource("Resource_e4gu4"),
-Vector3i(0, 0, 4): SubResource("Resource_0qut4"),
-Vector3i(0, 0, 5): SubResource("Resource_40t88"),
-Vector3i(0, 0, 6): SubResource("Resource_15x0o"),
-Vector3i(0, 0, 7): SubResource("Resource_x5so7"),
-Vector3i(1, 0, 0): SubResource("Resource_n2luj"),
-Vector3i(1, 0, 1): SubResource("Resource_rm6eh"),
-Vector3i(1, 0, 2): SubResource("Resource_3wd6p"),
-Vector3i(1, 0, 3): SubResource("Resource_73mg1"),
-Vector3i(1, 0, 4): SubResource("Resource_qd2ng"),
-Vector3i(1, 0, 5): SubResource("Resource_4o25m"),
-Vector3i(1, 0, 6): SubResource("Resource_0cnvo"),
-Vector3i(1, 0, 7): SubResource("Resource_7bhof"),
-Vector3i(2, 0, 0): SubResource("Resource_7umha"),
-Vector3i(2, 0, 1): SubResource("Resource_ack4i"),
-Vector3i(2, 0, 2): SubResource("Resource_1q0h4"),
-Vector3i(2, 0, 3): SubResource("Resource_ahclj"),
-Vector3i(2, 0, 4): SubResource("Resource_syqox"),
-Vector3i(2, 0, 5): SubResource("Resource_qi77q"),
-Vector3i(2, 0, 6): SubResource("Resource_u6182"),
-Vector3i(2, 0, 7): SubResource("Resource_7uero"),
-Vector3i(3, 0, 0): SubResource("Resource_u15ca"),
-Vector3i(3, 0, 1): SubResource("Resource_odqyq"),
-Vector3i(3, 0, 2): SubResource("Resource_kl3kc"),
-Vector3i(3, 0, 3): SubResource("Resource_36mdy"),
-Vector3i(3, 0, 4): SubResource("Resource_hnh8g"),
-Vector3i(3, 0, 5): SubResource("Resource_e06nv"),
-Vector3i(3, 0, 6): SubResource("Resource_rhqvk"),
-Vector3i(3, 0, 7): SubResource("Resource_evt6k"),
-Vector3i(4, 0, 0): SubResource("Resource_3yeg8"),
-Vector3i(4, 0, 1): SubResource("Resource_yts6u"),
-Vector3i(4, 0, 2): SubResource("Resource_d8dq2"),
-Vector3i(4, 0, 3): SubResource("Resource_06sa8"),
-Vector3i(4, 0, 4): SubResource("Resource_st0vu"),
-Vector3i(4, 0, 5): SubResource("Resource_t24as"),
-Vector3i(4, 0, 6): SubResource("Resource_p2unn"),
-Vector3i(4, 0, 7): SubResource("Resource_1dd75"),
-Vector3i(5, 0, 0): SubResource("Resource_pcdbo"),
-Vector3i(5, 0, 1): SubResource("Resource_unnqa"),
-Vector3i(5, 0, 2): SubResource("Resource_1tuvc"),
-Vector3i(5, 0, 3): SubResource("Resource_rsu50"),
-Vector3i(5, 0, 4): SubResource("Resource_ylywe"),
-Vector3i(5, 0, 5): SubResource("Resource_ukoh7"),
-Vector3i(5, 0, 6): SubResource("Resource_8lho1"),
-Vector3i(5, 0, 7): SubResource("Resource_g87gu"),
-Vector3i(6, 0, 0): SubResource("Resource_krogu"),
-Vector3i(6, 0, 1): SubResource("Resource_cvtx3"),
-Vector3i(6, 0, 2): SubResource("Resource_78xvf"),
-Vector3i(6, 0, 3): SubResource("Resource_8spdj"),
-Vector3i(6, 0, 4): SubResource("Resource_62qcv"),
-Vector3i(6, 0, 5): SubResource("Resource_r5lap"),
-Vector3i(6, 0, 6): SubResource("Resource_7ka66"),
-Vector3i(6, 0, 7): SubResource("Resource_1wlu5"),
-Vector3i(7, 0, 0): SubResource("Resource_rob00"),
-Vector3i(7, 0, 1): SubResource("Resource_ssfhh"),
-Vector3i(7, 0, 2): SubResource("Resource_kf3v4"),
-Vector3i(7, 0, 3): SubResource("Resource_ws41n"),
-Vector3i(7, 0, 4): SubResource("Resource_sy31y"),
-Vector3i(7, 0, 5): SubResource("Resource_3v0ux"),
-Vector3i(7, 0, 6): SubResource("Resource_75vnj"),
-Vector3i(7, 0, 7): SubResource("Resource_egeg3")
+TileFlags = PackedByteArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+TileCoverDirections = PackedByteArray(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+TileCoverAmounts = PackedByteArray(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+SpawnSlots = Dictionary[Vector3i, int]({
+Vector3i(0, 0, 0): 0,
+Vector3i(1, 0, 0): 0,
+Vector3i(2, 0, 0): 0,
+Vector3i(5, 0, 7): 1,
+Vector3i(6, 0, 7): 1,
+Vector3i(7, 0, 7): 1
 })
 
 [node name="MapAuthoring" type="Node3D" unique_id=15913624]
@@ -284,6 +30,7 @@ Vector3i(5, 0, 7): 1,
 Vector3i(6, 0, 7): 1,
 Vector3i(7, 0, 7): 1
 })
+ExportPath = "res://resources/maps/map.tscn"
 MapData = SubResource("Resource_oxy55")
 
 [node name="Floors" type="GridMap" parent="." unique_id=1465809198]
