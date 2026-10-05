@@ -54,6 +54,7 @@ public class CharacterModelAssetTest
 
   [TestCase(ZhuYuanScene)]
   [TestCase(TriggerScene)]
+  [TestCase("res://scenes/models/GraceCrowne/GraceCrowne.scn")]
   public void NativeComponentsResolveAndTheTreeStartsActive(string scene)
   {
     using var fixture = ModelFixture.FromScene(scene);

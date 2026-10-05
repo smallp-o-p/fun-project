@@ -4,6 +4,17 @@
 
 ## Scenes and resources
 
+Grace Crowne uses the same `CharacterModel` controls. Its wrapper is
+`res://scenes/models/GraceCrowne/GraceCrowne.scn`, with four outfits and five piece
+controls compiled into the imported `Model` catalog. Its dedicated post-import
+script translates the creator's frozen source data into the existing wardrobe and
+mask resources. The native face library and tree under
+`resources/models/grace_crowne/` provide 73 facial channels; `Movement` and
+`HeadTurn` use the shared body library. See
+[Grace authoring instructions](../scenes/models/GraceCrowne/README.txt) for the clean
+Blender source, explicit material conversion, weight normalization, and export
+workflow. `CharacterModel` has no Grace-specific runtime API.
+
 | Asset | Purpose |
 | --- | --- |
 | `res://scenes/models/ZhuYuan/ZhuYuan.scn` | Zhu Yuan: a wrapper retaining local material overrides. Root is `CharacterModel` with its fixed `ModelAnimationTree` child resolved by name; a `Model` child instances the imported Blender scene, selections are saved on the root, and the wardrobe catalog with fixed mask bindings comes from the imported `Model`, and `AttachmentsPath` points at the import-owned, default-hidden weapons group `Model/rig_D/GeneralSkeleton/Weapons`. |
@@ -192,3 +203,9 @@ Everything the system owns is inspectable in the editor, read-only; changing any
 ## Import-migration qualifications
 
 The original Blender-import migration was verified on a Windows PC. This review also completed fresh imports on Linux using Blender 5.1.2 and Godot 4.7.2 .NET; both committed source files require Blender 5.1 despite Trigger's filename. See [the review report](model-controls-review.md) for verification scope. Historical accepted differences: the Zhu Yuan and Trigger generated glTFs reference the shared face lightmap PNG with URIs that differ only in case (`Female_Face_lightmap.png` in Zhu Yuan's glTF, `Female_Face_Lightmap.png` in Trigger's), and the current shared imported cache stores the lowercase spelling, so Godot's case-mismatch warning comes from Trigger's capitalized request — the Windows export and runtime path worked, and fresh Linux import now succeeds with the committed model-prefixed PNG inputs; packaged export remains unverified; Trigger's pantyhose mesh from the source import differs from the legacy scene's baked pantyhose by up to ~0.0919 per vertex (the legacy bake's provenance is unestablished, and no source compensation is justified); and the shared `head_turn` endpoint is 12° where Zhu Yuan's legacy clip reached 20° — the deliberate trade for one body library shared by both models.
+
+GraceCrowne materials use a separate source-specific shader, not the shared toon
+shader. Its importer restores static PBR channels and scene-local material
+overrides before compiling wardrobe masks. DD skin Fresnel, hair colour/emission
+Fresnel and accessory emission falloff remain live. See
+[Grace material rebuild and renderer limits](../scenes/models/GraceCrowne/README.txt).

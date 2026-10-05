@@ -4,7 +4,7 @@ using Godot;
 namespace FunProject.Models;
 
 /// <summary>
-/// Model root node: the single C# entry point of the Zhu Yuan and Trigger model
+/// Model root node: the single C# entry point of the character model
 /// scenes. Body pose, movement, and facial expression presets belong to the
 /// native <c>ModelAnimationTree</c> child, resolved once on ready and published
 /// for the instance's lifetime.

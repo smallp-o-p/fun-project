@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "source_sha256": "064e0de64b06dc4958bfae47c2e63f39e270d54adf65acee263d6d14143e10a1",
+  "materials": {
+    "grace_crowne_nude": {
+      "textures": {
+        "normal": "grace_crowne_nude_normal.png",
+        "base": "grace_crowne_nude_base.png",
+        "pbr": "grace_crowne_nude_pbr.png",
+        "effects": "grace_crowne_nude_effects.png",
+        "emission": "grace_crowne_nude_emission.exr",
+        "hair_emission": "grace_crowne_nude_hair_emission.exr"
+      },
+      "skin_exponent": 1.0,
+      "skin_ior": 1.45,
+      "ranges": {
+        "effects": [
+          0.0,
+          1.0
+        ],
+        "emission": [
+          0.0,
+          0.0
+        ],
+        "hair_emission": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "grace_crowne_head": {
+      "textures": {
+        "normal": "grace_crowne_head_normal.png",
+        "base": "grace_crowne_head_base.png",
+        "pbr": "grace_crowne_head_pbr.png",
+        "effects": "grace_crowne_head_effects.png",
+        "emission": "grace_crowne_head_emission.exr",
+        "hair_emission": "grace_crowne_head_hair_emission.exr"
+      },
+      "skin_exponent": 1.0,
+      "skin_ior": 1.45,
+      "ranges": {
+        "effects": [
+          0.0,
+          1.0
+        ],
+        "emission": [
+          0.0,
+          0.0
+        ],
+        "hair_emission": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "grace_crowne_eyes": {
+      "textures": {
+        "normal": "grace_crowne_eyes_normal.png",
+        "base": "grace_crowne_eyes_base.png",
+        "pbr": "grace_crowne_eyes_pbr.png",
+        "effects": "grace_crowne_eyes_effects.png",
+        "emission": "grace_crowne_eyes_emission.exr",
+        "hair_emission": "grace_crowne_eyes_hair_emission.exr"
+      },
+      "ranges": {
+        "effects": [
+          0.0,
+          0.0313725508749485
+        ],
+        "emission": [
+          0.0,
+          1.0
+        ],
+        "hair_emission": [
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "grace_crowne_faceacc": {
+      "textures": {
+        "hair_mask": "T_SlickIntel_Swipe_FaceAcc_Strands.png",
+        "hair_tangent": "T_SlickIntel_Swipe_FaceAcc_Tangent.png",
+        "fx_mask": "T_WhiteMask.png",
+        "normal": "grace_crowne_faceacc_normal.png",
+        "base": "grace_crowne_faceacc_base.png",
+        "pbr": "grace_crowne_faceacc_pbr.png",
+        "effects": "grace_crowne_faceacc_effects.png",
+        "emission": "grace_crowne_faceacc_emission.exr",
+        "hair_emission": "grace_crowne_faceacc_hair_emission.exr"
+      },
+      "hair_brightness": 0.6000000238418579,
+      "hair_exponent": 3.5,
+      "hair_multiple": 3.0,
+      "hair_emission": 1.0,
+      "ranges": {
+        "effects": [
+          0.0,
+          0.0313725508749485
+        ],
+        "emission": [
+          0.0,
+          0.0
+        ],
+        "hair_emission": [
+          0.0,
+          0.10129265487194061
+        ]
+      }
+    },
+    "grace_crowne_body_01": {
+      "textures": {
+        "fx_mask": "T_SlickIntel_Swipe_Body_FX.png",
+        "normal": "grace_crowne_body_01_normal.png",
+        "base": "grace_crowne_body_01_base.png",
+        "pbr": "grace_crowne_body_01_pbr.png",
+        "effects": "grace_crowne_body_01_effects.png",
+        "emission": "grace_crowne_body_01_emission.exr",
+        "hair_emission": "grace_crowne_body_01_hair_emission.exr"
+      },
+      "metal_lut_enabled": 1.0,
+      "metal_lut_intensity": 0.5,
+      "metal_lut_mask": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "metal_lut_channel": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "metal_lut_curve": 0.0,
+      "ranges": {
+        "effects": [
+          0.0,
+          1.0
+        ],
+        "emission": [
+          0.0,
+          0.0
+        ],
+        "hair_emission": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "grace_crowne_body_02": {
+      "textures": {
+        "fx_mask": "T_SlickIntel_SwipeZipper_Body_FX.png",
+        "normal": "grace_crowne_body_02_normal.png",
+        "base": "grace_crowne_body_02_base.png",
+        "pbr": "grace_crowne_body_02_pbr.png",
+        "effects": "grace_crowne_body_02_effects.png",
+        "emission": "grace_crowne_body_02_emission.exr",
+        "hair_emission": "grace_crowne_body_02_hair_emission.exr"
+      },
+      "metal_lut_enabled": 1.0,
+      "metal_lut_intensity": 0.5,
+      "metal_lut_mask": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "metal_lut_channel": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "metal_lut_curve": 0.0,
+      "ranges": {
+        "effects": [
+          0.0,
+          1.0
+        ],
+        "emission": [
+          0.0,
+          0.0
+        ],
+        "hair_emission": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "grace_crowne_faceacc_02": {
+      "textures": {
+        "hair_mask": "T_SlickIntel_SwipeZipper_FaceAcc_Strands.png",
+        "hair_tangent": "T_SlickIntel_SwipeZipper_FaceAcc_Tangent.png",
+        "fx_mask": "T_WhiteMask.png",
+        "normal": "grace_crowne_faceacc_02_normal.png",
+        "base": "grace_crowne_faceacc_02_base.png",
+        "pbr": "grace_crowne_faceacc_02_pbr.png",
+        "effects": "grace_crowne_faceacc_02_effects.png",
+        "emission": "grace_crowne_faceacc_02_emission.exr",
+        "hair_emission": "grace_crowne_faceacc_02_hair_emission.exr"
+      },
+      "hair_brightness": 0.6000000238418579,
+      "hair_exponent": 3.5,
+      "hair_multiple": 3.0,
+      "hair_emission": 1.0,
+      "emissive_fresnel_enabled": 1.0,
+      "emissive_fresnel_power": 6.159966945648193,
+      "emissive_fresnel_inverted": 0.0,
+      "ranges": {
+        "effects": [
+          0.0,
+          0.0313725508749485
+        ],
+        "emission": [
+          0.0,
+          1.877371907234192
+        ],
+        "hair_emission": [
+          0.0,
+          1.877371907234192
+        ]
+      }
+    }
+  },
+  "atlas": "FN_Character_Atlas.png"
+}

@@ -7,6 +7,7 @@ const STRUCTURE = preload("res://scenes/models/import/humanoid_structure.gd")
 const MASK_VALIDATION = preload("res://scenes/models/import/ModelImportValidation.cs")
 const ROOT := "res://scenes/models/"
 const MASKS := {
+	"res://scenes/models/GraceCrowne/GraceCrowne.glb": {},
 	"res://scenes/models/ZhuYuan/ZhuYuan.blend": {
 		"ZZZ_Size02_C": "res://resources/models/zhu_yuan/presentation/body_mask.res",
 	},
@@ -16,7 +17,7 @@ const MASKS := {
 	},
 }
 
-static func apply(scene: Node, source_file: String) -> String:
+static func apply(scene: Node, source_file: String, authored_masks: Dictionary = {}) -> String:
 	if scene == null or not MASKS.has(source_file):
 		return "wardrobe: missing scene or unknown source " + source_file
 	# A rejected recompile must not leave a stale compiled definition behind.
@@ -34,7 +35,7 @@ static func apply(scene: Node, source_file: String) -> String:
 	var error := _collect_sources(scene, scene, sources)
 	if not error.is_empty():
 		return error
-	var resolved: Dictionary = {"sources": sources, "scene": scene, "source_file": source_file, "mask_configs": {}}
+	var resolved: Dictionary = {"sources": sources, "scene": scene, "source_file": source_file, "mask_configs": authored_masks.duplicate()}
 	error = _validate(data, resolved)
 	if not error.is_empty():
 		return error
@@ -187,10 +188,12 @@ static func _extras(node: Node) -> Dictionary:
 static func _validate_mask_sources(ctx: Dictionary) -> String:
 	var paths: Dictionary = MASKS[ctx["source_file"]]
 	for id: String in paths:
+		ctx["mask_configs"][id] = load(paths[id])
+	for id: String in ctx["mask_configs"]:
 		var node: MeshInstance3D = ctx["sources"].get(id) as MeshInstance3D
 		if node == null or not node.mesh is ArrayMesh:
 			return "wardrobe: fixed mask source requires an ArrayMesh: " + id
-		var config: Resource = load(paths[id])
+		var config: Resource = ctx["mask_configs"][id]
 		if config == null:
 			return "wardrobe: mask configuration lacks import geometry validation: " + id
 		var result: Variant = MASK_VALIDATION.new().call("ValidateMaskGeometry", config, node.mesh)

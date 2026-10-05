@@ -27,6 +27,7 @@ public class CharacterModelAnimationAssetTest
   // ------------------------------------------------------------------
 
   [TestCase(TriggerScene)]
+  [TestCase("res://scenes/models/GraceCrowne/GraceCrowne.scn")]
   public void ClothingChangeKeepsPresetWeightsAndPlayback(string scene)
   {
     using var fixture = ModelFixture.FromScene(scene);
@@ -74,6 +75,7 @@ public class CharacterModelAnimationAssetTest
 
   [TestCase(ZhuYuanScene)]
   [TestCase(TriggerScene)]
+  [TestCase("res://scenes/models/GraceCrowne/GraceCrowne.scn")]
   public void GraphDrivesPhysicalBoneAndFaceTargets(string scene)
   {
     using var fixture = ModelFixture.FromScene(scene);
