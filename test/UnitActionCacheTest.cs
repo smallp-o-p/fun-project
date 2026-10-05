@@ -589,7 +589,7 @@ public class UnitActionCacheTest
   }
 
   // The startup and continuation turn-start dispatches are separate orchestration bodies
-  // (StartBattle vs the round-rollover advance); both must observe pre-refresh availability
+  // (factory bootstrap vs the round-rollover advance); both must observe pre-refresh availability
   // from retained entries without caching stale results. The startup instance arranges and
   // observes through declared setup systems, because fixture construction already runs the
   // first turn; the continuation instance can arrange and subscribe after construction.
