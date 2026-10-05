@@ -1,3 +1,4 @@
+using System;
 using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Combatants;
 using FunProject.Strategic;
@@ -58,7 +59,9 @@ public sealed partial class CaptivityView : GeoscapeView
     if (_selected.Count == 0)
       return;
 
-    var view = SquadViewScene.InstantiateAs<SquadLoadoutView>(
+    var scene = SquadViewScene ?? throw new InvalidOperationException(
+      "CaptivityView requires SquadViewScene; assign a PackedScene in the inspector.");
+    var view = scene.InstantiateAs<SquadLoadoutView>(
       "CaptivityView SquadViewScene");
     view.Configure($"Interrogation", InterrogationCapacity,
       allowEquipmentEditing: false);

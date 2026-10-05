@@ -1,3 +1,4 @@
+using FunProject.Scenes.Ext;
 using FunProject.Strategic;
 using Godot;
 using System;
@@ -77,14 +78,8 @@ public sealed partial class GeoscapeMapControl : Control
 
       // Keep the authored visual, hit shape, and signal for every event. Placement uses
       // the full extent, so no later sibling can intercept another marker's clicks.
-      Node markerInstance = EventMarkerScene.Instantiate();
-      if (markerInstance is not RegionButton marker)
-      {
-        string kind = markerInstance.GetClass();
-        markerInstance.Free(); // free now: rejected roots must not linger to frame end
-        throw new InvalidOperationException(
-          $"GeoscapeMapControl requires EventMarkerScene whose root is a RegionButton; got {kind}.");
-      }
+      var marker = EventMarkerScene!.InstantiateAs<RegionButton>(
+        "GeoscapeMapControl EventMarkerScene");
       AddChild(marker);
       _markerNodes.Add((active, marker));
       marker.Pressed += () => EmitSignal(SignalName.EventClicked, new GeoscapeEventAdapter { Event = active });
