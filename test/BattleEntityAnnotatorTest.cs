@@ -7,24 +7,17 @@ using static GdUnit4.Assertions;
 [RequireGodotRuntime]
 public partial class BattleEntityAnnotatorTest
 {
-  [TestCase(0)]
-  [TestCase(1)]
-  [TestCase(2)]
-  public void PaintedItemsSupplyIndependentGameplayDefaults(int item)
+  [TestCase]
+  public void PaintedCellsUseAuthoredBrushMetadataWithoutCreatingOverrides()
   {
     var annotator = AutoFree(TestData.MakeEntityAnnotator())!;
-    annotator.Grid.SetCellItem(Godot.Vector3I.Zero, item);
-    annotator.Grid.SetCellItem(Godot.Vector3I.Right, item);
+    annotator.Grid.SetCellItem(Godot.Vector3I.Zero, 1);
+    annotator.Grid.SetCellItem(Godot.Vector3I.Right, 1);
     var footprint = annotator.BuildFootprint();
-    var first = footprint[Godot.Vector3I.Zero];
-    var second = footprint[Godot.Vector3I.Right];
-    Assert.Equal(item == 1, first.HasFloor);
-    Assert.Equal(item == 2, first.BlocksMovement);
-    Assert.Equal(item == 2, first.BlocksLineOfSight);
-    Assert.False(first == second);
-    first.HasFloor = !first.HasFloor;
-    Assert.Equal(item == 1, second.HasFloor);
-    Assert.Equal(item == 1, annotator.BuildFootprint()[Godot.Vector3I.Zero].HasFloor);
+    Assert.True(footprint[Godot.Vector3I.Zero].HasFloor);
+    footprint[Godot.Vector3I.Zero].HasFloor = false;
+    Assert.True(footprint[Godot.Vector3I.Right].HasFloor);
+    Assert.True(annotator.BuildFootprint()[Godot.Vector3I.Zero].HasFloor);
     Assert.Equal(0, annotator.Annotations.Count);
   }
 
@@ -107,7 +100,8 @@ public partial class BattleEntityAnnotatorTest
   [TestCase(1)]
   [TestCase(2)]
   [TestCase(3)]
-  public void InvalidAnnotationGridSettingsAreRejected(int scenario)
+  [TestCase(4)]
+  public void InvalidAnnotationPaintIsRejected(int scenario)
   {
     var annotator = AutoFree(TestData.MakeEntityAnnotator(TestData.MakeFloorFootprint(1, 1)))!;
     if (scenario == 0) annotator.Grid.Position = Vector3.Right;
@@ -115,6 +109,7 @@ public partial class BattleEntityAnnotatorTest
     if (scenario == 2) annotator.Grid.CellCenterY = false;
     if (scenario == 3) annotator.Grid.SetCellItem(Godot.Vector3I.Zero, 0,
       annotator.Grid.GetOrthogonalIndexFromBasis(new Basis(Vector3.Right, Mathf.Pi / 2)));
+    if (scenario == 4) annotator.Markers!.GetItemMesh(0).RemoveMeta(BattleAnnotationMarker.FootprintMeta);
     Assert.True(annotator.Validate().IsSome);
     Assert.Throws<InvalidOperationException>(() => annotator.BuildFootprint());
   }

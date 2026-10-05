@@ -48,13 +48,6 @@ public partial class BattleMapAuthoring : BattleMap
 
   public void Export()
   {
-    if (string.IsNullOrEmpty(ExportPath) || (!ExportPath.EndsWith(".tscn", StringComparison.Ordinal) && !ExportPath.EndsWith(".scn", StringComparison.Ordinal)) ||
-        (!ExportPath.StartsWith("res://", StringComparison.Ordinal) && !ExportPath.StartsWith("user://", StringComparison.Ordinal)))
-      throw new InvalidOperationException("Choose a separate .tscn or .scn Export Path.");
-    if (!string.IsNullOrEmpty(SceneFilePath) && string.Equals(
-      System.IO.Path.GetFullPath(ProjectSettings.GlobalizePath(ExportPath)),
-      System.IO.Path.GetFullPath(ProjectSettings.GlobalizePath(SceneFilePath)), StringComparison.OrdinalIgnoreCase))
-      throw new InvalidOperationException("Export to a separate scene; the editable map cannot be overwritten.");
     Bake();
     var exported = new BattleMap { Name = Name, MapData = MapData };
     try
@@ -186,8 +179,6 @@ public partial class BattleMapAuthoring : BattleMap
         var cell = PlacedCell(local, placement);
         if (source.WalkableTop || (source.HasFloor && cell.Y != 0))
           throw new InvalidOperationException($"Only one walkable ground layer is supported at {cell}.");
-        if (source.CoverAmount > 100 || ((int)source.CoverDirections & ~15) != 0)
-          throw new InvalidOperationException($"Invalid cover flags at {cell}.");
         var tile = Tile(cell);
         tile.BlocksLineOfSight |= source.BlocksLineOfSight;
         tile.BlocksVerticalLineOfSight |= source.BlocksVerticalLineOfSight;

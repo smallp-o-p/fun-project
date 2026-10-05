@@ -25,7 +25,7 @@ palette that already has painted users.
 3. Assign the brush MeshLibrary on the root. Paint unit cells in the native
    **Annotations** GridMap. Cell `(0,0,0)` spans the box from `(0,0,0)` to `(1,1,1)`.
 4. Select one painted cell and choose **Inspect selected box** in **Box annotations**.
-   First inspection copies brush defaults; explicit flags replace all defaults,
+   First inspection copies the brush's authored footprint resource; explicit flags replace all brush flags,
    including false values. Erased cells retain stored overrides but are excluded
    from export. Repainting their coordinates applies the overrides again.
    **Reset annotations** clears overrides with confirmation and supports Undo.
@@ -33,6 +33,10 @@ palette that already has painted users.
    source too. Exported props contain the finished mesh and a resolved
    Vector3I-to-BattleFootprintData dictionary in the Mesh's `battle_footprint`
    metadata. Native export strips custom node properties, so the Mesh owns this data.
+
+Uninspected cells export the footprint resource authored on their brush mesh.
+Missing brush metadata is an authoring error; no empty footprint resource is
+invented. Inspector visits are only needed to create per-cell overrides.
 
 The supplied Floor and Solid brushes set only HasFloor and movement/sight blocking
 respectively. Geometry never infers flags. Cover directions/amount, bottom and top
@@ -49,7 +53,7 @@ centered cells. Keep that placement when replacing a finished model.
 `resources/map_entities/MapPalette.tres` is an ordinary MeshLibrary. Use its native
 **Update from Scene**, applying transforms, after re-exporting entities. This keeps
 existing item names/IDs (FloorTile 0, Block 1, Car 2). Material slots, mesh transforms,
-footprint metadata and floor-picking collision travel through native export.
+footprint metadata and explicitly authored collision travel through native export.
 There are no custom ItemId fields, folder scans, or recursive mesh compiler.
 
 ## Paint and bake a map
@@ -78,5 +82,10 @@ sides still require the separate directional-cover extension.
 
 Map roots and GridMaps use identity transforms, centered unit cells and Cell Scale 1.
 Floors use collision layer 1 for native picking; Props use layer 2 so they do not
-intercept floor rays. Exported floor shapes follow the annotated footprint.
+intercept floor rays. HasFloor is gameplay data; entity export does not generate
+collision. For floor picking, add a StaticBody3D with CollisionShape3D children
+under the finished prop mesh in the palette source scene, then update the native
+MeshLibrary. Place the shapes at the intended walkable surface and leave holes
+uncovered. Re-exporting an entity replaces its finished scene, so keep additional
+collision in the palette source scene when it must survive entity re-export.
 Runtime uses saved MapData and native GridMaps without palette loading or rebaking.

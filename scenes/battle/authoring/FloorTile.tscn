@@ -27,5 +27,5 @@ mesh = SubResource("BoxMesh_ghfdu")
 mesh_library = ExtResource("3_a1fi2")
 cell_size = Vector3(1, 1, 1)
 data = {
-"cells": PackedInt32Array(0, 0, 0)
+"cells": PackedInt32Array(0, 0, 1)
 }

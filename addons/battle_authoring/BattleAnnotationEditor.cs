@@ -19,7 +19,7 @@ public partial class BattleAnnotationEditor : EditorPlugin
   private AnnotationInspector _annotationInspector = null!;
   public override void _EnterTree()
   {
-    _annotationInspector = new AnnotationInspector(this);
+    _annotationInspector = new AnnotationInspector { Editor = this };
     AddInspectorPlugin(_annotationInspector);
     _dock = GD.Load<PackedScene>("res://addons/battle_authoring/BattleAnnotationDock.tscn").Instantiate<EditorDock>();
     _status = _dock.GetNode<Label>("Panel/Status");
@@ -41,7 +41,8 @@ public partial class BattleAnnotationEditor : EditorPlugin
   public override void _ExitTree()
   {
     SceneChanged -= TrackScene;
-    if (GodotObject.IsInstanceValid(_sceneRoot)) _sceneRoot!.TreeExiting -= PauseScene;
+    if (GodotObject.IsInstanceValid(_sceneRoot) && _sceneRoot!.IsConnected(Node.SignalName.TreeExiting, Callable.From(PauseScene)))
+      _sceneRoot.TreeExiting -= PauseScene;
     RemoveInspectorPlugin(_annotationInspector);
     RemoveDock(_dock);
     _dock.QueueFree();
@@ -52,7 +53,8 @@ public partial class BattleAnnotationEditor : EditorPlugin
   private void PauseScene() => SetProcess(false);
   private void TrackScene(Node? root)
   {
-    if (GodotObject.IsInstanceValid(_sceneRoot)) _sceneRoot!.TreeExiting -= PauseScene;
+    if (GodotObject.IsInstanceValid(_sceneRoot) && _sceneRoot!.IsConnected(Node.SignalName.TreeExiting, Callable.From(PauseScene)))
+      _sceneRoot.TreeExiting -= PauseScene;
     _sceneRoot = root;
     if (_sceneRoot is not null) _sceneRoot.TreeExiting += PauseScene;
     SetProcess(true);
@@ -96,7 +98,7 @@ public partial class BattleAnnotationEditor : EditorPlugin
     _inspect.Disabled = problem.IsSome || !nativeSelection;
     _reset.Disabled = EditorInterface.Singleton.GetEditedSceneRoot() != _annotator || _annotator.Annotations.Count == 0;
     _status.Text = problem.Match(message => message, () => $"Boxes: {_grid.GetUsedCells().Count} · Cell size {_grid.CellSize} (unit grid)\n" +
-      "Paint markers for defaults; inspect a cell to customize its flags.");
+      "Paint brushes for their flags; inspect a cell to override them.");
     // Close an already-open cell resource as soon as native painting invalidates its coordinates.
     if (problem.IsSome && EditorInterface.Singleton.GetInspector().GetEditedObject() is BattleFootprintData)
       EditorInterface.Singleton.InspectObject(_grid);
@@ -116,7 +118,9 @@ public partial class BattleAnnotationEditor : EditorPlugin
     if (!_annotator.Annotations.TryGetValue(cell, out var data))
     {
       var next = _annotator.Annotations.Duplicate();
-      data = _annotator.CreateDefaultAnnotation(cell);
+      var mesh = _grid.MeshLibrary.GetItemMesh(_grid.GetCellItem(cell));
+      var defaults = (BattleFootprintData)mesh.GetMeta(BattleAnnotationMarker.FootprintMeta).AsGodotObject();
+      data = (BattleFootprintData)defaults.Duplicate();
       data.ResourceName = $"Box {cell}";
       next[cell] = data;
       var history = GetUndoRedo();
@@ -134,16 +138,19 @@ public partial class BattleAnnotationEditor : EditorPlugin
     _annotator.TrySelectedCell(_nativeGridEditor.GetSelectedCells(), out var coordinate) &&
     _annotator.Annotations.TryGetValue(coordinate, out var current) && current == cell;
 
-  private partial class AnnotationInspector(BattleAnnotationEditor editor) : EditorInspectorPlugin
+  [Tool]
+  private partial class AnnotationInspector : EditorInspectorPlugin
   {
-    public override bool _CanHandle(GodotObject obj) => obj is BattleFootprintData && editor._knownCells.Contains(obj.GetInstanceId());
+    public BattleAnnotationEditor Editor { get; set; } = null!;
+
+    public override bool _CanHandle(GodotObject obj) => obj is BattleFootprintData && Editor._knownCells.Contains(obj.GetInstanceId());
     public override void _ParseBegin(GodotObject obj)
     {
-      if (!editor.CanEditCell((BattleFootprintData)obj))
+      if (!Editor.CanEditCell((BattleFootprintData)obj))
         AddCustomControl(new Label { Text = "Select this occupied cell in the entity source to edit its flags.", AutowrapMode = TextServer.AutowrapMode.WordSmart });
     }
     public override bool _ParseProperty(GodotObject obj, Variant.Type type, string name, PropertyHint hintType,
-      string hintString, PropertyUsageFlags usageFlags, bool wide) => !editor.CanEditCell((BattleFootprintData)obj);
+      string hintString, PropertyUsageFlags usageFlags, bool wide) => !Editor.CanEditCell((BattleFootprintData)obj);
   }
 
   private void ResetAnnotations()
