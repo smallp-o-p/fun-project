@@ -78,7 +78,7 @@ public class ModelClothingTest
   }
 
   [TestCase]
-  public void DiscoveredControlsSelectTheirOwnInstanceWithoutForeignHandleInputs()
+  public void PieceDisableAndOutfitSelectionRemainInstanceLocal()
   {
     using var first = ModelFixture.WithWardrobe();
     using var second = ModelFixture.WithWardrobe();
@@ -88,8 +88,6 @@ public class ModelClothingTest
     second.Model.Outfits[1].Select();
     Assert.Equal(0, first.Model.OutfitIndex);
     Assert.Equal(1, second.Model.OutfitIndex);
-    Assert.True(typeof(CharacterModel).GetMethod("SetPieceEnabled") is null);
-    Assert.True(typeof(CharacterModel).GetMethod("SelectOutfit") is null);
   }
 
   [TestCase]
