@@ -36,7 +36,9 @@ public sealed class BattleActionExecutor : IDisposable
   private Option<BattleAction> _inFlightAction = None;
   private bool _disposed;
 
-  public BattleActionExecutor(BattleSession session)
+  // Implementation detail: the factory constructs the session's sole executor. A second
+  // executor would double-register the default systems.
+  internal BattleActionExecutor(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     _session = session;
@@ -86,8 +88,17 @@ public sealed class BattleActionExecutor : IDisposable
 
   public BattleActionExecResult Submit(BattleAction action)
   {
-    ThrowIfDisposed();
+    EnsureCanSubmit();
     return DoAction(action);
+  }
+
+  // One admission invariant shared by every submission door: a completed battle rejects new
+  // work as a caller error, before any signal, queue mutation, or event. Disposal first.
+  internal void EnsureCanSubmit()
+  {
+    ThrowIfDisposed();
+    if (_session.Outcome.IsSome)
+      throw new InvalidOperationException("Cannot submit actions to a completed battle.");
   }
 
   private BattleActionExecResult DoAction(BattleAction action)
@@ -100,8 +111,9 @@ public sealed class BattleActionExecutor : IDisposable
     {
       // A mid-dispatch battle end (objective directive, player-wipe backstop) drops all
       // remaining work: queued interrupts and un-executed composite steps must never run
-      // against an ended session (their primitives require InProgress).
-      while (_pendingActions.Count > 0 && _session.Phase != BattlePhase.Ended)
+      // against a battle whose outcome is already decided. New submissions are rejected by
+      // EnsureCanSubmit; this guard only stops work in flight.
+      while (_pendingActions.Count > 0 && _session.Outcome.IsNone)
       {
         var currentAction = _pendingActions.Peek();
 
@@ -137,7 +149,7 @@ public sealed class BattleActionExecutor : IDisposable
         }
       }
 
-      if (_session.Phase == BattlePhase.Ended)
+      if (_session.Outcome.IsSome)
         _pendingActions.Clear();
     }
     catch

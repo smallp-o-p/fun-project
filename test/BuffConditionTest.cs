@@ -45,9 +45,13 @@ public partial class BuffConditionTest
   public void ConditionSubclassNeedsNoRegistration()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [faction]);
     var buff = TestData.MakeBuff("Custom", new AlwaysMetBuffCondition());
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction, buffs: [buff]), new Vector3I(4, 0, 4));
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", faction, buffs: [buff])), new Vector3I(4, 0, 4))])],
+      Seed: 7));
+    var unit = battle.Unit;
 
     Assert.Equal(1, unit.ActiveBuffs.AsValueEnumerable().Count());
   }

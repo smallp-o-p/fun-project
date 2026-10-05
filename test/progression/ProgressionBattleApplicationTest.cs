@@ -1,4 +1,6 @@
+using FunProject.Battle;
 using FunProject.Buffs;
+using FunProject.Combatants;
 using FunProject.Stats;
 using GdUnit4;
 using Godot;
@@ -7,11 +9,21 @@ using Godot;
 [RequireGodotRuntime]
 public partial class ProgressionBattleApplicationTest
 {
+
+  // Factory-ready fixture with one seed unit away from the reinforcement cells, so tests can
+  // spawn trained combatants through the ordinary reinforcement door.
+  private static BattleFixture SeededBattle(Faction faction)
+    => new(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Seed", faction)), new Vector3I(0, 0, 0))])],
+      Seed: 7));
+
   [TestCase(TestName = "Unlocked stat-mod step raises the spawned unit's effective aim")]
   public void UnlockedStatModAppliesAtSpawn()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [faction]);
+    using var battle = SeededBattle(faction);
     var combatant = TestData.MakeCombatant("Alpha", faction, aim: 65);
     battle.UnlockFirstStep(combatant, TestData.MakePath("Marksman",
       TestData.MakeStep(1, TestData.MakeStatModEffect(new AimStatMod { Modifiers = [StatModifier.Add(10)] }))));
@@ -24,7 +36,7 @@ public partial class ProgressionBattleApplicationTest
   public void UnlockedHealthModRaisesSpawnHealth()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [faction]);
+    using var battle = SeededBattle(faction);
     var combatant = TestData.MakeCombatant("Bravo", faction, health: 20);
     battle.UnlockFirstStep(combatant, TestData.MakePath("Vitality",
       TestData.MakeStep(1, TestData.MakeStatModEffect(new HealthStatMod { Modifiers = [StatModifier.Add(5)] }))));
@@ -38,7 +50,7 @@ public partial class ProgressionBattleApplicationTest
   public void UnlockedBuffGrantSurfacesAndStacks()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [faction]);
+    using var battle = SeededBattle(faction);
     var condition = new HealthBelowPercentCondition { Percent = 50f };
     var shared = TestData.MakeBuff("Shared", condition);
     var innateOnly = TestData.MakeBuff("Innate", condition);

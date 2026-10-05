@@ -19,17 +19,52 @@ internal sealed class RecordingHook : BattleHook
   }
 }
 
-// Setup-time declared-system double: records the runtime it registered with and forwards to
-// a test-supplied callback, so lifecycle tests can hook in during startup.
+// Setup-time declared-system double: records the hook-registration capability it received
+// and forwards to a test-supplied callback, so lifecycle tests can hook in during startup.
 internal sealed partial class SetupSystemData : BattleTypeSystemData
 {
-  public Action<BattleRuntime> OnRegister { get; init; } = _ => { };
-  public BattleRuntime? RegisteredRuntime { get; private set; }
+  public Action<BattleHookRegistration> OnRegister { get; init; } = _ => { };
+  public BattleHookRegistration? RegisteredHooks { get; private set; }
 
-  public override void Register(BattleRuntime runtime)
+  public override void Register(BattleHookRegistration hooks)
   {
-    RegisteredRuntime = runtime;
-    OnRegister(runtime);
+    RegisteredHooks = hooks;
+    OnRegister(hooks);
+  }
+}
+
+// Fixture-owned declared recording system: BattleFixture appends it to the setup before the
+// factory call, so its catch-all hook is registered before factory startup and records every
+// committed event — including all startup events — into the fixture's assertion window. It
+// also captures the session from the first event for the fixture's test-only Session handle
+// and indexes unit-added records by (combatant identity, event placement point) for
+// authored-role resolution — the first record per key wins, so a later startup spawn
+// reusing an authored combatant/cell (a kill-and-replace reinforcement) cannot overwrite
+// the authored raw unit. The hook lives in the registered executor, so it is tied to that
+// executor: a replacement executor over the same session never reaches it.
+internal sealed partial class FixtureRecordingSystem : BattleTypeSystemData
+{
+  private readonly List<BattleEvent> _events;
+
+  public Option<BattleSession> Session { get; private set; } = None;
+  public Dictionary<(Combatant, Vector3I), BattleUnitState> AddedUnits { get; } = [];
+
+  public FixtureRecordingSystem(List<BattleEvent> events) => _events = events;
+
+  public override void Register(BattleHookRegistration hooks) =>
+    hooks.RegisterHook<BattleEventTag>(new Recorder(this), int.MinValue);
+
+  private sealed class Recorder(FixtureRecordingSystem owner) : BattleHook
+  {
+    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
+    {
+      if (owner.Session.IsNone)
+        owner.Session = Some(context.Session);
+      if (battleEvent is UnitAddedBattleEvent added)
+        owner.AddedUnits.TryAdd((added.Unit.Combatant, added.Position.Raw), added.Unit);
+      owner._events.Add(battleEvent);
+      return [];
+    }
   }
 }
 

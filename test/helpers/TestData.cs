@@ -420,14 +420,48 @@ internal static class TestData
     return map;
   }
 
-  // An all-walkable, all-floor height-one board; every cell is an authored tile.
-  public static BattleMapData MakeOpenBattleMap(int width = 4, int depth = 4)
+  // An all-walkable, all-floor board; every cell across all three dimensions is an authored
+  // tile, because a board built from map data starts fully unwalkable.
+  public static BattleMapData MakeOpenBattleMap(Vector3I dimensions)
   {
     List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
-    for (int x = 0; x < width; x++)
-      for (int z = 0; z < depth; z++)
-        tiles.Add((new Vector3I(x, 0, z), FloorTile()));
-    return MakeMapData(new Vector3I(width, 1, depth), [.. tiles]);
+    for (int x = 0; x < dimensions.X; x++)
+      for (int y = 0; y < dimensions.Y; y++)
+        for (int z = 0; z < dimensions.Z; z++)
+          tiles.Add((new Vector3I(x, y, z), FloorTile()));
+    return MakeMapData(dimensions, [.. tiles]);
+  }
+
+  // An all-walkable, all-floor height-one board; every cell is an authored tile.
+  public static BattleMapData MakeOpenBattleMap(int width = 4, int depth = 4) =>
+    MakeOpenBattleMap(new Vector3I(width, 1, depth));
+
+  // One materialized, board-indexed runtime unit for complete-input BattleSession
+  // construction in direct constructor/lifecycle tests (the factory's own convention:
+  // nonnegative setup-order ids).
+  public static BattleUnitState PlacedUnit(BattleBoardState board, int unitId, Combatant combatant,
+    Vector3I position, Option<Weapon> weapon = default, Option<ItemWith<ArmorCapability>> armor = default)
+  {
+    var unit = new BattleUnitState(unitId, combatant, weapon, armor);
+    BattleBoardState.ValidatedPoint point = board.ValidatePoint(position).RequireSome();
+    if (!board.TryPlaceOccupant(point, unit.Id))
+      throw new System.InvalidOperationException($"Test cell {position} is not occupiable.");
+    return unit;
+  }
+
+  // An otherwise-open authored map with WallTile at the named cells.
+  public static BattleMapData MakeMapWithWalls(Vector3I dimensions, params Vector3I[] walls)
+  {
+    var wallSet = new SysColGeneric.HashSet<Vector3I>(walls);
+    List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
+    for (int x = 0; x < dimensions.X; x++)
+      for (int y = 0; y < dimensions.Y; y++)
+        for (int z = 0; z < dimensions.Z; z++)
+        {
+          var cell = new Vector3I(x, y, z);
+          tiles.Add((cell, wallSet.Contains(cell) ? WallTile() : FloorTile()));
+        }
+    return MakeMapData(dimensions, [.. tiles]);
   }
 
   // Packs the map into a BattleMap-rooted scene, the authored pool's storage shape; the

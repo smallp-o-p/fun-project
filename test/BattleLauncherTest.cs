@@ -31,6 +31,25 @@ public partial class BattleLauncherTest
     Assert.True(status.Text.Contains("HP"));
   }
 
+  [TestCase(TestName = "A factory result that already has an outcome shows the battle-over banner at startup")]
+  public void LauncherShowsBannerForStartupTerminalBattle()
+  {
+    var type = TestData.MakeDuelBattleType();
+    type.Factions[0].Objectives.Clear();
+    type.Factions[0].Objectives.Add(new SurviveUntilTurnObjectiveData
+    {
+      TargetTurn = 1,
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    });
+    var launcher = new BattleLauncher { BattleType = type };
+    AddToTree(launcher);
+
+    var battle = (BattleScene)launcher.GetChild(0);
+    var banner = battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Label>("%BattleOverBanner");
+    Assert.True(banner.Visible);
+    Assert.Equal("VICTORY", banner.Text);
+  }
+
   [TestCase(TestName = "Present guards against nulls")]
   public void PresentGuardsAgainstNulls()
   {

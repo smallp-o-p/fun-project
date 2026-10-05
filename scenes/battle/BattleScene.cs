@@ -76,6 +76,11 @@ public sealed partial class BattleScene : Node3D
     _director.PlaybackIdle += OnPlaybackIdle;
 
     RefreshView();
+
+    // The StateChanged subscription only sees future transitions; a factory result that
+    // already ended the battle must show its banner now.
+    if (_ui.State == UiState.BattleOver)
+      ShowBattleOverBanner();
   }
 
   public override void _ExitTree()
@@ -148,7 +153,7 @@ public sealed partial class BattleScene : Node3D
   private void OnPlaybackIdle()
   {
     RefreshView();
-    if (_runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
+    if (_runtime.Query(new GetBattleOutcomeQuery()).IsSome)
       return;
 
     Faction activeSide = _runtime.Query(new GetActiveSideQuery());

@@ -1,5 +1,9 @@
 using FunProject.Battle;
+using FunProject.Combatants;
 using FunProject.Core;
+using FunProject.Weapons;
+using FunProject.Items;
+using FunProject.Items.Capabilities;
 using GdUnit4;
 using Godot;
 
@@ -7,18 +11,26 @@ using Godot;
 [RequireGodotRuntime]
 public partial class ArmorBattleTest
 {
+  // Factory-ready fixture: one Player unit at (1,0,1) with an explicit weapon/armor loadout.
+  private static BattleFixture ArmoredSolo(Faction faction, Combatant combatant,
+    Weapon? weapon = null, ItemWith<ArmorCapability>? armor = null)
+    => new(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(4, 1, 4)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(combatant,
+          weapon is null ? None : Some(weapon),
+          armor is null ? None : Some(armor)), new Vector3I(1, 0, 1))])],
+      Seed: 7));
+
   [TestCase(TestName = "Spawned unit exposes its equipped armor at full pool")]
   public void SpawnedUnitExposesEquippedArmor()
   {
     var playerFaction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [playerFaction]);
     var armor = TestData.MakeArmor("Plate", armor: 10, element: Element.Thermal);
-
-    var unit = battle.Spawn(
+    using var battle = ArmoredSolo(playerFaction,
       TestData.MakeCombatant("Alpha", playerFaction),
-      new Vector3I(1, 0, 1),
-      TestData.MakeWeapon("Rifle"),
-      armor);
+      TestData.MakeWeapon("Rifle"), armor);
+    var unit = battle.Unit;
 
     Assert.True(unit.EquippedArmor.IsSome);
     var equipped = unit.EquippedArmor.RequireSome();
@@ -30,9 +42,8 @@ public partial class ArmorBattleTest
   public void UnitsSpawnWithoutArmorByDefault()
   {
     var playerFaction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [playerFaction]);
-
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction), new Vector3I(1, 0, 1));
+    using var battle = ArmoredSolo(playerFaction, TestData.MakeCombatant("Alpha", playerFaction));
+    var unit = battle.Unit;
 
     Assert.True(unit.EquippedArmor.IsNone);
   }
@@ -44,11 +55,11 @@ public partial class ArmorBattleTest
   public void DamageDepletesArmorBeforeHealth()
   {
     var playerFaction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [playerFaction]);
     var armor = TestData.MakeArmor("Plate", armor: 10, element: Element.Thermal);
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction, health: 20),
-      new Vector3I(1, 0, 1), TestData.MakeWeapon("Rifle"), armor);
-    battle.Start();
+    using var battle = ArmoredSolo(playerFaction,
+      TestData.MakeCombatant("Alpha", playerFaction, health: 20),
+      TestData.MakeWeapon("Rifle"), armor);
+    var unit = battle.Unit;
 
     battle.ClearEvents();
     battle.ApplyDamage(unit, 4);
@@ -65,11 +76,11 @@ public partial class ArmorBattleTest
   public void SpilloverCanKillThroughArmor()
   {
     var playerFaction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [playerFaction]);
     var armor = TestData.MakeArmor("Vest", armor: 3, element: Element.Thermal);
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction, health: 5),
-      new Vector3I(1, 0, 1), TestData.MakeWeapon("Rifle"), armor);
-    battle.Start();
+    using var battle = ArmoredSolo(playerFaction,
+      TestData.MakeCombatant("Alpha", playerFaction, health: 5),
+      TestData.MakeWeapon("Rifle"), armor);
+    var unit = battle.Unit;
 
     battle.ClearEvents();
     battle.ApplyDamage(unit, 10);

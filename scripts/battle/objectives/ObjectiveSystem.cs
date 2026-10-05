@@ -58,7 +58,7 @@ public sealed class ObjectiveSystem : BattleHook
       }
 
       ApplyDirective(owner, directive);
-      if (_session.Phase == BattlePhase.Ended)
+      if (_session.Outcome.IsSome)
         break;
     }
 

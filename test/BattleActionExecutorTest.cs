@@ -10,6 +10,20 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public partial class BattleActionExecutorTest
 {
+  // Factory-ready fixture: one unit per side at the given positions.
+  private static BattleFixture DuelFixture(Faction factionA, string nameA, Vector3I posA,
+    Faction factionB, string nameB, Vector3I posB, Vector3I? dimensions = null,
+    int aActionPoints = 4)
+    => new(new BattleSetup(
+      TestData.MakeOpenBattleMap(dimensions ?? new Vector3I(4, 1, 4)),
+      [
+        new BattleSideSetup(factionA, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(nameA, factionA, actionPoints: aActionPoints)), posA)]),
+        new BattleSideSetup(factionB, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(nameB, factionB)), posB)]),
+      ],
+      Seed: 7));
+
   [TestCase(false, true, TestName = "Submit resolves a hook's interrupt within the same submission")]
   [TestCase(true, true, TestName = "Submit reports the submitted action once and resolves interrupts between its steps")]
   [TestCase(true, false, TestName = "MoveUnit submit reports only the submitted action")]
@@ -56,10 +70,17 @@ public partial class BattleActionExecutorTest
   {
     var factionA = TestData.MakeFaction("Alpha");
     var factionB = TestData.MakeFaction("Bravo");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [factionA, factionB]);
-    var mover = battle.Spawn(TestData.MakeCombatant("Mover", factionA, health: 20, actionPoints: 5), new Vector3I(0, 0, 0));
-    var victim = battle.Spawn(TestData.MakeCombatant("Victim", factionB, health: 10), new Vector3I(2, 0, 0));
-    battle.Start();
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(3, 1, 3)),
+      [
+        new BattleSideSetup(factionA, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Mover", factionA, health: 20, actionPoints: 5)), new Vector3I(0, 0, 0))]),
+        new BattleSideSetup(factionB, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Victim", factionB, health: 10)), new Vector3I(2, 0, 0))]),
+      ],
+      Seed: 7));
+    var mover = battle.UnitAt(new Vector3I(0, 0, 0));
+    var victim = battle.UnitAt(new Vector3I(2, 0, 0));
     battle.RegisterHook<UnitMovedBattleEvent>(new InterruptActionsHook(
       context =>
       [
@@ -335,12 +356,11 @@ public partial class BattleActionExecutorTest
   {
     var faction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction, enemyFaction]);
+    using var battle = DuelFixture(faction, "Alpha", new Vector3I(0, 0, 0), enemyFaction, "Seed", new Vector3I(3, 0, 3), aActionPoints: 5);
     var start = new Vector3I(0, 0, 0);
     var mid = new Vector3I(1, 0, 0);
     var end = new Vector3I(2, 0, 0);
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction, actionPoints: 5), start);
-    battle.Start();
+    var unit = battle.Unit;
 
     var action = new MoveUnit(battle.Alive(unit), [battle.At(mid), battle.At(end)]);
     battle.RegisterHook<TileOccupiedBattleEvent>(
@@ -409,13 +429,25 @@ public partial class BattleActionExecutorTest
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
-    battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Start();
+    using var battle = DuelFixture(factionA, "A1", new Vector3I(0, 0, 0), factionB, "B1", new Vector3I(1, 0, 0));
+    var session = battle.Session;
+    var unitA = battle.UnitAt(new Vector3I(0, 0, 0));
+    var unitB = battle.UnitAt(new Vector3I(1, 0, 0));
+    var sideFlips = new List<(Faction FlippedTo, Faction ActiveSide, int TurnNumber, bool OutgoingAvailable, bool IncomingAvailable)>();
+    session.BattleEventCommitted += battleEvent =>
+    {
+      if (battleEvent is not ActiveSideChangedBattleEvent changed)
+        return;
+      BattleUnitState outgoing = changed.Faction == factionA ? unitB : unitA;
+      BattleUnitState incoming = changed.Faction == factionA ? unitA : unitB;
+      sideFlips.Add((changed.Faction, session.ActiveSide, session.TurnNumber,
+        session.IsUnitStillAvailableThisTurn(outgoing),
+        session.IsUnitStillAvailableThisTurn(incoming)));
+    };
 
     battle.ClearEvents();
     battle.Submit(BattleAction.EndFactionTurn(factionA));
+    battle.Submit(BattleAction.EndFactionTurn(factionB));
 
     Assert.True(battle.Events.EventsOf<TurnEndedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
       battleEvent.Faction == factionA &&
@@ -423,6 +455,19 @@ public partial class BattleActionExecutorTest
     Assert.True(battle.Events.EventsOf<TurnStartedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
       battleEvent.Faction == factionB &&
       battleEvent.TurnNumber == 1));
+    Assert.True(battle.Events.EventsOf<TurnEndedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
+      battleEvent.Faction == factionB &&
+      battleEvent.TurnNumber == 1));
+    Assert.True(battle.Events.EventsOf<TurnStartedBattleEvent>().AsValueEnumerable().Any(battleEvent =>
+      battleEvent.Faction == factionA &&
+      battleEvent.TurnNumber == 2));
+
+    // The scheduling transition is complete before any event observer runs: the active
+    // identity is the flipped-to side, the outgoing side's availability is already cleared,
+    // the incoming side's is established, and the round increment precedes the notifications.
+    Assert.Equal(2, sideFlips.Count);
+    Assert.Equal((factionB, factionB, 1, false, true), sideFlips[0]);
+    Assert.Equal((factionA, factionA, 2, false, true), sideFlips[1]);
   }
 
   [TestCase(TestName = "Executor resolves queued actions in FIFO order")]
@@ -430,10 +475,8 @@ public partial class BattleActionExecutorTest
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
-    var unitA = battle.Spawn(TestData.MakeCombatant("A1", factionA, actionPoints: 4), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Start();
+    using var battle = DuelFixture(factionA, "A1", new Vector3I(0, 0, 0), factionB, "B1", new Vector3I(1, 0, 0), aActionPoints: 4);
+    var unitA = battle.Unit;
 
     BattleActionExecResult first = battle.Submit(BattleAction.MoveUnit(battle.Alive(unitA), [battle.At(0, 0, 1)]));
     BattleActionExecResult second = battle.Submit(BattleAction.EndFactionTurn(factionA));
@@ -448,12 +491,11 @@ public partial class BattleActionExecutorTest
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [factionA, factionB]);
-    var unitA = battle.Spawn(TestData.MakeCombatant("A1", factionA, actionPoints: 5), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(3, 0, 0));
+    using var battle = DuelFixture(factionA, "A1", new Vector3I(0, 0, 0), factionB, "B1", new Vector3I(3, 0, 3),
+      dimensions: new Vector3I(5, 1, 5), aActionPoints: 5);
+    var unitA = battle.Unit;
     var grenade = TestData.MakeGrenade("Practice");
     unitA.AddInventoryItem(grenade.Item);
-    battle.Start();
 
     BattleActionExecResult[] results =
     [
@@ -485,10 +527,8 @@ public partial class BattleActionExecutorTest
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [factionA, factionB]);
-    var unitA = battle.Spawn(TestData.MakeCombatant("A1", factionA), new Vector3I(0, 0, 0));
-    battle.Spawn(TestData.MakeCombatant("B1", factionB), new Vector3I(1, 0, 0));
-    battle.Start();
+    using var battle = DuelFixture(factionA, "A1", new Vector3I(0, 0, 0), factionB, "B1", new Vector3I(1, 0, 0));
+    var unitA = battle.Unit;
 
     battle.Submit(BattleAction.PassUnit(battle.Alive(unitA)));
     Assert.Equal(factionB, battle.Session.ActiveSide);

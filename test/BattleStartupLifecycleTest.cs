@@ -1,6 +1,8 @@
 using FunProject.Battle;
+using FunProject.Buffs;
 using FunProject.Combatants;
 using FunProject.Items.Effects;
+using FunProject.Stats;
 using GdUnit4;
 using Godot;
 using System;
@@ -41,9 +43,14 @@ public class BattleStartupLifecycleTest
   {
     var (setup, _, _) = GroupedSetup();
     var hook = new RecordingHook();
+    var observations = new FirstUnitAddedObservations();
     var system = new SetupSystemData
     {
-      OnRegister = runtime => runtime.RegisterHook<BattleEventTag>(hook),
+      OnRegister = hooks =>
+      {
+        hooks.RegisterHook<BattleEventTag>(hook);
+        hooks.RegisterHook<UnitAddedBattleEvent>(observations);
+      },
     };
     using var runtime = BattleFactory.Start(setup with
     {
@@ -72,11 +79,186 @@ public class BattleStartupLifecycleTest
       for (int objectiveIndex = 0; objectiveIndex < objectives.Count; objectiveIndex++)
         Assert.True(ReferenceEquals(side.Objectives[objectiveIndex], objectives[objectiveIndex].Data));
     }
+
+    // Startup hooks observe the COMPLETE initial board with valid turn state: the second
+    // unit and the placed object already exist when the first unit-added notification
+    // fires, and the active side's availability is established.
+    Assert.True(observations.Observed);
+    Assert.Equal(2, observations.AliveUnitCount);
+    Assert.Equal(1, observations.ObjectCount);
+    Assert.True(ReferenceEquals(setup.Sides[0].Faction, observations.ActiveSide));
+    Assert.True(observations.FirstUnitAvailable);
+    Assert.True(observations.FirstUnitCanAct);
+  }
+
+  [TestCase(TestName = "Initial spottings follow every unit announcement in deterministic setup order")]
+  public void InitialSpottingsFollowUnitAnnouncements()
+  {
+    var (setup, _, _) = GroupedSetup();
+    var hook = new RecordingHook();
+    var observations = new FirstUnitAddedObservations();
+    var system = new SetupSystemData
+    {
+      OnRegister = hooks =>
+      {
+        hooks.RegisterHook<BattleEventTag>(hook);
+        hooks.RegisterHook<UnitAddedBattleEvent>(observations);
+      },
+    };
+    using var runtime = BattleFactory.Start(setup with { Systems = [system] }).RequireRight();
+
+    var added = hook.Received.EventsOf<UnitAddedBattleEvent>();
+    Assert.Equal(2, added.Length);
+    var spotted = hook.Received.EventsOf<UnitSpottedBattleEvent>();
+    Assert.Equal(2, spotted.Length);
+    // Exactly one spotting per directed pair; ids follow setup order (0,1) then (1,0).
+    Assert.True(ReferenceEquals(added[0].Unit, spotted[0].Unit));
+    Assert.True(ReferenceEquals(added[1].Unit, spotted[0].Target));
+    Assert.True(ReferenceEquals(added[1].Unit, spotted[1].Unit));
+    Assert.True(ReferenceEquals(added[0].Unit, spotted[1].Target));
+    Assert.Equal(added[0].Unit.Id, spotted[0].Unit.Id);
+    Assert.Equal(added[1].Unit.Id, spotted[0].Target.Id);
+    Assert.Equal(added[1].Unit.Id, spotted[1].Unit.Id);
+    Assert.Equal(added[0].Unit.Id, spotted[1].Target.Id);
+    // Each spotting's observer and target were announced first.
+    for (int i = 0; i < spotted.Length; i++)
+    {
+      int spottedIndex = hook.Received.IndexOf(spotted[i]);
+      Assert.True(hook.Received.IndexOf(added[0]) < spottedIndex);
+      Assert.True(hook.Received.IndexOf(added[1]) < spottedIndex);
+    }
+
+    // Full visibility is already computed at the FIRST placement notification.
+    Assert.True(observations.Observed);
+    Assert.True(observations.MutuallyVisible);
+  }
+
+  [TestCase(false, TestName = "Without completion a startup interrupt executes once after the first turn-start event")]
+  [TestCase(true, TestName = "With completion during placement, notifications finish but the queued interrupt is dropped")]
+  public void StartupInterruptsRunOnlyAfterBootstrap(bool endDuringPlacement)
+  {
+    var (setup, _, _) = GroupedSetup();
+    var interrupt = new DamageFirstAddedUnitOnce();
+    var hook = new RecordingHook();
+    var ready = setup with
+    {
+      Objects = [new ObjectPlacement(new BattleSpecialObjectData { Name = "Marker" }, new Vector3I(1, 0, 0))],
+      Sides =
+      [
+        setup.Sides[0] with
+        {
+          Objectives = endDuringPlacement
+            ?
+            [
+              new FakeObjectiveData
+              {
+                Complete = true,
+                Observe = typeof(UnitAddedBattleEvent),
+                OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+              },
+            ]
+            : [new FakeObjectiveData()],
+        },
+        setup.Sides[1],
+      ],
+      Systems =
+      [
+        new SetupSystemData { OnRegister = runtime => runtime.RegisterHook<BattleEventTag>(hook) },
+        new SetupSystemData { OnRegister = runtime => runtime.RegisterHook<UnitAddedBattleEvent>(interrupt) },
+      ],
+    };
+    using var runtime = BattleFactory.Start(ready).RequireRight();
+
+    Assert.True(interrupt.HadSourceAction);
+    var added = hook.Received.EventsOf<UnitAddedBattleEvent>();
+    Assert.Equal(2, added.Length);
+    Assert.Equal(1, hook.Received.EventsOf<ObjectPlacedBattleEvent>().Length);
+
+    if (!endDuringPlacement)
+    {
+      Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsNone);
+      var damaged = hook.Received.EventsOf<UnitDamagedBattleEvent>();
+      Assert.Equal(1, damaged.Length);
+      hook.Received.EventBefore<TurnStartedBattleEvent, UnitDamagedBattleEvent>();
+      // The interrupt waited for the whole startup primitive: even the LAST unit-added
+      // notification precedes the damage.
+      int damageIndex = hook.Received.IndexOf(damaged[0]);
+      Assert.True(hook.Received.IndexOf(added[1]) < damageIndex);
+      Assert.Equal(added[0].Unit.MaxHealth - 1, added[0].Unit.CurrentHealth);
+    }
+    else
+    {
+      Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetBattleOutcomeQuery()).RequireSome());
+      Assert.Equal(0, hook.Received.EventsOf<SessionStartedBattleEvent>().Length);
+      Assert.Equal(0, hook.Received.EventsOf<TurnStartedBattleEvent>().Length);
+      Assert.Equal(added[0].Unit.MaxHealth, added[0].Unit.CurrentHealth);
+      Assert.Equal(1, hook.Received.EventsOf<SessionEndedBattleEvent>().Length);
+    }
+  }
+
+  // Captures what the first unit-added startup hook can observe: the complete roster, the
+  // placed object, valid turn state, established active-side availability, and mutual
+  // visibility computed from the complete board.
+  private sealed class FirstUnitAddedObservations : BattleHook<UnitAddedBattleEvent>
+  {
+    public bool Observed { get; private set; }
+    public int AliveUnitCount { get; private set; }
+    public int ObjectCount { get; private set; }
+    public Faction ActiveSide { get; private set; }
+    public bool FirstUnitAvailable { get; private set; }
+    public bool FirstUnitCanAct { get; private set; }
+    public bool MutuallyVisible { get; private set; }
+
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitAddedBattleEvent evt)
+    {
+      if (Observed)
+        return [];
+      Observed = true;
+      AliveUnitCount = context.Session.AliveUnits.AsValueEnumerable().Count();
+      ObjectCount = context.Session.Objects.AsValueEnumerable().Count();
+      ActiveSide = context.Session.ActiveSide;
+      FirstUnitAvailable = context.Session.IsUnitStillAvailableThisTurn(evt.Unit);
+      FirstUnitCanAct = context.Session.CanUnitActNow(evt.Unit);
+      BattleUnitState other = context.Session.AliveUnits.AsValueEnumerable()
+        .Single(unit => !ReferenceEquals(unit, evt.Unit));
+      MutuallyVisible = evt.Unit.VisibleUnits.Contains(other) && other.VisibleUnits.Contains(evt.Unit);
+      return [];
+    }
+  }
+
+  // One-shot first-unit-added interrupt source: mints a fresh proof at hook time and
+  // returns a damage action against that unit.
+  private sealed class DamageFirstAddedUnitOnce : BattleHook<UnitAddedBattleEvent>
+  {
+    private bool _fired;
+
+    public bool HadSourceAction { get; private set; }
+
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitAddedBattleEvent evt)
+    {
+      if (_fired)
+        return [];
+      _fired = true;
+      HadSourceAction = context.SourceAction.IsSome;
+      return [BattleAction.ApplyDamage(context.Session.TryGetAlive(evt.Unit).RequireSome(), 1)];
+    }
+  }
+
+  // Spends one action point of the turn-starting side's first unit during the turn-start
+  // dispatch, before the objective router can end the battle in the same dispatch.
+  private sealed class SpendActiveSideApOnTurnStart : BattleHook<TurnStartedBattleEvent>
+  {
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TurnStartedBattleEvent evt)
+    {
+      BattleUnitState unit = context.Session.GetFactionAliveUnits(evt.Faction).AsValueEnumerable().First();
+      Assert.True(unit.TrySpendActionPoints(1));
+      return [];
+    }
   }
 
   // Starts the real factory inside a using so even a successful Start disposes its runtime.
   // A capture must exist (a successful Start fails this helper), the system must have received
-  // the runtime, and that runtime must reject queries after disposal.
+  // its registration capability, and registering through it after disposal must throw.
   private static Exception AssertStartupFailureDisposes(BattleSetup setup, SetupSystemData system)
   {
     Exception? observed = null;
@@ -89,9 +271,11 @@ public class BattleStartupLifecycleTest
       observed = error;
     }
     Assert.True(observed is not null);
-    Assert.True(system.RegisteredRuntime is not null);
+    // The declared system registered before the fault; the retained capability died with the
+    // runtime — registering through it throws, and no runtime getter is added for tests.
+    Assert.True(system.RegisteredHooks is not null);
     Assert.Throws<ObjectDisposedException>(() =>
-      system.RegisteredRuntime!.Query(new GetBattlePhaseQuery()));
+      system.RegisteredHooks!.RegisterHook<BattleEventTag>(new RecordingHook()));
     return observed!;
   }
 
@@ -113,15 +297,15 @@ public class BattleStartupLifecycleTest
     var expected = new InvalidOperationException("setup sentinel");
     var system = new SetupSystemData
     {
-      OnRegister = runtime => runtime.RegisterHook<BattleEventTag>(
+      OnRegister = hooks => hooks.RegisterHook<BattleEventTag>(
         new ThrowOnSetupEvent(eventType, expected)),
     };
 
     Assert.True(ReferenceEquals(expected, AssertStartupFailureDisposes(setup, system)));
   }
 
-  [TestCase(TestName = "A malformed spawn buff throws, preserves the cause, and disposes the runtime")]
-  public void MalformedSpawnBuffDisposesRuntime()
+  [TestCase(TestName = "A malformed spawn buff fails unit materialization before any registration")]
+  public void MalformedSpawnBuffFailsBeforeRegistration()
   {
     var (setup, player, _) = GroupedSetup();
     var broken = setup with
@@ -139,13 +323,25 @@ public class BattleStartupLifecycleTest
       ],
     };
     var system = new SetupSystemData();
-    Exception observed = AssertStartupFailureDisposes(broken, system);
+
+    // Unit materialization runs before the session exists, so nothing registers and no
+    // runtime is created to dispose; the original cause propagates.
+    Exception? observed = null;
+    try
+    {
+      BattleFactory.Start(broken with { Systems = [system] });
+    }
+    catch (Exception error)
+    {
+      observed = error;
+    }
     Assert.True(observed is InvalidOperationException);
-    Assert.True(observed.Message.Contains("no activation condition"));
+    Assert.True(observed!.Message.Contains("no activation condition"));
+    Assert.True(system.RegisteredHooks is null);
   }
 
-  [TestCase(TestName = "A battle with objectives but no units throws and disposes the runtime")]
-  public void EmptyRostersThrowAndDispose()
+  [TestCase(TestName = "A battle with objectives but no units fails construction before any registration")]
+  public void EmptyRostersFailConstructionWithoutRegistration()
   {
     var (setup, _, _) = GroupedSetup();
     var empty = setup with
@@ -157,7 +353,12 @@ public class BattleStartupLifecycleTest
       ],
     };
     var system = new SetupSystemData();
-    AssertStartupFailureDisposes(empty, system);
+
+    // The roster cannot start: the scheduler's construction invariant fires before the
+    // session/runtime exist, so nothing registers and there is nothing to dispose.
+    Assert.Throws<InvalidOperationException>(() =>
+      BattleFactory.Start(empty with { Systems = [system] }));
+    Assert.True(system.RegisteredHooks is null);
   }
 
   [TestCase(TestName = "Repeated starts from one setup get fresh board, objective, object, and hook state")]
@@ -222,9 +423,37 @@ public class BattleStartupLifecycleTest
         setup.Sides[1],
       ],
     };
-    using var runtime = BattleFactory.Start(terminal).RequireRight();
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
+    using var runtime = BattleFactory.Start(terminal with
+    {
+      Systems = [new SetupSystemData
+      {
+        OnRegister = hooks => hooks.RegisterHook<TurnStartedBattleEvent>(new SpendActiveSideApOnTurnStart()),
+      }],
+    }).RequireRight();
+    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+
+    // The observer's spend happened during the terminal turn-start dispatch and no refresh
+    // followed it: the battle ended before any AP restoration could run.
+    var playerUnit = runtime.Query(new GetFactionAliveUnits(setup.Sides[0].Faction))
+      .AsValueEnumerable().Single().State;
+    Assert.Equal(playerUnit.MaxActionPoints - 1, playerUnit.CurrentActionPoints);
+  }
+
+  [TestCase(TestName = "The startup AP refresh reads buffs activated during placement")]
+  public void StartupApRefreshReadsSpawnActivatedBuffs()
+  {
+    var apBuff = TestData.MakeBuff(
+      "Adrenaline",
+      new AdjacentEnemyCondition(),
+      statMods: [new ActionPointsStatMod { Modifiers = [StatModifier.Add(2)] }]);
+    using var battle = BattleFixture.Duel(
+      player: new("Alpha", ActionPoints: 4, Position: new Vector3I(4, 0, 1), Buffs: [apBuff]),
+      enemy: new("Hostile", Position: new Vector3I(4, 0, 2)));
+
+    // Placement activated the adjacency buff (spawn evaluation); the first-turn refresh
+    // read the buffed maximum — the ordering BuffBattleTest pins for later turns.
+    Assert.Equal(6, battle.PlayerUnit.CurrentActionPoints);
   }
 
   [TestCase(TestName = "Seed 7 produces the same combat rolls from the type and resolved setups")]

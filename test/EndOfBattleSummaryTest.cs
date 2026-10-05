@@ -125,9 +125,8 @@ public class EndOfBattleSummaryTest
     battle.ApplyDamage(bravo, 999);
     battle.ApplyDamage(charlie, 1);
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
-    battle.Attack(battle.PlayerUnit, bandit2);
-    battle.EndFactionTurn(battle.PlayerFaction);
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    battle.Attack(battle.PlayerUnit, bandit2); // the last opposing unit falls: eliminate-all wins here
+    Assert.True(battle.Session.Outcome.IsSome);
 
     var summary = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
 
@@ -156,7 +155,7 @@ public class EndOfBattleSummaryTest
     battle.ApplyDamage(battle.EnemyUnit, 1);
     battle.EndFactionTurn(battle.PlayerFaction);
     battle.Attack(battle.EnemyUnit, battle.PlayerUnit);
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
 
     var playerSummary = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
     Assert.Equal(BattleOutcome.Defeat, playerSummary.Outcome);

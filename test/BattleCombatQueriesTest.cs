@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using FunProject.Battle;
+using FunProject.Combatants;
 using FunProject.Weapons;
 using GdUnit4;
 using Godot;
@@ -11,10 +13,17 @@ public partial class BattleCombatQueriesTest
   [TestCase(true, TestName = "Hit chance preview matches the breakdown the attack resolves with")]
   public void HitChancePreviewMatchesResolution(bool execute)
   {
-    var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(CoverDirections.North, 40);
+    List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
+    for (int x = 0; x < 8; x++)
+      for (int z = 0; z < 8; z++)
+      {
+        var cell = new Vector3I(x, 0, z);
+        tiles.Add((cell, cell == new Vector3I(4, 0, 4)
+          ? new BattleMapTileData { Walkable = true, CoverDirections = CoverDirections.North, CoverAmount = 40 }
+          : TestData.FloorTile()));
+      }
     using var battle = BattleFixture.Duel(
-      board: board,
+      map: TestData.MakeMapData(new Vector3I(8, 1, 8), [.. tiles]),
       randomSeed: execute ? 99 : null,
       player: new("Alpha", Weapon: TestData.MakeWeapon("Rifle")));
 
@@ -44,11 +53,21 @@ public partial class BattleCombatQueriesTest
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction), new Vector3I(4, 0, 1));
-    var enemyAttacker = battle.Spawn(TestData.MakeCombatant("Hostile", enemyFaction, aim: 70), new Vector3I(4, 0, 4), TestData.MakeWeapon("Rifle"));
-    var playerTarget = battle.Spawn(TestData.MakeCombatant("Bravo", playerFaction), new Vector3I(4, 0, 6));
-    battle.Start();
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
+      [
+        new BattleSideSetup(playerFaction, [new FakeObjectiveData()],
+          [
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", playerFaction)), new Vector3I(4, 0, 1)),
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Bravo", playerFaction)), new Vector3I(4, 0, 6)),
+          ]),
+        new BattleSideSetup(enemyFaction, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Hostile", enemyFaction, aim: 70),
+            Some(TestData.MakeWeapon("Rifle"))), new Vector3I(4, 0, 4))]),
+      ],
+      Seed: 7));
+    var enemyAttacker = battle.UnitAt(new Vector3I(4, 0, 4));
+    var playerTarget = battle.UnitAt(new Vector3I(4, 0, 6));
 
     // Player faction is active; the enemy attacker can still preview its odds.
     var breakdown = battle.Query(new GetHitChanceForAttack(
@@ -62,13 +81,28 @@ public partial class BattleCombatQueriesTest
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    var armedAttacker = battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction), new Vector3I(4, 0, 1), TestData.MakeWeapon("Rifle"));
-    var unarmedAttacker = battle.Spawn(TestData.MakeCombatant("Bravo", playerFaction), new Vector3I(5, 0, 1));
-    var shortSightedAttacker = battle.Spawn(TestData.MakeCombatant("Charlie", playerFaction, vision: 1), new Vector3I(6, 0, 1), TestData.MakeWeapon("Rifle"));
-    var shortRangedAttacker = battle.Spawn(TestData.MakeCombatant("Delta", playerFaction), new Vector3I(7, 0, 1), TestData.MakeWeapon("Pistol", range: 1));
-    var target = battle.Spawn(TestData.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    battle.Start();
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
+      [
+        new BattleSideSetup(playerFaction, [new FakeObjectiveData()],
+          [
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", playerFaction),
+              Some(TestData.MakeWeapon("Rifle"))), new Vector3I(4, 0, 1)),
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Bravo", playerFaction)), new Vector3I(5, 0, 1)),
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Charlie", playerFaction, vision: 1),
+              Some(TestData.MakeWeapon("Rifle"))), new Vector3I(6, 0, 1)),
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Delta", playerFaction),
+              Some(TestData.MakeWeapon("Pistol", range: 1))), new Vector3I(7, 0, 1)),
+          ]),
+        new BattleSideSetup(enemyFaction, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Hostile", enemyFaction)), new Vector3I(4, 0, 4))]),
+      ],
+      Seed: 7));
+    var armedAttacker = battle.UnitAt(new Vector3I(4, 0, 1));
+    var unarmedAttacker = battle.UnitAt(new Vector3I(5, 0, 1));
+    var shortSightedAttacker = battle.UnitAt(new Vector3I(6, 0, 1));
+    var shortRangedAttacker = battle.UnitAt(new Vector3I(7, 0, 1));
+    var target = battle.UnitAt(new Vector3I(4, 0, 4));
 
     void AssertFails(AliveUnit attacker, AttackTarget attackTarget, BattleQueryFailureReason expectedReason)
     {

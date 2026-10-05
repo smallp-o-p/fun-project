@@ -36,14 +36,14 @@ public class BattleOutcomeTest
 
     battle.ApplyDamage(battle.EnemyUnit, amount, kind);
     battle.ApplyDamage(battle.PlayerUnit, amount, kind);
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsNone);
 
     if (kind == DamageKind.Stun)
       battle.EndFactionTurn(battle.PlayerFaction);
     else
       battle.AdvanceTurn();
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(BattleOutcome.Draw, battle.Session.Outcome.RequireSome());
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Draw, ended.Outcome);
@@ -54,7 +54,10 @@ public class BattleOutcomeTest
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
-    var session = new BattleSession(new BattleBoardState(new Vector3I(5, 1, 5)), [player, enemy], playerFaction: Some(player));
+    var board = new BattleBoardState(new Vector3I(5, 1, 5));
+    var p1 = TestData.PlacedUnit(board, 0, TestData.MakeCombatant("P1", player), new Vector3I(0, 0, 0));
+    var e1 = TestData.PlacedUnit(board, 1, TestData.MakeCombatant("E1", enemy), new Vector3I(2, 0, 0));
+    var session = new BattleSession(board, [player, enemy], [p1, e1], [], [], playerFaction: Some(player));
 
     Assert.Equal(player, session.PlayerFaction.RequireSome());
     Assert.True(session.Outcome.IsNone);
@@ -73,7 +76,7 @@ public class BattleOutcomeTest
 
     battle.ApplyDamage(playerWiped ? battle.PlayerUnit : battle.EnemyUnit, 999);
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(expected, battle.Session.Outcome.RequireSome());
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(expected, ended.Outcome);
@@ -91,15 +94,14 @@ public class BattleOutcomeTest
     battle.ApplyDamage(battle.EnemyUnit, 999);
     battle.AdvanceTurn();
 
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
     Assert.True(battle.Session.Outcome.IsNone);
     Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
 
-    // A lone survivor keeps taking turns across the round boundary — the path
-    // adjacent to StartNextRound's impossible-state guard — without ending.
+    // A lone survivor keeps taking turns across the round boundary — the path adjacent
+    // to the scheduler's exhaustion boundary — without ending.
     battle.AdvanceTurn();
 
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsNone);
     Assert.Equal(3, battle.Session.TurnNumber);
     Assert.True(battle.Session.Outcome.IsNone);
     Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
@@ -125,7 +127,7 @@ public class BattleOutcomeTest
 
     battle.AdvanceTurn();
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Defeat, ended.Outcome);

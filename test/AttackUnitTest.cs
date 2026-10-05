@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using FunProject.Battle;
 using FunProject.Core;
 using FunProject.Weapons;
+using FunProject.Combatants;
 using GdUnit4;
 using Godot;
 
@@ -53,10 +54,17 @@ public partial class AttackUnitTest
   [TestCase(TestName = "Applicable cover lowers the resolved hit chance")]
   public void ApplicableCoverLowersTheResolvedHitChance()
   {
-    var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    board.GetTile(board.At(4, 0, 4)).Cover = new TileCover(CoverDirections.North, 60);
+    List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
+    for (int x = 0; x < 8; x++)
+      for (int z = 0; z < 8; z++)
+      {
+        var cell = new Vector3I(x, 0, z);
+        tiles.Add((cell, cell == new Vector3I(4, 0, 4)
+          ? new BattleMapTileData { Walkable = true, CoverDirections = CoverDirections.North, CoverAmount = 60 }
+          : TestData.FloorTile()));
+      }
     using var battle = BattleFixture.Duel(
-      board: board,
+      map: TestData.MakeMapData(new Vector3I(8, 1, 8), [.. tiles]),
       player: new("Alpha", Aim: 60, Weapon: TestData.MakeWeapon("Rifle")));
 
     battle.ClearEvents();
@@ -85,14 +93,30 @@ public partial class AttackUnitTest
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [playerFaction, enemyFaction]);
-    var armedAttacker = battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction, aim: 100), new Vector3I(4, 0, 1), TestData.MakeWeapon("Rifle"));
-    var unarmedAttacker = battle.Spawn(TestData.MakeCombatant("Bravo", playerFaction), new Vector3I(5, 0, 1));
-    var shortSightedAttacker = battle.Spawn(TestData.MakeCombatant("Charlie", playerFaction, vision: 1, aim: 100), new Vector3I(6, 0, 1), TestData.MakeWeapon("Rifle"));
-    var shortRangedAttacker = battle.Spawn(TestData.MakeCombatant("Delta", playerFaction, aim: 100), new Vector3I(7, 0, 1), TestData.MakeWeapon("Pistol", range: 1));
-    var ally = battle.Spawn(TestData.MakeCombatant("Echo", playerFaction), new Vector3I(3, 0, 1));
-    var target = battle.Spawn(TestData.MakeCombatant("Hostile", enemyFaction), new Vector3I(4, 0, 4));
-    battle.Start();
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
+      [
+        new BattleSideSetup(playerFaction, [new FakeObjectiveData()],
+          [
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", playerFaction, aim: 100),
+              Some(TestData.MakeWeapon("Rifle"))), new Vector3I(4, 0, 1)),
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Bravo", playerFaction)), new Vector3I(5, 0, 1)),
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Charlie", playerFaction, vision: 1, aim: 100),
+              Some(TestData.MakeWeapon("Rifle"))), new Vector3I(6, 0, 1)),
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Delta", playerFaction, aim: 100),
+              Some(TestData.MakeWeapon("Pistol", range: 1))), new Vector3I(7, 0, 1)),
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Echo", playerFaction)), new Vector3I(3, 0, 1)),
+          ]),
+        new BattleSideSetup(enemyFaction, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Hostile", enemyFaction)), new Vector3I(4, 0, 4))]),
+      ],
+      Seed: 7));
+    var armedAttacker = battle.UnitAt(new Vector3I(4, 0, 1));
+    var unarmedAttacker = battle.UnitAt(new Vector3I(5, 0, 1));
+    var shortSightedAttacker = battle.UnitAt(new Vector3I(6, 0, 1));
+    var shortRangedAttacker = battle.UnitAt(new Vector3I(7, 0, 1));
+    var ally = battle.UnitAt(new Vector3I(3, 0, 1));
+    var target = battle.UnitAt(new Vector3I(4, 0, 4));
 
     // Feasibility misses interrupt silently (staleness from interleaved interrupts cannot
     // be distinguished from caller bugs at Execute time): the attack drops, nothing is

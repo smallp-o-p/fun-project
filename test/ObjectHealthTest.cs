@@ -36,28 +36,38 @@ public class ObjectHealthTest
           HealthStat = new HealthStat { BaseValue = amount },
         }.CreateRuntime());
 
-    using var battle = BattleFixture.Duel(start: false);
-    var duplicate = TestData.MakeObject("Broken", 10,
-      new ObjectHealthCapabilityData { HealthStat = new HealthStat { BaseValue = 20 } });
     Assert.Throws<InvalidOperationException>(() =>
-      battle.PlaceObject(duplicate, new Vector3I(2, 0, 2)));
+    {
+      using var battle = BattleFixture.Duel(configure: setup => setup with
+      {
+        Objects = [new ObjectPlacement(TestData.MakeObject("Broken", 10,
+          new ObjectHealthCapabilityData { HealthStat = new HealthStat { BaseValue = 20 } }), new Vector3I(2, 0, 2))],
+      });
+    });
   }
 
   [TestCase]
   public void MintRequiresHealthMembershipAndLivePlacement()
   {
-    using var battle = BattleFixture.Duel(start: false);
-    using var foreign = BattleFixture.Duel(start: false);
-    var crate = battle.PlaceObject(TestData.MakeObject("Crate", 10,
-      new InteractiveCapabilityData()), new Vector3I(3, 0, 1));
-    var scenery = battle.PlaceObject(TestData.MakeObject(), new Vector3I(2, 0, 2));
+    using var battle = BattleFixture.Duel(configure: setup => setup with
+    {
+      Objects =
+      [
+        new ObjectPlacement(TestData.MakeObject("Crate", 10, new InteractiveCapabilityData()), new Vector3I(3, 0, 1)),
+        new ObjectPlacement(TestData.MakeObject(), new Vector3I(2, 0, 2)),
+      ],
+    });
+    using var foreign = BattleFixture.Duel();
+    var crate = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable()
+      .Single(o => o.Position == new Vector3I(3, 0, 1));
+    var scenery = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable()
+      .Single(o => o.Position == new Vector3I(2, 0, 2));
     var identity = new BattleEntity.Object(crate);
     Assert.True(ReferenceEquals(identity, battle.Runtime.TryGetAttackTarget(identity).RequireSome().Entity));
     Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(scenery)).IsNone);
     Assert.True(foreign.Runtime.TryGetAttackTarget(identity).IsNone);
     Assert.True(foreign.Runtime.TryGetAttackTarget(new BattleEntity.Unit(battle.PlayerUnit)).IsNone);
     Assert.Equal(battle.Alive(battle.EnemyUnit).Position, battle.Target(battle.EnemyUnit).Position);
-    battle.Start();
     battle.Interact(battle.PlayerUnit, crate);
     Assert.True(battle.Runtime.TryGetAttackTarget(identity).IsNone);
   }

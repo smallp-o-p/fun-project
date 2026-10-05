@@ -143,14 +143,41 @@ public sealed partial class BattleUiControllerTest
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
 
     battle.Runtime.ExecuteAction(BattleAction.ApplyDamage(
-      battle.Runtime.TryGetAlive(battle.EnemyUnit).RequireSome(), 999));
-    battle.Runtime.ExecuteAction(BattleAction.EndFactionTurn(battle.PlayerFaction));
+      battle.Runtime.TryGetAlive(battle.EnemyUnit).RequireSome(), 999)); // the last opposing unit falls: battle over
 
-    Assert.Equal(BattlePhase.Ended, battle.Runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.Equal(UiState.BattleOver, battle.Ui.State);
     Assert.True(battle.Ui.SelectedUnit.IsNone);
 
     // Terminal: further intents are no-ops, gate stays meaningless-but-closed.
+    Assert.False(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));
+    Assert.Equal(UiState.BattleOver, battle.Ui.State);
+  }
+
+  [TestCase(TestName = "A factory result that already has an outcome starts BattleOver with closed input")]
+  public void StartupTerminalFactoryResultStartsBattleOver()
+  {
+    // The factory finishes bootstrap before returning, so this terminal first-turn objective
+    // is decided before the controller is even constructed — no action result can deliver it.
+    using var battle = BattleFixture.Duel(playerControlled: true, configure: setup => setup with
+    {
+      Sides =
+      [
+        setup.Sides[0] with
+        {
+          Objectives = [new SurviveUntilTurnObjectiveData
+          {
+            TargetTurn = 1,
+            OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+          }],
+        },
+        setup.Sides[1],
+      ],
+    });
+
+    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsSome);
+    Assert.Equal(UiState.BattleOver, battle.Ui.State);
+    Assert.Equal(InputGate.NotPlayerTurn, battle.Ui.Gate);
     Assert.False(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));
     Assert.Equal(UiState.BattleOver, battle.Ui.State);
   }
@@ -202,11 +229,9 @@ public sealed partial class BattleUiControllerTest
   [TestCase(TestName = "A boxed-in available move can enter empty targeting and cancel")]
   public void BoxedInAvailableMoveCanCancelEmptyTargeting()
   {
-    var board = new BattleBoardState(new Vector3I(8, 1, 8));
-    Vector3I[] walls = [new(4, 0, 0), new(4, 0, 2), new(3, 0, 1), new(5, 0, 1)];
-    foreach (Vector3I wall in walls)
-      board.SetTileWalkable(board.ValidatePoint(wall).RequireSome(), false);
-    using var battle = BattleFixture.Duel(board: board, playerControlled: true);
+    using var battle = BattleFixture.Duel(map: TestData.MakeMapWithWalls(new Vector3I(8, 1, 8),
+      new Vector3I(4, 0, 0), new Vector3I(4, 0, 2), new Vector3I(3, 0, 1), new Vector3I(5, 0, 1)),
+      playerControlled: true);
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
     MoveActionOption move = battle.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single();
 

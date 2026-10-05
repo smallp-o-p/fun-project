@@ -82,13 +82,24 @@ public sealed class GeoscapeFixture : IDisposable
     params (Combatant Combatant, int Damage, int Stun)[] squad)
   {
     ThrowIfDisposed();
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [State.PlayerFaction]);
-    int slot = 0;
-    foreach ((Combatant combatant, int damage, int stun) in squad)
+    // Squad deployments are factory setup: one placement per member in deployment order,
+    // carrying each combatant's own equipment and the condition registry's stat mods.
+    UnitPlacement[] placements = squad.AsValueEnumerable().Select((member, slot) =>
     {
-      BattleUnitState unit = battle.Spawn(combatant, new Vector3I(slot++, 0, 0),
-        combatant.EquippedWeapon, combatant.EquippedArmor,
-        State.Conditions.StatContributions(combatant));
+      (Combatant combatant, int damage, int stun) = member;
+      return new UnitPlacement(
+        new UnitLoadout(combatant, combatant.EquippedWeapon, combatant.EquippedArmor)
+        { StatMods = State.Conditions.StatContributions(combatant) },
+        new Vector3I(slot, 0, 0));
+    }).ToArray();
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(5, 1, 5)),
+      [new BattleSideSetup(State.PlayerFaction, [new FakeObjectiveData()], placements)],
+      Seed: 7));
+    for (int slot = 0; slot < squad.Length; slot++)
+    {
+      (Combatant combatant, int damage, int stun) = squad[slot];
+      BattleUnitState unit = battle.UnitAt(new Vector3I(slot, 0, 0));
       if (damage > 0)
         battle.ApplyDamage(unit, damage);
       if (stun > 0)
