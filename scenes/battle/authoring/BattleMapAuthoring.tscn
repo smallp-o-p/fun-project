@@ -1,41 +1,38 @@
-[gd_scene format=3 uid="uid://bnasvcnx1dtrg"]
+[gd_scene format=3]
 
-[ext_resource type="Script" uid="uid://b7o483mxqmumq" path="res://scenes/battle/authoring/BattleMapAuthoring.cs" id="1_ouqxw"]
-[ext_resource type="Script" uid="uid://o0p1pxi51jff" path="res://scripts/battle/map/BattleMapTileData.cs" id="2_i1m1x"]
-[ext_resource type="MeshLibrary" uid="uid://36q78g1u282t" path="res://scenes/debug/DebugMeshLib.meshlib" id="3_gbl4c"]
-[ext_resource type="Script" uid="uid://djtekemlaytk4" path="res://scenes/battle/authoring/BattleTilePalette.cs" id="4_670cs"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleMapAuthoring.cs" id="1"]
+[ext_resource type="Script" path="res://scripts/battle/map/BattleMapData.cs" id="3_gbl4c"]
+[ext_resource type="MeshLibrary" path="res://resources/map_entities/MapPalette.tres" id="4_670cs"]
 
-[sub_resource type="Resource" id="Resource_gbl4c"]
-script = ExtResource("2_i1m1x")
+[sub_resource type="Resource" id="Resource_hno3r"]
+script = ExtResource("3_gbl4c")
+Dimensions = Vector3i(8, 1, 8)
+TileFlags = PackedByteArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+TileCoverDirections = PackedByteArray(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 2, 0, 0, 4, 0, 12, 0, 12, 0, 8, 0, 4, 0, 12, 0, 12, 0, 8, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+TileCoverAmounts = PackedByteArray(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 0, 40, 0, 40, 0, 0, 40, 0, 40, 0, 40, 0, 40, 0, 40, 0, 40, 0, 40, 0, 40, 0, 0, 40, 0, 40, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+SpawnSlots = Dictionary[Vector3i, int]({})
 
-[sub_resource type="Resource" id="Resource_i1m1x"]
-script = ExtResource("2_i1m1x")
+[node name="BattleMapAuthoring" type="Node3D" unique_id=219962060]
+script = ExtResource("1")
+Palette = ExtResource("4_670cs")
+SpawnSlots = Dictionary[Vector3i, int]({})
+ExportPath = "res://resources/maps/map.tscn"
+MapData = SubResource("Resource_hno3r")
 
-[sub_resource type="Resource" id="Resource_670cs"]
-script = ExtResource("2_i1m1x")
-
-[sub_resource type="Resource" id="Resource_b6vs2"]
-script = ExtResource("2_i1m1x")
-
-[sub_resource type="Resource" id="Resource_yrade"]
-script = ExtResource("4_670cs")
-MeshLibrary = ExtResource("3_gbl4c")
-Brushes = Dictionary[StringName, ExtResource("2_i1m1x")]({
-&"DebugBox": SubResource("Resource_gbl4c"),
-&"DebugFloor": SubResource("Resource_i1m1x"),
-&"DebugSpawnFloor": SubResource("Resource_670cs"),
-&"DebugSpawnFloorB": SubResource("Resource_b6vs2")
-})
-metadata/_custom_type_script = "uid://djtekemlaytk4"
-
-[node name="BattleMapAuthoring" type="GridMap" unique_id=1566391189]
-mesh_library = ExtResource("3_gbl4c")
+[node name="Floors" type="GridMap" parent="." unique_id=1721605823]
+mesh_library = ExtResource("4_670cs")
 cell_size = Vector3(1, 1, 1)
-cell_center_y = false
+collision_mask = 0
 data = {
-"cells": PackedInt32Array(3, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 4, 0, 0, 5, 0, 0, 6, 0, 0, 7, 0, 0, 7, 1, 0, 6, 1, 0, 5, 1, 0, 4, 1, 0, 3, 1, 0, 1, 1, 0, 0, 1, 0, 2, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 0, 5, 0, 0, 6, 0, 0, 7, 0, 1, 7, 0, 2, 7, 0, 3, 7, 0, 4, 7, 0, 5, 7, 0, 6, 7, 0, 7, 7, 0, 7, 6, 0, 7, 5, 0, 7, 4, 0, 7, 3, 0, 7, 2, 0, 6, 2, 0, 5, 2, 0, 4, 2, 0, 3, 2, 0, 2, 2, 0, 1, 2, 0, 1, 3, 0, 1, 4, 0, 2, 4, 0, 2, 3, 0, 3, 3, 0, 4, 3, 0, 5, 3, 0, 6, 3, 0, 6, 4, 0, 5, 4, 0, 4, 4, 0, 3, 4, 0, 3, 5, 0, 2, 5, 0, 2, 6, 0, 1, 6, 0, 1, 5, 0, 3, 6, 0, 4, 6, 0, 5, 6, 0, 6, 6, 0, 6, 5, 0, 5, 5, 0, 4, 5, 0)
+"cells": PackedInt32Array(2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 2, 1, 0, 2, 2, 0, 1, 2, 0, 0, 2, 0, 0, 3, 0, 1, 3, 0, 2, 3, 0, 3, 3, 0, 3, 2, 0, 3, 1, 0, 3, 0, 0, 4, 0, 0, 4, 1, 0, 4, 2, 0, 4, 3, 0, 4, 4, 0, 3, 4, 0, 2, 4, 0, 1, 4, 0, 0, 4, 0, 5, 0, 0, 5, 1, 0, 5, 2, 0, 5, 3, 0, 5, 4, 0, 5, 5, 0, 4, 5, 0, 3, 5, 0, 2, 5, 0, 1, 5, 0, 0, 5, 0, 0, 6, 0, 1, 6, 0, 2, 6, 0, 3, 6, 0, 4, 6, 0, 5, 6, 0, 6, 6, 0, 6, 5, 0, 6, 4, 0, 6, 3, 0, 6, 2, 0, 6, 1, 0, 6, 0, 0, 7, 0, 0, 7, 1, 0, 7, 2, 0, 7, 5, 0, 7, 6, 0, 7, 7, 0, 6, 7, 0, 5, 7, 0, 4, 7, 0, 3, 7, 0, 2, 7, 0, 1, 7, 0, 0, 7, 0, 7, 4, 0, 7, 3, 0)
 }
-script = ExtResource("1_ouqxw")
-Palette = SubResource("Resource_yrade")
-TargetPath = "res://resources/maps/test_map.tscn"
 metadata/_editor_floor_ = Vector3(0, 0, 0)
+
+[node name="Props" type="GridMap" parent="." unique_id=2012863358]
+mesh_library = ExtResource("4_670cs")
+cell_size = Vector3(1, 1, 1)
+collision_layer = 2
+collision_mask = 0
+data = {
+"cells": PackedInt32Array(4, 3, 2, 2, 3, 2, 6, 3, 2)
+}

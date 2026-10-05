@@ -69,7 +69,7 @@ public class BattleFactoryTest
     var system = new SetupSystemData();
     BattleSetupFailure failure = BattleFactory.Start(broken with { Systems = [system] }).RequireLeft();
     Assert.Equal(expected, failure.Reason);
-    Assert.True(system.RegisteredRuntime is null);
+    Assert.True(system.RegisteredHooks is null);
     return failure;
   }
 
@@ -129,7 +129,7 @@ public class BattleFactoryTest
   {
     var (setup, player, _, _, _) = MinimalSetup();
     if (blocked)
-      setup.Map.Tiles[new Godot.Vector3I(1, 0, 0)] = TestData.WallTile();
+      setup.Map.SetTile(new Godot.Vector3I(1, 0, 0), TestData.WallTile());
     var alpha = TestData.MakeCombatant("Alpha", player);
     var cell = blocked ? new Vector3I(1, 0, 0) : new Vector3I(99, 0, 0);
     var broken = setup with
@@ -175,7 +175,7 @@ public class BattleFactoryTest
   {
     var (setup, _, _, _, _) = MinimalSetup();
     if (blocked)
-      setup.Map.Tiles[new Godot.Vector3I(1, 0, 0)] = TestData.WallTile();
+      setup.Map.SetTile(new Godot.Vector3I(1, 0, 0), TestData.WallTile());
     var cell = bomb ? new Vector3I(9, 0, 9)
       : blocked ? new Vector3I(1, 0, 0)
       : new Vector3I(99, 0, 0);
@@ -324,7 +324,7 @@ public class BattleFactoryTest
     Assert.Equal(1, objects.Count);
     Assert.True(objects[0].Status.IsNone);
 
-    for (int turn = 0; turn < 6 && runtime.Query(new GetBattlePhaseQuery()) == BattlePhase.InProgress; turn++)
+    for (int turn = 0; turn < 6 && runtime.Query(new GetBattleOutcomeQuery()).IsNone; turn++)
       runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
     Assert.Equal(Some(ObjectStatus.Expired), runtime.Query(new GetBattleSpecialObjectsQuery())[0].Status);
   }

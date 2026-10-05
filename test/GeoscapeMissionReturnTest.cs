@@ -230,7 +230,7 @@ public class GeoscapeMissionReturnTest
       Assert.True(campaign.Session.PendingResolution.IsSome);
       Assert.Equal(0, campaign.Events.Count, "A denied return commits nothing.");
       Assert.True(campaign.State.Conditions.GetFatigue(alpha).IsNone);
-      Assert.Equal(BattlePhase.InProgress, battle.Runtime.Query(new GetBattlePhaseQuery()),
+      Assert.True(battle.Runtime.Query(new GetBattleOutcomeQuery()).IsNone,
         "The live battle keeps running after the denial.");
     }
     finally

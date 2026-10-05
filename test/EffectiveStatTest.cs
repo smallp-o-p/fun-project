@@ -103,7 +103,6 @@ public class EffectiveStatTest
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = new BattleFixture(new Vector3I(12, 1, 12), [playerFaction, enemyFaction]);
 
     // Base range 3 is too short to reach tile (0,0,8); the +10 slot mod lifts effective range to 13.
     var weaponData = TestData.MakeFirearmWeaponData(range: 3, critChance: 0, modSlots: 1, ammo: new Ammunition());
@@ -111,9 +110,17 @@ public class EffectiveStatTest
     weapon.GetModSlots()[0].Equip(new MultiStatMod { StatMods = [new RangeStatMod { Modifiers = [StatModifier.Add(10)] }] });
 
     // distance 8 > base range 3, but effective range 3+10=13 => in range after edits
-    var attacker = battle.Spawn(TestData.MakeCombatant("Alpha", playerFaction), new Vector3I(0, 0, 0), weapon);
-    var target = battle.Spawn(TestData.MakeCombatant("Hostile", enemyFaction), new Vector3I(0, 0, 8));
-    battle.Start();
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(12, 1, 12)),
+      [
+        new BattleSideSetup(playerFaction, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", playerFaction), Some<Weapon>(weapon)), new Vector3I(0, 0, 0))]),
+        new BattleSideSetup(enemyFaction, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Hostile", enemyFaction)), new Vector3I(0, 0, 8))]),
+      ],
+      Seed: 7));
+    var attacker = battle.UnitAt(new Vector3I(0, 0, 0));
+    var target = battle.UnitAt(new Vector3I(0, 0, 8));
 
     var result = battle.Query(new GetHitChanceForAttack(battle.Alive(attacker), battle.Target(target)));
     Assert.True(result.IsRight); // would be Left (out of range) without the four production edits

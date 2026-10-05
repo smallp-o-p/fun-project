@@ -14,23 +14,26 @@ public class BattleEventTest
   public void CommittedBattleEventsExposeSessionDomainObjects()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [faction]);
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(5, 1, 5)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", faction, actionPoints: 6)), new Vector3I(1, 0, 1))])],
+      Seed: 7));
     var runtime = battle.Runtime;
 
     var start = battle.At(1, 0, 1);
     var destination = battle.At(1, 0, 2);
     var target = battle.At(3, 0, 2);
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction, actionPoints: 6), start.Raw);
+    var unit = battle.Unit;
     var grenade = TestData.MakeGrenade("Frag Grenade", throwRange: 4, actionPointCost: 1);
     unit.AddInventoryItem(grenade.Item);
-    battle.Start();
 
     runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [destination]));
     runtime.ExecuteAction(BattleAction.ThrowItem(battle.Alive(unit), grenade, target));
     runtime.ExecuteAction(BattleAction.ApplyDamage(battle.Alive(unit), 3));
 
-    // The fixture window deliberately includes the spawn: UnitAdded is part of what this
-    // test observes, so it is never cleared.
+    // The fixture window deliberately includes the startup placement: UnitAdded is part of
+    // what this test observes, so it is never cleared.
     var addedEvent = battle.Events.SingleEvent<UnitAddedBattleEvent>();
     Assert.True(ReferenceEquals(unit, addedEvent.Unit));
     Assert.Equal(start, addedEvent.Position);
@@ -53,8 +56,11 @@ public class BattleEventTest
   public void EventDispatchKeysContainExactlyConcreteTypeAndTagInterfaces()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [faction]);
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(5, 1, 5)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", faction)), new Vector3I(1, 0, 1))])],
+      Seed: 7));
 
     UnitAddedBattleEvent addedEvent = battle.Events.SingleEvent<UnitAddedBattleEvent>();
     FrozenSet<Type> keys = addedEvent.EventKeys;
@@ -125,9 +131,14 @@ public class BattleEventTest
   [TestCase]
   public void ObjectOutcomeEventsHaveTypedIdentityAndGuardTheirPayloads()
   {
-    using var battle = BattleFixture.Duel(start: false,
-      player: new("Shooter", Aim: 100, Weapon: TestData.MakeWeapon("Rifle")));
-    var obj = battle.PlaceObject(TestData.MakeObject("Crate", 10), new Vector3I(3, 0, 2));
+    using var battle = BattleFixture.Duel(
+      player: new("Shooter", Aim: 100, Weapon: TestData.MakeWeapon("Rifle")),
+      configure: setup => setup with
+      {
+        Objects = [new ObjectPlacement(TestData.MakeObject("Crate", 10), new Vector3I(3, 0, 2))],
+      });
+    var obj = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable()
+      .Single(o => o.Name == "Crate");
     Assert.Throws<ArgumentNullException>(() => new ObjectDamagedBattleEvent(null!, [], 1, None));
     Assert.Throws<ArgumentNullException>(() => new ObjectDamagedBattleEvent(obj, null!, 1, None));
     foreach (int amount in new[] { 0, -1 })
@@ -139,7 +150,6 @@ public class BattleEventTest
     Assert.True(destroyed is IPositionedBattleEvent and ICausedByUnit);
     Assert.False(damaged is IUnitBattleEvent);
     Assert.False(destroyed is IUnitBattleEvent);
-    battle.Start();
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
     Assert.True(ReferenceEquals(battle.EnemyUnit,

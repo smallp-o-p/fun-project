@@ -100,10 +100,14 @@ public sealed partial class BattleScene : Node3D
       if (_ui.State == UiState.BattleOver)
         ShowBattleOverBanner();
     };
-    _director.PlaybackIdle += RefreshView;
     _director.PlaybackIdle += OnPlaybackIdle;
 
     RefreshView();
+
+    // The StateChanged subscription only sees future transitions; a factory result that
+    // already ended the battle must show its banner now.
+    if (_ui.State == UiState.BattleOver)
+      ShowBattleOverBanner();
   }
 
   public override void _ExitTree()
@@ -117,7 +121,7 @@ public sealed partial class BattleScene : Node3D
   {
     if (!_allowReturn || _disposed)
       return;
-    if (_runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.Ended || _director.Busy)
+    if (_runtime.Query(new GetBattleOutcomeQuery()).IsNone || _director.Busy)
       return;
     ReturnRequested?.Invoke();
   }
@@ -144,7 +148,7 @@ public sealed partial class BattleScene : Node3D
   private void UpdateReturnAvailability()
   {
     bool available = _allowReturn && !_disposed
-      && _runtime.Query(new GetBattlePhaseQuery()) == BattlePhase.Ended
+      && _runtime.Query(new GetBattleOutcomeQuery()).IsSome
       && !_director.Busy;
     _view.ShowReturn(available);
   }
@@ -199,7 +203,7 @@ public sealed partial class BattleScene : Node3D
   private void OnPlaybackIdle()
   {
     RefreshView();
-    if (_runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
+    if (_runtime.Query(new GetBattleOutcomeQuery()).IsSome)
       return;
 
     Faction activeSide = _runtime.Query(new GetActiveSideQuery());

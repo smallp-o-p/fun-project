@@ -13,20 +13,25 @@ using ZLinq;
 
 namespace FunProject.Tests;
 
-// The owning test fixture for battle tests: one BattleSession/BattleRuntime pair per fixture
-// instance, the runtime owns the session's single executor, and the fixture records every
-// committed event behind an explicit assertion window (ClearEvents starts a new one; nothing
-// clears it implicitly). Spawn/UnitAt return the native BattleUnitState; Alive/Live/At mint
-// current proofs through the runtime on each call. The Solo/Duel/Started/UiBattle scenario
-// factories and the action conveniences are thin wrappers that submit once through those same
-// doors. Presentation objects are retained too: Ui mints one controller bound to the same
-// runtime, and OwnNode/AttachDirector transfer fresh Godot nodes to the fixture so disposal
-// frees them alongside the runtime.
+// The owning test fixture for battle tests: every fixture is built through the production
+// BattleFactory, so a successfully constructed fixture owns one factory-started
+// BattleSession/BattleRuntime pair, the runtime owns the session's single executor, and a
+// fixture-owned declared recording system captures every committed event — including all
+// startup events — behind an explicit assertion window (ClearEvents starts a new one;
+// nothing clears it implicitly). Spawn is always a reinforcement; UnitAt returns the native
+// BattleUnitState; Alive/Live/At mint current proofs through the runtime on each call. The
+// Solo/Duel/Started/UiBattle scenario factories build authored BattleSetup data directly
+// and the action conveniences are thin wrappers that submit once through those same doors.
+// Presentation objects are retained too: Ui mints one controller bound to the same runtime,
+// and OwnNode/AttachDirector transfer fresh Godot nodes to the fixture so disposal frees
+// them alongside the runtime.
 public sealed class BattleFixture : IDisposable
 {
   private readonly List<BattleEvent> _events = [];
   private bool _disposed;
 
+  // Captured by the fixture recorder from the first startup event; a successfully
+  // constructed fixture always recorded at least one, so this is never null afterwards.
   public BattleSession Session { get; }
   public BattleRuntime Runtime { get; }
   public BattleBoardState Board => Session.Board;
@@ -44,21 +49,49 @@ public sealed class BattleFixture : IDisposable
   public BattleUnitState Unit => PlayerUnit;
   public BattleUnitState SupportUnit => _supportUnit.RequireSome("This fixture has no support-unit role; only UiBattle provides one.");
 
-  public BattleFixture(Vector3I dimensions, IEnumerable<Faction> factions,
-    IHitChanceCalculator hitChanceCalculator = null, int? randomSeed = null,
-    Option<Faction> playerFaction = default)
-    : this(new BattleBoardState(dimensions), factions, hitChanceCalculator, randomSeed, playerFaction) { }
-
-  public BattleFixture(BattleBoardState board, IEnumerable<Faction> factions,
-    IHitChanceCalculator hitChanceCalculator = null, int? randomSeed = null,
-    Option<Faction> playerFaction = default)
+  public BattleFixture(BattleSetup setup, IHitChanceCalculator hitChanceCalculator = null)
   {
-    // Materialize once: the caller may pass a one-shot enumerable, and the same faction
-    // instances must reach both the fixture and the session.
-    Factions = factions.AsValueEnumerable().ToArray();
-    Session = new BattleSession(board, Factions, hitChanceCalculator, randomSeed, playerFaction);
-    Runtime = new BattleRuntime(Session);
-    Runtime.BattleEventCommitted += RecordEvent;
+    ArgumentNullException.ThrowIfNull(setup);
+    Factions = setup.Sides.AsValueEnumerable().Select(side => side.Faction).ToArray();
+    var recorder = new FixtureRecordingSystem(_events);
+    Runtime = BattleFactory
+      .Start(setup with { Systems = [.. setup.Systems, recorder] }, hitChanceCalculator)
+      .Match(
+        Right: started => started,
+        Left: failure => throw new InvalidOperationException(
+          $"Fixture setup failed ({failure.Reason}): {failure.Message}"));
+    Session = recorder.Session.RequireSome("A factory-started fixture must have recorded a startup event.");
+
+    // Player/enemy/support roles come from unit-added records matched to the final setup's
+    // authored placements by combatant identity and authored placement point (never live
+    // position/liveness or the raw event order): a startup hook spawning a reinforcement
+    // cannot steal an authored role. Raw units are retained even if they die or move during
+    // startup.
+    List<BattleUnitState> authored = [];
+    foreach (BattleSideSetup side in setup.Sides)
+      foreach (UnitPlacement placement in side.Units)
+        authored.Add(recorder.AddedUnits.TryGetValue(
+          (placement.Loadout.Combatant, placement.Position), out BattleUnitState added)
+          ? added
+          : throw new InvalidOperationException(
+            $"No unit-added record matched authored placement {placement.Loadout.Combatant.Name} at {placement.Position}."));
+    if (authored.Count > 0)
+    {
+      BattleUnitState player = authored[0];
+      _playerUnit = Some(player);
+      foreach (BattleUnitState candidate in authored.AsValueEnumerable().Skip(1))
+      {
+        if (ReferenceEquals(candidate.Side, player.Side))
+        {
+          if (_supportUnit.IsNone)
+            _supportUnit = Some(candidate);
+        }
+        else if (_enemyUnit.IsNone)
+        {
+          _enemyUnit = Some(candidate);
+        }
+      }
+    }
   }
 
   // Raw submission door: deliberately invalid or stale actions reach the executor unchanged,
@@ -86,6 +119,7 @@ public sealed class BattleFixture : IDisposable
   public AliveUnit SingleAliveUnit(Faction faction)
     => Query(new GetFactionAliveUnits(faction)).AsValueEnumerable().Single();
 
+  // Gameplay reinforcement: submits through the runtime like any other action.
   public BattleUnitState Spawn(Combatant combatant, Vector3I position,
     Option<Weapon> weapon = default, Option<ItemWith<ArmorCapability>> armor = default,
     IReadOnlyList<StatMod>? statMods = null)
@@ -94,14 +128,9 @@ public sealed class BattleFixture : IDisposable
     return UnitAt(position);
   }
 
-  // Valid during setup only, preserving the existing placement contract.
-  public BattleObjectState PlaceObject(BattleSpecialObjectData data, Vector3I position) =>
-    Submit(BattleAction.PlaceObject(data, At(position)))
-      .EventsThatOccurred.ToArray().SingleEvent<ObjectPlacedBattleEvent>().Object;
-
   // Progression integration setup: awards the first step's cost, commits the path, and
   // unlocks that step on the supplied combatant's own progression object. Call before
-  // Spawn so the spawned unit already carries the unlocked effects.
+  // factory construction so the deployed unit already carries the unlocked effects.
   public void UnlockFirstStep(Combatant combatant, SkillPathData path)
   {
     ThrowIfDisposed();
@@ -114,128 +143,97 @@ public sealed class BattleFixture : IDisposable
 
   // A started single-unit battle on the Player faction. PlayerUnit retains the spawn result.
   public static BattleFixture Solo(Vector3I dimensions, Vector3I unitPosition,
-    int health = 20, int actionPoints = 4, string unitName = "Alpha", bool start = true)
+    int health = 20, int actionPoints = 4, string unitName = "Alpha",
+    Func<BattleSetup, BattleSetup> configure = null)
   {
     var faction = TestData.MakeFaction("Player");
-    var battle = new BattleFixture(dimensions, [faction]);
-    try
-    {
-      battle._playerUnit = Some(battle.Spawn(TestData.MakeCombatant(unitName, faction,
-        health: health, actionPoints: actionPoints), unitPosition));
-      if (start)
-        battle.Start();
-      return battle;
-    }
-    catch
-    {
-      battle.Dispose();
-      throw;
-    }
+    var setup = new BattleSetup(
+      TestData.MakeOpenBattleMap(dimensions),
+      [new BattleSideSetup(faction, DefaultSideObjectives(None, faction),
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(unitName, faction,
+          health: health, actionPoints: actionPoints)), unitPosition)])],
+      Seed: 7);
+    return new BattleFixture(configure?.Invoke(setup) ?? setup);
   }
 
-  private BattleUnitState SpawnSide(Faction faction, UnitSpec side, Vector3I defaultPosition) =>
-    Spawn(TestData.MakeCombatant(side.Name, faction, health: side.Health,
-      actionPoints: side.ActionPoints, aim: side.Aim, buffs: side.Buffs),
-      side.Position ?? defaultPosition, side.Weapon, side.Armor);
+  // The old Start() objective default: EliminateAllOpposingForces on every side, and only
+  // the designated player's copy carries the Victory directive.
+  private static IReadOnlyList<ObjectiveData> DefaultSideObjectives(Option<Faction> playerFaction, Faction side)
+  {
+    var data = new EliminateAllOpposingForcesObjectiveData();
+    if (playerFaction == Some(side))
+      data.OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory };
+    return [data];
+  }
 
-  // A started Player-vs-Enemy duel with one unit per side. The board argument wins over
-  // dimensions; positions default to the (4,0,1)/(4,0,4) convention.
+  private static UnitLoadout SideLoadout(Faction faction, UnitSpec side) =>
+    new(TestData.MakeCombatant(side.Name, faction, health: side.Health,
+      actionPoints: side.ActionPoints, aim: side.Aim, buffs: side.Buffs),
+      side.Weapon, side.Armor);
+
+  // A started Player-vs-Enemy duel with one unit per side. The authored map argument wins
+  // over dimensions; positions default to the (4,0,1)/(4,0,4) convention.
   public static BattleFixture Duel(UnitSpec player = null, UnitSpec enemy = null,
-    Vector3I? dimensions = null, BattleBoardState board = null,
+    Vector3I? dimensions = null, BattleMapData map = null,
     IHitChanceCalculator hitChanceCalculator = null, int? randomSeed = null,
-    bool playerControlled = false, bool start = true)
+    bool playerControlled = false, Func<BattleSetup, BattleSetup> configure = null)
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    var battle = new BattleFixture(board ?? new BattleBoardState(dimensions ?? new Vector3I(8, 1, 8)),
-      [playerFaction, enemyFaction], hitChanceCalculator, randomSeed,
-      playerControlled ? Some(playerFaction) : None);
-    try
-    {
-      battle._playerUnit = Some(battle.SpawnSide(playerFaction, player ?? new UnitSpec("Alpha"), new Vector3I(4, 0, 1)));
-      battle._enemyUnit = Some(battle.SpawnSide(enemyFaction, enemy ?? new UnitSpec("Hostile"), new Vector3I(4, 0, 4)));
-      if (start)
-        battle.Start();
-      return battle;
-    }
-    catch
-    {
-      battle.Dispose();
-      throw;
-    }
+    UnitSpec playerSide = player ?? new UnitSpec("Alpha");
+    UnitSpec enemySide = enemy ?? new UnitSpec("Hostile");
+    Option<Faction> designatedPlayer = playerControlled ? Some(playerFaction) : None;
+    var setup = new BattleSetup(
+      map ?? TestData.MakeOpenBattleMap(dimensions ?? new Vector3I(8, 1, 8)),
+      [
+        new BattleSideSetup(playerFaction, DefaultSideObjectives(designatedPlayer, playerFaction),
+          [new UnitPlacement(SideLoadout(playerFaction, playerSide), playerSide.Position ?? new Vector3I(4, 0, 1))]),
+        new BattleSideSetup(enemyFaction, DefaultSideObjectives(designatedPlayer, enemyFaction),
+          [new UnitPlacement(SideLoadout(enemyFaction, enemySide), enemySide.Position ?? new Vector3I(4, 0, 4))]),
+      ],
+      Seed: randomSeed ?? 7,
+      PlayerFaction: designatedPlayer);
+    return new BattleFixture(configure?.Invoke(setup) ?? setup, hitChanceCalculator);
   }
 
   // The presentation scenario: the standard duel (8x1x8, Hero at (4,0,1) with a damage-10
-  // rifle, Goon at (4,0,4) with 10 health) plus a surviving Support at (7,0,7) spawned before
-  // Start, AlwaysHit rolls, and the player configured as the battle's player faction. UI and
-  // director wiring stays lazy: tests reach it through Ui and AttachDirector.
-  public static BattleFixture UiBattle()
-  {
-    var battle = Duel(
+  // rifle, Goon at (4,0,4) with 10 health) plus a surviving Support at (7,0,7), AlwaysHit
+  // rolls, and the player configured as the battle's player faction. UI and director wiring
+  // stays lazy: tests reach it through Ui and AttachDirector.
+  public static BattleFixture UiBattle() =>
+    Duel(
       player: new("Hero", Weapon: TestData.MakeWeapon("Rifle", damage: 10)),
       enemy: new("Goon", Health: 10),
-      hitChanceCalculator: new AlwaysHitCalculator(), playerControlled: true, start: false);
-    try
-    {
-      battle._supportUnit = Some(battle.Spawn(
-        TestData.MakeCombatant("Support", battle.PlayerFaction), new Vector3I(7, 0, 7)));
-      battle.Start();
-      return battle;
-    }
-    catch
-    {
-      battle.Dispose();
-      throw;
-    }
-  }
+      hitChanceCalculator: new AlwaysHitCalculator(), playerControlled: true,
+      configure: setup => setup with
+      {
+        Sides =
+        [
+          setup.Sides[0] with { Units = [.. setup.Sides[0].Units,
+            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Support", setup.Sides[0].Faction)),
+              new Vector3I(7, 0, 7))] },
+          setup.Sides[1],
+        ],
+      });
 
   // A started battle whose factions derive from the placements' own combatants in
   // first-appearance order, one inert FakeObjective per faction, armor-inclusive spawning.
   public static BattleFixture Started(Vector3I dimensions, params UnitPlacement[] placements) =>
-    Started(new BattleBoardState(dimensions), placements);
+    Started(TestData.MakeOpenBattleMap(dimensions), placements);
 
-  public static BattleFixture Started(BattleBoardState board, params UnitPlacement[] placements)
+  public static BattleFixture Started(BattleMapData map, params UnitPlacement[] placements)
   {
     Faction[] factions = placements.AsValueEnumerable()
       .Select(placement => placement.Loadout.Combatant.OwningFaction).Distinct().ToArray();
-    var battle = new BattleFixture(board, factions);
-    try
-    {
-      foreach (Faction faction in factions)
-        battle.Session.AddObjective(faction, new FakeObjective());
-      foreach (UnitPlacement placement in placements)
-        battle.Spawn(placement.Loadout.Combatant, placement.Position,
-          placement.Loadout.Weapon, placement.Loadout.Armor, placement.Loadout.StatMods);
-      battle.Start();
-      return battle;
-    }
-    catch
-    {
-      battle.Dispose();
-      throw;
-    }
+    BattleSideSetup[] sides = factions.AsValueEnumerable().Select(faction =>
+      new BattleSideSetup(faction, [new FakeObjectiveData()],
+        placements.AsValueEnumerable()
+          .Where(placement => ReferenceEquals(placement.Loadout.Combatant.OwningFaction, faction))
+          .ToArray())).ToArray();
+    return new BattleFixture(new BattleSetup(map, sides, Seed: 7));
   }
 
-  // Setup convenience preserving the old missing-objective policy: every faction without an
-  // authored objective gets EliminateAllOpposingForces, and only the configured player's
-  // copy carries the Victory directive. Tests of missing objectives submit the raw
-  // BattleAction.StartBattle() through Submit instead.
-  public BattleActionExecResult Start()
-  {
-    ThrowIfDisposed();
-    foreach (Faction faction in Session.GlobalFactionTurnOrder)
-    {
-      if (Session.GetObjectives(faction).Count > 0)
-        continue;
-      var data = new EliminateAllOpposingForcesObjectiveData();
-      if (Session.PlayerFaction == Some(faction))
-        data.OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory };
-      Session.AddObjective(faction, data.Instantiate());
-    }
-    return Submit(BattleAction.StartBattle());
-  }
-
-  // Explicitly starts a new assertion window; never called by Start, Submit, or conveniences.
+  // Explicitly starts a new assertion window; never called by Submit or conveniences.
   public void ClearEvents()
   {
     ThrowIfDisposed();
@@ -338,10 +336,10 @@ public sealed class BattleFixture : IDisposable
     return director;
   }
 
-  // Detaches recording, disposes the UI, frees owned nodes in reverse registration order,
-  // then closes the runtime — all under one idempotent flag set at entry. Events and the raw
-  // Session/Board handles stay inspectable afterwards for lifecycle tests. The runtime and
-  // any bound directors share this lifetime because Bind exposes no unbind.
+  // Disposes the UI, frees owned nodes in reverse registration order, then closes the
+  // runtime — all under one idempotent flag set at entry. Events and the raw Session/Board
+  // handles stay inspectable afterwards for lifecycle tests. The runtime and any bound
+  // directors share this lifetime because Bind exposes no unbind.
   public void Dispose()
   {
     if (_disposed)
@@ -364,12 +362,9 @@ public sealed class BattleFixture : IDisposable
     }
     finally
     {
-      Runtime.BattleEventCommitted -= RecordEvent;
       Runtime.Dispose();
     }
   }
-
-  private void RecordEvent(BattleEvent value) => _events.Add(value);
 
   private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 

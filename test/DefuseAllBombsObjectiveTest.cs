@@ -58,7 +58,7 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(bomb).RequireSome()));
 
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome);
   }
 
@@ -70,11 +70,11 @@ public class DefuseAllBombsObjectiveTest
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
     BattleObjectState bomb = runtime.Query(new GetBattleSpecialObjectsQuery())[0];
 
-    for (int turn = 0; turn < 6 && runtime.Query(new GetBattlePhaseQuery()) == BattlePhase.InProgress; turn++)
+    for (int turn = 0; turn < 6 && runtime.Query(new GetBattleOutcomeQuery()).IsNone; turn++)
       runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
     Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.Equal(BattleOutcome.Defeat, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome);
   }
 
@@ -98,7 +98,7 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(bombs[0]).RequireSome()));
 
-    Assert.Equal(BattlePhase.InProgress, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsNone);
     Assert.Equal(Some(ObjectStatus.Interacted), bombs[0].Status);
     Assert.True(bombs[1].Status.IsNone);
   }
@@ -121,27 +121,39 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(crate).RequireSome()));
 
-    Assert.Equal(BattlePhase.InProgress, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsNone);
   }
 
   [TestCase]
   public void DestroyingTimedObjectsFailsButDestroyingCratesDoesNot()
   {
-    using var battle = BattleFixture.Duel(start: false, playerControlled: true,
-      player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 5)));
-    battle.Session.AddObjective(battle.PlayerFaction, new DefuseAllBombsObjectiveData
-    {
-      OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
-    }.Instantiate());
-    var bomb = battle.PlaceObject(TestData.MakeObject("Bomb", 5,
-      new TimedEffectCapabilityData { FireAfterTurns = 5 }), new Vector3I(3, 0, 2));
-    var crate = battle.PlaceObject(TestData.MakeObject("Crate", 5), new Vector3I(2, 0, 2));
-    battle.Start();
+    using var battle = BattleFixture.Duel(playerControlled: true,
+      player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 5)),
+      configure: setup => setup with
+      {
+        Objects =
+        [
+          new ObjectPlacement(TestData.MakeObject("Bomb", 5,
+            new TimedEffectCapabilityData { FireAfterTurns = 5 }), new Vector3I(3, 0, 2)),
+          new ObjectPlacement(TestData.MakeObject("Crate", 5), new Vector3I(2, 0, 2)),
+        ],
+        Sides =
+        [
+          setup.Sides[0] with { Objectives = [new DefuseAllBombsObjectiveData
+          {
+            OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
+          }] },
+          setup.Sides[1],
+        ],
+      });
+    var objects = battle.Query(new GetBattleSpecialObjectsQuery());
+    var bomb = objects.AsValueEnumerable().Single(o => o.Name == "Bomb");
+    var crate = objects.AsValueEnumerable().Single(o => o.Name == "Crate");
     battle.Attack(battle.PlayerUnit, crate);
-    Assert.Equal(BattlePhase.InProgress, battle.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsNone);
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, bomb);
-    Assert.Equal(BattlePhase.Ended, battle.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
     Assert.Equal(1, battle.Events.EventsOf<ObjectiveFailedBattleEvent>().Length);
     Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().Length);
@@ -151,15 +163,23 @@ public class DefuseAllBombsObjectiveTest
   [TestCase]
   public void GrenadeDestructionFailsTheObjectiveAndFinishesResolution()
   {
-    using var battle = BattleFixture.Duel(start: false, playerControlled: true);
-    battle.Session.AddObjective(battle.PlayerFaction, new DefuseAllBombsObjectiveData
-    {
-      OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
-    }.Instantiate());
+    using var battle = BattleFixture.Duel(playerControlled: true,
+      configure: setup => setup with
+      {
+        Objects = [new ObjectPlacement(TestData.MakeObject("Bomb", 5,
+          new TimedEffectCapabilityData { FireAfterTurns = 5 }), new Vector3I(3, 0, 2))],
+        Sides =
+        [
+          setup.Sides[0] with { Objectives = [new DefuseAllBombsObjectiveData
+          {
+            OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
+          }] },
+          setup.Sides[1],
+        ],
+      });
     var cell = new Vector3I(3, 0, 2);
-    var bomb = battle.PlaceObject(TestData.MakeObject("Bomb", 5,
-      new TimedEffectCapabilityData { FireAfterTurns = 5 }), cell);
-    battle.Start();
+    var bomb = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable()
+      .Single(o => o.Name == "Bomb");
     var grenade = TestData.MakeGrenade("Frag", throwRange: 10, blastRadius: 0,
       effects: [new DamageEffectData { BaseDamage = 5 }]);
     battle.PlayerUnit.AddInventoryItem(grenade.Item);

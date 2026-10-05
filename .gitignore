@@ -4,6 +4,8 @@
 .claude/
 .vscode/
 addons/**/*
+!addons/manifest_inspector/
+!addons/manifest_inspector/**
 handoffs/*
 test/TestResults/
 /TestResults/

@@ -69,8 +69,8 @@ public partial class MapDeploymentTest
   public void OutOfBoundsTaggedCellDelegatesToStartValidation()
   {
     Faction faction = TestData.MakeFaction("Player");
-    BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4),
-      (new Vector3I(9, 0, 0), TestData.SpawnTile(0))); // dim.X = 4
+    BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4));
+    map.SpawnSlots[new Godot.Vector3I(9, 0, 0)] = 0; // malformed sparse spawn, dim.X = 4
     var loadouts = new[] { new UnitLoadout(TestData.MakeCombatant("A", faction)) };
 
     var placements = MapDeployment.AssignSpawns(map, 0, loadouts).RequireRight();

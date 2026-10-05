@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Scenes.Ext;
 using Godot;
 
 /// <summary>
@@ -26,15 +27,7 @@ public sealed partial class BattleLauncher : Node
     {
       PackedScene scene = ResourceLoader.Load<PackedScene>("res://scenes/battle/BattleScene.tscn")
         ?? throw new System.InvalidOperationException("Could not load the battle scene.");
-      Node instance = scene.Instantiate();
-      if (instance is not BattleScene battleRoot)
-      {
-        string kind = instance.GetClass();
-        instance.Free();
-        throw new System.InvalidOperationException(
-          $"The battle scene root must be a BattleScene; got {kind}.");
-      }
-      battle = battleRoot;
+      battle = scene.InstantiateAs<BattleScene>("The battle scene");
       battle.Present(runtime, setup); // allowReturn stays false: standalone battles end here
       presented = true; // the host owns the runtime once Present succeeds
       AddChild(battle);

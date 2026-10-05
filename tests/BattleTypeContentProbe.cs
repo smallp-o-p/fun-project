@@ -37,15 +37,15 @@ public partial class BattleTypeContentProbe : SceneTree
       Right: started => started,
       Left: failure => throw new InvalidOperationException($"Battle setup failed: {failure.Message}"));
 
-    if (runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
+    if (runtime.Query(new GetBattleOutcomeQuery()).IsSome)
       throw new InvalidOperationException("Bomb defusal battle did not start in progress.");
     if (runtime.Query(new GetBattleSpecialObjectsQuery()).Count != 2)
       throw new InvalidOperationException("Bomb defusal battle did not place two bombs.");
 
-    for (int turn = 0; turn < 12 && runtime.Query(new GetBattlePhaseQuery()) == BattlePhase.InProgress; turn++)
+    for (int turn = 0; turn < 12 && runtime.Query(new GetBattleOutcomeQuery()).IsNone; turn++)
       runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
-    if (runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.Ended)
+    if (runtime.Query(new GetBattleOutcomeQuery()).IsNone)
       throw new InvalidOperationException("Bomb defusal battle did not end after the authored deadline.");
 
     GD.Print("BOMB_DEFUSAL_CONTENT_OK");
@@ -59,7 +59,7 @@ public partial class BattleTypeContentProbe : SceneTree
       Right: started => started,
       Left: failure => throw new InvalidOperationException($"Battle setup failed: {failure.Message}"));
 
-    if (runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
+    if (runtime.Query(new GetBattleOutcomeQuery()).IsSome)
       throw new InvalidOperationException("Skirmish battle did not start in progress.");
 
     int units = 0;

@@ -54,8 +54,12 @@ public class GeoscapeConditionsTest
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [campaign.State.PlayerFaction]);
-    var unit = battle.Spawn(alpha, Vector3I.Zero, armor: TestData.MakeArmor("Vest", armor: 10));
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(5, 1, 5)),
+      [new BattleSideSetup(campaign.State.PlayerFaction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(alpha, Armor: TestData.MakeArmor("Vest", armor: 10)), Vector3I.Zero)])],
+      Seed: 7));
+    var unit = battle.Unit;
     battle.ApplyDamage(unit, 5);
     battle.Session.EndBattle(BattleOutcome.Victory);
     var summary = battle.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
@@ -140,7 +144,18 @@ public class GeoscapeConditionsTest
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
-    using var battle = new BattleFixture(new Vector3I(5, 1, 5), [campaign.State.PlayerFaction]);
+    var opposing = TestData.MakeFaction("Opposing");
+    // Real factory battle with an empty campaign-faction side and a populated other side,
+    // both with inert objectives: the campaign return path is exercised with a legitimately
+    // empty summary, not a half-constructed rosterless session.
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(5, 1, 5)),
+      [
+        new BattleSideSetup(campaign.State.PlayerFaction, [new FakeObjectiveData()], []),
+        new BattleSideSetup(opposing, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Hostile", opposing)), new Vector3I(0, 0, 0))]),
+      ],
+      Seed: 7));
     battle.Session.EndBattle(BattleOutcome.Victory);
     var empty = battle.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
 

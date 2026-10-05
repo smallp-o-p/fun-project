@@ -27,31 +27,28 @@ public static class BattleSetupResolver
         $"PlayerFactionIndex {type.PlayerFactionIndex} is out of range for {type.Factions.Count} factions."));
 
     SideDeployment? sideOverride = null;
-    if (sideDeployment.IsSome)
+    if (sideDeployment.Case is SideDeployment suppliedSide)
     {
-      SideDeployment supplied = sideDeployment.Match(
-        Some: value => value,
-        None: () => throw new InvalidOperationException("Expected a side deployment."));
-      ArgumentNullException.ThrowIfNull(supplied.Faction);
-      ArgumentNullException.ThrowIfNull(supplied.Loadouts);
-      if (supplied.FactionIndex < 0 || supplied.FactionIndex >= type.Factions.Count)
+      ArgumentNullException.ThrowIfNull(suppliedSide.Faction);
+      ArgumentNullException.ThrowIfNull(suppliedSide.Loadouts);
+      if (suppliedSide.FactionIndex < 0 || suppliedSide.FactionIndex >= type.Factions.Count)
         return Left<BattleSetupFailure, BattleSetup>(new BattleSetupFailure(
           BattleSetupFailureReason.UnknownFaction,
-          $"SideDeployment faction index {supplied.FactionIndex} is out of range for {type.Factions.Count} factions."));
-      if (supplied.FactionIndex == type.PlayerFactionIndex)
+          $"SideDeployment faction index {suppliedSide.FactionIndex} is out of range for {type.Factions.Count} factions."));
+      if (suppliedSide.FactionIndex == type.PlayerFactionIndex)
         return Left<BattleSetupFailure, BattleSetup>(new BattleSetupFailure(
           BattleSetupFailureReason.FactionMismatch,
-          $"SideDeployment targets faction slot {supplied.FactionIndex}; only non-player slots can be overridden."));
-      foreach (UnitLoadout loadout in supplied.Loadouts)
+          $"SideDeployment targets faction slot {suppliedSide.FactionIndex}; only non-player slots can be overridden."));
+      foreach (UnitLoadout loadout in suppliedSide.Loadouts)
       {
         ArgumentNullException.ThrowIfNull(loadout);
         ArgumentNullException.ThrowIfNull(loadout.Combatant);
-        if (!ReferenceEquals(loadout.Combatant.OwningFaction, supplied.Faction))
+        if (!ReferenceEquals(loadout.Combatant.OwningFaction, suppliedSide.Faction))
           return Left<BattleSetupFailure, BattleSetup>(new(
             BattleSetupFailureReason.FactionMismatch,
-            $"Deployment unit {loadout.Combatant.Name} does not belong to {supplied.Faction.Name}."));
+            $"Deployment unit {loadout.Combatant.Name} does not belong to {suppliedSide.Faction.Name}."));
       }
-      sideOverride = supplied;
+      sideOverride = suppliedSide;
     }
 
     int resolvedSeed = seed ?? Random.Shared.Next();
@@ -88,11 +85,8 @@ public static class BattleSetupResolver
       ArgumentNullException.ThrowIfNull(authoredSide.Faction);
       Faction faction;
       IReadOnlyList<UnitLoadout> loadouts;
-      if (slot == type.PlayerFactionIndex && playerDeployment.IsSome)
+      if (slot == type.PlayerFactionIndex && playerDeployment.Case is PlayerDeployment supplied)
       {
-        PlayerDeployment supplied = playerDeployment.Match(
-          Some: value => value,
-          None: () => throw new InvalidOperationException("Expected a player deployment."));
         ArgumentNullException.ThrowIfNull(supplied.Faction);
         ArgumentNullException.ThrowIfNull(supplied.Loadouts);
         faction = supplied.Faction;

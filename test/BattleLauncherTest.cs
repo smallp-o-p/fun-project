@@ -34,7 +34,7 @@ public partial class BattleLauncherTest
   [TestCase(TestName = "A failing standalone startup leaves no host and a disposed runtime")]
   public void FailingStartupLeavesNoHostAndDisposedRuntime()
   {
-    var capture = new RuntimeCaptureSystemData();
+    var capture = new HookCaptureSystemData();
     var type = TestData.MakeDuelBattleType();
     type.Systems.Add(capture);
     type.Systems.Add(new ThrowingSystemData());
@@ -42,18 +42,31 @@ public partial class BattleLauncherTest
     AddToTree(launcher); // the bridge logs the _Ready failure; nothing may remain half-built
 
     Assert.Equal(0, launcher.GetChildCount());
-    Assert.Throws<ObjectDisposedException>(() =>
-      capture.Captured!.Query(new GetBattlePhaseQuery()));
+    AssertBattleDisposed(capture);
   }
 
-  [TestCase(TestName = "Standalone launch does not expose Return")]
-  public void StandaloneLaunchDoesNotExposeReturn()
+  [TestCase(TestName = "A factory result that already has an outcome shows the battle-over banner at startup")]
+  public void LauncherShowsBannerForStartupTerminalBattle()
   {
-    var launcher = new BattleLauncher { BattleType = TestData.MakeDuelBattleType() };
+    var type = TestData.MakeDuelBattleType();
+    type.Factions[0].Objectives.Clear();
+    type.Factions[0].Objectives.Add(new SurviveUntilTurnObjectiveData
+    {
+      TargetTurn = 1,
+      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+    });
+    var launcher = new BattleLauncher { BattleType = type };
     AddToTree(launcher);
 
     var battle = (BattleScene)launcher.GetChild(0);
+    var banner = battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Label>("%BattleOverBanner");
+    Assert.True(banner.Visible);
+    Assert.Equal("VICTORY", banner.Text);
     Assert.False(ReturnButton(battle).Visible);
+    int returns = 0;
+    battle.ReturnRequested += () => returns++;
+    ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
+    Assert.Equal(0, returns); // terminal standalone battles still cannot return to a campaign
   }
 
   [TestCase(TestName = "Present guards against nulls")]

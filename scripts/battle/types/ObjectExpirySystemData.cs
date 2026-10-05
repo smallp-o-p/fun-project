@@ -8,6 +8,6 @@ public sealed partial class ObjectExpirySystemData : BattleTypeSystemData
 {
   [Export] public int Priority { get; set; } = 0;
 
-  public override void Register(BattleRuntime runtime)
-    => runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem(), Priority);
+  public override void Register(BattleHookRegistration hooks)
+    => hooks.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem(), Priority);
 }

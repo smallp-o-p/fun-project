@@ -176,11 +176,9 @@ public sealed class GameState
   {
     ArgumentNullException.ThrowIfNull(dead);
 
-    foreach (Combatant combatant in _roster.AsValueEnumerable().Where(dead.Contains).ToArray())
-    {
-      _roster.Remove(combatant);
-      Conditions.Forget(combatant);
-    }
+    foreach (Combatant combatant in dead)
+      if (_roster.Remove(combatant))
+        Conditions.Forget(combatant);
   }
 
   // Bakes one authored entry into an immutable firing. Unset events and out-of-range expiry

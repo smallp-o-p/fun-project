@@ -61,11 +61,12 @@ public abstract class UnitActionCondition
 }
 
 // Battle is in progress and the scheduler allows this unit to act right now
-// (active side, still available this turn, alive, and not incapacitated).
+// (active side, still available this turn, alive, and not incapacitated). Delegates to the
+// session's total availability answer: false once the battle is decided.
 public sealed class UnitCanActNowCondition : UnitActionCondition
 {
   internal override bool IsMet(BattleSession session, AliveUnit unit)
-    => session.Phase == BattlePhase.InProgress && session.CanUnitActNow(unit.State);
+    => session.CanUnitActNow(unit.State);
 
   internal override bool MayChange(BattleEvent battleEvent, BattleUnitState unit)
     => SchedulingMayChange(battleEvent, unit) || ActionPointsMayChange(battleEvent, unit);
@@ -108,7 +109,7 @@ public sealed class CanReloadCondition : UnitActionCondition
 public sealed class IsActiveSideCondition : UnitActionCondition
 {
   internal override bool IsMet(BattleSession session, AliveUnit unit)
-    => session.Phase == BattlePhase.InProgress && unit.State.Side == session.ActiveSide;
+    => session.Outcome.IsNone && unit.State.Side == session.ActiveSide;
 
   internal override bool MayChange(BattleEvent battleEvent, BattleUnitState unit)
     => PhaseOrSideMayChange(battleEvent);

@@ -15,8 +15,8 @@ using static FunProject.Tests.GeoscapeTestScenes;
 // Real host handoff at the authored scene boundary: mission preparation's Deploy presents the
 // battle as a geoscape sibling while the retained stack keeps campaign/session/mission views,
 // and the terminal Return applies the campaign return exactly once before restoring the root.
-// Battles run on genuinely launched runtimes captured through the production registration
-// door; no test-only runtime/state exports exist.
+// Battles advance through real HUD actions; startup registration exposes only the hook
+// capability used to verify owner disposal. Campaign effect details live in return tests.
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -39,24 +39,24 @@ public partial class GeoscapeBattleHandoffTest
     return mission;
   }
 
-  // A mission whose survival objective completes during startup: the launched battle is
-  // already terminal when first presented.
-  private static TacticalMissionData StartupTerminalMission()
+  // A real turn transition completes the authored objective; turn 1 covers battles
+  // already terminal at startup and turn 2 covers playback and normal Return.
+  private static TacticalMissionData SurvivalMission(int targetTurn = 2)
   {
     TacticalMissionData mission = EliminationMission();
     mission.BattleType.Factions[0].Objectives.Clear();
     mission.BattleType.Factions[0].Objectives.Add(new SurviveUntilTurnObjectiveData
     {
-      TargetTurn = 1,
+      TargetTurn = targetTurn,
       OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
     });
     return mission;
   }
 
   private static GeoscapeBattleHandoffScene NewScene(TacticalMissionData mission,
-    out RuntimeCaptureSystemData capture, GeoscapeEventDefinition[]? backgroundEvents = null)
+    out HookCaptureSystemData capture, GeoscapeEventDefinition[]? backgroundEvents = null)
   {
-    capture = new RuntimeCaptureSystemData();
+    capture = new HookCaptureSystemData();
     mission.BattleType.Systems.Add(capture);
     var scene = ((PackedScene)GD.Load<PackedScene>("res://test/GeoscapeBattleHandoffScene.tscn"))
       .Instantiate<GeoscapeBattleHandoffScene>();
@@ -77,10 +77,10 @@ public partial class GeoscapeBattleHandoffTest
   // here: after the engage the squad is the stack's current view.
   private static (GeoscapeBattleHandoffScene Scene, GeoscapeViewManager Manager,
     SquadLoadoutView Squad, GeoscapeEventResolution Dialog, GeoscapeSession Session) PreparedScene(
-    TacticalMissionData? mission, out RuntimeCaptureSystemData capture,
+    TacticalMissionData? mission, out HookCaptureSystemData capture,
     GeoscapeEventDefinition[]? backgroundEvents = null)
   {
-    var scene = NewScene(mission ?? EliminationMission(), out capture, backgroundEvents);
+    var scene = NewScene(mission ?? SurvivalMission(), out capture, backgroundEvents);
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     SpeedButton(scene).EmitSignal(Button.SignalName.Pressed); // Normal
     scene._PhysicsProcess(0.1); // the mission fires at tick 1
@@ -96,9 +96,7 @@ public partial class GeoscapeBattleHandoffTest
   // A session-level launch for host-boundary tests that present the runtime themselves.
   private static (GeoscapeFixture Fixture, MissionBattle Battle) LaunchedBattle()
   {
-    var capture = new RuntimeCaptureSystemData();
     TacticalMissionData mission = EliminationMission();
-    mission.BattleType.Systems.Add(capture);
     var fixture = new GeoscapeFixture(MakeStart(
       roster: [MakeEntry("Alpha", MakeCombatantData("Alpha", health: 100))],
       timeline: [MakeScheduled(1,
@@ -114,33 +112,49 @@ public partial class GeoscapeBattleHandoffTest
     runtime.Query(new GetUnitAtTile(
       runtime.TryGetTile(new Vector3I(2, 0, 0)).RequireSome())).RequireSome();
 
-  [TestCase(TestName = "Deploy presents the battle and Return restores the retained geoscape")]
+  [TestCase(TestName = "Two deployments restore the same geoscape and route fresh input")]
   public async Task DeployPresentsBattleAndReturnRestoresGeoscape()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, dialog, _) = PreparedScene(null, out var capture);
+    var secondMission = MakeEvent("Second mission", GeoscapeEventKind.TacticalBattle,
+      tacticalMission: SurvivalMission());
+    var (scene, manager, squad, dialog, liveSession) = PreparedScene(null, out var capture,
+      backgroundEvents: [secondMission]);
     CampaignGameState campaign = scene.Campaign!;
     var session = new GeoscapeSession(campaign); // sessions are rebuildable views over state
 
     Assert.True(manager.Visible);
-    Assert.Equal(1, MapEventMarkers(scene).Length); // the pending mission's marker is live
+    Assert.Equal(2, MapEventMarkers(scene).Length);
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
 
     var battle = OnlyChild<BattleScene>(scene); // presented as a sibling of the view manager
-    BattleRuntime runtime = capture.Captured!;
     Assert.True(session.ActiveMission.IsSome); // campaign association held while presented
     Assert.True(session.PendingResolution.IsSome);
-    Assert.Equal(BattlePhase.InProgress, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.False(ReturnButton(battle).Visible);
     Assert.False(manager.Visible); // the stack hides; the battle sibling stays live
     Assert.Equal(Node.ProcessModeEnum.Disabled, manager.ProcessMode);
+    int cancelInputs = 0;
+    battle.GetNode<BattleInputController>("BattleInputController").CancelPressed += () => cancelInputs++;
+    scene.GetViewport().PushInput(new InputEventMouseButton
+    {
+      Position = new Vector2(400, 200),
+      ButtonIndex = MouseButton.Right,
+      Pressed = true,
+    });
+    Assert.Equal(1, cancelInputs); // retained geoscape must not consume battle pointer input
+    scene.GetViewport().PushInput(new InputEventMouseButton
+    {
+      Position = new Vector2(400, 200),
+      ButtonIndex = MouseButton.Right,
+      Pressed = false,
+    });
     string clockDuring = Clock(scene).Text;
     scene._PhysicsProcess(1.0); // the pending mission still freezes campaign time
     Assert.Equal(clockDuring, Clock(scene).Text);
 
-    runtime.ExecuteAction(BattleAction.ApplyDamage(
-      runtime.TryGetAlive(GruntAt(runtime)).RequireSome(), 999));
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
+    await SelectFirstBattleUnit(battle);
+    EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
 
     int intents = 0;
     battle.ReturnRequested += () => intents++; // probe subscribed after the geoscape handler
@@ -157,13 +171,13 @@ public partial class GeoscapeBattleHandoffTest
 
     Assert.True(session.ActiveMission.IsNone);
     Assert.True(session.PendingResolution.IsNone);
-    Assert.Equal(0, campaign.ActiveEvents.Count); // mission consumed
-    Assert.Equal(0, MapEventMarkers(scene).Length); // the consumed mission's marker is gone
+    Assert.Equal(1, campaign.ActiveEvents.Count); // only the deployed mission was consumed
+    Assert.Equal(1, MapEventMarkers(scene).Length);
     Assert.Equal(1, campaign.Conditions.GetFatigue(campaign.Roster[0]).RequireSome().Tier);
     Assert.True(ReferenceEquals(campaign, scene.Campaign),
       "The scene keeps one campaign instance across presentation and return.");
 
-    Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetBattlePhaseQuery()));
+    AssertBattleDisposed(capture);
     Assert.True(manager.Visible);
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
@@ -178,6 +192,26 @@ public partial class GeoscapeBattleHandoffTest
     scene._PhysicsProcess(1.0);
     Assert.That(Clock(scene).Text != clockResumed,
       "The campaign clock must advance again after the return.");
+
+    OpenResolutionViaMapEvent(scene);
+    var secondDialog = (GeoscapeEventResolution)manager.Current;
+    DialogButton(secondDialog, "Engage").EmitSignal(Button.SignalName.Pressed);
+    var secondSquad = (SquadLoadoutView)manager.Current;
+    ChooseSquadUnit(secondSquad, 0, "Alpha");
+    Assert.True(ReferenceEquals(liveSession, CaptureSceneSession(manager)));
+    SquadDeployButton(secondSquad).EmitSignal(Button.SignalName.Pressed);
+    var secondBattle = OnlyChild<BattleScene>(scene);
+    await SelectFirstBattleUnit(secondBattle);
+    EndTurnButton(secondBattle).EmitSignal(Button.SignalName.Pressed);
+    DrainDirector(secondBattle);
+    ReturnButton(secondBattle).EmitSignal(Button.SignalName.Pressed);
+    Assert.Equal(0, campaign.ActiveEvents.Count);
+    Assert.Equal(0, MapEventMarkers(scene).Length);
+    Assert.True(session.ActiveMission.IsNone);
+    Assert.True(ReferenceEquals(manager.RootView, manager.Current));
+    await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
+    Assert.False(GodotObject.IsInstanceValid(secondBattle));
+    Assert.False(GodotObject.IsInstanceValid(secondSquad));
   }
 
   [TestCase(TestName = "A mission ended at startup offers Return at presentation")]
@@ -185,13 +219,11 @@ public partial class GeoscapeBattleHandoffTest
   {
 
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, _, _) = PreparedScene(StartupTerminalMission(), out var capture);
+    var (scene, manager, squad, _, _) = PreparedScene(SurvivalMission(1), out var capture);
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
 
     var battle = OnlyChild<BattleScene>(scene);
-    BattleRuntime runtime = capture.Captured!;
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
     Assert.True(ReturnButton(battle).Visible, // terminal at presentation, director idle
       "Startup-terminal battles must not depend on a later BattleOver transition.");
 
@@ -203,7 +235,7 @@ public partial class GeoscapeBattleHandoffTest
     var session = new GeoscapeSession(scene.Campaign!);
     Assert.True(session.ActiveMission.IsNone);
     Assert.True(session.PendingResolution.IsNone);
-    Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetBattlePhaseQuery()));
+    AssertBattleDisposed(capture);
     Assert.True(manager.Visible);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
   }
@@ -250,8 +282,7 @@ public partial class GeoscapeBattleHandoffTest
     // proven by the restored state, not by an escaping exception.
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
 
-    BattleRuntime runtime = capture.Captured!;
-    Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetBattlePhaseQuery()));
+    AssertBattleDisposed(capture);
     Assert.True(session.ActiveMission.IsNone); // association aborted
     Assert.True(session.PendingResolution.IsSome);
     Assert.True(ReferenceEquals(pending,
@@ -313,7 +344,7 @@ public partial class GeoscapeBattleHandoffTest
     scene.ReturnRequested += () => intents++;
     battle.Runtime.ExecuteAction(BattleAction.ApplyDamage(
       battle.Runtime.TryGetAlive(GruntAt(battle.Runtime)).RequireSome(), 999));
-    Assert.Equal(BattlePhase.Ended, battle.Runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.True(Director(scene).Busy);
 
     returnButton.EmitSignal(Button.SignalName.Pressed);
@@ -340,9 +371,8 @@ public partial class GeoscapeBattleHandoffTest
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
     var battle = OnlyChild<BattleScene>(scene);
-    BattleRuntime runtime = capture.Captured!;
-    runtime.ExecuteAction(BattleAction.ApplyDamage(
-      runtime.TryGetAlive(GruntAt(runtime)).RequireSome(), 999));
+    await SelectFirstBattleUnit(battle);
+    EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
     DrainDirector(battle);
 
     // Captured before the swap: MapEventMarkers filters by the export's resource path, so
@@ -366,7 +396,7 @@ public partial class GeoscapeBattleHandoffTest
     Assert.Equal("Rumor", campaign.ActiveEvents.AsValueEnumerable().Single().Definition.Title);
     Assert.Equal(1, campaign.Conditions.GetFatigue(campaign.Roster[0]).RequireSome().Tier,
       "The return must apply exactly once — no replay after the subscriber failure.");
-    Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetBattlePhaseQuery()));
+    AssertBattleDisposed(capture);
     Assert.True(manager.Visible);
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
@@ -396,9 +426,8 @@ public partial class GeoscapeBattleHandoffTest
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
     var battle = OnlyChild<BattleScene>(scene);
-    BattleRuntime runtime = capture.Captured!;
-    runtime.ExecuteAction(BattleAction.ApplyDamage(
-      runtime.TryGetAlive(GruntAt(runtime)).RequireSome(), 999));
+    await SelectFirstBattleUnit(battle);
+    EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
     DrainDirector(battle);
     var map = scene.GetNode<GeoscapeMapControl>("%Map");
     int childrenBeforeReturn = map.GetChildCount(); // authored regions plus both markers
@@ -422,7 +451,7 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(session.PendingResolution.IsNone);
     Assert.Equal(1, campaign.ActiveEvents.Count); // the mission is consumed despite the throw
     Assert.Equal("Rumor", campaign.ActiveEvents.AsValueEnumerable().Single().Definition.Title);
-    Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetBattlePhaseQuery()));
+    AssertBattleDisposed(capture);
     Assert.True(manager.Visible);
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));

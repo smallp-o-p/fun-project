@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using FunProject.Battle;
+using Godot;
 
 namespace FunProject.Tests;
 
@@ -94,5 +95,24 @@ public static class Assert
     }
 
     throw new Exception(string.IsNullOrEmpty(msg) ? $"Expected {typeof(T).Name} but no exception was thrown." : $"Expected {typeof(T).Name} but no exception was thrown. {msg}");
+  }
+
+  // Asserts the exact enabled region set of a model's mask — the readable
+  // replacement of the removed numeric bit diagnostics.
+  public static void MaskRegions(FunProject.Models.CharacterModel model, NodePath meshPath,
+    params string[] enabled)
+  {
+    var expected = new SysColGeneric.HashSet<string>(enabled);
+    var actual = new SysColGeneric.HashSet<string>();
+    foreach (FunProject.Models.CharacterModel.MaskRuntime.Region region in model.ResolveMask(meshPath).Regions)
+    {
+      if (region.Enabled)
+        actual.Add(region.Name.ToString());
+    }
+
+    if (!expected.SetEquals(actual))
+      throw new Exception(
+        $"Expected the mask '{meshPath}' regions [{string.Join(", ", expected)}] enabled, "
+        + $"but found [{string.Join(", ", actual)}].");
   }
 }

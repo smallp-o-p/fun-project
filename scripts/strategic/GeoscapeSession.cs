@@ -212,14 +212,13 @@ public sealed class GeoscapeSession
     SideDeployment side = MissionEnemyResolver.Resolve(authored, seed);
 
     return BattleSetupResolver.Resolve(authored.BattleType, seed, Some(player), Some(side))
-      .Bind(setup => BattleFactory.Start(setup).Map(runtime => (Setup: setup, Runtime: runtime)))
-      .MapLeft(failure => new MissionLaunchFailure(
-        MissionLaunchFailureReason.SetupFailed, failure.Message, Some(failure)))
-      .Map(launched =>
+      .Bind(setup => BattleFactory.Start(setup).Map(runtime =>
       {
         _state.ActiveMission = Some(deployment);
-        return new MissionBattle(deployment, launched.Setup, launched.Runtime);
-      });
+        return new MissionBattle(deployment, setup, runtime);
+      }))
+      .MapLeft(failure => new MissionLaunchFailure(
+        MissionLaunchFailureReason.SetupFailed, failure.Message, Some(failure)));
   }
 
   /// <summary>Host failure recovery only: detaches a battle presentation that cannot proceed
@@ -269,10 +268,6 @@ public sealed class GeoscapeSession
         Right: value => value,
         Left: failure => throw new InvalidOperationException(
           $"The mission battle has no terminal return: {failure.Message}."));
-    if (!ReferenceEquals(summary.Faction, _state.PlayerFaction))
-      throw new InvalidOperationException(
-        "The queried battle return is not the campaign player's.");
-
     MissionDeployment active = _state.ActiveMission.Match(
       value => value,
       () => throw new InvalidOperationException(

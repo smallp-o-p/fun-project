@@ -19,7 +19,7 @@ public sealed class GetBattleResultQuery : IBattleSessionQuery<Either<BattleQuer
 {
   public Either<BattleQueryFailure, BattleResult> Execute(BattleSession session)
   {
-    if (session.Phase != BattlePhase.Ended)
+    if (session.Outcome.IsNone)
       return Left(new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState, "Battle session isn't over."));
 
     var factions = new SysColGeneric.Dictionary<Faction, FactionResultCounts>();

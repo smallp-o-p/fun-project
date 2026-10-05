@@ -3,6 +3,7 @@ using FunProject.Dialogue;
 using FunProject.GameState;
 using FunProject.Geoscape;
 using FunProject.Strategic;
+using FunProject.Scenes.Ext;
 using CampaignGameState = global::FunProject.GameState.GameState;
 using Godot;
 using System;
@@ -166,19 +167,7 @@ public partial class GeoscapeScene : Control
 
   // A fresh dialog per pending resolution: the manager frees popped views.
   private GeoscapeEventResolution InstantiateResolutionView()
-    => InstantiateRoot<GeoscapeEventResolution>(_resolutionViewScene, "ResolutionViewScene");
-
-  private T InstantiateRoot<T>(PackedScene scene, string exportName) where T : Node
-  {
-    Node instance = scene.Instantiate();
-    if (instance is not T view)
-    {
-      string kind = instance.GetClass();
-      instance.Free(); // free now: rejected roots must not linger to frame end
-      throw new InvalidOperationException($"{exportName} root must be a {typeof(T).Name}; got {kind}.");
-    }
-    return view;
-  }
+    => _resolutionViewScene.InstantiateAs<GeoscapeEventResolution>("ResolutionViewScene");
 
   // A dialogue-carrying event plays its conversation over the just-pushed resolution
   // view: the dialogue covers it and pops back to the retained dialog when finished.
@@ -188,7 +177,7 @@ public partial class GeoscapeScene : Control
     if (dialogue is null)
       return;
 
-    DialogueView view = InstantiateRoot<DialogueView>(_dialogueViewScene, "DialogueViewScene");
+    DialogueView view = _dialogueViewScene.InstantiateAs<DialogueView>("DialogueViewScene");
     view.Configure(dialogue);
     _viewManager.Push(view);
   }
@@ -216,7 +205,7 @@ public partial class GeoscapeScene : Control
     // authoring faults never reach it.
     PackedScene battleSceneExport = BattleScene ?? throw new InvalidOperationException(
       "GeoscapeScene requires a BattleScene export; assign one in the inspector.");
-    BattleScene battle = InstantiateRoot<BattleScene>(battleSceneExport, "BattleScene");
+    BattleScene battle = battleSceneExport.InstantiateAs<BattleScene>("BattleScene");
     MissionBattle? handle = null;
     bool presented = false;
     try
@@ -224,13 +213,13 @@ public partial class GeoscapeScene : Control
       var launch = _session.LaunchMission(mission, squad);
       if (launch.IsLeft)
       {
-        battle.Free(); // no runtime exists; the preparation stays for a corrected retry
         MissionLaunchFailure failure = launch.Match(
           Right: _ => throw new InvalidOperationException("Expected a launch failure."),
           Left: value => value);
         (_deploySquad ?? throw new InvalidOperationException(
             "Deploy intent arrived with no active preparation."))
           .ShowDeploymentFailure(failure);
+        battle.Free(); // no runtime exists; the preparation stays for a corrected retry
         return;
       }
       handle = launch.Match(

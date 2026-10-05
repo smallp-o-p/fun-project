@@ -101,7 +101,7 @@ public class BattleSetupResolverTest
 
     Assert.True(ReferenceEquals(scene, setup.MapScene.RequireSome()));
     Assert.Equal(new Godot.Vector3I(4, 1, 1), setup.Map.Dimensions);
-    Assert.Equal(2, setup.Map.Tiles.Count);
+    Assert.Equal(2, setup.Map.SpawnSlots.Count);
   }
 
   [TestCase(TestName = "A pooled scene whose root is not a BattleMap fails with MapSceneInvalid")]

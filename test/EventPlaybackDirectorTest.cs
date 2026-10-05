@@ -13,20 +13,29 @@ public sealed partial class EventPlaybackDirectorTest
   public void EventsPlayInOrderAndIdleFiresOnce()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
+    using var battle = new BattleFixture(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(3, 1, 3)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Seed", faction)), new Vector3I(0, 0, 0))])],
+      Seed: 7));
     int idleCount = 0;
     var director = battle.AttachDirector(new CaptureDirector()); // bound before the spawn
     director.PlaybackIdle += () => idleCount++;
 
     Assert.False(director.Busy);
 
-    battle.Spawn(TestData.MakeCombatant("Alpha", battle.PlayerFaction), new Vector3I(1, 0, 1));
+    BattleActionExecResult result = battle.Submit(BattleAction.SpawnUnit(
+      TestData.MakeCombatant("Alpha", battle.PlayerFaction), battle.At(1, 0, 1)));
+    BattleEvent[] committed = result.EventsThatOccurred.ToArray();
 
     Assert.True(director.Busy); // queued but not yet ticked
     director.Tick();
-    Assert.False(director.Busy);
-    Assert.Equal(1, director.Played.Count);
-    Assert.True(director.Played[0] is UnitAddedBattleEvent);
+    Assert.Equal(1, director.Played.Count); // one step per Tick
+    while (director.Busy)
+      director.Tick();
+    Assert.Equal(committed.Length, director.Played.Count);
+    for (int i = 0; i < committed.Length; i++)
+      Assert.True(ReferenceEquals(committed[i], director.Played[i])); // commit order
     Assert.Equal(1, idleCount);
     director.Tick(); // idle fires only once
     Assert.Equal(1, idleCount);

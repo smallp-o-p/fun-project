@@ -192,10 +192,11 @@ public sealed partial class SquadLoadoutView : GeoscapeView
       // Inert until a destination slot is marked (Choose), while the unit occupies one, and
       // — under an explicit mission context — while the campaign bars the unit from that
       // mission (injury or exhaustion without an exceptional-deployment override).
+      string label = RosterButtonText(unit);
       var button = new Button
       {
-        Text = RosterButtonText(unit),
-        TooltipText = RosterButtonText(unit),
+        Text = label,
+        TooltipText = label,
         CustomMinimumSize = new Vector2(0, 58),
         Alignment = HorizontalAlignment.Left,
         AutowrapMode = TextServer.AutowrapMode.WordSmart,

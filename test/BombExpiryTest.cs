@@ -83,7 +83,7 @@ public class BombExpiryTest
 
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.Equal(
       BattleOutcome.Defeat,
       runtime.Query(new GetBattleResultQuery()).RequireRight().Outcome);
@@ -135,13 +135,20 @@ public class BombExpiryTest
   [TestCase]
   public void ExpiryPayloadDamagesObjectsThroughTheSharedResolver()
   {
-    using var battle = BattleFixture.Duel(start: false);
     var timer = new TimedEffectCapabilityData { FireAfterTurns = 1, EffectRadius = 1 };
     timer.Effects.Add(new DamageEffectData { BaseDamage = 8 });
-    var bomb = battle.PlaceObject(TestData.MakeObject("Bomb", 20, timer), new Vector3I(1, 0, 1));
-    var crate = battle.PlaceObject(TestData.MakeObject("Crate", 20), new Vector3I(2, 0, 1));
+    using var battle = BattleFixture.Duel(configure: setup => setup with
+    {
+      Objects =
+      [
+        new ObjectPlacement(TestData.MakeObject("Bomb", 20, timer), new Vector3I(1, 0, 1)),
+        new ObjectPlacement(TestData.MakeObject("Crate", 20), new Vector3I(2, 0, 1)),
+      ],
+    });
+    var objects = battle.Query(new GetBattleSpecialObjectsQuery());
+    var bomb = objects.AsValueEnumerable().Single(o => o.Name == "Bomb");
+    var crate = objects.AsValueEnumerable().Single(o => o.Name == "Crate");
     battle.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
-    battle.Start();
     battle.ClearEvents();
     battle.AdvanceTurn();
     Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
@@ -153,13 +160,17 @@ public class BombExpiryTest
   [TestCase]
   public void DestroyedBombNeverFiresItsPayloadOrExpiresLater()
   {
-    using var battle = BattleFixture.Duel(start: false,
-      player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 5)));
     var timer = new TimedEffectCapabilityData { FireAfterTurns = 1, EffectRadius = 1 };
     timer.Effects.Add(new DamageEffectData { BaseDamage = 99 });
-    var bomb = battle.PlaceObject(TestData.MakeObject("Bomb", 5, timer), new Vector3I(4, 0, 2));
+    using var battle = BattleFixture.Duel(
+      player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 5)),
+      configure: setup => setup with
+      {
+        Objects = [new ObjectPlacement(TestData.MakeObject("Bomb", 5, timer), new Vector3I(4, 0, 2))],
+      });
+    var bomb = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable()
+      .Single(o => o.Name == "Bomb");
     battle.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
-    battle.Start();
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, bomb);
     battle.AdvanceTurn();

@@ -382,6 +382,6 @@ public partial class GeoscapeMissionLaunchTest
   {
     public Action? OnRegister { get; set; }
 
-    public override void Register(BattleRuntime runtime) => OnRegister?.Invoke();
+    public override void Register(BattleHookRegistration hooks) => OnRegister?.Invoke();
   }
 }

@@ -18,20 +18,60 @@ namespace FunProject.Tests;
 // AutoFree; layout/deletion waits and screen-space queries live here too.
 internal static partial class GeoscapeTestScenes
 {
-  // Battle-system doubles exercising the production registration door: one captures the
-  // launched runtime for ownership/disposal proofs, one fails startup, so scene-boundary
-  // tests need no production test seams.
-  public sealed partial class RuntimeCaptureSystemData : BattleTypeSystemData
+  // Capture only the startup registration capability; registering after host teardown
+  // proves disposal without exposing a runtime through declared-system setup.
+  public sealed partial class HookCaptureSystemData : BattleTypeSystemData
   {
-    public BattleRuntime? Captured { get; private set; }
+    public BattleHookRegistration? Captured { get; private set; }
 
-    public override void Register(BattleRuntime runtime) => Captured = runtime;
+    public override void Register(BattleHookRegistration hooks) => Captured = hooks;
   }
 
   public sealed partial class ThrowingSystemData : BattleTypeSystemData
   {
-    public override void Register(BattleRuntime runtime)
+    public override void Register(BattleHookRegistration hooks)
       => throw new InvalidOperationException("The startup system registration failed.");
+  }
+
+  public static void AssertBattleDisposed(HookCaptureSystemData capture)
+    => Assert.Throws<ObjectDisposedException>(() =>
+      capture.Captured!.RegisterHook<BattleEventTag>(new RecordingHook()));
+
+  public static Button EndTurnButton(BattleScene battle)
+    => battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Container>("%TurnButtons")
+      .GetChildren().AsValueEnumerable().OfType<Button>().Single(button => button.Text == "End Turn");
+
+  // Synthetic map scenes carry data only. Supply a ground collider and select the first
+  // player's tile through the same viewport/raycast input as the authored battle.
+  public static async Task SelectFirstBattleUnit(BattleScene battle)
+  {
+    var ground = new StaticBody3D { Position = new Vector3(0.5f, -0.05f, 0.5f) };
+    ground.AddChild(new CollisionShape3D
+    {
+      Shape = new BoxShape3D { Size = new Vector3(1, 0.1f, 1) },
+    });
+    battle.AddChild(ground);
+    var tree = (SceneTree)Engine.GetMainLoop();
+    await battle.ToSignal(tree, SceneTree.SignalName.PhysicsFrame);
+    await battle.ToSignal(tree, SceneTree.SignalName.PhysicsFrame);
+    var camera = battle.GetNode<Camera3D>("GameCamera/CameraPath/PathFollow3D/Camera");
+    Vector2 pointer = camera.UnprojectPosition(new Vector3(0.5f, 0, 0.5f));
+    var viewport = battle.GetViewport();
+    Input.WarpMouse(pointer);
+    Input.ParseInputEvent(new InputEventMouseMotion { Position = pointer, GlobalPosition = pointer });
+    Input.FlushBufferedEvents();
+    viewport.PushInput(new InputEventMouseButton
+    {
+      Position = pointer,
+      ButtonIndex = MouseButton.Left,
+      Pressed = true,
+    });
+    viewport.PushInput(new InputEventMouseButton
+    {
+      Position = pointer,
+      ButtonIndex = MouseButton.Left,
+      Pressed = false,
+    });
   }
 
   // Momentary capture of the composition root's live session at the production Present
@@ -50,7 +90,7 @@ internal static partial class GeoscapeTestScenes
   public static GeoscapeSession CaptureSceneSession(GeoscapeViewManager manager)
   {
     var capture = new SessionCaptureView();
-    manager.RootView.RequestView(capture);
+    manager.Current.RequestView(capture);
     GeoscapeSession session = capture.Captured
       ?? throw new InvalidOperationException("The capture view was never presented.");
     capture.RequestBack();

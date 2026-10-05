@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Combatants;
 using GdUnit4;
 using Godot;
 using System;
@@ -8,17 +9,24 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public sealed partial class BattleRuntimeTest
 {
+  private static BattleSetup SingleUnitSetup(Faction faction, string unitName = "Alpha")
+    => new(
+      TestData.MakeOpenBattleMap(new Vector3I(3, 1, 3)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(unitName, faction)), new Vector3I(0, 0, 0))])],
+      Seed: 7);
+
   [TestCase(0, TestName = "Query executes against the session")]
   [TestCase(1, TestName = "ExecuteAction delegates to the executor and the runtime republishes session events")]
   public void RuntimeForwardsQueriesActionsAndEvents(int z)
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
+    using var battle = new BattleFixture(SingleUnitSetup(faction));
     var runtime = battle.Runtime;
     battle.ClearEvents();
     var cell = new Vector3I(1, 0, z);
     // Runtime-only driving (no conveniences): the fixture's runtime owns this session's
-    // only executor.
+    // only executor; the spawn is an ordinary reinforcement into the started battle.
     runtime.ExecuteAction(BattleAction.SpawnUnit(
       TestData.MakeCombatant("Alpha", faction), battle.Board.At(cell)));
 
@@ -56,7 +64,7 @@ public sealed partial class BattleRuntimeTest
   public void DisposedRuntimeNoLongerRepublishesSessionEvents()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
+    using var battle = new BattleFixture(SingleUnitSetup(faction));
     var runtime = battle.Runtime;
     var observed = new List<BattleEvent>();
     runtime.BattleEventCommitted += observed.Add;
@@ -77,7 +85,7 @@ public sealed partial class BattleRuntimeTest
   public void PublicMethodsThrowAfterRuntimeIsDisposed()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(3, 1, 3), [faction]);
+    using var battle = new BattleFixture(SingleUnitSetup(faction));
     var runtime = battle.Runtime;
     var hook = new RuntimeRecordingHook("runtime_reaction", new Vector3I(1, 0, 0), []);
 
@@ -117,18 +125,6 @@ public sealed partial class BattleRuntimeTest
     int followUpIndex = observed.EventIndex<UnitDamagedBattleEvent>();
     Assert.True(causeIndex >= 0);
     Assert.True(followUpIndex > causeIndex);
-  }
-
-  [TestCase(TestName = "Hook interrupts with no executor action in flight throw")]
-  public void HookInterruptsWithoutInFlightActionThrow()
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
-    var unit = battle.Unit;
-    battle.RegisterHook<UnitMovedBattleEvent>(new DamageMoverOnMovedHook());
-
-    var from = battle.Session.GetUnitPosition(unit).RequireSome();
-    var to = battle.Board.At(new Vector3I(1, 0, 0));
-    Assert.Throws<InvalidOperationException>(() => battle.Session.MoveUnit(unit, from, to));
   }
 
   private sealed partial class RuntimeRecordingHook : BattleHook

@@ -9,6 +9,7 @@ using FunProject.GameState;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
+using FunProject.Models;
 using FunProject.Progression;
 using FunProject.Research;
 using FunProject.Stats;
@@ -340,6 +341,66 @@ internal static class TestData
     return buff;
   }
 
+  public static BattleMapAuthoring MakeMapAuthoring()
+  {
+    var map = new BattleMapAuthoring { Name = "Map" };
+    foreach (string name in new[] { "Floors", "Props" })
+    {
+      var grid = new GridMap { Name = name, CellSize = Vector3.One, CollisionLayer = name == "Floors" ? 1u : 2u, CollisionMask = 0 };
+      map.AddChild(grid);
+      grid.Owner = map;
+    }
+    return map;
+  }
+
+  public static MeshLibrary MakeTilePalette(Godot.Collections.Dictionary<int, Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>> footprints)
+  {
+    var palette = new MeshLibrary();
+    foreach (var (id, footprint) in footprints)
+    {
+      var mesh = new BoxMesh();
+      mesh.SetMeta(BattleProp.FootprintMeta, footprint);
+      palette.CreateItem(id);
+      palette.SetItemMesh(id, mesh);
+    }
+    return palette;
+  }
+
+  public static BattleEntityAnnotator MakeEntityAnnotator(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>? footprint = null)
+  {
+    var markers = new MeshLibrary();
+    for (int item = 0; item < 3; item++)
+    {
+      var mesh = new BoxMesh();
+      mesh.SetMeta(BattleAnnotationMarker.FootprintMeta, new BattleFootprintData
+      {
+        HasFloor = item == 1,
+        BlocksMovement = item == 2,
+        BlocksLineOfSight = item == 2
+      });
+      markers.CreateItem(item);
+      markers.SetItemMesh(item, mesh);
+    }
+    var annotator = new BattleEntityAnnotator { Name = "Entity", Markers = markers, Annotations = footprint ?? [] };
+    var model = new MeshInstance3D { Name = "Model", Mesh = new BoxMesh() };
+    annotator.AddChild(model);
+    model.Owner = annotator;
+    var grid = new GridMap { Name = "Annotations", CellSize = Vector3.One, MeshLibrary = markers };
+    annotator.AddChild(grid);
+    grid.Owner = annotator;
+    foreach (var cell in annotator.Annotations.Keys) grid.SetCellItem(cell, 0);
+    return annotator;
+  }
+
+  public static Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> MakeFloorFootprint(int width, int depth)
+  {
+    var footprint = new Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>();
+    for (int x = 0; x < width; x++)
+      for (int z = 0; z < depth; z++)
+        footprint[new(x, 0, z)] = new() { HasFloor = true };
+    return footprint;
+  }
+
   public static BattleMapTileData FloorTile() => new() { Walkable = true };
 
   public static BattleMapTileData WallTile() => new() { Walkable = false, BlocksLineOfSight = true };
@@ -347,45 +408,67 @@ internal static class TestData
   public static BattleMapTileData SpawnTile(int slot) => new() { SpawnFactionSlot = slot };
 
   // Takes runtime Vector3I coordinates (X = width, Y = levels/height, Z = depth) and converts
-  // them to Godot.Vector3I dictionary keys when building the authored map.
+  // them to Godot.Vector3I cell coordinates when building the authored map.
   public static BattleMapData MakeMapData(
     Vector3I dimensions,
     params (Vector3I Cell, BattleMapTileData Tile)[] tiles)
   {
-    var dict = new Godot.Collections.Dictionary<Godot.Vector3I, BattleMapTileData>();
+    var map = new BattleMapData { Dimensions = new Godot.Vector3I(dimensions.X, dimensions.Y, dimensions.Z) };
+    map.InitializeTiles();
     foreach ((Vector3I cell, BattleMapTileData tile) in tiles)
-      dict[new Godot.Vector3I(cell.X, cell.Y, cell.Z)] = tile;
+      map.SetTile(new Godot.Vector3I(cell.X, cell.Y, cell.Z), tile);
+    return map;
+  }
 
-    return new BattleMapData
-    {
-      Dimensions = new Godot.Vector3I(dimensions.X, dimensions.Y, dimensions.Z),
-      Tiles = dict,
-    };
+  // An all-walkable, all-floor board; every cell across all three dimensions is an authored
+  // tile, because a board built from map data starts fully unwalkable.
+  public static BattleMapData MakeOpenBattleMap(Vector3I dimensions)
+  {
+    List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
+    for (int x = 0; x < dimensions.X; x++)
+      for (int y = 0; y < dimensions.Y; y++)
+        for (int z = 0; z < dimensions.Z; z++)
+          tiles.Add((new Vector3I(x, y, z), FloorTile()));
+    return MakeMapData(dimensions, [.. tiles]);
   }
 
   // An all-walkable, all-floor height-one board; every cell is an authored tile.
-  public static BattleMapData MakeOpenBattleMap(int width = 4, int depth = 4)
+  public static BattleMapData MakeOpenBattleMap(int width = 4, int depth = 4) =>
+    MakeOpenBattleMap(new Vector3I(width, 1, depth));
+
+  // One materialized, board-indexed runtime unit for complete-input BattleSession
+  // construction in direct constructor/lifecycle tests (the factory's own convention:
+  // nonnegative setup-order ids).
+  public static BattleUnitState PlacedUnit(BattleBoardState board, int unitId, Combatant combatant,
+    Vector3I position, Option<Weapon> weapon = default, Option<ItemWith<ArmorCapability>> armor = default)
   {
+    var unit = new BattleUnitState(unitId, combatant, weapon, armor);
+    BattleBoardState.ValidatedPoint point = board.ValidatePoint(position).RequireSome();
+    if (!board.TryPlaceOccupant(point, unit.Id))
+      throw new System.InvalidOperationException($"Test cell {position} is not occupiable.");
+    return unit;
+  }
+
+  // An otherwise-open authored map with WallTile at the named cells.
+  public static BattleMapData MakeMapWithWalls(Vector3I dimensions, params Vector3I[] walls)
+  {
+    var wallSet = new SysColGeneric.HashSet<Vector3I>(walls);
     List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
-    for (int x = 0; x < width; x++)
-      for (int z = 0; z < depth; z++)
-        tiles.Add((new Vector3I(x, 0, z), FloorTile()));
-    return MakeMapData(new Vector3I(width, 1, depth), [.. tiles]);
+    for (int x = 0; x < dimensions.X; x++)
+      for (int y = 0; y < dimensions.Y; y++)
+        for (int z = 0; z < dimensions.Z; z++)
+        {
+          var cell = new Vector3I(x, y, z);
+          tiles.Add((cell, wallSet.Contains(cell) ? WallTile() : FloorTile()));
+        }
+    return MakeMapData(dimensions, [.. tiles]);
   }
 
   // Packs the map into a BattleMap-rooted scene, the authored pool's storage shape; the
   // prototype node is freed after packing so only the scene survives. Runs under the Godot
   // runtime covered by the RequireGodotRuntime suites.
-  public static PackedScene MakeMapScene(BattleMapData map)
-  {
-    var battleMap = new BattleMap { MapData = map, UsedPalette = new BattleTilePalette { MeshLibrary = null } };
-    var scene = new PackedScene();
-    Error error = scene.Pack(battleMap);
-    battleMap.Free();
-    if (error != Error.Ok)
-      throw new System.InvalidOperationException($"Test map scene packing failed: {error}");
-    return scene;
-  }
+  public static PackedScene MakeMapScene(BattleMapData map) =>
+    GeoscapeTestScenes.Pack(new BattleMap { MapData = map });
 
   // Concrete setup for direct factory tests: fresh open 4x1x4 board, one unit per side at
   // (0,0,0)/(3,0,3), fixed seed 7, optional designated player faction. Pure: callers add
@@ -617,4 +700,339 @@ internal static class TestData
 
   public static AbilityGrantUpgradeEffectData MakeAbilityGrantEffect(string abilityName)
     => new() { Ability = new AbilityData { Name = abilityName } };
+
+  // One surface of `triangleCount` disjoint triangles; triangle t occupies vertices
+  // 3t..3t+2 at base position (10t, 0, 0) so compacted vertex data is assertable.
+  public static ArrayMesh MakeMaskedSourceMesh(int triangleCount = 2)
+  {
+    var vertices = new Vector3[triangleCount * 3];
+    var indices = new int[triangleCount * 3];
+    for (int t = 0; t < triangleCount; t++)
+    {
+      vertices[3 * t] = new Vector3(10 * t, 0, 0);
+      vertices[3 * t + 1] = new Vector3(10 * t + 1, 0, 0);
+      vertices[3 * t + 2] = new Vector3(10 * t, 1, 0);
+      for (int v = 0; v < 3; v++)
+        indices[3 * t + v] = 3 * t + v;
+    }
+
+    var mesh = new ArrayMesh();
+    var arrays = new Godot.Collections.Array();
+    arrays.Resize((int)Mesh.ArrayType.Max);
+    arrays[(int)Mesh.ArrayType.Vertex] = vertices;
+    arrays[(int)Mesh.ArrayType.Index] = indices;
+    mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+    return mesh;
+  }
+
+  // Two-triangle surface exercising every per-vertex channel stride: normals, colors,
+  // skin bones/weights (4- or 8-wide), and one blend shape with vertex + normal deltas.
+  public static ArrayMesh MakeSkinSourceMesh(bool eightBoneWeights = false, bool withBlendShape = true)
+  {
+    if (eightBoneWeights && withBlendShape)
+      throw new System.ArgumentException("The fixture never combines 8-bone weights with blend shapes.");
+    int stride = eightBoneWeights ? 8 : 4;
+    var mesh = new ArrayMesh();
+    if (withBlendShape)
+      mesh.AddBlendShape("Wide");
+    var vertices = new Vector3[6];
+    var normals = new Vector3[6];
+    var colors = new Color[6];
+    var bones = new int[6 * stride];
+    var weights = new float[6 * stride];
+    for (int v = 0; v < 6; v++)
+    {
+      vertices[v] = new Vector3(10 * (v / 3) + (v % 3 == 2 ? 0 : v % 3), v % 3 == 2 ? 1 : 0, 0);
+      normals[v] = Vector3.Back;
+      colors[v] = new Color(v * 0.1f, 0.5f, 1f);
+      for (int k = 0; k < stride; k++)
+      {
+        bones[v * stride + k] = k % 16;
+        weights[v * stride + k] = 1f / stride;
+      }
+    }
+
+    var arrays = new Godot.Collections.Array();
+    arrays.Resize((int)Mesh.ArrayType.Max);
+    arrays[(int)Mesh.ArrayType.Vertex] = vertices;
+    arrays[(int)Mesh.ArrayType.Normal] = normals;
+    arrays[(int)Mesh.ArrayType.Color] = colors;
+    arrays[(int)Mesh.ArrayType.Bones] = bones;
+    arrays[(int)Mesh.ArrayType.Weights] = weights;
+    arrays[(int)Mesh.ArrayType.Index] = new int[] { 0, 1, 2, 3, 4, 5 };
+    if (withBlendShape)
+    {
+      var shapeVertices = new Vector3[6];
+      var shapeNormals = new Vector3[6];
+      for (int v = 0; v < 6; v++)
+      {
+        shapeVertices[v] = new Vector3(1, 0, 0);
+        shapeNormals[v] = Vector3.Up;
+      }
+      var shape = new Godot.Collections.Array();
+      shape.Resize((int)Mesh.ArrayType.Max);
+      shape[(int)Mesh.ArrayType.Vertex] = shapeVertices;
+      shape[(int)Mesh.ArrayType.Normal] = shapeNormals;
+      mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays, blendShapes: [shape]);
+    }
+    else if (eightBoneWeights)
+    {
+      mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays,
+        flags: Mesh.ArrayFormat.FlagUse8BoneWeights);
+    }
+    else
+    {
+      mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+    }
+    return mesh;
+  }
+
+  // Authored mask configuration in the typed ModelMaskConfiguration form: mask
+  // names with defaults, triangle masks, default bits, default mesh, and the
+  // geometry hash. Mask i hides triangle i; the default bits hide triangle 0.
+  public static ModelMaskConfiguration MakeModelMaskConfiguration(ArrayMesh source, int maskCount = 2, long defaultBits = 1)
+  {
+    if (maskCount is < 1 or > 64)
+      throw new System.ArgumentOutOfRangeException(nameof(maskCount), maskCount,
+        "Mask fixture configurations need between 1 and 64 masks.");
+    if (source.GetSurfaceCount() != 1)
+      throw new System.ArgumentException("Mask fixture configurations expect a single-surface source mesh.");
+
+    var masks = new Godot.Collections.Dictionary<string, bool>();
+    var triangleFlags = new long[maskCount];
+    for (int i = 0; i < maskCount; i++)
+    {
+      masks[$"Mask{i}"] = false;
+      triangleFlags[i] = 1L << i;
+    }
+    var triangleMasks = new Godot.Collections.Array<long[]> { triangleFlags };
+
+    return new ModelMaskConfiguration
+    {
+      Masks = masks,
+      TriangleMasks = triangleMasks,
+      DefaultBits = defaultBits,
+      DefaultMesh = ModelMaskGeometry.BuildMesh(source, [triangleFlags], defaultBits),
+      GeometryHash = ModelImportValidation.GeometryHash(source),
+    };
+  }
+
+  // Exercise the same bound-rule selection operation used by the wardrobe.
+  public static void SelectMaskRegions(CharacterModel model, NodePath meshPath, params string[] enabled)
+  {
+    CharacterModel.MaskRuntime mask = model.ResolveMask(meshPath);
+    var selected = new SysColGeneric.List<CharacterModel.MaskRuntime.Region>();
+    foreach (string name in enabled)
+      selected.Add(mask.Regions.AsValueEnumerable().First(region => region.Name == name));
+    mask.PrepareSelection(mask.Regions, selected)();
+  }
+
+  // Counts the generated triangles a render mesh draws per surface, skipping
+  // only the all-hidden convention's degenerate [x, x, x] sentinel triangle; it
+  // does not validate the geometry of the triangles it counts.
+  public static int VisibleTriangles(ArrayMesh? mesh)
+  {
+    if (mesh is null)
+      throw new System.InvalidOperationException("The mask renders no mesh yet.");
+    int visible = 0;
+    for (int s = 0; s < mesh.GetSurfaceCount(); s++)
+    {
+      int[] indices = mesh.SurfaceGetArrays(s)[(int)Mesh.ArrayType.Index].AsInt32Array();
+      for (int t = 0; t < indices.Length / 3; t++)
+      {
+        if (indices[3 * t] == indices[3 * t + 1] && indices[3 * t + 1] == indices[3 * t + 2])
+          continue;
+        visible++;
+      }
+    }
+
+    return visible;
+  }
+
+  // Test inputs simulate the importer's serialized output, not a runtime authoring API.
+  public static T ImportedResource<T>(params (string Name, Variant Value)[] fields) where T : Resource, new()
+  {
+    var resource = new T();
+    foreach (var (name, value) in fields)
+      resource.Set(name, value);
+    return resource;
+  }
+
+  private static ModelWardrobeGarment Piece(string path, int variant = -1)
+    => ImportedResource<ModelWardrobeGarment>(("_path", new NodePath(path)), ("_variant", variant));
+
+  private static ModelWardrobeMaskRule MaskRule(string path, string name, int index,
+    string component, int variant)
+    => ImportedResource<ModelWardrobeMaskRule>(("_path", new NodePath(path)), ("_name", new StringName(name)),
+      ("_index", index), ("_component", component), ("_variant", variant));
+
+  private static ModelWardrobeComponent Component(params ModelWardrobeGarment[] pieces)
+    => ImportedResource<ModelWardrobeComponent>(("_pieces", new Godot.Collections.Array<ModelWardrobeGarment>(pieces)));
+
+  // One imported component with a garment and body mask rule per outfit.
+  public static ModelWardrobeConfiguration MakeWardrobeConfiguration()
+    => ImportedResource<ModelWardrobeConfiguration>(
+      ("_variants", new string[] { "outfit0", "outfit1" }),
+      ("_components", new Godot.Collections.Dictionary<string, ModelWardrobeComponent>
+      {
+        ["Garment"] = Component(Piece("GarmentA", 0), Piece("GarmentB", 1)),
+      }),
+      ("_masks", new Godot.Collections.Array<ModelWardrobeMaskRule>
+      {
+        MaskRule("Body", "Mask0", 0, "Garment", 0), MaskRule("Body", "Mask1", 1, "Garment", 1),
+      }));
+
+  // Two outfit-independent components cover the same region. Their rules must
+  // OR their contributions rather than allowing the last rule to win.
+  public static ModelWardrobeConfiguration MakeOverlappingWardrobeConfiguration()
+    => ImportedResource<ModelWardrobeConfiguration>(
+      ("_variants", new string[] { "outfit0", "outfit1" }),
+      ("_components", new Godot.Collections.Dictionary<string, ModelWardrobeComponent>
+      {
+        ["shirt"] = Component(Piece("GarmentA")),
+        ["jacket"] = Component(Piece("GarmentB")),
+      }),
+      ("_masks", new Godot.Collections.Array<ModelWardrobeMaskRule>
+      {
+        MaskRule("Body", "Mask0", 0, "shirt", -1), MaskRule("Body", "Mask0", 0, "jacket", -1),
+      }));
+
+  // The second mask has no component-associated rule; outfit-wide changes
+  // must still reach its componentless rule.
+  public static ModelWardrobeConfiguration MakeWardrobeConfigurationWithComponentlessVariantRule(int variant)
+  {
+    var configuration = MakeWardrobeConfiguration();
+    var rules = new Godot.Collections.Array<ModelWardrobeMaskRule>(configuration.Masks);
+    rules.Add(MaskRule("AccessoryBody", "Mask1", 1, "", variant));
+    configuration.Set("_masks", rules);
+    return configuration;
+  }
+
+  // Scene-local fixture materials with authored outline toggles and weights.
+  public static ShaderMaterial MakeModelMaterial()
+  {
+    const string code = """
+      shader_type spatial;
+
+      uniform bool enabled = true;
+      uniform float width_scale = 1.0;
+      uniform sampler2D vertex_weights : filter_nearest;
+      """;
+    var shader = new Shader { Code = code };
+    var outline = new ShaderMaterial { Shader = shader, ResourceLocalToScene = true };
+    outline.SetMeta("source_weights", new float[] { 1, 1, 1, 1, 1, 1 });
+    var material = new ShaderMaterial { Shader = shader, NextPass = outline, ResourceLocalToScene = true };
+    return material;
+  }
+
+  // Single-triangle mesh carrying the Smile and Blink blend shapes in registration
+  // order (Smile = 0, Blink = 1), each with one vertex/normal delta array, following
+  // the established skin-source pattern of registering names before the surface.
+  public static ArrayMesh MakeExpressionMesh()
+  {
+    var mesh = new ArrayMesh();
+    mesh.AddBlendShape("Smile");
+    mesh.AddBlendShape("Blink");
+    var arrays = new Godot.Collections.Array();
+    arrays.Resize((int)Mesh.ArrayType.Max);
+    arrays[(int)Mesh.ArrayType.Vertex] = new Vector3[] { new(0, 0, 0), new(1, 0, 0), new(0, 1, 0) };
+    arrays[(int)Mesh.ArrayType.Normal] = new Vector3[] { Vector3.Back, Vector3.Back, Vector3.Back };
+    arrays[(int)Mesh.ArrayType.Index] = new int[] { 0, 1, 2 };
+    var smile = new Godot.Collections.Array();
+    smile.Resize((int)Mesh.ArrayType.Max);
+    smile[(int)Mesh.ArrayType.Vertex] = new Vector3[] { new(0, 1, 0), new(1, 1, 0), new(0, 1, 1) };
+    smile[(int)Mesh.ArrayType.Normal] = new Vector3[] { Vector3.Up, Vector3.Up, Vector3.Up };
+    var blink = new Godot.Collections.Array();
+    blink.Resize((int)Mesh.ArrayType.Max);
+    blink[(int)Mesh.ArrayType.Vertex] = new Vector3[] { new(1, 0, 0), new(2, 0, 0), new(1, 0, 1) };
+    blink[(int)Mesh.ArrayType.Normal] = new Vector3[] { Vector3.Right, Vector3.Right, Vector3.Right };
+    mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays, blendShapes: [smile, blink]);
+    return mesh;
+  }
+
+  // Deterministic expression clips: one-second looping constants. Neutral carries
+  // the face baseline plus the moving skeleton track (body, five degrees around Y
+  // at the midpoint) and a static identity head track; the expression clips each
+  // hold a single face value so every expression stays neutral-relative.
+  public static AnimationLibrary MakeExpressionLibrary()
+  {
+    var library = new AnimationLibrary();
+    library.AddAnimation("neutral", MakeExpressionClip("neutral"));
+    library.AddAnimation("smile", MakeExpressionClip("smile"));
+    library.AddAnimation("blink", MakeExpressionClip("blink"));
+    library.AddAnimation("smile_extra", MakeExpressionClip("smile_extra"));
+    return library;
+  }
+
+  private static Animation MakeExpressionClip(string name)
+  {
+    var clip = new Animation { Length = 1, LoopMode = Animation.LoopModeEnum.Linear };
+    switch (name)
+    {
+      case "neutral":
+        SetConstantBlendShape(clip, "Face:Smile", 0.2f);
+        SetConstantBlendShape(clip, "Face:Blink", 0f);
+        Quaternion identity = Quaternion.Identity;
+        Quaternion tilted = Quaternion.FromEuler(new Vector3(0, Mathf.DegToRad(5), 0));
+        int moving = clip.AddTrack(Animation.TrackType.Rotation3D);
+        clip.TrackSetPath(moving, "Skeleton:body");
+        clip.RotationTrackInsertKey(moving, 0, identity);
+        clip.RotationTrackInsertKey(moving, 0.5, tilted);
+        clip.RotationTrackInsertKey(moving, 1, identity);
+        int head = clip.AddTrack(Animation.TrackType.Rotation3D);
+        clip.TrackSetPath(head, "Skeleton:head");
+        clip.RotationTrackInsertKey(head, 0, identity);
+        break;
+      case "smile":
+        SetConstantBlendShape(clip, "Face:Smile", 0.8f);
+        break;
+      case "blink":
+        SetConstantBlendShape(clip, "Face:Blink", 1f);
+        break;
+      case "smile_extra":
+        SetConstantBlendShape(clip, "Face:Smile", 0.5f);
+        break;
+    }
+
+    return clip;
+  }
+
+  private static void SetConstantBlendShape(Animation clip, string path, float value)
+  {
+    int track = clip.AddTrack(Animation.TrackType.BlendShape);
+    clip.TrackSetPath(track, path);
+    clip.BlendShapeTrackInsertKey(track, 0, value);
+  }
+
+  // Deterministic expression graph: each expression subtracts its own
+  // AnimationNodeAnimation reference of the shared neutral clip and feeds the delta
+  // into an Add2 filtered to its own face track, chained after the previous
+  // expression. Sharing the Animation resource between the reference nodes keeps
+  // every delta neutral-relative; the filters keep an expression from subtracting
+  // or adding the other face channels.
+  public static AnimationNodeBlendTree MakeExpressionTree()
+  {
+    var graph = new AnimationNodeBlendTree();
+    graph.AddNode("Neutral", new AnimationNodeAnimation { Animation = "neutral" });
+    AddExpressionChain(graph, "Smile", "smile", "Face:Smile", "Neutral");
+    AddExpressionChain(graph, "Blink", "blink", "Face:Blink", "Smile");
+    AddExpressionChain(graph, "SmileExtra", "smile_extra", "Face:Smile", "Blink");
+    graph.ConnectNode("output", 0, "SmileExtra");
+    return graph;
+  }
+
+  private static void AddExpressionChain(
+    AnimationNodeBlendTree graph, string id, string clipName, string filterPath, string input)
+  {
+    graph.AddNode($"{id}Clip", new AnimationNodeAnimation { Animation = clipName });
+    graph.AddNode($"{id}Neutral", new AnimationNodeAnimation { Animation = "neutral" });
+    graph.AddNode($"{id}Delta", new AnimationNodeSub2());
+    graph.ConnectNode($"{id}Delta", 0, $"{id}Clip");
+    graph.ConnectNode($"{id}Delta", 1, $"{id}Neutral");
+    var add = new AnimationNodeAdd2 { FilterEnabled = true };
+    add.SetFilterPath(filterPath, true);
+    graph.AddNode(id, add);
+    graph.ConnectNode(id, 0, input);
+    graph.ConnectNode(id, 1, $"{id}Delta");
+  }
 }

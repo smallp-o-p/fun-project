@@ -60,14 +60,21 @@ public partial class BattleHookTest
   public void HookReceivesOnlyItsConcreteEvent()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
     var turnStartedListener = new RecordingHook();
     var damagedListener = new RecordingHook();
-    battle.RegisterHook<TurnStartedBattleEvent>(turnStartedListener);
-    battle.RegisterHook<UnitDamagedBattleEvent>(damagedListener);
-
-    battle.Start();
+    var setup = new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(4, 1, 4)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", faction)), new Vector3I(1, 0, 1))])],
+      Seed: 7) with
+    {
+      Systems = [new SetupSystemData { OnRegister = runtime =>
+      {
+        runtime.RegisterHook<TurnStartedBattleEvent>(turnStartedListener);
+        runtime.RegisterHook<UnitDamagedBattleEvent>(damagedListener);
+      } }]
+    };
+    using var battle = new BattleFixture(setup);
 
     Assert.Equal(1, turnStartedListener.Received.Count);
     Assert.True(turnStartedListener.Received.AsValueEnumerable().Single() is TurnStartedBattleEvent);
@@ -77,12 +84,11 @@ public partial class BattleHookTest
   [TestCase(TestName = "Hook registered for a marker interface receives implementing events")]
   public void HookReceivesMarkerInterfaceEvents()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0));
     var unitEventsListener = new RecordingHook();
     battle.RegisterHook<IUnitBattleEvent>(unitEventsListener);
 
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("Reinforcement", battle.PlayerFaction), new Vector3I(1, 0, 1));
 
     Assert.True(unitEventsListener.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
   }
@@ -91,12 +97,17 @@ public partial class BattleHookTest
   public void RootTagRegistrationReceivesEveryCommittedEvent()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
     var catchAll = new RecordingHook();
-    battle.RegisterHook<BattleEventTag>(catchAll);
-
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
-    battle.Start();
+    var setup = new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(4, 1, 4)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", faction)), new Vector3I(1, 0, 1))])],
+      Seed: 7) with
+    {
+      Systems = [new SetupSystemData { OnRegister = runtime =>
+        runtime.RegisterHook<BattleEventTag>(catchAll) }]
+    };
+    using var battle = new BattleFixture(setup);
 
     Assert.True(catchAll.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
     Assert.True(catchAll.Received.AsValueEnumerable().OfType<TurnStartedBattleEvent>().Any());
@@ -110,14 +121,13 @@ public partial class BattleHookTest
   [TestCase(TestName = "Hook firing order follows priority then registration across different event keys")]
   public void PriorityThenRegistrationOrderHoldsAcrossDifferentEventKeys()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
+    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0));
     var log = new List<string>();
     battle.RegisterHook<IUnitBattleEvent>(new OrderedHook("unit-default", log));
     battle.RegisterHook<IPositionedBattleEvent>(new OrderedHook("positioned-low-priority", log), -5);
     battle.RegisterHook<UnitAddedBattleEvent>(new OrderedHook("concrete-default", log));
 
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    battle.Spawn(TestData.MakeCombatant("Reinforcement", battle.PlayerFaction), new Vector3I(1, 0, 1));
 
     Assert.Equal("positioned-low-priority|unit-default|concrete-default", string.Join("|", log));
   }
@@ -125,9 +135,8 @@ public partial class BattleHookTest
   [TestCase(TestName = "A hook registered under concrete and interface keys fires once for one event")]
   public void OneHookRegisteredUnderMultipleMatchingKeysFiresOnce()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(1, 0, 1));
+    var unit = battle.Unit;
     var hook = new RecordingHook();
     battle.RegisterHook<UnitKilledBattleEvent>(hook);
     battle.RegisterHook<IUnitBattleEvent>(hook);
@@ -141,12 +150,22 @@ public partial class BattleHookTest
   public void HookRaisedEventDispatchesAfterCurrentEvent()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
-    battle.RegisterHook<TurnEndedBattleEvent>(new RaiseProbeOnTurnEndedHook());
     var hook = new CountingHook();
-    battle.RegisterHook<ProbeBattleEvent>(hook);
-    battle.Start();
+    var setup = new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(4, 1, 4)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", faction)), new Vector3I(1, 0, 1))])],
+      Seed: 7) with
+    {
+      Systems =
+        [
+          new SetupSystemData { OnRegister = runtime =>
+            runtime.RegisterHook<TurnEndedBattleEvent>(new RaiseProbeOnTurnEndedHook()) },
+          new SetupSystemData { OnRegister = runtime =>
+            runtime.RegisterHook<ProbeBattleEvent>(hook) },
+        ],
+    };
+    using var battle = new BattleFixture(setup);
 
     battle.ClearEvents();
     battle.Submit(BattleAction.EndFactionTurn(faction));
@@ -175,10 +194,16 @@ public partial class BattleHookTest
   public void ThrowingHookPropagatesAndClearsQueue()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
-    battle.RegisterHook<TurnEndedBattleEvent>(new RaiseThenThrowOnceOnTurnEndedHook());
-    battle.Start();
+    var setup = new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(4, 1, 4)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Alpha", faction)), new Vector3I(1, 0, 1))])],
+      Seed: 7) with
+    {
+      Systems = [new SetupSystemData { OnRegister = runtime =>
+        runtime.RegisterHook<TurnEndedBattleEvent>(new RaiseThenThrowOnceOnTurnEndedHook()) }]
+    };
+    using var battle = new BattleFixture(setup);
 
     battle.ClearEvents();
     // The simple execution model lets a hook failure surface as the throw it is; the
@@ -209,41 +234,36 @@ public partial class BattleHookTest
   [TestCase(TestName = "A hook returning interrupts outside an executor action throws")]
   public void InterruptsOutsideExecutorActionThrow()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
-    battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
-    battle.RegisterHook<TurnStartedBattleEvent>(
+    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
+    var unit = battle.Unit;
+    battle.RegisterHook<UnitMovedBattleEvent>(
       new InterruptingHook(context => BattleAction.EndFactionTurn(context.Session.ActiveSide)));
 
-    // session.StartBattle raises TurnStarted with no executor action in flight. Pre-assign
-    // the faction's objective exactly as the started path would — or the no-objective guard
-    // throws the same exception type and the test false-passes; then assert on the message
-    // to pin the right throw.
-    battle.Session.AddObjective(faction, new EliminateAllOpposingForcesObjectiveData().Instantiate());
-
+    // Session-direct mutation keeps this at the real no-in-flight boundary without a start
+    // operation: the hook sees the movement event outside any executor action window.
+    var from = battle.Session.GetUnitPosition(unit).RequireSome();
+    var to = battle.Board.At(new Vector3I(1, 0, 0));
     InvalidOperationException thrown = null;
     try
     {
-      battle.Session.StartBattle();
+      battle.Session.MoveUnit(unit, from, to);
     }
     catch (InvalidOperationException exception)
     {
       thrown = exception;
     }
 
-    Assert.True(thrown is not null, "Expected StartBattle to throw when a hook returns interrupts outside an executor action.");
+    Assert.True(thrown is not null, "Expected the session mutation to throw when a hook returns interrupts outside an executor action.");
     Assert.True(thrown.Message.Contains("interrupt"));
   }
 
   [TestCase(TestName = "Hooks receive the in-flight action as SourceAction during executor dispatches")]
   public void HooksReceiveSourceActionInsideExecutorDispatch()
   {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [faction]);
-    var unit = battle.Spawn(TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
-    battle.Start();
+    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(1, 0, 1));
+    var unit = battle.Unit;
     var hook = new InterruptingHook(context => BattleAction.PassUnit(
-      context.Session.TryGetAlive(context.Session.GetFactionAliveUnits(faction).AsValueEnumerable().First()).RequireSome()));
+      context.Session.TryGetAlive(context.Session.GetFactionAliveUnits(battle.PlayerFaction).AsValueEnumerable().First()).RequireSome()));
     battle.RegisterHook<UnitMovedBattleEvent>(hook);
 
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 2)]));

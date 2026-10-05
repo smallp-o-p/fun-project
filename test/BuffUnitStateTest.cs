@@ -1,5 +1,6 @@
 #nullable disable warnings
 using System;
+using FunProject.Combatants;
 using FunProject.Battle;
 using FunProject.Buffs;
 using FunProject.Stats;
@@ -16,18 +17,25 @@ public partial class BuffUnitStateTest
       new HealthBelowPercentCondition { Percent = 50f },
       statMods: [new AimStatMod { Modifiers = [StatModifier.Add(10)] }]);
 
+  // Factory-ready fixture: one unit at (4,0,4) with an optional loadout weapon.
+  private static BattleFixture UnitSolo(Faction faction, Combatant combatant, Weapon? weapon = null)
+    => new(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
+      [new BattleSideSetup(faction, [new FakeObjectiveData()],
+        [new UnitPlacement(new UnitLoadout(combatant, weapon is null ? None : Some(weapon)), new Vector3I(0, 0, 0))])],
+      Seed: 7));
+
   [TestCase(TestName = "Unit aggregates innate and equipped-item buffs; identical buffs stack")]
   public void AggregatesAndStacks()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [faction]);
     var shared = AimBuff("Shared");
     var innateOnly = AimBuff("InnateOnly");
 
-    var unit = battle.Spawn(
+    using var battle = UnitSolo(faction,
       TestData.MakeCombatant("Alpha", faction, buffs: [shared, innateOnly]),
-      new Vector3I(4, 0, 4),
       TestData.MakeWeapon("Charm Blade", grantedBuffs: [shared]));
+    var unit = battle.Unit;
 
     Assert.Equal(3, unit.Buffs.Count);
     Assert.Equal(2, unit.Buffs.AsValueEnumerable().Count(buff => buff == shared));
@@ -40,10 +48,9 @@ public partial class BuffUnitStateTest
   public void ActiveBuffContributesStats()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [faction]);
-    var buffed = battle.Spawn(
-      TestData.MakeCombatant("Alpha", faction, health: 20, aim: 65, buffs: [AimBuff()]),
-      new Vector3I(4, 0, 4));
+    using var battle = UnitSolo(faction,
+      TestData.MakeCombatant("Alpha", faction, health: 20, aim: 65, buffs: [AimBuff()]));
+    var buffed = battle.Unit;
 
     Assert.Equal(65f, buffed.EffectiveStat<AimStat>());
     Assert.False(buffed.ActiveBuffDamageMods.AsValueEnumerable().Any());
@@ -59,15 +66,14 @@ public partial class BuffUnitStateTest
   public void ClampLowersToReducedMax()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [faction]);
     // Percent 200 => current < 2*max is always true: an always-on buff without board setup.
     var intimidation = TestData.MakeBuff(
       "Intimidation",
       new HealthBelowPercentCondition { Percent = 200f },
       statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-5)] }]);
-    var unit = battle.Spawn(
-      TestData.MakeCombatant("Alpha", faction, health: 20, buffs: [intimidation]),
-      new Vector3I(4, 0, 4));
+    using var battle = UnitSolo(faction,
+      TestData.MakeCombatant("Alpha", faction, health: 20, buffs: [intimidation]));
+    var unit = battle.Unit;
 
     unit.ClampCurrentHealthToMax();
 
@@ -82,14 +88,13 @@ public partial class BuffUnitStateTest
   public void ClampFloorsAtOneHealth()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [faction]);
     var crushing = TestData.MakeBuff(
       "Crushing Doubt",
       new HealthBelowPercentCondition { Percent = 200f },
       statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-25)] }]);
-    var unit = battle.Spawn(
-      TestData.MakeCombatant("Alpha", faction, health: 20, buffs: [crushing]),
-      new Vector3I(4, 0, 4));
+    using var battle = UnitSolo(faction,
+      TestData.MakeCombatant("Alpha", faction, health: 20, buffs: [crushing]));
+    var unit = battle.Unit;
 
     Assert.True(unit.IsAlive);
     Assert.Equal(1, unit.CurrentHealth);
@@ -210,7 +215,7 @@ public partial class BuffUnitStateTest
   public void UnitRequiresBuffCondition()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [faction]);
+    using var battle = UnitSolo(faction, TestData.MakeCombatant("Seed", faction));
     var broken = TestData.MakeBuff("Broken", null);
     var combatant = TestData.MakeCombatant("Alpha", faction, buffs: [broken]);
 
@@ -222,7 +227,7 @@ public partial class BuffUnitStateTest
   public void UnitRejectsNullBuffGrant()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new Vector3I(8, 1, 8), [faction]);
+    using var battle = UnitSolo(faction, TestData.MakeCombatant("Seed", faction));
     var combatant = TestData.MakeCombatant("Alpha", faction, buffs: [null]);
 
     Assert.Throws<ArgumentNullException>(() =>

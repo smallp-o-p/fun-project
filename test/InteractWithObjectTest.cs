@@ -1,4 +1,5 @@
 using FunProject.Battle;
+using FunProject.Combatants;
 using GdUnit4;
 using Godot;
 using System;
@@ -15,15 +16,32 @@ public class InteractWithObjectTest
     return data;
   }
 
+  // Factory-ready fixture: unit A at (1,0,1), unit B at (3,0,3), one interactive bomb at (2,0,1).
+  private static BattleFixture BombFixture(Faction player, Faction enemy, int playerActionPoints = 4)
+    => new(new BattleSetup(
+      TestData.MakeOpenBattleMap(new Vector3I(4, 1, 4)),
+      [
+        new BattleSideSetup(player, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player,
+            actionPoints: playerActionPoints)), new Vector3I(1, 0, 1))]),
+        new BattleSideSetup(enemy, [new FakeObjectiveData()],
+          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
+      ],
+      Seed: 7) with
+    { Objects = [new ObjectPlacement(MakeInteractiveObjectData(), new Vector3I(2, 0, 1))] });
+
+  private static BattleObjectState BombAt(BattleFixture battle, Vector3I cell) =>
+    battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable().Single(o => o.Position == cell);
+
   [TestCase(TestName = "Adjacent interact spends AP, defuses, clears occupancy, raises event")]
   public void HappyPathInteract()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
-    var unit = battle.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
+    using var battle = BombFixture(player, enemy);
+    var unit = battle.UnitAt(new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
-    var bomb = battle.PlaceObject(MakeInteractiveObjectData(), point.Raw);
+    var bomb = BombAt(battle, point.Raw);
     battle.ClearEvents();
 
     int apBefore = unit.CurrentActionPoints;
@@ -48,10 +66,12 @@ public class InteractWithObjectTest
     using var battle = BattleFixture.Duel(
       player: new("Alpha", ActionPoints: 2, Weapon: weapon),
       enemy: new("Hostile"),
-      start: false);
+      configure: setup => setup with
+      {
+        Objects = [new ObjectPlacement(MakeInteractiveObjectData(actionPointCost: 2), new Vector3I(5, 0, 1))],
+      });
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(5, 0, 1));
-    BattleObjectState bomb = battle.PlaceObject(MakeInteractiveObjectData(actionPointCost: 2), point.Raw);
-    battle.Start();
+    BattleObjectState bomb = BombAt(battle, point.Raw);
 
     IReadOnlyList<UnitAction> playerActions = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
@@ -66,7 +86,7 @@ public class InteractWithObjectTest
     battle.Interact(battle.PlayerUnit, bomb);
 
     Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
-    Assert.Equal(BattlePhase.InProgress, battle.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsNone);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
     Assert.Equal(turnNumber, battle.Session.TurnNumber);
     Assert.False(playerActions.AsValueEnumerable()
@@ -89,10 +109,10 @@ public class InteractWithObjectTest
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
-    var unit = battle.Spawn(TestData.MakeCombatant("A", player, actionPoints: 1), new Vector3I(1, 0, 1));
+    using var battle = BombFixture(player, enemy, playerActionPoints: 1);
+    var unit = battle.UnitAt(new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
-    var bomb = battle.PlaceObject(MakeInteractiveObjectData(actionPointCost: 2), point.Raw);
+    var bomb = BombAt(battle, point.Raw);
     battle.ClearEvents();
 
     Assert.Throws<InvalidOperationException>(() => battle.Submit(
@@ -110,15 +130,14 @@ public class InteractWithObjectTest
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
-    using var local = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
-    var localUnit = local.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
+    using var local = BombFixture(player, enemy);
+    var localUnit = local.UnitAt(new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint localPoint = local.At(new Vector3I(2, 0, 1));
-    var localBomb = local.PlaceObject(MakeInteractiveObjectData(), localPoint.Raw);
+    var localBomb = BombAt(local, localPoint.Raw);
 
-    using var foreign = new BattleFixture(new Vector3I(4, 1, 4), [TestData.MakeFaction("P"), TestData.MakeFaction("E")]);
-    foreign.Spawn(TestData.MakeCombatant("A", foreign.PlayerFaction), new Vector3I(1, 0, 1));
+    using var foreign = BombFixture(TestData.MakeFaction("P"), TestData.MakeFaction("E"));
     BattleBoardState.ValidatedPoint foreignPoint = foreign.At(new Vector3I(2, 0, 1));
-    var foreignBomb = foreign.PlaceObject(MakeInteractiveObjectData(), foreignPoint.Raw);
+    var foreignBomb = BombAt(foreign, foreignPoint.Raw);
 
     LiveObject foreignProof = foreign.Live(foreignBomb);
 
@@ -138,10 +157,10 @@ public class InteractWithObjectTest
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
-    using var battle = new BattleFixture(new Vector3I(4, 1, 4), [player, enemy]);
-    var unit = battle.Spawn(TestData.MakeCombatant("A", player), new Vector3I(1, 0, 1));
+    using var battle = BombFixture(player, enemy);
+    var unit = battle.UnitAt(new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
-    var bomb = battle.PlaceObject(MakeInteractiveObjectData(), point.Raw);
+    var bomb = BombAt(battle, point.Raw);
 
     AliveUnit unitProof = battle.Alive(unit);
     LiveObject objectProof = battle.Live(bomb);

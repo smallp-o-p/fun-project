@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://b235xx6uvs7ln"]
+
+[ext_resource type="Script" uid="uid://c2onfxh5innap" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="2_um0pc"]
+[ext_resource type="MeshLibrary" uid="uid://blsq5tu0sqlim" path="res://scenes/battle/authoring/markers/MarkerPalette.tres" id="3_oviq3"]
+[ext_resource type="Script" uid="uid://10b0wqthk6fa" path="res://scenes/battle/authoring/BattleEntityAnnotator.cs" id="4_annotations"]
+
+[sub_resource type="Resource" id="Resource_vesj4"]
+script = ExtResource("2_um0pc")
+BlocksMovement = true
+BlocksLineOfSight = true
+CoverDirections = 15
+CoverAmount = 60
+
+[sub_resource type="BoxMesh" id="BoxMesh_emol3"]
+
+[node name="Block" type="Node3D" unique_id=1021311450]
+script = ExtResource("4_annotations")
+Annotations = Dictionary[Vector3i, ExtResource("2_um0pc")]({
+Vector3i(0, 0, 0): SubResource("Resource_vesj4")
+})
+Markers = ExtResource("3_oviq3")
+ExportPath = "res://resources/map_entities/Block.tscn"
+
+[node name="Model" type="MeshInstance3D" parent="." unique_id=2065824019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_emol3")
+
+[node name="Annotations" type="GridMap" parent="." unique_id=59814809]
+mesh_library = ExtResource("3_oviq3")
+cell_size = Vector3(1, 1, 1)
+data = {
+"cells": PackedInt32Array(0, 0, 0)
+}
