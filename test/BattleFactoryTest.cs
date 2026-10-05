@@ -129,7 +129,7 @@ public class BattleFactoryTest
   {
     var (setup, player, _, _, _) = MinimalSetup();
     if (blocked)
-      setup.Map.Tiles[new Godot.Vector3I(1, 0, 0)] = TestData.WallTile();
+      setup.Map.SetTile(new Godot.Vector3I(1, 0, 0), TestData.WallTile());
     var alpha = TestData.MakeCombatant("Alpha", player);
     var cell = blocked ? new Vector3I(1, 0, 0) : new Vector3I(99, 0, 0);
     var broken = setup with
@@ -175,7 +175,7 @@ public class BattleFactoryTest
   {
     var (setup, _, _, _, _) = MinimalSetup();
     if (blocked)
-      setup.Map.Tiles[new Godot.Vector3I(1, 0, 0)] = TestData.WallTile();
+      setup.Map.SetTile(new Godot.Vector3I(1, 0, 0), TestData.WallTile());
     var cell = bomb ? new Vector3I(9, 0, 9)
       : blocked ? new Vector3I(1, 0, 0)
       : new Vector3I(99, 0, 0);

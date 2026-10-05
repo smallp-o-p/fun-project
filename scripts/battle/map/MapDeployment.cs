@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
-// Pure: turns a baked map's spawn cells (tiles whose SpawnFactionSlot >= 0) + one slot's
+// Pure: turns a baked map's sparse spawn cells + one slot's
 // loadouts into spawn placements. SpawnFactionSlot is the index into the battle's side order.
 // Pairing decides capacity and order only; bounds, walkability, and collisions are checked
 // against the fresh board during BattleFactory.Start.
@@ -32,9 +32,9 @@ public static class MapDeployment
   private static List<Vector3I> SpawnCellsForSlot(BattleMapData map, int slot)
   {
     var cells = new List<Vector3I>();
-    foreach (var entry in map.Tiles)
+    foreach (var entry in map.SpawnSlots)
     {
-      if (entry.Value is not null && entry.Value.SpawnFactionSlot == slot)
+      if (entry.Value == slot)
         cells.Add(new Vector3I(entry.Key.X, entry.Key.Y, entry.Key.Z));
     }
 
