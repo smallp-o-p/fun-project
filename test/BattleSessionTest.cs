@@ -57,8 +57,8 @@ public class BattleSessionTest
       () => battle.Submit(BattleAction.SpawnUnit(TestData.MakeCombatant("Bravo", faction), battle.At(1, 0, 1))));
   }
 
-  [TestCase(TestName = "StartBattle activates first participating faction")]
-  public void StartBattleActivatesFirstParticipatingFaction()
+  [TestCase(TestName = "Startup activates the first participating faction")]
+  public void StartupActivatesFirstParticipatingFaction()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -90,22 +90,23 @@ public class BattleSessionTest
     Assert.Equal(factionB, session.TurnQueue.AsValueEnumerable().Last());
   }
 
-  [TestCase(TestName = "Constructor seeds global faction order")]
+  [TestCase(TestName = "Constructor seeds global faction order from the materialized roster")]
   public void ConstructorSeedsGlobalFactionOrder()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
-    var session = new BattleSession(
-      new BattleBoardState(new Vector3I(4, 1, 4)),
-      [factionB, factionA, factionB]);
+    var board = new BattleBoardState(new Vector3I(4, 1, 4));
+    var b1 = TestData.PlacedUnit(board, 0, TestData.MakeCombatant("B1", factionB), new Vector3I(0, 0, 0));
+    var a1 = TestData.PlacedUnit(board, 1, TestData.MakeCombatant("A1", factionA), new Vector3I(1, 0, 0));
+    var session = new BattleSession(board, [factionB, factionA, factionB], [b1, a1], [], []);
 
     Assert.Equal(2, session.GlobalFactionTurnOrder.Count);
     Assert.Equal(factionB, session.GlobalFactionTurnOrder.AsValueEnumerable().First());
     Assert.Equal(factionA, session.GlobalFactionTurnOrder.AsValueEnumerable().Last());
     Assert.Equal(factionB, session.ActiveSide);
     Assert.Equal(factionB, session.TurnQueue.AsValueEnumerable().First());
-    Assert.Equal(0, session.AliveUnits.AsValueEnumerable().Count());
-    Assert.False(session.Board.IsOccupied(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()));
+    Assert.Equal(2, session.AliveUnits.AsValueEnumerable().Count());
+    Assert.True(session.Board.IsOccupied(session.Board.ValidatePoint(new Vector3I(0, 0, 0)).RequireSome()));
   }
 
   [TestCase(TestName = "Constructor can use a prebuilt board state")]
@@ -114,14 +115,13 @@ public class BattleSessionTest
     var faction = TestData.MakeFaction("A");
     var board = new BattleBoardState(new Vector3I(3, 1, 3));
     board.SetTileWalkable(board.ValidatePoint(new Vector3I(1, 0, 0)).RequireSome(), false);
+    var unit = TestData.PlacedUnit(board, 0, TestData.MakeCombatant("A1", faction), new Vector3I(0, 0, 0));
 
-    var session = new BattleSession(
-      board,
-      [faction]);
+    var session = new BattleSession(board, [faction], [unit], [], []);
 
     using var executor = new BattleActionExecutor(session);
     Assert.Throws<System.InvalidOperationException>(
-      () => executor.Submit(BattleAction.SpawnUnit(TestData.MakeCombatant("A1", faction), board.At(1, 0, 0))));
+      () => executor.Submit(BattleAction.SpawnUnit(TestData.MakeCombatant("A2", faction), board.At(1, 0, 0))));
 
     Assert.True(ReferenceEquals(board, session.Board));
   }
@@ -133,7 +133,7 @@ public class BattleSessionTest
 
     Assert.Throws<ArgumentException>(() => new BattleSession(
       board,
-      []));
+      [], [], [], []));
   }
 
   [TestCase(TestName = "SpawnUnit accepts equipped weapon option")]
@@ -442,64 +442,26 @@ public class BattleSessionTest
     Assert.True(battle.Query(new IsUnitStillAvailableThisTurn(battle.PlayerUnit)));
   }
 
-  [TestCase(false)]
-  [TestCase(true)]
+  [TestCase(false, TestName = "A scheduler ignores killed spawn candidates")]
+  [TestCase(true, TestName = "A scheduler ignores unconscious spawn candidates")]
   public void SchedulerIgnoresDisabledSpawnCandidates(bool killed)
   {
     using var battle = BattleFixture.Duel();
     var kind = killed ? DamageKind.Health : DamageKind.Stun;
     battle.ApplyDamage(battle.PlayerUnit, 20, kind);
-    var scheduler = new TurnScheduler(battle.Session.HasConsciousUnits, battle.Session.GetFactionConsciousUnits);
-    scheduler.RegisterFaction(battle.PlayerFaction);
-    scheduler.InitializeQueueFromGlobalOrder();
+    var scheduler = new TurnScheduler(
+      [battle.PlayerFaction, battle.EnemyFaction],
+      battle.Session.HasConsciousUnits,
+      battle.Session.GetFactionConsciousUnits);
 
     scheduler.AddSpawnedUnit(battle.PlayerUnit);
 
     Assert.False(scheduler.IsUnitAvailable(battle.PlayerUnit));
   }
 
-  // The no-conscious-start invariants below are the direct-session predecessors of the
-  // scheduler-construction coverage their Task 3 owner will hold; they stay local to these
-  // constructor/lifecycle tests instead of the shared fixture.
-  [TestCase]
-  public void SetupSkipsUnconsciousFactions()
-  {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    var session = new BattleSession(new BattleBoardState(new Vector3I(3, 1, 1)), [player, enemy]);
-    using var executor = new BattleActionExecutor(session);
-    session.AddObjective(player, new FakeObjectiveData().Instantiate());
-    session.AddObjective(enemy, new FakeObjectiveData().Instantiate());
-    var body = executor.Submit(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Observer", player), session.Board.At(0, 0, 0))).EventsThatOccurred
-      .ToArray().SingleEvent<UnitAddedBattleEvent>().Unit;
-    executor.Submit(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Enemy", enemy), session.Board.At(2, 0, 0)));
-    executor.Submit(BattleAction.ApplyDamage(
-      session.TryGetAlive(body).RequireSome(), 20, DamageKind.Stun));
-
-    executor.Submit(BattleAction.StartBattle());
-
-    Assert.Equal(enemy, session.ActiveSide);
-    Assert.Equal(1, session.TurnQueue.Count);
-  }
-
-  [TestCase]
-  public void SetupRejectsOnlyUnconsciousForces()
-  {
-    var faction = TestData.MakeFaction("Player");
-    var session = new BattleSession(new BattleBoardState(new Vector3I(2, 1, 1)), [faction]);
-    using var executor = new BattleActionExecutor(session);
-    session.AddObjective(faction, new FakeObjectiveData().Instantiate());
-    var unit = executor.Submit(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Observer", faction), session.Board.At(0, 0, 0))).EventsThatOccurred
-      .ToArray().SingleEvent<UnitAddedBattleEvent>().Unit;
-    executor.Submit(BattleAction.ApplyDamage(
-      session.TryGetAlive(unit).RequireSome(), 20, DamageKind.Stun));
-
-    Assert.Throws<InvalidOperationException>(() => executor.Submit(BattleAction.StartBattle()));
-    Assert.Equal(BattlePhase.Setup, session.Phase);
-  }
+  // The no-conscious-start invariants these setup-session tests covered moved to their
+  // Task 3 owner: TurnSchedulerTest's construction rows (skipped ineligible first faction,
+  // rejected empty eligible roster).
 
   [TestCase(TestName = "Killing the only active unit on an eliminated faction does not auto-advance")]
   public void KillingTheOnlyActiveUnitOnAnEliminatedFactionDoesNotAutoAdvance()
@@ -571,12 +533,12 @@ public class BattleSessionTest
   public void AddUnitThrowsWhenValidatedPlacementCanNoLongerBeApplied()
   {
     var faction = TestData.MakeFaction("Player");
-    var session = new BattleSession(new BattleBoardState(new Vector3I(4, 1, 4)), [faction]);
-    BattleBoardState.ValidatedPoint occupiedPoint = session.Board.At(1, 0, 1);
-    var occupiedUnit = session.AddUnit(TestData.MakeCombatant("Alpha", faction), occupiedPoint, None, None).Unit;
+    var board = new BattleBoardState(new Vector3I(4, 1, 4));
+    var occupiedUnit = TestData.PlacedUnit(board, 0, TestData.MakeCombatant("Alpha", faction), new Vector3I(1, 0, 1));
+    var session = new BattleSession(board, [faction], [occupiedUnit], [], []);
 
     Assert.Throws<InvalidOperationException>(() =>
-      session.AddUnit(TestData.MakeCombatant("Bravo", faction), occupiedPoint, None, None));
+      session.AddUnit(TestData.MakeCombatant("Bravo", faction), board.At(1, 0, 1), None, None));
     Assert.Equal(1, session.AliveUnits.AsValueEnumerable().Count());
     Assert.True(session.AliveUnits.AsValueEnumerable().Contains(occupiedUnit));
     Assert.False(session.AliveUnits.AsValueEnumerable().Any(unit => unit.Combatant.Name == "Bravo"));
@@ -630,12 +592,20 @@ public class BattleSessionTest
     Assert.Equal(factionA, session.ActiveSide);
   }
 
+  // Complete-input construction: a one-unit roster is the minimal live session.
+  private static BattleSession FreshSession(int? randomSeed = null)
+  {
+    var faction = TestData.MakeFaction("Player");
+    var board = new BattleBoardState(new Vector3I(2, 1, 2));
+    var unit = TestData.PlacedUnit(board, 0, TestData.MakeCombatant("A1", faction), new Vector3I(0, 0, 0));
+    return new BattleSession(board, [faction], [unit], [], [], randomSeed: randomSeed);
+  }
+
   [TestCase(TestName = "RollPercent with the same seed produces the same in-range sequence")]
   public void RollPercentWithTheSameSeedProducesTheSameInRangeSequence()
   {
-    var faction = TestData.MakeFaction("Player");
-    var first = new BattleSession(new BattleBoardState(new Vector3I(2, 1, 2)), [faction], randomSeed: 1234);
-    var second = new BattleSession(new BattleBoardState(new Vector3I(2, 1, 2)), [faction], randomSeed: 1234);
+    var first = FreshSession(randomSeed: 1234);
+    var second = FreshSession(randomSeed: 1234);
 
     for (int i = 0; i < 20; i++)
     {
@@ -649,8 +619,7 @@ public class BattleSessionTest
   [TestCase(TestName = "Session defaults to the standard hit chance calculator")]
   public void SessionDefaultsToTheStandardHitChanceCalculator()
   {
-    var faction = TestData.MakeFaction("Player");
-    var session = new BattleSession(new BattleBoardState(new Vector3I(2, 1, 2)), [faction]);
+    var session = FreshSession();
 
     Assert.True(session.HitChanceCalculator is StandardHitChanceCalculator);
   }

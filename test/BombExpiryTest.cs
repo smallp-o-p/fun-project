@@ -83,7 +83,7 @@ public class BombExpiryTest
 
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.Equal(
       BattleOutcome.Defeat,
       runtime.Query(new GetBattleResultQuery()).RequireRight().Outcome);

@@ -256,7 +256,7 @@ public partial class StatusEffectBattleTest
 
     Assert.True(target.IsDead);
     Assert.True(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Any());
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsNone);
     Assert.Equal(battle.PlayerFaction, battle.Session.ActiveSide);
   }
 
@@ -307,7 +307,7 @@ public partial class StatusEffectBattleTest
     Assert.Equal(2, target.ActiveStatusEffects.Count);
     Assert.Equal(1, target.ActiveStatusEffects.AsValueEnumerable().Count(effect => effect.RemainingTurns == 1));
     Assert.Equal(1, target.ActiveStatusEffects.AsValueEnumerable().Count(effect => effect.RemainingTurns == 2));
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsNone);
     Assert.Equal(battle.PlayerFaction, battle.Session.ActiveSide);
   }
 

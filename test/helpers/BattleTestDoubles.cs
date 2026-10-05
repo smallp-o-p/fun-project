@@ -19,17 +19,17 @@ internal sealed class RecordingHook : BattleHook
   }
 }
 
-// Setup-time declared-system double: records the runtime it registered with and forwards to
-// a test-supplied callback, so lifecycle tests can hook in during startup.
+// Setup-time declared-system double: records the hook-registration capability it received
+// and forwards to a test-supplied callback, so lifecycle tests can hook in during startup.
 internal sealed partial class SetupSystemData : BattleTypeSystemData
 {
-  public Action<BattleRuntime> OnRegister { get; init; } = _ => { };
-  public BattleRuntime? RegisteredRuntime { get; private set; }
+  public Action<BattleHookRegistration> OnRegister { get; init; } = _ => { };
+  public BattleHookRegistration? RegisteredHooks { get; private set; }
 
-  public override void Register(BattleRuntime runtime)
+  public override void Register(BattleHookRegistration hooks)
   {
-    RegisteredRuntime = runtime;
-    OnRegister(runtime);
+    RegisteredHooks = hooks;
+    OnRegister(hooks);
   }
 }
 
@@ -51,8 +51,8 @@ internal sealed partial class FixtureRecordingSystem : BattleTypeSystemData
 
   public FixtureRecordingSystem(List<BattleEvent> events) => _events = events;
 
-  public override void Register(BattleRuntime runtime) =>
-    runtime.RegisterHook<BattleEventTag>(new Recorder(this), int.MinValue);
+  public override void Register(BattleHookRegistration hooks) =>
+    hooks.RegisterHook<BattleEventTag>(new Recorder(this), int.MinValue);
 
   private sealed class Recorder(FixtureRecordingSystem owner) : BattleHook
   {

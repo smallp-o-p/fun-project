@@ -24,11 +24,6 @@ public abstract class BattleAction
   /// <param name="session"></param>
   public abstract Result Execute(BattleSession session);
 
-  public static StartBattle StartBattle()
-  {
-    return new StartBattle();
-  }
-
   public static SpawnUnit SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position)
   {
     return new SpawnUnit(combatant, position);
@@ -37,11 +32,6 @@ public abstract class BattleAction
   public static SpawnUnit SpawnUnit(Combatant combatant, BattleBoardState.ValidatedPoint position, Weapon equippedWeapon)
   {
     return new SpawnUnit(combatant, position, equippedWeapon);
-  }
-
-  public static PlaceObject PlaceObject(BattleSpecialObjectData data, BattleBoardState.ValidatedPoint position)
-  {
-    return new PlaceObject(data, position);
   }
 
   public static MoveUnit MoveUnit(

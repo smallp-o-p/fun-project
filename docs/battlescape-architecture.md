@@ -77,7 +77,7 @@ flowchart LR
 ## Ownership Rules
 
 - `BattleSession` owns:
-  - battle phase
+  - battle completion (`Option<BattleOutcome>`)
   - turn number
   - active side
   - global faction order
@@ -133,20 +133,19 @@ flowchart LR
 
 1. Resolve map / factions / loadouts / positions / seed
 2. Create fresh board and parse the complete layout
-3. Create session and objectives
-4. Create runtime and default hooks
-5. Register declared systems
-6. Submit unit spawns, then object placements, then StartBattle
-7. Return runtime; dispose and rethrow if initialization throws
+3. Materialize the roster and objects on the board, instantiate the objectives
+4. Construct the session (scheduler included — valid from construction) and its runtime + default hooks
+5. Register declared systems through the narrow hook-registration capability
+6. Submit the single factory-owned bootstrap: placement notifications, `SessionStarted`, first turn + AP refresh
+7. Return runtime; dispose and rethrow if startup throws
 
-Declared systems register before any unit spawns, so they observe spawning, session start, and the first turn. Typed layout failures (unavailable or duplicate cells, `SpawnSlotShortfall`) return a `BattleSetupFailure` before the session exists; exceptions after that point dispose the runtime and propagate unchanged. The campaign-to-battle scene integration remains deferred; `BattleScene` currently boots a standalone runtime through this entry point.
+Declared systems register before the bootstrap submits, so they observe placement, session start, and the first turn with the complete initial board already in place. Initial spottings are computed by the first visibility refresh and announced after every placement notification. Typed layout failures (unavailable or duplicate cells, `SpawnSlotShortfall`) return a `BattleSetupFailure` before the session exists; construction failures (no eligible faction, malformed spawn buffs) throw before anything registers; exceptions after the runtime exists dispose it and propagate unchanged. The campaign-to-battle scene integration remains deferred; `BattleScene` currently boots a standalone runtime through this entry point.
 
 ### BattleSession
 
 `BattleSession` currently exposes authoritative state and bookkeeping around:
 
 - `Board`
-- `Phase`
 - `TurnNumber`
 - `ActiveSide`
 - `AliveUnits`
@@ -201,7 +200,7 @@ Health/stun damage that kills or newly knocks out a unit consumes activation ava
 
 `StunRecoverySystem` is a default executor system, running on `TurnEndedBattleEvent` at priority −90, after `StatusEffectSystem` then `ArmorRegenSystem` at −100. Living conscious units of the ending faction recover up to a fixed 5 stun, clamped at zero. AP exhaustion and temporary immobilization permit recovery; unconscious/dead units recover nothing. DoT can cross the unconscious threshold before recovery runs. A positive reduction raises `UnitStunRecoveredBattleEvent`; zero stun emits nothing. Ended sessions do not recover.
 
-The hook owns its fixed `uint` rate, phase checks, and event emission. Battle types, setup, and runtime constructors expose no recovery configuration. `BattleSession` has no recovery-specific methods; the hook uses existing unit access and `RaiseEvents`. The recovered amount is also `uint` and is clamped to current stun before narrowing for subtraction.
+The hook owns its fixed `uint` rate, its stop-on-completion rule, and event emission. Battle types, setup, and runtime constructors expose no recovery configuration. `BattleSession` has no recovery-specific methods; the hook uses existing unit access and `RaiseEvents`. The recovered amount is also `uint` and is clamped to current stun before narrowing for subtraction.
 
 ### Capture summary and campaign lifetime
 
@@ -234,7 +233,7 @@ Each query's result shape declares whether the question can fail:
 - **`Option<T>`** — absence is a normal answer, not a failure (`GetUnitAtTile`, `GetObjectivesForFaction`).
 - **`Either<BattleQueryFailure, TResult>`** — the question itself can be infeasible at runtime (`GetHitChanceForAttack` when the target is out of range or unseen, `GetFactionEndOfBattleSummary` before the battle ends). Callers handle the `Left` before using the `Right` value.
 
-Missing/dead units and off-board tiles are no longer query failures: they are rejected at the proof mint doors before a query is ever built. Scene code holding a raw `BattleUnitState` or coordinate mints proofs through `BattleRuntime.TryGetAlive(unit) : Option<AliveUnit>` and `TryGetTile(coordinates) : Option<ValidatedPoint>`; the `None` path is what used to surface as a query `Left`. Misusing the trusted core — passing a proof into a context it was never valid for, or asking a question the current phase cannot answer (for example `CanUnitActNow` while the battle is not in progress) — is programmer error and is guarded by exceptions that are not meant to be caught, per the trusted-core convention.
+Missing/dead units and off-board tiles are no longer query failures: they are rejected at the proof mint doors before a query is ever built. Scene code holding a raw `BattleUnitState` or coordinate mints proofs through `BattleRuntime.TryGetAlive(unit) : Option<AliveUnit>` and `TryGetTile(coordinates) : Option<ValidatedPoint>`; the `None` path is what used to surface as a query `Left`. Misusing the trusted core — passing a proof into a context it was never valid for — is programmer error and is guarded by exceptions that are not meant to be caught, per the trusted-core convention. `CanUnitActNow` is total: it answers `false` once the battle is decided rather than throwing.
 
 Example query types:
 
@@ -286,7 +285,6 @@ Current limitations:
 
 The current built-in authoritative actions are:
 
-- `StartBattle`
 - `SpawnUnit`
 - `MoveUnit`
 - `AttackEntity`
@@ -379,12 +377,11 @@ sequenceDiagram
 
 ## Turn Flow Notes
 
-- The battle starts from `BattlePhase.Setup` and transitions to `InProgress` through `StartBattle`.
-- Setup initializes the turn queue from the stable global faction order.
-- `StartBattle` rebuilds the active round queue from factions with conscious forces in that order; setup with no conscious faction throws.
+- There is no setup phase: a session is constructed from the complete materialized roster, and its scheduler establishes the first round queue, the active side, and availability at construction. The factory-owned bootstrap announces the placements, `SessionStarted`, and the first turn through the ordinary event machinery; `SpawnUnit` remains as the in-game reinforcement operation.
+- A roster whose first declared faction has no conscious unit is skipped; a roster with no conscious faction at all cannot construct.
 - `ActiveSide` and `TurnNumber` are owned by the session.
 - `EndFactionTurn` is the explicit faction-turn action.
-- Turn start is the same shape at both invocation sites: refresh the relevant faction's action-point availability, then raise the turn-start events (`TurnStarted`, plus `ActiveSideChanged` on a side flip or `SessionStarted` on battle start), then refresh `RefreshForNewTurn` for the affected units. Buff evaluation is an ordinary hook on `TurnStartedBattleEvent` (`TurnStartBuffHook`) and on `UnitAddedBattleEvent` at spawn (`UnitSpawnedBuffHook`) — both registered by the executor's constructor and fired after the event's broadcast — so a buff flip lands during the dispatch and, for turn start, before the AP refresh that runs once the dispatch completes and reads (possibly buffed) `MaxActionPoints`. Mid-dispatch observers of `SessionStarted`/`TurnStarted` see pre-refresh action points; this is deliberate, since the refresh always completes before `Submit`/`StartBattle` returns.
+- Turn start is the same shape at both invocation sites (the factory bootstrap's first turn and subsequent side turns): refresh the relevant faction's action-point availability, then raise the turn-start events (`TurnStarted`, plus `ActiveSideChanged` on a side flip or `SessionStarted` on battle start), then refresh `RefreshForNewTurn` for the affected units. Buff evaluation is an ordinary hook on `TurnStartedBattleEvent` (`TurnStartBuffHook`) and on `UnitAddedBattleEvent` at spawn (`UnitSpawnedBuffHook`) — both registered by the executor's constructor and fired after the event's broadcast — so a buff flip lands during the dispatch and, for turn start, before the AP refresh that runs once the dispatch completes and reads (possibly buffed) `MaxActionPoints`. Mid-dispatch observers of `SessionStarted`/`TurnStarted` see pre-refresh action points; this is deliberate, since the refresh always completes before the submission returns.
 - `PassUnit` ends a unit activation and currently advances the turn automatically if that side has no remaining actable units.
 - Unit death updates alive/dead storage, board occupancy, current-turn availability, and faction queue membership through session bookkeeping. Unconsciousness consumes availability and removes the faction from future turns when no conscious ally remains, while preserving the body and its occupancy. A disabled active faction keeps its current queue head until explicit turn end.
 - The designated player's loss of all conscious forces ends the battle as defeat. `ObjectiveSystem` suppresses directives on that final death or unconscious event so an objective cannot override the player-wipe backstop. Without a designated player, total knockout remains in progress until turn end resolves a draw.

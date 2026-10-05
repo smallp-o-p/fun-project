@@ -41,7 +41,7 @@ public class ObjectiveBattleTest
 
     battle.ApplyDamage(battle.EnemyUnit, 999); // ANY observed kill trips either directive
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(complete ? BattleOutcome.Victory : BattleOutcome.Defeat,
       battle.Session.Outcome.RequireSome());
     if (!complete)
@@ -74,7 +74,7 @@ public class ObjectiveBattleTest
       battle.AdvanceTurn(); // enemy turn 1 ends -> round rolls -> TurnStarted(player, 2) -> Victory mid-submission
     }
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
     Assert.Equal(targetTurn, battle.Session.TurnNumber);
   }
@@ -136,7 +136,7 @@ public class ObjectiveBattleTest
 
     battle.ApplyDamage(firstEnemy, 999); // main fails -> follow-up SurviveUntilTurn(3) queued
 
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsNone);
     Assert.Equal(2, battle.Session.GetObjectives(player).Count); // main (Failed, history) + follow-up
     Assert.Equal(ObjectiveResult.Failed, battle.Session.GetObjectives(player)[0].State);
     Assert.Equal(ObjectiveResult.Ongoing, battle.Session.GetObjectives(player)[1].State);
@@ -145,7 +145,7 @@ public class ObjectiveBattleTest
     // turn 2, proving per-event snapshot semantics and silent non-resolution:
     battle.AdvanceTurn();
     battle.AdvanceTurn();
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsNone);
   }
 
   [TestCase(TestName = "A queued follow-up observes the next event in the same committed batch")]
@@ -169,7 +169,7 @@ public class ObjectiveBattleTest
 
     battle.Move(unit, [new Vector3I(1, 0, 0)]);
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
   }
 
@@ -193,11 +193,11 @@ public class ObjectiveBattleTest
     var unit = battle.Unit;
 
     battle.Move(unit, [new Vector3I(1, 0, 0)]);
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsNone);
 
     battle.AdvanceTurn();
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
   }
 
@@ -258,7 +258,7 @@ public class ObjectiveBattleTest
 
     battle.Move(unit, [new Vector3I(1, 0, 0)]);
 
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsNone);
     Assert.Equal(1, battle.Events.EventsOf<ObjectiveCompletedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(0, battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Count());
   }
@@ -279,7 +279,7 @@ public class ObjectiveBattleTest
 
     battle.Move(unit, [mid, end]);
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
     Assert.Equal(mid, battle.Session.GetUnitPosition(unit).RequireSome().Raw);
   }
@@ -301,7 +301,7 @@ public class ObjectiveBattleTest
 
     battle.ApplyDamage(battle.EnemyUnit, 999); // a reaction kill during the enemy's own turn
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase); // resolved NOW, not at turn end
+    Assert.True(battle.Session.Outcome.IsSome); // resolved NOW, not at turn end
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
     Assert.Equal(1, battle.Events.EventsOf<ObjectiveCompletedBattleEvent>().AsValueEnumerable().Count(e => e.Faction == battle.PlayerFaction));
     Assert.Equal(BattleOutcome.Victory, battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single().Outcome);
@@ -318,7 +318,7 @@ public class ObjectiveBattleTest
 
     battle.ApplyDamage(battle.PlayerUnit, 999);
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome()); // the backstop, not a directive
   }
 
@@ -337,7 +337,7 @@ public class ObjectiveBattleTest
 
     battle.ApplyDamage(battle.PlayerUnit, 999, kind); // owner wiped -> backstop Defeat, not the authored rescue directive
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
     Assert.Equal(BattleOutcome.Defeat, battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single().Outcome);
     Assert.Equal(0, battle.Events.EventsOf<ObjectiveFailedBattleEvent>().AsValueEnumerable().Count());
@@ -373,7 +373,7 @@ public class ObjectiveBattleTest
 
     battle.ApplyDamage(battle.EnemyUnit, 999); // without the guard this throws (PassUnit requires InProgress)
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
   }
 }

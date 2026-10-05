@@ -380,6 +380,19 @@ internal static class TestData
   public static BattleMapData MakeOpenBattleMap(int width = 4, int depth = 4) =>
     MakeOpenBattleMap(new Vector3I(width, 1, depth));
 
+  // One materialized, board-indexed runtime unit for complete-input BattleSession
+  // construction in direct constructor/lifecycle tests (the factory's own convention:
+  // nonnegative setup-order ids).
+  public static BattleUnitState PlacedUnit(BattleBoardState board, int unitId, Combatant combatant,
+    Vector3I position, Option<Weapon> weapon = default, Option<ItemWith<ArmorCapability>> armor = default)
+  {
+    var unit = new BattleUnitState(unitId, combatant, weapon, armor);
+    BattleBoardState.ValidatedPoint point = board.ValidatePoint(position).RequireSome();
+    if (!board.TryPlaceOccupant(point, unit.Id))
+      throw new System.InvalidOperationException($"Test cell {position} is not occupiable.");
+    return unit;
+  }
+
   // An otherwise-open authored map with WallTile at the named cells.
   public static BattleMapData MakeMapWithWalls(Vector3I dimensions, params Vector3I[] walls)
   {

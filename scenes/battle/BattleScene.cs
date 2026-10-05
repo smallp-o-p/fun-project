@@ -148,7 +148,7 @@ public sealed partial class BattleScene : Node3D
   private void OnPlaybackIdle()
   {
     RefreshView();
-    if (_runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
+    if (_runtime.Query(new GetBattleOutcomeQuery()).IsSome)
       return;
 
     Faction activeSide = _runtime.Query(new GetActiveSideQuery());

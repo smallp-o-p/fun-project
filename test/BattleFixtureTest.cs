@@ -139,7 +139,7 @@ public partial class BattleFixtureTest
     // The replacement actually committed on the authored lookup key and the battle survived
     // the mid-startup wipe, so the role contract below is exercised, not vacuous.
     Assert.Equal(2, adds.Length);
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsNone);
     // The authored role stays the originally recorded unit: dead but retained...
     Assert.True(ReferenceEquals(battle.EnemyUnit, adds[0]));
     Assert.True(battle.EnemyUnit.IsDead);
@@ -228,7 +228,7 @@ public partial class BattleFixtureTest
     replacement.Submit(BattleAction.SpawnUnit(
       TestData.MakeCombatant("Later", faction), battle.Board.At(2, 0, 2)));
     Assert.Equal(recorded, battle.Events.Count);
-    Assert.Throws<ObjectDisposedException>(() => battle.Query(new GetBattlePhaseQuery()));
+    Assert.Throws<ObjectDisposedException>(() => battle.Query(new GetBattleOutcomeQuery()));
     Assert.Throws<ObjectDisposedException>(() => battle.ClearEvents());
   }
 }

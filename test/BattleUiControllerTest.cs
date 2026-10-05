@@ -145,7 +145,7 @@ public sealed partial class BattleUiControllerTest
     battle.Runtime.ExecuteAction(BattleAction.ApplyDamage(
       battle.Runtime.TryGetAlive(battle.EnemyUnit).RequireSome(), 999)); // the last opposing unit falls: battle over
 
-    Assert.Equal(BattlePhase.Ended, battle.Runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.Equal(UiState.BattleOver, battle.Ui.State);
     Assert.True(battle.Ui.SelectedUnit.IsNone);
 

@@ -598,7 +598,6 @@ public class UnitActionCacheTest
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    BattleRuntime runtime = null;
     BattleUnitState support = null;
     IReadOnlyList<UnitAction> existing = null;
     IReadOnlyList<UnitAction> createdDuringCallback = null;
@@ -616,8 +615,8 @@ public class UnitActionCacheTest
         .AsValueEnumerable().Single(unit => unit.Combatant.Name == "Support");
       player.TrySpendActionPoints(player.CurrentActionPoints);
       support.TrySpendActionPoints(support.CurrentActionPoints);
-      existing = runtime.Query(new GetAvailableActionsForUnit(
-        context.Session.TryGetAlive(player).RequireSome()));
+      existing = new GetAvailableActionsForUnit(
+        context.Session.TryGetAlive(player).RequireSome()).Execute(context.Session);
       existingMove = Row<MoveActionDefinition>(existing);
     }
 
@@ -627,8 +626,8 @@ public class UnitActionCacheTest
         return;
       existingDuringCallback = existingMove.IsAvailable;
       existingDirtyDuringCallback = existingMove.IsDirty;
-      createdDuringCallback = runtime.Query(new GetAvailableActionsForUnit(
-        context.Session.TryGetAlive(support).RequireSome()));
+      createdDuringCallback = new GetAvailableActionsForUnit(
+        context.Session.TryGetAlive(support).RequireSome()).Execute(context.Session);
       UnitAction createdMove = Row<MoveActionDefinition>(createdDuringCallback);
       createdDuringCallbackValue = createdMove.IsAvailable;
       createdDirtyDuringCallback = createdMove.IsDirty;
@@ -638,7 +637,6 @@ public class UnitActionCacheTest
     {
       Systems = [new SetupSystemData { OnRegister = registered =>
       {
-        runtime = registered;
         registered.RegisterHook<SessionStartedBattleEvent>(new HookBody<SessionStartedBattleEvent>(ArrangeAtSessionStart));
         registered.RegisterHook<TurnStartedBattleEvent>(new HookBody<TurnStartedBattleEvent>(ObserveAtFirstTurnStart));
       } }],

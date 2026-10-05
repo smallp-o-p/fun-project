@@ -11,7 +11,7 @@ public sealed class StunRecoverySystem : BattleHook<TurnEndedBattleEvent>
   {
     foreach (var unit in context.Session.GetFactionAliveUnits(evt.Faction))
     {
-      if (context.Session.Phase != BattlePhase.InProgress)
+      if (context.Session.Outcome.IsSome)
         break;
 
       uint recovered = unit.RecoverStun(RecoveryPerTurn);

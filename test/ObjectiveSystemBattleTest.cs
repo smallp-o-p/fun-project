@@ -44,31 +44,6 @@ public class ObjectiveSystemBattleTest
     Assert.Equal(1, battle.Session.GetObjectives(a).AsValueEnumerable().Count(o => o.State == ObjectiveResult.Passed));
   }
 
-  [TestCase(TestName = "Objectives present before executor construction are read from session state")]
-  public void PreExecutorObjectivesAreReadFromSessionState()
-  {
-    var a = TestData.MakeFaction("A");
-    var b = TestData.MakeFaction("B");
-    var session = new BattleSession(new BattleBoardState(new Vector3I(5, 1, 5)), [a, b]);
-    // No executor yet. The objective remains in session state and is visible to the
-    // catch-all router once the executor is constructed.
-    session.AddObjective(a, new FakeObjective { Complete = true });
-
-    using var executor = new BattleActionExecutor(session);
-    executor.Submit(BattleAction.SpawnUnit(TestData.MakeCombatant("A1", a), session.Board.At(new Vector3I(0, 0, 0))));
-    executor.Submit(BattleAction.SpawnUnit(TestData.MakeCombatant("B1", b), session.Board.At(new Vector3I(2, 0, 0))));
-    var bUnit = session.GetUnitAt(session.Board.At(new Vector3I(2, 0, 0))).RequireSome();
-    // The old setup helper's missing-objective policy, spelled out: faction B has no
-    // authored objective, so it gets the silent eliminate-all default (no player faction
-    // means no Victory directive) before the battle can start.
-    session.AddObjective(b, new EliminateAllOpposingForcesObjectiveData().Instantiate());
-    executor.Submit(BattleAction.StartBattle());
-
-    executor.Submit(BattleAction.ApplyDamage(session.TryGetAlive(bUnit).RequireSome(), 999));
-
-    Assert.Equal(1, session.GetObjectives(a).AsValueEnumerable().Count(o => o.State == ObjectiveResult.Passed));
-  }
-
   [TestCase(TestName = "AddObjective raises an ObjectiveAdded event")]
   public void AddObjectiveRaisesEvent()
   {
@@ -126,11 +101,11 @@ public class ObjectiveSystemBattleTest
     // The follow-up must NOT have been checked against the killing event: candidates were
     // snapshotted before the directive added it. Its target is TurnStarted anyway, so the
     // battle continues...
-    Assert.Equal(BattlePhase.InProgress, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsNone);
 
     battle.AdvanceTurn(); // enemy turn 1 ends -> round rolls -> TurnStarted(player, 2) -> follow-up completes -> Defeat
 
-    Assert.Equal(BattlePhase.Ended, battle.Session.Phase);
+    Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
   }
 

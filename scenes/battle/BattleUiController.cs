@@ -56,7 +56,7 @@ public sealed class BattleUiController : IDisposable
     {
       if (_playbackBusy())
         return InputGate.PlaybackBusy;
-      if (_runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
+      if (_runtime.Query(new GetBattleOutcomeQuery()).IsSome)
         return InputGate.NotPlayerTurn;
       if (!ReferenceEquals(_runtime.Query(new GetActiveSideQuery()), _playerFaction))
         return InputGate.NotPlayerTurn;
@@ -242,7 +242,7 @@ public sealed class BattleUiController : IDisposable
     if (_state == UiState.BattleOver)
       return;
 
-    if (_runtime.Query(new GetBattlePhaseQuery()) != BattlePhase.InProgress)
+    if (_runtime.Query(new GetBattleOutcomeQuery()).IsSome)
     {
       ResetTargeting();
       _selected = None;

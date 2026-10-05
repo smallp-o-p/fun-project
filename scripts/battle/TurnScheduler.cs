@@ -20,12 +20,28 @@ internal sealed class TurnScheduler
   private readonly SysColGeneric.HashSet<Faction> _sidesActedThisRound = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _activeFactionUnitsAvailable = [];
 
+  // A constructed scheduler is immediately valid: the global faction order keeps the first
+  // occurrence of each identity, the first-round queue holds the conscious factions in that
+  // order, the active side is the queue head, and its availability is established. A roster
+  // that cannot start is a construction failure.
   public TurnScheduler(
+    IEnumerable<Faction> factionOrder,
     Func<Faction, bool> hasConsciousUnits,
     Func<Faction, IEnumerable<BattleUnitState>> eligibleUnitsOf)
   {
+    ArgumentNullException.ThrowIfNull(factionOrder);
     _hasConsciousUnits = hasConsciousUnits ?? throw new ArgumentNullException(nameof(hasConsciousUnits));
     _eligibleUnitsOf = eligibleUnitsOf ?? throw new ArgumentNullException(nameof(eligibleUnitsOf));
+
+    foreach (var faction in factionOrder)
+      RegisterFaction(faction);
+
+    RebuildRoundQueueFromConsciousSides();
+    if (_turnQueue.Count == 0)
+      throw new InvalidOperationException(
+        "Cannot start a battle without at least one conscious faction in the session.");
+    ActiveSide = _turnQueue.Peek();
+    RefreshActiveFactionAvailability();
   }
 
   public Faction ActiveSide { get; private set; } = null!;
@@ -43,14 +59,6 @@ internal sealed class TurnScheduler
     return true;
   }
 
-  // Setup-time round queue seed (constructor): build the queue from the full global order
-  // and point ActiveSide at its head, before any conscious-force filtering applies.
-  public void InitializeQueueFromGlobalOrder()
-  {
-    _turnQueue = new Queue<Faction>(_globalFactionOrder);
-    ActiveSide = _turnQueue.Peek();
-  }
-
   public void RebuildRoundQueueFromConsciousSides()
   {
     _turnQueue.Clear();
@@ -60,11 +68,6 @@ internal sealed class TurnScheduler
       if (_hasConsciousUnits(side))
         _turnQueue.Enqueue(side);
     }
-  }
-
-  public void SetActiveSideToQueueHead()
-  {
-    ActiveSide = _turnQueue.Peek();
   }
 
   public void ClearSidesActedThisRound()
@@ -77,13 +80,6 @@ internal sealed class TurnScheduler
     _activeFactionUnitsAvailable.Clear();
     foreach (var unit in _eligibleUnitsOf(ActiveSide))
       _activeFactionUnitsAvailable.Add(unit);
-  }
-
-  // Setup-time spawn: ensure the spawned unit's side is queued for the (not yet started) round.
-  public void EnqueueSideIfAbsent(Faction side)
-  {
-    if (!_turnQueue.Contains(side))
-      _turnQueue.Enqueue(side);
   }
 
   // In-progress spawn: fold the unit into the current round (active-faction availability if
@@ -131,18 +127,18 @@ internal sealed class TurnScheduler
 
   // Scheduler-side reaction to a faction being wiped out: it has no more turns. Drop it from
   // the acted set, then either prune it from the queue or — if it is the active side mid-turn —
-  // clear the active availability set so its remaining activations end. The session owns the
-  // phase/active decision (isActiveInProgress) plus all death/outcome side-effects.
-  public void OnFactionEliminated(Faction side, bool isActiveInProgress)
+  // clear the active availability set so its remaining activations end. Active-side identity
+  // is a scheduler-owned fact.
+  public void OnFactionEliminated(Faction side)
   {
     _sidesActedThisRound.Remove(side);
-    if (!isActiveInProgress)
+    if (side == ActiveSide)
     {
-      RemoveSideFromQueue(side);
+      _activeFactionUnitsAvailable.Clear();
       return;
     }
 
-    _activeFactionUnitsAvailable.Clear();
+    RemoveSideFromQueue(side);
   }
 
   public bool TryConsumeAvailableUnit(BattleUnitState unit)

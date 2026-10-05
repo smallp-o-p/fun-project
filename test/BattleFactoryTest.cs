@@ -69,7 +69,7 @@ public class BattleFactoryTest
     var system = new SetupSystemData();
     BattleSetupFailure failure = BattleFactory.Start(broken with { Systems = [system] }).RequireLeft();
     Assert.Equal(expected, failure.Reason);
-    Assert.True(system.RegisteredRuntime is null);
+    Assert.True(system.RegisteredHooks is null);
     return failure;
   }
 
@@ -324,7 +324,7 @@ public class BattleFactoryTest
     Assert.Equal(1, objects.Count);
     Assert.True(objects[0].Status.IsNone);
 
-    for (int turn = 0; turn < 6 && runtime.Query(new GetBattlePhaseQuery()) == BattlePhase.InProgress; turn++)
+    for (int turn = 0; turn < 6 && runtime.Query(new GetBattleOutcomeQuery()).IsNone; turn++)
       runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
     Assert.Equal(Some(ObjectStatus.Expired), runtime.Query(new GetBattleSpecialObjectsQuery())[0].Status);
   }

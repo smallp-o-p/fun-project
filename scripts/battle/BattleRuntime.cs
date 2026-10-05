@@ -12,7 +12,9 @@ public sealed class BattleRuntime : IDisposable
   public event Action<BattleAction> ActionStarted = delegate { };
   public event Action<BattleActionExecResult> ActionCompleted = delegate { };
 
-  public BattleRuntime(BattleSession session)
+  // Implementation detail: the factory is the only production assembly point. A runtime is
+  // never an alternate public construction path.
+  internal BattleRuntime(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 

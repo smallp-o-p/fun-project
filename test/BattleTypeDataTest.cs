@@ -29,7 +29,7 @@ public partial class BattleTypeDataTest
     var observed = new List<Option<ObjectStatus>>();
     runtime.RegisterHook<TurnEndedBattleEvent>(
       new StatusObserverHook(() => observed.Add(bomb.Status)), 0);
-    new ObjectExpirySystemData { Priority = -50 }.Register(runtime);
+    new ObjectExpirySystemData { Priority = -50 }.Register(new BattleHookRegistration(runtime));
 
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 

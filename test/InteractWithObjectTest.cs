@@ -86,7 +86,7 @@ public class InteractWithObjectTest
     battle.Interact(battle.PlayerUnit, bomb);
 
     Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
-    Assert.Equal(BattlePhase.InProgress, battle.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsNone);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
     Assert.Equal(turnNumber, battle.Session.TurnNumber);
     Assert.False(playerActions.AsValueEnumerable()

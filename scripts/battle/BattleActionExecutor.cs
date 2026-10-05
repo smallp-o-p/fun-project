@@ -36,7 +36,9 @@ public sealed class BattleActionExecutor : IDisposable
   private Option<BattleAction> _inFlightAction = None;
   private bool _disposed;
 
-  public BattleActionExecutor(BattleSession session)
+  // Implementation detail: the factory constructs the session's sole executor. A second
+  // executor would double-register the default systems.
+  internal BattleActionExecutor(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     _session = session;

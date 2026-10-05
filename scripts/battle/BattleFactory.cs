@@ -111,24 +111,48 @@ public static class BattleFactory
       objects.Add((placement.Data, point.Value()));
     }
 
-    var session = new BattleSession(board,
-      setup.Sides.AsValueEnumerable().Select(side => side.Faction).ToArray(),
-      hitChance, setup.Seed, setup.PlayerFaction);
+    // Materialize the initial roster/objects on the factory-owned board with the existing ID
+    // conventions (units nonnegative in setup order, objects negative), then instantiate the
+    // objectives. A placement miss after parsing is a trusted-invariant error, not a typed
+    // setup failure. The same unit constructor reinforcement uses; no buff/stat/inventory
+    // duplication.
+    var runtimeUnits = new List<BattleUnitState>(units.Count);
+    var placementEvents = new List<BattleEvent>(units.Count + objects.Count);
+    foreach (var (loadout, point) in units)
+    {
+      var unit = new BattleUnitState(
+        runtimeUnits.Count, loadout.Combatant, loadout.Weapon, loadout.Armor, loadout.StatMods);
+      if (!board.TryPlaceOccupant(point, unit.Id))
+        throw new InvalidOperationException($"Could not place unit {unit.Id} at {point.Raw}.");
+      runtimeUnits.Add(unit);
+      placementEvents.Add(new UnitAddedBattleEvent(unit, point));
+    }
+
+    var runtimeObjects = new List<BattleObjectState>(objects.Count);
+    foreach (var (data, point) in objects)
+    {
+      var state = new BattleObjectState(-runtimeObjects.Count - 1, data, point.Raw);
+      if (!board.TryPlaceObjectOccupant(point, state.Id))
+        throw new InvalidOperationException($"Object cell {point.Raw} is not occupiable.");
+      runtimeObjects.Add(state);
+      placementEvents.Add(new ObjectPlacedBattleEvent(state, point));
+    }
+
+    var objectives = new List<(Faction, Objective)>(setup.Sides.Count);
     foreach (BattleSideSetup side in setup.Sides)
       foreach (ObjectiveData objective in side.Objectives)
-        session.AddObjective(side.Faction, objective.Instantiate());
+        objectives.Add((side.Faction, objective.Instantiate()));
 
+    var session = new BattleSession(board,
+      setup.Sides.AsValueEnumerable().Select(side => side.Faction).ToArray(),
+      runtimeUnits, runtimeObjects, objectives, hitChance, setup.Seed, setup.PlayerFaction);
     var runtime = new BattleRuntime(session);
     try
     {
+      var hooks = new BattleHookRegistration(runtime);
       foreach (BattleTypeSystemData system in setup.Systems)
-        system.Register(runtime);
-      foreach (var (loadout, point) in units)
-        runtime.ExecuteAction(new SpawnUnit(loadout.Combatant, point,
-          loadout.Weapon, loadout.Armor, loadout.StatMods));
-      foreach (var (data, point) in objects)
-        runtime.ExecuteAction(BattleAction.PlaceObject(data, point));
-      runtime.ExecuteAction(BattleAction.StartBattle());
+        system.Register(hooks);
+      runtime.ExecuteAction(new BootstrapBattle(placementEvents));
       return Right<BattleSetupFailure, BattleRuntime>(runtime);
     }
     catch
@@ -137,6 +161,31 @@ public static class BattleFactory
       // they are not translated into typed cell failures, and nothing is rolled back.
       runtime.Dispose();
       throw;
+    }
+  }
+
+  // Factory-owned startup notification, invoked exactly once per start: it announces every
+  // initial placement through one executor action window (so hooks keep a valid source
+  // action and interrupts work through the existing machinery), then session start, then the
+  // first turn. All placements are enqueued before dispatch, so the first visibility refresh
+  // appends its deterministic spottings after the placement announcements, and hook-born
+  // follow-ups keep the normal queue order. An outcome decided mid-dispatch finishes the
+  // remaining notifications but skips the later stages; the executor drops queued interrupts
+  // once completion exists.
+  private sealed class BootstrapBattle(IReadOnlyList<BattleEvent> placementEvents) : BattleAction
+  {
+    public override Result Execute(BattleSession session)
+    {
+      session.RaiseEvents([.. placementEvents]);
+      if (session.Outcome.IsSome)
+        return Result.Completed;
+
+      session.RaiseEvents(new SessionStartedBattleEvent());
+      if (session.Outcome.IsSome)
+        return Result.Completed;
+
+      session.BeginFirstTurn();
+      return Result.Completed;
     }
   }
 }

@@ -58,7 +58,7 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(bomb).RequireSome()));
 
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome);
   }
 
@@ -70,11 +70,11 @@ public class DefuseAllBombsObjectiveTest
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
     BattleObjectState bomb = runtime.Query(new GetBattleSpecialObjectsQuery())[0];
 
-    for (int turn = 0; turn < 6 && runtime.Query(new GetBattlePhaseQuery()) == BattlePhase.InProgress; turn++)
+    for (int turn = 0; turn < 6 && runtime.Query(new GetBattleOutcomeQuery()).IsNone; turn++)
       runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
     Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
-    Assert.Equal(BattlePhase.Ended, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.Equal(BattleOutcome.Defeat, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome);
   }
 
@@ -98,7 +98,7 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(bombs[0]).RequireSome()));
 
-    Assert.Equal(BattlePhase.InProgress, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsNone);
     Assert.Equal(Some(ObjectStatus.Interacted), bombs[0].Status);
     Assert.True(bombs[1].Status.IsNone);
   }
@@ -121,7 +121,7 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(crate).RequireSome()));
 
-    Assert.Equal(BattlePhase.InProgress, runtime.Query(new GetBattlePhaseQuery()));
+    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsNone);
   }
 
   [TestCase]
@@ -150,10 +150,10 @@ public class DefuseAllBombsObjectiveTest
     var bomb = objects.AsValueEnumerable().Single(o => o.Name == "Bomb");
     var crate = objects.AsValueEnumerable().Single(o => o.Name == "Crate");
     battle.Attack(battle.PlayerUnit, crate);
-    Assert.Equal(BattlePhase.InProgress, battle.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsNone);
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, bomb);
-    Assert.Equal(BattlePhase.Ended, battle.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
     Assert.Equal(1, battle.Events.EventsOf<ObjectiveFailedBattleEvent>().Length);
     Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().Length);

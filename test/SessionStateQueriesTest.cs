@@ -6,12 +6,12 @@ using Godot;
 [RequireGodotRuntime]
 public sealed partial class SessionStateQueriesTest
 {
-  [TestCase(TestName = "Active side and phase queries read live session truth")]
-  public void ActiveSideAndPhaseQueriesReadSessionTruth()
+  [TestCase(TestName = "Active side and outcome queries read live session truth")]
+  public void ActiveSideAndOutcomeQueriesReadSessionTruth()
   {
     using var battle = BattleFixture.Duel(player: new("Hero"), enemy: new("Goon"));
 
-    Assert.Equal(BattlePhase.InProgress, battle.Query(new GetBattlePhaseQuery()));
+    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsNone);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
 
     battle.EndFactionTurn(battle.PlayerFaction);

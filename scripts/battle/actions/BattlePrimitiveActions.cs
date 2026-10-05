@@ -7,18 +7,6 @@ using System;
 using System.Collections.Generic;
 namespace FunProject.Battle;
 
-public sealed class StartBattle : BattleAction
-{
-  public override Result Execute(BattleSession session)
-  {
-    if (session.Phase != BattlePhase.Setup || !session.AliveUnits.AsValueEnumerable().Any())
-      return Result.Rejected;
-
-    session.StartBattle();
-    return Result.Completed;
-  }
-}
-
 public sealed class SpawnUnit : BattleAction
 {
   private Combatant Combatant { get; }
@@ -54,24 +42,10 @@ public sealed class SpawnUnit : BattleAction
 
   public override Result Execute(BattleSession session)
   {
-    if (session.Phase == BattlePhase.Ended || !session.Board.CanOccupy(Position))
+    if (session.Outcome.IsSome || !session.Board.CanOccupy(Position))
       return Result.Rejected;
 
     session.AddUnit(Combatant, Position, EquippedWeapon, EquippedArmor, StatMods);
-    return Result.Completed;
-  }
-}
-
-/// <summary>Places a special board object onto the board during setup.</summary>
-public sealed class PlaceObject(BattleSpecialObjectData data, BattleBoardState.ValidatedPoint position) : BattleAction
-{
-  public override Result Execute(BattleSession session)
-  {
-    ArgumentNullException.ThrowIfNull(data);
-    if (session.Phase != BattlePhase.Setup || !session.Board.CanOccupy(position))
-      return Result.Rejected;
-
-    session.AddObject(data, position);
     return Result.Completed;
   }
 }
@@ -295,7 +269,7 @@ public sealed class EndFactionTurn(Faction expectedActiveSide) : BattleAction
 {
   public override Result Execute(BattleSession session)
   {
-    if (session.Phase != BattlePhase.InProgress)
+    if (session.Outcome.IsSome)
       return Result.Rejected;
 
     Faction activeSide = session.ActiveSide;

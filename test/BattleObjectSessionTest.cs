@@ -48,21 +48,6 @@ public class BattleObjectSessionTest
     Assert.Throws<System.InvalidOperationException>(() => battle.Submit(spawn));
   }
 
-  [TestCase(TestName = "PlaceObject is rejected once the battle is in progress")]
-  public void MidBattlePlacementRejected()
-  {
-    var player = TestData.MakeFaction("P");
-    var enemy = TestData.MakeFaction("E");
-    using var battle = BattleFixture.Started(new Vector3I(4, 1, 4),
-      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", player)), new Vector3I(0, 0, 0)),
-      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3)));
-
-    BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 2));
-    Assert.Throws<System.InvalidOperationException>(() => battle.Submit(
-      BattleAction.PlaceObject(MakeBombData(), point)));
-    Assert.Equal(0, battle.Query(new GetBattleSpecialObjectsQuery()).Count);
-  }
-
   [TestCase(TestName = "Start(setup) places objects")]
   public void StartPlacesObjects()
   {

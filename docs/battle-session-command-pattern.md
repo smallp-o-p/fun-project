@@ -55,7 +55,6 @@ Presentation code that needs committed state changes should subscribe to `Battle
 
 The current built-in actions are:
 
-- `StartBattle`
 - `SpawnUnit`
 - `MoveUnit`
 - `AttackEntity`
@@ -65,6 +64,8 @@ The current built-in actions are:
 - `ApplyDamage`
 - `PassUnit`
 - `EndFactionTurn`
+
+Initial placement is construction, not gameplay: the factory materializes the complete roster and objects before the session exists and announces them through its private bootstrap operation, so there is no setup `StartBattle`/`PlaceObject` action. `SpawnUnit` is reinforcement only — it folds the new unit into live scheduling of an already-running battle.
 
 `MoveUnit` is composite. Callers provide ordered, board-validated destination steps (`ValidatedPoint`s — in-bounds is proven at the caller's mint door), and the action checks the mutable route facts (adjacency, occupancy) from the unit's current session position before committing each tile, returning `Result.Incomplete` between tiles. This gives the executor a checkpoint where committed movement events can trigger reactions before the route continues inside the same submission. If a reaction kills the mover, the remainder is interrupted quietly (`Result.Interrupted`); any other failed step is an invariant break that throws out of `Submit`.
 
