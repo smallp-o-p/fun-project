@@ -154,6 +154,34 @@ public sealed partial class BattleUiControllerTest
     Assert.Equal(UiState.BattleOver, battle.Ui.State);
   }
 
+  [TestCase(TestName = "A factory result that already has an outcome starts BattleOver with closed input")]
+  public void StartupTerminalFactoryResultStartsBattleOver()
+  {
+    // The factory finishes bootstrap before returning, so this terminal first-turn objective
+    // is decided before the controller is even constructed — no action result can deliver it.
+    using var battle = BattleFixture.Duel(playerControlled: true, configure: setup => setup with
+    {
+      Sides =
+      [
+        setup.Sides[0] with
+        {
+          Objectives = [new SurviveUntilTurnObjectiveData
+          {
+            TargetTurn = 1,
+            OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
+          }],
+        },
+        setup.Sides[1],
+      ],
+    });
+
+    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsSome);
+    Assert.Equal(UiState.BattleOver, battle.Ui.State);
+    Assert.Equal(InputGate.NotPlayerTurn, battle.Ui.Gate);
+    Assert.False(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));
+    Assert.Equal(UiState.BattleOver, battle.Ui.State);
+  }
+
   [TestCase(TestName = "BeginAction enters targeting with candidates; invalid clicks no-op")]
   public void BeginActionEntersTargetingWithCandidates()
   {

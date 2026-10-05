@@ -22,7 +22,7 @@ public sealed class BattleUiController : IDisposable
   private readonly Faction _playerFaction;
   private readonly Func<bool> _playbackBusy;
 
-  private UiState _state = UiState.Unselected;
+  private UiState _state;
   private Option<BattleUnitState> _selected;
   private readonly Dictionary<IReadOnlyList<UnitAction>, IReadOnlyList<UnitActionOption>> _optionsByList = [];
   private IReadOnlyList<UnitActionOption> _options = [];
@@ -44,6 +44,11 @@ public sealed class BattleUiController : IDisposable
     _runtime = runtime;
     _playerFaction = playerFaction;
     _playbackBusy = playbackBusy;
+    // The factory finishes bootstrap before returning, so an already-decided outcome never
+    // arrives through ActionCompleted; initialize terminal state from the current outcome.
+    _state = runtime.Query(new GetBattleOutcomeQuery()).IsSome
+      ? UiState.BattleOver
+      : UiState.Unselected;
     _runtime.ActionCompleted += OnActionResult;
   }
 

@@ -105,7 +105,7 @@ public partial class BattleFixtureTest
         runtime.RegisterHook<UnitAddedBattleEvent>(new ReinforceOnceOnFirstUnitAdded(reinforcement, new Vector3I(7, 0, 7)))
       }));
 
-    // The interrupt actually spawned between the initial placements...
+    // The interrupt spawned after the bootstrap's complete placement primitive...
     var interloper = battle.UnitAt(new Vector3I(7, 0, 7));
     Assert.Equal("Interloper", interloper.Combatant.Name);
     // ...but the authored placement still owns the enemy role.

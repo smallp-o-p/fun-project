@@ -258,7 +258,7 @@ public class BattleStartupLifecycleTest
 
   // Starts the real factory inside a using so even a successful Start disposes its runtime.
   // A capture must exist (a successful Start fails this helper), the system must have received
-  // the runtime, and that runtime must reject queries after disposal.
+  // its registration capability, and registering through it after disposal must throw.
   private static Exception AssertStartupFailureDisposes(BattleSetup setup, SetupSystemData system)
   {
     Exception? observed = null;

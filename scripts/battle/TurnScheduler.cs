@@ -44,7 +44,7 @@ internal sealed class TurnScheduler
     RefreshActiveFactionAvailability();
   }
 
-  public Faction ActiveSide { get; private set; } = null!;
+  public Faction ActiveSide { get; private set; }
   public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _globalFactionOrder;
   public IReadOnlyCollection<Faction> TurnQueue => _turnQueue;
   public int RoundQueueCount => _turnQueue.Count;

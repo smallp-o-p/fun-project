@@ -442,8 +442,8 @@ public class BattleSessionTest
     Assert.True(battle.Query(new IsUnitStillAvailableThisTurn(battle.PlayerUnit)));
   }
 
-  [TestCase(false, TestName = "A scheduler ignores killed spawn candidates")]
-  [TestCase(true, TestName = "A scheduler ignores unconscious spawn candidates")]
+  [TestCase(false, TestName = "A scheduler ignores unconscious spawn candidates")]
+  [TestCase(true, TestName = "A scheduler ignores killed spawn candidates")]
   public void SchedulerIgnoresDisabledSpawnCandidates(bool killed)
   {
     using var battle = BattleFixture.Duel();
