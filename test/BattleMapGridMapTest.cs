@@ -22,7 +22,7 @@ public partial class BattleMapGridMapTest
     map.Floors.SetCellItem(Godot.Vector3I.Zero, 0);
     map.Props.SetCellItem(Godot.Vector3I.Zero, 1);
     var data = map.BuildData(new() { [0] = floor, [1] = prop });
-    var tile = data.Tiles[Godot.Vector3I.Zero];
+    using var tile = data.GetTile(Godot.Vector3I.Zero);
     Assert.True(tile.Walkable);
     Assert.False(tile.BlocksLineOfSight);
     Assert.False(tile.BlocksVerticalLineOfSight);
@@ -49,10 +49,12 @@ public partial class BattleMapGridMapTest
     var basis = new Basis(Vector3.Up, turn * Mathf.Pi / 2);
     map.Props.SetCellItem(anchor, 1, map.Props.GetOrthogonalIndexFromBasis(basis));
     var data = map.BuildData(new() { [0] = TestData.MakeFloorFootprint(7, 7), [1] = prop });
-    Assert.False(data.Tiles[anchor].Walkable);
-    Assert.False(data.Tiles[anchor + (Godot.Vector3I)(basis * Vector3.Back).Round()].Walkable);
-    Assert.Equal(2, data.Tiles.Values.AsValueEnumerable().Count(tile => !tile.Walkable));
-    Assert.Equal(6, data.Tiles.Values.AsValueEnumerable().Count(tile => tile.CoverAmount == 40));
+    using var anchorTile = data.GetTile(anchor);
+    using var neighborTile = data.GetTile(anchor + (Godot.Vector3I)(basis * Vector3.Back).Round());
+    Assert.False(anchorTile.Walkable);
+    Assert.False(neighborTile.Walkable);
+    Assert.Equal(2, data.TileFlags.AsValueEnumerable().Count(flags => ((BattleTileFlags)flags & BattleTileFlags.Walkable) == 0));
+    Assert.Equal(6, data.TileCoverAmounts.AsValueEnumerable().Count(amount => amount == 40));
   }
 
   [TestCase]
@@ -70,11 +72,14 @@ public partial class BattleMapGridMapTest
     map.Floors.SetCellItem(Godot.Vector3I.Zero, 0);
     map.Props.SetCellItem(Godot.Vector3I.Zero, 1);
     var data = map.BuildData(new() { [0] = floor, [1] = prop });
-    Assert.False(data.Tiles[Godot.Vector3I.Zero].Walkable);
-    Assert.True(data.Tiles[new(0, 1, 0)].BlocksLineOfSight);
-    Assert.False(data.Tiles[new(0, 1, 0)].Walkable);
-    Assert.True(data.Tiles[new(1, 0, 0)].Walkable);
-    Assert.True(data.Tiles[new(1, 0, 0)].BlocksVerticalLineOfSight);
+    using var ground = data.GetTile(Godot.Vector3I.Zero);
+    using var upper = data.GetTile(new(0, 1, 0));
+    using var neighbor = data.GetTile(new(1, 0, 0));
+    Assert.False(ground.Walkable);
+    Assert.True(upper.BlocksLineOfSight);
+    Assert.False(upper.Walkable);
+    Assert.True(neighbor.Walkable);
+    Assert.True(neighbor.BlocksVerticalLineOfSight);
     Assert.Equal(new Godot.Vector3I(2, 3, 1), data.Dimensions);
   }
 
@@ -152,7 +157,7 @@ public partial class BattleMapGridMapTest
     map.Floors.SetCellItem(Godot.Vector3I.Zero, 0);
     map.Props.SetCellItem(new(10, 0, 10), 1);
     var data = map.BuildData(new() { [0] = TestData.MakeFloorFootprint(1, 1), [1] = [] });
-    Assert.Equal(1, data.Tiles.Count);
+    Assert.Equal(1, data.TileFlags.Length);
     Assert.Equal(new Godot.Vector3I(1, 1, 1), data.Dimensions);
   }
 }

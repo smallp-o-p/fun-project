@@ -121,9 +121,12 @@ public partial class BattleMapAuthoring : BattleMap
     var data = BuildMap(pieces);
     foreach (var (cell, slot) in SpawnSlots)
     {
-      if (slot < 0 || !data.Tiles.TryGetValue(cell, out var tile) || !tile.Walkable)
+      if (slot < 0 || !data.Contains(cell))
         throw new InvalidOperationException($"Spawn at {cell} requires a walkable floor and nonnegative faction slot.");
-      tile.SpawnFactionSlot = slot;
+      using var tile = data.GetTile(cell);
+      if (!tile.Walkable)
+        throw new InvalidOperationException($"Spawn at {cell} requires a walkable floor and nonnegative faction slot.");
+      data.SpawnSlots[cell] = slot;
     }
     return data;
 
@@ -167,6 +170,7 @@ public partial class BattleMapAuthoring : BattleMap
   public static BattleMapData BuildMap(IEnumerable<(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> Footprint, Transform3D Placement)> pieces)
   {
     var data = new BattleMapData();
+    var tiles = new SysColGeneric.Dictionary<Godot.Vector3I, BattleMapTileData>();
     var floorCells = new SysColGeneric.HashSet<Godot.Vector3I>();
     var blocked = new SysColGeneric.HashSet<Godot.Vector3I>();
     var cover = new Dictionary<(Godot.Vector3I Cell, int Side), int>();
@@ -197,26 +201,32 @@ public partial class BattleMapAuthoring : BattleMap
         }
       }
     }
-    foreach (var (cell, tile) in data.Tiles)
+    foreach (var (cell, tile) in tiles)
     {
       tile.Walkable = floorCells.Contains(cell) && !blocked.Contains(cell);
     }
     foreach (var ((cell, side), amount) in cover)
     {
-      if (!data.Tiles.TryGetValue(cell, out var tile) || !tile.Walkable) continue;
+      if (!tiles.TryGetValue(cell, out var tile) || !tile.Walkable) continue;
       if (tile.CoverDirections != CoverDirections.None && tile.CoverAmount != amount)
         throw new InvalidOperationException($"Different cover strengths on separate sides of {cell} require the directional-cover extension.");
       tile.CoverDirections |= Sides[side];
       tile.CoverAmount = amount;
     }
-    if (data.Tiles.Count == 0) throw new InvalidOperationException("Map contains no gameplay cells.");
+    if (tiles.Count == 0) throw new InvalidOperationException("Map contains no gameplay cells.");
+    data.InitializeTiles();
+    foreach (var (cell, tile) in tiles)
+    {
+      data.SetTile(cell, tile);
+      tile.Dispose();
+    }
     return data;
 
     BattleMapTileData Tile(Godot.Vector3I cell)
     {
       if (cell.X < 0 || cell.Y < 0 || cell.Z < 0) throw new InvalidOperationException($"Negative map coordinate {cell}.");
       data.Dimensions = new(Math.Max(data.Dimensions.X, cell.X + 1), Math.Max(data.Dimensions.Y, cell.Y + 1), Math.Max(data.Dimensions.Z, cell.Z + 1));
-      if (!data.Tiles.TryGetValue(cell, out var tile)) data.Tiles[cell] = tile = new() { Walkable = false };
+      if (!tiles.TryGetValue(cell, out var tile)) tiles[cell] = tile = new() { Walkable = false };
       return tile;
     }
     void AddFloor(Godot.Vector3I cell)

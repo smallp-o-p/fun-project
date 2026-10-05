@@ -17,9 +17,9 @@ Runtime ownership: [battlescape-architecture.md](battlescape-architecture.md). M
 
 ## Map data
 
-`BattleMapData` contains `Dimensions` and a `Tiles` dictionary keyed by `Vector3I`. The map baker expands entity footprints into cell flags. A ground cell is walkable when it has a floor and is free of movement blockers.
+`BattleMapData` stores `Dimensions`, three flattened byte arrays (walkability/LOS flags, cover directions and cover amounts), and sparse `SpawnSlots`. Cell access uses `GetTile`/`SetTile`; `GetTile` materializes a `BattleMapTileData` Resource owned by the caller. Both baked and runtime cells use `x + width * (z + depth * y)`. The map baker expands entity footprints into cell flags. A ground cell is walkable when it has a floor and is free of movement blockers.
 
-`new BattleBoardState(mapData)` creates the runtime board. Each cell starts unwalkable, then receives its baked tile data. Unpainted cells remain unwalkable holes. See [battle-map-authoring.md](battle-map-authoring.md).
+`new BattleBoardState(mapData)` creates an independent flat array of materialized tile structs. Runtime `GetTile` returns a reference to the cell; use a `ref` local to retain mutable access, since ordinary assignment copies its value. Each cell starts unwalkable, then receives its baked tile data. Unpainted cells remain unwalkable holes. See [battle-map-authoring.md](battle-map-authoring.md).
 
 ## Presentation and input
 

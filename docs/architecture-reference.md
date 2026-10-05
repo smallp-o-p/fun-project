@@ -43,7 +43,10 @@ The session/board/queries/actions/executor/hooks core is scene-independent C# an
 - **Life and consciousness** — `IsAlive` is `CurrentHealth > 0`. `IsUnconscious` is `IsAlive && CurrentStun >= CurrentHealth`. `IsIncapacitated` is `IsDead || IsUnconscious || IsImmobilized`. Acting requires AP, a capable actor, and the session's turn and availability checks.
   - Unconscious bodies keep their tile, block movement, stay in alive storage, and remain targetable. Their observer caches are empty.
   - Faction vision comes from conscious units. Elimination and scheduling count living conscious units, regardless of AP or immobilization.
-- **`BattleBoardState`** — The board stores a `BattleTileState[x,y,z]` grid, occupancy, and eight-way adjacency. A diagonal step needs one open flank. A pure-C# breadth-first search with fixed direction order provides pathfinding. Coordinates are the engine-agnostic `Vector3I` (X width, Y height, Z depth).
+- **`BattleBoardState`** — The board stores a flat materialized `BattleTileState[]`, occupancy, and eight-way adjacency. A diagonal step needs one open flank. A pure-C# breadth-first search with fixed direction order provides pathfinding. Coordinates are the engine-agnostic `Vector3I` (X width, Y height, Z depth). Cells use the index `x + width * (z + depth * y)`.
+  - `GetTile` returns a cell by reference. A `ref` local retains a mutable cell. Value assignment takes a snapshot.
+  - Board construction copies baked values into independent runtime cells. Missing map cells are non-walkable, transparent, and uncovered. Dimension-only boards are walkable.
+  - Saved maps use three byte arrays for flags and cover plus sparse spawn slots. Repository maps are migrated. Old Resource-per-cell dictionaries require a rebake before loading.
 - **Reads** — Gameplay code reads state through `IBattleSessionQuery<TResult>` questions via `runtime.Query(...)`. The result shape is contract:
   - Reads with proof-typed inputs return bare results.
   - Reads with normal absence return `Option<T>`.

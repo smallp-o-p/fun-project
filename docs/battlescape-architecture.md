@@ -161,7 +161,7 @@ Examples: `FindPathForUnit`, `GetPossibleMoveTilesForUnit`, `GetVisibleEnemiesFo
 
 ### BattleBoardState
 
-The board stores `BattleTileState[x,y,z]`, unit and object occupancy, and positions. Adjacency is eight-way: orthogonal plus same-level diagonals. A diagonal step needs at least one open flank. Pathfinding is a pure-C# breadth-first search with a fixed direction order; the board exposes it as `FindPath`. Unit-specific questions stay in queries (`FindPathForUnit`, `GetPossibleMoveTilesForUnit`). See [battlescape-tile-system.md](battlescape-tile-system.md).
+The board stores a flat materialized `BattleTileState[]`, unit and object occupancy, and positions. Cells use the index `x + width * (z + depth * y)` (X width, Y height, Z depth). Adjacency is eight-way: orthogonal plus same-level diagonals. A diagonal step needs at least one open flank. Pathfinding is a pure-C# breadth-first search with a fixed direction order; the board exposes it as `FindPath`. Unit-specific questions stay in queries (`FindPathForUnit`, `GetPossibleMoveTilesForUnit`). See [battlescape-tile-system.md](battlescape-tile-system.md).
 
 ### Visibility
 

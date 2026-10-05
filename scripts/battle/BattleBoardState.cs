@@ -50,7 +50,7 @@ public sealed class BattleBoardState
     }
   }
 
-  private readonly BattleTileState[,,] _tiles;
+  private readonly BattleTileState[] _tiles;
   private readonly Dictionary<ValidatedPoint, int> _occupants = [];
   private readonly Dictionary<ValidatedPoint, int> _objectOccupants = [];
   private readonly Dictionary<int, ValidatedPoint> _positionByUnit = [];
@@ -73,39 +73,26 @@ public sealed class BattleBoardState
       throw new ArgumentOutOfRangeException(nameof(dim));
 
     Dimensions = dim;
-    _tiles = new BattleTileState[Dimensions.X, Dimensions.Y, Dimensions.Z];
-
-    foreach (ValidatedPoint point in EnumerateBoardPoints())
-      _tiles[point.X, point.Y, point.Z] = new BattleTileState();
-
-    if (map is not null)
-      ApplyMapData(map);
-  }
-
-  private void ApplyMapData(BattleMapData map)
-  {
-    foreach (ValidatedPoint point in EnumerateBoardPoints())
-      GetTile(point).IsWalkable = false;
-
-    foreach (var entry in map.Tiles)
+    int count = checked(dim.X * dim.Z * dim.Y);
+    _tiles = new BattleTileState[count];
+    // Dimension-only boards are fully walkable; missing authored map cells remain holes.
+    if (map is null)
     {
-      BattleMapTileData data = entry.Value;
-      if (data is null)
-        continue;
-
-      ValidatePoint(new Vector3I(entry.Key.X, entry.Key.Y, entry.Key.Z)).Match(
-        point =>
+      System.Array.Fill(_tiles, new BattleTileState { IsWalkable = true });
+    }
+    else if (map.TileFlags.Length != 0)
+    {
+      for (int i = 0; i < count; i++)
+      {
+        var flags = (BattleTileFlags)map.TileFlags[i];
+        _tiles[i] = new BattleTileState
         {
-          BattleTileState tile = GetTile(point);
-          tile.IsWalkable = data.Walkable;
-          tile.BlocksLineOfSight = data.BlocksLineOfSight;
-          tile.BlocksVerticalLineOfSight = data.BlocksVerticalLineOfSight;
-          tile.Cover = new TileCover(data.CoverDirections, data.CoverAmount);
-        },
-        () =>
-        {
-          GD.PushError($"{nameof(BattleMapData)} tile at '{entry.Key}' is out of bounds for dimensions '{map.Dimensions}'.");
-        });
+          IsWalkable = (flags & BattleTileFlags.Walkable) != 0,
+          BlocksLineOfSight = (flags & BattleTileFlags.BlocksLineOfSight) != 0,
+          BlocksVerticalLineOfSight = (flags & BattleTileFlags.BlocksVerticalLineOfSight) != 0,
+          Cover = new((CoverDirections)map.TileCoverDirections[i], map.TileCoverAmounts[i])
+        };
+      }
     }
   }
 
@@ -318,15 +305,16 @@ public sealed class BattleBoardState
     }
   }
 
-  public BattleTileState GetTile(ValidatedPoint point)
+  // Use ref locals when retaining a mutable cell; ordinary value assignment makes a snapshot.
+  public ref BattleTileState GetTile(ValidatedPoint point)
   {
-    return _tiles[point.X, point.Y, point.Z];
+    return ref GetTileUnchecked(point.X, point.Y, point.Z);
   }
 
   // Unchecked Tile access, do NOT call this unless you've proven that the input is valid.
-  internal BattleTileState GetTileUnchecked(int x, int y, int z)
+  internal ref BattleTileState GetTileUnchecked(int x, int y, int z)
   {
-    return _tiles[x, y, z];
+    return ref _tiles[x + Dimensions.X * (z + Dimensions.Z * y)];
   }
 
   public bool IsBlockedByObject(ValidatedPoint point)

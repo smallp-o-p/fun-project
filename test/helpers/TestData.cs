@@ -408,20 +408,16 @@ internal static class TestData
   public static BattleMapTileData SpawnTile(int slot) => new() { SpawnFactionSlot = slot };
 
   // Takes runtime Vector3I coordinates (X = width, Y = levels/height, Z = depth) and converts
-  // them to Godot.Vector3I dictionary keys when building the authored map.
+  // them to Godot.Vector3I cell coordinates when building the authored map.
   public static BattleMapData MakeMapData(
     Vector3I dimensions,
     params (Vector3I Cell, BattleMapTileData Tile)[] tiles)
   {
-    var dict = new Godot.Collections.Dictionary<Godot.Vector3I, BattleMapTileData>();
+    var map = new BattleMapData { Dimensions = new Godot.Vector3I(dimensions.X, dimensions.Y, dimensions.Z) };
+    map.InitializeTiles();
     foreach ((Vector3I cell, BattleMapTileData tile) in tiles)
-      dict[new Godot.Vector3I(cell.X, cell.Y, cell.Z)] = tile;
-
-    return new BattleMapData
-    {
-      Dimensions = new Godot.Vector3I(dimensions.X, dimensions.Y, dimensions.Z),
-      Tiles = dict,
-    };
+      map.SetTile(new Godot.Vector3I(cell.X, cell.Y, cell.Z), tile);
+    return map;
   }
 
   // An all-walkable, all-floor board; every cell across all three dimensions is an authored
