@@ -341,6 +341,66 @@ internal static class TestData
     return buff;
   }
 
+  public static BattleMapAuthoring MakeMapAuthoring()
+  {
+    var map = new BattleMapAuthoring { Name = "Map" };
+    foreach (string name in new[] { "Floors", "Props" })
+    {
+      var grid = new GridMap { Name = name, CellSize = Vector3.One, CollisionLayer = name == "Floors" ? 1u : 2u, CollisionMask = 0 };
+      map.AddChild(grid);
+      grid.Owner = map;
+    }
+    return map;
+  }
+
+  public static MeshLibrary MakeTilePalette(Godot.Collections.Dictionary<int, Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>> footprints)
+  {
+    var palette = new MeshLibrary();
+    foreach (var (id, footprint) in footprints)
+    {
+      var mesh = new BoxMesh();
+      mesh.SetMeta(BattleProp.FootprintMeta, footprint);
+      palette.CreateItem(id);
+      palette.SetItemMesh(id, mesh);
+    }
+    return palette;
+  }
+
+  public static BattleEntityAnnotator MakeEntityAnnotator(Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>? footprint = null)
+  {
+    var markers = new MeshLibrary();
+    for (int item = 0; item < 3; item++)
+    {
+      var mesh = new BoxMesh();
+      mesh.SetMeta(BattleAnnotationMarker.FootprintMeta, new BattleFootprintData
+      {
+        HasFloor = item == 1,
+        BlocksMovement = item == 2,
+        BlocksLineOfSight = item == 2
+      });
+      markers.CreateItem(item);
+      markers.SetItemMesh(item, mesh);
+    }
+    var annotator = new BattleEntityAnnotator { Name = "Entity", Markers = markers, Annotations = footprint ?? [] };
+    var model = new MeshInstance3D { Name = "Model", Mesh = new BoxMesh() };
+    annotator.AddChild(model);
+    model.Owner = annotator;
+    var grid = new GridMap { Name = "Annotations", CellSize = Vector3.One, MeshLibrary = markers };
+    annotator.AddChild(grid);
+    grid.Owner = annotator;
+    foreach (var cell in annotator.Annotations.Keys) grid.SetCellItem(cell, 0);
+    return annotator;
+  }
+
+  public static Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> MakeFloorFootprint(int width, int depth)
+  {
+    var footprint = new Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>();
+    for (int x = 0; x < width; x++)
+      for (int z = 0; z < depth; z++)
+        footprint[new(x, 0, z)] = new() { HasFloor = true };
+    return footprint;
+  }
+
   public static BattleMapTileData FloorTile() => new() { Walkable = true };
 
   public static BattleMapTileData WallTile() => new() { Walkable = false, BlocksLineOfSight = true };
@@ -377,16 +437,8 @@ internal static class TestData
   // Packs the map into a BattleMap-rooted scene, the authored pool's storage shape; the
   // prototype node is freed after packing so only the scene survives. Runs under the Godot
   // runtime covered by the RequireGodotRuntime suites.
-  public static PackedScene MakeMapScene(BattleMapData map)
-  {
-    var battleMap = new BattleMap { MapData = map, UsedPalette = new BattleTilePalette { MeshLibrary = null } };
-    var scene = new PackedScene();
-    Error error = scene.Pack(battleMap);
-    battleMap.Free();
-    if (error != Error.Ok)
-      throw new System.InvalidOperationException($"Test map scene packing failed: {error}");
-    return scene;
-  }
+  public static PackedScene MakeMapScene(BattleMapData map) =>
+    GeoscapeTestScenes.Pack(new BattleMap { MapData = map });
 
   // Concrete setup for direct factory tests: fresh open 4x1x4 board, one unit per side at
   // (0,0,0)/(3,0,3), fixed seed 7, optional designated player faction. Pure: callers add

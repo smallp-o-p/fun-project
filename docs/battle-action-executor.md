@@ -12,7 +12,7 @@ Detail: [battlescape-architecture.md](battlescape-architecture.md) (runtime over
 - Controllers, HUD code, and AI build actions and submit them. Presentation reacts to committed events.
 - `BattleEvent` reports a state change that already committed.
 
-The executor never owns tactical truth, rendering, pathfinding, or AI decisions. It does not need to know which concrete action type it is running.
+The executor runs each action through its `Execute` method.
 
 ## Public Surface
 
@@ -20,36 +20,36 @@ The executor never owns tactical truth, rendering, pathfinding, or AI decisions.
 - `RegisterHook<TEventKey>(hook, priority = 0)` / `UnregisterHook<TEventKey>(hook)` — the registration surface. `BattleRuntime.RegisterHook` delegates here.
 - `Dispose()` — detaches the executor's `BattleEventCommitted` subscription.
 
-There are no executor lifecycle events and no `LastResult`. Outcomes are read from the returned event stream and committed session state. `BattleRuntime` raises `ActionStarted` and `ActionCompleted` around each submission; `EventPlaybackDirector` consumes `ActionCompleted`.
+Read outcomes from the returned event stream and committed session state. `BattleRuntime` raises `ActionStarted` and `ActionCompleted` around each submission; `EventPlaybackDirector` consumes `ActionCompleted`.
 
 ## One Executor Per Session
 
-The constructor registers the default systems: `StatusEffectSystem` and `ArmorRegenSystem` (`TurnEndedBattleEvent`, priority −100), `StunRecoverySystem` (−90), `CapabilityEffectSystem` (`ItemThrownBattleEvent`), `TurnStartBuffHook` (`TurnStartedBattleEvent`), `UnitSpawnedBuffHook` (`UnitAddedBattleEvent`), and `ObjectiveSystem` (catch-all `BattleEventTag` at +100; it receives every event and filters each objective's declared observed keys internally, with no self-registration or executor back-reference).
+The constructor registers the default systems: `StatusEffectSystem` and `ArmorRegenSystem` (`TurnEndedBattleEvent`, priority −100), `StunRecoverySystem` (−90), `CapabilityEffectSystem` (`ItemThrownBattleEvent`), `TurnStartBuffHook` (`TurnStartedBattleEvent`), `UnitSpawnedBuffHook` (`UnitAddedBattleEvent`), and `ObjectiveSystem` (catch-all `BattleEventTag` at +100; it receives every event and filters each objective's declared observed keys internally).
 
-A second live executor on the same session would double-register these systems: statuses, armor regen, and stun recovery would tick twice. Nothing in the language prevents that, so the invariant is held by ownership. Production `BattleRuntime` owns the session's single executor and subscribes its `BattleEventCommitted` re-raise before constructing it, so subscribers observe cause events before hook-born follow-ups. Tests reuse `BattleFixture.Runtime`; a lifecycle replacement is created only after the previous owner is disposed.
+Keep one live executor per session through ownership. Duplicate executors register duplicate upkeep handlers, causing statuses, armor regen, and stun recovery to tick twice. Production `BattleRuntime` owns the session's single executor and subscribes its `BattleEventCommitted` re-raise before constructing it, so subscribers observe cause events before hook-born follow-ups. Tests reuse `BattleFixture.Runtime`; a lifecycle replacement is created only after the previous owner is disposed.
 
 ## Execution Flow
 
-1. A controller or AI constructs a `BattleAction` and submits it immediately, with no intervening battle-state changes.
+1. A controller or AI constructs a `BattleAction` and submits it immediately against the same battle state.
 2. `Submit` stacks the action and resolves work until the stack drains.
 3. Each loop takes the stack head as the in-flight action and calls its `Execute(session)`. The action validates itself against current session state, applies its change through session and board helpers, and raises its events.
-4. `BattleSession` broadcasts each event after refreshing visibility and invalidating affected action-option availability. The executor's subscription appends the event to the log and fires matching hooks. A hook may mutate state, raise follow-up events (they queue and drain after the current event), and return interrupt actions. Interrupts returned while no action is in flight throw — this guard lives in the executor. Calling `executor.Submit` from inside `OnEvent` is forbidden by convention; there is no guard.
+4. `BattleSession` broadcasts each event after refreshing visibility and invalidating affected action-option availability. The executor's subscription appends the event to the log and fires matching hooks. A hook may mutate state, raise follow-up events (they queue and drain after the current event), and return interrupt actions. Interrupts require an in-flight action; the executor throws on an invalid return. Hooks request queued actions by returning them from `OnEvent`. This convention relies on caller discipline.
 5. On `Result.Completed` the executor pops the action and pushes the step's captured interrupts ahead of paused work (the combined list is reversed once, so earlier events' interrupts run first). On `Result.Incomplete` the action stays at the head and its interrupts are pushed. On `Result.Interrupted` the action is dropped quietly.
-6. Only `Result.Rejected` fails the submission as a converted error: `InvalidOperationException` from `Submit`, because parameters are trusted and a rejection is a caller bug. Arbitrary action or hook exceptions propagate unchanged. Either way the submission is unwound: queued work is cleared and availability is invalidated, but committed state and events are not rolled back.
-7. When the battle ends mid-dispatch, the executor drops remaining composite steps and queued interrupts instead of running them against an ended session.
+6. Only `Result.Rejected` fails the submission as a converted error: `InvalidOperationException` from `Submit`, because parameters are trusted and a rejection is a caller bug. Arbitrary action or hook exceptions propagate unchanged. Either way the submission is unwound: queued work is cleared, availability is invalidated, and committed state and events remain.
+7. When the battle ends mid-dispatch, the executor drops remaining composite steps and queued interrupts and ends execution.
 8. `Submit` returns exactly one result: the submitted action and every event committed while resolving it, including interrupt events.
 
-Composite actions such as `MoveUnit` commit one step per `Execute` and return `Result.Incomplete` between steps. Those steps are commit checkpoints for validation, event emission, and hook evaluation — not separate public results. Interrupt actions mutate state and raise committed events inside the same submission, and their events belong to the submission's result. A normal submission leaves the stack empty.
+Composite actions such as `MoveUnit` commit one step per `Execute` and return `Result.Incomplete` between steps. Those steps are commit checkpoints for validation, event emission, and hook evaluation. Their events belong to the submission's single result. Interrupt actions mutate state and raise committed events inside the same submission, and their events belong to the submission's result. A normal submission leaves the stack empty.
 
 ## Validation and Interruption
 
 Actions are constructed with trusted parameters — proof types such as `AliveUnit` and `ItemWith<TCap>` gate what can even be built. At commit time an action re-checks only state-dependent facts: battle phase, active side, board occupancy, attack feasibility (shared through `AttackContext.Resolve`), path legality, and stale faction-turn requests. A failed check is `Result.Rejected` and surfaces as an `InvalidOperationException`.
 
-Availability gating (AP, turn order, incapacity) belongs to the read side — action conditions and `CanUnitActNow` — before an action is built. Mutable facts can still change between construction and commit: liveness, incapacity, item possession, equipped weapon, remaining charges, target feasibility, loaded magazine. Actions re-check these at `Execute` and return `Result.Interrupted` to stop quietly. `MoveUnit` validates its whole route once (total AP, adjacency, occupancy) and then re-checks liveness, incapacity, and next-cell occupancy on every step; `AttackEntity`, `ReloadWeapon` (before `CanReload`), `ThrowItem`, `UseItem`, `InteractWithObject`, and `PassUnit` interrupt on lost liveness or incapacity — unconsciousness and immobilization included — before spending AP, ammunition, charges, items, or mutating objects. `EndFactionTurn` stays independent of any unit's capacity; a stale faction-turn request is a validation rejection. `ApplyDamage` checks target liveness only and can still damage unconscious bodies. A reaction can stop a route after its already-committed step without charging for later steps.
+Availability gating (AP, turn order, incapacity) belongs to the read side — action conditions and `CanUnitActNow` — before an action is built. Mutable facts can still change between construction and commit: liveness, incapacity, item possession, equipped weapon, remaining charges, target feasibility, loaded magazine. Actions re-check these at `Execute` and return `Result.Interrupted` to stop quietly. `MoveUnit` validates its whole route once (total AP, adjacency, occupancy) and then re-checks liveness, incapacity, and next-cell occupancy on every step; `AttackEntity`, `ReloadWeapon` (before `CanReload`), `ThrowItem`, `UseItem`, `InteractWithObject`, and `PassUnit` interrupt on lost liveness or incapacity — unconsciousness and immobilization included — before spending AP, ammunition, charges, items, or mutating objects. `EndFactionTurn` stays independent of any unit's capacity; a stale faction-turn request is a validation rejection. `ApplyDamage` checks target liveness only and can still damage unconscious bodies. A reaction can stop a route after its already-committed step and preserves the AP for later steps.
 
-The split: a rule that prevents a commit ("this tile cannot be entered") is validation inside the action. A rule that reacts to a settled fact ("a watched tile became occupied") is a hook. Because a hook's interrupts run in the same submission, immediately after the step that raised the event, reactions act on the committed state that caused it — a unit that stepped from X to X + 1 is on X + 1 when an overwatch shot resolves, and the remaining steps can be cut short.
+Actions validate legality before commit. Hooks react to committed changes, such as a watched tile becoming occupied. Because a hook's interrupts run in the same submission, immediately after the step that raised the event, reactions act on the committed state that caused it — a unit that stepped from X to X + 1 is on X + 1 when an overwatch shot resolves, and the remaining steps can be cut short.
 
-`AliveUnit` includes unconscious bodies: it proves life and board presence. `IsIncapacitated` is `IsDead || IsUnconscious || IsImmobilized`. Interruption behavior is tested through real executor submissions with hooks, never by driving actions directly.
+`AliveUnit` includes unconscious bodies: it proves life and board presence. `IsIncapacitated` is `IsDead || IsUnconscious || IsImmobilized`. Test interruptions through executor submissions with hooks.
 
 ## Turn-End Upkeep
 
@@ -59,9 +59,9 @@ The executor registers owner-turn upkeep on `TurnEndedBattleEvent` in this order
 2. `ArmorRegenSystem`, priority −100 (registration order breaks the tie).
 3. `StunRecoverySystem`, priority −90.
 
-`StunRecoverySystem` owns its fixed `uint` rate of `5u`, its phase checks, and its event emission. Battle types, setup, and runtime constructors expose no recovery setting; `BattleSession` has no recovery-specific methods — the hook uses existing unit access and event dispatch. Recovery clamps to the unit's current stun before narrowing from `uint`; `UnitStunRecoveredBattleEvent.AmountRecovered` is `uint` and requires a positive reduction. Unconscious and dead units never recover; conscious units recover even with no AP or under immobilization. Status damage can cause unconsciousness before recovery runs, and ended sessions skip recovery.
+`StunRecoverySystem` owns its fixed `uint` rate of `5u`, its phase checks, and its event emission. The hook uses the session's existing unit access and event dispatch. Recovery clamps to the unit's current stun before narrowing from `uint`; `UnitStunRecoveredBattleEvent.AmountRecovered` is `uint` and requires a positive reduction. Recovery requires a living conscious unit. AP and immobilization are independent of recovery eligibility. Status damage can cause unconsciousness before recovery runs, and ended sessions skip recovery.
 
-`ObjectiveSystem` suppresses objective routing on the player's final death or unconscious event when the player has no conscious forces, so the defeat backstop stays authoritative. Other events still update objective history and can queue follow-ups after the battle ends. The first `EndBattle` freezes victory capture membership before `SessionEndedBattleEvent` observers query it; executor queue clearing then drops remaining work. Applying captures to the campaign is deferred (see [battlescape-architecture.md](battlescape-architecture.md)).
+`ObjectiveSystem` suppresses objective routing on the player's final death or unconscious event when the player loses all conscious forces, so the defeat backstop stays authoritative. Other events still update objective history and can queue follow-ups after the battle ends. The first `EndBattle` freezes victory capture membership before `SessionEndedBattleEvent` observers query it; executor queue clearing then drops remaining work. Applying captures to the campaign is deferred (see [battlescape-architecture.md](battlescape-architecture.md)).
 
 ## Single-Threaded Execution
 
@@ -69,7 +69,7 @@ Authoritative execution is single-threaded: outcomes stay deterministic, orderin
 
 ## Relationship To Visuals
 
-Visuals never infer tactical truth from executor internals:
+Presentation uses the runtime's public results and queries:
 
 - use the submission's `BattleActionExecResult` for command outcomes;
 - use read-side queries for previews;
@@ -77,4 +77,4 @@ Visuals never infer tactical truth from executor internals:
 
 Scene nodes that need Godot signals adapt the C# event at the presentation boundary; `EventPlaybackDirector` is that adapter for playback. The session stays a pure runtime object.
 
-The executor exposes no preview evaluation. Controllers and AI use explicit queries — `GetPossibleMoveTilesForUnit`, `FindPathForUnit`, `GetHitChanceForAttack` — which stay read-only and never bypass the action path.
+Controllers and AI preview actions through read-only queries: `GetPossibleMoveTilesForUnit`, `FindPathForUnit`, and `GetHitChanceForAttack`. Submit gameplay changes as actions.

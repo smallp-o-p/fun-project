@@ -10,6 +10,6 @@ Two review passes reshaped the model system in October 2026:
 Historical assertions recorded by those reviews, retained as context only:
 
 - The generated glTFs of both models referenced the shared face lightmap PNG with case-differing URIs; the shared imported cache stored the lowercase spelling. Fresh Linux import succeeded with the committed model-prefixed PNG inputs; packaged export remained unverified at the time.
-- Trigger's pantyhose mesh from the source import differed from the legacy scene's baked pantyhose by up to about 0.0919 per vertex; the legacy bake's provenance was unestablished, and no source compensation was made.
-- The shared `head_turn` clip endpoint is 12°, where Zhu Yuan's legacy clip reached 20° — the deliberate trade for one body library shared by both models.
-- Verification pass counts, file inventories, and per-test results from the original reports described those commits, not the current tree. Do not cite them as current facts.
+- Trigger's source-imported pantyhose geometry was accepted during the migration.
+- Both models use a shared body library with a 12° `head_turn` endpoint.
+- Interpret historical validation results against the commit recorded in the original report.

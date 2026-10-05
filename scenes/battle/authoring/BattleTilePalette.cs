@@ -1,53 +1,19 @@
-using FunProject.Battle;
 using Godot;
-using Godot.Collections;
+using System;
 
-/// <summary>
-/// A mapping of MeshLibrary objects to Tile data.
-/// </summary>
-[Tool, GlobalClass]
-public partial class BattleTilePalette : Resource
+// Palettes are ordinary MeshLibraries; native item IDs belong to their painted cells.
+public static class BattleTilePalette
 {
-  private MeshLibrary? _meshLibrary;
-  [Export]
-  public required MeshLibrary? MeshLibrary
+  public static Godot.Collections.Dictionary<int, Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>> ReadFootprints(MeshLibrary palette)
   {
-    get => _meshLibrary;
-    set
+    Godot.Collections.Dictionary<int, Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>> footprints = [];
+    foreach (int item in palette.GetItemList())
     {
-      _meshLibrary = value;
-      NotifyPropertyListChanged();
+      var mesh = palette.GetItemMesh(item);
+      if (mesh is null || !mesh.HasMeta(BattleProp.FootprintMeta))
+        throw new InvalidOperationException($"Palette item {item} needs an exported BattleProp mesh with footprint metadata.");
+      footprints[item] = mesh.GetMeta(BattleProp.FootprintMeta).AsGodotDictionary<Godot.Vector3I, BattleFootprintData>();
     }
-  }
-
-  // Do not add any keys on your own: This is automatically filled with the required keys when the MeshLib is set. 
-  [Export] public Dictionary<StringName, BattleMapTileData> Brushes { get; private set; } = [];
-
-  public override void _ValidateProperty(Dictionary property)
-  {
-    if (MeshLibrary is null)
-      return;
-
-    if (property["name"].AsStringName() == PropertyName.MeshLibrary)
-    {
-      foreach (var meshId in MeshLibrary.GetItemList())
-      {
-        StringName name = MeshLibrary.GetItemName(meshId);
-
-        if (Brushes.TryGetValue(name, out _))
-          continue;
-        Brushes[name] = new BattleMapTileData();
-      }
-    }
-    else if (property["name"].AsStringName() == PropertyName.Brushes)
-    {
-      foreach (var (name, _) in Brushes)
-      {
-        if (MeshLibrary.FindItemByName(name) == -1)
-        {
-          GD.PushError($"Could not find item {name} inside mesh library!");
-        }
-      }
-    }
+    return footprints;
   }
 }
