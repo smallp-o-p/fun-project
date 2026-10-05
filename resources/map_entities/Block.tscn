@@ -1,0 +1,21 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleFootprintData.cs" id="1_pppak"]
+[ext_resource type="Script" path="res://scenes/battle/authoring/BattleProp.cs" id="2_xwool"]
+
+[sub_resource type="Resource" id="Resource_bur33"]
+script = ExtResource("1_pppak")
+BlocksMovement = true
+BlocksLineOfSight = true
+CoverDirections = 15
+CoverAmount = 60
+
+[sub_resource type="BoxMesh" id="BoxMesh_btrju"]
+metadata/battle_footprint = Dictionary[Vector3i, ExtResource("1_pppak")]({
+Vector3i(0, 0, 0): SubResource("Resource_bur33")
+})
+
+[node name="Block" type="MeshInstance3D" unique_id=736389376]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 0.5)
+mesh = SubResource("BoxMesh_btrju")
+script = ExtResource("2_xwool")
