@@ -91,7 +91,7 @@ public class GeoscapeMissionReturnTest
       Assert.Equal(BattleOutcome.Victory, PlayerSummary(battle, campaign.State).Outcome);
 
       campaign.ClearEvents();
-      campaign.Session.CompleteMission(battle);
+      campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
 
       Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier);
       Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier);
@@ -151,7 +151,7 @@ public class GeoscapeMissionReturnTest
       Assert.Equal(BattleOutcome.Defeat, PlayerSummary(battle, campaign.State).Outcome);
 
       campaign.ClearEvents();
-      campaign.Session.CompleteMission(battle);
+      campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
 
       Assert.False(Holds(campaign.State.Roster, alpha), "The reported death leaves the roster.");
       Assert.Equal(2, campaign.State.Roster.Count);
@@ -194,7 +194,7 @@ public class GeoscapeMissionReturnTest
       Assert.Equal(BattleOutcome.Victory, PlayerSummary(battle, campaign.State).Outcome);
 
       campaign.ClearEvents();
-      campaign.Session.CompleteMission(battle);
+      campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
 
       Assert.True(Holds(campaign.State.Roster, beta),
         "Unconscious survivors remain on the roster.");
@@ -213,66 +213,6 @@ public class GeoscapeMissionReturnTest
     }
   }
 
-  [TestCase(TestName = "Completing a live battle is denied before any effect")]
-  public void EarlyReturnDeniedBeforeEffects()
-  {
-    using var campaign = NewMissionCampaign();
-    var mission = campaign.ActiveEvent;
-    var alpha = campaign.State.Roster[0];
-    campaign.OpenResolution(mission);
-    var battle = campaign.Session.LaunchMission(mission, [alpha]).RequireRight();
-    try
-    {
-      campaign.ClearEvents();
-      Assert.Throws<InvalidOperationException>(() => campaign.Session.CompleteMission(battle));
-
-      Assert.True(campaign.Session.ActiveMission.IsSome);
-      Assert.True(campaign.Session.PendingResolution.IsSome);
-      Assert.Equal(0, campaign.Events.Count, "A denied return commits nothing.");
-      Assert.True(campaign.State.Conditions.GetFatigue(alpha).IsNone);
-      Assert.True(battle.Runtime.Query(new GetBattleOutcomeQuery()).IsNone,
-        "The live battle keeps running after the denial.");
-    }
-    finally
-    {
-      battle.Runtime.Dispose();
-    }
-  }
-
-  [TestCase(TestName = "A stale handle after a presentation abort cannot return its battle")]
-  public void ForeignHandleDeniedBeforeEffects()
-  {
-    using var campaign = NewMissionCampaign();
-    var mission = campaign.ActiveEvent;
-    var alpha = campaign.State.Roster[0];
-    campaign.OpenResolution(mission);
-    var stale = campaign.Session.LaunchMission(mission, [alpha]).RequireRight();
-    Strike(stale, UnitAt(stale, 0), 25);
-    Strike(stale, UnitAt(stale, 2), 20, DamageKind.Stun);
-    campaign.Session.AbortMissionPresentation(stale);
-
-    var retry = campaign.Session.LaunchMission(mission, [alpha]).RequireRight();
-    try
-    {
-      campaign.ClearEvents();
-      Assert.Throws<InvalidOperationException>(() => campaign.Session.CompleteMission(stale));
-
-      Assert.True(ReferenceEquals(retry.Deployment, campaign.Session.ActiveMission.RequireSome()),
-        "The retry keeps the association.");
-      Assert.True(campaign.Session.PendingResolution.IsSome);
-      Assert.True(campaign.State.Conditions.GetInjury(alpha).IsNone,
-        "The stale return was never applied.");
-      Assert.Equal(0, campaign.State.Captivity.Combatants.Count,
-        "The stale return captured nobody.");
-      Assert.Equal(0, campaign.Events.Count, "A denied return commits nothing.");
-    }
-    finally
-    {
-      retry.Runtime.Dispose();
-      stale.Runtime.Dispose();
-    }
-  }
-
   [TestCase(TestName = "A consumed mission return cannot apply again")]
   public void ConsumedReturnCannotApplyAgain()
   {
@@ -288,12 +228,12 @@ public class GeoscapeMissionReturnTest
       Strike(battle, UnitAt(battle, 2), 20, DamageKind.Stun);
 
       campaign.ClearEvents();
-      campaign.Session.CompleteMission(battle);
+      campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
       Assert.True(campaign.Session.ActiveMission.IsNone);
       Assert.True(campaign.Session.PendingResolution.IsNone);
       FatigueState betaFatigue = campaign.State.Conditions.GetFatigue(beta).RequireSome();
 
-      Assert.Throws<InvalidOperationException>(() => campaign.Session.CompleteMission(battle));
+      Assert.Throws<InvalidOperationException>(() => campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State)));
 
       Assert.Equal(betaFatigue, campaign.State.Conditions.GetFatigue(beta).RequireSome(),
         "The denied second return leaves survivor conditions untouched.");
@@ -341,7 +281,7 @@ public class GeoscapeMissionReturnTest
           Assert.True(campaign.Session.ActiveMission.IsNone);
           Assert.True(campaign.Session.PendingResolution.IsNone);
           Assert.Equal(0, campaign.Session.ActiveEvents.Count);
-          Assert.Throws<InvalidOperationException>(() => campaign.Session.CompleteMission(battle));
+          Assert.Throws<InvalidOperationException>(() => campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State)));
         }
         if (geoscapeEvent is ResolutionEventClosed && !inspectedClose)
         {
@@ -352,7 +292,7 @@ public class GeoscapeMissionReturnTest
       };
 
       campaign.ClearEvents();
-      campaign.Session.CompleteMission(battle);
+      campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
 
       Assert.True(inspectedCondition);
       Assert.True(inspectedClose);
@@ -391,7 +331,7 @@ public class GeoscapeMissionReturnTest
       Exception? caught = null;
       try
       {
-        campaign.Session.CompleteMission(battle);
+        campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
       }
       catch (Exception exception)
       {
@@ -407,7 +347,7 @@ public class GeoscapeMissionReturnTest
         "Survivor effects stay committed.");
       Assert.Equal(2, campaign.Events.Count, "The close was committed before the throw.");
 
-      Assert.Throws<InvalidOperationException>(() => campaign.Session.CompleteMission(battle));
+      Assert.Throws<InvalidOperationException>(() => campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State)));
       Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier);
       Assert.Equal(1, campaign.State.Captivity.Combatants.Count, "No effect is replayed.");
     }
@@ -432,7 +372,7 @@ public class GeoscapeMissionReturnTest
       Strike(battle, UnitAt(battle, 2), 20, DamageKind.Stun);
 
       var rebuilt = new GeoscapeSession(campaign.State);
-      rebuilt.CompleteMission(battle);
+      rebuilt.CompleteMission(PlayerSummary(battle, campaign.State));
 
       Assert.True(rebuilt.ActiveMission.IsNone);
       Assert.True(rebuilt.PendingResolution.IsNone);
@@ -442,7 +382,7 @@ public class GeoscapeMissionReturnTest
       Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier);
       Assert.Equal(3, campaign.State.Roster.Count, "No death means no roster removal.");
 
-      Assert.Throws<InvalidOperationException>(() => campaign.Session.CompleteMission(battle));
+      Assert.Throws<InvalidOperationException>(() => campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State)));
     }
     finally
     {

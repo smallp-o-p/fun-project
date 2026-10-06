@@ -4,35 +4,46 @@ using System;
 
 namespace FunProject.Battle;
 
-/// <summary>Authored capacity envelope for a tactical mission: how many player units may
-/// deploy, and the inclusive ordinary-enemy draw range. Special enemies are additive and
-/// never raise the player limit.</summary>
-[GlobalClass]
+/// <summary>Player capacity and the inclusive ordinary-enemy range. Special enemies are additive.</summary>
+[Tool, GlobalClass]
 public partial class BattleSizeData : NamedEntityData
 {
-  [Export] public int MaxPlayerUnits { get; set; } = 1;
+  private uint _maxPlayerUnits = 1;
+  private uint _minEnemyUnits;
+  private uint _maxEnemyUnits;
 
-  [Export] public int MinEnemyUnits { get; set; } = 0;
-
-  [Export] public int MaxEnemyUnits { get; set; } = 0;
-
-  /// <summary>Authoring guard: positive player capacity and 0 &lt;= Min &lt;= Max.</summary>
-  public void Validate()
+  [Export(PropertyHint.Range, "1,4294967295,1")]
+  public uint MaxPlayerUnits
   {
-    if (MaxPlayerUnits <= 0)
-      throw new InvalidOperationException(
-        $"{nameof(BattleSizeData)} requires a positive {nameof(MaxPlayerUnits)}.");
-    if (MinEnemyUnits < 0 || MinEnemyUnits > MaxEnemyUnits)
-      throw new InvalidOperationException(
-        $"{nameof(BattleSizeData)} requires 0 <= {nameof(MinEnemyUnits)} <= {nameof(MaxEnemyUnits)}; found [{MinEnemyUnits}, {MaxEnemyUnits}].");
+    get => _maxPlayerUnits;
+    set => _maxPlayerUnits = Math.Max(1u, value);
   }
 
-  /// <summary>Ordinary count for one resolution: inclusive
-  /// [MinEnemyUnits, MaxEnemyUnits]; the exclusive upper bound is widened to long so a
-  /// maximum of int.MaxValue stays reachable.</summary>
-  public int SampleEnemyCount(Random random)
+  // Preserve the authored minimum until both serialized properties have been assigned.
+  [Export(PropertyHint.Range, "0,4294967295,1")]
+  public uint MinEnemyUnits
   {
-    ArgumentNullException.ThrowIfNull(random);
-    return (int)random.NextInt64(MinEnemyUnits, (long)MaxEnemyUnits + 1);
+    get => Math.Min(_minEnemyUnits, MaxEnemyUnits);
+    set => _minEnemyUnits = value;
   }
+
+  [Export(PropertyHint.Range, "0,4294967295,1")]
+  public uint MaxEnemyUnits
+  {
+    get => _maxEnemyUnits;
+    set
+    {
+      _maxEnemyUnits = value;
+      NotifyPropertyListChanged();
+    }
+  }
+
+  public override void _ValidateProperty(Godot.Collections.Dictionary property)
+  {
+    if (property["name"].AsString() == PropertyName.MinEnemyUnits)
+      property["hint_string"] = $"0,{MaxEnemyUnits},1";
+  }
+
+  public uint SampleEnemyCount(Random random)
+    => (uint)random.NextInt64(MinEnemyUnits, (long)MaxEnemyUnits + 1);
 }

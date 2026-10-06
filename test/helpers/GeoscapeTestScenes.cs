@@ -57,21 +57,21 @@ internal static partial class GeoscapeTestScenes
     var camera = battle.GetNode<Camera3D>("GameCamera/CameraPath/PathFollow3D/Camera");
     Vector2 pointer = camera.UnprojectPosition(new Vector3(0.5f, 0, 0.5f));
     var viewport = battle.GetViewport();
-    Input.WarpMouse(pointer);
-    Input.ParseInputEvent(new InputEventMouseMotion { Position = pointer, GlobalPosition = pointer });
-    Input.FlushBufferedEvents();
+    // Camera projection returns viewport coordinates, including under canvas_items scaling.
+    viewport.WarpMouse(pointer);
+    viewport.PushInput(new InputEventMouseMotion { Position = pointer, GlobalPosition = pointer }, inLocalCoords: true);
     viewport.PushInput(new InputEventMouseButton
     {
       Position = pointer,
       ButtonIndex = MouseButton.Left,
       Pressed = true,
-    });
+    }, inLocalCoords: true);
     viewport.PushInput(new InputEventMouseButton
     {
       Position = pointer,
       ButtonIndex = MouseButton.Left,
       Pressed = false,
-    });
+    }, inLocalCoords: true);
   }
 
   // Momentary capture of the composition root's live session at the production Present

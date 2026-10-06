@@ -66,7 +66,7 @@ public partial class BattleLauncherTest
     Assert.Equal("VICTORY", banner.Text);
     Assert.False(ReturnButton(battle).Visible);
     int returns = 0;
-    battle.ReturnRequested += () => returns++;
+    battle.Completed += _ => returns++;
     ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(0, returns); // terminal standalone battles still cannot return to a campaign
   }

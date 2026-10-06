@@ -311,21 +311,19 @@ public class BattleSetupResolverTest
     Assert.Equal(1, floored.Sides[0].Units.Count);
   }
 
-  [TestCase(TestName = "Equipment authored as armor without an armor capability throws at resolution")]
-  public void MalformedArmorThrows()
+  [TestCase(TestName = "Loadout authoring clears equipment without an armor capability")]
+  public void LoadoutAuthoringClearsNonArmor()
   {
-    var type = TestData.MakeDuelBattleType();
-    type.Factions[0].Roster.Clear();
-    type.Factions[0].Roster.Add(new FunProject.Battle.RosterEntryData
+    using var loadout = new UnitLoadoutData
     {
-      Loadout = new UnitLoadoutData
-      {
-        Combatant = TestData.MakeCombatantData("Trooper", health: 20, aim: 65),
-        Armor = TestData.MakeWeaponData(damage: 3, range: 8),
-      },
-    });
-
-    Assert.Throws<InvalidOperationException>(() => BattleSetupResolver.Resolve(type, seed: 7));
+      Combatant = TestData.MakeCombatantData("Trooper"),
+      Armor = TestData.MakeArmorData("Vest"),
+    };
+    Assert.True(loadout.Armor is not null);
+    loadout.Armor = TestData.MakeWeaponData(damage: 3, range: 8);
+    Assert.True(loadout.Armor is null);
+    var faction = TestData.MakeFaction("Player");
+    Assert.True(loadout.CreateRuntime(faction).Armor.IsNone);
   }
 
   [TestCase(TestName = "A loadout without authored gear stays unarmed and unarmored")]

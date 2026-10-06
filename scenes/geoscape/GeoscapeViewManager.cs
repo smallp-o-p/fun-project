@@ -38,13 +38,10 @@ public sealed partial class GeoscapeViewManager : Control
 
     Deactivate(Current);
 
-    if (view.HidesPreviousScene)
-      Current.Hide();
-
     _views.Push(view);
     AddChild(view);
     SubscribeNavigation(view);
-    view.Show();
+    UpdateVisibility();
     view.ProcessMode = ProcessModeEnum.Inherit;
     EmitSignal(SignalName.ViewChanged, view);
   }
@@ -60,9 +57,19 @@ public sealed partial class GeoscapeViewManager : Control
     removed.QueueFree();
 
     SubscribeNavigation(Current);
-    Current.Show();
+    UpdateVisibility();
     Current.ProcessMode = ProcessModeEnum.Inherit;
     EmitSignal(SignalName.ViewChanged, Current);
+  }
+
+  private void UpdateVisibility()
+  {
+    bool visible = true;
+    foreach (GeoscapeView view in _views)
+    {
+      view.Visible = visible;
+      visible &= !view.HidesPreviousScene;
+    }
   }
 
   private void SubscribeNavigation(GeoscapeView view)

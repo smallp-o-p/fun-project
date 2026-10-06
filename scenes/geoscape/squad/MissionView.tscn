@@ -1,0 +1,9 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/geoscape/squad/SquadLoadoutView.tscn" id="1_squad"]
+[ext_resource type="Script" path="res://scenes/geoscape/squad/MissionView.cs" id="2_script"]
+[ext_resource type="PackedScene" path="res://scenes/battle/BattleScene.tscn" id="3_battle"]
+
+[node name="MissionView" instance=ExtResource("1_squad")]
+script = ExtResource("2_script")
+BattleScene = ExtResource("3_battle")

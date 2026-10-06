@@ -13,7 +13,7 @@ using GdUnit4;
 using static FunProject.Tests.GeoscapeTestScenes;
 
 // Real host handoff at the authored scene boundary: mission preparation's Deploy presents the
-// battle as a geoscape sibling while the retained stack keeps campaign/session/mission views,
+// battle inside the pushed mission view while the stack keeps the campaign and session,
 // and the terminal Return applies the campaign return exactly once before restoring the root.
 // Battles advance through real HUD actions; startup registration exposes only the hook
 // capability used to verify owner disposal. Campaign effect details live in return tests.
@@ -128,12 +128,14 @@ public partial class GeoscapeBattleHandoffTest
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
 
-    var battle = OnlyChild<BattleScene>(scene); // presented as a sibling of the view manager
+    var battle = OnlyChild<BattleScene>(manager.Current); // owned by the pushed mission view
     Assert.True(session.ActiveMission.IsSome); // campaign association held while presented
     Assert.True(session.PendingResolution.IsSome);
     Assert.False(ReturnButton(battle).Visible);
-    Assert.False(manager.Visible); // the stack hides; the battle sibling stays live
-    Assert.Equal(Node.ProcessModeEnum.Disabled, manager.ProcessMode);
+    Assert.True(ReferenceEquals(manager.Current, battle.GetParent()));
+    Assert.True(manager.Visible);
+    Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
+    Assert.False(squad.GetNode<Control>("Content").Visible);
     int cancelInputs = 0;
     battle.GetNode<BattleInputController>("BattleInputController").CancelPressed += () => cancelInputs++;
     scene.GetViewport().PushInput(new InputEventMouseButton
@@ -157,7 +159,7 @@ public partial class GeoscapeBattleHandoffTest
     EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
 
     int intents = 0;
-    battle.ReturnRequested += () => intents++; // probe subscribed after the geoscape handler
+    battle.Completed += _ => intents++; // probe subscribed after the mission handler
     var returnButton = ReturnButton(battle);
     Assert.False(returnButton.Visible); // playback still draining
     returnButton.EmitSignal(Button.SignalName.Pressed);
@@ -167,7 +169,7 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(returnButton.Visible); // terminal and idle at drain
 
     returnButton.EmitSignal(Button.SignalName.Pressed);
-    Assert.Equal(1, intents); // the geoscape handler completed without subscriber failure
+    Assert.Equal(1, intents); // the mission handler completed without subscriber failure
 
     Assert.True(session.ActiveMission.IsNone);
     Assert.True(session.PendingResolution.IsNone);
@@ -183,7 +185,7 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
 
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
-    Assert.False(GodotObject.IsInstanceValid(squad)); // recorded views removed
+    Assert.False(GodotObject.IsInstanceValid(squad)); // mission view popped
     Assert.False(GodotObject.IsInstanceValid(dialog));
     Assert.False(GodotObject.IsInstanceValid(battle)); // host freed after teardown
 
@@ -200,7 +202,7 @@ public partial class GeoscapeBattleHandoffTest
     ChooseSquadUnit(secondSquad, 0, "Alpha");
     Assert.True(ReferenceEquals(liveSession, CaptureSceneSession(manager)));
     SquadDeployButton(secondSquad).EmitSignal(Button.SignalName.Pressed);
-    var secondBattle = OnlyChild<BattleScene>(scene);
+    var secondBattle = OnlyChild<BattleScene>(manager.Current);
     await SelectFirstBattleUnit(secondBattle);
     EndTurnButton(secondBattle).EmitSignal(Button.SignalName.Pressed);
     DrainDirector(secondBattle);
@@ -223,12 +225,16 @@ public partial class GeoscapeBattleHandoffTest
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
 
-    var battle = OnlyChild<BattleScene>(scene);
+    var battle = OnlyChild<BattleScene>(manager.Current);
+    Assert.True(ReferenceEquals(manager.Current, battle.GetParent()),
+      "The pushed mission view must own the battle host.");
+    Assert.False(MapViewport(scene).IsVisibleInTree());
+    Assert.False(scene.GetNode<GeoscapeHud>("%GeoscapeHud").IsVisibleInTree());
     Assert.True(ReturnButton(battle).Visible, // terminal at presentation, director idle
       "Startup-terminal battles must not depend on a later BattleOver transition.");
 
     int intents = 0;
-    battle.ReturnRequested += () => intents++;
+    battle.Completed += _ => intents++;
     ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(1, intents);
 
@@ -247,7 +253,7 @@ public partial class GeoscapeBattleHandoffTest
     await using var cleanup = new DeferredNodeCleanup();
     var (scene, manager, squad, _, _) = PreparedScene(null, out _);
 
-    scene.BattleScene = Pack(new Label { Name = "NotABattleScene" });
+    ((MissionView)squad).BattleScene = Pack(new Label { Name = "NotABattleScene" });
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed); // guard throws inside the handler
 
     var session = new GeoscapeSession(scene.Campaign!);
@@ -255,7 +261,7 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(session.PendingResolution.IsSome);
     Assert.True(ReferenceEquals(squad, manager.Current)); // preparation retained
     Assert.Equal(1, squad.GetSelectedCombatants().Count);
-    Assert.Equal(0, scene.GetChildren().AsValueEnumerable().OfType<BattleScene>().Count());
+    Assert.Equal(0, squad.GetChildren().AsValueEnumerable().OfType<BattleScene>().Count());
     Assert.True(manager.Visible);
   }
 
@@ -264,7 +270,7 @@ public partial class GeoscapeBattleHandoffTest
   public async Task CorrectlyTypedInstallFailureAbortsInstallationAndRestoresPreparation(bool dropCamera)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, _, _) = PreparedScene(null, out var capture);
+    var (scene, manager, squad, _, _) = PreparedScene(SurvivalMission(1), out var capture);
     CampaignGameState campaign = scene.Campaign!;
     var session = new GeoscapeSession(campaign);
     PendingResolution pending = session.PendingResolution.Match(
@@ -276,7 +282,7 @@ public partial class GeoscapeBattleHandoffTest
     Node authored = prototype.GetNode<Node>(dropCamera ? "GameCamera" : "BattleUI");
     prototype.RemoveChild(authored);
     authored.Free();
-    scene.BattleScene = Pack(prototype); // correctly typed root, missing a fallible node
+    ((MissionView)squad).BattleScene = Pack(prototype); // correctly typed root, missing a fallible node
 
     // Godot's signal dispatch only logs handler exceptions, so the aborted installation is
     // proven by the restored state, not by an escaping exception.
@@ -294,7 +300,18 @@ public partial class GeoscapeBattleHandoffTest
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
 
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
-    Assert.Equal(0, scene.GetChildren().AsValueEnumerable().OfType<BattleScene>().Count());
+    Assert.Equal(0, squad.GetChildren().AsValueEnumerable().OfType<BattleScene>().Count());
+
+    // Repairing the authored host retries the same pending event with the retained squad.
+    ((MissionView)squad).BattleScene = GD.Load<PackedScene>("res://scenes/battle/BattleScene.tscn");
+    SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
+    var retry = OnlyChild<BattleScene>(manager.Current);
+    Assert.True(session.ActiveMission.IsSome);
+    ReturnButton(retry).EmitSignal(Button.SignalName.Pressed);
+    Assert.True(session.ActiveMission.IsNone);
+    Assert.True(session.PendingResolution.IsNone);
+    Assert.True(ReferenceEquals(manager.RootView, manager.Current));
+    AssertBattleDisposed(capture);
   }
 
   [TestCase(TestName = "A throwing startup system leaves no detached host and no association")]
@@ -309,11 +326,11 @@ public partial class GeoscapeBattleHandoffTest
       value => value.Event.BattleSeed,
       () => throw new InvalidOperationException("The mission must stay pending."));
 
-    // The bridge logs the signal-dispatched failure. A probe behind the geoscape handler
+    // The bridge logs the signal-dispatched failure. A probe behind the mission handler
     // proves the launch fault aborted the deployment path; the restored state proves the
     // recovery, and the detached host's deferred free keeps the run orphan-free.
     int intents = 0;
-    squad.DeployRequested += (_, _) => intents++; // runs only if the geoscape handler completed
+    squad.DeployRequested += (_, _) => intents++; // runs only if the mission handler completed
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
 
     Assert.Equal(0, intents);
@@ -323,7 +340,7 @@ public partial class GeoscapeBattleHandoffTest
       value => value.Event.BattleSeed, () => Option<int>.None));
     Assert.Equal(1, squad.GetSelectedCombatants().Count);
     Assert.True(manager.Visible);
-    Assert.Equal(0, scene.GetChildren().AsValueEnumerable().OfType<BattleScene>().Count());
+    Assert.Equal(0, squad.GetChildren().AsValueEnumerable().OfType<BattleScene>().Count());
   }
 
   [TestCase(TestName = "Return intent at the host boundary waits for the director queue to idle")]
@@ -341,7 +358,7 @@ public partial class GeoscapeBattleHandoffTest
     Assert.False(returnButton.Visible); // battle in progress at presentation
 
     int intents = 0;
-    scene.ReturnRequested += () => intents++;
+    scene.Completed += _ => intents++;
     battle.Runtime.ExecuteAction(BattleAction.ApplyDamage(
       battle.Runtime.TryGetAlive(GruntAt(battle.Runtime)).RequireSome(), 999));
     Assert.True(battle.Runtime.Query(new GetBattleOutcomeQuery()).IsSome);
@@ -370,7 +387,7 @@ public partial class GeoscapeBattleHandoffTest
     var session = new GeoscapeSession(campaign);
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
-    var battle = OnlyChild<BattleScene>(scene);
+    var battle = OnlyChild<BattleScene>(manager.Current);
     await SelectFirstBattleUnit(battle);
     EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
     DrainDirector(battle);
@@ -385,11 +402,11 @@ public partial class GeoscapeBattleHandoffTest
       Pack(new Label { Name = "NotAMarker" });
 
     int probe = 0;
-    battle.ReturnRequested += () => probe++; // skipped when the geoscape handler throws
+    battle.Completed += _ => probe++; // skipped when the mission handler throws
 
     ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
 
-    Assert.Equal(0, probe); // the geoscape handler did not complete: the failure propagated
+    Assert.Equal(0, probe); // the mission handler did not complete: the failure propagated
     Assert.True(session.ActiveMission.IsNone);
     Assert.True(session.PendingResolution.IsNone);
     Assert.Equal(1, campaign.ActiveEvents.Count); // the background event stays; the mission is consumed
@@ -425,7 +442,7 @@ public partial class GeoscapeBattleHandoffTest
     var session = new GeoscapeSession(campaign);
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
-    var battle = OnlyChild<BattleScene>(scene);
+    var battle = OnlyChild<BattleScene>(manager.Current);
     await SelectFirstBattleUnit(battle);
     EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
     DrainDirector(battle);
@@ -442,11 +459,11 @@ public partial class GeoscapeBattleHandoffTest
     };
 
     int probe = 0;
-    battle.ReturnRequested += () => probe++; // skipped when the geoscape handler throws
+    battle.Completed += _ => probe++; // skipped when the mission handler throws
 
     ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
 
-    Assert.Equal(0, probe); // the geoscape handler did not complete: the failure propagated
+    Assert.Equal(0, probe); // the mission handler did not complete: the failure propagated
     Assert.True(session.ActiveMission.IsNone);
     Assert.True(session.PendingResolution.IsNone);
     Assert.Equal(1, campaign.ActiveEvents.Count); // the mission is consumed despite the throw

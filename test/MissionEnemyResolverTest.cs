@@ -69,23 +69,23 @@ public class MissionEnemyResolverTest
     var size = new BattleSizeData
     {
       MaxPlayerUnits = 1,
-      MinEnemyUnits = int.MaxValue - 1,
-      MaxEnemyUnits = int.MaxValue,
+      MinEnemyUnits = uint.MaxValue - 1,
+      MaxEnemyUnits = uint.MaxValue,
     };
     int minimumDraws = 0;
     int maximumDraws = 0;
 
     foreach (int seed in new[] { 1, 2, 3, 4, 5, 6, 7, 8 })
     {
-      int count = size.SampleEnemyCount(new Random(seed));
-      if (count == int.MaxValue - 1)
+      uint count = size.SampleEnemyCount(new Random(seed));
+      if (count == uint.MaxValue - 1)
         minimumDraws++;
-      if (count == int.MaxValue)
+      if (count == uint.MaxValue)
         maximumDraws++;
     }
 
-    Assert.True(minimumDraws > 0, "Never sampled the minimum endpoint int.MaxValue - 1.");
-    Assert.True(maximumDraws > 0, "Never sampled the inclusive maximum endpoint int.MaxValue.");
+    Assert.True(minimumDraws > 0, "Never sampled the minimum endpoint uint.MaxValue - 1.");
+    Assert.True(maximumDraws > 0, "Never sampled the inclusive maximum endpoint uint.MaxValue.");
   }
 
   [TestCase(TestName = "Enemy count sampling respects small, zero, and fixed inclusive bounds")]
@@ -97,63 +97,61 @@ public class MissionEnemyResolverTest
 
     foreach (int seed in new[] { 7, -7, 99 })
     {
-      int drawn = small.SampleEnemyCount(new Random(seed));
+      uint drawn = small.SampleEnemyCount(new Random(seed));
       Assert.True(drawn >= 2 && drawn <= 5, $"Seed {seed} drew {drawn} outside [2, 5].");
-      Assert.Equal(0, zero.SampleEnemyCount(new Random(seed)));
-      Assert.Equal(4, fixedRange.SampleEnemyCount(new Random(seed)));
+      Assert.Equal(0u, zero.SampleEnemyCount(new Random(seed)));
+      Assert.Equal(4u, fixedRange.SampleEnemyCount(new Random(seed)));
     }
   }
 
-  [TestCase(TestName = "Malformed mission authoring fails validation")]
-  public void MalformedMissionAuthoringFailsValidation()
+  [TestCase(true)]
+  [TestCase(false)]
+  public void EnemyMinimumClampsWithoutLosingAssignmentOrder(bool minimumFirst)
   {
-    var missingEntryCombatant = TestData.MakeTacticalMission();
-    missingEntryCombatant.OrdinaryEnemies[0].Combatant = null!;
-    var playerSlot = TestData.MakeTacticalMission();
-    playerSlot.EnemyFactionIndex = 0;
-    var outOfRangeSlot = TestData.MakeTacticalMission();
-    outOfRangeSlot.EnemyFactionIndex = 2;
-    var brokenPlayerIndex = TestData.MakeTacticalMission();
-    brokenPlayerIndex.BattleType.PlayerFactionIndex = -1;
-    var nullEnemySlot = TestData.MakeTacticalMission();
-    nullEnemySlot.BattleType.Factions[1] = null!;
-    var nullPlayerFaction = TestData.MakeTacticalMission();
-    nullPlayerFaction.BattleType.Factions[0].Faction = null!;
-    var nullEnemyFaction = TestData.MakeTacticalMission();
-    nullEnemyFaction.BattleType.Factions[1].Faction = null!;
+    using var size = new BattleSizeData();
+    if (minimumFirst)
+    {
+      size.MinEnemyUnits = 2;
+      size.MaxEnemyUnits = 4;
+    }
+    else
+    {
+      size.MaxEnemyUnits = 4;
+      size.MinEnemyUnits = 2;
+    }
+    Assert.Equal(2u, size.MinEnemyUnits);
+    size.MinEnemyUnits = 8;
+    Assert.Equal(4u, size.MinEnemyUnits);
+    size.MaxEnemyUnits = 1;
+    Assert.Equal(1u, size.MinEnemyUnits);
+    size.MaxPlayerUnits = 0;
+    Assert.Equal(1u, size.MaxPlayerUnits);
+  }
 
-    (string Case, Func<TacticalMissionData> Build)[] malformed =
-    [
-      ("negative minimum", () => TestData.MakeTacticalMission(minEnemyUnits: -1)),
-      ("minimum above maximum", () => TestData.MakeTacticalMission(minEnemyUnits: 2, maxEnemyUnits: 1)),
-      ("non-positive player capacity", () => TestData.MakeTacticalMission(maxPlayerUnits: 0)),
-      ("missing battle type", () => new TacticalMissionData
-      {
-        BattleType = null!,
-        Size = new BattleSizeData { MaxPlayerUnits = 3, MinEnemyUnits = 1, MaxEnemyUnits = 1 },
-        EnemyFactionIndex = 1,
-      }),
-      ("missing size", () => new TacticalMissionData
-      {
-        BattleType = TestData.MakeDuelBattleType(),
-        Size = null!,
-        EnemyFactionIndex = 1,
-      }),
-      ("loadout entry without a combatant", () => missingEntryCombatant),
-      ("enemy slot on the player faction", () => playerSlot),
-      ("enemy slot out of range", () => outOfRangeSlot),
-      ("battle type with an out-of-range player index", () => brokenPlayerIndex),
-      ("enemy slot without a deployment", () => nullEnemySlot),
-      ("player slot without a faction", () => nullPlayerFaction),
-      ("enemy slot without a faction", () => nullEnemyFaction),
-      ("empty ordinary pool with a positive maximum", () => new TacticalMissionData
-      {
-        BattleType = TestData.MakeDuelBattleType(),
-        Size = new BattleSizeData { MaxPlayerUnits = 3, MinEnemyUnits = 1, MaxEnemyUnits = 1 },
-        EnemyFactionIndex = 1,
-      }),
-    ];
-    foreach ((string name, Func<TacticalMissionData> build) in malformed)
-      Assert.Throws<InvalidOperationException>(() => build().Validate(), name);
+  [TestCase(TestName = "Battle size exports round trip with the authored minimum and unsigned maximum")]
+  public void BattleSizeResourceRoundTrip()
+  {
+    using var size = new BattleSizeData
+    {
+      MinEnemyUnits = 2,
+      MaxEnemyUnits = 4,
+      MaxPlayerUnits = uint.MaxValue,
+    };
+    var minimumProperty = size.GetPropertyList().AsValueEnumerable()
+      .Single(property => property["name"].AsString() == BattleSizeData.PropertyName.MinEnemyUnits);
+    Assert.Equal("0,4,1", minimumProperty["hint_string"].AsString());
+    const string path = "user://handoff-battle-size.tres";
+    try
+    {
+      Assert.Equal(Godot.Error.Ok, Godot.ResourceSaver.Save(size, path));
+      using var loaded = Godot.ResourceLoader.Load<BattleSizeData>(path, cacheMode: Godot.ResourceLoader.CacheMode.Ignore);
+      Assert.Equal(2u, loaded.MinEnemyUnits);
+      Assert.Equal(4u, loaded.MaxEnemyUnits);
+      Assert.Equal(uint.MaxValue, loaded.MaxPlayerUnits);
+    }
+    finally
+    {
+      Godot.DirAccess.RemoveAbsolute(Godot.ProjectSettings.GlobalizePath(path));
+    }
   }
 }

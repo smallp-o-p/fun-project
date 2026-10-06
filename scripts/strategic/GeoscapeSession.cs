@@ -141,25 +141,22 @@ public sealed class GeoscapeSession
 
     if (_state.ActiveMission.IsSome)
       return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
-        MissionLaunchFailureReason.AlreadyLaunched,
-        "A mission is already active; it must complete before another launches."));
+        MissionLaunchFailureReason.AlreadyLaunched));
     if (_state.Pending.Case is not PendingResolution pending)
       return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
-        MissionLaunchFailureReason.NoPendingMission,
-        "No resolution is pending; open the mission's event before launching."));
+        MissionLaunchFailureReason.NoPendingMission));
     if (!ReferenceEquals(pending.Event, mission))
       return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
-        MissionLaunchFailureReason.WrongPendingMission,
-        "The requested event is not the currently pending mission."));
+        MissionLaunchFailureReason.WrongPendingMission));
 
     // Captured once, before any validation or startup callback runs: every check, the
     // loadouts, and the association membership share this snapshot, so a startup callback
     // mutating the caller's list cannot desynchronize the battle from the association.
-    var deployment = new MissionDeployment(squad);
+    var deployment = new MissionDeployment([.. squad]);
 
     if (deployment.Participants.Count == 0)
       return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
-        MissionLaunchFailureReason.EmptySquad, "The squad is empty."));
+        MissionLaunchFailureReason.EmptySquad));
 
     var seen = new SysColGeneric.HashSet<Combatant>();
     foreach (Combatant combatant in deployment.Participants)
@@ -167,30 +164,25 @@ public sealed class GeoscapeSession
       ArgumentNullException.ThrowIfNull(combatant);
       if (!seen.Add(combatant))
         return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
-          MissionLaunchFailureReason.DuplicateCombatant,
-          $"Combatant {combatant.Name} appears twice in the squad."));
+          MissionLaunchFailureReason.DuplicateCombatant));
     }
 
-    TacticalMissionData authored = MissionContract(mission);
+    TacticalMissionData authored = mission.Definition.TacticalMission!;
     if (deployment.Participants.Count > authored.Size.MaxPlayerUnits)
       return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
-        MissionLaunchFailureReason.SquadTooLarge,
-        $"Squad of {deployment.Participants.Count} exceeds the mission capacity of {authored.Size.MaxPlayerUnits}."));
+        MissionLaunchFailureReason.SquadTooLarge));
 
     foreach (Combatant combatant in deployment.Participants)
     {
       if (!ReferenceEquals(combatant.OwningFaction, _state.PlayerFaction))
         return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
-          MissionLaunchFailureReason.FactionMismatch,
-          $"Combatant {combatant.Name} does not belong to the player faction."));
+          MissionLaunchFailureReason.FactionMismatch));
       if (!_state.Roster.AsValueEnumerable().Any(member => ReferenceEquals(member, combatant)))
         return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
-          MissionLaunchFailureReason.NotInRoster,
-          $"Combatant {combatant.Name} is not part of the campaign roster."));
+          MissionLaunchFailureReason.NotInRoster));
       if (!_state.Conditions.CanDeploy(combatant, mission.Definition.AllowUnfitDeployment))
         return Left<MissionLaunchFailure, MissionBattle>(new MissionLaunchFailure(
-          MissionLaunchFailureReason.UnitUnavailable,
-          $"Combatant {combatant.Name} is not fit to deploy on this mission."));
+          MissionLaunchFailureReason.UnitUnavailable));
     }
 
     int seed = mission.BattleSeed.Match(
@@ -215,71 +207,22 @@ public sealed class GeoscapeSession
         return new MissionBattle(deployment, setup, runtime);
       }))
       .MapLeft(failure => new MissionLaunchFailure(
-        MissionLaunchFailureReason.SetupFailed, failure.Message, Some(failure)));
+        MissionLaunchFailureReason.SetupFailed, Some(failure)));
   }
 
-  /// <summary>Host failure recovery only: detaches a battle presentation that cannot proceed
-  /// from the campaign association. The pending event and its seed stay pending for a retry;
-  /// the host-owned runtime and any committed tactical effects are not touched.</summary>
-  public void AbortMissionPresentation(MissionBattle battle)
+  /// <summary>Installation failed; retain the pending event and seed for another attempt.
+  /// Runtime disposal belongs to the view.</summary>
+  public void AbortMissionPresentation() => _state.ActiveMission = None;
+
+  /// <summary>Applies the active mission's terminal summary and consumes the mission before
+  /// broadcasting. The completion signal supplies the trusted player summary.</summary>
+  public void CompleteMission(FactionBattleSummary summary)
   {
-    ArgumentNullException.ThrowIfNull(battle);
-
-    MissionDeployment active = _state.ActiveMission.Match(
-      value => value,
-      () => throw new InvalidOperationException("No mission is active; there is nothing to abort."));
-    if (!ReferenceEquals(active, battle.Deployment))
-      throw new InvalidOperationException(
-        "The aborted battle is not the active mission association.");
-
-    _state.ActiveMission = Option<MissionDeployment>.None;
-  }
-
-  // A launchable event always carries the authored mission contract; anything else reaching
-  // this door is a caller bug (baked tactical events are validated at campaign construction).
-  private static TacticalMissionData MissionContract(GeoscapeEvent mission)
-  {
-    if (mission.Definition.Kind != GeoscapeEventKind.TacticalBattle
-        || mission.Definition.TacticalMission is null)
-      throw new InvalidOperationException(
-        $"Event '{mission.Definition.Title}' does not carry a tactical mission contract.");
-    return mission.Definition.TacticalMission;
-  }
-
-  /// <summary>Applies the terminal return of the associated mission battle exactly once:
-  /// queries the player summary from the handle's live runtime, verifies the association,
-  /// the player faction, and exact participant membership, then lands every campaign effect
-  /// — survivor conditions, roster removal of the reported deaths, captivity of the reported
-  /// captures, and consumption of the mission, its pending resolution, and the association —
-  /// before the first notification. Survivors are notified per reported identity and the
-  /// resolution closes as Engaged. A throwing subscriber propagates without replay or
-  /// rollback, and the host-owned runtime is never disposed here.</summary>
-  public void CompleteMission(MissionBattle battle)
-  {
-    ArgumentNullException.ThrowIfNull(battle);
-
-    // Query while the runtime is live; a battle that has not ended carries no return yet.
-    FactionBattleSummary summary = battle.Runtime
-      .Query(new GetFactionEndOfBattleSummary(_state.PlayerFaction))
-      .Match(
-        Right: value => value,
-        Left: failure => throw new InvalidOperationException(
-          $"The mission battle has no terminal return: {failure.Message}."));
-    MissionDeployment active = _state.ActiveMission.Match(
-      value => value,
-      () => throw new InvalidOperationException(
-        "No mission is active; there is nothing to complete."));
-    if (!ReferenceEquals(active, battle.Deployment))
-      throw new InvalidOperationException(
-        "The completed battle is not the active mission association.");
-    VerifyReturnedParticipants(summary, battle.Deployment);
-
-    // The pending resolution outlives the association everywhere else, so an associated
-    // mission always has one; extraction first keeps every later mutation unconditional.
+    if (_state.ActiveMission.IsNone)
+      throw new InvalidOperationException("No mission is active; there is nothing to complete.");
     PendingResolution pending = _state.Pending.Match(
       value => value,
-      () => throw new InvalidOperationException(
-        "The active mission lost its pending resolution."));
+      () => throw new InvalidOperationException("The active mission lost its pending resolution."));
 
     foreach ((Combatant combatant, BattleHealthSummary health) in summary.HealthByCombatant)
       _state.Conditions.ApplyMissionReturn(combatant, health.HealthDamageTaken, health.MaxHealth, Tick);
@@ -296,21 +239,6 @@ public sealed class GeoscapeSession
     foreach (Combatant combatant in summary.HealthByCombatant.Keys)
       Commit(new CombatantConditionsChanged(combatant));
     Commit(new ResolutionEventClosed(pending, ResolutionOutcome.Engaged));
-  }
-
-  // The return must cover exactly the captured deployment — no foreign or partial summary
-  // may touch the roster. Present membership spans alive and dead units.
-  private static void VerifyReturnedParticipants(
-    FactionBattleSummary summary, MissionDeployment deployment)
-  {
-    if (summary.CombatantsPresent.Count != deployment.Participants.Count)
-      throw new InvalidOperationException(
-        $"The battle returned {summary.CombatantsPresent.Count} participants; "
-        + $"the deployment captured {deployment.Participants.Count}.");
-    foreach (Combatant combatant in deployment.Participants)
-      if (!summary.CombatantsPresent.Contains(combatant))
-        throw new InvalidOperationException(
-          $"Combatant {combatant.Name} deployed but is absent from the battle return.");
   }
 
   public void ApplyMissionReturn(FactionBattleSummary summary)

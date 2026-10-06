@@ -20,7 +20,7 @@ namespace FunProject.Geoscape;
 // gates apply only while an explicit mission context was configured; a generic configuration
 // never infers one. Deploy only emits the intent — session validation stays authoritative.
 // Back discards the slot selection; it never mutates campaign state.
-public sealed partial class SquadLoadoutView : GeoscapeView
+public partial class SquadLoadoutView : GeoscapeView
 {
   [Export] public PackedScene? UnitViewScene { get; set; }
   [Export] public PackedScene? SquadSlotCardScene { get; set; }
@@ -60,7 +60,7 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     TacticalMissionData contract = mission.Definition.TacticalMission
       ?? throw new InvalidOperationException(
         $"Event '{mission.Definition.Title}' carries no tactical mission contract.");
-    Configure(mission.Definition.Title, (uint)contract.Size.MaxPlayerUnits,
+    Configure(mission.Definition.Title, contract.Size.MaxPlayerUnits,
       allowEquipmentEditing: true, mission: mission.Definition);
     _launchMission = Some(mission);
   }
@@ -119,7 +119,21 @@ public sealed partial class SquadLoadoutView : GeoscapeView
   {
     ArgumentNullException.ThrowIfNull(failure);
     var label = GetNode<Label>("%DeploymentFailure");
-    label.Text = failure.Message;
+    label.Text = failure.Reason switch
+    {
+      MissionLaunchFailureReason.NoPendingMission => "Open a mission before deploying.",
+      MissionLaunchFailureReason.WrongPendingMission => "This mission is no longer pending.",
+      MissionLaunchFailureReason.AlreadyLaunched => "A mission is already active.",
+      MissionLaunchFailureReason.EmptySquad => "Choose at least one unit.",
+      MissionLaunchFailureReason.DuplicateCombatant => "A unit can only occupy one squad slot.",
+      MissionLaunchFailureReason.NotInRoster => "A selected unit is no longer in the roster.",
+      MissionLaunchFailureReason.FactionMismatch => "Only player units can deploy.",
+      MissionLaunchFailureReason.SquadTooLarge => "The squad exceeds the mission capacity.",
+      MissionLaunchFailureReason.UnitUnavailable => "A selected unit is not fit to deploy.",
+      MissionLaunchFailureReason.SetupFailed => failure.SetupFailure.Match(
+        Some: setup => setup.Message, None: () => "The battle could not start."),
+      _ => throw new InvalidOperationException($"Unknown deployment failure {failure.Reason}."),
+    };
     label.Visible = true;
   }
 

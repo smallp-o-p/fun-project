@@ -9,7 +9,7 @@ using System;
 // while intents flow back through events. The environment (WorldEnvironment, sun, authored
 // GameCamera rig instance) is authored in the scene. The standalone debug host is BattleLauncher
 // (allowReturn false); the geoscape handoff presents with allowReturn true and routes
-// ReturnRequested into the campaign return.
+// Completed into the campaign return.
 // Deliberately throwaway — to be superseded by the real BattleScene later.
 public sealed partial class BattleScene : Node3D
 {
@@ -24,7 +24,7 @@ public sealed partial class BattleScene : Node3D
 
   /// <summary>Raised when the player requests the campaign return while the battle is
   /// terminal and playback is idle. Only wired meaningfully when Present allowed a return.</summary>
-  public event Action? ReturnRequested;
+  public event Action<FactionBattleSummary>? Completed;
 
   public void Present(BattleRuntime runtime, BattleSetup setup, bool allowReturn = false)
   {
@@ -121,7 +121,9 @@ public sealed partial class BattleScene : Node3D
   private void OnReturnIntent()
   {
     if (CanReturn)
-      ReturnRequested?.Invoke();
+      Completed?.Invoke(_runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
+        Right: summary => summary,
+        Left: failure => throw new InvalidOperationException(failure.Message)));
   }
 
   private void RefreshView()

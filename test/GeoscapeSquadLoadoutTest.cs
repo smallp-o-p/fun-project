@@ -231,12 +231,12 @@ public class GeoscapeSquadLoadoutTest
     ChooseSquadUnit(squad, 0, "Alpha");
 
     var failure = new MissionLaunchFailure(
-      MissionLaunchFailureReason.UnitUnavailable, "Alpha is not fit to deploy on this mission.");
+      MissionLaunchFailureReason.UnitUnavailable);
     squad.ShowDeploymentFailure(failure);
 
     var label = SquadDeploymentFailure(squad);
     Assert.True(label.Visible);
-    Assert.Equal("Alpha is not fit to deploy on this mission.", label.Text);
+    Assert.Equal("A selected unit is not fit to deploy.", label.Text);
     var selected = squad.GetSelectedCombatants();
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));

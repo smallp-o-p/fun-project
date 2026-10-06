@@ -580,9 +580,9 @@ internal static class TestData
       BattleType = type ?? MakeDuelBattleType(),
       Size = new BattleSizeData
       {
-        MaxPlayerUnits = maxPlayerUnits,
-        MinEnemyUnits = minEnemyUnits,
-        MaxEnemyUnits = maxEnemyUnits,
+        MaxPlayerUnits = (uint)maxPlayerUnits,
+        MinEnemyUnits = (uint)minEnemyUnits,
+        MaxEnemyUnits = (uint)maxEnemyUnits,
       },
       EnemyFactionIndex = 1,
     };

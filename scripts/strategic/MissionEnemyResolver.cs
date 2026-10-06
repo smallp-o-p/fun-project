@@ -17,15 +17,14 @@ public static class MissionEnemyResolver
   public static SideDeployment Resolve(TacticalMissionData mission, int seed)
   {
     ArgumentNullException.ThrowIfNull(mission);
-    mission.Validate();
 
     var random = new Random(unchecked(seed ^ StreamSalt));
-    int ordinaryCount = mission.Size.SampleEnemyCount(random);
+    uint ordinaryCount = mission.Size.SampleEnemyCount(random);
 
     FactionDeploymentData authoredSlot = mission.BattleType.Factions[mission.EnemyFactionIndex];
     var faction = new Faction(authoredSlot.Faction);
-    var loadouts = new List<UnitLoadout>(ordinaryCount + mission.SpecialEnemies.Count);
-    for (int index = 0; index < ordinaryCount; index++)
+    List<UnitLoadout> loadouts = [];
+    for (uint index = 0; index < ordinaryCount; index++)
       loadouts.Add(mission.OrdinaryEnemies[random.Next(mission.OrdinaryEnemies.Count)].CreateRuntime(faction));
     foreach (UnitLoadoutData special in mission.SpecialEnemies)
       loadouts.Add(special.CreateRuntime(faction));

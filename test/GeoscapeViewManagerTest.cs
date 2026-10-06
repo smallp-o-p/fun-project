@@ -59,6 +59,24 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
+  public async Task OpaqueViewCoversLayersBelowTransparentDialog()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var manager = BuildManager();
+    var dialog = new FakeView { HidesPreviousScene = false };
+    manager.Push(dialog);
+    Assert.True(manager.RootView.IsVisibleInTree());
+
+    manager.Push(new FakeView());
+    Assert.False(dialog.IsVisibleInTree());
+    Assert.False(manager.RootView.IsVisibleInTree());
+
+    manager.Pop();
+    Assert.True(dialog.IsVisibleInTree());
+    Assert.True(manager.RootView.IsVisibleInTree());
+  }
+
+  [TestCase]
   public async Task PushShowsOnlyTheTopViewAndDisablesCoveredViews()
   {
     await using var cleanup = new DeferredNodeCleanup();

@@ -28,6 +28,11 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
 
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
+    if (session.PendingResolution.IsNone)
+    {
+      RequestBack();
+      return;
+    }
     PendingResolution pending = session.PendingResolution.Match(
       value => value,
       () => throw new InvalidOperationException(

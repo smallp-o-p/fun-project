@@ -109,21 +109,6 @@ public partial class GeoscapeMissionLaunchTest
     Assert.True(campaign.Session.ActiveMission.IsNone);
   }
 
-  [TestCase(TestName = "Launching a pending non-mission event is a caller bug")]
-  public void LaunchingNonMissionEventThrows()
-  {
-    using var campaign = new GeoscapeFixture(MakeStart(
-      roster: [MakeEntry("Alpha")],
-      timeline: [MakeScheduled(1, MakeEvent("Incident"))]));
-    campaign.AdvanceTicks(1);
-    var active = campaign.ActiveEvent;
-    campaign.OpenResolution(active);
-
-    Assert.Throws<System.InvalidOperationException>(
-      () => campaign.Session.LaunchMission(active, [campaign.State.Roster[0]]));
-    Assert.True(campaign.Session.ActiveMission.IsNone);
-  }
-
   [TestCase(TestName = "Exceptional deployment captures only condition penalties")]
   public void ExceptionalDeploymentCapturesOnlyConditionPenalties()
   {
@@ -339,10 +324,7 @@ public partial class GeoscapeMissionLaunchTest
     var battle = campaign.Session.LaunchMission(active, squad).RequireRight();
     try
     {
-      Assert.Throws<ArgumentNullException>(
-        () => campaign.Session.AbortMissionPresentation(null!));
-
-      new GeoscapeSession(campaign.State).AbortMissionPresentation(battle);
+      new GeoscapeSession(campaign.State).AbortMissionPresentation();
 
       Assert.True(campaign.Session.ActiveMission.IsNone);
       Assert.True(campaign.Session.PendingResolution.IsSome);
@@ -352,9 +334,6 @@ public partial class GeoscapeMissionLaunchTest
         .Any(member => ReferenceEquals(member, active)));
       Assert.True(battle.Runtime.TryGetTile(Vector3I.Zero).IsSome,
         "Abort must not dispose the host-owned runtime.");
-
-      Assert.Throws<System.InvalidOperationException>(
-        () => campaign.Session.AbortMissionPresentation(battle));
 
       var retry = campaign.Session.LaunchMission(active, squad).RequireRight();
       try

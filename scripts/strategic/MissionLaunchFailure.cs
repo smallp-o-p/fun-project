@@ -20,5 +20,4 @@ public enum MissionLaunchFailureReason
 /// <summary>A typed launch failure; setup faults retain the original battle failure.</summary>
 public sealed record MissionLaunchFailure(
   MissionLaunchFailureReason Reason,
-  string Message,
   Option<BattleSetupFailure> SetupFailure = default);

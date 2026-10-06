@@ -30,8 +30,8 @@ public partial class GeoscapeEventDefinition : Resource
   // mission anyway. Default false — the roster gate stands.
   [Export] public bool AllowUnfitDeployment { get; set; } = false;
 
-  // Tactical mission contract; required (and validated at campaign bake) for TacticalBattle
-  // events, left unset for other kinds.
+  // Tactical mission contract; assigned by convention for TacticalBattle events.
+  // Encoding that invariant in the event type remains deferred.
   [Export] public TacticalMissionData? TacticalMission { get; set; }
 
   // If dialogue needs to be triggered
