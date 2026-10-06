@@ -3,6 +3,10 @@ root = true
 [*]
 charset = utf-8
 
+# Godot's build outputs and source generator output are generated code.
+[.godot/**]
+generated_code = true
+
 # The GdUnit4 adapter extracts its runner scene here at test time; the folder is
 # generated and must stay outside formatting/analysis scope.
 [gdunit4_testadapter_v5/**]
@@ -11,3 +15,6 @@ generated_code = true
 [*.cs]
 indent_style = space
 indent_size = 2
+
+# Enforce the existing ZLinq convention without promoting other warnings.
+dotnet_diagnostic.RS0030.severity = error
