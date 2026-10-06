@@ -359,13 +359,21 @@ public class BattleFactoryTest
       (new Vector3I(0, 0, 1), TestData.SpawnTile(1)))));
 
     var playerDeployment = new FactionDeploymentData { Faction = playerFaction };
-    playerDeployment.Roster.Add(new RosterEntryData { Combatant = trooper, Quantity = 2 });
+    playerDeployment.Roster.Add(new RosterEntryData
+    {
+      Loadout = new UnitLoadoutData { Combatant = trooper },
+      Quantity = 2,
+    });
     playerDeployment.Objectives.Add(new DefuseAllBombsObjectiveData
     {
       OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
     });
     var enemyDeployment = new FactionDeploymentData { Faction = enemyFaction };
-    enemyDeployment.Roster.Add(new RosterEntryData { Combatant = trooper, Quantity = 1 });
+    enemyDeployment.Roster.Add(new RosterEntryData
+    {
+      Loadout = new UnitLoadoutData { Combatant = trooper },
+      Quantity = 1,
+    });
     enemyDeployment.Objectives.Add(new FakeObjectiveData());
 
     type.Factions.Add(playerDeployment);
@@ -396,8 +404,11 @@ public class BattleFactoryTest
     BattleTypeData type = TestData.MakeDuelBattleType();
     type.Factions[0].Roster.Add(new FunProject.Battle.RosterEntryData
     {
-      Combatant = TestData.MakeCombatantData("Extra", health: 20, aim: 65),
-      Weapon = TestData.MakeWeaponData(damage: 1, critChance: 0, range: 10),
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Extra", health: 20, aim: 65),
+        Weapon = TestData.MakeWeaponData(damage: 1, critChance: 0, range: 10),
+      },
     });
 
     Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall,
@@ -414,13 +425,19 @@ public class BattleFactoryTest
     var playerDeployment = new FactionDeploymentData { Faction = new FactionData { Name = "Player" } };
     playerDeployment.Roster.Add(new FunProject.Battle.RosterEntryData
     {
-      Combatant = TestData.MakeCombatantData("Alpha", health: 20, aim: 65),
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Alpha", health: 20, aim: 65),
+      },
     });
     playerDeployment.Objectives.Add(new FakeObjectiveData());
     var enemyDeployment = new FactionDeploymentData { Faction = new FactionData { Name = "Enemy" } };
     enemyDeployment.Roster.Add(new FunProject.Battle.RosterEntryData
     {
-      Combatant = TestData.MakeCombatantData("Bandit", health: 20, aim: 65),
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Bandit", health: 20, aim: 65),
+      },
     });
     enemyDeployment.Objectives.Add(new FakeObjectiveData());
     type.Factions.Add(playerDeployment);

@@ -36,10 +36,9 @@ public sealed partial class GeoscapeViewManager : Control
     if (view.GetParent() is not null)
       throw new InvalidOperationException("Push requires an unparented view.");
 
-    Deactivate(Current);
-
     if (view.HidesPreviousScene)
       Current.Hide();
+    Deactivate(Current);
 
     _views.Push(view);
     AddChild(view);

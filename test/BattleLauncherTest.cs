@@ -2,6 +2,7 @@ using FunProject.Battle;
 using Godot;
 using GdUnit4;
 using System;
+using System.Threading.Tasks;
 using static FunProject.Tests.GeoscapeTestScenes;
 using static GdUnit4.Assertions;
 
@@ -31,6 +32,21 @@ public partial class BattleLauncherTest
     Assert.True(status.Text.Contains("HP"));
   }
 
+  [TestCase(TestName = "A failing standalone startup leaves no host and a disposed runtime")]
+  public async Task FailingStartupLeavesNoHostAndDisposedRuntime()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var capture = new HookCaptureSystemData();
+    var type = TestData.MakeDuelBattleType();
+    type.Systems.Add(capture);
+    type.Systems.Add(new ThrowingSystemData());
+    var launcher = new BattleLauncher { BattleType = type };
+    AddToTree(launcher); // the bridge logs the _Ready failure; nothing may remain half-built
+
+    Assert.Equal(0, launcher.GetChildCount());
+    AssertBattleDisposed(capture);
+  }
+
   [TestCase(TestName = "A factory result that already has an outcome shows the battle-over banner at startup")]
   public void LauncherShowsBannerForStartupTerminalBattle()
   {
@@ -48,6 +64,11 @@ public partial class BattleLauncherTest
     var banner = battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Label>("%BattleOverBanner");
     Assert.True(banner.Visible);
     Assert.Equal("VICTORY", banner.Text);
+    Assert.False(ReturnButton(battle).Visible);
+    int returns = 0;
+    battle.Completed += _ => returns++;
+    ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
+    Assert.Equal(0, returns); // terminal standalone battles still cannot return to a campaign
   }
 
   [TestCase(TestName = "Present guards against nulls")]

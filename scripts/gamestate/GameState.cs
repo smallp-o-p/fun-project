@@ -11,6 +11,7 @@ namespace FunProject.GameState;
 /// <summary>
 /// The campaign truth container: everything that holds for the life of the campaign —
 /// clock position, the baked event timeline, active events, the pending resolution, the
+/// active mission association, the
 /// region binding, the roster, the player faction, and the condition registry
 /// (<see cref="Conditions"/>). <see cref="Strategic.GeoscapeSession"/> is the ephemeral runtime
 /// constructed over this state (the BattleSession-over-BattleBoardState pattern);
@@ -162,6 +163,17 @@ public sealed class GameState
   internal List<GeoscapeEvent> ActiveEvents { get; } = [];
 
   internal Option<PendingResolution> Pending { get; set; }
+
+  /// <summary>Campaign-held deployment for the active mission.</summary>
+  internal Option<MissionDeployment> ActiveMission { get; set; }
+
+  /// <summary>Removes reported deaths and their condition records. Equipment stays with the combatants.</summary>
+  internal void RemoveDeadFromRoster(IReadOnlySet<Combatant> dead)
+  {
+    foreach (Combatant combatant in dead)
+      if (_roster.Remove(combatant))
+        Conditions.Forget(combatant);
+  }
 
   // Bakes one authored entry into an immutable firing. Unset events and out-of-range expiry
   // are authoring mistakes: they fail the load instead of being silently dropped.

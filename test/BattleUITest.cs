@@ -90,19 +90,29 @@ public partial class BattleUITest
     view.ShowActionOptions([moveOption]);
     int confirms = 0;
     int cancels = 0;
+    int returns = 0;
     UnitActionOption? selected = null;
     view.ConfirmRequested += () => confirms++;
     view.CancelRequested += () => cancels++;
+    view.ReturnRequested += () => returns++;
     view.VerbSelected += option => selected = option;
 
     view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ConfirmButton").EmitSignal(Button.SignalName.Pressed);
     view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%CancelButton").EmitSignal(Button.SignalName.Pressed);
     ((Button)view.GetNode<BattleHud>("%BattleHud").GetNode<Container>("%VerbButtons").GetChild(0))
       .EmitSignal(Button.SignalName.Pressed);
+    var returnButton = view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ReturnButton");
+    Assert.False(returnButton.Visible);
+    view.ShowReturn(true);
+    Assert.True(returnButton.Visible);
+    returnButton.EmitSignal(Button.SignalName.Pressed);
+    view.ShowReturn(false);
+    Assert.False(returnButton.Visible);
     view.ShowBattleOver("VICTORY");
 
     Assert.Equal(1, confirms);
     Assert.Equal(1, cancels);
+    Assert.Equal(1, returns);
     Assert.True(ReferenceEquals(moveOption, selected));
     var banner = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%BattleOverBanner");
     Assert.True(banner.Visible);

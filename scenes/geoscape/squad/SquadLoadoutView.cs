@@ -4,47 +4,34 @@ using FunProject.Combatants.Conditions;
 using FunProject.Strategic;
 using Godot;
 using System;
+using System.Collections.Generic;
 using FunProject.Scenes.Ext;
 using LanguageExt.UnsafeValueAccess;
 
 namespace FunProject.Geoscape;
 
-// Shared squad selection screen behind openers that configure it: mission preparation
-// (three editable slots, the mission's title, mission-scoped deployment eligibility) and
-// interrogation preparation (two slots, equipment editing disabled, a captive-targets
-// heading, unrestricted roster selection). Presentation only — the screen owns nothing but
-// a temporary slot selection over the roster's live combatant references and re-presents
-// from campaign truth on every activation, so equipment edits made in the nested UnitView
-// show up on return without this view caching anything. Deployment gates apply only while
-// an explicit mission context was configured; a generic configuration never infers one.
-// Back discards the slot selection; it never mutates campaign state.
-public sealed partial class SquadLoadoutView : GeoscapeView
+// Selects live roster combatants in configured slots and refreshes their equipment and
+// condition summaries when presented.
+public partial class SquadLoadoutView : GeoscapeView
 {
   [Export] public PackedScene? UnitViewScene { get; set; }
   [Export] public PackedScene? SquadSlotCardScene { get; set; }
 
-  // Bound by Configure (heading/policy) and Present (state/session); render paths assume
-  // both ran.
   private CampaignGameState _state = null!;
   private GeoscapeSession _session = null!;
   private string _heading = null!;
   private bool _allowEquipmentEditing;
-  private Option<GeoscapeEventDefinition> _mission;
   private int? _choosingSlot;
   private Option<Combatant>[] _slots = [];
 
-  public void Configure(string heading, uint capacity, bool allowEquipmentEditing,
-    Option<GeoscapeEventDefinition> mission = default)
+  public void Configure(string heading, uint capacity, bool allowEquipmentEditing)
   {
     _heading = heading;
     _allowEquipmentEditing = allowEquipmentEditing;
-    _mission = mission;
     _choosingSlot = null;
     _slots = new Option<Combatant>[capacity];
   }
 
-  // Every activation re-presents from campaign truth under the configured heading,
-  // capacity, and mission gate.
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
     _state = state;
@@ -52,7 +39,7 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     RebuildAll();
   }
 
-  private void RebuildAll()
+  protected virtual void RebuildAll()
   {
     var title = GetNode<Label>("%Title");
     title.Text = _heading;
@@ -62,25 +49,17 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     string prompt = _choosingSlot is { } slot
       ? $"Assigning Slot {slot + 1} — pick a unit below."
       : "Pick Choose on a slot, then select a unit.";
-    if (_mission.Case is GeoscapeEventDefinition { AllowUnfitDeployment: true })
-      prompt += "\nExceptional deployment authorized — injured or exhausted units may join this mission.";
     GetNode<Label>("%SelectionPrompt").Text = prompt;
+
     RebuildSlots();
     RebuildChoices();
   }
 
-  // The preparation boundary output: the original campaign combatants in slot order.
-  // Equipment is read live through those references; nothing is cloned here.
   public SysColGeneric.List<Combatant> GetSelectedCombatants()
     => _slots.AsValueEnumerable()
       .Where(c => c.IsSome).Select(v => v.ValueUnsafe()!).ToList();
 
-  // Mission-aware eligibility, only while an explicit mission context was configured: the
-  // session's own gate against that mission. Generic configurations permit any roster
-  // unit; deployment rules belong to mission preparation, not to interrogation or any
-  // other shared use.
-  private bool CanDeploy(Combatant unit)
-    => _mission.Case is not GeoscapeEventDefinition mission || _session.CanDeploy(unit, mission);
+  protected virtual bool CanChoose(Combatant unit) => true;
 
   private void RebuildSlots()
   {
@@ -97,7 +76,7 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     Node instance = scene.Instantiate();
     if (instance is not SquadSlotCard card)
     {
-      instance.Free(); // free now: rejected roots must not linger to frame end
+      instance.Free();
       throw new InvalidOperationException(
         "SquadLoadoutView requires SquadSlotCardScene whose root is a SquadSlotCard.");
     }
@@ -127,7 +106,7 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     {
       choices.AddChild(new Label
       {
-        Text = "No units available for this mission.",
+        Text = "No units available.",
         AutowrapMode = TextServer.AutowrapMode.WordSmart,
       });
       return;
@@ -135,18 +114,16 @@ public sealed partial class SquadLoadoutView : GeoscapeView
 
     foreach (Combatant unit in _state.Roster)
     {
-      // Inert until a destination slot is marked (Choose), while the unit occupies one, and
-      // — under an explicit mission context — while the campaign bars the unit from that
-      // mission (injury or exhaustion without an exceptional-deployment override).
+      string label = RosterButtonText(unit);
       var button = new Button
       {
-        Text = RosterButtonText(unit),
-        TooltipText = RosterButtonText(unit),
+        Text = label,
+        TooltipText = label,
         CustomMinimumSize = new Vector2(0, 58),
         Alignment = HorizontalAlignment.Left,
         AutowrapMode = TextServer.AutowrapMode.WordSmart,
         ClipText = true,
-        Disabled = _choosingSlot is null || InSquad(unit) || !CanDeploy(unit),
+        Disabled = _choosingSlot is null || InSquad(unit) || !CanChoose(unit),
       };
       button.Pressed += () => ChooseUnit(unit);
       choices.AddChild(button);
@@ -194,7 +171,7 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     Node instance = scene.Instantiate();
     if (instance is not UnitView view)
     {
-      instance.Free(); // free now: rejected roots must not linger to frame end
+      instance.Free();
       throw new InvalidOperationException(
         "SquadLoadoutView requires a UnitView scene root.");
     }
@@ -220,9 +197,6 @@ public sealed partial class SquadLoadoutView : GeoscapeView
     return conditions.Length == 0 ? unit.Name : $"{unit.Name} — {conditions}";
   }
 
-  // Both records read separately from the bound campaign's registry; names resolve
-  // through the same system so shared campaign rules label every unit consistently. Only
-  // active records render — a healthy/fresh unit contributes no part.
   private string ConditionsText(Combatant unit, long tick)
   {
     CombatantConditionSystem system = _state.Conditions;

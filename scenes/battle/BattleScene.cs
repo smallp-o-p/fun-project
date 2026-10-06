@@ -7,8 +7,9 @@ using System;
 // map and builds unit meshes in code, keeps the presentation FSM plus refresh orchestration and
 // input routing here, and pushes view models into the runtime-free view (authored BattleUI)
 // while intents flow back through events. The environment (WorldEnvironment, sun, authored
-// GameCamera rig instance) is authored in the scene. The standalone debug host is BattleLauncher;
-// the future geoscape handoff presents the same way.
+// GameCamera rig instance) is authored in the scene. The standalone debug host is BattleLauncher
+// (allowReturn false); the geoscape handoff presents with allowReturn true and routes
+// Completed into the campaign return.
 // Deliberately throwaway — to be superseded by the real BattleScene later.
 public sealed partial class BattleScene : Node3D
 {
@@ -18,8 +19,13 @@ public sealed partial class BattleScene : Node3D
   private EventPlaybackDirector _director = null!;
   private BattleUI _view = null!;
   private Faction _playerFaction = null!;
+  private bool _allowReturn;
+  private bool _disposed;
 
-  public void Present(BattleRuntime runtime, BattleSetup setup)
+  /// <summary>Requests campaign completion after terminal playback finishes.</summary>
+  public event Action<FactionBattleSummary>? Completed;
+
+  public void Present(BattleRuntime runtime, BattleSetup setup, bool allowReturn = false)
   {
     ArgumentNullException.ThrowIfNull(runtime);
     ArgumentNullException.ThrowIfNull(setup);
@@ -27,13 +33,27 @@ public sealed partial class BattleScene : Node3D
       throw new System.InvalidOperationException("BattleScene was already presented.");
     _runtime = runtime;
     _setup = setup;
+    _allowReturn = allowReturn;
   }
 
-  public override void _Ready()
+  /// <summary>Releases the controller and host-owned runtime once.</summary>
+  public new void Dispose()
+  {
+    if (_disposed)
+      return;
+    _disposed = true;
+    _ui?.Dispose();
+    _runtime?.Dispose();
+  }
+
+  // The installer runs fallible setup after tree attachment and recovers exceptions directly.
+  public void InitializePresentation()
   {
     if (_runtime is null || _setup is null)
       throw new System.InvalidOperationException(
-        "BattleScene requires Present(runtime, setup) before entering the tree.");
+        "BattleScene requires Present(runtime, setup) before initialization.");
+    if (_ui is not null)
+      throw new System.InvalidOperationException("BattleScene was already initialized.");
 
     _playerFaction = _runtime.Query(new GetPlayerFactionQuery()).Match(
       Some: faction => faction,
@@ -60,6 +80,7 @@ public sealed partial class BattleScene : Node3D
     _view.ConfirmRequested += () => _ui.Confirm();
     _view.CancelRequested += _ui.Cancel;
     _view.VerbSelected += _ui.BeginAction;
+    _view.ReturnRequested += OnReturnIntent;
     input.TileClicked += tile => _ui.ClickTile(tile);
     input.TileHovered += OnTileHovered;
     input.ConfirmPressed += () => _ui.Confirm();
@@ -72,21 +93,45 @@ public sealed partial class BattleScene : Node3D
       if (_ui.State == UiState.BattleOver)
         ShowBattleOverBanner();
     };
-    _director.PlaybackIdle += RefreshView;
     _director.PlaybackIdle += OnPlaybackIdle;
 
     RefreshView();
 
-    // The StateChanged subscription only sees future transitions; a factory result that
-    // already ended the battle must show its banner now.
+    // Show startup-terminal results immediately.
     if (_ui.State == UiState.BattleOver)
       ShowBattleOverBanner();
   }
 
   public override void _ExitTree()
   {
-    _ui?.Dispose();
-    _runtime?.Dispose();
+    Dispose();
+  }
+
+  private bool CanReturn => _allowReturn && !_disposed
+    && _runtime.Query(new GetBattleOutcomeQuery()).IsSome && !_director.Busy;
+
+  private void OnReturnIntent()
+  {
+    if (CanReturn)
+      Completed?.Invoke(_runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
+        Right: summary => summary,
+        Left: failure => throw new InvalidOperationException(failure.Message)));
+  }
+
+  private void RefreshView()
+  {
+    var queriedUnits = _runtime.Query(new GetFactionAliveUnits(_playerFaction))
+      .AsValueEnumerable().Select(unit => unit.State).ToArray();
+    _view.ShowUnits(queriedUnits);
+    _view.ShowActionOptions(_ui.ActionOptions);
+
+    bool targeting = _ui.State is UiState.Targeting or UiState.TargetingLocked;
+    if (targeting)
+      _view.ShowTargeting(_ui.CandidateCells, _ui.LastPreview);
+    else
+      _view.HideTargeting();
+
+    _view.ShowReturn(CanReturn);
   }
 
   private void InstantiateMap()
@@ -106,20 +151,6 @@ public sealed partial class BattleScene : Node3D
     var center = new Vector3(_setup.Map.Dimensions.X / 2f, 0f, _setup.Map.Dimensions.Z / 2f);
     rig.GlobalPosition = center + new Vector3(0f, 10f, 0f);
     return rig;
-  }
-
-  private void RefreshView()
-  {
-    var queriedUnits = _runtime.Query(new GetFactionAliveUnits(_playerFaction))
-      .AsValueEnumerable().Select(unit => unit.State).ToArray();
-    _view.ShowUnits(queriedUnits);
-    _view.ShowActionOptions(_ui.ActionOptions);
-
-    bool targeting = _ui.State is UiState.Targeting or UiState.TargetingLocked;
-    if (targeting)
-      _view.ShowTargeting(_ui.CandidateCells, _ui.LastPreview);
-    else
-      _view.HideTargeting();
   }
 
   private void OnTileHovered(Vector3I tile)

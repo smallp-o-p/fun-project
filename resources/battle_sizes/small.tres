@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="BattleSizeData" format=3]
+
+[ext_resource type="Script" path="res://scripts/battle/types/BattleSizeData.cs" id="1_size"]
+
+[resource]
+script = ExtResource("1_size")
+Name = "Small"
+Description = "One-soldier probe against two to five ordinary hostiles."
+MaxPlayerUnits = 1
+MinEnemyUnits = 2
+MaxEnemyUnits = 5

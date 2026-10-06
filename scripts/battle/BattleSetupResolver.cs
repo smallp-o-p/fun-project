@@ -1,7 +1,4 @@
 using FunProject.Combatants;
-using FunProject.Items;
-using FunProject.Items.Capabilities;
-using FunProject.Weapons;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -17,7 +14,8 @@ public static class BattleSetupResolver
   public static Either<BattleSetupFailure, BattleSetup> Resolve(
     BattleTypeData type,
     int? seed = null,
-    Option<PlayerDeployment> playerDeployment = default)
+    Option<PlayerDeployment> playerDeployment = default,
+    Option<SideDeployment> sideDeployment = default)
   {
     ArgumentNullException.ThrowIfNull(type);
     if (type.MapPool.Count == 0)
@@ -27,6 +25,31 @@ public static class BattleSetupResolver
       return Left<BattleSetupFailure, BattleSetup>(new BattleSetupFailure(
         BattleSetupFailureReason.UnknownFaction,
         $"PlayerFactionIndex {type.PlayerFactionIndex} is out of range for {type.Factions.Count} factions."));
+
+    SideDeployment? sideOverride = null;
+    if (sideDeployment.Case is SideDeployment suppliedSide)
+    {
+      ArgumentNullException.ThrowIfNull(suppliedSide.Faction);
+      ArgumentNullException.ThrowIfNull(suppliedSide.Loadouts);
+      if (suppliedSide.FactionIndex < 0 || suppliedSide.FactionIndex >= type.Factions.Count)
+        return Left<BattleSetupFailure, BattleSetup>(new BattleSetupFailure(
+          BattleSetupFailureReason.UnknownFaction,
+          $"SideDeployment faction index {suppliedSide.FactionIndex} is out of range for {type.Factions.Count} factions."));
+      if (suppliedSide.FactionIndex == type.PlayerFactionIndex)
+        return Left<BattleSetupFailure, BattleSetup>(new BattleSetupFailure(
+          BattleSetupFailureReason.FactionMismatch,
+          $"SideDeployment targets faction slot {suppliedSide.FactionIndex}; only non-player slots can be overridden."));
+      foreach (UnitLoadout loadout in suppliedSide.Loadouts)
+      {
+        ArgumentNullException.ThrowIfNull(loadout);
+        ArgumentNullException.ThrowIfNull(loadout.Combatant);
+        if (!ReferenceEquals(loadout.Combatant.OwningFaction, suppliedSide.Faction))
+          return Left<BattleSetupFailure, BattleSetup>(new(
+            BattleSetupFailureReason.FactionMismatch,
+            $"Deployment unit {loadout.Combatant.Name} does not belong to {suppliedSide.Faction.Name}."));
+      }
+      sideOverride = suppliedSide;
+    }
 
     int resolvedSeed = seed ?? Random.Shared.Next();
     int chosenIndex = new Random(resolvedSeed).Next(type.MapPool.Count);
@@ -62,11 +85,8 @@ public static class BattleSetupResolver
       ArgumentNullException.ThrowIfNull(authoredSide.Faction);
       Faction faction;
       IReadOnlyList<UnitLoadout> loadouts;
-      if (slot == type.PlayerFactionIndex && playerDeployment.IsSome)
+      if (slot == type.PlayerFactionIndex && playerDeployment.Case is PlayerDeployment supplied)
       {
-        PlayerDeployment supplied = playerDeployment.Match(
-          Some: value => value,
-          None: () => throw new InvalidOperationException("Expected a player deployment."));
         ArgumentNullException.ThrowIfNull(supplied.Faction);
         ArgumentNullException.ThrowIfNull(supplied.Loadouts);
         faction = supplied.Faction;
@@ -80,6 +100,11 @@ public static class BattleSetupResolver
               BattleSetupFailureReason.FactionMismatch,
               $"Deployment unit {loadout.Combatant.Name} does not belong to {faction.Name}."));
         }
+      }
+      else if (sideOverride is not null && sideOverride.FactionIndex == slot)
+      {
+        faction = sideOverride.Faction;
+        loadouts = sideOverride.Loadouts;
       }
       else
       {
@@ -116,23 +141,14 @@ public static class BattleSetupResolver
     });
   }
 
-  // Authored quantity/equipment expansion: quantity floors at one; weapons route through
-  // ItemRuntimeFactory and armor needs its capability proof. Equipment comes only from the
-  // roster entries — campaign equipment slots are never read or written here.
+  // Expand authored quantities into combatants with fresh loadout equipment.
   private static List<UnitLoadout> ExpandRoster(FactionDeploymentData authoredSide, Faction faction)
   {
     var loadouts = new List<UnitLoadout>();
     foreach (RosterEntryData entry in authoredSide.Roster)
     {
       for (int count = 0; count < Math.Max(1, entry.Quantity); count++)
-      {
-        Combatant combatant = new(entry.Combatant, faction);
-        Option<Weapon> weapon = entry.Weapon is null ? None : Some(ItemRuntimeFactory.CreateWeapon(entry.Weapon));
-        Option<ItemWith<ArmorCapability>> armor = entry.Armor is null
-          ? None
-          : ItemRuntimeFactory.Create(entry.Armor).With<ArmorCapability>();
-        loadouts.Add(new UnitLoadout(combatant, weapon, armor));
-      }
+        loadouts.Add(entry.Loadout.CreateRuntime(faction));
     }
 
     return loadouts;

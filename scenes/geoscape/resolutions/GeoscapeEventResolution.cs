@@ -28,6 +28,11 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
 
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
+    if (session.PendingResolution.IsNone)
+    {
+      RequestBack();
+      return;
+    }
     PendingResolution pending = session.PendingResolution.Match(
       value => value,
       () => throw new InvalidOperationException(
@@ -44,7 +49,7 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
       var button = new Button { Text = txt, CustomMinimumSize = new Vector2(120, 44) };
       if (outcome == ResolutionOutcome.Engaged)
       {
-        button.Pressed += () => RequestSquadView(pending.Event.Definition);
+        button.Pressed += () => RequestSquadView(pending);
       }
       else
       {
@@ -54,10 +59,10 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
     }
   }
 
-  private void RequestSquadView(GeoscapeEventDefinition mission)
+  private void RequestSquadView(PendingResolution pending)
   {
-    var view = SquadViewScene!.InstantiateAs<SquadLoadoutView>();
-    view.Configure(mission.Title, 3, allowEquipmentEditing: true, mission: mission);
+    var view = SquadViewScene!.InstantiateAs<MissionView>();
+    view.ConfigureMission(pending.Event);
     RequestView(view);
   }
 

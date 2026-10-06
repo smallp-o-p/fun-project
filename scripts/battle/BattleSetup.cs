@@ -37,6 +37,14 @@ public sealed record PlayerDeployment(
   Faction Faction,
   IReadOnlyList<UnitLoadout> Loadouts);
 
+/// <summary>Campaign-supplied override for one non-player side: the battle type's faction
+/// slot it replaces, its runtime faction, and the exact loadouts to deploy there. Every
+/// combatant must already belong to the faction; the slot's authored roster is discarded.</summary>
+public sealed record SideDeployment(
+  int FactionIndex,
+  Faction Faction,
+  IReadOnlyList<UnitLoadout> Loadouts);
+
 /// <summary>The concrete launch description: one selected map, ordered sides, and an
 /// already-resolved seed. Objects/systems default to empty; explicit null is a caller error.</summary>
 public sealed record BattleSetup(
