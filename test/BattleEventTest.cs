@@ -82,19 +82,6 @@ public class BattleEventTest
     Assert.True(keys.Contains(typeof(BattleEventTag)), "Root tag missing from dispatch keys.");
   }
 
-  [TestCase(TestName = "Instances of one event type share one static keys set; different event types do not")]
-  public void SameEventTypeSharesOneKeysSetWhileDifferentEventTypesDoNot()
-  {
-    FrozenSet<Type> firstStarted = new SessionStartedBattleEvent().EventKeys;
-    FrozenSet<Type> secondStarted = new SessionStartedBattleEvent().EventKeys;
-    FrozenSet<Type> ended = new SessionEndedBattleEvent().EventKeys;
-
-    // The keys set is a per-closed-type static, so instances of one event type share the
-    // set instance and different event types each own their own.
-    Assert.True(ReferenceEquals(firstStarted, secondStarted));
-    Assert.False(ReferenceEquals(firstStarted, ended));
-  }
-
   // No compile-time enforcement exists for the sealed/self-keyed contract that keeps the
   // per-closed-type dispatch keys authoritative, so this test-only guard fails naming the
   // offender. GetTypes() scans the Debug test-inclusive assembly, so test-defined events

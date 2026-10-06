@@ -17,7 +17,6 @@ public sealed class UnitAction
 
   public BattleUnitState Unit { get; }
   public UnitActionDefinition Action { get; }
-  internal bool IsDirty => _isDirty;
 
   public bool IsAvailable
   {

@@ -8,31 +8,53 @@ using System.Collections.Generic;
 [RequireGodotRuntime]
 public class MissionEnemyResolverTest
 {
-  [TestCase(TestName = "Special enemies are additive: ordinary draws first, mandatory specials in the final positions")]
-  public void SpecialEnemiesAreAdditive()
+  [TestCase(TestName = "Seeded forces repeat with fresh units and ordered additive specials")]
+  public void SeededForcesRepeatWithFreshUnitsAndAdditiveSpecials()
   {
-    var mission = TestData.MakeTacticalMission(minEnemyUnits: 2, maxEnemyUnits: 2);
-    var specialOne = new UnitLoadoutData { Combatant = TestData.MakeCombatantData("Special One", health: 30) };
-    var specialTwo = new UnitLoadoutData { Combatant = TestData.MakeCombatantData("Special Two", health: 30) };
-    mission.SpecialEnemies.Add(specialOne);
-    mission.SpecialEnemies.Add(specialTwo);
+    var mission = TestData.MakeTacticalMission(minEnemyUnits: 2, maxEnemyUnits: 4);
+    mission.OrdinaryEnemies.Add(new UnitLoadoutData
+    { Combatant = TestData.MakeCombatantData("Heavy", health: 25) });
+    mission.SpecialEnemies.Add(new UnitLoadoutData
+    { Combatant = TestData.MakeCombatantData("Special One", health: 30) });
+    mission.SpecialEnemies.Add(new UnitLoadoutData
+    { Combatant = TestData.MakeCombatantData("Special Two", health: 30) });
+    var names = new SysColGeneric.HashSet<string>();
+    var counts = new SysColGeneric.HashSet<int>();
 
-    SideDeployment force = MissionEnemyResolver.Resolve(mission, seed: 7);
-
-    Assert.Equal(1, force.FactionIndex);
-    Assert.Equal(4, force.Loadouts.Count);
-    Assert.Equal("Grunt", force.Loadouts[0].Combatant.Name);
-    Assert.Equal("Grunt", force.Loadouts[1].Combatant.Name);
-    Assert.Equal(specialOne.Combatant.Name, force.Loadouts[2].Combatant.Name);
-    Assert.Equal(specialTwo.Combatant.Name, force.Loadouts[3].Combatant.Name);
-    foreach (UnitLoadout loadout in force.Loadouts)
-      Assert.True(ReferenceEquals(loadout.Combatant.OwningFaction, force.Faction));
+    for (int seed = 1; seed <= 32; seed++)
+    {
+      SideDeployment first = MissionEnemyResolver.Resolve(mission, seed);
+      SideDeployment second = MissionEnemyResolver.Resolve(mission, seed);
+      int ordinaryCount = first.Loadouts.Count - 2;
+      Assert.True(ordinaryCount >= 2 && ordinaryCount <= 4);
+      counts.Add(ordinaryCount);
+      Assert.Equal(1, first.FactionIndex);
+      Assert.Equal("Special One", first.Loadouts[ordinaryCount].Combatant.Name);
+      Assert.Equal("Special Two", first.Loadouts[ordinaryCount + 1].Combatant.Name);
+      Assert.False(ReferenceEquals(first.Faction, second.Faction));
+      Assert.Equal(first.Faction.Name, second.Faction.Name);
+      Assert.Equal(first.Loadouts.Count, second.Loadouts.Count);
+      for (int index = 0; index < first.Loadouts.Count; index++)
+      {
+        UnitLoadout loadout = first.Loadouts[index];
+        if (index < ordinaryCount)
+          names.Add(loadout.Combatant.Name);
+        Assert.Equal(loadout.Combatant.Name, second.Loadouts[index].Combatant.Name);
+        Assert.False(ReferenceEquals(loadout.Combatant, second.Loadouts[index].Combatant));
+        Assert.True(ReferenceEquals(first.Faction, loadout.Combatant.OwningFaction));
+        Assert.True(ReferenceEquals(second.Faction, second.Loadouts[index].Combatant.OwningFaction));
+      }
+    }
+    Assert.True(names.Contains("Grunt") && names.Contains("Heavy"));
+    Assert.Equal(2, names.Count);
+    Assert.True(counts.Count >= 2);
   }
 
   [TestCase(TestName = "A specials-only mission needs no ordinary pool and produces exactly the specials")]
   public void SpecialOnlyMissionNeedsNoOrdinaryPool()
   {
     var mission = TestData.MakeTacticalMission(minEnemyUnits: 0, maxEnemyUnits: 0);
+    mission.OrdinaryEnemies.Clear();
     mission.SpecialEnemies.Add(new UnitLoadoutData
     {
       Combatant = TestData.MakeCombatantData("Warlock", health: 30),
@@ -42,25 +64,6 @@ public class MissionEnemyResolverTest
 
     Assert.Equal(1, force.Loadouts.Count);
     Assert.Equal("Warlock", force.Loadouts[0].Combatant.Name);
-  }
-
-  [TestCase(TestName = "Resolution mints a fresh faction and separate instances for every unit")]
-  public void ResolutionMintsFreshInstances()
-  {
-    var mission = TestData.MakeTacticalMission(minEnemyUnits: 2, maxEnemyUnits: 2);
-
-    SideDeployment first = MissionEnemyResolver.Resolve(mission, seed: 7);
-    SideDeployment second = MissionEnemyResolver.Resolve(mission, seed: 7);
-
-    Assert.False(ReferenceEquals(first.Faction, second.Faction));
-    Assert.Equal(first.Faction.Name, second.Faction.Name);
-    for (int index = 0; index < first.Loadouts.Count; index++)
-    {
-      Assert.False(ReferenceEquals(first.Loadouts[index].Combatant, second.Loadouts[index].Combatant));
-      Assert.False(ReferenceEquals(
-        first.Loadouts[index].Combatant.OwningFaction,
-        second.Loadouts[index].Combatant.OwningFaction));
-    }
   }
 
   [TestCase(TestName = "Enemy count sampling observes both endpoints of an extreme inclusive range")]

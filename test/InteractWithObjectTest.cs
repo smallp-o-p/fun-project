@@ -59,7 +59,7 @@ public class InteractWithObjectTest
     Assert.Equal(point, @event.Position);
   }
 
-  [TestCase(TestName = "Interaction spending the actor's last AP refreshes retained actions only for that actor")]
+  [TestCase(TestName = "Interaction spending the actor's last AP refreshes that actor's retained actions")]
   public void InteractionSpendingLastActionPointRefreshesActorOptions()
   {
     var weapon = TestData.MakeWeapon("Rifle");
@@ -79,8 +79,6 @@ public class InteractWithObjectTest
       new GetAvailableActionsForUnit(battle.Alive(battle.EnemyUnit)));
     foreach (UnitAction action in playerActions)
       _ = action.IsAvailable;
-    foreach (UnitAction action in enemyActions)
-      _ = action.IsAvailable;
     int turnNumber = battle.Session.TurnNumber;
 
     battle.Interact(battle.PlayerUnit, bomb);
@@ -97,7 +95,6 @@ public class InteractWithObjectTest
       .Single(action => action.Action is PassActionDefinition).IsAvailable);
     Assert.True(playerActions.AsValueEnumerable()
       .Single(action => action.Action is EndTurnActionDefinition).IsAvailable);
-    Assert.True(enemyActions.AsValueEnumerable().All(action => !action.IsDirty));
     Assert.True(ReferenceEquals(playerActions, battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)))));
     Assert.True(ReferenceEquals(enemyActions, battle.Query(

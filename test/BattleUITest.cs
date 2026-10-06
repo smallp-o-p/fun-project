@@ -79,24 +79,6 @@ public partial class BattleUITest
     Assert.Equal("65%", hitChance.Text);
   }
 
-  [TestCase(TestName = "Return availability toggles the button and forwards the intent")]
-  public void ReturnAvailabilityForwardsIntent()
-  {
-    var view = BuildView();
-    int returns = 0;
-    view.ReturnRequested += () => returns++;
-    var button = view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ReturnButton");
-
-    Assert.False(button.Visible); // authored default hides the return intent
-    view.ShowReturn(true);
-    Assert.True(button.Visible);
-    button.EmitSignal(Button.SignalName.Pressed);
-    Assert.Equal(1, returns);
-
-    view.ShowReturn(false);
-    Assert.False(button.Visible);
-  }
-
   [TestCase(TestName = "HUD intents re-raise through the BattleUI root")]
   public void HudIntentsRaiseThroughRoot()
   {
@@ -108,19 +90,29 @@ public partial class BattleUITest
     view.ShowActionOptions([moveOption]);
     int confirms = 0;
     int cancels = 0;
+    int returns = 0;
     UnitActionOption? selected = null;
     view.ConfirmRequested += () => confirms++;
     view.CancelRequested += () => cancels++;
+    view.ReturnRequested += () => returns++;
     view.VerbSelected += option => selected = option;
 
     view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ConfirmButton").EmitSignal(Button.SignalName.Pressed);
     view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%CancelButton").EmitSignal(Button.SignalName.Pressed);
     ((Button)view.GetNode<BattleHud>("%BattleHud").GetNode<Container>("%VerbButtons").GetChild(0))
       .EmitSignal(Button.SignalName.Pressed);
+    var returnButton = view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ReturnButton");
+    Assert.False(returnButton.Visible);
+    view.ShowReturn(true);
+    Assert.True(returnButton.Visible);
+    returnButton.EmitSignal(Button.SignalName.Pressed);
+    view.ShowReturn(false);
+    Assert.False(returnButton.Visible);
     view.ShowBattleOver("VICTORY");
 
     Assert.Equal(1, confirms);
     Assert.Equal(1, cancels);
+    Assert.Equal(1, returns);
     Assert.True(ReferenceEquals(moveOption, selected));
     var banner = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%BattleOverBanner");
     Assert.True(banner.Visible);

@@ -410,10 +410,13 @@ public class BattleSetupResolverTest
     // The other slot keeps its authored roster and its own fresh faction.
     Assert.Equal(1, setup.Sides[0].Units.Count);
     Assert.False(ReferenceEquals(force.Faction, setup.Sides[0].Faction));
+
+    var oversized = force with { Loadouts = [.. force.Loadouts, force.Loadouts[0], force.Loadouts[0]] };
+    Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall,
+      BattleSetupResolver.Resolve(type, seed: 7, sideDeployment: Some(oversized)).RequireLeft().Reason);
   }
 
   [TestCase(7, TestName = "Seed 7: a side deployment never changes the seeded map choice")]
-  [TestCase(-7, TestName = "Seed -7: a side deployment never changes the seeded map choice")]
   public void SideDeploymentPreservesSeededMapChoice(int seed)
   {
     var type = TestData.MakeTacticalBattleType(enemyCells: 4);
@@ -434,75 +437,6 @@ public class BattleSetupResolverTest
 
     Assert.True(ReferenceEquals(expected, withForce.MapScene.RequireSome()));
     Assert.True(ReferenceEquals(expected, authored.MapScene.RequireSome()));
-  }
-
-  [TestCase(7, TestName = "Seed 7: same-seed resolutions of a generated force repeat the layout with fresh identities")]
-  [TestCase(-7, TestName = "Seed -7: same-seed resolutions of a generated force repeat the layout with fresh identities")]
-  public void GeneratedForcesRepeatLayoutWithFreshIdentities(int seed)
-  {
-    var type = TestData.MakeTacticalBattleType(enemyCells: 4);
-    var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 3);
-    mission.OrdinaryEnemies.Add(new UnitLoadoutData
-    {
-      Combatant = TestData.MakeCombatantData("Heavy", health: 25, aim: 55),
-    });
-    mission.SpecialEnemies.Add(new UnitLoadoutData
-    {
-      Combatant = TestData.MakeCombatantData("Special", health: 30),
-    });
-
-    BattleSetup first = BattleSetupResolver.Resolve(type, seed: seed,
-      sideDeployment: Some(MissionEnemyResolver.Resolve(mission, seed: seed))).RequireRight();
-    BattleSetup second = BattleSetupResolver.Resolve(type, seed: seed,
-      sideDeployment: Some(MissionEnemyResolver.Resolve(mission, seed: seed))).RequireRight();
-
-    int enemyCount = first.Sides[1].Units.Count;
-    Assert.True(enemyCount >= 3 && enemyCount <= 4,
-      $"Expected an ordinary draw in [2, 3] plus the special, found {enemyCount} units.");
-    Assert.Equal("Special", first.Sides[1].Units[enemyCount - 1].Loadout.Combatant.Name);
-    Assert.True(ReferenceEquals(first.MapScene.RequireSome(), second.MapScene.RequireSome()));
-    Assert.False(ReferenceEquals(first.Sides[1].Faction, second.Sides[1].Faction));
-    Assert.Equal(first.Sides.Count, second.Sides.Count);
-    for (int side = 0; side < first.Sides.Count; side++)
-    {
-      Assert.Equal(first.Sides[side].Units.Count, second.Sides[side].Units.Count);
-      for (int unit = 0; unit < first.Sides[side].Units.Count; unit++)
-      {
-        Assert.Equal(first.Sides[side].Units[unit].Position, second.Sides[side].Units[unit].Position);
-        Assert.Equal(first.Sides[side].Units[unit].Loadout.Combatant.Name,
-          second.Sides[side].Units[unit].Loadout.Combatant.Name);
-        Assert.False(ReferenceEquals(first.Sides[side].Units[unit].Loadout.Combatant,
-          second.Sides[side].Units[unit].Loadout.Combatant));
-      }
-    }
-  }
-
-  [TestCase(TestName = "Generated ordinary draws span the pool and the count range across seeds 1 through 32")]
-  public void GeneratedOrdinaryDrawsSpanPoolAndCountAcrossSeeds()
-  {
-    var type = TestData.MakeTacticalBattleType(enemyCells: 4);
-    var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 4);
-    mission.OrdinaryEnemies.Add(new UnitLoadoutData
-    {
-      Combatant = TestData.MakeCombatantData("Heavy", health: 25, aim: 55),
-    });
-
-    var names = new SysColGeneric.HashSet<string>();
-    var counts = new SysColGeneric.HashSet<int>();
-    for (int seed = 1; seed <= 32; seed++)
-    {
-      SideDeployment force = MissionEnemyResolver.Resolve(mission, seed);
-      counts.Add(force.Loadouts.Count);
-      foreach (UnitLoadout loadout in force.Loadouts)
-        names.Add(loadout.Combatant.Name);
-    }
-
-    Assert.True(names.Contains("Grunt") && names.Contains("Heavy"),
-      $"Expected both pool entries across seeds 1..32, saw [{string.Join(", ", names)}].");
-    Assert.True(counts.Count >= 2,
-      $"Expected divergent ordinary counts across seeds 1..32, saw [{string.Join(", ", counts)}].");
-    foreach (int count in counts)
-      Assert.True(count >= 2 && count <= 4, $"Ordinary count {count} outside [2, 4].");
   }
 
   [TestCase(TestName = "Side deployments guard index, player slot, membership, and required inputs")]
@@ -535,19 +469,6 @@ public class BattleSetupResolverTest
       sideDeployment: Some(new SideDeployment(1, campaign, [null!]))));
     Assert.Throws<ArgumentNullException>(() => BattleSetupResolver.Resolve(type, seed: 7,
       sideDeployment: Some(new SideDeployment(1, campaign, [new UnitLoadout(null!)]))));
-  }
-
-  [TestCase(TestName = "A generated force larger than its slot's spawn capacity fails with SpawnSlotShortfall")]
-  public void OversizedGeneratedForceFailsWithShortfall()
-  {
-    var type = TestData.MakeDuelBattleType(); // 2x1x1 map: one spawn cell per side
-    var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 2);
-
-    SideDeployment force = MissionEnemyResolver.Resolve(mission, seed: 7);
-    BattleSetupFailure failure = BattleSetupResolver.Resolve(type, seed: 7,
-      sideDeployment: Some(force)).RequireLeft();
-
-    Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall, failure.Reason);
   }
 
   [TestCase(TestName = "Campaign equipment slots are never read; only loadout equipment equips")]

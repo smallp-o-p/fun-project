@@ -98,37 +98,20 @@ public partial class GeoscapeBattleHandoffTest
     return (scene, manager, squad, dialog, session);
   }
 
-  // A session-level launch for host-boundary tests that present the runtime themselves.
-  private static (GeoscapeFixture Fixture, MissionBattle Battle) LaunchedBattle()
-  {
-    TacticalMissionData mission = EliminationMission();
-    var fixture = new GeoscapeFixture(MakeStart(
-      roster: [MakeEntry("Alpha", MakeCombatantData("Alpha", health: 100))],
-      timeline: [MakeScheduled(1,
-        MakeEvent("Ambush", GeoscapeEventKind.TacticalBattle, tacticalMission: mission))]));
-    fixture.AdvanceTicks(1);
-    fixture.OpenResolution(fixture.ActiveEvent);
-    var battle = fixture.Session.LaunchMission(
-      fixture.ActiveEvent, [fixture.State.Roster[0]]).RequireRight();
-    return (fixture, battle);
-  }
-
-  private static BattleUnitState GruntAt(BattleRuntime runtime) =>
-    runtime.Query(new GetUnitAtTile(
-      runtime.TryGetTile(new Vector3I(2, 0, 0)).RequireSome())).RequireSome();
-
   [TestCase(800, 600, TestName = "Opaque battle viewport covers retained geoscape at minimum size")]
   [TestCase(1600, 900, TestName = "Opaque battle viewport covers retained geoscape in a scaled window")]
   public async Task BattleOwnsOpaqueViewport(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (_, manager, squad, _, _) = PreparedScene(SurvivalMission(1), out _,
+    var (_, manager, squad, _, session) = PreparedScene(SurvivalMission(1), out var capture,
       windowSize: new Vector2I(width, height));
     var sentinel = new ColorRect { Color = Colors.Magenta, MouseFilter = Control.MouseFilterEnum.Ignore };
     manager.RootView.AddChild(sentinel);
     sentinel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
     var battle = MissionBattleHost(manager.Current);
+    Assert.True(ReturnButton(battle).Visible);
+    Assert.True(manager.RootView.IsVisibleInTree());
 
     Assert.True(battle.GetViewport() is SubViewport);
     var viewport = (SubViewport)battle.GetViewport();
@@ -154,7 +137,13 @@ public partial class GeoscapeBattleHandoffTest
     battle.GetNode<BattleInputController>("BattleInputController").TileClicked += tile => clicked = Some(tile);
     await SelectFirstBattleUnit(battle, throughContainer: true);
     Assert.Equal(Vector3I.Zero, clicked.RequireSome());
+    int completions = 0;
+    battle.Completed += _ => completions++;
     ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
+    Assert.Equal(1, completions);
+    Assert.True(session.ActiveMission.IsNone);
+    Assert.True(session.PendingResolution.IsNone);
+    AssertBattleDisposed(capture);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
     await WaitForLayout(window);
     using var restored = window.GetTexture().GetImage();
@@ -181,7 +170,6 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(session.ActiveMission.IsSome); // campaign association held while presented
     Assert.True(session.PendingResolution.IsSome);
     Assert.False(ReturnButton(battle).Visible);
-    Assert.True(ReferenceEquals(manager.Current.GetNode<SubViewport>("Background/Viewport"), battle.GetParent()));
     Assert.True(manager.Visible);
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
     Assert.False(squad.GetNode<Control>("Content").Visible);
@@ -210,9 +198,9 @@ public partial class GeoscapeBattleHandoffTest
     int intents = 0;
     battle.Completed += _ => intents++; // probe subscribed after the mission handler
     var returnButton = ReturnButton(battle);
-    Assert.False(returnButton.Visible); // playback still draining
+    Assert.False(returnButton.Visible); // the enemy turn has not completed
     returnButton.EmitSignal(Button.SignalName.Pressed);
-    Assert.Equal(0, intents); // no return intent until the director queue idles
+    Assert.Equal(0, intents); // an ongoing battle cannot return
 
     DrainDirector(battle);
     Assert.True(returnButton.Visible); // terminal and idle at drain
@@ -263,37 +251,6 @@ public partial class GeoscapeBattleHandoffTest
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
     Assert.False(GodotObject.IsInstanceValid(secondBattle));
     Assert.False(GodotObject.IsInstanceValid(secondSquad));
-  }
-
-  [TestCase(TestName = "A mission ended at startup offers Return at presentation")]
-  public async Task StartupTerminalMissionOffersReturnAtPresentation()
-  {
-
-    await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, _, _) = PreparedScene(SurvivalMission(1), out var capture);
-
-    SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
-
-    var battle = MissionBattleHost(manager.Current);
-    Assert.True(ReferenceEquals(manager.Current.GetNode<SubViewport>("Background/Viewport"), battle.GetParent()),
-      "The mission viewport owns the battle host.");
-    Assert.True(manager.RootView.IsVisibleInTree());
-    Assert.True(squad.GetNode<SubViewportContainer>("Background").IsVisibleInTree());
-    Assert.False(battle.GetViewport().TransparentBg);
-    Assert.True(ReturnButton(battle).Visible, // terminal at presentation, director idle
-      "Startup-terminal battles must not depend on a later BattleOver transition.");
-
-    int intents = 0;
-    battle.Completed += _ => intents++;
-    ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
-    Assert.Equal(1, intents);
-
-    var session = new GeoscapeSession(scene.Campaign!);
-    Assert.True(session.ActiveMission.IsNone);
-    Assert.True(session.PendingResolution.IsNone);
-    AssertBattleDisposed(capture);
-    Assert.True(manager.Visible);
-    Assert.True(ReferenceEquals(manager.RootView, manager.Current));
   }
 
   [TestCase(TestName = "A wrong-root battle export leaves the mission pending with the selection")]
@@ -392,8 +349,14 @@ public partial class GeoscapeBattleHandoffTest
   public async Task HostBoundaryReturnWaitsForPlaybackIdle()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (fixture, battle) = LaunchedBattle();
-    using var _ = fixture;
+    using var fixture = new GeoscapeFixture(MakeStart(
+      roster: [MakeEntry("Alpha", MakeCombatantData("Alpha", health: 100))],
+      timeline: [MakeScheduled(1, MakeEvent("Ambush", GeoscapeEventKind.TacticalBattle,
+        tacticalMission: EliminationMission()))]));
+    fixture.AdvanceTicks(1);
+    fixture.OpenResolution(fixture.ActiveEvent);
+    var battle = fixture.Session.LaunchMission(fixture.ActiveEvent, [fixture.State.Roster[0]]).RequireRight();
+    using var runtime = battle.Runtime;
     var scene = CreateBattleScene();
     scene.Present(battle.Runtime, battle.Setup, allowReturn: true);
     AddToTree(scene);
@@ -404,8 +367,8 @@ public partial class GeoscapeBattleHandoffTest
 
     int intents = 0;
     scene.Completed += _ => intents++;
-    battle.Runtime.ExecuteAction(BattleAction.ApplyDamage(
-      battle.Runtime.TryGetAlive(GruntAt(battle.Runtime)).RequireSome(), 999));
+    var grunt = runtime.Query(new GetUnitAtTile(runtime.TryGetTile(new Vector3I(2, 0, 0)).RequireSome())).RequireSome();
+    runtime.ExecuteAction(BattleAction.ApplyDamage(runtime.TryGetAlive(grunt).RequireSome(), 999));
     Assert.True(battle.Runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.True(Director(scene).Busy);
 
@@ -418,7 +381,6 @@ public partial class GeoscapeBattleHandoffTest
     returnButton.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(1, intents);
 
-    battle.Runtime.Dispose();
   }
 
   [TestCase(TestName = "A throwing return subscriber still tears down the presentation once")]

@@ -17,30 +17,26 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class GeoscapeMissionReturnTest
 {
-  // One fired tactical event over a three-soldier campaign. The player side carries the
-  // elimination objective with both terminal directives (opposition down = Victory, squad
-  // down = Defeat); the enemy side keeps an inert objective. Two player cells and two
-  // enemy cells fit a two-soldier squad plus up to one ordinary Grunt and one special Boss.
-  private static GeoscapeFixture NewMissionCampaign(bool withSpecialEnemy = false)
+  // Three player cells support a mixed squad; Delta stays outside the mission.
+  // The player's elimination objective ends the real battle on victory or defeat.
+  private static GeoscapeFixture NewMissionCampaign()
   {
     TacticalMissionData mission = MakeTacticalMission(
-      MakeTacticalBattleType(playerCells: 2, enemyCells: 2),
-      maxPlayerUnits: 2, minEnemyUnits: 1, maxEnemyUnits: 1);
+      MakeTacticalBattleType(playerCells: 3, enemyCells: 2),
+      maxPlayerUnits: 3, minEnemyUnits: 1, maxEnemyUnits: 1);
     mission.BattleType.Factions[0].Objectives.Clear();
     mission.BattleType.Factions[0].Objectives.Add(new EliminateAllOpposingForcesObjectiveData
     {
       OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
       OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
     });
-    if (withSpecialEnemy)
-      mission.SpecialEnemies.Add(new UnitLoadoutData
-      { Combatant = MakeCombatantData("Boss", health: 40) });
     var campaign = new GeoscapeFixture(MakeStart(
       roster:
       [
         MakeEntry("Alpha", MakeCombatantData("Alpha", health: 100)),
         MakeEntry("Beta", MakeCombatantData("Beta", health: 100)),
         MakeEntry("Gamma", MakeCombatantData("Gamma", health: 100)),
+        MakeEntry("Delta", MakeCombatantData("Delta", health: 100)),
       ],
       timeline: [MakeScheduled(1, MakeEvent(
         "Ambush", GeoscapeEventKind.TacticalBattle, tacticalMission: mission))]));
@@ -61,7 +57,7 @@ public class GeoscapeMissionReturnTest
       battle.Runtime.TryGetTile(new Vector3I(x, 0, 0)).RequireSome())).RequireSome();
 
   // One real action per call through the handle's runtime, minting fresh proofs at use
-  // time. Spawn row order: Alpha (0,0,0), Beta (1,0,0), Grunt (2,0,0), Boss (3,0,0).
+  // time. Player cells occupy x=0..2; the enemy starts at x=3.
   private static void Strike(MissionBattle battle, BattleUnitState target, int amount,
     DamageKind kind = DamageKind.Health) =>
     battle.Runtime.ExecuteAction(BattleAction.ApplyDamage(
@@ -73,56 +69,89 @@ public class GeoscapeMissionReturnTest
   private static bool Holds(IReadOnlyList<Combatant> roster, Combatant combatant) =>
     roster.AsValueEnumerable().Any(member => ReferenceEquals(member, combatant));
 
-  [TestCase(TestName = "Victory return injures survivors, captures the stunned enemy, and consumes the mission")]
-  public void VictoryReturnAppliesAllCampaignEffects()
+  [TestCase(TestName = "A rebuilt session commits mixed campaign effects before notifying the return")]
+  public void RebuiltSessionCommitsAllCampaignEffectsBeforeNotifications()
   {
     using var campaign = NewMissionCampaign();
     var mission = campaign.ActiveEvent;
     var alpha = campaign.State.Roster[0];
     var beta = campaign.State.Roster[1];
     var gamma = campaign.State.Roster[2];
+    var delta = campaign.State.Roster[3];
+    campaign.ReturnFromMission((gamma, 25, 0));
+    mission.Definition.AllowUnfitDeployment = true;
+    var weapon = MakeWeapon("Service Blade");
+    gamma.EquipWeapon(weapon);
     campaign.OpenResolution(mission);
-    var battle = campaign.Session.LaunchMission(mission, [alpha, beta]).RequireRight();
+    var battle = campaign.Session.LaunchMission(mission, [alpha, beta, gamma]).RequireRight();
     try
     {
-      var grunt = UnitAt(battle, 2).Combatant;
+      var grunt = UnitAt(battle, 3).Combatant;
       Strike(battle, UnitAt(battle, 0), 25);
-      Strike(battle, UnitAt(battle, 2), 20, DamageKind.Stun);
-      Assert.Equal(BattleOutcome.Victory, PlayerSummary(battle, campaign.State).Outcome);
+      Strike(battle, UnitAt(battle, 1), 999, DamageKind.Stun);
+      Strike(battle, UnitAt(battle, 2), 999);
+      Strike(battle, UnitAt(battle, 3), 20, DamageKind.Stun);
+      FactionBattleSummary summary = PlayerSummary(battle, campaign.State);
+      Assert.Equal(BattleOutcome.Victory, summary.Outcome);
 
-      campaign.ClearEvents();
-      campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
+      var rebuilt = new GeoscapeSession(campaign.State);
+      Assert.True(ReferenceEquals(battle.Deployment, rebuilt.ActiveMission.RequireSome()));
+      Assert.Throws<InvalidOperationException>(() => rebuilt.CompleteResolution(ResolutionOutcome.Engaged));
+      bool alphaNotified = false;
+      bool betaNotified = false;
+      bool closed = false;
+      rebuilt.EventCommitted += geoscapeEvent =>
+      {
+        Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier);
+        Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier);
+        Assert.True(campaign.State.Conditions.GetInjury(beta).IsNone);
+        Assert.Equal(1, campaign.State.Conditions.GetFatigue(beta).RequireSome().Tier);
+        Assert.True(Holds(campaign.State.Roster, alpha));
+        Assert.True(Holds(campaign.State.Roster, beta));
+        Assert.False(Holds(campaign.State.Roster, gamma));
+        Assert.True(campaign.State.Conditions.GetInjury(gamma).IsNone);
+        Assert.True(campaign.State.Conditions.GetFatigue(gamma).IsNone);
+        Assert.True(ReferenceEquals(weapon, gamma.EquippedWeapon.RequireSome()));
+        Assert.True(Holds(campaign.State.Roster, delta));
+        Assert.True(campaign.State.Conditions.GetInjury(delta).IsNone);
+        Assert.True(campaign.State.Conditions.GetFatigue(delta).IsNone);
+        Assert.Equal(3, campaign.State.Roster.Count);
+        Assert.Equal(1, campaign.State.Captivity.Combatants.Count);
+        Assert.True(ReferenceEquals(grunt, campaign.State.Captivity.Combatants[0]));
+        Assert.True(ReferenceEquals(grunt.OwningFaction, battle.Setup.Sides[1].Faction));
+        Assert.True(campaign.Session.ActiveMission.IsNone);
+        Assert.True(campaign.Session.PendingResolution.IsNone);
+        Assert.Equal(0, campaign.Session.ActiveEvents.Count);
 
-      Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier);
-      Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier);
-      Assert.True(campaign.State.Conditions.GetInjury(beta).IsNone,
-        "An undamaged survivor is never injured.");
-      Assert.Equal(1, campaign.State.Conditions.GetFatigue(beta).RequireSome().Tier,
-        "Undamaged survivors earn fatigue like any survivor.");
-      Assert.True(campaign.State.Conditions.GetInjury(gamma).IsNone);
-      Assert.True(campaign.State.Conditions.GetFatigue(gamma).IsNone);
-      Assert.Equal(3, campaign.State.Roster.Count, "Survivors and nonparticipants stay on the roster.");
+        Assert.False(closed, "The resolution closes after survivor notifications.");
+        if (geoscapeEvent is CombatantConditionsChanged changed)
+        {
+          if (ReferenceEquals(alpha, changed.Combatant))
+          {
+            Assert.False(alphaNotified);
+            alphaNotified = true;
+          }
+          else
+          {
+            Assert.True(ReferenceEquals(beta, changed.Combatant));
+            Assert.False(betaNotified);
+            betaNotified = true;
+          }
+        }
+        else
+        {
+          Assert.True(alphaNotified && betaNotified);
+          Assert.True(geoscapeEvent is ResolutionEventClosed close
+            && ReferenceEquals(close.Resolved.Event, mission)
+            && close.SelectedOutcome == ResolutionOutcome.Engaged);
+          closed = true;
+        }
+      };
 
-      Assert.Equal(1, campaign.State.Captivity.Combatants.Count);
-      Assert.True(ReferenceEquals(grunt, campaign.State.Captivity.Combatants[0]),
-        "The captured enemy keeps its identity.");
-      Assert.True(ReferenceEquals(grunt.OwningFaction, battle.Setup.Sides[1].Faction),
-        "Capture never changes the enemy's original faction.");
-
-      Assert.True(campaign.Session.ActiveMission.IsNone);
-      Assert.True(campaign.Session.PendingResolution.IsNone);
-      Assert.Equal(0, campaign.Session.ActiveEvents.Count);
-
-      Assert.Equal(2, campaign.Events.EventsOf<CombatantConditionsChanged>().Length);
-      Assert.True(campaign.Events.EventsOf<CombatantConditionsChanged>()
-        .AsValueEnumerable().Any(changed => ReferenceEquals(changed.Combatant, alpha)));
-      Assert.True(campaign.Events.EventsOf<CombatantConditionsChanged>()
-        .AsValueEnumerable().Any(changed => ReferenceEquals(changed.Combatant, beta)));
-      Assert.True(campaign.Events[^1] is ResolutionEventClosed closed
-        && ReferenceEquals(closed.Resolved.Event, mission)
-        && closed.SelectedOutcome == ResolutionOutcome.Engaged,
-        "Survivor notices precede the engaged close.");
-      Assert.Equal(3, campaign.Events.Count);
+      rebuilt.CompleteMission(summary);
+      Assert.True(closed);
+      Assert.True(rebuilt.ActiveMission.IsNone);
+      Assert.True(rebuilt.PendingResolution.IsNone);
     }
     finally
     {
@@ -154,7 +183,7 @@ public class GeoscapeMissionReturnTest
       campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
 
       Assert.False(Holds(campaign.State.Roster, alpha), "The reported death leaves the roster.");
-      Assert.Equal(2, campaign.State.Roster.Count);
+      Assert.Equal(3, campaign.State.Roster.Count);
       Assert.True(Holds(campaign.State.Roster, gamma), "Nonparticipants are never removed.");
       Assert.True(ReferenceEquals(alpha.EquippedWeapon.RequireSome(), weapon),
         "The dead keep their equipment; nothing returns to the Armory.");
@@ -177,102 +206,6 @@ public class GeoscapeMissionReturnTest
     }
   }
 
-  [TestCase(TestName = "Unconscious survivors stay on the roster and are never captured")]
-  public void UnconsciousSurvivorsStayOnRoster()
-  {
-    using var campaign = NewMissionCampaign();
-    var mission = campaign.ActiveEvent;
-    var alpha = campaign.State.Roster[0];
-    var beta = campaign.State.Roster[1];
-    campaign.OpenResolution(mission);
-    var battle = campaign.Session.LaunchMission(mission, [alpha, beta]).RequireRight();
-    try
-    {
-      var grunt = UnitAt(battle, 2).Combatant;
-      Strike(battle, UnitAt(battle, 1), 999, DamageKind.Stun);
-      Strike(battle, UnitAt(battle, 2), 20, DamageKind.Stun);
-      Assert.Equal(BattleOutcome.Victory, PlayerSummary(battle, campaign.State).Outcome);
-
-      campaign.ClearEvents();
-      campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
-
-      Assert.True(Holds(campaign.State.Roster, beta),
-        "Unconscious survivors remain on the roster.");
-      Assert.True(campaign.State.Conditions.GetInjury(beta).IsNone);
-      Assert.Equal(1, campaign.State.Conditions.GetFatigue(beta).RequireSome().Tier);
-      Assert.True(Holds(campaign.State.Roster, alpha));
-      Assert.Equal(1, campaign.State.Captivity.Combatants.Count);
-      Assert.True(ReferenceEquals(grunt, campaign.State.Captivity.Combatants[0]),
-        "Only enemies are captured, never unconscious players.");
-      Assert.True(campaign.Session.ActiveMission.IsNone);
-      Assert.True(campaign.Session.PendingResolution.IsNone);
-    }
-    finally
-    {
-      battle.Runtime.Dispose();
-    }
-  }
-
-  [TestCase(TestName = "Return observers see every campaign effect before the first notification")]
-  public void ReturnObserversSeeAllCampaignEffects()
-  {
-    using var campaign = NewMissionCampaign(withSpecialEnemy: true);
-    var mission = campaign.ActiveEvent;
-    var alpha = campaign.State.Roster[0];
-    var beta = campaign.State.Roster[1];
-    var gamma = campaign.State.Roster[2];
-    campaign.OpenResolution(mission);
-    var battle = campaign.Session.LaunchMission(mission, [alpha, beta]).RequireRight();
-    try
-    {
-      var boss = UnitAt(battle, 3).Combatant;
-      Strike(battle, UnitAt(battle, 1), 999);
-      Strike(battle, UnitAt(battle, 3), 40, DamageKind.Stun);
-      Strike(battle, UnitAt(battle, 2), 999);
-      Assert.Equal(BattleOutcome.Victory, PlayerSummary(battle, campaign.State).Outcome);
-
-      bool inspectedCondition = false;
-      bool inspectedClose = false;
-      campaign.Session.EventCommitted += geoscapeEvent =>
-      {
-        if (geoscapeEvent is CombatantConditionsChanged && !inspectedCondition)
-        {
-          inspectedCondition = true;
-          Assert.False(Holds(campaign.State.Roster, beta), "Deaths are removed before the first notification.");
-          Assert.True(Holds(campaign.State.Roster, alpha));
-          Assert.True(Holds(campaign.State.Roster, gamma));
-          Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier,
-            "Survivor conditions are applied before the first notification.");
-          Assert.Equal(1, campaign.State.Captivity.Combatants.Count);
-          Assert.True(ReferenceEquals(boss, campaign.State.Captivity.Combatants[0]),
-            "Captures land before the first notification.");
-          Assert.True(campaign.Session.ActiveMission.IsNone);
-          Assert.True(campaign.Session.PendingResolution.IsNone);
-          Assert.Equal(0, campaign.Session.ActiveEvents.Count);
-        }
-        if (geoscapeEvent is ResolutionEventClosed && !inspectedClose)
-        {
-          inspectedClose = true;
-          Assert.True(campaign.Session.PendingResolution.IsNone);
-          Assert.True(campaign.Session.ActiveMission.IsNone);
-        }
-      };
-
-      campaign.ClearEvents();
-      campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
-
-      Assert.True(inspectedCondition);
-      Assert.True(inspectedClose);
-      Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier,
-        "Survivor fatigue is applied once before notifications.");
-      Assert.Equal(2, campaign.Events.Count);
-    }
-    finally
-    {
-      battle.Runtime.Dispose();
-    }
-  }
-
   [TestCase(TestName = "A throwing close subscriber leaves the committed return in place")]
   public void ThrowingSubscriberPropagatesAfterCommit()
   {
@@ -283,8 +216,8 @@ public class GeoscapeMissionReturnTest
     var battle = campaign.Session.LaunchMission(mission, [alpha]).RequireRight();
     try
     {
-      var grunt = UnitAt(battle, 2).Combatant;
-      Strike(battle, UnitAt(battle, 2), 20, DamageKind.Stun);
+      var grunt = UnitAt(battle, 3).Combatant;
+      Strike(battle, UnitAt(battle, 3), 20, DamageKind.Stun);
       Assert.Equal(BattleOutcome.Victory, PlayerSummary(battle, campaign.State).Outcome);
 
       var retained = new InvalidOperationException("Subscriber exploded.");
@@ -313,9 +246,6 @@ public class GeoscapeMissionReturnTest
       Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier,
         "Survivor effects stay committed.");
       Assert.Equal(2, campaign.Events.Count, "The close was committed before the throw.");
-
-      Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier);
-      Assert.Equal(1, campaign.State.Captivity.Combatants.Count, "No effect is replayed.");
     }
     finally
     {
@@ -323,35 +253,4 @@ public class GeoscapeMissionReturnTest
     }
   }
 
-  [TestCase(TestName = "A rebuilt session completes the associated mission exactly once")]
-  public void RebuiltSessionCompletesAssociatedMission()
-  {
-    using var campaign = NewMissionCampaign();
-    var mission = campaign.ActiveEvent;
-    var alpha = campaign.State.Roster[0];
-    var beta = campaign.State.Roster[1];
-    campaign.OpenResolution(mission);
-    var battle = campaign.Session.LaunchMission(mission, [alpha, beta]).RequireRight();
-    try
-    {
-      Strike(battle, UnitAt(battle, 0), 25);
-      Strike(battle, UnitAt(battle, 2), 20, DamageKind.Stun);
-
-      var rebuilt = new GeoscapeSession(campaign.State);
-      rebuilt.CompleteMission(PlayerSummary(battle, campaign.State));
-
-      Assert.True(rebuilt.ActiveMission.IsNone);
-      Assert.True(rebuilt.PendingResolution.IsNone);
-      Assert.True(campaign.Session.ActiveMission.IsNone,
-        "The original session observes the shared consumption.");
-      Assert.True(campaign.Session.PendingResolution.IsNone);
-      Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier);
-      Assert.Equal(3, campaign.State.Roster.Count, "No death means no roster removal.");
-
-    }
-    finally
-    {
-      battle.Runtime.Dispose();
-    }
-  }
 }

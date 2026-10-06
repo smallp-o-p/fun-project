@@ -42,30 +42,16 @@ public partial class GeoscapeMissionLaunchTest
     }
   }
 
-  [TestCase(0, TestName = "Duplicate selections retain the first occurrence in order")]
-  [TestCase(1, TestName = "Over-capacity selections retain the first capacity-sized squad")]
-  [TestCase(2, TestName = "Deduplication precedes capacity truncation")]
-  [TestCase(3, TestName = "Unsigned maximum capacity preserves the selected squad")]
-  public void SelectionNormalizesInOrder(int selectionKind)
+  [TestCase(TestName = "Unsigned maximum capacity preserves the selected squad")]
+  public void UnsignedCapacityPreservesSelectedSquad()
   {
     using var campaign = NewMissionCampaign(customize: mission =>
-    {
-      if (selectionKind == 3)
-        mission.Size.MaxPlayerUnits = uint.MaxValue;
-    });
-    var roster = campaign.State.Roster;
-    Combatant first = roster[2];
-    Combatant second = roster[1];
-    IReadOnlyList<Combatant> selected = selectionKind switch
-    {
-      0 => [first, first, second],
-      1 => [first, second, roster[0]],
-      3 => [first, second],
-      _ => [first, first, second, roster[0]],
-    };
+      mission.Size.MaxPlayerUnits = uint.MaxValue);
+    var first = campaign.State.Roster[2];
+    var second = campaign.State.Roster[1];
     campaign.OpenResolution(campaign.ActiveEvent);
 
-    var battle = campaign.Session.LaunchMission(campaign.ActiveEvent, selected).RequireRight();
+    var battle = campaign.Session.LaunchMission(campaign.ActiveEvent, [first, second]).RequireRight();
     try
     {
       Assert.Equal(2, battle.Deployment.Participants.Count);
@@ -121,76 +107,28 @@ public partial class GeoscapeMissionLaunchTest
     }
   }
 
-  [TestCase(TestName = "Successful launch associates the deployment and retains pending truth")]
-  public void SuccessfulLaunchRetainsAssociationAndPendingTruth()
-  {
-    using var campaign = NewMissionCampaign(customize: mission => mission.SpecialEnemies.Add(
-      new UnitLoadoutData { Combatant = MakeCombatantData("Boss", health: 40) }));
-    var active = campaign.ActiveEvent;
-    var alpha = campaign.State.Roster[0];
-    var beta = campaign.State.Roster[1];
-    campaign.OpenResolution(active);
-
-    var selected = new List<Combatant> { alpha, beta };
-    campaign.ClearEvents();
-    var battle = campaign.Session.LaunchMission(active, selected).RequireRight();
-    try
-    {
-      selected.Clear();
-
-      var deployment = campaign.Session.ActiveMission.RequireSome();
-      Assert.True(ReferenceEquals(battle.Deployment, deployment));
-      Assert.Equal(2, deployment.Participants.Count);
-      Assert.True(ReferenceEquals(alpha, deployment.Participants[0]));
-      Assert.True(ReferenceEquals(beta, deployment.Participants[1]),
-        "Captured participants keep selection order and ignore later caller mutations.");
-
-      BattleSideSetup player = battle.Setup.Sides[0];
-      Assert.True(ReferenceEquals(campaign.State.PlayerFaction, player.Faction));
-      Assert.Equal(2, player.Units.Count);
-      Assert.True(ReferenceEquals(alpha, player.Units[0].Loadout.Combatant));
-      Assert.True(ReferenceEquals(beta, player.Units[1].Loadout.Combatant));
-
-      BattleSideSetup enemies = battle.Setup.Sides[1];
-      Assert.Equal(2, enemies.Units.Count);
-      Assert.Equal("Grunt", enemies.Units[0].Loadout.Combatant.Name);
-      Assert.Equal("Boss", enemies.Units[1].Loadout.Combatant.Name);
-      foreach (UnitPlacement placement in enemies.Units)
-        Assert.True(ReferenceEquals(enemies.Faction, placement.Loadout.Combatant.OwningFaction));
-
-      Assert.True(ReferenceEquals(active, campaign.Session.PendingResolution.RequireSome().Event));
-      Assert.Equal(1, campaign.Session.Tick, "Launch must not advance campaign time.");
-      Assert.True(campaign.Session.ActiveEvents.AsValueEnumerable()
-        .Any(member => ReferenceEquals(member, active)),
-        "The pending event stays active until the mission returns.");
-      Assert.Equal(active.BattleSeed.RequireSome(), battle.Setup.Seed,
-        "The battle resolves with the event's retained generation seed.");
-      Assert.Equal(0, campaign.Events.Count, "Launch commits no geoscape events.");
-    }
-    finally
-    {
-      battle.Runtime.Dispose();
-    }
-  }
-
-  [TestCase(TestName = "Startup selection mutation cannot alter the validated deployment")]
+  [TestCase(TestName = "Launch normalizes and snapshots selection before startup while retaining the pending mission")]
   public void StartupSelectionMutationKeepsValidatedDeployment()
   {
     var mutation = new ScriptedSystemData();
     using var campaign = NewMissionCampaign(customize: mission =>
-      mission.BattleType.Systems.Add(mutation));
+    {
+      mission.BattleType.Systems.Add(mutation);
+      mission.SpecialEnemies.Add(new UnitLoadoutData { Combatant = MakeCombatantData("Boss", health: 40) });
+    });
     var active = campaign.ActiveEvent;
     var alpha = campaign.State.Roster[0];
     var beta = campaign.State.Roster[1];
     campaign.OpenResolution(active);
 
-    var selected = new List<Combatant> { alpha, alpha, beta, campaign.State.Roster[2] };
+    var selected = new List<Combatant> { beta, beta, alpha, campaign.State.Roster[2] };
     mutation.OnRegister = () =>
     {
       selected.Clear();
       selected.Add(campaign.State.Roster[2]);
     };
 
+    campaign.ClearEvents();
     var battle = campaign.Session.LaunchMission(active, selected).RequireRight();
     try
     {
@@ -198,14 +136,29 @@ public partial class GeoscapeMissionLaunchTest
       Assert.True(ReferenceEquals(battle.Deployment, deployment),
         "The association is stored only after startup succeeded.");
       Assert.Equal(2, deployment.Participants.Count);
-      Assert.True(ReferenceEquals(alpha, deployment.Participants[0]));
-      Assert.True(ReferenceEquals(beta, deployment.Participants[1]),
+      Assert.True(ReferenceEquals(beta, deployment.Participants[0]));
+      Assert.True(ReferenceEquals(alpha, deployment.Participants[1]),
         "Captured membership is the validated selection, not the callback-mutated caller list.");
       BattleSideSetup player = battle.Setup.Sides[0];
       Assert.Equal(2, player.Units.Count);
-      Assert.True(ReferenceEquals(alpha, player.Units[0].Loadout.Combatant));
-      Assert.True(ReferenceEquals(beta, player.Units[1].Loadout.Combatant),
+      Assert.True(ReferenceEquals(beta, player.Units[0].Loadout.Combatant));
+      Assert.True(ReferenceEquals(alpha, player.Units[1].Loadout.Combatant),
         "The battle setup still deploys the original validated selection.");
+      selected.Clear();
+      Assert.Equal(2, deployment.Participants.Count);
+      Assert.True(ReferenceEquals(active, campaign.Session.PendingResolution.RequireSome().Event));
+      Assert.Equal(1, campaign.Session.Tick);
+      Assert.True(campaign.Session.ActiveEvents.AsValueEnumerable()
+        .Any(member => ReferenceEquals(member, active)));
+      Assert.Equal(active.BattleSeed.RequireSome(), battle.Setup.Seed);
+      Assert.Equal(0, campaign.Events.Count);
+      Assert.True(ReferenceEquals(campaign.State.PlayerFaction, player.Faction));
+      BattleSideSetup enemies = battle.Setup.Sides[1];
+      Assert.Equal(2, enemies.Units.Count);
+      Assert.Equal("Grunt", enemies.Units[0].Loadout.Combatant.Name);
+      Assert.Equal("Boss", enemies.Units[1].Loadout.Combatant.Name);
+      foreach (UnitPlacement placement in enemies.Units)
+        Assert.True(ReferenceEquals(enemies.Faction, placement.Loadout.Combatant.OwningFaction));
     }
     finally
     {
@@ -252,32 +205,6 @@ public partial class GeoscapeMissionLaunchTest
     Assert.True(campaign.Session.ActiveMission.IsNone);
     Assert.True(campaign.Session.PendingResolution.IsSome);
     Assert.True(ReferenceEquals(active, campaign.Session.PendingResolution.RequireSome().Event));
-  }
-
-  [TestCase(TestName = "Mission association and resolution ownership survive a session rebuild")]
-  public void AssociationSurvivesSessionRebuild()
-  {
-    using var campaign = NewMissionCampaign();
-    var active = campaign.ActiveEvent;
-    var squad = new[] { campaign.State.Roster[0], campaign.State.Roster[1] };
-    campaign.OpenResolution(active);
-    var battle = campaign.Session.LaunchMission(active, squad).RequireRight();
-    try
-    {
-      Assert.Throws<System.InvalidOperationException>(
-        () => campaign.Session.CompleteResolution(ResolutionOutcome.Engaged));
-      Assert.Throws<System.InvalidOperationException>(
-        () => campaign.Session.CompleteResolution(ResolutionOutcome.Declined));
-
-      var rebuilt = new GeoscapeSession(campaign.State);
-      Assert.True(ReferenceEquals(battle.Deployment, rebuilt.ActiveMission.RequireSome()));
-      Assert.Throws<System.InvalidOperationException>(
-        () => rebuilt.CompleteResolution(ResolutionOutcome.Acknowledged));
-    }
-    finally
-    {
-      battle.Runtime.Dispose();
-    }
   }
 
   [TestCase(TestName = "Presentation abort clears only the association and retains the pending mission")]

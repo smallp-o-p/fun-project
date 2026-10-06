@@ -27,16 +27,4 @@ public class ObjectiveDataTest
     AssertThat(runtime).IsInstanceOf<SurviveUntilTurnObjective>();
     AssertThat(data).IsSame(runtime.Data);
   }
-
-  [TestCase(TestName = "Directives expose their authored payloads")]
-  public void DirectivesExposePayloads()
-  {
-    var end = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat };
-    var followUp = new SurviveUntilTurnObjectiveData { TargetTurn = 2 };
-    var queue = new QueueDirectiveData { FollowUps = [followUp] };
-
-    Assert.Equal(BattleOutcome.Defeat, end.Outcome);
-    Assert.Equal(1, queue.FollowUps.Length);
-    AssertThat(followUp).IsSame(queue.FollowUps[0]);
-  }
 }

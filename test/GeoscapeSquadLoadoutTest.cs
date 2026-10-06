@@ -572,51 +572,38 @@ public class GeoscapeSquadLoadoutTest
     Assert.True(card.Contains("Exhausted"), card);
   }
 
-  [TestCase(TestName = "Generic interrogation selects injured units without any pending mission")]
-  public async Task GenericInterrogationAllowsInjuredUnitsWithoutAPendingMission()
+  [TestCase(TestName = "Generic interrogation retains injured selections when a mission becomes pending")]
+  public async Task GenericInterrogationIgnoresMissionContext()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var fixture = new GeoscapeFixture(MakeStart(roster: [MakeConditionEntry("Alpha")]));
-    using var _ = fixture;
-    Combatant alpha = fixture.State.Roster[0];
-    fixture.ReturnFromMission((alpha, 25, 0)); // Injured + Tired
-
-    var view = AddToTree(CreateSquadLoadoutView());
-    view.Configure("Interrogation — Alpha (Cult)", 2, allowEquipmentEditing: false);
-    view.Present(fixture.State, fixture.Session);
-
-    Assert.False(fixture.Session.PendingResolution.IsSome); // no mission anywhere to infer from
-    Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"),
-      "A generic configuration carries no exceptional-deployment notice.");
-    string choice = SquadChoice(view, "Alpha").Text;
-    Assert.True(choice.Contains("Injured (6d)"), $"Expected the condition label, got '{choice}'.");
-
-    ChooseSquadUnit(view, 0, "Alpha"); // deployment rules do not restrict interrogation
-    var selected = view.GetSelectedCombatants();
-    Assert.Equal(1, selected.Count);
-    Assert.True(ReferenceEquals(alpha, selected[0]));
-    Assert.False(SquadSlot(view, 0).GetNode<Button>("%EditUnit").Visible); // editing stays disabled
-  }
-
-  [TestCase(TestName = "Generic interrogation remains independent of a pending mission")]
-  public async Task GenericInterrogationWithPendingMission()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var (fixture, _) = Mission([MakeConditionEntry("Alpha")],
-      mission: MakeEvent("Last Stand", GeoscapeEventKind.TacticalBattle, allowUnfitDeployment: true));
-    using var campaign = fixture;
+    using var fixture = new GeoscapeFixture(MakeStart(
+      roster: [MakeConditionEntry("Alpha")],
+      timeline: [MakeScheduled(1,
+        MakeEvent("Last Stand", GeoscapeEventKind.TacticalBattle, allowUnfitDeployment: true))]));
     Combatant alpha = fixture.State.Roster[0];
     fixture.ReturnFromMission((alpha, 25, 0));
     var view = AddToTree(CreateSquadLoadoutView());
     view.Configure("Interrogation", 2, allowEquipmentEditing: false);
     view.Present(fixture.State, fixture.Session);
-
-    Assert.True(fixture.Session.PendingResolution.IsSome);
-    Assert.Equal("Squad: 0/2", view.GetNode<Label>("%SquadCount").Text);
+    Assert.True(fixture.Session.PendingResolution.IsNone);
     Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"));
-    Assert.True(view.GetNodeOrNull<Button>("%DeployButton") is null);
+    Assert.True(SquadChoice(view, "Alpha").Text.Contains("Injured (6d)"));
     ChooseSquadUnit(view, 0, "Alpha");
     Assert.True(ReferenceEquals(alpha, view.GetSelectedCombatants()[0]));
     Assert.False(SquadSlot(view, 0).GetNode<Button>("%EditUnit").Visible);
+
+    fixture.AdvanceTicks(1);
+    fixture.OpenResolution(fixture.ActiveEvent);
+    view.Present(fixture.State, fixture.Session);
+
+    Assert.True(fixture.Session.PendingResolution.IsSome);
+    Assert.Equal("Squad: 1/2", view.GetNode<Label>("%SquadCount").Text);
+    Press(SquadSlot(view, 0).GetNode<Button>("%RemoveUnit"));
+    ChooseSquadUnit(view, 0, "Alpha");
+    Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"));
+    Assert.True(view.GetNodeOrNull<Button>("%DeployButton") is null);
+    Assert.True(ReferenceEquals(alpha, view.GetSelectedCombatants()[0]));
+    Assert.False(SquadSlot(view, 0).GetNode<Button>("%EditUnit").Visible);
   }
+
 }

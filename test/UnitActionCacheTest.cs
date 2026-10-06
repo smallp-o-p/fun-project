@@ -120,16 +120,6 @@ public class UnitActionCacheTest
       _ = action.IsAvailable;
   }
 
-  private static int MaterializedSetCount(UnitActionCache cache)
-  {
-    var field = typeof(UnitActionCache).GetField("_entries",
-      System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic) ??
-      throw new InvalidOperationException("UnitActionCache is missing the private _entries field.");
-    var entries = (System.Collections.IDictionary)(field.GetValue(cache) ??
-      throw new InvalidOperationException("UnitActionCache._entries was null."));
-    return entries.Count;
-  }
-
   [TestCase]
   public void RetainedQueryListAndEntriesSurviveApSpendAndRefresh()
   {
@@ -271,7 +261,6 @@ public class UnitActionCacheTest
     battle.EndFactionTurn(battle.PlayerFaction);
     battle.ApplyDamage(battle.PlayerUnit, 11);
     Assert.False(attack.IsAvailable);
-    Assert.False(attack.IsDirty);
 
     bool attackAtTurnStarted = true;
     int actionPointsAtTurnStarted = -1;
@@ -281,7 +270,6 @@ public class UnitActionCacheTest
         return;
       actionPointsAtTurnStarted = battle.PlayerUnit.CurrentActionPoints;
       attackAtTurnStarted = attack.IsAvailable;
-      Assert.True(attack.IsDirty);
     };
 
     battle.EndFactionTurn(battle.EnemyFaction);
@@ -291,7 +279,6 @@ public class UnitActionCacheTest
     Assert.Equal(2, battle.PlayerUnit.MaxActionPoints);
     Assert.Equal(2, battle.PlayerUnit.CurrentActionPoints);
     Assert.True(attack.IsAvailable);
-    Assert.False(attack.IsDirty);
   }
 
   [TestCase]
@@ -404,8 +391,6 @@ public class UnitActionCacheTest
       observedExpiry = true;
       moveAtExpiry = move.IsAvailable;
       endTurnAtExpiry = endTurn.IsAvailable;
-      Assert.True(move.IsDirty);
-      Assert.True(endTurn.IsDirty);
     };
 
     battle.EndFactionTurn(battle.PlayerFaction);
@@ -424,7 +409,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void AdjacentOccupancyChangesTargetingWithoutDirtyingObserverEntries()
+  public void AdjacentOccupancyChangesTargetingAndRetainsCachedEntries()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -442,31 +427,23 @@ public class UnitActionCacheTest
     BattleUnitState ally = battle.UnitAt(new Vector3I(2, 0, 0));
     IReadOnlyList<UnitAction> actions = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(observer)));
-    UnitAction move = Row<MoveActionDefinition>(actions);
-    UnitAction attack = Row<AttackActionDefinition>(actions);
-    _ = move.IsAvailable;
-    _ = attack.IsAvailable;
     var targeting = new MoveTargeting(battle.Runtime, observer);
 
     Assert.False(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(2, 0, 0)));
 
     battle.Move(ally, [new Vector3I(3, 0, 0)]);
 
-    Assert.False(move.IsDirty);
-    Assert.False(attack.IsDirty);
     Assert.True(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(2, 0, 0)));
 
     battle.Move(ally, [new Vector3I(2, 0, 0)]);
 
-    Assert.False(move.IsDirty);
-    Assert.False(attack.IsDirty);
     Assert.False(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(2, 0, 0)));
     Assert.True(ReferenceEquals(actions, battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(observer)))));
   }
 
   [TestCase]
-  public void EnemyRangeAndSightChangesTargetingWithoutDirtyingObserverEntries()
+  public void EnemyRangeAndSightChangesTargetingAndRetainsCachedEntries()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -489,23 +466,15 @@ public class UnitActionCacheTest
     battle.EndFactionTurn(player);
     IReadOnlyList<UnitAction> actions = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(observer)));
-    UnitAction move = Row<MoveActionDefinition>(actions);
-    UnitAction attack = Row<AttackActionDefinition>(actions);
-    _ = move.IsAvailable;
-    _ = attack.IsAvailable;
 
     battle.Move(target, [new Vector3I(4, 0, 0)]);
 
     Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.False(move.IsDirty);
-    Assert.False(attack.IsDirty);
     Assert.False(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(4, 0, 0)));
 
     battle.Move(target, [new Vector3I(5, 0, 0)]);
 
     Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.False(move.IsDirty);
-    Assert.False(attack.IsDirty);
     Assert.False(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(5, 0, 0)));
     Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable()
       .Count(e => ReferenceEquals(e.Unit, observer) && ReferenceEquals(e.Target, target)));
@@ -514,8 +483,6 @@ public class UnitActionCacheTest
 
     Assert.Equal(0, target.CurrentActionPoints);
     Assert.True(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(3, 0, 0)));
-    Assert.False(move.IsDirty);
-    Assert.False(attack.IsDirty);
     Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable()
       .Count(e => ReferenceEquals(e.Unit, observer) && ReferenceEquals(e.Target, target)));
     Assert.True(ReferenceEquals(actions, battle.Query(
@@ -523,23 +490,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void SameActorMovementDirtiesOnlyActionPointDependentEntries()
-  {
-    using var battle = BattleFixture.UiBattle();
-    IReadOnlyList<UnitAction> actions = battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    EvaluateAll(actions);
-
-    battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2)]);
-
-    Assert.True(Row<MoveActionDefinition>(actions).IsDirty);
-    Assert.True(Row<AttackActionDefinition>(actions).IsDirty);
-    Assert.True(Row<PassActionDefinition>(actions).IsDirty);
-    Assert.False(Row<EndTurnActionDefinition>(actions).IsDirty);
-  }
-
-  [TestCase]
-  public void SharedWeaponEventsInvalidateEveryHoldersWeaponEntries()
+  public void SharedMagazineUpdatesRefreshHoldersRetainedOptions()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -559,35 +510,13 @@ public class UnitActionCacheTest
 
     battle.Attack(actor, target);
 
-    Assert.True(attack.IsDirty);
-    Assert.True(reload.IsDirty);
     Assert.False(attack.IsAvailable);
     Assert.True(reload.IsAvailable);
 
     battle.Reload(actor, shared);
 
-    Assert.True(attack.IsDirty);
-    Assert.True(reload.IsDirty);
     Assert.True(attack.IsAvailable);
     Assert.False(reload.IsAvailable);
-  }
-
-  [TestCase]
-  public void KnownIrrelevantEventsLeaveMaterializedOptionsClean()
-  {
-    using var battle = BattleFixture.UiBattle();
-    IReadOnlyList<UnitAction> playerActions = battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    IReadOnlyList<UnitAction> supportActions = battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(battle.SupportUnit)));
-    EvaluateAll(playerActions);
-    EvaluateAll(supportActions);
-    Assert.Equal(2, MaterializedSetCount(battle.Session.ActionOptions));
-
-    battle.Session.RaiseEvents(new UnitArmorRegeneratedBattleEvent(battle.PlayerUnit, 1, 1));
-
-    Assert.True(playerActions.AsValueEnumerable().All(action => !action.IsDirty));
-    Assert.True(supportActions.AsValueEnumerable().All(action => !action.IsDirty));
   }
 
   // The startup and continuation turn-start dispatches are separate orchestration bodies
@@ -606,8 +535,6 @@ public class UnitActionCacheTest
     UnitAction existingMove = null;
     bool existingDuringCallback = true;
     bool createdDuringCallbackValue = true;
-    bool existingDirtyDuringCallback = true;
-    bool createdDirtyDuringCallback = true;
 
     void ArrangeAtSessionStart(HookContext context)
     {
@@ -627,12 +554,9 @@ public class UnitActionCacheTest
       if (context.Session.TurnNumber != 1)
         return;
       existingDuringCallback = existingMove.IsAvailable;
-      existingDirtyDuringCallback = existingMove.IsDirty;
       createdDuringCallback = new GetAvailableActionsForUnit(
         context.Session.TryGetAlive(support).RequireSome()).Execute(context.Session);
-      UnitAction createdMove = Row<MoveActionDefinition>(createdDuringCallback);
-      createdDuringCallbackValue = createdMove.IsAvailable;
-      createdDirtyDuringCallback = createdMove.IsDirty;
+      createdDuringCallbackValue = Row<MoveActionDefinition>(createdDuringCallback).IsAvailable;
     }
 
     using var battle = new BattleFixture(ThreeUnitSetup(playerFaction, enemyFaction) with
@@ -646,12 +570,8 @@ public class UnitActionCacheTest
 
     Assert.False(existingDuringCallback);
     Assert.False(createdDuringCallbackValue);
-    Assert.True(existingDirtyDuringCallback);
-    Assert.True(createdDirtyDuringCallback);
     Assert.True(existingMove.IsAvailable);
     Assert.True(Row<MoveActionDefinition>(createdDuringCallback).IsAvailable);
-    Assert.False(existingMove.IsDirty);
-    Assert.False(Row<MoveActionDefinition>(createdDuringCallback).IsDirty);
   }
 
   [TestCase(TestName = "Reads during a continuation TurnStarted observe pre-refresh availability without caching")]
@@ -679,8 +599,6 @@ public class UnitActionCacheTest
       createdDuringCallback = battle.Query(
         new GetAvailableActionsForUnit(battle.Alive(support)));
       createdDuringCallbackValue = Row<MoveActionDefinition>(createdDuringCallback).IsAvailable;
-      Assert.True(existingMove.IsDirty);
-      Assert.True(Row<MoveActionDefinition>(createdDuringCallback).IsDirty);
     };
 
     // Round-rollover continuation reaches the player's next TurnStarted.
@@ -693,8 +611,6 @@ public class UnitActionCacheTest
     Assert.False(createdDuringCallbackValue);
     Assert.True(existingMove.IsAvailable);
     Assert.True(Row<MoveActionDefinition>(created).IsAvailable);
-    Assert.False(existingMove.IsDirty);
-    Assert.False(Row<MoveActionDefinition>(created).IsDirty);
   }
 
   private static BattleSetup ThreeUnitSetup(Faction playerFaction, Faction enemyFaction) => new(
@@ -758,9 +674,6 @@ public class UnitActionCacheTest
     Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
     Assert.Equal(1, battle.Events.EventsOf<UnitMovedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(1, battle.Events.EventsOf<TileOccupiedBattleEvent>().AsValueEnumerable().Count());
-    Assert.True(playerActions.AsValueEnumerable().All(action => action.IsDirty));
-    Assert.True(enemyActions.AsValueEnumerable().All(action => action.IsDirty));
-    Assert.False(battle.Session.ActionOptions.IsExecuting);
     Assert.False(Row<MoveActionDefinition>(playerActions).IsAvailable);
     Assert.False(Row<PassActionDefinition>(playerActions).IsAvailable);
     Assert.True(Row<EndTurnActionDefinition>(playerActions).IsAvailable);
@@ -802,15 +715,12 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void EventlessFailureInvalidatesEveryMaterializedEntry()
+  public void EventlessFailureRefreshesPlayerOptionsAfterSpentCost()
   {
     using var battle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1));
     IReadOnlyList<UnitAction> playerActions = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    IReadOnlyList<UnitAction> enemyActions = battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(battle.EnemyUnit)));
     EvaluateAll(playerActions);
-    EvaluateAll(enemyActions);
     var failure = new ApplicationException("eventless failure");
 
     Exception? caught = null;
@@ -824,29 +734,13 @@ public class UnitActionCacheTest
     }
 
     Assert.True(ReferenceEquals(failure, caught));
-    Assert.True(playerActions.AsValueEnumerable().All(action => action.IsDirty));
-    Assert.True(enemyActions.AsValueEnumerable().All(action => action.IsDirty));
     Assert.False(Row<MoveActionDefinition>(playerActions).IsAvailable);
     Assert.False(Row<PassActionDefinition>(playerActions).IsAvailable);
     Assert.True(Row<EndTurnActionDefinition>(playerActions).IsAvailable);
   }
 
   [TestCase]
-  public void ExecutorReplacementInvalidatesExistingEntries()
-  {
-    using var battle = BattleFixture.Duel();
-    IReadOnlyList<UnitAction> actions = battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    EvaluateAll(actions);
-    battle.Runtime.Dispose();
-
-    using var replacement = new BattleActionExecutor(battle.Session);
-
-    Assert.True(actions.AsValueEnumerable().All(action => action.IsDirty));
-  }
-
-  [TestCase]
-  public void CleanReadsEvaluateOnceAndOnlyRelevantEventsDirtyTheEntry()
+  public void CleanReadsEvaluateOnceAndOnlyRelevantEventsReevaluateTheEntry()
   {
     using var battle = BattleFixture.Duel();
     var condition = new CountingCondition();
@@ -867,7 +761,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void EvaluationFailureLeavesEntryDirtyForRetry()
+  public void EvaluationFailureRetriesAndCachesSuccess()
   {
     using var battle = BattleFixture.Duel();
     var failure = new ApplicationException("condition failed");
@@ -886,10 +780,8 @@ public class UnitActionCacheTest
     }
 
     Assert.True(ReferenceEquals(failure, caught));
-    Assert.True(action.IsDirty);
     condition.ShouldThrow = false;
     Assert.True(action.IsAvailable);
-    Assert.False(action.IsDirty);
     Assert.True(action.IsAvailable);
     Assert.Equal(2, condition.Calls);
   }

@@ -156,22 +156,12 @@ public class GeoscapeScheduleTest
       else
         Assert.True(active.BattleSeed.IsNone, "Non-tactical events must not carry a battle seed.");
     }
-  }
-
-  [TestCase(TestName = "A fired tactical event keeps its battle seed across a session rebuild")]
-  public void BattleSeedSurvivesSessionRebuild()
-  {
-    using var campaign = new GeoscapeFixture(timeline:
-    [
-      TestData.MakeScheduled(1, TestData.MakeEvent("Raid", GeoscapeEventKind.TacticalBattle)),
-    ]);
-    campaign.AdvanceTicks(1);
-    int seed = campaign.ActiveEvent.BattleSeed.RequireSome();
-
+    GeoscapeEvent tactical = campaign.Session.ActiveEvents.AsValueEnumerable()
+      .Single(active => active.Definition.Kind == GeoscapeEventKind.TacticalBattle);
+    int seed = tactical.BattleSeed.RequireSome();
     var rebuilt = new GeoscapeSession(campaign.State);
-
-    Assert.Equal(1, rebuilt.ActiveEvents.Count);
-    Assert.True(rebuilt.ActiveEvents[0].BattleSeed.IsSome);
-    Assert.Equal(seed, rebuilt.ActiveEvents[0].BattleSeed.RequireSome());
+    Assert.Equal(seed, rebuilt.ActiveEvents.AsValueEnumerable()
+      .Single(active => active.Definition.Kind == GeoscapeEventKind.TacticalBattle).BattleSeed.RequireSome());
   }
+
 }

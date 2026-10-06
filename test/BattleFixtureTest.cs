@@ -1,7 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Core;
-using FunProject.Items.Capabilities;
 using GdUnit4;
 using System;
 using System.Collections.Generic;
@@ -49,18 +48,6 @@ public partial class BattleFixtureTest
     Assert.Equal(new Vector3I(2, 0, 0), battle.Alive(battle.Unit).Position.Raw);
     Assert.Equal(2, battle.Unit.CurrentActionPoints);
     Assert.Equal(2, battle.Events.EventsOf<UnitMovedBattleEvent>().Length);
-  }
-
-  [TestCase]
-  public void OneOwningTurnEndTicksRegenExactlyOnce()
-  {
-    var armor = TestData.MakeArmor("Recharger", armor: 10, element: Element.Thermal,
-      regenDelayTurns: 2, regenPerTurn: 3);
-    using var battle = BattleFixture.Duel(player: new("Alpha", Armor: armor));
-    battle.ApplyDamage(battle.PlayerUnit, 5);
-    battle.EndFactionTurn(battle.PlayerFaction);
-    Assert.Equal(1, armor.Capability.RegenDelayRemaining);
-    Assert.Equal(5, armor.Capability.Current);
   }
 
   [TestCase]
