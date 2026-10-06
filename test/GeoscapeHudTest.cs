@@ -1,4 +1,5 @@
 using FunProject.Strategic;
+using FunProject.Geoscape;
 using static FunProject.Tests.GeoscapeTestScenes;
 using Godot;
 using GdUnit4;
@@ -78,8 +79,10 @@ public partial class GeoscapeHudTest
     hud.GetNode<Button>("%UnitsButton").EmitSignal(Button.SignalName.Pressed);
     hud.GetNode<Button>("%UnitsButton").EmitSignal(Button.SignalName.Pressed);
     hud.GetNode<Button>("%EngineeringButton").EmitSignal(Button.SignalName.Pressed);
+    hud.GetNode<Button>("%ResearchButton").EmitSignal(Button.SignalName.Pressed);
+    hud.GetNode<Button>("%ResearchButton").EmitSignal(Button.SignalName.Pressed);
 
-    Assert.Equal(3, received.Count);
+    Assert.Equal(5, received.Count);
     Assert.True(received[0] is UnitRoster);
     Assert.Equal("res://scenes/geoscape/units/UnitRoster.tscn", received[0].SceneFilePath);
     Assert.True(received[1] is UnitRoster);
@@ -87,6 +90,11 @@ public partial class GeoscapeHudTest
     Assert.False(ReferenceEquals(received[0], received[1])); // each Units press builds a fresh roster
     Assert.True(received[2] is EngineeringView);
     Assert.Equal("res://scenes/geoscape/engineering/EngineeringView.tscn", received[2].SceneFilePath);
+    Assert.True(received[3] is ResearchView);
+    Assert.Equal("res://scenes/geoscape/research/ResearchView.tscn", received[3].SceneFilePath);
+    Assert.True(received[4] is ResearchView);
+    Assert.Equal("res://scenes/geoscape/research/ResearchView.tscn", received[4].SceneFilePath);
+    Assert.False(ReferenceEquals(received[3], received[4]));
   }
 
   [TestCase(TestName = "An arbitrary ordinary button can bind another view")]

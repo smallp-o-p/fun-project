@@ -114,6 +114,9 @@ internal static partial class GeoscapeTestScenes
     return scene;
   }
 
+  public static GeoscapeScene CreateDebugGeoscapeScene()
+    => GD.Load<PackedScene>("res://scenes/debug/DebugGeoscape.tscn").Instantiate<GeoscapeScene>();
+
   public static UnitView CreateUnitView()
     => GD.Load<PackedScene>("res://scenes/geoscape/units/UnitView.tscn").Instantiate<UnitView>();
 
