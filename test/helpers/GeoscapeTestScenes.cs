@@ -136,6 +136,10 @@ internal static partial class GeoscapeTestScenes
     => GD.Load<PackedScene>("res://scenes/geoscape/engineering/EngineeringView.tscn")
       .Instantiate<EngineeringView>();
 
+  public static ResearchView CreateResearchView()
+    => GD.Load<PackedScene>("res://scenes/geoscape/research/ResearchView.tscn")
+      .Instantiate<ResearchView>();
+
   public static GeoscapeEventResolution CreateResolutionView()
     => GD.Load<PackedScene>("res://scenes/geoscape/resolutions/GeoscapeEventResolution.tscn")
       .Instantiate<GeoscapeEventResolution>();
