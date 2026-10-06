@@ -18,8 +18,8 @@
 [ext_resource type="Script" uid="uid://cl5bjj507pl44" path="res://scripts/stats/StatMod.cs" id="16_o3xng"]
 [ext_resource type="Resource" path="res://resources/items/workshop_sample.tres" id="16_workshop"]
 [ext_resource type="Script" uid="uid://xdfawnbqt73s" path="res://scripts/combatants/CombatantData.cs" id="17_miyhh"]
-[ext_resource type="Resource" path="res://resources/items/prototype_kit.tres" id="17_prototype"]
-[ext_resource type="Resource" path="res://resources/items/supply_kit.tres" id="18_supply"]
+[ext_resource type="Resource" path="res://resources/research/prototype_kit_research.tres" id="17_prototype"]
+[ext_resource type="Resource" path="res://resources/research/supply_kit_research.tres" id="18_supply"]
 [ext_resource type="Resource" uid="uid://bcwpute5bjeiv" path="res://resources/combatants/grunt.tres" id="18_tp4lw"]
 [ext_resource type="Script" uid="uid://1rlerednam3o" path="res://scripts/gamestate/CaptiveEntryData.cs" id="19_ccnbb"]
 
@@ -74,6 +74,7 @@ StartingRoster = [SubResource("Resource_entry1"), SubResource("Resource_entry2")
 StartingCaptives = [SubResource("Resource_823qi"), SubResource("Resource_1qqs6"), SubResource("Resource_i306x")]
 Armory = [ExtResource("8_pistol"), ExtResource("9_rifle"), ExtResource("10_vest"), ExtResource("11_grenade")]
 ModStock = [ExtResource("12_reflex"), ExtResource("13_cardio"), ExtResource("14_barrel"), ExtResource("15_magwell")]
-ManufacturableItems = [ExtResource("16_workshop"), ExtResource("17_prototype"), ExtResource("18_supply")]
+ManufacturableItems = [ExtResource("16_workshop")]
+ResearchProjects = [ExtResource("17_prototype"), ExtResource("18_supply")]
 Name = "Test Campaign"
 Description = "Debug campaign for the geoscape."

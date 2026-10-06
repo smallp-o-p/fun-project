@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ResearchProject" format=3]
+
+[ext_resource type="Script" path="res://scripts/research/ResearchProject.cs" id="1_project"]
+[ext_resource type="Script" path="res://scripts/research/ResearchCompletedCondition.cs" id="2_condition"]
+[ext_resource type="Resource" path="res://resources/items/supply_kit.tres" id="3_item"]
+[ext_resource type="Resource" path="res://resources/research/prototype_kit_research.tres" id="4_prerequisite"]
+
+[sub_resource type="Resource" id="Condition_prototype"]
+script = ExtResource("2_condition")
+Project = ExtResource("4_prerequisite")
+
+[resource]
+script = ExtResource("1_project")
+Name = "Supply Kit Research"
+Description = "Develop the Supply Kit for Engineering manufacture."
+DurationDays = 2
+Condition = SubResource("Condition_prototype")
+ManufacturingUnlocks = [ExtResource("3_item")]

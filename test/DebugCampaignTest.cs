@@ -1,5 +1,6 @@
 using FunProject.Combatants;
 using FunProject.GameState;
+using FunProject.Items;
 using FunProject.Stats;
 using GdUnit4;
 using Godot;
@@ -8,6 +9,34 @@ using Godot;
 [RequireGodotRuntime]
 public class DebugCampaignTest
 {
+  [TestCase]
+  public void AuthoredResearchChainUnlocksPrototypeThenSupply()
+  {
+    var start = GD.Load<CampaignStartData>("res://resources/geoscape/TestCampaign.tres");
+    var sample = GD.Load<EquippableItemData>("res://resources/items/workshop_sample.tres");
+    var prototypeItem = GD.Load<EquippableItemData>("res://resources/items/prototype_kit.tres");
+    var supplyItem = GD.Load<EquippableItemData>("res://resources/items/supply_kit.tres");
+    using var campaign = new GeoscapeFixture(start);
+
+    Assert.Equal(2, start.ResearchProjects.Length);
+    var prototype = start.ResearchProjects[0];
+    var supply = start.ResearchProjects[1];
+    Assert.Equal(1U, prototype.DurationDays);
+    Assert.Equal(2U, supply.DurationDays);
+    Assert.Equal(sample, campaign.Session.GetManufacturingOptions()[0].Project.Item);
+    Assert.Equal(1, campaign.Session.GetManufacturingOptions().Count);
+    Assert.Equal(prototype, campaign.Session.GetAvailableResearchProjects()[0]);
+    Assert.Equal(1, campaign.Session.GetAvailableResearchProjects().Count);
+    campaign.Session.StartResearch(prototype).RequireRight();
+    campaign.AdvanceTicks(1440);
+    Assert.Equal(prototypeItem, campaign.Session.GetManufacturingOptions()[1].Project.Item);
+    Assert.Equal(supply, campaign.Session.GetAvailableResearchProjects()[0]);
+    campaign.Session.StartResearch(supply).RequireRight();
+    campaign.AdvanceTicks(2880);
+    Assert.Equal(supplyItem, campaign.Session.GetManufacturingOptions()[2].Project.Item);
+    Assert.Equal(0, campaign.Session.GetAvailableResearchProjects().Count);
+  }
+
   // Content regression guard: pins the authored debug captives — three Alien Raiders
   // grunts beside the untouched four-member roster — against TestCampaign.tres.
   [TestCase]
