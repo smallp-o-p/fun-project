@@ -43,7 +43,7 @@ internal static partial class GeoscapeTestScenes
 
   // Synthetic map scenes carry data only. Supply a ground collider and select the first
   // player's tile through the same viewport/raycast input as the authored battle.
-  public static async Task SelectFirstBattleUnit(BattleScene battle)
+  public static async Task SelectFirstBattleUnit(BattleScene battle, bool throughContainer = false)
   {
     var ground = new StaticBody3D { Position = new Vector3(0.5f, -0.05f, 0.5f) };
     ground.AddChild(new CollisionShape3D
@@ -57,16 +57,23 @@ internal static partial class GeoscapeTestScenes
     var camera = battle.GetNode<Camera3D>("GameCamera/CameraPath/PathFollow3D/Camera");
     Vector2 pointer = camera.UnprojectPosition(new Vector3(0.5f, 0, 0.5f));
     var viewport = battle.GetViewport();
-    // Camera projection returns viewport coordinates, including under canvas_items scaling.
-    viewport.WarpMouse(pointer);
-    viewport.PushInput(new InputEventMouseMotion { Position = pointer, GlobalPosition = pointer }, inLocalCoords: true);
-    viewport.PushInput(new InputEventMouseButton
+    // Convert projected viewport pixels to the container's parent viewport for forwarded input.
+    Viewport inputViewport = viewport;
+    if (throughContainer)
+    {
+      var container = (SubViewportContainer)viewport.GetParent();
+      pointer = container.GetGlobalTransformWithCanvas() * pointer;
+      inputViewport = container.GetViewport();
+    }
+    inputViewport.WarpMouse(pointer);
+    inputViewport.PushInput(new InputEventMouseMotion { Position = pointer, GlobalPosition = pointer }, inLocalCoords: true);
+    inputViewport.PushInput(new InputEventMouseButton
     {
       Position = pointer,
       ButtonIndex = MouseButton.Left,
       Pressed = true,
     }, inLocalCoords: true);
-    viewport.PushInput(new InputEventMouseButton
+    inputViewport.PushInput(new InputEventMouseButton
     {
       Position = pointer,
       ButtonIndex = MouseButton.Left,
@@ -113,6 +120,13 @@ internal static partial class GeoscapeTestScenes
   public static SquadLoadoutView CreateSquadLoadoutView()
     => GD.Load<PackedScene>("res://scenes/geoscape/squad/SquadLoadoutView.tscn")
       .Instantiate<SquadLoadoutView>();
+
+  public static MissionView CreateMissionView()
+    => GD.Load<PackedScene>("res://scenes/geoscape/squad/MissionView.tscn")
+      .Instantiate<MissionView>();
+
+  public static BattleScene MissionBattleHost(GeoscapeView view)
+    => OnlyChild<BattleScene>(view.GetNode<SubViewport>("Background/Viewport"));
 
   public static CaptivityView CreateCaptivityView()
     => GD.Load<PackedScene>("res://scenes/geoscape/captivity/CaptivityView.tscn")
@@ -172,9 +186,6 @@ internal static partial class GeoscapeTestScenes
 
   public static Button SquadDeployButton(SquadLoadoutView view)
     => view.GetNode<Button>("%DeployButton");
-
-  public static Label SquadDeploymentFailure(SquadLoadoutView view)
-    => view.GetNode<Label>("%DeploymentFailure");
 
   public static Button DialogButton(GeoscapeEventResolution dialog, string text)
     => dialog.GetNode<HBoxContainer>("%Buttons").GetChildren()

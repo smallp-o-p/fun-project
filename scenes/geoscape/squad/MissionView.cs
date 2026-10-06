@@ -4,24 +4,30 @@ using FunProject.Combatants;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
 using Godot;
-using System;
-using System.Collections.Generic;
 
 namespace FunProject.Geoscape;
 
-// One pushed view owns preparation and its live battle. Covered equipment views return to
-// the same selection; completing the battle returns through the ordinary navigation signal.
+// Owns mission preparation and the battle's full-screen viewport. Completion returns
+// through the ordinary navigation signal.
 public sealed partial class MissionView : SquadLoadoutView
 {
   [Export] public PackedScene BattleScene { get; set; } = null!;
 
+  private GeoscapeEvent _mission = null!;
   private GeoscapeSession _session = null!;
   private BattleScene? _battle;
+
+  public void ConfigureMission(GeoscapeEvent mission)
+  {
+    _mission = mission;
+    Configure(mission.Definition.Title, mission.Definition.TacticalMission!.Size.MaxPlayerUnits,
+      allowEquipmentEditing: true);
+  }
 
   public override void _Ready()
   {
     base._Ready();
-    DeployRequested += DeployMission;
+    GetNode<Button>("%DeployButton").Pressed += DeployMission;
   }
 
   public override void Present(CampaignGameState state, GeoscapeSession session)
@@ -31,37 +37,41 @@ public sealed partial class MissionView : SquadLoadoutView
       base.Present(state, session);
   }
 
-  private void DeployMission(GeoscapeEvent mission, IReadOnlyList<Combatant> squad)
-  {
-    if (_battle is not null)
-      throw new InvalidOperationException("The mission is already presented.");
+  protected override bool CanChoose(Combatant unit) => _session.CanDeploy(unit, _mission.Definition);
 
+  protected override void RebuildAll()
+  {
+    base.RebuildAll();
+    if (_mission.Definition.AllowUnfitDeployment)
+      GetNode<Label>("%SelectionPrompt").Text +=
+        "\nExceptional deployment authorized — injured or exhausted units may join this mission.";
+    GetNode<Button>("%DeployButton").Disabled = GetSelectedCombatants().Count == 0;
+  }
+
+  private void DeployMission()
+  {
     var host = BattleScene.InstantiateAs<BattleScene>("BattleScene");
     MissionBattle? launched = null;
     try
     {
-      var launch = _session.LaunchMission(mission, squad);
-      launch.IfLeft(failure =>
-      {
-        ShowDeploymentFailure(failure);
-        host.Free();
-      });
+      var launch = _session.LaunchMission(_mission, GetSelectedCombatants());
+      launch.IfLeft(_ => host.Free());
       launch.IfRight(handle =>
       {
         launched = handle;
         host.Present(handle.Runtime, handle.Setup, allowReturn: true);
         host.Completed += CompleteMission;
-        AddChild(host);
+        GetNode<SubViewport>("Background/Viewport").AddChild(host);
         host.InitializePresentation();
         GetNode<Control>("Content").Hide();
+        GetNode<Control>("Background").Show();
         _battle = host;
       });
     }
     catch
     {
       host.Dispose();
-      if (host.IsInsideTree())
-        RemoveChild(host);
+      host.GetParent()?.RemoveChild(host);
       host.QueueFree();
       if (launched is not null)
         _session.AbortMissionPresentation();
@@ -77,8 +87,7 @@ public sealed partial class MissionView : SquadLoadoutView
     }
     finally
     {
-      // Campaign consumption precedes notifications. A subscriber failure still pops the
-      // view and disposes the host; a failure before consumption leaves it for a retry.
+      // Consumption completes before notifications; committed returns pop even when a subscriber throws.
       if (_session.ActiveMission.IsNone)
         RequestBack();
     }

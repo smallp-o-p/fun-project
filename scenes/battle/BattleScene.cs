@@ -22,8 +22,7 @@ public sealed partial class BattleScene : Node3D
   private bool _allowReturn;
   private bool _disposed;
 
-  /// <summary>Raised when the player requests the campaign return while the battle is
-  /// terminal and playback is idle. Only wired meaningfully when Present allowed a return.</summary>
+  /// <summary>Requests campaign completion after terminal playback finishes.</summary>
   public event Action<FactionBattleSummary>? Completed;
 
   public void Present(BattleRuntime runtime, BattleSetup setup, bool allowReturn = false)
@@ -37,11 +36,7 @@ public sealed partial class BattleScene : Node3D
     _allowReturn = allowReturn;
   }
 
-  /// <summary>Releases the controller and the host-owned runtime. Idempotent: tree exit and
-  /// failed pre-tree host installation both route through here, and exactly the first call
-  /// disposes. The host owns the runtime once Present succeeds — disposal never applies
-  /// campaign results. Shadows the GodotObject IDisposable boilerplate deliberately: callers
-  /// hold this as a battle host, never as a bare GodotObject.</summary>
+  /// <summary>Releases the controller and host-owned runtime once.</summary>
   public new void Dispose()
   {
     if (_disposed)
@@ -51,9 +46,7 @@ public sealed partial class BattleScene : Node3D
     _runtime?.Dispose();
   }
 
-  // Fallible presentation construction, run by the installing host inside its failure
-  // recovery after tree attachment: Godot's C# callback bridge only logs _Ready exceptions,
-  // so autonomous tree-entry work could never trigger an installer's catch.
+  // The installer runs fallible setup after tree attachment and recovers exceptions directly.
   public void InitializePresentation()
   {
     if (_runtime is null || _setup is null)
@@ -104,8 +97,7 @@ public sealed partial class BattleScene : Node3D
 
     RefreshView();
 
-    // The StateChanged subscription only sees future transitions; a factory result that
-    // already ended the battle must show its banner now.
+    // Show startup-terminal results immediately.
     if (_ui.State == UiState.BattleOver)
       ShowBattleOverBanner();
   }

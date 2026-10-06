@@ -61,8 +61,8 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
 
   private void RequestSquadView(PendingResolution pending)
   {
-    var view = SquadViewScene!.InstantiateAs<SquadLoadoutView>();
-    view.ConfigureMission(pending.Event); // the whole event: heading, gate, capacity, launch context
+    var view = SquadViewScene!.InstantiateAs<MissionView>();
+    view.ConfigureMission(pending.Event);
     RequestView(view);
   }
 

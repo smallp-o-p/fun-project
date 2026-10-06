@@ -2,11 +2,7 @@ using FunProject.Battle;
 using FunProject.Scenes.Ext;
 using Godot;
 
-/// <summary>
-/// Standalone host that resolves the exported battle type and presents BattleScene; the geoscape
-/// handoff presents with allowReturn true instead. Validate the fresh host before starting
-/// the runtime, then bind it immediately. The host owns all presentation-failure cleanup.
-/// </summary>
+/// <summary>Starts the exported battle type and owns presentation-failure cleanup.</summary>
 public sealed partial class BattleLauncher : Node
 {
   [Export] public BattleTypeData? BattleType { get; set; }
@@ -26,7 +22,6 @@ public sealed partial class BattleLauncher : Node
       BattleRuntime runtime = BattleFactory.Start(setup).Match(
         Right: started => started,
         Left: failure => throw new System.InvalidOperationException($"Battle start failed: {failure.Message}"));
-      // Binding only assigns this fresh host's guaranteed runtime/setup.
       battle.Present(runtime, setup); // allowReturn stays false: standalone battles end here
       AddChild(battle);
       battle.InitializePresentation();

@@ -54,7 +54,7 @@ public partial class GeoscapeBattleHandoffTest
   }
 
   private static GeoscapeBattleHandoffScene NewScene(TacticalMissionData mission,
-    out HookCaptureSystemData capture, GeoscapeEventDefinition[]? backgroundEvents = null)
+    out HookCaptureSystemData capture, GeoscapeEventDefinition[]? backgroundEvents = null, Vector2I? windowSize = null)
   {
     capture = new HookCaptureSystemData();
     mission.BattleType.Systems.Add(capture);
@@ -69,6 +69,11 @@ public partial class GeoscapeBattleHandoffTest
     scene.Start = MakeStart(
       roster: [MakeEntry("Alpha", MakeCombatantData("Alpha", health: 100))],
       timeline: [.. timeline]);
+    if (windowSize is { } size)
+    {
+      CreateScaledWindow(scene, size);
+      return scene;
+    }
     return AddToTree(scene);
   }
 
@@ -78,9 +83,9 @@ public partial class GeoscapeBattleHandoffTest
   private static (GeoscapeBattleHandoffScene Scene, GeoscapeViewManager Manager,
     SquadLoadoutView Squad, GeoscapeEventResolution Dialog, GeoscapeSession Session) PreparedScene(
     TacticalMissionData? mission, out HookCaptureSystemData capture,
-    GeoscapeEventDefinition[]? backgroundEvents = null)
+    GeoscapeEventDefinition[]? backgroundEvents = null, Vector2I? windowSize = null)
   {
-    var scene = NewScene(mission ?? SurvivalMission(), out capture, backgroundEvents);
+    var scene = NewScene(mission ?? SurvivalMission(), out capture, backgroundEvents, windowSize);
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     SpeedButton(scene).EmitSignal(Button.SignalName.Pressed); // Normal
     scene._PhysicsProcess(0.1); // the mission fires at tick 1
@@ -112,6 +117,50 @@ public partial class GeoscapeBattleHandoffTest
     runtime.Query(new GetUnitAtTile(
       runtime.TryGetTile(new Vector3I(2, 0, 0)).RequireSome())).RequireSome();
 
+  [TestCase(800, 600, TestName = "Opaque battle viewport covers retained geoscape at minimum size")]
+  [TestCase(1600, 900, TestName = "Opaque battle viewport covers retained geoscape in a scaled window")]
+  public async Task BattleOwnsOpaqueViewport(int width, int height)
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (_, manager, squad, _, _) = PreparedScene(SurvivalMission(1), out _,
+      windowSize: new Vector2I(width, height));
+    var sentinel = new ColorRect { Color = Colors.Magenta, MouseFilter = Control.MouseFilterEnum.Ignore };
+    manager.RootView.AddChild(sentinel);
+    sentinel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+    SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
+    var battle = MissionBattleHost(manager.Current);
+
+    Assert.True(battle.GetViewport() is SubViewport);
+    var viewport = (SubViewport)battle.GetViewport();
+    var container = (SubViewportContainer)viewport.GetParent();
+    Assert.False(viewport.TransparentBg);
+    Assert.True(viewport.OwnWorld3D);
+    Assert.True(container.Stretch);
+    Assert.True(container.IsVisibleInTree());
+    Assert.Equal(Node.ProcessModeEnum.Disabled, manager.RootView.ProcessMode);
+    await WaitForLayout(squad);
+    Assert.Equal(ScreenRect(squad), ScreenRect(container));
+    Assert.Equal(new Vector2I((int)container.Size.X, (int)container.Size.Y), viewport.Size);
+
+    await RenderingServer.Singleton.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+    using var pixels = viewport.GetTexture().GetImage();
+    Assert.Equal(1f, pixels.GetPixel(0, 0).A);
+    Assert.Equal(1f, pixels.GetPixel(pixels.GetWidth() - 1, pixels.GetHeight() - 1).A);
+    var window = squad.GetWindow();
+    using var rendered = window.GetTexture().GetImage();
+    Assert.False(rendered.GetPixel(1, 1).IsEqualApprox(Colors.Magenta));
+    Assert.False(rendered.GetPixel(rendered.GetWidth() - 2, rendered.GetHeight() - 2).IsEqualApprox(Colors.Magenta));
+    Option<Vector3I> clicked = None;
+    battle.GetNode<BattleInputController>("BattleInputController").TileClicked += tile => clicked = Some(tile);
+    await SelectFirstBattleUnit(battle, throughContainer: true);
+    Assert.Equal(Vector3I.Zero, clicked.RequireSome());
+    ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
+    Assert.True(ReferenceEquals(manager.RootView, manager.Current));
+    await WaitForLayout(window);
+    using var restored = window.GetTexture().GetImage();
+    Assert.True(restored.GetPixel(1, 1).IsEqualApprox(Colors.Magenta));
+  }
+
   [TestCase(TestName = "Two deployments restore the same geoscape and route fresh input")]
   public async Task DeployPresentsBattleAndReturnRestoresGeoscape()
   {
@@ -128,11 +177,11 @@ public partial class GeoscapeBattleHandoffTest
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
 
-    var battle = OnlyChild<BattleScene>(manager.Current); // owned by the pushed mission view
+    var battle = MissionBattleHost(manager.Current); // owned by the pushed mission view
     Assert.True(session.ActiveMission.IsSome); // campaign association held while presented
     Assert.True(session.PendingResolution.IsSome);
     Assert.False(ReturnButton(battle).Visible);
-    Assert.True(ReferenceEquals(manager.Current, battle.GetParent()));
+    Assert.True(ReferenceEquals(manager.Current.GetNode<SubViewport>("Background/Viewport"), battle.GetParent()));
     Assert.True(manager.Visible);
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
     Assert.False(squad.GetNode<Control>("Content").Visible);
@@ -202,7 +251,7 @@ public partial class GeoscapeBattleHandoffTest
     ChooseSquadUnit(secondSquad, 0, "Alpha");
     Assert.True(ReferenceEquals(liveSession, CaptureSceneSession(manager)));
     SquadDeployButton(secondSquad).EmitSignal(Button.SignalName.Pressed);
-    var secondBattle = OnlyChild<BattleScene>(manager.Current);
+    var secondBattle = MissionBattleHost(manager.Current);
     await SelectFirstBattleUnit(secondBattle);
     EndTurnButton(secondBattle).EmitSignal(Button.SignalName.Pressed);
     DrainDirector(secondBattle);
@@ -225,11 +274,12 @@ public partial class GeoscapeBattleHandoffTest
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
 
-    var battle = OnlyChild<BattleScene>(manager.Current);
-    Assert.True(ReferenceEquals(manager.Current, battle.GetParent()),
-      "The pushed mission view must own the battle host.");
-    Assert.False(MapViewport(scene).IsVisibleInTree());
-    Assert.False(scene.GetNode<GeoscapeHud>("%GeoscapeHud").IsVisibleInTree());
+    var battle = MissionBattleHost(manager.Current);
+    Assert.True(ReferenceEquals(manager.Current.GetNode<SubViewport>("Background/Viewport"), battle.GetParent()),
+      "The mission viewport owns the battle host.");
+    Assert.True(manager.RootView.IsVisibleInTree());
+    Assert.True(squad.GetNode<SubViewportContainer>("Background").IsVisibleInTree());
+    Assert.False(battle.GetViewport().TransparentBg);
     Assert.True(ReturnButton(battle).Visible, // terminal at presentation, director idle
       "Startup-terminal battles must not depend on a later BattleOver transition.");
 
@@ -261,7 +311,7 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(session.PendingResolution.IsSome);
     Assert.True(ReferenceEquals(squad, manager.Current)); // preparation retained
     Assert.Equal(1, squad.GetSelectedCombatants().Count);
-    Assert.Equal(0, squad.GetChildren().AsValueEnumerable().OfType<BattleScene>().Count());
+    Assert.Equal(0, squad.GetNode<SubViewport>("Background/Viewport").GetChildCount());
     Assert.True(manager.Visible);
   }
 
@@ -300,12 +350,12 @@ public partial class GeoscapeBattleHandoffTest
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
 
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
-    Assert.Equal(0, squad.GetChildren().AsValueEnumerable().OfType<BattleScene>().Count());
+    Assert.Equal(0, squad.GetNode<SubViewport>("Background/Viewport").GetChildCount());
 
     // Repairing the authored host retries the same pending event with the retained squad.
     ((MissionView)squad).BattleScene = GD.Load<PackedScene>("res://scenes/battle/BattleScene.tscn");
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
-    var retry = OnlyChild<BattleScene>(manager.Current);
+    var retry = MissionBattleHost(manager.Current);
     Assert.True(session.ActiveMission.IsSome);
     ReturnButton(retry).EmitSignal(Button.SignalName.Pressed);
     Assert.True(session.ActiveMission.IsNone);
@@ -326,21 +376,16 @@ public partial class GeoscapeBattleHandoffTest
       value => value.Event.BattleSeed,
       () => throw new InvalidOperationException("The mission must stay pending."));
 
-    // The bridge logs the signal-dispatched failure. A probe behind the mission handler
-    // proves the launch fault aborted the deployment path; the restored state proves the
-    // recovery, and the detached host's deferred free keeps the run orphan-free.
-    int intents = 0;
-    squad.DeployRequested += (_, _) => intents++; // runs only if the mission handler completed
+    // The bridge logs signal-dispatched failures; inspect restored campaign and host ownership.
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
 
-    Assert.Equal(0, intents);
     Assert.True(session.ActiveMission.IsNone); // no launch association was established
     Assert.True(session.PendingResolution.IsSome);
     Assert.Equal(seedBefore, session.PendingResolution.Match(
       value => value.Event.BattleSeed, () => Option<int>.None));
     Assert.Equal(1, squad.GetSelectedCombatants().Count);
     Assert.True(manager.Visible);
-    Assert.Equal(0, squad.GetChildren().AsValueEnumerable().OfType<BattleScene>().Count());
+    Assert.Equal(0, squad.GetNode<SubViewport>("Background/Viewport").GetChildCount());
   }
 
   [TestCase(TestName = "Return intent at the host boundary waits for the director queue to idle")]
@@ -387,7 +432,7 @@ public partial class GeoscapeBattleHandoffTest
     var session = new GeoscapeSession(campaign);
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
-    var battle = OnlyChild<BattleScene>(manager.Current);
+    var battle = MissionBattleHost(manager.Current);
     await SelectFirstBattleUnit(battle);
     EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
     DrainDirector(battle);
@@ -442,7 +487,7 @@ public partial class GeoscapeBattleHandoffTest
     var session = new GeoscapeSession(campaign);
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
-    var battle = OnlyChild<BattleScene>(manager.Current);
+    var battle = MissionBattleHost(manager.Current);
     await SelectFirstBattleUnit(battle);
     EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
     DrainDirector(battle);

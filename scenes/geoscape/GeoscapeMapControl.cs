@@ -188,9 +188,7 @@ public sealed partial class GeoscapeMapControl : Control
     }
   }
 
-  // Guaranteed cleanup for the composition root's return path: drops markers whose event
-  // is no longer active without re-stamping, so a failed close-path refresh can never mask
-  // its fault by succeeding here. Prunes backwards; surviving active markers stay intact.
+  // Reconcile retained markers with campaign truth when the root view resumes.
   public void RemoveInactiveEventMarkers()
   {
     for (int index = _markerNodes.Count - 1; index >= 0; index--)

@@ -36,12 +36,14 @@ public sealed partial class GeoscapeViewManager : Control
     if (view.GetParent() is not null)
       throw new InvalidOperationException("Push requires an unparented view.");
 
+    if (view.HidesPreviousScene)
+      Current.Hide();
     Deactivate(Current);
 
     _views.Push(view);
     AddChild(view);
     SubscribeNavigation(view);
-    UpdateVisibility();
+    view.Show();
     view.ProcessMode = ProcessModeEnum.Inherit;
     EmitSignal(SignalName.ViewChanged, view);
   }
@@ -57,19 +59,9 @@ public sealed partial class GeoscapeViewManager : Control
     removed.QueueFree();
 
     SubscribeNavigation(Current);
-    UpdateVisibility();
+    Current.Show();
     Current.ProcessMode = ProcessModeEnum.Inherit;
     EmitSignal(SignalName.ViewChanged, Current);
-  }
-
-  private void UpdateVisibility()
-  {
-    bool visible = true;
-    foreach (GeoscapeView view in _views)
-    {
-      view.Visible = visible;
-      visible &= !view.HidesPreviousScene;
-    }
   }
 
   private void SubscribeNavigation(GeoscapeView view)

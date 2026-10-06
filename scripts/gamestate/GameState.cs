@@ -164,18 +164,12 @@ public sealed class GameState
 
   internal Option<PendingResolution> Pending { get; set; }
 
-  /// <summary>The launched-mission association: campaign truth, so a rebuilt session observes
-  /// the same active mission and cannot permit a second launch. Cleared by the mission return
-  /// or by AbortMissionPresentation (host presentation failure recovery).</summary>
+  /// <summary>Campaign-held deployment for the active mission.</summary>
   internal Option<MissionDeployment> ActiveMission { get; set; }
 
-  /// <summary>Removes exactly the reported deployed deaths from the roster — never unrelated
-  /// members — and drops their condition records, because a removed member can never recover.
-  /// The dead keep their equipment; nothing is returned to the Armory.</summary>
-  internal void RemoveRosterParticipants(IReadOnlySet<Combatant> dead)
+  /// <summary>Removes reported deaths and their condition records. Equipment stays with the combatants.</summary>
+  internal void RemoveDeadFromRoster(IReadOnlySet<Combatant> dead)
   {
-    ArgumentNullException.ThrowIfNull(dead);
-
     foreach (Combatant combatant in dead)
       if (_roster.Remove(combatant))
         Conditions.Forget(combatant);

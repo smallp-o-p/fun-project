@@ -77,7 +77,6 @@ public sealed partial class BattleHud : CanvasLayer
     _bannerLabel.Visible = true;
   }
 
-  // The campaign-return intent: offered only while the terminal battle's playback is idle.
   public void ShowReturn(bool available)
     => _returnButton.Visible = available;
 

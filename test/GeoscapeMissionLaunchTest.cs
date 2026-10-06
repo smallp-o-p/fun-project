@@ -6,10 +6,8 @@ using FunProject.Stats;
 using FunProject.Strategic;
 using GdUnit4;
 
-// Campaign mission-launch boundary: typed squad/pending failures against the opened event,
-// the captured deployment the battle consumes, and the campaign-held association that guards
-// resolution closure and survives session rebuilds. Runtimes returned to tests are
-// host-owned and disposed here; the session never registers or disposes one.
+// Mission selection normalization, startup snapshots, setup failures, and campaign associations.
+// Tests dispose their host-owned runtimes.
 [TestSuite]
 [RequireGodotRuntime]
 public partial class GeoscapeMissionLaunchTest
@@ -44,69 +42,43 @@ public partial class GeoscapeMissionLaunchTest
     }
   }
 
-  // A distinct GeoscapeEvent instance carrying the same definition: the stale request an
-  // older dialog or session snapshot would hold.
-  private static GeoscapeEvent StaleCopy(GeoscapeEvent mission) =>
-    new(mission.Definition, mission.TargetRegionIndex, mission.OccurredTick, mission.ExpiresAtTick);
-
-  [TestCase(MissionLaunchFailureReason.EmptySquad, TestName = "Empty squads do not launch")]
-  [TestCase(MissionLaunchFailureReason.DuplicateCombatant, TestName = "Duplicate squad members do not launch")]
-  [TestCase(MissionLaunchFailureReason.SquadTooLarge, TestName = "Over-capacity squads do not launch")]
-  [TestCase(MissionLaunchFailureReason.NotInRoster, TestName = "Non-roster combatants do not launch")]
-  [TestCase(MissionLaunchFailureReason.FactionMismatch, TestName = "Foreign-faction combatants do not launch")]
-  [TestCase(MissionLaunchFailureReason.UnitUnavailable, TestName = "Unavailable combatants do not launch")]
-  [TestCase(MissionLaunchFailureReason.WrongPendingMission, TestName = "Stale mission requests do not launch")]
-  public void InvalidSquadDoesNotLaunch(MissionLaunchFailureReason reason)
+  [TestCase(0, TestName = "Duplicate selections retain the first occurrence in order")]
+  [TestCase(1, TestName = "Over-capacity selections retain the first capacity-sized squad")]
+  [TestCase(2, TestName = "Deduplication precedes capacity truncation")]
+  [TestCase(3, TestName = "Unsigned maximum capacity preserves the selected squad")]
+  public void SelectionNormalizesInOrder(int selectionKind)
   {
-    using var campaign = NewMissionCampaign();
-    var active = campaign.ActiveEvent;
-    if (reason == MissionLaunchFailureReason.UnitUnavailable)
-      campaign.ReturnFromMission((campaign.State.Roster[2], 5, 0));
-    campaign.OpenResolution(active);
-    campaign.ClearEvents();
-
-    var roster = campaign.State.Roster;
-    IReadOnlyList<Combatant> squad = reason switch
+    using var campaign = NewMissionCampaign(customize: mission =>
     {
-      MissionLaunchFailureReason.EmptySquad => [],
-      MissionLaunchFailureReason.DuplicateCombatant => [roster[0], roster[0]],
-      MissionLaunchFailureReason.SquadTooLarge => [roster[0], roster[1], roster[2]],
-      MissionLaunchFailureReason.NotInRoster =>
-        [roster[0], MakeCombatant("Outsider", campaign.State.PlayerFaction)],
-      MissionLaunchFailureReason.FactionMismatch =>
-        [roster[0], MakeCombatant("Alien", MakeFaction("Aliens"))],
-      MissionLaunchFailureReason.UnitUnavailable => [roster[2]],
-      _ => [roster[0], roster[1]],
+      if (selectionKind == 3)
+        mission.Size.MaxPlayerUnits = uint.MaxValue;
+    });
+    var roster = campaign.State.Roster;
+    Combatant first = roster[2];
+    Combatant second = roster[1];
+    IReadOnlyList<Combatant> selected = selectionKind switch
+    {
+      0 => [first, first, second],
+      1 => [first, second, roster[0]],
+      3 => [first, second],
+      _ => [first, first, second, roster[0]],
     };
-    GeoscapeEvent requested = reason == MissionLaunchFailureReason.WrongPendingMission
-      ? StaleCopy(active)
-      : active;
+    campaign.OpenResolution(campaign.ActiveEvent);
 
-    MissionLaunchFailure failure = campaign.Session.LaunchMission(requested, squad).RequireLeft();
-
-    Assert.Equal(reason, failure.Reason);
-    Assert.True(campaign.Session.ActiveMission.IsNone);
-    Assert.True(campaign.Session.PendingResolution.IsSome);
-    Assert.True(ReferenceEquals(active, campaign.Session.PendingResolution.RequireSome().Event),
-      "The pending event must survive a failed launch unchanged.");
-    Assert.Equal(0, campaign.Events.Count, "Failed launches commit no geoscape events.");
-  }
-
-  [TestCase(TestName = "Launching without an opened resolution fails typed")]
-  public void LaunchWithoutOpenedResolutionFailsTyped()
-  {
-    using var campaign = NewMissionCampaign();
-    var active = campaign.ActiveEvent;
-    var alpha = campaign.State.Roster[0];
-
-    Assert.Equal(MissionLaunchFailureReason.NoPendingMission,
-      campaign.Session.LaunchMission(active, [alpha]).RequireLeft().Reason);
-
-    campaign.OpenResolution(active);
-    campaign.CompleteResolution(ResolutionOutcome.Acknowledged);
-    Assert.Equal(MissionLaunchFailureReason.NoPendingMission,
-      campaign.Session.LaunchMission(active, [alpha]).RequireLeft().Reason);
-    Assert.True(campaign.Session.ActiveMission.IsNone);
+    var battle = campaign.Session.LaunchMission(campaign.ActiveEvent, selected).RequireRight();
+    try
+    {
+      Assert.Equal(2, battle.Deployment.Participants.Count);
+      Assert.True(ReferenceEquals(first, battle.Deployment.Participants[0]));
+      Assert.True(ReferenceEquals(second, battle.Deployment.Participants[1]));
+      Assert.Equal(2, battle.Setup.Sides[0].Units.Count);
+      Assert.True(ReferenceEquals(first, battle.Setup.Sides[0].Units[0].Loadout.Combatant));
+      Assert.True(ReferenceEquals(second, battle.Setup.Sides[0].Units[1].Loadout.Combatant));
+    }
+    finally
+    {
+      battle.Runtime.Dispose();
+    }
   }
 
   [TestCase(TestName = "Exceptional deployment captures only condition penalties")]
@@ -212,7 +184,7 @@ public partial class GeoscapeMissionLaunchTest
     var beta = campaign.State.Roster[1];
     campaign.OpenResolution(active);
 
-    var selected = new List<Combatant> { alpha, beta };
+    var selected = new List<Combatant> { alpha, alpha, beta, campaign.State.Roster[2] };
     mutation.OnRegister = () =>
     {
       selected.Clear();
@@ -248,11 +220,10 @@ public partial class GeoscapeMissionLaunchTest
     var active = campaign.ActiveEvent;
     campaign.OpenResolution(active);
 
-    MissionLaunchFailure failure = campaign.Session.LaunchMission(active,
+    BattleSetupFailure failure = campaign.Session.LaunchMission(active,
       [campaign.State.Roster[0], campaign.State.Roster[1], campaign.State.Roster[2]]).RequireLeft();
 
-    Assert.Equal(MissionLaunchFailureReason.SetupFailed, failure.Reason);
-    Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall, failure.SetupFailure.RequireSome().Reason);
+    Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall, failure.Reason);
     Assert.True(campaign.Session.ActiveMission.IsNone);
     Assert.True(ReferenceEquals(active, campaign.Session.PendingResolution.RequireSome().Event));
   }
@@ -283,8 +254,8 @@ public partial class GeoscapeMissionLaunchTest
     Assert.True(ReferenceEquals(active, campaign.Session.PendingResolution.RequireSome().Event));
   }
 
-  [TestCase(TestName = "Launch and resolution guards hold across a session rebuild")]
-  public void GuardsHoldAcrossSessionRebuild()
+  [TestCase(TestName = "Mission association and resolution ownership survive a session rebuild")]
+  public void AssociationSurvivesSessionRebuild()
   {
     using var campaign = NewMissionCampaign();
     var active = campaign.ActiveEvent;
@@ -293,8 +264,6 @@ public partial class GeoscapeMissionLaunchTest
     var battle = campaign.Session.LaunchMission(active, squad).RequireRight();
     try
     {
-      Assert.Equal(MissionLaunchFailureReason.AlreadyLaunched,
-        campaign.Session.LaunchMission(active, squad).RequireLeft().Reason);
       Assert.Throws<System.InvalidOperationException>(
         () => campaign.Session.CompleteResolution(ResolutionOutcome.Engaged));
       Assert.Throws<System.InvalidOperationException>(
@@ -302,8 +271,6 @@ public partial class GeoscapeMissionLaunchTest
 
       var rebuilt = new GeoscapeSession(campaign.State);
       Assert.True(ReferenceEquals(battle.Deployment, rebuilt.ActiveMission.RequireSome()));
-      Assert.Equal(MissionLaunchFailureReason.AlreadyLaunched,
-        rebuilt.LaunchMission(active, squad).RequireLeft().Reason);
       Assert.Throws<System.InvalidOperationException>(
         () => rebuilt.CompleteResolution(ResolutionOutcome.Acknowledged));
     }

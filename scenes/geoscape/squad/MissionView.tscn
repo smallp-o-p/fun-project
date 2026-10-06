@@ -7,3 +7,15 @@
 [node name="MissionView" instance=ExtResource("1_squad")]
 script = ExtResource("2_script")
 BattleScene = ExtResource("3_battle")
+
+[node name="Background" parent="." index="0"]
+mouse_filter = 0
+
+[node name="Viewport" parent="Background" index="0"]
+transparent_bg = false
+
+[node name="DeployButton" type="Button" parent="Content/Margin/Layout/Footer" index="1"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+text = "Deploy"

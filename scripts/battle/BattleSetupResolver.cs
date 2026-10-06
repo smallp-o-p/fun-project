@@ -141,9 +141,7 @@ public static class BattleSetupResolver
     });
   }
 
-  // Authored quantity expansion: every spawned unit instantiates fresh runtime gear through
-  // its loadout; quantity floors at one. Equipment comes only from the roster entries —
-  // campaign equipment slots are never read or written here.
+  // Expand authored quantities into combatants with fresh loadout equipment.
   private static List<UnitLoadout> ExpandRoster(FactionDeploymentData authoredSide, Faction faction)
   {
     var loadouts = new List<UnitLoadout>();
