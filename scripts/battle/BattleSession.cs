@@ -13,6 +13,9 @@ namespace FunProject.Battle;
 
 public sealed class BattleSession
 {
+  internal BattleAccessGuard? Access { get; private set; }
+  internal void BindBattleAccess(BattleAccessGuard access) => Access = access;
+  internal long Revision { get { Access?.RequireReadAccess(); return Access?.Revision ?? 0; } }
   internal readonly record struct SpawnedBattleUnit(BattleUnitState Unit);
 
   public const int DefaultMovementStepActionPointCost = 1;
