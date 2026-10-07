@@ -8,7 +8,7 @@ namespace FunProject.Battle;
 public sealed class BattleBoardState
 {
   private readonly BattleAccessBinding _battleAccess = new();
-  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access);  }
+  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access); }
   internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
 
   public readonly struct ValidatedPoint : IEquatable<ValidatedPoint>
@@ -189,7 +189,7 @@ public sealed class BattleBoardState
   /// this with a best-first search, keeping the neighbor rule below). Every tile the search
   /// enters — the destination included — must be occupiable (walkable and unoccupied); the
   /// source is seeded without testing, so an occupied source still paths out of it. The fixed
-  /// <see cref="AdjacentDirections"/> order makes the choice among equal-length paths
+  /// <see cref="BattlePathSearch.AdjacentDirections"/> order makes the choice among equal-length paths
   /// deterministic.
   /// </summary>
   /// <param name="source"></param>
@@ -198,54 +198,10 @@ public sealed class BattleBoardState
   public ValidatedPoint[] FindPath(ValidatedPoint source, ValidatedPoint destination)
   {
     _battleAccess.RequireRead();
-    if (source == destination)
-      return [source];
-    if (!CanOccupy(destination))
-      return [];
-
-    Dictionary<ValidatedPoint, ValidatedPoint> parentByNode = [];
-    Queue<ValidatedPoint> frontier = new();
-    parentByNode[source] = source;
-    frontier.Enqueue(source);
-
-    while (frontier.Count > 0)
-    {
-      ValidatedPoint current = frontier.Dequeue();
-      if (current == destination)
-        return ReconstructPath(parentByNode, source, destination);
-
-      foreach (Vector3I direction in AdjacentDirections)
-      {
-        Vector3I neighborCoordinates = current.Raw + direction;
-        if (!IsInBounds(neighborCoordinates))
-          continue;
-
-        var neighbor = new ValidatedPoint(neighborCoordinates);
-        if (parentByNode.ContainsKey(neighbor))
-          continue;
-        if (!CanOccupy(neighbor) || !CanStep(current, direction))
-          continue;
-
-        parentByNode[neighbor] = current;
-        frontier.Enqueue(neighbor);
-      }
-    }
-
-    return [];
+    return BattlePathSearch.FindPath(Dimensions, source, destination, ExactKnowledge).Points;
   }
 
-  private static ValidatedPoint[] ReconstructPath(
-    Dictionary<ValidatedPoint, ValidatedPoint> parentByNode,
-    ValidatedPoint source,
-    ValidatedPoint destination)
-  {
-    List<ValidatedPoint> reversed = [];
-    for (ValidatedPoint current = destination; current != source; current = parentByNode[current])
-      reversed.Add(current);
-    reversed.Add(source);
-
-    return reversed.AsValueEnumerable().Reverse().ToArray();
-  }
+  private TraversalKnowledge ExactKnowledge(ValidatedPoint point) => CanOccupy(point) ? TraversalKnowledge.Clear : TraversalKnowledge.Blocked;
 
   public bool CanOccupy(ValidatedPoint point)
   {
@@ -256,29 +212,8 @@ public sealed class BattleBoardState
   private bool IsOccupiable(Vector3I coordinates)
     => ValidatePoint(coordinates).Match(Some: CanOccupy, None: () => false);
 
-  // A diagonal step is legal only when at least one of the two orthogonals flanking it is
-  // occupiable, so a unit cannot cut a corner sealed on both sides. Orthogonal and vertical
-  // steps never cut a corner.
-  private bool CanStep(ValidatedPoint from, Vector3I direction)
-  {
-    if (direction.X == 0 || direction.Z == 0)
-      return true;
-
-    return IsOccupiable(from.Raw + new Vector3I(direction.X, 0, 0))
-      || IsOccupiable(from.Raw + new Vector3I(0, 0, direction.Z));
-  }
-
-  // The board's single definition of tile adjacency; the path search, the reachability flood,
-  // and every adjacency question must share it so movement rules cannot drift. Diagonals stay
-  // on one level (Y is fixed — Godot's up axis gets no diagonals), and a diagonal step is legal
-  // only past an open flank (see CanStep) so units cannot cut a sealed corner. The order is
-  // load-bearing: searches visit neighbors in this order, which fixes the tie-break among
-  // equal-cost paths.
-  private static readonly Vector3I[] AdjacentDirections =
-  [
-    new(-1, 0, 0), new(1, 0, 0), new(0, 0, -1), new(0, 0, 1), new(0, -1, 0), new(0, 1, 0),
-    new(1, 0, 1), new(-1, 0, -1), new(1, 0, -1), new(-1, 0, 1) // no diagonals across the Y axis
-  ];
+  private bool CanStep(ValidatedPoint from, Vector3I direction) =>
+    BattlePathSearch.StepKnowledge(Dimensions, from, direction, ExactKnowledge) != TraversalKnowledge.Blocked;
 
   public static double GetGridDistance(Vector3I source, Vector3I destination)
   {
@@ -299,7 +234,7 @@ public sealed class BattleBoardState
   public bool HasOccupiableNeighbor(ValidatedPoint point)
   {
     _battleAccess.RequireRead();
-    foreach (Vector3I direction in AdjacentDirections)
+    foreach (Vector3I direction in BattlePathSearch.AdjacentDirections)
     {
       if (IsOccupiable(point.Raw + direction) && CanStep(point, direction))
         return true;
@@ -341,7 +276,7 @@ public sealed class BattleBoardState
   }
 
   public bool IsBlockedByObject(ValidatedPoint point)
-    { _battleAccess.RequireRead(); return _objectOccupants.ContainsKey(point); }
+  { _battleAccess.RequireRead(); return _objectOccupants.ContainsKey(point); }
 
   public bool TryPlaceObjectOccupant(ValidatedPoint point, int objectId)
   {
@@ -368,37 +303,7 @@ public sealed class BattleBoardState
   public IReadOnlyCollection<ValidatedPoint> GetReachableTiles(ValidatedPoint origin, int maxSteps)
   {
     _battleAccess.RequireRead();
-    // Bounded-depth flood over occupiable tiles, using the same neighbor rule FindPath searches.
-    // The origin seeds the search unconditionally — its own occupation (the mover standing on
-    // it) must not block the search — but is not itself part of the result.
-    List<ValidatedPoint> reachable = [];
-    SysColGeneric.HashSet<ValidatedPoint> visited = [origin];
-    Queue<(ValidatedPoint Point, int Steps)> frontier = new();
-    frontier.Enqueue((origin, 0));
-
-    while (frontier.Count > 0)
-    {
-      var (current, steps) = frontier.Dequeue();
-      if (steps >= maxSteps)
-        continue;
-
-      foreach (Vector3I direction in AdjacentDirections)
-      {
-        Vector3I neighborCoordinates = current.Raw + direction;
-        if (!IsInBounds(neighborCoordinates))
-          continue;
-
-        var neighbor = new ValidatedPoint(neighborCoordinates);
-        if (!visited.Add(neighbor))
-          continue;
-        if (!CanOccupy(neighbor) || !CanStep(current, direction))
-          continue;
-
-        reachable.Add(neighbor);
-        frontier.Enqueue((neighbor, steps + 1));
-      }
-    }
-
-    return reachable;
+    return BattlePathSearch.GetReachableTiles(Dimensions, origin, maxSteps, ExactKnowledge)
+      .AsValueEnumerable().Select(tile => tile.Point).ToArray();
   }
 }

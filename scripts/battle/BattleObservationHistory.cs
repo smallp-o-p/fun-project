@@ -8,6 +8,7 @@ internal sealed class BattleObservationHistory
 {
   private readonly BattleAccessBinding _access = new();
   private readonly Dictionary<Faction, Dictionary<int, LastSeenContact>> _contacts = [];
+  private readonly Dictionary<Faction, Dictionary<BattleBoardState.ValidatedPoint, BattleTileState>> _terrain = [];
   private long _revision;
   internal void BindBattleAccess(BattleAccessGuard access) => _access.Bind(access);
 
@@ -18,6 +19,8 @@ internal sealed class BattleObservationHistory
     foreach (var observer in units)
     {
       if (!observer.IsAlive || observer.IsUnconscious) continue;
+      if (!_terrain.TryGetValue(observer.Side, out var terrain)) _terrain.Add(observer.Side, terrain = []);
+      foreach (var point in observer.VisibleTiles) terrain[point] = board.GetTile(point);
       foreach (var target in observer.VisibleUnits)
       {
         if (target.Side == observer.Side) continue;
@@ -28,6 +31,12 @@ internal sealed class BattleObservationHistory
         contacts[target.Id] = new(target.Id, position, _revision);
       }
     }
+  }
+
+  internal Option<BattleTileState> GetTerrain(Faction faction, BattleBoardState.ValidatedPoint tile)
+  {
+    _access.RequireRead();
+    return _terrain.TryGetValue(faction, out var terrain) && terrain.TryGetValue(tile, out var value) ? Some(value) : None;
   }
 
   internal IReadOnlyList<LastSeenContact> GetContacts(Faction faction)
