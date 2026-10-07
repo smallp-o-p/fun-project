@@ -72,6 +72,8 @@ public sealed class GeoscapeSession
   public IReadOnlyList<ResearchProject> GetAvailableResearchProjects()
     => _state.Research.GetAvailableProjects(_state);
 
+  /// <summary>Starts an eligible project, replacing any different active project after
+  /// resolution and scheduling succeed. Interrupted progress is discarded.</summary>
   public Either<ResearchStartFailure, ResearchJob> StartResearch(ResearchProject project)
     => _state.Research.ResolveResearch(project, _state).Map(definition =>
     {

@@ -4,6 +4,7 @@ namespace FunProject.Research;
 public enum ResearchStartFailure
 {
   UnknownProject,
+  /// <summary>The requested project is already active; its progress is preserved.</summary>
   Busy,
   AlreadyCompleted,
   Locked,

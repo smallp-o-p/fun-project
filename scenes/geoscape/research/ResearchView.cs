@@ -9,6 +9,9 @@ namespace FunProject.Geoscape;
 
 public sealed partial class ResearchView : GeoscapeView
 {
+  [Export] public PackedScene ProjectButtonScene { get; set; } = null!;
+  [Export] public PackedScene EmptyCatalogScene { get; set; } = null!;
+
   private GeoscapeSession _session = null!;
   private SysColGeneric.IReadOnlyList<ResearchProject> _projects = [];
   private Option<ResearchProject> _selection = None;
@@ -65,14 +68,8 @@ public sealed partial class ResearchView : GeoscapeView
     list.QueueFreeAllChildren();
     foreach (var project in _projects)
     {
-      var button = new Button
-      {
-        Text = project.Name,
-        AutowrapMode = TextServer.AutowrapMode.WordSmart,
-        ToggleMode = true,
-        Alignment = HorizontalAlignment.Left,
-        CustomMinimumSize = new Vector2(0, 36),
-      };
+      var button = ProjectButtonScene.Instantiate<Button>();
+      button.Text = project.Name;
       button.Pressed += () =>
       {
         _selection = Some(project);
@@ -81,11 +78,7 @@ public sealed partial class ResearchView : GeoscapeView
       list.AddChild(button);
     }
     if (_projects.Count == 0)
-      list.AddChild(new Label
-      {
-        Text = "No projects available to research.",
-        AutowrapMode = TextServer.AutowrapMode.WordSmart,
-      });
+      list.AddChild(EmptyCatalogScene.Instantiate<Label>());
   }
 
   private void RefreshSelection()
@@ -93,21 +86,31 @@ public sealed partial class ResearchView : GeoscapeView
     var rows = GetNode<VBoxContainer>("%ResearchProjects");
     for (int index = 0; index < _projects.Count; index++)
     {
-      int rowIndex = index;
-      rows.GetChild<Button>(index).SetPressedNoSignal(_selection.Match(
-        selected => ReferenceEquals(selected, _projects[rowIndex]), () => false));
+      rows.GetChild<Button>(index).SetPressedNoSignal(
+        _selection.Case is ResearchProject selected && ReferenceEquals(selected, _projects[index]));
     }
-    GetNode<Label>("%ProjectName").Text = _selection.Match(
-      project => project.Name, () => "Select a project to research.");
-    GetNode<Label>("%ProjectDescription").Text = _selection.Match(
-      project => project.Description, () => "");
-    GetNode<Label>("%ResearchDuration").Text = _selection.Match(
-      project => $"Duration: {project.DurationDays}d", () => "");
-    GetNode<Label>("%ManufacturingUnlocks").Text = _selection.Match(
-      project => "Manufacturing unlocks: " + (project.ManufacturingUnlocks.Length == 0
+    if (_selection.Case is ResearchProject project)
+    {
+      GetNode<Label>("%ProjectName").Text = project.Name;
+      GetNode<Label>("%ProjectDescription").Text = project.Description;
+      GetNode<Label>("%ResearchDuration").Text = $"Duration: {project.DurationDays}d";
+      GetNode<Label>("%ManufacturingUnlocks").Text = "Manufacturing unlocks: " + (project.ManufacturingUnlocks.Length == 0
         ? "None"
-        : string.Join(", ", project.ManufacturingUnlocks.AsValueEnumerable().Select(item => item.Name).ToArray())),
-      () => "");
-    GetNode<Button>("%StartResearchButton").Disabled = _session.ActiveResearch.IsSome || _selection.IsNone;
+        : string.Join(", ", project.ManufacturingUnlocks.AsValueEnumerable().Select(item => item.Name).ToArray()));
+    }
+    else
+    {
+      GetNode<Label>("%ProjectName").Text = "Select a project to research.";
+      GetNode<Label>("%ProjectDescription").Text = "";
+      GetNode<Label>("%ResearchDuration").Text = "";
+      GetNode<Label>("%ManufacturingUnlocks").Text = "";
+    }
+    GetNode<Label>("%ProjectDescription").Visible = _selection.IsSome;
+    GetNode<Label>("%ResearchDuration").Visible = _selection.IsSome;
+    GetNode<Label>("%ManufacturingUnlocks").Visible = _selection.IsSome;
+    var start = GetNode<Button>("%StartResearchButton");
+    start.Disabled = _selection.IsNone;
+    start.Text = _session.ActiveResearch.IsSome ? "Switch Research" : "Start Research";
+    GetNode<Label>("%SwitchHint").Visible = _session.ActiveResearch.IsSome;
   }
 }

@@ -1,155 +1,191 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
 [ext_resource type="Script" path="res://scenes/geoscape/research/ResearchView.cs" id="2_script"]
-[ext_resource type="StyleBox" path="res://scenes/ui/ScreenBackground.tres" id="3_background"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/research/ResearchProjectButton.tscn" id="3_row"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/research/ResearchEmptyCatalog.tscn" id="4_empty"]
+[ext_resource type="PackedScene" path="res://scenes/geoscape/research/ResearchRoom.tscn" id="5_room"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
+bg_color = Color(0.065, 0.09, 0.13, 0.94)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.24, 0.4, 0.48, 0.9)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_left = 12
+corner_radius_bottom_right = 12
 
 [node name="ResearchView" instance=ExtResource("1_base") node_paths=PackedStringArray("BackButton")]
 script = ExtResource("2_script")
-BackButton = NodePath("Content/Margin/Layout/Footer/BackButton")
+BackButton = NodePath("BackButton")
+ProjectButtonScene = ExtResource("3_row")
+EmptyCatalogScene = ExtResource("4_empty")
 
-[node name="Content" type="PanelContainer" parent="."]
-theme_override_styles/panel = ExtResource("3_background")
+[node name="Background" parent="." index="0"]
+visible = true
+
+[node name="Viewport" parent="Background" index="0"]
+transparent_bg = false
+handle_input_locally = false
+physics_object_picking = false
+
+[node name="ResearchRoom" parent="Background/Viewport" instance=ExtResource("5_room")]
+
+[node name="Header" type="HBoxContainer" parent="."]
 layout_mode = 1
-anchors_preset = 15
 anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 52.0
+mouse_filter = 2
 
-[node name="Margin" type="MarginContainer" parent="Content"]
-layout_mode = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 16
-
-[node name="Layout" type="VBoxContainer" parent="Content/Margin"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="Header" type="HBoxContainer" parent="Content/Margin/Layout"]
-layout_mode = 2
-
-[node name="Title" type="Label" parent="Content/Margin/Layout/Header"]
+[node name="Title" type="Label" parent="Header"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 24
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
 text = "RESEARCH"
 
-[node name="PauseHint" type="Label" parent="Content/Margin/Layout/Header"]
+[node name="PauseHint" type="Label" parent="Header"]
 layout_mode = 2
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
 text = "Time paused while browsing"
 
-[node name="Body" type="HBoxContainer" parent="Content/Margin/Layout"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 16
+[node name="ResearchPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_left = 0.54
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 72.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBox_panel")
 
-[node name="Catalog" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
+[node name="Margin" type="MarginContainer" parent="ResearchPanel"]
 layout_mode = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 1.0
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Layout" type="VBoxContainer" parent="ResearchPanel/Margin"]
+layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="CatalogTitle" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
+[node name="CatalogTitle" type="Label" parent="ResearchPanel/Margin/Layout"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.64, 0.8, 0.87, 1)
 text = "AVAILABLE PROJECTS"
 
-[node name="CatalogHint" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
-layout_mode = 2
-text = "Select a project"
-
-[node name="ProjectsScroll" type="ScrollContainer" parent="Content/Margin/Layout/Body/Catalog"]
+[node name="ProjectsScroll" type="ScrollContainer" parent="ResearchPanel/Margin/Layout"]
+custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+size_flags_stretch_ratio = 0.7
 horizontal_scroll_mode = 0
 follow_focus = true
 
-[node name="ResearchProjects" type="VBoxContainer" parent="Content/Margin/Layout/Body/Catalog/ProjectsScroll"]
+[node name="ResearchProjects" type="VBoxContainer" parent="ResearchPanel/Margin/Layout/ProjectsScroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 6
 
-[node name="ProjectDivider" type="HSeparator" parent="Content/Margin/Layout/Body/Catalog"]
+[node name="DetailsDivider" type="HSeparator" parent="ResearchPanel/Margin/Layout"]
 layout_mode = 2
 
-[node name="ProjectTitle" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
-layout_mode = 2
-text = "CURRENT PROJECT"
-
-[node name="ActiveJob" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "No active research."
-autowrap_mode = 3
-
-[node name="ProjectHint" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
-layout_mode = 2
-text = "One project at a time.\nProjects advance on the map."
-autowrap_mode = 3
-
-[node name="Details" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-size_flags_stretch_ratio = 1.3
-theme_override_constants/separation = 8
-
-[node name="DetailsScroll" type="ScrollContainer" parent="Content/Margin/Layout/Body/Details"]
+[node name="DetailsScroll" type="ScrollContainer" parent="ResearchPanel/Margin/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
+size_flags_stretch_ratio = 1.8
 horizontal_scroll_mode = 0
 follow_focus = true
 
-[node name="Text" type="VBoxContainer" parent="Content/Margin/Layout/Body/Details/DetailsScroll"]
+[node name="Text" type="VBoxContainer" parent="ResearchPanel/Margin/Layout/DetailsScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 12
 
-[node name="ProjectName" type="Label" parent="Content/Margin/Layout/Body/Details/DetailsScroll/Text"]
+[node name="ProjectName" type="Label" parent="ResearchPanel/Margin/Layout/DetailsScroll/Text"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 text = "Select a project to research."
 autowrap_mode = 3
 
-[node name="ProjectDescription" type="Label" parent="Content/Margin/Layout/Body/Details/DetailsScroll/Text"]
+[node name="ProjectDescription" type="Label" parent="ResearchPanel/Margin/Layout/DetailsScroll/Text"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="ResearchDuration" type="Label" parent="Content/Margin/Layout/Body/Details/DetailsScroll/Text"]
+[node name="ResearchDuration" type="Label" parent="ResearchPanel/Margin/Layout/DetailsScroll/Text"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="ManufacturingUnlocks" type="Label" parent="Content/Margin/Layout/Body/Details/DetailsScroll/Text"]
+[node name="ManufacturingUnlocks" type="Label" parent="ResearchPanel/Margin/Layout/DetailsScroll/Text"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="StartResearchButton" type="Button" parent="Content/Margin/Layout/Body/Details"]
+[node name="ProjectDivider" type="HSeparator" parent="ResearchPanel/Margin/Layout"]
+layout_mode = 2
+
+[node name="ProjectTitle" type="Label" parent="ResearchPanel/Margin/Layout"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.64, 0.8, 0.87, 1)
+text = "CURRENT PROJECT"
+
+[node name="ActiveJob" type="Label" parent="ResearchPanel/Margin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "No active research."
+autowrap_mode = 3
+
+[node name="SwitchHint" type="Label" parent="ResearchPanel/Margin/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.76, 0.54, 1)
+text = "Switching projects discards current progress."
+autowrap_mode = 3
+
+[node name="StartResearchButton" type="Button" parent="ResearchPanel/Margin/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 disabled = true
 text = "Start Research"
 
-[node name="Status" type="Label" parent="Content/Margin/Layout/Body/Details"]
+[node name="Status" type="Label" parent="ResearchPanel/Margin/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="Footer" type="HBoxContainer" parent="Content/Margin/Layout"]
-layout_mode = 2
-
-[node name="BackButton" type="Button" parent="Content/Margin/Layout/Footer"]
+[node name="BackButton" type="Button" parent="."]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 36)
-layout_mode = 2
+layout_mode = 1
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -52.0
+offset_right = 166.0
+offset_bottom = -16.0
+grow_vertical = 0
 text = "Back to Geoscape"

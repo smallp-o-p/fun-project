@@ -31,7 +31,7 @@ public class ResearchViewTest
   }
 
   [TestCase]
-  public async Task RefreshAndStartUseCampaignTruth()
+  public async Task RefreshAndStartOrSwitchUseCampaignTruth()
   {
     await using var cleanup = new DeferredNodeCleanup();
     bool unlocked = true;
@@ -74,6 +74,16 @@ public class ResearchViewTest
     campaign.AdvanceTicks(1);
     view.Present(campaign.State, campaign.Session);
     Assert.True(view.GetNode<Label>("%ActiveJob").Text.Contains("23h 59m"));
+    unlocked = true;
+    view.Present(campaign.State, campaign.Session);
+    OnlyChild<Button>(rows).EmitSignal(Button.SignalName.Pressed);
+    Assert.False(start.Disabled);
+    Assert.Equal("Switch Research", start.Text);
+    start.EmitSignal(Button.SignalName.Pressed);
+    Assert.Equal(2, campaign.Events.EventsOf<ResearchStarted>().Length);
+    Assert.True(campaign.Session.ActiveResearch.Match(job => ReferenceEquals(job.Project, first), () => false));
+    Assert.Equal("Kit", OnlyChild<Button>(rows).Text);
+    Assert.False(OnlyChild<Button>(rows).ButtonPressed);
   }
 
   [TestCase(800, 600)]
@@ -93,6 +103,12 @@ public class ResearchViewTest
     await WaitForLayout(view);
 
     var visible = new Rect2(0, 0, width, height);
+    var background = view.GetNode<SubViewportContainer>("Background");
+    Assert.True(background.Visible);
+    Assert.Equal(visible, ScreenRect(background));
+    var panel = view.GetNode<PanelContainer>("%ResearchPanel");
+    Assert.True(ScreenRect(panel).Position.X >= width * 0.5f);
+    Assert.True(visible.Encloses(ScreenRect(panel)));
     var start = view.GetNode<Button>("%StartResearchButton");
     var back = view.GetNode<Button>("%BackButton");
     Assert.True(visible.Encloses(ScreenRect(start)));

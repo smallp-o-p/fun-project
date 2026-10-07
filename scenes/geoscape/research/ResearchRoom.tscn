@@ -1,0 +1,148 @@
+[gd_scene load_steps=16 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/models/ZhuYuan/ZhuYuan.scn" id="1_character"]
+
+[sub_resource type="Environment" id="Environment_room"]
+background_mode = 1
+background_color = Color(0.035, 0.055, 0.08, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.72, 0.82, 1, 1)
+ambient_light_energy = 0.65
+reflected_light_source = 2
+
+[sub_resource type="StandardMaterial3D" id="Material_wall"]
+albedo_color = Color(0.10, 0.15, 0.19, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="Material_floor"]
+albedo_color = Color(0.13, 0.19, 0.23, 1)
+roughness = 0.65
+
+[sub_resource type="StandardMaterial3D" id="Material_desk"]
+albedo_color = Color(0.23, 0.30, 0.34, 1)
+metallic = 0.5
+roughness = 0.55
+
+[sub_resource type="StandardMaterial3D" id="Material_light"]
+shading_mode = 0
+albedo_color = Color(0.35, 0.78, 0.9, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_wall"]
+material = SubResource("Material_wall")
+size = Vector3(12, 4, 0.2)
+
+[sub_resource type="BoxMesh" id="Mesh_floor"]
+material = SubResource("Material_floor")
+size = Vector3(12, 0.15, 6)
+
+[sub_resource type="BoxMesh" id="Mesh_desk"]
+material = SubResource("Material_desk")
+size = Vector3(2.4, 0.12, 0.7)
+
+[sub_resource type="BoxMesh" id="Mesh_support"]
+material = SubResource("Material_desk")
+size = Vector3(0.2, 0.75, 0.55)
+
+[sub_resource type="BoxMesh" id="Mesh_light"]
+material = SubResource("Material_light")
+size = Vector3(2.4, 0.025, 0.04)
+
+[sub_resource type="StandardMaterial3D" id="Material_display"]
+shading_mode = 0
+albedo_color = Color(0.07, 0.28, 0.36, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_monitor"]
+material = SubResource("Material_desk")
+size = Vector3(0.65, 0.42, 0.055)
+
+[sub_resource type="BoxMesh" id="Mesh_display"]
+material = SubResource("Material_display")
+size = Vector3(0.59, 0.35, 0.016)
+
+[sub_resource type="CylinderMesh" id="Mesh_sample"]
+material = SubResource("Material_desk")
+top_radius = 0.065
+bottom_radius = 0.065
+height = 0.18
+
+[node name="ResearchRoom" type="Node3D"]
+
+[node name="Camera" type="Camera3D" parent="."]
+position = Vector3(0.15, 1.15, 5)
+projection = 1
+current = true
+size = 2.8
+near = 0.05
+far = 30.0
+
+[node name="Environment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_room")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-25, -30, 0)
+light_color = Color(0.9, 0.94, 1, 1)
+light_energy = 1.2
+
+[node name="FillLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-10, 140, 0)
+light_color = Color(0.5, 0.76, 0.9, 1)
+light_energy = 0.7
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.075, 0)
+mesh = SubResource("Mesh_floor")
+
+[node name="BackWall" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.7, -1.1)
+mesh = SubResource("Mesh_wall")
+
+[node name="Desk" type="Node3D" parent="."]
+position = Vector3(0.1, 0, -0.45)
+
+[node name="Top" type="MeshInstance3D" parent="Desk"]
+position = Vector3(0, 0.8, 0)
+mesh = SubResource("Mesh_desk")
+
+[node name="LeftSupport" type="MeshInstance3D" parent="Desk"]
+position = Vector3(-0.95, 0.375, 0)
+mesh = SubResource("Mesh_support")
+
+[node name="RightSupport" type="MeshInstance3D" parent="Desk"]
+position = Vector3(0.95, 0.375, 0)
+mesh = SubResource("Mesh_support")
+
+[node name="DeskLight" type="MeshInstance3D" parent="Desk"]
+position = Vector3(0, 0.84, 0.34)
+mesh = SubResource("Mesh_light")
+
+[node name="WallLight" type="MeshInstance3D" parent="."]
+position = Vector3(-1.25, 2.05, -0.98)
+mesh = SubResource("Mesh_light")
+
+[node name="Monitor" type="Node3D" parent="Desk"]
+position = Vector3(-1.05, 1.16, -0.1)
+
+[node name="Body" type="MeshInstance3D" parent="Desk/Monitor"]
+mesh = SubResource("Mesh_monitor")
+
+[node name="Display" type="MeshInstance3D" parent="Desk/Monitor"]
+position = Vector3(0, 0, 0.04)
+mesh = SubResource("Mesh_display")
+
+[node name="Stand" type="MeshInstance3D" parent="Desk/Monitor"]
+position = Vector3(0, -0.22, 0)
+scale = Vector3(0.6, 0.18, 0.5)
+mesh = SubResource("Mesh_support")
+
+[node name="SampleA" type="MeshInstance3D" parent="Desk"]
+position = Vector3(0.2, 0.95, 0.1)
+mesh = SubResource("Mesh_sample")
+
+[node name="SampleB" type="MeshInstance3D" parent="Desk"]
+position = Vector3(0.4, 0.95, 0.1)
+mesh = SubResource("Mesh_sample")
+
+[node name="Character" parent="." instance=ExtResource("1_character")]
+position = Vector3(-0.75, 0, 0.25)
+rotation_degrees = Vector3(0, -12, 0)
+AttachmentsVisible = false

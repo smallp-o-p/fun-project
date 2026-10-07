@@ -69,7 +69,8 @@ public sealed class ResearchState
     ArgumentNullException.ThrowIfNull(project);
     ArgumentNullException.ThrowIfNull(state);
     if (!_byProject.TryGetValue(project, out var definition)) return ResearchStartFailure.UnknownProject;
-    if (ActiveJob.IsSome) return ResearchStartFailure.Busy;
+    if (ActiveJob.Case is ResearchJob active && ReferenceEquals(active.Project, project))
+      return ResearchStartFailure.Busy;
     if (_completedProjects.Contains(project)) return ResearchStartFailure.AlreadyCompleted;
     if (!definition.Condition.IsMet(state)) return ResearchStartFailure.Locked;
     return definition;
