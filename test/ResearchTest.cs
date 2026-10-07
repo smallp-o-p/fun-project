@@ -118,16 +118,57 @@ public class ResearchTest
     session.StartResearch(active).RequireRight();
     var job = session.ActiveResearch;
     campaign.ClearEvents();
-    Assert.Equal(ResearchStartFailure.UnknownProject, session.StartResearch(MakeResearch("Active")).RequireLeft());
-    Assert.Equal(ResearchStartFailure.Busy, session.StartResearch(active).RequireLeft());
-    Assert.Equal(ResearchStartFailure.Busy, session.StartResearch(completed).RequireLeft());
-    Assert.Equal(ResearchStartFailure.Busy, session.StartResearch(locked).RequireLeft());
-    Assert.Equal(job, session.ActiveResearch);
+    (ResearchProject Project, ResearchStartFailure Failure)[] requests =
+    [
+      (MakeResearch("Active"), ResearchStartFailure.UnknownProject),
+      (active, ResearchStartFailure.Busy),
+      (completed, ResearchStartFailure.AlreadyCompleted),
+      (locked, ResearchStartFailure.Locked),
+    ];
+    foreach (var (project, failure) in requests)
+    {
+      Assert.Equal(failure, session.StartResearch(project).RequireLeft());
+      Assert.Equal(job, session.ActiveResearch);
+      Assert.Equal(0, campaign.Events.Count);
+    }
     Assert.True(campaign.State.Research.IsCompleted(completed));
     Assert.False(campaign.State.Research.IsCompleted(active));
     Assert.False(campaign.State.Research.IsCompleted(locked));
-    Assert.Equal(0, campaign.Events.Count);
     Assert.Equal(0, campaign.State.Armory.ItemStock().Count);
+  }
+
+  [TestCase]
+  public void SwitchingDiscardsProgressAndOnlyTheReplacementCanComplete()
+  {
+    var firstItem = MakeItemData("First reward");
+    var secondItem = MakeItemData("Second reward");
+    var first = MakeResearch("First", manufacturingUnlocks: [firstItem]);
+    var second = MakeResearch("Second", days: 2, manufacturingUnlocks: [secondItem]);
+    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [first, second]));
+    var session = campaign.Session;
+    session.StartResearch(first).RequireRight();
+    campaign.AdvanceTicks(100);
+    var replacement = session.StartResearch(second).RequireRight();
+    Assert.Equal(100L, replacement.StartedAtTick);
+    Assert.Equal(2980L, replacement.CompletesAtTick);
+    Assert.Equal(Some(replacement), session.ActiveResearch);
+    Assert.Equal(first, session.GetAvailableResearchProjects()[0]);
+    campaign.AdvanceTicks(1340);
+    Assert.Equal(0, campaign.Events.EventsOf<ResearchCompleted>().Length);
+    Assert.Equal(0, session.GetManufacturingOptions().Count);
+
+    var restarted = session.StartResearch(first).RequireRight();
+    Assert.Equal(1440L, restarted.StartedAtTick);
+    Assert.Equal(2880L, restarted.CompletesAtTick);
+    campaign.AdvanceTicks(1439);
+    Assert.Equal(Some(restarted), session.ActiveResearch);
+    campaign.AdvanceTicks(101);
+    Assert.Equal(restarted, campaign.Events.SingleEvent<ResearchCompleted>().Job);
+    Assert.True(campaign.State.Research.IsCompleted(first));
+    Assert.False(campaign.State.Research.IsCompleted(second));
+    Assert.Equal(firstItem, session.GetManufacturingOptions().AsValueEnumerable().Single().Project.Item);
+    Assert.Equal(0, campaign.State.Armory.ItemStock().Count);
+    Assert.Equal(3, campaign.Events.EventsOf<ResearchStarted>().Length);
   }
 
   [TestCase]
@@ -203,7 +244,8 @@ public class ResearchTest
   public void DeadlineOverflowOccursBeforeStartingAndExactMaximumDeadlineIsSupported()
   {
     var project = MakeResearch();
-    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project]));
+    var replacement = MakeResearch("Replacement");
+    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project, replacement]));
     campaign.State.Tick = long.MaxValue;
     Assert.Throws<OverflowException>(() => campaign.Session.StartResearch(project));
     Assert.True(campaign.Session.ActiveResearch.IsNone);
@@ -211,6 +253,11 @@ public class ResearchTest
     campaign.State.Tick = long.MaxValue - 1440;
     var job = campaign.Session.StartResearch(project).RequireRight();
     Assert.Equal(long.MaxValue, job.CompletesAtTick);
+    campaign.State.Tick = long.MaxValue;
+    campaign.ClearEvents();
+    Assert.Throws<OverflowException>(() => campaign.Session.StartResearch(replacement));
+    Assert.Equal(Some(job), campaign.Session.ActiveResearch);
+    Assert.Equal(0, campaign.Events.Count);
     Assert.True(campaign.State.Research.CompleteIfDue(long.MaxValue - 1).IsNone);
     Assert.Equal(job, campaign.State.Research.CompleteIfDue(long.MaxValue).RequireSome().Job);
   }

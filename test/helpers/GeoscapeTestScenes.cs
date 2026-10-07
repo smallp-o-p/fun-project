@@ -114,6 +114,9 @@ internal static partial class GeoscapeTestScenes
     return scene;
   }
 
+  public static GeoscapeScene CreateDebugGeoscapeScene()
+    => GD.Load<PackedScene>("res://scenes/debug/DebugGeoscape.tscn").Instantiate<GeoscapeScene>();
+
   public static UnitView CreateUnitView()
     => GD.Load<PackedScene>("res://scenes/geoscape/units/UnitView.tscn").Instantiate<UnitView>();
 
@@ -135,6 +138,10 @@ internal static partial class GeoscapeTestScenes
   public static EngineeringView CreateEngineeringView()
     => GD.Load<PackedScene>("res://scenes/geoscape/engineering/EngineeringView.tscn")
       .Instantiate<EngineeringView>();
+
+  public static ResearchView CreateResearchView()
+    => GD.Load<PackedScene>("res://scenes/geoscape/research/ResearchView.tscn")
+      .Instantiate<ResearchView>();
 
   public static GeoscapeEventResolution CreateResolutionView()
     => GD.Load<PackedScene>("res://scenes/geoscape/resolutions/GeoscapeEventResolution.tscn")

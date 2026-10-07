@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using FunProject.Geoscape;
 using GdUnit4;
 using Godot;
 using static FunProject.Tests.GeoscapeTestScenes;
@@ -11,19 +12,27 @@ public class GeoscapeProjectsIntegrationTest
     => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Button>("%EngineeringButton")
       .EmitSignal(Button.SignalName.Pressed);
 
+  private static void PressResearchButton(GeoscapeScene scene)
+    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Button>("%ResearchButton")
+      .EmitSignal(Button.SignalName.Pressed);
+
   // Synchronous tests: automatic frames cannot race manual clock steps. Completion paths
   // use visible actions; rejection paths supply snapshots through the public view contract.
   // The authored scenes supply bindings and layout; manual clock assertions run
   // synchronously, and async tests await layout/deletion boundaries.
   // A hosted view must stay in viewport pixels when the map camera moves or zooms.
-  [TestCase]
-  public async Task ProjectControlsStayInViewportWhenCameraMovesAndViewportResizes()
+  [TestCase(false)]
+  [TestCase(true)]
+  public async Task ProjectControlsStayInViewportWhenCameraMovesAndViewportResizes(bool research)
   {
     var scene = CreateGeoscapeScene(MakeStart());
     var viewport = CreateUiViewport(scene, new Vector2I(1600, 900));
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
-    PressEngineeringButton(scene);
-    var view = (EngineeringView)manager.Current;
+    if (research)
+      PressResearchButton(scene);
+    else
+      PressEngineeringButton(scene);
+    var view = manager.Current;
     await WaitForLayout(scene);
     Assert.Equal(new Rect2(0, 0, 1600, 900), ScreenRect(view));
 
@@ -45,7 +54,37 @@ public class GeoscapeProjectsIntegrationTest
     Assert.False(GodotObject.IsInstanceValid(view));
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
     Assert.True(scene.GetNode<GeoscapeMapControl>("%Map").IsVisibleInTree());
-    Assert.True(scene.GetNode<GeoscapeHud>("%GeoscapeHud").IsVisibleInTree());
+    var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
+    Assert.True(hud.IsVisibleInTree());
+    Assert.True(visible.Encloses(ScreenRect(hud.GetNode<Button>("%ResearchButton"))));
+    Assert.True(visible.Encloses(ScreenRect(hud.GetNode<Label>("%EngineeringProgress"))));
+  }
+
+  [TestCase]
+  public async Task ReopeningResearchShowsProgressAndEngineeringUnlock()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var scene = AddToTree(CreateDebugGeoscapeScene());
+    var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
+    PressResearchButton(scene);
+    var research = (ResearchView)manager.Current;
+    OnlyChild<Button>(research.GetNode<VBoxContainer>("%ResearchProjects"))
+      .EmitSignal(Button.SignalName.Pressed);
+    research.GetNode<Button>("%StartResearchButton").EmitSignal(Button.SignalName.Pressed);
+    research.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
+    SpeedButton(scene).EmitSignal(Button.SignalName.Pressed);
+    for (int i = 0; i < 1439; i++)
+      scene._PhysicsProcess(0.02);
+
+    PressResearchButton(scene);
+    var reopened = (ResearchView)manager.Current;
+    Assert.Equal("Research: Prototype Kit Research - 1m remaining", reopened.GetNode<Label>("%ActiveJob").Text);
+    reopened.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
+    scene._PhysicsProcess(0.02);
+    PressEngineeringButton(scene);
+    var engineering = (EngineeringView)manager.Current;
+    Assert.True(engineering.GetNode<VBoxContainer>("%ManufacturableItems").GetChildren()
+      .AsValueEnumerable().OfType<Button>().Any(button => button.Text == "Prototype Kit"));
   }
 
   [TestCase]
