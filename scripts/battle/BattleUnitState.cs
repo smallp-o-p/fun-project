@@ -22,11 +22,21 @@ public sealed class BattleUnitState
     EquippedArmor.IfSome(armor => armor.Item.BindBattleAccess(access));
     foreach (var item in _inventory) item.BindBattleAccess(access);
     foreach (var status in _activeStatusEffects.Values) status.BindBattleAccess(access);
+    PrepareStatInputs();
   }
   internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
 
   private readonly List<EquippableItem> _inventory;
   private readonly StatMod[] _loadoutStatMods;
+  private BattleStatInputs? _statInputs;
+  internal void PrepareStatInputs()
+  {
+    _battleAccess.RequireMutation();
+    _statInputs = BattleStatInputs.Capture(Combatant.CopyBaseValues(),
+      Combatant.StatContributions().AsValueEnumerable().Concat(_loadoutStatMods)
+        .Concat(EquippedWeapon.Match<IEnumerable<StatMod>>(weapon => weapon.StatContributions, () => []))
+        .ToArray(), Buffs);
+  }
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _spottedUnits = [];
@@ -81,14 +91,19 @@ public sealed class BattleUnitState
   public IReadOnlyCollection<ActiveStatusEffect> ActiveStatusEffects { get { _battleAccess.RequireRead(); return _activeStatusEffects.Values.AsValueEnumerable().ToArray(); } }
   public bool IsImmobilized { get { _battleAccess.RequireRead(); return _activeStatusEffects.Values.AsValueEnumerable().Any(effect => !effect.IsExpired && effect.BlocksAction); } }
   public IReadOnlyList<Buff> Buffs
-    { get { _battleAccess.RequireRead(); return _buffs.AsValueEnumerable().Select(entry => entry.Buff).ToArray(); } }
+  { get { _battleAccess.RequireRead(); return _buffs.AsValueEnumerable().Select(entry => entry.Buff).ToArray(); } }
 
   public IEnumerable<Buff> ActiveBuffs
-    { get { _battleAccess.RequireRead(); return _buffs.AsValueEnumerable().Where(entry => entry.IsActive)
-      .Select(entry => entry.Buff).ToArray(); } }
+  {
+    get
+    {
+      _battleAccess.RequireRead(); return _buffs.AsValueEnumerable().Where(entry => entry.IsActive)
+    .Select(entry => entry.Buff).ToArray();
+    }
+  }
 
   internal IEnumerable<DamageBundleMod> ActiveBuffDamageMods
-    { get { _battleAccess.RequireRead(); return ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.DamageMods).ToArray(); } }
+  { get { _battleAccess.RequireRead(); return ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.DamageMods).ToArray(); } }
 
   internal BattleUnitState(
     int unitId,
@@ -273,10 +288,14 @@ public sealed class BattleUnitState
   public bool CanAct() { _battleAccess.RequireRead(); return CurrentActionPoints > 0 && !IsIncapacitated; }
 
   public float EffectiveStat<TStat>() where TStat : Stat
-    { _battleAccess.RequireRead(); return Combatant.Resolve<TStat>(GatherStatContributions()); }
+  { _battleAccess.RequireRead(); return TryEffectiveStat<TStat>().IfNone(0f); }
 
   public Option<float> TryEffectiveStat<TStat>() where TStat : Stat
-    { _battleAccess.RequireRead(); return Combatant.TryResolve<TStat>(GatherStatContributions()); }
+  {
+    _battleAccess.RequireRead(); return _battleAccess.Guard is null
+    ? Combatant.TryResolve<TStat>(GatherStatContributions())
+    : (_statInputs ?? throw new InvalidOperationException("Bound unit inputs are not prepared.")).TryResolve<TStat>(ActiveBuffs);
+  }
 
   private IEnumerable<StatMod> GatherStatContributions()
     => Combatant.StatContributions()

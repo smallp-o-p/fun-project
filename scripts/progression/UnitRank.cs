@@ -36,8 +36,18 @@ public sealed class UnitRank
     _table = table;
   }
 
-  public int Level { get; private set; } = 1;
-  public int Xp { get; private set; }
+  private int _level = 1;
+  public int Level
+  {
+    get { _battleAccess.RequireRead(); return _level; }
+    private set { _battleAccess.RequireMutation(); _level = value; }
+  }
+  private int _xp;
+  public int Xp
+  {
+    get { _battleAccess.RequireRead(); return _xp; }
+    private set { _battleAccess.RequireMutation(); _xp = value; }
+  }
 
   public string RankName => _table.Levels[Level - 1].Name;
   public bool IsMaxLevel => Level == _table.Levels.Count;
@@ -64,6 +74,7 @@ public sealed class UnitRank
 
     if (IsMaxLevel)
       Xp = 0;
+    _battleAccess.Guard?.NotifyStatSourcesChanged();
   }
 
   /// <summary>Permanent stat mods from held rungs, folding into stat contributions.</summary>

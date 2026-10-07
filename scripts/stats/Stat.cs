@@ -9,6 +9,8 @@ public abstract partial class Stat : Resource
   [Export] public int BaseValue { get; set; } = 0;
 }
 
+public readonly record struct StatModifierValue(ModifierOperation Operation, float Value);
+
 public interface HasStats
 {
   Option<TStat> TryGetStat<TStat>() where TStat : Stat;
@@ -20,6 +22,10 @@ public interface HasStats
   /// clamp. Pure arithmetic — independent of any stat owner.
   /// </summary>
   public static float Fold(float baseValue, IEnumerable<StatModifier> modifiers)
+    => Fold(baseValue, modifiers.AsValueEnumerable().Select(modifier =>
+      new StatModifierValue(modifier.Operation, modifier.Value)).ToArray());
+
+  public static float Fold(float baseValue, IEnumerable<StatModifierValue> modifiers)
   {
     float flat = 0f;
     float percentAdd = 0f;
@@ -28,7 +34,7 @@ public interface HasStats
     float? max = null;
     float? over = null;
 
-    foreach (StatModifier modifier in modifiers)
+    foreach (StatModifierValue modifier in modifiers)
     {
       switch (modifier.Operation)
       {

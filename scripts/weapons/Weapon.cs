@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using FunProject.Items;
+using FunProject.Battle;
 using FunProject.Stats;
 
 namespace FunProject.Weapons;
@@ -10,6 +11,19 @@ public class Weapon : EquippableItem, HasStats
 {
   protected readonly StatSheet _stats;
   protected readonly WeaponFrameData _frame;
+  private BattleStatInputs? _statInputs;
+  protected int PreparedPacketCount { get; private set; }
+  internal override void BindBattleAccess(BattleAccessGuard access)
+  {
+    base.BindBattleAccess(access);
+    PrepareStatInputs();
+  }
+  internal void PrepareStatInputs()
+  {
+    _battleAccess.RequireMutation();
+    PreparedPacketCount = _frame.Packets.Count;
+    _statInputs = BattleStatInputs.Capture(_stats.CopyBaseValues(), StatContributions.AsValueEnumerable().ToArray(), []);
+  }
 
   public Weapon(WeaponData data) : base(data)
   {
@@ -80,13 +94,16 @@ public class Weapon : EquippableItem, HasStats
   public virtual bool CanReload() => false;
 
   public float EffectiveStat<TStat>() where TStat : Stat
-  { _battleAccess.RequireRead(); return this.Resolve<TStat>(StatContributions); }
+  {
+    _battleAccess.RequireRead(); return _battleAccess.Guard is null ? this.Resolve<TStat>(StatContributions)
+      : (_statInputs ?? throw new InvalidOperationException("Bound weapon inputs are not prepared.")).TryResolve<TStat>([]).IfNone(0f);
+  }
 
   public int EffectiveRange => Mathf.RoundToInt(EffectiveStat<RangeStat>());
 
   /// <summary>StatMods this weapon contributes to resolution; override to add more (e.g. ammunition).</summary>
   public virtual IEnumerable<StatMod> StatContributions
-  { get { _battleAccess.RequireRead(); return this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).ToArray(); } }
+  { get { _battleAccess.RequireRead(); _battleAccess.Guard?.RequireHostThread(); return this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).ToArray(); } }
 
   /// <summary>
   /// DamageBundleMods this weapon contributes to every emission, folded before any external
@@ -125,7 +142,7 @@ public class AmmunitionedWeapon : Weapon
   public int MagazineSize => Mathf.RoundToInt(EffectiveStat<AmmunitionStat>());
 
   // One shot spends one round per frame packet.
-  public int ShotCost => _frame.Packets.Count;
+  public int ShotCost { get { _battleAccess.RequireRead(); return _battleAccess.Guard is null ? _frame.Packets.Count : PreparedPacketCount; } }
 
   public override bool IsLoaded => !NeedsToReload();
 
@@ -154,13 +171,13 @@ public class FirearmWeapon(FirearmWeaponData data) : AmmunitionedWeapon(data)
   public FirearmArchetype Archetype
   {
     get { _battleAccess.RequireRead(); return _archetype; }
-    set { _battleAccess.RequireMutation(); _archetype = value; }
+    set { _battleAccess.RequireMutation(); _archetype = value; _battleAccess.Guard?.NotifyStatSourcesChanged(); }
   }
   private Option<Ammunition> _ammoType = Optional(data.DefaultAmmoData);
   public Option<Ammunition> AmmoType
   {
     get { _battleAccess.RequireRead(); return _ammoType; }
-    set { _battleAccess.RequireMutation(); _ammoType = value; }
+    set { _battleAccess.RequireMutation(); _ammoType = value; _battleAccess.Guard?.NotifyStatSourcesChanged(); }
   }
 
   protected override IEnumerable<DamageBundleMod> DamageContributions

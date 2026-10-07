@@ -12,7 +12,7 @@ public class ModSlotsCapability : ItemCapability
   {
     get
     {
-      _battleAccess.RequireRead();
+      _battleAccess.RequireRead(); _battleAccess.Guard?.RequireHostThread();
       return _battleAccess.Guard is null ? _slots : new Array<ModSlot>(_slots);
     }
   }

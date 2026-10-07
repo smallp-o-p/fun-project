@@ -23,7 +23,7 @@ public partial class ModSlot : Resource
   public Option<EquippableMod> EquippedMod
   {
     get { _battleAccess.RequireRead(); return _equippedMod; }
-    set { _battleAccess.RequireMutation(); _equippedMod = value; }
+    set { _battleAccess.RequireMutation(); _equippedMod = value; _battleAccess.Guard?.NotifyStatSourcesChanged(); }
   }
 
   public bool HasMod => EquippedMod.IsSome;

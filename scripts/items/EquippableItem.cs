@@ -61,7 +61,7 @@ public class EquippableItem : HasModSlots, HasNameAndDescription
 
   public Array<ModSlot> GetModSlots()
   {
-    _battleAccess.RequireRead(); return FindCapability<ModSlotsCapability>().Match(
+    _battleAccess.RequireRead(); _battleAccess.Guard?.RequireHostThread(); return FindCapability<ModSlotsCapability>().Match(
       capability => capability.Slots,
       () => new Array<ModSlot>());
   }

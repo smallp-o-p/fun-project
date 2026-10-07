@@ -22,7 +22,12 @@ public sealed class UnitProgression
   private readonly List<SkillPathData> _committedPaths = [];
   private readonly Dictionary<SkillPathData, int> _unlockedStepsByPath = [];
 
-  public int CurrencyPoints { get; private set; }
+  private int _currencyPoints;
+  public int CurrencyPoints
+  {
+    get { _battleAccess.RequireRead(); return _currencyPoints; }
+    private set { _battleAccess.RequireMutation(); _currencyPoints = value; }
+  }
   public IReadOnlyList<SkillPathData> CommittedPaths { get { _battleAccess.RequireRead(); return _committedPaths.AsReadOnly(); } }
 
   public void AwardPoints(int amount)
@@ -88,6 +93,7 @@ public sealed class UnitProgression
 
         CurrencyPoints -= next.Cost;
         _unlockedStepsByPath[path] += 1;
+        _battleAccess.Guard?.NotifyStatSourcesChanged();
         return Some(new UnlockedStep(path, next));
       },
       None: () => Option<UnlockedStep>.None);

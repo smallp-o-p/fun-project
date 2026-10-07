@@ -14,6 +14,9 @@ internal sealed class BattleAccessGuard
   private bool _executing;
   private bool _disposed;
   private readonly SysColGeneric.HashSet<BattleAccessBinding> _sharedBindings = [];
+  private Action _statSourcesChanged = delegate { };
+  internal void SetStatSourcesChanged(Action refresh) { RequireMutationAccess(); _statSourcesChanged = refresh; }
+  internal void NotifyStatSourcesChanged() { RequireMutationAccess(); _statSourcesChanged(); }
   internal long Revision { get; private set; }
   internal bool IsClosing => Volatile.Read(ref _closing) != 0;
   internal bool IsOwned => Monitor.IsEntered(_gate);
@@ -123,6 +126,7 @@ internal sealed class BattleAccessGuard
     RequireDrainAccess();
     foreach (var binding in _sharedBindings) binding.Unbind(this);
     _sharedBindings.Clear();
+    _statSourcesChanged = delegate { };
   }
 }
 

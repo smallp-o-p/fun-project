@@ -101,6 +101,8 @@ public class Combatant : HasStats, HasModSlots
     MaxInventorySize = data.InventorySize;
   }
 
+  internal IReadOnlyDictionary<Type, float> CopyBaseValues() => _stats.CopyBaseValues();
+
   public Option<TStat> TryGetStat<TStat>() where TStat : Stat => _stats.TryGetStat<TStat>();
 
   public TStat GetStat<TStat>() where TStat : Stat => _stats.GetStat<TStat>();
@@ -108,6 +110,7 @@ public class Combatant : HasStats, HasModSlots
   public Godot.Collections.Array<ModSlot> GetModSlots()
   {
     _battleAccess.RequireRead();
+    _battleAccess.Guard?.RequireHostThread();
     return _battleAccess.Guard is null ? _modSlots : new Godot.Collections.Array<ModSlot>(_modSlots);
   }
 

@@ -26,6 +26,17 @@ public sealed class BattleSession
     foreach (var obj in _objects) obj.BindBattleAccess(access);
     foreach (var list in _objectives.Values)
       foreach (var objective in list) objective.BindBattleAccess(access);
+    access.SetStatSourcesChanged(RefreshStatInputs);
+  }
+  private void RefreshStatInputs()
+  {
+    RequireMutationAccess();
+    var weapons = new SysColGeneric.HashSet<Weapon>(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    foreach (var unit in _units)
+      unit.EquippedWeapon.IfSome(weapon => { if (weapons.Add(weapon)) weapon.PrepareStatInputs(); });
+    foreach (var unit in _units) unit.PrepareStatInputs();
+    ActionOptions.InvalidateAll();
+    InvalidateVisibility();
   }
   internal void RequireReadAccess() => Access?.RequireReadAccess();
   internal void RequireMutationAccess() => Access?.RequireMutationAccess();
