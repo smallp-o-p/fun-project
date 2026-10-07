@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FunProject.Currencies;
 using FunProject.GameState;
 using FunProject.Items;
 using FunProject.Strategic;
@@ -18,31 +19,41 @@ public sealed class EngineeringState
   }
 
   // Registers unseen item references, baking duration and stock policy at first registration.
-  // Validate the whole batch first so null input never leaves a partial registry update.
+  // Parse the whole batch before changing the registry, including costs of unseen recipes.
   internal void Unlock(IReadOnlyList<EquippableItemData> items)
   {
     ArgumentNullException.ThrowIfNull(items);
     foreach (var item in items)
       ArgumentNullException.ThrowIfNull(item);
 
+    var pending = new List<ManufacturingProject>();
+    var seen = new SysColGeneric.HashSet<EquippableItemData>(ReferenceEqualityComparer.Instance);
     foreach (var item in items)
     {
-      if (_projectsByItem.ContainsKey(item)) continue;
-      var project = new ManufacturingProject(item, item.ManufacturingDurationDays, item.UnlimitedStock);
-      _projectsByItem.Add(item, project);
+      if (_projectsByItem.ContainsKey(item) || !seen.Add(item)) continue;
+      var project = new ManufacturingProject(item, item.ManufacturingDurationDays, item.UnlimitedStock,
+        CurrencyCosts.Capture(item.ManufacturingCosts));
+      pending.Add(project);
+    }
+    foreach (var project in pending)
+    {
+      _projectsByItem.Add(project.Item, project);
       _projects.Add(project);
     }
   }
 
   public Option<ManufacturingJob> ActiveJob { get; private set; }
 
-  public IReadOnlyList<ManufacturingOption> GetManufacturingOptions(Armory armory)
+  public IReadOnlyList<ManufacturingOption> GetManufacturingOptions(Armory armory,
+    IReadOnlyDictionary<Currency, long> balances)
   {
     ArgumentNullException.ThrowIfNull(armory);
+    ArgumentNullException.ThrowIfNull(balances);
     return _projects.AsValueEnumerable()
       .Where(project => !project.UnlimitedStock || armory.TryGetItemStock(project.Item).IsNone)
       .Select(project => new ManufacturingOption(project,
-        armory.TryGetItemStock(project.Item).Match(stock => stock.Remaining, () => 0)))
+        armory.TryGetItemStock(project.Item).Match(stock => stock.Remaining, () => 0),
+        CurrencyCosts.Shortfalls(project.Costs, balances)))
       .ToImmutableList();
   }
 

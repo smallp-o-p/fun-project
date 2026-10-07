@@ -1,4 +1,5 @@
 using FunProject.Core;
+using FunProject.Currencies;
 using FunProject.Items;
 using Godot;
 
@@ -17,4 +18,6 @@ public partial class ResearchProject : NamedEntityData
   [Export] public required ResearchCondition Condition { get; set; }
 
   [Export] public EquippableItemData[] ManufacturingUnlocks { get; set; } = [];
+
+  [Export] public Godot.Collections.Dictionary<Currency, long> Costs { get; set; } = [];
 }

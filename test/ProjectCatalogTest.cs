@@ -13,7 +13,7 @@ public class ProjectCatalogTest
   {
     var item = MakeItemData(manufacturingDays: days);
     using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
-    Assert.Equal(days, campaign.State.Engineering.GetManufacturingOptions(campaign.State.Armory)[0].Project.DurationDays);
+    Assert.Equal(days, campaign.State.Engineering.GetManufacturingOptions(campaign.State.Armory, campaign.State.Currencies)[0].Project.DurationDays);
 
     campaign.AdvanceTicks(17);
     var job = campaign.Session.StartManufacturing(item).RequireRight();
@@ -38,7 +38,7 @@ public class ProjectCatalogTest
     var item = MakeItemData(manufacturingDays: 0);
     var state = new GameState(MakeStart(armory: [item]));
     Assert.True(state.Armory.HasAvailableItem(item));
-    Assert.Equal(0, state.Engineering.GetManufacturingOptions(state.Armory).Count);
+    Assert.Equal(0, state.Engineering.GetManufacturingOptions(state.Armory, state.Currencies).Count);
   }
 
   [TestCase]
@@ -56,7 +56,7 @@ public class ProjectCatalogTest
     var secondItem = MakeItemData();
     var state = new GameState(MakeStart(armory: [firstItem],
       manufacturableItems: [secondItem, firstItem]));
-    var options = state.Engineering.GetManufacturingOptions(state.Armory);
+    var options = state.Engineering.GetManufacturingOptions(state.Armory, state.Currencies);
     Assert.Equal(2, options.Count);
     Assert.Equal(secondItem, options[0].Project.Item);
     Assert.Equal(firstItem, options[1].Project.Item);
@@ -78,7 +78,7 @@ public class ProjectCatalogTest
     item.ManufacturingDurationDays = 0;
     item.UnlimitedStock = true;
 
-    var options = state.Engineering.GetManufacturingOptions(state.Armory);
+    var options = state.Engineering.GetManufacturingOptions(state.Armory, state.Currencies);
     Assert.Equal(item, options[0].Project.Item);
     Assert.Equal(2U, options[0].Project.DurationDays);
     Assert.False(options[0].Project.UnlimitedStock);

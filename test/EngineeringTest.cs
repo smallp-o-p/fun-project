@@ -1,6 +1,7 @@
 using System;
 using FunProject.Engineering;
 using FunProject.GameState;
+using FunProject.Currencies;
 using FunProject.Strategic;
 using GdUnit4;
 
@@ -110,15 +111,18 @@ public class EngineeringTest
   [TestCase]
   public void ScarceProductionAddsOnePerCompletedJob()
   {
-    var item = MakeItemData(manufacturingDays: 1);
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
+    var currency = MakeCurrency();
+    var item = MakeItemData(manufacturingDays: 1, manufacturingCosts: new() { [currency] = 7 });
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item], startingCurrencies: new() { [currency] = 14 }));
     var state = campaign.State;
     var session = campaign.Session;
     Assert.True(session.StartManufacturing(item).IsRight);
     Assert.True(state.Armory.TryGetItemStock(item).IsNone);
     campaign.AdvanceTicks(1440);
     Assert.Equal(1, state.Armory.ItemStock()[0].Remaining);
+    Assert.Equal(7L, state.GetCurrencyBalance(currency));
     Assert.True(session.StartManufacturing(item).IsRight);
+    Assert.Equal(0L, state.GetCurrencyBalance(currency));
     Assert.Equal(1, state.Armory.ItemStock()[0].Remaining);
     campaign.AdvanceTicks(1440);
     Assert.Equal(2, state.Armory.ItemStock()[0].Remaining);
@@ -176,11 +180,12 @@ public class EngineeringTest
   [TestCase]
   public void BusyPrecedesAlreadyAvailableWithoutReplacingJob()
   {
-    var item = MakeItemData();
-    var other = MakeItemData("Other");
-    var supplied = MakeItemData("Supplied", unlimited: true);
+    var currency = MakeCurrency();
+    var item = MakeItemData(manufacturingCosts: new() { [currency] = 10 });
+    var other = MakeItemData("Other", manufacturingCosts: new() { [currency] = 20 });
+    var supplied = MakeItemData("Supplied", unlimited: true, manufacturingCosts: new() { [currency] = 20 });
     using var campaign = new GeoscapeFixture(MakeStart(armory: [supplied],
-      manufacturableItems: [item, other, supplied]));
+      manufacturableItems: [item, other, supplied], startingCurrencies: new() { [currency] = 10 }));
     var state = campaign.State;
     var session = campaign.Session;
     campaign.ClearEvents();
@@ -196,6 +201,12 @@ public class EngineeringTest
     Assert.False(state.Armory.HasAvailableItem(item));
     Assert.False(state.Armory.HasAvailableItem(other));
     Assert.True(state.Armory.HasAvailableItem(supplied));
+    Assert.Equal(0L, state.GetCurrencyBalance(currency));
+    campaign.AdvanceTicks(1440);
+    campaign.ClearEvents();
+    Assert.Equal(ManufacturingStartFailure.AlreadyAvailable, session.StartManufacturing(supplied).RequireLeft());
+    Assert.Equal(0L, state.GetCurrencyBalance(currency));
+    Assert.Equal(0, campaign.Events.Count);
   }
 
   [TestCase]
@@ -401,16 +412,18 @@ public class EngineeringTest
   [TestCase]
   public void ResourceEditsCannotChangeBakedDurationCatalogOrEitherStockPolicy()
   {
-    var scarce = MakeItemData("Scarce", manufacturingDays: 1);
+    var currency = MakeCurrency();
+    var scarce = MakeItemData("Scarce", manufacturingDays: 1, manufacturingCosts: new() { [currency] = 7 });
     var unlimited = MakeItemData("Unlimited", unlimited: true, manufacturingDays: 1);
     var replacement = MakeItemData("Replacement");
-    var start = MakeStart(manufacturableItems: [scarce, unlimited]);
+    var start = MakeStart(manufacturableItems: [scarce, unlimited], startingCurrencies: new() { [currency] = 7 });
     using var campaign = new GeoscapeFixture(start);
     var state = campaign.State;
     var session = campaign.Session;
     scarce.UnlimitedStock = true;
     unlimited.UnlimitedStock = false;
     scarce.ManufacturingDurationDays = 100;
+    scarce.ManufacturingCosts[currency] = 99;
     unlimited.ManufacturingDurationDays = 100;
     start.ManufacturableItems[0] = replacement;
 
@@ -418,6 +431,8 @@ public class EngineeringTest
     Assert.Equal(2, options.Count);
     Assert.Equal(scarce, options[0].Project.Item);
     Assert.False(options[0].Project.UnlimitedStock);
+    Assert.Equal(7L, options[0].Project.Costs[currency]);
+    Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IDictionary<Currency, long>)options[0].Project.Costs).Clear());
     Assert.True(options[1].Project.UnlimitedStock);
     Assert.True(session.StartManufacturing(scarce).IsRight);
     Assert.Equal(1440L, session.ActiveManufacturing.Match(job => job.CompletesAtTick, () => -1));
@@ -442,8 +457,9 @@ public class EngineeringTest
   [TestCase]
   public void CompletionTickOverflowThrowsBeforeAssigningJobOrChangingStock()
   {
-    var item = MakeItemData();
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
+    var currency = MakeCurrency();
+    var item = MakeItemData(manufacturingCosts: new() { [currency] = 7 });
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item], startingCurrencies: new() { [currency] = 7 }));
     var state = campaign.State;
     var session = campaign.Session;
 
@@ -453,8 +469,11 @@ public class EngineeringTest
     Assert.False(state.Armory.HasAvailableItem(item));
     Assert.Equal(0, campaign.Events.Count);
 
+    Assert.Equal(7L, state.GetCurrencyBalance(currency));
+
     state.Tick = long.MaxValue - 1440;
     var job = session.StartManufacturing(item).RequireRight();
+    Assert.Equal(0L, state.GetCurrencyBalance(currency));
     Assert.Equal(long.MaxValue - 1440, job.StartedAtTick);
     Assert.Equal(long.MaxValue, job.CompletesAtTick);
     Assert.True(state.Engineering.CompleteIfDue(long.MaxValue - 1).IsNone);
@@ -466,8 +485,9 @@ public class EngineeringTest
   [TestCase]
   public void FailedCompletionEffectPropagatesWithoutBroadcastingOrRetrying()
   {
-    var item = MakeItemData(manufacturingDays: 1);
-    using var campaign = new GeoscapeFixture(MakeStart(armory: [item], manufacturableItems: [item]));
+    var currency = MakeCurrency();
+    var item = MakeItemData(manufacturingDays: 1, manufacturingCosts: new() { [currency] = 7 });
+    using var campaign = new GeoscapeFixture(MakeStart(armory: [item], manufacturableItems: [item], startingCurrencies: new() { [currency] = 10 }));
     var state = campaign.State;
     var session = campaign.Session;
     state.Armory.AddStock(item, int.MaxValue - 1);
@@ -483,5 +503,6 @@ public class EngineeringTest
     Assert.True(session.ActiveManufacturing.IsNone);
     Assert.Equal(int.MaxValue - 1, state.Armory.ItemStock()[0].Remaining);
     Assert.Equal(0, campaign.Events.EventsOf<ManufacturingCompleted>().Length);
+    Assert.Equal(3L, state.GetCurrencyBalance(currency));
   }
 }

@@ -284,11 +284,12 @@ internal static class TestData
 
   // Bare armory stock entries: no capabilities, so withdrawal materializes plain items.
   public static EquippableItemData MakeItemData(string name = "Item", bool unlimited = false,
-    uint manufacturingDays = 1) => new()
+    uint manufacturingDays = 1, Godot.Collections.Dictionary<Currency, long> manufacturingCosts = null) => new()
     {
       Name = name,
       UnlimitedStock = unlimited,
       ManufacturingDurationDays = manufacturingDays,
+      ManufacturingCosts = manufacturingCosts ?? [],
     };
 
   public static MultiStatMod MakeMod(string name, bool unlimited = false) =>
@@ -661,13 +662,15 @@ internal static class TestData
   public static ResearchProject MakeResearch(
     string name = "Research", uint days = 1,
     ResearchCondition condition = null,
-    EquippableItemData[] manufacturingUnlocks = null)
+    EquippableItemData[] manufacturingUnlocks = null,
+    Godot.Collections.Dictionary<Currency, long> costs = null)
     => new()
     {
       Name = name,
       DurationDays = days,
       Condition = condition ?? new AlwaysResearchCondition(),
       ManufacturingUnlocks = manufacturingUnlocks ?? [],
+      Costs = costs ?? [],
     };
 
   public static SkillPathData MakePath(string name, params SkillUpgradeStepData[] steps)

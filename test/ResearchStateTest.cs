@@ -1,6 +1,7 @@
 #nullable disable warnings
 using System;
 using FunProject.GameState;
+using FunProject.Currencies;
 using FunProject.Items;
 using FunProject.Research;
 using FunProject.Strategic;
@@ -39,9 +40,10 @@ public class ResearchStateTest
   [TestCase]
   public void CatalogAndCapturedOutputsPreserveIdentityAndImmutableMembership()
   {
+    var currency = MakeCurrency();
     var item = MakeItemData();
     var replacementItem = MakeItemData();
-    var project = MakeResearch(days: 2, manufacturingUnlocks: [item]);
+    var project = MakeResearch(days: 2, manufacturingUnlocks: [item], costs: new() { [currency] = 7 });
     var sameName = MakeResearch();
     var start = MakeStart(researchProjects: [project, project, sameName]);
     using var campaign = new GeoscapeFixture(start);
@@ -52,15 +54,19 @@ public class ResearchStateTest
     Assert.Equal(sameName, catalog[1]);
     start.ResearchProjects[0] = MakeResearch("Replacement");
     project.DurationDays = 20;
+    project.Costs[currency] = 99;
     project.Condition = new NotResearchCondition { Child = new AlwaysResearchCondition() };
     project.ManufacturingUnlocks[0] = replacementItem;
     var definition = research.ResolveResearch(project, campaign.State).RequireRight();
     Assert.Equal(2U, definition.DurationDays);
+    Assert.Equal(7L, research.GetCosts(project).RequireSome()[currency]);
+    Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IDictionary<Currency, long>)research.GetCosts(project).RequireSome()).Clear());
     Assert.Equal(item, definition.ManufacturingUnlocks[0]);
     Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IList<ResearchProject>)catalog).Clear());
     var available = research.GetAvailableProjects(campaign.State);
     Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IList<ResearchProject>)available).Clear());
     research.Start(new ResearchJob(project, 0, 2880));
+    Assert.True(campaign.Session.GetResearchCosts(MakeResearch()).IsNone);
     var completed = research.CompleteIfDue(2880).RequireSome();
     Assert.Equal(item, completed.ManufacturingUnlocks[0]);
     Assert.Throws<NotSupportedException>(() =>
@@ -83,10 +89,13 @@ public class ResearchStateTest
     noCondition.Condition = null;
     var noOutputs = MakeResearch();
     noOutputs.ManufacturingUnlocks = null;
+    var noCosts = MakeResearch();
+    noCosts.Costs = null;
     CampaignStartData[] invalid = [nullArray,
       MakeStart(researchProjects: [null]),
       MakeStart(researchProjects: [noCondition]),
       MakeStart(researchProjects: [noOutputs]),
+      MakeStart(researchProjects: [noCosts]),
       MakeStart(researchProjects: [MakeResearch(manufacturingUnlocks: [null])]),
     ];
     foreach (var start in invalid)

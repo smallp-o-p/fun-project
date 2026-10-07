@@ -5,4 +5,5 @@ public enum ManufacturingStartFailure
   UnknownItem,
   Busy,
   AlreadyAvailable,
+  InsufficientCurrencies,
 }

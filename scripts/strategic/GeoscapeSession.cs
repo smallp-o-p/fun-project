@@ -1,6 +1,7 @@
 using CampaignGameState = global::FunProject.GameState.GameState;
 using System;
 using System.Collections.Generic;
+using FunProject.Currencies;
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Engineering;
@@ -72,22 +73,32 @@ public sealed class GeoscapeSession
   public IReadOnlyList<ResearchProject> GetAvailableResearchProjects()
     => _state.Research.GetAvailableProjects(_state);
 
+  public Option<IReadOnlyDictionary<Currency, long>> GetResearchCosts(ResearchProject project)
+    => _state.Research.GetCosts(project);
+
+  public IReadOnlyList<CurrencyShortfall> GetCurrencyShortfalls(IReadOnlyDictionary<Currency, long> costs)
+    => _state.GetCurrencyShortfalls(costs);
+
   public Either<ResearchStartFailure, ResearchJob> StartResearch(ResearchProject project)
-    => _state.Research.ResolveResearch(project, _state).Map(definition =>
+    => _state.Research.ResolveResearch(project, _state).Bind<ResearchJob>(definition =>
     {
       var job = new ResearchJob(definition.Project, Tick, CompletionTick(definition.DurationDays));
+      if (!_state.TrySpendCurrencyCosts(definition.Costs))
+        return ResearchStartFailure.InsufficientCurrencies;
       var started = _state.Research.Start(job);
       Commit(started);
       return started.Job;
     });
 
   public IReadOnlyList<ManufacturingOption> GetManufacturingOptions()
-    => _state.Engineering.GetManufacturingOptions(_state.Armory);
+    => _state.Engineering.GetManufacturingOptions(_state.Armory, _state.Currencies);
 
   public Either<ManufacturingStartFailure, ManufacturingJob> StartManufacturing(EquippableItemData data)
-    => _state.Engineering.ResolveManufacturing(data, _state.Armory).Map(project =>
+    => _state.Engineering.ResolveManufacturing(data, _state.Armory).Bind<ManufacturingJob>(project =>
     {
       var job = new ManufacturingJob(project, Tick, CompletionTick(project.DurationDays));
+      if (!_state.TrySpendCurrencyCosts(project.Costs))
+        return ManufacturingStartFailure.InsufficientCurrencies;
       ManufacturingStarted started = _state.Engineering.Start(job);
       Commit(started);
       return started.Job;

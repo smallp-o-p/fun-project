@@ -13,6 +13,155 @@ namespace FunProject.Tests;
 public class ResearchTest
 {
   [TestCase]
+  public void JobStartsSpendSharedBalancesBeforeNotification()
+  {
+    var a = MakeCurrency("A");
+    var b = MakeCurrency("B");
+    var item = MakeItemData(manufacturingCosts: new() { [a] = 20, [b] = 2 });
+    var project = MakeResearch(costs: new() { [a] = 30, [b] = 3 });
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item], researchProjects: [project],
+      startingCurrencies: new() { [a] = 100, [b] = 10 }));
+    campaign.Session.EventCommitted += fact =>
+    {
+      if (fact is ManufacturingStarted manufacturing)
+      {
+        Assert.Equal(Some(manufacturing.Job), campaign.Session.ActiveManufacturing);
+        Assert.Equal(80L, campaign.State.GetCurrencyBalance(a));
+        Assert.Equal(8L, campaign.State.GetCurrencyBalance(b));
+      }
+      if (fact is ResearchStarted research)
+      {
+        Assert.Equal(Some(research.Job), campaign.Session.ActiveResearch);
+        Assert.Equal(50L, campaign.State.GetCurrencyBalance(a));
+        Assert.Equal(5L, campaign.State.GetCurrencyBalance(b));
+      }
+    };
+    campaign.Session.StartManufacturing(item).RequireRight();
+    campaign.Session.StartResearch(project).RequireRight();
+    campaign.AdvanceTicks(100);
+    var rebuilt = new GeoscapeSession(campaign.State);
+    rebuilt.ChangeSpeed(TimeSpeed.Normal);
+    rebuilt.Advance(1340 * 0.1);
+    Assert.True(rebuilt.ActiveManufacturing.IsNone);
+    Assert.True(rebuilt.ActiveResearch.IsNone);
+    Assert.True(campaign.State.Research.IsCompleted(project));
+    Assert.Equal(1, campaign.State.Armory.ItemStock()[0].Remaining);
+    Assert.Equal(50L, campaign.State.GetCurrencyBalance(a));
+    Assert.Equal(5L, campaign.State.GetCurrencyBalance(b));
+  }
+
+  [TestCase(false)]
+  [TestCase(true)]
+  public void InsufficientCurrenciesPreserveJobsBalancesAndEvents(bool research)
+  {
+    var a = MakeCurrency("A");
+    var b = MakeCurrency("B");
+    var item = MakeItemData(manufacturingCosts: new() { [a] = 7, [b] = 2 });
+    var old = MakeResearch("Old");
+    var project = MakeResearch(costs: new() { [a] = 7, [b] = 2 });
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item], researchProjects: [old, project],
+      startingCurrencies: new() { [a] = 10, [b] = 1 }));
+    var active = campaign.Session.StartResearch(old).RequireRight();
+    campaign.AdvanceTicks(100);
+    campaign.ClearEvents();
+    if (research)
+      Assert.Equal(ResearchStartFailure.InsufficientCurrencies, campaign.Session.StartResearch(project).RequireLeft());
+    else
+      Assert.Equal(ManufacturingStartFailure.InsufficientCurrencies, campaign.Session.StartManufacturing(item).RequireLeft());
+    Assert.Equal(Some(active), campaign.Session.ActiveResearch);
+    Assert.True(campaign.Session.ActiveManufacturing.IsNone);
+    Assert.Equal(10L, campaign.State.GetCurrencyBalance(a));
+    Assert.Equal(1L, campaign.State.GetCurrencyBalance(b));
+    Assert.Equal(0, campaign.Events.Count);
+    Assert.Equal(1, campaign.Session.GetAvailableResearchProjects().Count);
+    Assert.Equal(1, campaign.Session.GetManufacturingOptions().Count);
+  }
+
+  [TestCase]
+  public void ResearchReplacementPaysAgainWithoutRefund()
+  {
+    var currency = MakeCurrency();
+    var first = MakeResearch("A", costs: new() { [currency] = 30 });
+    var second = MakeResearch("B", costs: new() { [currency] = 50 });
+    var unaffordable = MakeResearch("Too expensive", costs: new() { [currency] = 280 });
+    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [first, second, unaffordable],
+      startingCurrencies: new() { [currency] = 300 }));
+    var old = campaign.Session.StartResearch(first).RequireRight();
+    campaign.AdvanceTicks(100);
+    campaign.ClearEvents();
+    Assert.Equal(ResearchStartFailure.InsufficientCurrencies, campaign.Session.StartResearch(unaffordable).RequireLeft());
+    Assert.Equal(ResearchStartFailure.Busy, campaign.Session.StartResearch(first).RequireLeft());
+    Assert.Equal(Some(old), campaign.Session.ActiveResearch);
+    Assert.Equal(270L, campaign.State.GetCurrencyBalance(currency));
+    Assert.Equal(0, campaign.Events.Count);
+    campaign.Session.StartResearch(second).RequireRight();
+    Assert.Equal(220L, campaign.State.GetCurrencyBalance(currency));
+    campaign.AdvanceTicks(100);
+    var restarted = campaign.Session.StartResearch(first).RequireRight();
+    Assert.Equal(200L, restarted.StartedAtTick);
+    Assert.Equal(1640L, restarted.CompletesAtTick);
+    Assert.Equal(190L, campaign.State.GetCurrencyBalance(currency));
+    Assert.Equal(2, campaign.Events.EventsOf<ResearchStarted>().Length);
+  }
+
+  [TestCase(false)]
+  [TestCase(true)]
+  public void StartNotificationExceptionDoesNotReplayPayment(bool research)
+  {
+    var currency = MakeCurrency();
+    var old = MakeResearch("Old");
+    var project = MakeResearch(costs: new() { [currency] = 7 });
+    var item = MakeItemData(manufacturingCosts: new() { [currency] = 7 });
+    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [old, project], manufacturableItems: [item],
+      startingCurrencies: new() { [currency] = 10 }));
+    campaign.Session.StartResearch(old).RequireRight();
+    campaign.AdvanceTicks(10);
+    campaign.Session.EventCommitted += fact =>
+    {
+      if (fact is ResearchStarted or ManufacturingStarted)
+        throw new InvalidOperationException("Subscriber failed");
+    };
+    if (research)
+    {
+      Assert.Throws<InvalidOperationException>(() => campaign.Session.StartResearch(project));
+      var job = campaign.Session.ActiveResearch.RequireSome();
+      Assert.Equal(project, job.Project);
+      Assert.Equal(10L, job.StartedAtTick);
+      Assert.Equal(ResearchStartFailure.Busy, campaign.Session.StartResearch(project).RequireLeft());
+      Assert.Equal(Some(job), campaign.Session.ActiveResearch);
+    }
+    else
+    {
+      Assert.Throws<InvalidOperationException>(() => campaign.Session.StartManufacturing(item));
+      var job = campaign.Session.ActiveManufacturing.RequireSome();
+      Assert.Equal(item, job.Project.Item);
+      Assert.Equal(ManufacturingStartFailure.Busy, campaign.Session.StartManufacturing(item).RequireLeft());
+      Assert.Equal(Some(job), campaign.Session.ActiveManufacturing);
+    }
+    Assert.Equal(3L, campaign.State.GetCurrencyBalance(currency));
+  }
+
+  [TestCase]
+  public void FailedResearchUnlockRetainsPaymentAndCompletionWithoutPartialRegistration()
+  {
+    var currency = MakeCurrency();
+    var first = MakeItemData("Valid");
+    var malformed = MakeItemData("Malformed", manufacturingCosts: new() { [currency] = 7 });
+    var project = MakeResearch(days: 0, manufacturingUnlocks: [first, malformed], costs: new() { [currency] = 7 });
+    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project], startingCurrencies: new() { [currency] = 10 }));
+    malformed.ManufacturingCosts[currency] = -1;
+    campaign.Session.StartResearch(project).RequireRight();
+    Assert.Throws<ArgumentOutOfRangeException>(() => campaign.AdvanceTicks(1));
+    Assert.True(campaign.Session.ActiveResearch.IsNone);
+    Assert.True(campaign.State.Research.IsCompleted(project));
+    Assert.Equal(0, campaign.Session.GetManufacturingOptions().Count);
+    Assert.Equal(0, campaign.Events.EventsOf<ResearchCompleted>().Length);
+    campaign.AdvanceTicks(1);
+    Assert.Equal(3L, campaign.State.GetCurrencyBalance(currency));
+    Assert.Equal(0, campaign.Session.GetManufacturingOptions().Count);
+  }
+
+  [TestCase]
   public void ResearchUnlocksManufacturingBeforeBroadcastWithoutGrantingStock()
   {
     var item = MakeItemData();
@@ -108,10 +257,11 @@ public class ResearchTest
   [TestCase]
   public void StartFailurePrecedencePreservesTheActiveJobAndEventWindow()
   {
-    var completed = MakeResearch("Completed");
-    var active = MakeResearch("Active");
-    var locked = MakeResearch("Locked", condition: new NotResearchCondition { Child = new AlwaysResearchCondition() });
-    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [completed, active, locked]));
+    var currency = MakeCurrency();
+    var completed = MakeResearch("Completed", costs: new() { [currency] = 10 });
+    var active = MakeResearch("Active", costs: new() { [currency] = 10 });
+    var locked = MakeResearch("Locked", condition: new NotResearchCondition { Child = new AlwaysResearchCondition() }, costs: new() { [currency] = 30 });
+    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [completed, active, locked], startingCurrencies: new() { [currency] = 20 }));
     var session = campaign.Session;
     session.StartResearch(completed).RequireRight();
     campaign.AdvanceTicks(1440);
@@ -135,6 +285,7 @@ public class ResearchTest
     Assert.False(campaign.State.Research.IsCompleted(active));
     Assert.False(campaign.State.Research.IsCompleted(locked));
     Assert.Equal(0, campaign.State.Armory.ItemStock().Count);
+    Assert.Equal(0L, campaign.State.GetCurrencyBalance(currency));
   }
 
   [TestCase]
@@ -243,13 +394,15 @@ public class ResearchTest
   [TestCase]
   public void DeadlineOverflowOccursBeforeStartingAndExactMaximumDeadlineIsSupported()
   {
-    var project = MakeResearch();
-    var replacement = MakeResearch("Replacement");
-    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project, replacement]));
+    var currency = MakeCurrency();
+    var project = MakeResearch(costs: new() { [currency] = 7 });
+    var replacement = MakeResearch("Replacement", costs: new() { [currency] = 7 });
+    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project, replacement], startingCurrencies: new() { [currency] = 14 }));
     campaign.State.Tick = long.MaxValue;
     Assert.Throws<OverflowException>(() => campaign.Session.StartResearch(project));
     Assert.True(campaign.Session.ActiveResearch.IsNone);
     Assert.Equal(0, campaign.Events.Count);
+    Assert.Equal(14L, campaign.State.GetCurrencyBalance(currency));
     campaign.State.Tick = long.MaxValue - 1440;
     var job = campaign.Session.StartResearch(project).RequireRight();
     Assert.Equal(long.MaxValue, job.CompletesAtTick);
@@ -258,6 +411,7 @@ public class ResearchTest
     Assert.Throws<OverflowException>(() => campaign.Session.StartResearch(replacement));
     Assert.Equal(Some(job), campaign.Session.ActiveResearch);
     Assert.Equal(0, campaign.Events.Count);
+    Assert.Equal(7L, campaign.State.GetCurrencyBalance(currency));
     Assert.True(campaign.State.Research.CompleteIfDue(long.MaxValue - 1).IsNone);
     Assert.Equal(job, campaign.State.Research.CompleteIfDue(long.MaxValue).RequireSome().Job);
   }
