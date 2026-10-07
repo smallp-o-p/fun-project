@@ -30,9 +30,9 @@ public partial class BattleCombatQueriesTest
     var previewed = battle.Query(new GetHitChanceForAttack(
       battle.Alive(battle.PlayerUnit), battle.Target(battle.EnemyUnit))).RequireRight();
 
-    Assert.Equal(65, previewed.BaseChance);
-    Assert.Equal(-40, previewed.Modifiers.AsValueEnumerable().Single().Amount);
-    Assert.Equal(25, previewed.FinalChance);
+    battle.Read(() => Assert.Equal(65, previewed.BaseChance));
+    battle.Read(() => Assert.Equal(-40, previewed.Modifiers.AsValueEnumerable().Single().Amount));
+    battle.Read(() => Assert.Equal(25, previewed.FinalChance));
 
     if (!execute)
     {
@@ -43,9 +43,9 @@ public partial class BattleCombatQueriesTest
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
     var resolved = battle.Events.SingleEvent<UnitAttackedBattleEvent>().Breakdown;
-    Assert.Equal(previewed.BaseChance, resolved.BaseChance);
-    Assert.Equal(previewed.FinalChance, resolved.FinalChance);
-    Assert.Equal(previewed.Modifiers.Count, resolved.Modifiers.Count);
+    battle.Read(() => Assert.Equal(previewed.BaseChance, resolved.BaseChance));
+    battle.Read(() => Assert.Equal(previewed.FinalChance, resolved.FinalChance));
+    battle.Read(() => Assert.Equal(previewed.Modifiers.Count, resolved.Modifiers.Count));
   }
 
   [TestCase(TestName = "GetHitChanceForAttack ignores turn order")]
@@ -73,7 +73,7 @@ public partial class BattleCombatQueriesTest
     var breakdown = battle.Query(new GetHitChanceForAttack(
       battle.Alive(enemyAttacker), battle.Target(playerTarget))).RequireRight();
 
-    Assert.Equal(70, breakdown.FinalChance);
+    battle.Read(() => Assert.Equal(70, breakdown.FinalChance));
   }
 
   [TestCase(TestName = "GetHitChanceForAttack fails when the odds are undefined")]
@@ -107,7 +107,7 @@ public partial class BattleCombatQueriesTest
     void AssertFails(AliveUnit attacker, AttackTarget attackTarget, BattleQueryFailureReason expectedReason)
     {
       var failure = battle.Query(new GetHitChanceForAttack(attacker, attackTarget)).RequireLeft();
-      Assert.Equal(expectedReason, failure.Reason);
+      battle.Read(() => Assert.Equal(expectedReason, failure.Reason));
     }
 
     AssertFails(battle.Alive(unarmedAttacker), battle.Target(target), BattleQueryFailureReason.InvalidBattleState);   // no weapon
@@ -124,8 +124,8 @@ public partial class BattleCombatQueriesTest
       player: new("Alpha", Weapon: TestData.MakeAmmoWeapon("Rifle")));
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
 
-    Assert.True(battle.Query(new GetHitChanceForAttack(
-      battle.Alive(battle.PlayerUnit), battle.Target(battle.EnemyUnit))).IsRight);
+    battle.Read(() => Assert.True(battle.Query(new GetHitChanceForAttack(
+      battle.Alive(battle.PlayerUnit), battle.Target(battle.EnemyUnit))).IsRight));
   }
 
   [TestCase(TestName = "Hit chance preview ignores action points and phase availability")]
@@ -135,11 +135,11 @@ public partial class BattleCombatQueriesTest
       player: new("Alpha", Weapon: TestData.MakeAmmoWeapon("Rifle")));
     var attacker = battle.Alive(battle.PlayerUnit);
     var target = battle.Target(battle.EnemyUnit);
-    battle.PlayerUnit.SpendActionPoints(battle.PlayerUnit.CurrentActionPoints);
-    Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight);
+    battle.Mutate(() => battle.PlayerUnit.SpendActionPoints(battle.PlayerUnit.CurrentActionPoints));
+    battle.Read(() => Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight));
 
-    battle.Session.EndBattle(BattleOutcome.Draw);
+    battle.Mutate(() => battle.Session.EndBattle(BattleOutcome.Draw));
 
-    Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight);
+    battle.Read(() => Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight));
   }
 }

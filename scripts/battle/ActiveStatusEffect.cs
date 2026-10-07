@@ -13,7 +13,7 @@ namespace FunProject.Battle;
 public abstract class ActiveStatusEffect
 {
   private readonly BattleAccessBinding _battleAccess = new();
-  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access);  }
+  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access); }
   internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
 
   public StatusEffectSpecData Spec { get; }

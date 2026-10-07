@@ -14,7 +14,9 @@ public class TurnSchedulerTest
   // roster callbacks, eligibility is arranged through ordinary damage before construction,
   // and the fixture's own scheduler/executor stay untouched.
   private static TurnScheduler SchedulerFor(BattleFixture battle, params Faction[] factionOrder)
-    => new(factionOrder, battle.Session.HasConsciousUnits, battle.Session.GetFactionConsciousUnits);
+    => battle.Read(() => new TurnScheduler(factionOrder,
+      side => battle.Read(() => battle.Session.HasConsciousUnits(side)),
+      side => battle.Read(() => battle.Session.GetFactionConsciousUnits(side))));
 
   [TestCase(TestName = "Construction activates the first conscious side and establishes its availability")]
   public void ConstructionActivatesTheFirstConsciousSide()
@@ -22,12 +24,12 @@ public class TurnSchedulerTest
     using var battle = BattleFixture.Duel();
     var scheduler = SchedulerFor(battle, battle.PlayerFaction, battle.EnemyFaction);
 
-    Assert.Equal(battle.PlayerFaction, scheduler.ActiveSide);
-    Assert.Equal(2, scheduler.TurnQueue.Count);
-    Assert.Equal(battle.PlayerFaction, scheduler.TurnQueue.AsValueEnumerable().First());
-    Assert.Equal(battle.EnemyFaction, scheduler.TurnQueue.AsValueEnumerable().Last());
-    Assert.True(scheduler.IsUnitAvailable(battle.PlayerUnit));
-    Assert.False(scheduler.IsUnitAvailable(battle.EnemyUnit));
+    battle.Read(() => Assert.Equal(battle.PlayerFaction, scheduler.ActiveSide));
+    battle.Read(() => Assert.Equal(2, scheduler.TurnQueue.Count));
+    battle.Read(() => Assert.Equal(battle.PlayerFaction, scheduler.TurnQueue.AsValueEnumerable().First()));
+    battle.Read(() => Assert.Equal(battle.EnemyFaction, scheduler.TurnQueue.AsValueEnumerable().Last()));
+    battle.Read(() => Assert.True(scheduler.IsUnitAvailable(battle.PlayerUnit)));
+    battle.Read(() => Assert.False(scheduler.IsUnitAvailable(battle.EnemyUnit)));
   }
 
   [TestCase(TestName = "A first declared faction without any unit is skipped")]
@@ -37,9 +39,9 @@ public class TurnSchedulerTest
     var stranger = TestData.MakeFaction("Stranger");
     var scheduler = SchedulerFor(battle, stranger, battle.PlayerFaction, battle.EnemyFaction);
 
-    Assert.Equal(battle.PlayerFaction, scheduler.ActiveSide);
-    Assert.Equal(2, scheduler.TurnQueue.Count);
-    Assert.False(scheduler.TurnQueue.AsValueEnumerable().Contains(stranger));
+    battle.Read(() => Assert.Equal(battle.PlayerFaction, scheduler.ActiveSide));
+    battle.Read(() => Assert.Equal(2, scheduler.TurnQueue.Count));
+    battle.Read(() => Assert.False(scheduler.TurnQueue.AsValueEnumerable().Contains(stranger)));
   }
 
   [TestCase(TestName = "A first declared faction with only unconscious units is skipped")]
@@ -49,9 +51,9 @@ public class TurnSchedulerTest
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
     var scheduler = SchedulerFor(battle, battle.PlayerFaction, battle.EnemyFaction);
 
-    Assert.Equal(battle.EnemyFaction, scheduler.ActiveSide);
-    Assert.Equal(1, scheduler.TurnQueue.Count);
-    Assert.Equal(battle.EnemyFaction, scheduler.TurnQueue.AsValueEnumerable().Single());
+    battle.Read(() => Assert.Equal(battle.EnemyFaction, scheduler.ActiveSide));
+    battle.Read(() => Assert.Equal(1, scheduler.TurnQueue.Count));
+    battle.Read(() => Assert.Equal(battle.EnemyFaction, scheduler.TurnQueue.AsValueEnumerable().Single()));
   }
 
   [TestCase(TestName = "A first declared faction with only dead units is skipped")]
@@ -61,9 +63,9 @@ public class TurnSchedulerTest
     battle.ApplyDamage(battle.PlayerUnit, 999);
     var scheduler = SchedulerFor(battle, battle.PlayerFaction, battle.EnemyFaction);
 
-    Assert.Equal(battle.EnemyFaction, scheduler.ActiveSide);
-    Assert.Equal(1, scheduler.TurnQueue.Count);
-    Assert.Equal(battle.EnemyFaction, scheduler.TurnQueue.AsValueEnumerable().Single());
+    battle.Read(() => Assert.Equal(battle.EnemyFaction, scheduler.ActiveSide));
+    battle.Read(() => Assert.Equal(1, scheduler.TurnQueue.Count));
+    battle.Read(() => Assert.Equal(battle.EnemyFaction, scheduler.TurnQueue.AsValueEnumerable().Single()));
   }
 
   [TestCase(TestName = "Construction rejects a faction order without any conscious unit")]
@@ -83,10 +85,10 @@ public class TurnSchedulerTest
     using var battle = BattleFixture.Duel();
     var scheduler = SchedulerFor(battle, battle.PlayerFaction, battle.EnemyFaction, battle.PlayerFaction);
 
-    Assert.Equal(2, scheduler.GlobalFactionTurnOrder.Count);
-    Assert.Equal(battle.PlayerFaction, scheduler.GlobalFactionTurnOrder.AsValueEnumerable().First());
-    Assert.Equal(battle.EnemyFaction, scheduler.GlobalFactionTurnOrder.AsValueEnumerable().Last());
-    Assert.True(scheduler.IsUnitAvailable(battle.PlayerUnit));
+    battle.Read(() => Assert.Equal(2, scheduler.GlobalFactionTurnOrder.Count));
+    battle.Read(() => Assert.Equal(battle.PlayerFaction, scheduler.GlobalFactionTurnOrder.AsValueEnumerable().First()));
+    battle.Read(() => Assert.Equal(battle.EnemyFaction, scheduler.GlobalFactionTurnOrder.AsValueEnumerable().Last()));
+    battle.Read(() => Assert.True(scheduler.IsUnitAvailable(battle.PlayerUnit)));
   }
 
   [TestCase(TestName = "Advance returns a complete turn or exhaustion")]
@@ -97,31 +99,31 @@ public class TurnSchedulerTest
 
     var nextSide = scheduler.Advance();
 
-    Assert.False(nextSide.Exhausted);
-    Assert.False(nextSide.NextRound);
-    Assert.Equal(battle.EnemyFaction, nextSide.NextSide);
-    Assert.Equal(battle.EnemyFaction, scheduler.ActiveSide);
-    Assert.False(scheduler.IsUnitAvailable(battle.PlayerUnit));
-    Assert.True(scheduler.IsUnitAvailable(battle.EnemyUnit));
+    battle.Read(() => Assert.False(nextSide.Exhausted));
+    battle.Read(() => Assert.False(nextSide.NextRound));
+    battle.Read(() => Assert.Equal(battle.EnemyFaction, nextSide.NextSide));
+    battle.Read(() => Assert.Equal(battle.EnemyFaction, scheduler.ActiveSide));
+    battle.Read(() => Assert.False(scheduler.IsUnitAvailable(battle.PlayerUnit)));
+    battle.Read(() => Assert.True(scheduler.IsUnitAvailable(battle.EnemyUnit)));
 
     var rollover = scheduler.Advance();
 
-    Assert.False(rollover.Exhausted);
-    Assert.True(rollover.NextRound);
-    Assert.Equal(battle.PlayerFaction, rollover.NextSide);
-    Assert.Equal(battle.PlayerFaction, scheduler.ActiveSide);
-    Assert.True(scheduler.IsUnitAvailable(battle.PlayerUnit));
-    Assert.False(scheduler.IsUnitAvailable(battle.EnemyUnit));
+    battle.Read(() => Assert.False(rollover.Exhausted));
+    battle.Read(() => Assert.True(rollover.NextRound));
+    battle.Read(() => Assert.Equal(battle.PlayerFaction, rollover.NextSide));
+    battle.Read(() => Assert.Equal(battle.PlayerFaction, scheduler.ActiveSide));
+    battle.Read(() => Assert.True(scheduler.IsUnitAvailable(battle.PlayerUnit)));
+    battle.Read(() => Assert.False(scheduler.IsUnitAvailable(battle.EnemyUnit)));
 
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
 
     var exhausted = scheduler.Advance();
 
-    Assert.True(exhausted.Exhausted);
-    Assert.Equal(battle.PlayerFaction, scheduler.ActiveSide);
-    Assert.Equal(0, scheduler.TurnQueue.Count);
-    Assert.False(scheduler.IsUnitAvailable(battle.PlayerUnit));
-    Assert.False(scheduler.IsUnitAvailable(battle.EnemyUnit));
+    battle.Read(() => Assert.True(exhausted.Exhausted));
+    battle.Read(() => Assert.Equal(battle.PlayerFaction, scheduler.ActiveSide));
+    battle.Read(() => Assert.Equal(0, scheduler.TurnQueue.Count));
+    battle.Read(() => Assert.False(scheduler.IsUnitAvailable(battle.PlayerUnit)));
+    battle.Read(() => Assert.False(scheduler.IsUnitAvailable(battle.EnemyUnit)));
   }
 }

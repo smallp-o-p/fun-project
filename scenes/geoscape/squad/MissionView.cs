@@ -16,6 +16,7 @@ public sealed partial class MissionView : SquadLoadoutView
   private GeoscapeEvent _mission = null!;
   private GeoscapeSession _session = null!;
   private BattleScene? _battle;
+  private MissionBattle? _launched;
 
   public void ConfigureMission(GeoscapeEvent mission)
   {
@@ -33,7 +34,7 @@ public sealed partial class MissionView : SquadLoadoutView
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
     _session = session;
-    if (_battle is null)
+    if (_battle is null && _session.ActiveMission.IsNone)
       base.Present(state, session);
   }
 
@@ -50,6 +51,7 @@ public sealed partial class MissionView : SquadLoadoutView
 
   private void DeployMission()
   {
+    if (_launched is not null || _session.ActiveMission.IsSome) return;
     var host = BattleScene.InstantiateAs<BattleScene>("BattleScene");
     MissionBattle? launched = null;
     try
@@ -59,6 +61,7 @@ public sealed partial class MissionView : SquadLoadoutView
       launch.IfRight(handle =>
       {
         launched = handle;
+        _launched = handle;
         host.Present(handle.Runtime, handle.Setup, allowReturn: true);
         host.Completed += CompleteMission;
         GetNode<SubViewport>("Background/Viewport").AddChild(host);
@@ -74,7 +77,11 @@ public sealed partial class MissionView : SquadLoadoutView
       host.GetParent()?.RemoveChild(host);
       host.QueueFree();
       if (launched is not null)
-        _session.AbortMissionPresentation();
+      {
+        var session = _session; var deployment = launched.Deployment;
+        BattleRuntimeDrainHost.Retain(launched.Runtime, () => session.AbortMissionPresentation(deployment));
+      }
+      _launched = null;
       throw;
     }
   }
@@ -95,7 +102,10 @@ public sealed partial class MissionView : SquadLoadoutView
 
   public override void _ExitTree()
   {
-    if (_battle is not null && _session.ActiveMission.IsSome)
-      _session.AbortMissionPresentation();
+    if (_launched is not null && _session.ActiveMission.IsSome)
+    {
+      var session = _session; var deployment = _launched.Deployment;
+      BattleRuntimeDrainHost.Retain(_launched.Runtime, () => session.AbortMissionPresentation(deployment));
+    }
   }
 }

@@ -33,7 +33,7 @@ public class Combatant : HasStats, HasModSlots
   internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
 
   public string Name { get; }
-  private Faction _owningFaction;
+  private Faction _owningFaction = null!;
   public Faction OwningFaction
   {
     get => _owningFaction;

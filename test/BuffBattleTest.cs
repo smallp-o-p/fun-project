@@ -37,7 +37,7 @@ public partial class BuffBattleTest
       TestData.MakeCombatant("Alpha", faction, buffs: [alwaysOn]));
     var unit = battle.Unit;
 
-    Assert.Equal(1, unit.ActiveBuffs.AsValueEnumerable().Count());
+    battle.Read(() => Assert.Equal(1, unit.ActiveBuffs.AsValueEnumerable().Count()));
     Assert.Equal(alwaysOn, battle.Events.SingleEvent<UnitBuffActivatedBattleEvent>().Buff);
     battle.Events.EventBefore<UnitAddedBattleEvent, UnitBuffActivatedBattleEvent>();
     // The activation must happen in the spawn pass, before SessionStarted: the first
@@ -58,15 +58,15 @@ public partial class BuffBattleTest
       battle.Alive(battle.PlayerUnit), battle.Target(battle.EnemyUnit))).RequireRight();
 
     battle.ApplyDamage(player, 11); // 9/20: condition now holds
-    Assert.Equal(0, player.ActiveBuffs.AsValueEnumerable().Count());  // poll model: nothing until a turn boundary
-    Assert.Equal(65, Preview().FinalChance); // open ground, no cover: preview = base aim
+    battle.Read(() => Assert.Equal(0, player.ActiveBuffs.AsValueEnumerable().Count()));  // poll model: nothing until a turn boundary
+    battle.Read(() => Assert.Equal(65, Preview().FinalChance)); // open ground, no cover: preview = base aim
 
     battle.EndFactionTurn(battle.PlayerFaction); // enemy turn starts -> EvaluateAll
 
-    Assert.Equal(1, player.ActiveBuffs.AsValueEnumerable().Count()); // fresh during the ENEMY turn (every-turn-start eval)
-    Assert.Equal(75f, player.EffectiveStat<AimStat>());
-    Assert.Equal(75, Preview().FinalChance); // spec test 4: the preview sees the aim buff
-    Assert.Equal(1, battle.Events.EventsOf<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count());
+    battle.Read(() => Assert.Equal(1, player.ActiveBuffs.AsValueEnumerable().Count())); // fresh during the ENEMY turn (every-turn-start eval)
+    battle.Read(() => Assert.Equal(75f, player.EffectiveStat<AimStat>()));
+    battle.Read(() => Assert.Equal(75, Preview().FinalChance)); // spec test 4: the preview sees the aim buff
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count()));
     // v2 hook order pin: TurnStarted commits BEFORE the buff hook's activation (buff
     // evaluation is fired by the executor after the TurnStarted broadcast), not after.
     battle.Events.EventBefore<TurnStartedBattleEvent, UnitBuffActivatedBattleEvent>();
@@ -90,8 +90,8 @@ public partial class BuffBattleTest
     // The damage lands after the last evaluation before the player's refresh, so the flip can
     // only happen in the same transition that refreshes AP: if the refresh ran first it would
     // read Max=4 (buff not yet active) and CurrentActionPoints would be 4, failing this assert.
-    Assert.Equal(6, player.MaxActionPoints);
-    Assert.Equal(6, player.CurrentActionPoints); // the ordering regression this design exists for
+    battle.Read(() => Assert.Equal(6, player.MaxActionPoints));
+    battle.Read(() => Assert.Equal(6, player.CurrentActionPoints)); // the ordering regression this design exists for
   }
 
   [TestCase(TestName = "A buff deactivates at the next turn start once its condition no longer holds")]
@@ -121,14 +121,14 @@ public partial class BuffBattleTest
     // Adjacent, killable in one hit; a second enemy keeps the battle running after the kill.
     var adjacentEnemy = battle.UnitAt(new Vector3I(4, 0, 4));
 
-    Assert.Equal(1, player.ActiveBuffs.AsValueEnumerable().Count()); // activated by the startup pass
+    battle.Read(() => Assert.Equal(1, player.ActiveBuffs.AsValueEnumerable().Count())); // activated by the startup pass
 
     battle.ClearEvents();
     battle.Attack(player, adjacentEnemy); // kills the adjacent enemy
     battle.EndFactionTurn(playerFaction);          // enemy turn start -> re-evaluate
 
-    Assert.Equal(0, player.ActiveBuffs.AsValueEnumerable().Count());
-    Assert.Equal(aura, battle.Events.SingleEvent<UnitBuffDeactivatedBattleEvent>().Buff);
+    battle.Read(() => Assert.Equal(0, player.ActiveBuffs.AsValueEnumerable().Count()));
+    battle.Read(() => Assert.Equal(aura, battle.Events.SingleEvent<UnitBuffDeactivatedBattleEvent>().Buff));
   }
 
   [TestCase(TestName = "A negative max-health buff activating at spawn clamps current health down")]
@@ -158,9 +158,9 @@ public partial class BuffBattleTest
 
     // Observed at SessionStarted, before the first turn-start pass could repair a missing
     // spawn clamp: the spawn evaluation must already have activated and clamped.
-    Assert.Equal((15, 15), observeClamp.Observed);
-    Assert.Equal(15, enemy.MaxHealth);
-    Assert.Equal(15, enemy.CurrentHealth);
+    battle.Read(() => Assert.Equal((15, 15), observeClamp.Observed));
+    battle.Read(() => Assert.Equal(15, enemy.MaxHealth));
+    battle.Read(() => Assert.Equal(15, enemy.CurrentHealth));
   }
 
   // Records the side's single living unit's health at SessionStarted: after all initial

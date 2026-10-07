@@ -115,7 +115,7 @@ public sealed class BattleFixture : IDisposable
   // Test-only setup after startup still uses the session's sole executor.
   public void Mutate(Action mutation) => Submit(new FixtureMutation(mutation));
 
-  private sealed class FixtureMutation(Action mutation) : BattleAction
+  internal sealed class FixtureMutation(Action mutation) : BattleAction
   {
     public override Result Execute(BattleSession session) { mutation(); return Result.Completed; }
   }

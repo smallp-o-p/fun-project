@@ -28,9 +28,9 @@ public class GetAvailableActionsForUnitTest
     using var battle = MakeBattle(TestData.MakeWeapon("Rifle"));
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.SingleAliveUnit(battle.PlayerFaction)));
 
-    Assert.Equal(4, actions.Count);
-    Assert.True(actions.AsValueEnumerable().All(action => action.IsAvailable));
-    Assert.False(actions.AsValueEnumerable().Any(action => action.Action is ReloadActionDefinition));
+    battle.Read(() => Assert.Equal(4, actions.Count));
+    battle.Read(() => Assert.True(actions.AsValueEnumerable().All(action => action.IsAvailable)));
+    battle.Read(() => Assert.False(actions.AsValueEnumerable().Any(action => action.Action is ReloadActionDefinition)));
   }
 
   [TestCase(TestName = "Magazine weapon adds a Reload row in catalog order; full mag makes it unavailable")]
@@ -39,16 +39,16 @@ public class GetAvailableActionsForUnitTest
     using var battle = MakeBattle(TestData.MakeAmmoWeapon("SMG"));
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.SingleAliveUnit(battle.PlayerFaction)));
 
-    Assert.Equal(5, actions.Count);
-    Assert.True(actions[0].Action is MoveActionDefinition);
-    Assert.True(actions[1].Action is AttackActionDefinition);
-    Assert.True(actions[2].Action is ReloadActionDefinition);
-    Assert.True(actions[3].Action is PassActionDefinition);
-    Assert.True(actions[4].Action is EndTurnActionDefinition);
+    battle.Read(() => Assert.Equal(5, actions.Count));
+    battle.Read(() => Assert.True(actions[0].Action is MoveActionDefinition));
+    battle.Read(() => Assert.True(actions[1].Action is AttackActionDefinition));
+    battle.Read(() => Assert.True(actions[2].Action is ReloadActionDefinition));
+    battle.Read(() => Assert.True(actions[3].Action is PassActionDefinition));
+    battle.Read(() => Assert.True(actions[4].Action is EndTurnActionDefinition));
 
-    Assert.True(Row<AttackActionDefinition>(actions).IsAvailable);
+    battle.Read(() => Assert.True(Row<AttackActionDefinition>(actions).IsAvailable));
     var reload = Row<ReloadActionDefinition>(actions);
-    Assert.False(reload.IsAvailable);
+    battle.Read(() => Assert.False(reload.IsAvailable));
   }
 
   [TestCase(TestName = "Empty magazine: Attack unavailable, Reload available")]
@@ -56,16 +56,16 @@ public class GetAvailableActionsForUnitTest
   {
     using var battle = MakeBattle(TestData.MakeAmmoWeapon("Pistol", magazine: 1));
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
-    var weapon = hero.State.EquippedWeapon.Match(
+    var weapon = battle.Read(() => hero.State.EquippedWeapon.Match(
       Some: w => (AmmunitionedWeapon)w,
-      None: () => throw new Exception("Hero should be armed."));
-    Assert.True(weapon.TrySpendShot().IsSome); // drain the single round
+      None: () => throw new Exception("Hero should be armed.")));
+    battle.Mutate(() => Assert.True(weapon.TrySpendShot().IsSome)); // drain the single round
 
     var actions = battle.Query(new GetAvailableActionsForUnit(hero));
 
     var attack = Row<AttackActionDefinition>(actions);
-    Assert.False(attack.IsAvailable);
-    Assert.True(Row<ReloadActionDefinition>(actions).IsAvailable);
+    battle.Read(() => Assert.False(attack.IsAvailable));
+    battle.Read(() => Assert.True(Row<ReloadActionDefinition>(actions).IsAvailable));
   }
 
   [TestCase(TestName = "Unarmed unit: no Attack or Reload rows, Move available")]
@@ -74,9 +74,9 @@ public class GetAvailableActionsForUnitTest
     using var battle = MakeBattle(None);
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.SingleAliveUnit(battle.PlayerFaction)));
 
-    Assert.False(actions.AsValueEnumerable().Any(action => action.Action is AttackActionDefinition));
-    Assert.False(actions.AsValueEnumerable().Any(action => action.Action is ReloadActionDefinition));
-    Assert.True(Row<MoveActionDefinition>(actions).IsAvailable);
+    battle.Read(() => Assert.False(actions.AsValueEnumerable().Any(action => action.Action is AttackActionDefinition)));
+    battle.Read(() => Assert.False(actions.AsValueEnumerable().Any(action => action.Action is ReloadActionDefinition)));
+    battle.Read(() => Assert.True(Row<MoveActionDefinition>(actions).IsAvailable));
   }
 
   [TestCase(TestName = "Not-active-side unit: every row unavailable, including EndTurn")]
@@ -85,7 +85,7 @@ public class GetAvailableActionsForUnitTest
     using var battle = MakeBattle(TestData.MakeWeapon("Rifle"));
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.SingleAliveUnit(battle.EnemyFaction))); // enemy is not active at turn 1
 
-    Assert.True(actions.AsValueEnumerable().All(action => !action.IsAvailable));
+    battle.Read(() => Assert.True(actions.AsValueEnumerable().All(action => !action.IsAvailable)));
   }
 
   [TestCase(TestName = "Boxed-in unit: Move available with no reachable destinations")]
@@ -100,8 +100,8 @@ public class GetAvailableActionsForUnitTest
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
 
     var move = Row<MoveActionDefinition>(battle.Query(new GetAvailableActionsForUnit(hero)));
-    Assert.True(move.IsAvailable);
-    Assert.Equal(0, battle.Query(new GetPossibleMoveTilesForUnit(hero)).Count);
+    battle.Read(() => Assert.True(move.IsAvailable));
+    battle.Read(() => Assert.Equal(0, battle.Query(new GetPossibleMoveTilesForUnit(hero)).Count));
   }
 
   [TestCase(TestName = "Out-of-AP unit: only EndTurn is available")]
@@ -116,10 +116,10 @@ public class GetAvailableActionsForUnitTest
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
 
     var actions = battle.Query(new GetAvailableActionsForUnit(hero));
-    Assert.False(Row<MoveActionDefinition>(actions).IsAvailable);
-    Assert.False(Row<AttackActionDefinition>(actions).IsAvailable);
-    Assert.False(Row<PassActionDefinition>(actions).IsAvailable);
-    Assert.True(Row<EndTurnActionDefinition>(actions).IsAvailable);
+    battle.Read(() => Assert.False(Row<MoveActionDefinition>(actions).IsAvailable));
+    battle.Read(() => Assert.False(Row<AttackActionDefinition>(actions).IsAvailable));
+    battle.Read(() => Assert.False(Row<PassActionDefinition>(actions).IsAvailable));
+    battle.Read(() => Assert.True(Row<EndTurnActionDefinition>(actions).IsAvailable));
   }
 
   [TestCase(TestName = "Unconscious unit has no available catalog actions, including EndTurn")]
@@ -131,8 +131,8 @@ public class GetAvailableActionsForUnitTest
 
     var actions = battle.Query(new GetAvailableActionsForUnit(hero));
 
-    Assert.True(actions.AsValueEnumerable().All(action => !action.IsAvailable));
-    Assert.False(Row<EndTurnActionDefinition>(actions).IsAvailable);
+    battle.Read(() => Assert.True(actions.AsValueEnumerable().All(action => !action.IsAvailable)));
+    battle.Read(() => Assert.False(Row<EndTurnActionDefinition>(actions).IsAvailable));
   }
 
   [TestCase(TestName = "An unconscious unit has no possible move tiles while FindPath stays geometric")]
@@ -142,10 +142,10 @@ public class GetAvailableActionsForUnitTest
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
     battle.ApplyDamage(hero.State, 20, DamageKind.Stun);
 
-    Assert.Equal(0, battle.Query(new GetPossibleMoveTilesForUnit(hero)).Count);
+    battle.Read(() => Assert.Equal(0, battle.Query(new GetPossibleMoveTilesForUnit(hero)).Count));
     var path = battle.Query(new FindPathForUnit(hero, battle.At(new Vector3I(1, 0, 0))));
     Vector3I[] expected = [Vector3I.Zero, new Vector3I(1, 0, 0)];
-    Assert.True(path.AsValueEnumerable().Select(point => point.Raw).SequenceEqual(expected));
+    battle.Read(() => Assert.True(path.AsValueEnumerable().Select(point => point.Raw).SequenceEqual(expected)));
   }
 
   [TestCase(TestName = "A walkable tile directly above is reachable for Move")]
@@ -162,6 +162,6 @@ public class GetAvailableActionsForUnitTest
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
 
     var reachable = battle.Query(new GetPossibleMoveTilesForUnit(hero));
-    Assert.True(reachable.AsValueEnumerable().Select(point => point.Raw).Contains(new Vector3I(0, 1, 0)));
+    battle.Read(() => Assert.True(reachable.AsValueEnumerable().Select(point => point.Raw).Contains(new Vector3I(0, 1, 0))));
   }
 }

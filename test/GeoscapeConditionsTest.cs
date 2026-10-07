@@ -61,10 +61,12 @@ public class GeoscapeConditionsTest
       Seed: 7));
     var unit = battle.Unit;
     battle.ApplyDamage(unit, 5);
-    battle.Session.EndBattle(BattleOutcome.Victory);
+    battle.Mutate(() => battle.Session.EndBattle(BattleOutcome.Victory));
     var summary = battle.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
-    Assert.Equal(0L, summary.HealthByCombatant[alpha].HealthDamageTaken);
+    battle.Read(() => Assert.Equal(0L, summary.HealthByCombatant[alpha].HealthDamageTaken));
 
+    battle.Dispose();
+    Assert.True(battle.Runtime.TryFinishDisposal());
     campaign.Session.ApplyMissionReturn(summary);
 
     Assert.True(campaign.State.Conditions.GetInjury(alpha).IsNone);
@@ -156,14 +158,14 @@ public class GeoscapeConditionsTest
           [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Hostile", opposing)), new Vector3I(0, 0, 0))]),
       ],
       Seed: 7));
-    battle.Session.EndBattle(BattleOutcome.Victory);
+    battle.Mutate(() => battle.Session.EndBattle(BattleOutcome.Victory));
     var empty = battle.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
 
     campaign.ClearEvents();
     campaign.Session.ApplyMissionReturn(empty);
 
-    Assert.Equal(0, campaign.Events.EventsOf<CombatantConditionsChanged>().Length);
-    Assert.True(campaign.State.Conditions.GetFatigue(alpha).IsNone);
+    battle.Read(() => Assert.Equal(0, campaign.Events.EventsOf<CombatantConditionsChanged>().Length));
+    battle.Read(() => Assert.True(campaign.State.Conditions.GetFatigue(alpha).IsNone));
   }
 
   // The fatigue row (three real zero-damage returns) and the injury row (one 25% return)

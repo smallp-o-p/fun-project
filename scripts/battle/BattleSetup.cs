@@ -65,6 +65,7 @@ public sealed record BattleSetup(
 /// <summary>Typed reasons a battle request/setup can fail before the session starts.</summary>
 public enum BattleSetupFailureReason
 {
+  MissionAlreadyActive,
   /// <summary>A side was missing its required objective list.</summary>
   MissingObjective,
   /// <summary>A referenced faction was not part of the battle's side list.</summary>

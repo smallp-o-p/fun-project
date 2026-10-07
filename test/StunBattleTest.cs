@@ -16,8 +16,8 @@ public partial class StunBattleTest
 
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
 
-    Assert.Equal(point, battle.Alive(battle.EnemyUnit).Position);
-    Assert.False(battle.Board.CanOccupy(point));
+    battle.Read(() => Assert.Equal(point, battle.Alive(battle.EnemyUnit).Position));
+    battle.Read(() => Assert.False(battle.Board.CanOccupy(point)));
   }
 
   [TestCase]
@@ -28,10 +28,10 @@ public partial class StunBattleTest
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
     battle.ApplyDamage(battle.EnemyUnit, 5, DamageKind.Stun);
     battle.ApplyDamage(battle.EnemyUnit, 20);
-    Assert.Equal(1, battle.Events.EventsOf<UnitUnconsciousBattleEvent>().Length);
-    Assert.Equal(1, battle.Events.EventsOf<UnitKilledBattleEvent>().Length);
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<UnitUnconsciousBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<UnitKilledBattleEvent>().Length));
     battle.Events.EventBefore<UnitUnconsciousBattleEvent, UnitKilledBattleEvent>();
-    Assert.Equal(5, battle.Events.SingleEvent<UnitDamagedBattleEvent>().StunDamage);
+    battle.Read(() => Assert.Equal(5, battle.Events.SingleEvent<UnitDamagedBattleEvent>().StunDamage));
   }
 
   [TestCase(19, false)]
@@ -43,8 +43,8 @@ public partial class StunBattleTest
 
     battle.ApplyDamage(battle.EnemyUnit, stun, DamageKind.Stun);
 
-    Assert.Equal(unconscious, battle.EnemyUnit.IsUnconscious);
-    Assert.Equal(!unconscious, battle.EnemyUnit.CanAct());
+    battle.Read(() => Assert.Equal(unconscious, battle.EnemyUnit.IsUnconscious));
+    battle.Read(() => Assert.Equal(!unconscious, battle.EnemyUnit.CanAct()));
   }
 
   [TestCase]
@@ -52,13 +52,13 @@ public partial class StunBattleTest
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.EnemyUnit, 10, DamageKind.Stun);
-    Assert.False(battle.EnemyUnit.IsUnconscious);
+    battle.Read(() => Assert.False(battle.EnemyUnit.IsUnconscious));
     battle.ClearEvents();
 
     battle.ApplyDamage(battle.EnemyUnit, 10);
 
-    Assert.True(battle.EnemyUnit.IsUnconscious);
-    Assert.Equal(battle.EnemyUnit, battle.Events.SingleEvent<UnitUnconsciousBattleEvent>().Unit);
+    battle.Read(() => Assert.True(battle.EnemyUnit.IsUnconscious));
+    battle.Read(() => Assert.Equal(battle.EnemyUnit, battle.Events.SingleEvent<UnitUnconsciousBattleEvent>().Unit));
   }
 
   [TestCase]
@@ -74,8 +74,8 @@ public partial class StunBattleTest
 
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
-    Assert.Equal(battle.EnemyUnit, battle.Events.SingleEvent<UnitKilledBattleEvent>().Unit);
-    Assert.Equal(0, battle.Events.EventsOf<UnitUnconsciousBattleEvent>().Length);
+    battle.Read(() => Assert.Equal(battle.EnemyUnit, battle.Events.SingleEvent<UnitKilledBattleEvent>().Unit));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<UnitUnconsciousBattleEvent>().Length));
   }
 
   [TestCase]
@@ -90,9 +90,9 @@ public partial class StunBattleTest
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
     var unconscious = battle.Events.SingleEvent<UnitUnconsciousBattleEvent>();
-    Assert.Equal(battle.EnemyUnit, unconscious.Unit);
-    Assert.Equal(position, unconscious.Position);
-    Assert.Equal(battle.PlayerUnit, unconscious.MaybeCause.RequireSome());
+    battle.Read(() => Assert.Equal(battle.EnemyUnit, unconscious.Unit));
+    battle.Read(() => Assert.Equal(position, unconscious.Position));
+    battle.Read(() => Assert.Equal(battle.PlayerUnit, unconscious.MaybeCause.RequireSome()));
   }
 
   [TestCase]
@@ -114,30 +114,30 @@ public partial class StunBattleTest
 
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
-    Assert.Equal(10, armor.Capability.Current);
-    Assert.Equal(20, battle.EnemyUnit.CurrentHealth);
-    Assert.Equal(8, battle.EnemyUnit.CurrentStun);
+    battle.Read(() => Assert.Equal(10, armor.Capability.Current));
+    battle.Read(() => Assert.Equal(20, battle.EnemyUnit.CurrentHealth));
+    battle.Read(() => Assert.Equal(8, battle.EnemyUnit.CurrentStun));
   }
 
   [TestCase]
   public void KnockingOutAnAvailableUnitConsumesItsActivation()
   {
     using var battle = BattleFixture.Duel();
-    Assert.True(battle.Query(new IsUnitStillAvailableThisTurn(battle.PlayerUnit)));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitStillAvailableThisTurn(battle.PlayerUnit))));
 
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
 
-    Assert.False(battle.Query(new IsUnitStillAvailableThisTurn(battle.PlayerUnit)));
+    battle.Read(() => Assert.False(battle.Query(new IsUnitStillAvailableThisTurn(battle.PlayerUnit))));
   }
 
   [TestCase]
   public void StunRejectsNegativeAmountsAndOverflowWithoutWrapping()
   {
     using var battle = BattleFixture.Duel();
-    Assert.Throws<ArgumentOutOfRangeException>(() => battle.EnemyUnit.ReceiveStun(-1));
-    Assert.Equal(0, battle.EnemyUnit.CurrentStun);
-    battle.EnemyUnit.ReceiveStun(int.MaxValue);
-    Assert.Throws<OverflowException>(() => battle.EnemyUnit.ReceiveStun(1));
-    Assert.Equal(int.MaxValue, battle.EnemyUnit.CurrentStun);
+    Assert.Throws<ArgumentOutOfRangeException>(() => battle.Mutate(() => battle.EnemyUnit.ReceiveStun(-1)));
+    battle.Read(() => Assert.Equal(0, battle.EnemyUnit.CurrentStun));
+    battle.Mutate(() => battle.EnemyUnit.ReceiveStun(int.MaxValue));
+    Assert.Throws<OverflowException>(() => battle.Mutate(() => battle.EnemyUnit.ReceiveStun(1)));
+    battle.Read(() => Assert.Equal(int.MaxValue, battle.EnemyUnit.CurrentStun));
   }
 }

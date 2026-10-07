@@ -31,13 +31,13 @@ public partial class BlastResolutionTest
     var enemy = battle.UnitAt(new Vector3I(3, 0, 1));
 
     var grenade = TestData.MakeGrenade("Frag", throwRange: 6, blastRadius: 1, effects: [new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic }]);
-    thrower.AddInventoryItem(grenade.Item);
+    battle.Mutate(() => thrower.AddInventoryItem(grenade.Item));
     battle.ClearEvents();
     battle.Throw(thrower, grenade, new Vector3I(3, 0, 1));
 
-    Assert.Equal(12, enemy.CurrentHealth);
-    Assert.True(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, enemy)));
-    Assert.True(battle.Events.EventsOf<CapabilityResolvedBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.Equal(12, enemy.CurrentHealth));
+    battle.Read(() => Assert.True(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, enemy))));
+    battle.Read(() => Assert.True(battle.Events.EventsOf<CapabilityResolvedBattleEvent>().AsValueEnumerable().Any()));
   }
 
   [TestCase(TestName = "A unit outside the blast radius is unaffected")]
@@ -54,13 +54,13 @@ public partial class BlastResolutionTest
     var farEnemy = battle.UnitAt(new Vector3I(3, 0, 4));
 
     var grenade = TestData.MakeGrenade("Frag", throwRange: 6, blastRadius: 1, effects: [new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic }]);
-    thrower.AddInventoryItem(grenade.Item);
+    battle.Mutate(() => thrower.AddInventoryItem(grenade.Item));
     battle.ClearEvents();
     battle.Throw(thrower, grenade, new Vector3I(3, 0, 1));
 
-    Assert.Equal(12, nearEnemy.CurrentHealth);
-    Assert.Equal(20, farEnemy.CurrentHealth);
-    Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, farEnemy)));
+    battle.Read(() => Assert.Equal(12, nearEnemy.CurrentHealth));
+    battle.Read(() => Assert.Equal(20, farEnemy.CurrentHealth));
+    battle.Read(() => Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, farEnemy))));
   }
 
   [TestCase(TestName = "Friendly-fire: an allied unit within the blast radius is also damaged")]
@@ -77,14 +77,14 @@ public partial class BlastResolutionTest
     var enemy = battle.UnitAt(new Vector3I(4, 0, 1));
 
     var grenade = TestData.MakeGrenade("Frag", throwRange: 6, blastRadius: 1, effects: [new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic }]);
-    thrower.AddInventoryItem(grenade.Item);
+    battle.Mutate(() => thrower.AddInventoryItem(grenade.Item));
     battle.ClearEvents();
     battle.Throw(thrower, grenade, new Vector3I(4, 0, 1));
 
     // Target (4,0,1): the enemy (distance 0) and the allied unit (distance 1) are both in radius.
-    Assert.Equal(12, enemy.CurrentHealth);
-    Assert.Equal(12, ally.CurrentHealth);
-    Assert.True(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, ally)));
+    battle.Read(() => Assert.Equal(12, enemy.CurrentHealth));
+    battle.Read(() => Assert.Equal(12, ally.CurrentHealth));
+    battle.Read(() => Assert.True(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, ally))));
   }
 
   [TestCase(TestName = "A status effect in the blast applies to an in-radius unit")]
@@ -103,12 +103,12 @@ public partial class BlastResolutionTest
       throwRange: 6,
       blastRadius: 1,
       effects: [new ImmobilizeStatusSpecData { DurationTurns = 2, ApplyChancePercent = 100 }]);
-    thrower.AddInventoryItem(grenade.Item);
+    battle.Mutate(() => thrower.AddInventoryItem(grenade.Item));
     battle.ClearEvents();
     battle.Throw(thrower, grenade, new Vector3I(3, 0, 1));
 
-    Assert.True(enemy.IsImmobilized);
-    Assert.True(battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, enemy)));
+    battle.Read(() => Assert.True(enemy.IsImmobilized));
+    battle.Read(() => Assert.True(battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, enemy))));
   }
 
   [TestCase]
@@ -138,17 +138,17 @@ public partial class BlastResolutionTest
     battle.Attack(battle.PlayerUnit, destroyed);
     var grenade = TestData.MakeGrenade("Frag", throwRange: 10, blastRadius: 1,
       effects: [new DamageEffectData { BaseDamage = 8, DamageTerrain = false }]);
-    battle.PlayerUnit.AddInventoryItem(grenade.Item);
+    battle.Mutate(() => battle.PlayerUnit.AddInventoryItem(grenade.Item));
     battle.ClearEvents();
     battle.Throw(battle.PlayerUnit, grenade, origin);
-    Assert.Equal(12, near.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
-    Assert.Equal(12, battle.EnemyUnit.CurrentHealth);
-    Assert.Equal(20, far.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
-    Assert.Equal(20, resolved.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
-    Assert.Equal(Some(ObjectStatus.Destroyed), destroyed.Status);
-    Assert.Equal(0, battle.Events.EventsOf<ObjectDestroyedBattleEvent>().Length);
-    Assert.True(scenery.Status.IsNone);
-    Assert.True(battle.Events.SingleEvent<ObjectDamagedBattleEvent>().MaybeCause.IsNone);
+    battle.Read(() => Assert.Equal(12, near.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth));
+    battle.Read(() => Assert.Equal(12, battle.EnemyUnit.CurrentHealth));
+    battle.Read(() => Assert.Equal(20, far.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth));
+    battle.Read(() => Assert.Equal(20, resolved.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth));
+    battle.Read(() => Assert.Equal(Some(ObjectStatus.Destroyed), destroyed.Status));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<ObjectDestroyedBattleEvent>().Length));
+    battle.Read(() => Assert.True(scenery.Status.IsNone));
+    battle.Read(() => Assert.True(battle.Events.SingleEvent<ObjectDamagedBattleEvent>().MaybeCause.IsNone));
     battle.Events.EventBefore<ObjectDamagedBattleEvent, CapabilityResolvedBattleEvent>();
   }
 
@@ -170,13 +170,13 @@ public partial class BlastResolutionTest
     var grenade = TestData.MakeGrenade("Mixed", throwRange: 10, blastRadius: 0,
       effects: [TestData.MakeBurn(), new DamageEffectData { BaseDamage = 5 },
         new DamageEffectData { BaseDamage = 5 }]);
-    battle.PlayerUnit.AddInventoryItem(grenade.Item);
+    battle.Mutate(() => battle.PlayerUnit.AddInventoryItem(grenade.Item));
     battle.ClearEvents();
     battle.Throw(battle.PlayerUnit, grenade, origin);
-    Assert.Equal(Some(ObjectStatus.Destroyed), obj.Status);
-    Assert.Equal(20, neighbor.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
-    Assert.Equal(1, battle.Events.EventsOf<ObjectDestroyedBattleEvent>().Length);
-    Assert.Equal(0, battle.Events.EventsOf<ObjectDamagedBattleEvent>().Length);
-    Assert.Equal(0, battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().Length);
+    battle.Read(() => Assert.Equal(Some(ObjectStatus.Destroyed), obj.Status));
+    battle.Read(() => Assert.Equal(20, neighbor.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<ObjectDestroyedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<ObjectDamagedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().Length));
   }
 }

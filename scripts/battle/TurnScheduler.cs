@@ -13,7 +13,7 @@ namespace FunProject.Battle;
 internal sealed class TurnScheduler
 {
   private readonly BattleAccessBinding _battleAccess = new();
-  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access);  }
+  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access); }
   internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
 
   private readonly Func<Faction, bool> _hasConsciousUnits;
@@ -52,7 +52,7 @@ internal sealed class TurnScheduler
     RefreshActiveFactionAvailability();
   }
 
-  private Faction _activeSide;
+  private Faction _activeSide = null!;
   public Faction ActiveSide
   {
     get { _battleAccess.RequireRead(); return _activeSide; }

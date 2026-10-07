@@ -91,7 +91,7 @@ public sealed class BattleRuntimeAccessTest
   public void OwnerCallbacksReadBeforeAndAfterCleanup()
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), actionPoints: 4);
-    battle.Unit.TrySpendActionPoints(4);
+    battle.Mutate(() => battle.Unit.TrySpendActionPoints(4));
     int during = -1;
     int after = -1;
     battle.Runtime.BattleEventCommitted += evt =>

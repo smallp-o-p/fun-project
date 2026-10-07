@@ -24,6 +24,8 @@ public sealed partial class BattleScene : Node3D
   private bool _refreshPending;
   private bool _idlePending;
   private bool _bannerPending;
+  private bool _returnPending;
+  private bool _returnIssued;
 
   /// <summary>Requests campaign completion after terminal playback finishes.</summary>
   public event Action<FactionBattleSummary>? Completed;
@@ -45,9 +47,10 @@ public sealed partial class BattleScene : Node3D
     if (_disposed)
       return;
     _disposed = true;
+    _runtime?.RequestClose();
     _ui?.Dispose();
     _director?.Unbind();
-    _runtime?.Dispose();
+    if (_runtime is not null) BattleRuntimeDrainHost.Retain(_runtime, delegate { });
   }
 
   // The installer runs fallible setup after tree attachment and recovers exceptions directly.
@@ -121,6 +124,7 @@ public sealed partial class BattleScene : Node3D
     if (_refreshPending) RefreshView();
     if (_bannerPending) ShowBattleOverBanner();
     if (_idlePending) OnPlaybackIdle();
+    if (_returnPending) OnReturnIntent();
   }
 
   private bool TryRead(out BattleQueryScope? scope)
@@ -139,7 +143,9 @@ public sealed partial class BattleScene : Node3D
 
   private void OnReturnIntent()
   {
-    if (!TryRead(out var scope)) return;
+    if (_returnIssued || _disposed) return;
+    if (!TryRead(out var scope)) { _returnPending = !_runtime.IsClosing; return; }
+    _returnPending = false;
     FactionBattleSummary? summary = null;
     using (scope)
     {
@@ -147,7 +153,13 @@ public sealed partial class BattleScene : Node3D
         summary = _runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
           Right: value => value, Left: failure => throw new InvalidOperationException(failure.Message));
     }
-    if (summary is not null) Completed?.Invoke(summary);
+    if (summary is null) return;
+    _returnIssued = true;
+    var finalSummary = summary;
+    BattleRuntimeDrainHost.Retain(_runtime, () =>
+    {
+      if (!_disposed) Completed?.Invoke(finalSummary);
+    });
   }
 
   private void RefreshView()

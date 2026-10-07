@@ -44,19 +44,19 @@ public class InteractWithObjectTest
     var bomb = BombAt(battle, point.Raw);
     battle.ClearEvents();
 
-    int apBefore = unit.CurrentActionPoints;
+    int apBefore = battle.Read(() => unit.CurrentActionPoints);
     battle.Interact(unit, bomb);
 
-    Assert.Equal(Some(ObjectStatus.Interacted), bomb.Status);
-    Assert.Equal(apBefore - 2, unit.CurrentActionPoints);
-    Assert.True(battle.Session.TryGetAliveObject(bomb).IsNone);
-    Assert.False(battle.Session.Board.IsBlockedByObject(point));
-    Assert.Equal(point.Raw, bomb.Position);
+    battle.Read(() => Assert.Equal(Some(ObjectStatus.Interacted), bomb.Status));
+    battle.Read(() => Assert.Equal(apBefore - 2, unit.CurrentActionPoints));
+    battle.Read(() => Assert.True(battle.Session.TryGetAliveObject(bomb).IsNone));
+    battle.Read(() => Assert.False(battle.Session.Board.IsBlockedByObject(point)));
+    battle.Read(() => Assert.Equal(point.Raw, bomb.Position));
 
     ObjectInteractedBattleEvent @event = battle.Events.SingleEvent<ObjectInteractedBattleEvent>();
-    Assert.Equal(unit, @event.Actor);
-    Assert.Equal(bomb, @event.Object);
-    Assert.Equal(point, @event.Position);
+    battle.Read(() => Assert.Equal(unit, @event.Actor));
+    battle.Read(() => Assert.Equal(bomb, @event.Object));
+    battle.Read(() => Assert.Equal(point, @event.Position));
   }
 
   [TestCase(TestName = "Interaction spending the actor's last AP refreshes that actor's retained actions")]
@@ -77,28 +77,30 @@ public class InteractWithObjectTest
       new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
     IReadOnlyList<UnitAction> enemyActions = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(battle.EnemyUnit)));
-    foreach (UnitAction action in playerActions)
-      _ = action.IsAvailable;
-    int turnNumber = battle.Session.TurnNumber;
+    battle.Read(() =>
+    {
+      foreach (UnitAction action in playerActions) _ = action.IsAvailable;
+    });
+    int turnNumber = battle.Read(() => battle.Session.TurnNumber);
 
     battle.Interact(battle.PlayerUnit, bomb);
 
-    Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
-    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsNone);
-    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
-    Assert.Equal(turnNumber, battle.Session.TurnNumber);
-    Assert.False(playerActions.AsValueEnumerable()
-      .Single(action => action.Action is MoveActionDefinition).IsAvailable);
-    Assert.False(playerActions.AsValueEnumerable()
-      .Single(action => action.Action is AttackActionDefinition).IsAvailable);
-    Assert.False(playerActions.AsValueEnumerable()
-      .Single(action => action.Action is PassActionDefinition).IsAvailable);
-    Assert.True(playerActions.AsValueEnumerable()
-      .Single(action => action.Action is EndTurnActionDefinition).IsAvailable);
-    Assert.True(ReferenceEquals(playerActions, battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)))));
-    Assert.True(ReferenceEquals(enemyActions, battle.Query(
-      new GetAvailableActionsForUnit(battle.Alive(battle.EnemyUnit)))));
+    battle.Read(() => Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints));
+    battle.Read(() => Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsNone));
+    battle.Read(() => Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery())));
+    battle.Read(() => Assert.Equal(turnNumber, battle.Session.TurnNumber));
+    battle.Read(() => Assert.False(playerActions.AsValueEnumerable()
+      .Single(action => action.Action is MoveActionDefinition).IsAvailable));
+    battle.Read(() => Assert.False(playerActions.AsValueEnumerable()
+      .Single(action => action.Action is AttackActionDefinition).IsAvailable));
+    battle.Read(() => Assert.False(playerActions.AsValueEnumerable()
+      .Single(action => action.Action is PassActionDefinition).IsAvailable));
+    battle.Read(() => Assert.True(playerActions.AsValueEnumerable()
+      .Single(action => action.Action is EndTurnActionDefinition).IsAvailable));
+    battle.Read(() => Assert.True(ReferenceEquals(playerActions, battle.Query(
+      new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit))))));
+    battle.Read(() => Assert.True(ReferenceEquals(enemyActions, battle.Query(
+      new GetAvailableActionsForUnit(battle.Alive(battle.EnemyUnit))))));
   }
 
   [TestCase(TestName = "Insufficient action points throw before object mutation")]
@@ -115,11 +117,11 @@ public class InteractWithObjectTest
     Assert.Throws<InvalidOperationException>(() => battle.Submit(
       BattleAction.InteractWithObject(battle.Alive(unit), battle.Live(bomb))));
 
-    Assert.True(bomb.Status.IsNone);
-    Assert.True(battle.Session.TryGetAliveObject(bomb).IsSome);
-    Assert.True(battle.Session.Board.IsBlockedByObject(point));
-    Assert.Equal(point.Raw, bomb.Position);
-    Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().AsValueEnumerable().Count());
+    battle.Read(() => Assert.True(bomb.Status.IsNone));
+    battle.Read(() => Assert.True(battle.Session.TryGetAliveObject(bomb).IsSome));
+    battle.Read(() => Assert.True(battle.Session.Board.IsBlockedByObject(point)));
+    battle.Read(() => Assert.Equal(point.Raw, bomb.Position));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().AsValueEnumerable().Count()));
   }
 
   [TestCase(TestName = "Foreign object proofs interrupt instead of touching local occupancy")]
@@ -138,15 +140,15 @@ public class InteractWithObjectTest
 
     LiveObject foreignProof = foreign.Live(foreignBomb);
 
-    Assert.Equal(
+    local.Mutate(() => Assert.Equal(
       BattleAction.Result.Interrupted,
-      BattleAction.InteractWithObject(local.Alive(localUnit), foreignProof).Execute(local.Session));
+      BattleAction.InteractWithObject(local.Alive(localUnit), foreignProof).Execute(local.Session)));
 
-    Assert.True(localBomb.Status.IsNone);
-    Assert.True(local.Session.TryGetAliveObject(localBomb).IsSome);
-    Assert.True(local.Session.Board.IsBlockedByObject(localPoint));
-    Assert.Equal(localPoint.Raw, localBomb.Position);
-    Assert.True(foreignBomb.Status.IsNone);
+    local.Read(() => Assert.True(localBomb.Status.IsNone));
+    local.Read(() => Assert.True(local.Session.TryGetAliveObject(localBomb).IsSome));
+    local.Read(() => Assert.True(local.Session.Board.IsBlockedByObject(localPoint)));
+    local.Read(() => Assert.Equal(localPoint.Raw, localBomb.Position));
+    foreign.Read(() => Assert.True(foreignBomb.Status.IsNone));
   }
 
   [TestCase(TestName = "A defused object keeps stale proofs from executing")]
@@ -164,8 +166,8 @@ public class InteractWithObjectTest
 
     battle.Submit(BattleAction.InteractWithObject(unitProof, objectProof));
 
-    Assert.True(battle.Session.TryGetAliveObject(bomb).IsNone);
-    Assert.Equal(BattleAction.Result.Interrupted,
-      BattleAction.InteractWithObject(unitProof, objectProof).Execute(battle.Session));
+    battle.Read(() => Assert.True(battle.Session.TryGetAliveObject(bomb).IsNone));
+    battle.Mutate(() => Assert.Equal(BattleAction.Result.Interrupted,
+      BattleAction.InteractWithObject(unitProof, objectProof).Execute(battle.Session)));
   }
 }

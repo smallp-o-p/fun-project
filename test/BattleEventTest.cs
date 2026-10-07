@@ -26,7 +26,7 @@ public class BattleEventTest
     var target = battle.At(3, 0, 2);
     var unit = battle.Unit;
     var grenade = TestData.MakeGrenade("Frag Grenade", throwRange: 4, actionPointCost: 1);
-    unit.AddInventoryItem(grenade.Item);
+    battle.Mutate(() => unit.AddInventoryItem(grenade.Item));
 
     runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [destination]));
     runtime.ExecuteAction(BattleAction.ThrowItem(battle.Alive(unit), grenade, target));
@@ -35,21 +35,21 @@ public class BattleEventTest
     // The fixture window deliberately includes the startup placement: UnitAdded is part of
     // what this test observes, so it is never cleared.
     var addedEvent = battle.Events.SingleEvent<UnitAddedBattleEvent>();
-    Assert.True(ReferenceEquals(unit, addedEvent.Unit));
-    Assert.Equal(start, addedEvent.Position);
+    battle.Read(() => Assert.True(ReferenceEquals(unit, addedEvent.Unit)));
+    battle.Read(() => Assert.Equal(start, addedEvent.Position));
 
     var movedEvent = battle.Events.SingleEvent<UnitMovedBattleEvent>();
-    Assert.True(ReferenceEquals(unit, movedEvent.Unit));
-    Assert.Equal(destination, movedEvent.Position);
-    Assert.Equal(start, movedEvent.SourcePosition);
+    battle.Read(() => Assert.True(ReferenceEquals(unit, movedEvent.Unit)));
+    battle.Read(() => Assert.Equal(destination, movedEvent.Position));
+    battle.Read(() => Assert.Equal(start, movedEvent.SourcePosition));
 
     var thrownEvent = battle.Events.SingleEvent<ItemThrownBattleEvent>();
-    Assert.True(ReferenceEquals(unit, thrownEvent.Unit));
-    Assert.True(ReferenceEquals(grenade.Item, thrownEvent.Item));
-    Assert.Equal(target, thrownEvent.Position);
+    battle.Read(() => Assert.True(ReferenceEquals(unit, thrownEvent.Unit)));
+    battle.Read(() => Assert.True(ReferenceEquals(grenade.Item, thrownEvent.Item)));
+    battle.Read(() => Assert.Equal(target, thrownEvent.Position));
 
     var damagedEvent = battle.Events.SingleEvent<UnitDamagedBattleEvent>();
-    Assert.True(ReferenceEquals(unit, damagedEvent.Unit));
+    battle.Read(() => Assert.True(ReferenceEquals(unit, damagedEvent.Unit)));
   }
 
   [TestCase(TestName = "Event dispatch keys contain exactly the concrete type and its tag interfaces")]
@@ -65,11 +65,11 @@ public class BattleEventTest
     UnitAddedBattleEvent addedEvent = battle.Events.SingleEvent<UnitAddedBattleEvent>();
     FrozenSet<Type> keys = addedEvent.EventKeys;
 
-    Assert.Equal(4, keys.Count);
-    Assert.True(keys.Contains(typeof(UnitAddedBattleEvent)), "Concrete event type missing from dispatch keys.");
-    Assert.True(keys.Contains(typeof(BattleEventTag)), "Root tag missing from dispatch keys.");
-    Assert.True(keys.Contains(typeof(IUnitBattleEvent)), "IUnitBattleEvent missing from dispatch keys.");
-    Assert.True(keys.Contains(typeof(IPositionedBattleEvent)), "IPositionedBattleEvent missing from dispatch keys.");
+    battle.Read(() => Assert.Equal(4, keys.Count));
+    battle.Read(() => Assert.True(keys.Contains(typeof(UnitAddedBattleEvent)), "Concrete event type missing from dispatch keys."));
+    battle.Read(() => Assert.True(keys.Contains(typeof(BattleEventTag)), "Root tag missing from dispatch keys."));
+    battle.Read(() => Assert.True(keys.Contains(typeof(IUnitBattleEvent)), "IUnitBattleEvent missing from dispatch keys."));
+    battle.Read(() => Assert.True(keys.Contains(typeof(IPositionedBattleEvent)), "IPositionedBattleEvent missing from dispatch keys."));
   }
 
   [TestCase(TestName = "An event without marker interfaces keys on its concrete type and the root tag only")]
@@ -133,13 +133,13 @@ public class BattleEventTest
     Assert.Throws<ArgumentNullException>(() => new ObjectDestroyedBattleEvent(null!, battle.At(3, 0, 2), None));
     BattleEvent damaged = new ObjectDamagedBattleEvent(obj, [new Damage(1, Element.Kinetic)], 1, None);
     BattleEvent destroyed = new ObjectDestroyedBattleEvent(obj, battle.At(3, 0, 2), None);
-    Assert.True(damaged is ICausedByUnit);
-    Assert.True(destroyed is IPositionedBattleEvent and ICausedByUnit);
-    Assert.False(damaged is IUnitBattleEvent);
-    Assert.False(destroyed is IUnitBattleEvent);
+    battle.Read(() => Assert.True(damaged is ICausedByUnit));
+    battle.Read(() => Assert.True(destroyed is IPositionedBattleEvent and ICausedByUnit));
+    battle.Read(() => Assert.False(damaged is IUnitBattleEvent));
+    battle.Read(() => Assert.False(destroyed is IUnitBattleEvent));
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
-    Assert.True(ReferenceEquals(battle.EnemyUnit,
-      ((BattleEntity.Unit)battle.Events.SingleEvent<UnitAttackedBattleEvent>().Target).State));
+    battle.Read(() => Assert.True(ReferenceEquals(battle.EnemyUnit,
+      ((BattleEntity.Unit)battle.Events.SingleEvent<UnitAttackedBattleEvent>().Target).State)));
   }
 }

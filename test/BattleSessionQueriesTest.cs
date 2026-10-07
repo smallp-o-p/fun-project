@@ -49,10 +49,10 @@ public class BattleSessionQueriesTest
 
     BattleBoardState.ValidatedPoint[] path = battle.Query(new FindPathForUnit(battle.Alive(unit), battle.At(2, 0, 0)));
 
-    Assert.Equal(new Vector3I(0, 0, 0), battle.Alive(unit).Position.Raw);
-    Assert.Equal(3, path.Length);
-    Assert.Equal(new Vector3I(0, 0, 0), path[0].Raw);
-    Assert.Equal(new Vector3I(2, 0, 0), path[^1].Raw);
+    battle.Read(() => Assert.Equal(new Vector3I(0, 0, 0), battle.Alive(unit).Position.Raw));
+    battle.Read(() => Assert.Equal(3, path.Length));
+    battle.Read(() => Assert.Equal(new Vector3I(0, 0, 0), path[0].Raw));
+    battle.Read(() => Assert.Equal(new Vector3I(2, 0, 0), path[^1].Raw));
   }
 
   [TestCase(1, TestName = "GetUnitAtTile returns the unit occupying a tile")]
@@ -65,9 +65,9 @@ public class BattleSessionQueriesTest
 
     Option<BattleUnitState> occupant = battle.Query(new GetUnitAtTile(battle.At(x, 0, 0)));
 
-    Assert.Equal(x == 1, occupant.IsSome);
+    battle.Read(() => Assert.Equal(x == 1, occupant.IsSome));
     if (x == 1)
-      Assert.Equal(unit, occupant.RequireSome());
+      battle.Read(() => Assert.Equal(unit, occupant.RequireSome()));
   }
 
   [TestCase(TestName = "GetPossibleMoveTilesForUnit respects action points")]
@@ -78,11 +78,11 @@ public class BattleSessionQueriesTest
     var unit = battle.Unit;
 
     IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = battle.Query(new GetPossibleMoveTilesForUnit(battle.Alive(unit)));
-    Assert.True(tiles.Count == 2);
+    battle.Read(() => Assert.True(tiles.Count == 2));
     var rawTiles = tiles.AsValueEnumerable().Select(tile => tile.Raw).ToHashSet();
-    Assert.True(rawTiles.Contains(new Vector3I(1, 0, 0)));
-    Assert.True(rawTiles.Contains(new Vector3I(2, 0, 0)));
-    Assert.False(tiles.AsValueEnumerable().Any(tile => tile.Raw == battle.Session.GetUnitPosition(unit).RequireSome().Raw));
+    battle.Read(() => Assert.True(rawTiles.Contains(new Vector3I(1, 0, 0))));
+    battle.Read(() => Assert.True(rawTiles.Contains(new Vector3I(2, 0, 0))));
+    battle.Read(() => Assert.False(tiles.AsValueEnumerable().Any(tile => tile.Raw == battle.Session.GetUnitPosition(unit).RequireSome().Raw)));
   }
 
   [TestCase(TestName = "GetPossibleMoveTilesForUnit does not include unreachable tiles inside movement range")]
@@ -94,7 +94,7 @@ public class BattleSessionQueriesTest
     var unit = battle.Unit;
 
     IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles = battle.Query(new GetPossibleMoveTilesForUnit(battle.Alive(unit)));
-    Assert.True(tiles.Count == 0);
+    battle.Read(() => Assert.True(tiles.Count == 0));
   }
 
   [TestCase(TestName = "GetVisibleEnemiesForUnit returns visible enemies only")]
@@ -111,8 +111,8 @@ public class BattleSessionQueriesTest
 
     IReadOnlyCollection<AliveUnit> enemies = battle.Query(new GetVisibleEnemiesForUnit(battle.Alive(observer)));
 
-    Assert.True(enemies.AsValueEnumerable().Select(e => e.State).Contains(visibleEnemy));
-    Assert.False(enemies.AsValueEnumerable().Select(e => e.State).Contains(hiddenEnemy));
+    battle.Read(() => Assert.True(enemies.AsValueEnumerable().Select(e => e.State).Contains(visibleEnemy)));
+    battle.Read(() => Assert.False(enemies.AsValueEnumerable().Select(e => e.State).Contains(hiddenEnemy)));
   }
 
   [TestCase(TestName = "GetFactionDeadUnits filters by faction")]
@@ -129,9 +129,9 @@ public class BattleSessionQueriesTest
     var factionADead = battle.Query(new GetFactionDeadUnits(factionA));
     var factionBDead = battle.Query(new GetFactionDeadUnits(factionB));
 
-    Assert.True(factionADead.AsValueEnumerable().Select(d => d.State).Contains(unitA));
-    Assert.False(factionBDead.AsValueEnumerable().Select(d => d.State).Contains(unitA));
-    Assert.True(!factionBDead.AsValueEnumerable().Any());
+    battle.Read(() => Assert.True(factionADead.AsValueEnumerable().Select(d => d.State).Contains(unitA)));
+    battle.Read(() => Assert.False(factionBDead.AsValueEnumerable().Select(d => d.State).Contains(unitA)));
+    battle.Read(() => Assert.True(!factionBDead.AsValueEnumerable().Any()));
   }
 
 }

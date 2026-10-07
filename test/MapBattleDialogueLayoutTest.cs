@@ -116,8 +116,8 @@ public class MapBattleDialogueLayoutTest
 
     var verbs = hud.GetNode<Container>("%VerbButtons");
     AssertInside(verbs, width, height);
-    Assert.True(ScreenRect(verbs).Position.Y > height * 0.65f);
-    Assert.True(ScreenRect(verbs.GetChild<Button>(1)).Position.X > ScreenRect(verbs.GetChild<Button>(0)).Position.X);
+    battle.Read(() => Assert.True(ScreenRect(verbs).Position.Y > height * 0.65f));
+    battle.Read(() => Assert.True(ScreenRect(verbs.GetChild<Button>(1)).Position.X > ScreenRect(verbs.GetChild<Button>(0)).Position.X));
     AssertInside(hud.GetNode<Control>("%UnitScroll"), width, height);
     AssertInside(hud.GetNode<Button>("%ConfirmButton"), width, height);
   }
@@ -131,12 +131,12 @@ public class MapBattleDialogueLayoutTest
     var option = new EndTurnActionOption(actions.AsValueEnumerable().First(action => action.Action is EndTurnActionDefinition));
     hud.ShowActionOptions(battle.Read(() => new[] { new ActionOptionReadout(option, option.IsAvailable) }));
     var button = Required<Container>(hud, "%TurnButtons").GetChild<Button>(0);
-    Assert.Equal("End Turn", button.Text);
+    battle.Read(() => Assert.Equal("End Turn", button.Text));
     UnitActionOption? selected = null;
     hud.VerbSelected += value => selected = value;
     button.EmitSignal(Button.SignalName.Pressed);
-    Assert.True(ReferenceEquals(option, selected));
-    Assert.Equal(0, hud.GetNode<Container>("%VerbButtons").GetChildCount());
+    battle.Read(() => Assert.True(ReferenceEquals(option, selected)));
+    battle.Read(() => Assert.Equal(0, hud.GetNode<Container>("%VerbButtons").GetChildCount()));
   }
 
   [TestCase(800, 600)]

@@ -17,7 +17,7 @@ public partial class BattleMapBakeTest
     source.Floors.SetCellItem(new(2, 0, 0), 0);
     source.Props.SetCellItem(Godot.Vector3I.Zero, 1);
     var map = FunProject.Tests.GeoscapeTestScenes.AddToTree(source);
-    var camera = FunProject.Tests.GeoscapeTestScenes.AddToTree(new Camera3D());
+    var camera = FunProject.Tests.GeoscapeTestScenes.AddToTree(new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal });
     var tree = (SceneTree)Engine.GetMainLoop();
     await tree.ToSignal(tree, SceneTree.SignalName.PhysicsFrame);
     await tree.ToSignal(tree, SceneTree.SignalName.PhysicsFrame);

@@ -46,15 +46,15 @@ public partial class BattleHudTest
     hud.ShowActionOptions(battle.Read(() => new[] { new ActionOptionReadout(moveOption, moveOption.IsAvailable), new ActionOptionReadout(new PassActionOption(passAction), passAction.IsAvailable) }));
 
     var verbs = hud.GetNode<Container>("%VerbButtons");
-    Assert.Equal(2, verbs.GetChildCount());
+    battle.Read(() => Assert.Equal(2, verbs.GetChildCount()));
     var moveButton = (Button)verbs.GetChild(0);
-    Assert.Equal("Move", moveButton.Text);
+    battle.Read(() => Assert.Equal("Move", moveButton.Text));
     UnitActionOption? selected = null;
     hud.VerbSelected += option => selected = option;
 
     moveButton.EmitSignal(Button.SignalName.Pressed);
 
-    Assert.True(ReferenceEquals(moveOption, selected));
+    battle.Read(() => Assert.True(ReferenceEquals(moveOption, selected)));
   }
 
   [TestCase(TestName = "Battle over banner starts hidden and shows the pushed text")]

@@ -35,11 +35,11 @@ public partial class BattleUITest
     view.ShowActionOptions(battle.Read(() => new[] { new ActionOptionReadout(moveOption, moveOption.IsAvailable), new ActionOptionReadout(passOption, passOption.IsAvailable) }));
 
     var status = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%UnitStatus");
-    Assert.True(status.Text.Contains("HP"));
-    Assert.Equal(units.Length, status.Text.Split("\n").Length);
+    battle.Read(() => Assert.True(status.Text.Contains("HP")));
+    battle.Read(() => Assert.Equal(units.Length, status.Text.Split("\n").Length));
     var verbs = view.GetNode<BattleHud>("%BattleHud").GetNode<Container>("%VerbButtons");
-    Assert.Equal(2, verbs.GetChildCount());
-    Assert.Equal("Move", ((Button)verbs.GetChild(0)).Text);
+    battle.Read(() => Assert.Equal(2, verbs.GetChildCount()));
+    battle.Read(() => Assert.Equal("Move", ((Button)verbs.GetChild(0)).Text));
   }
 
   [TestCase(TestName = "Targeting shows candidate markers and clears them")]
@@ -102,20 +102,20 @@ public partial class BattleUITest
     ((Button)view.GetNode<BattleHud>("%BattleHud").GetNode<Container>("%VerbButtons").GetChild(0))
       .EmitSignal(Button.SignalName.Pressed);
     var returnButton = view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ReturnButton");
-    Assert.False(returnButton.Visible);
+    battle.Read(() => Assert.False(returnButton.Visible));
     view.ShowReturn(true);
-    Assert.True(returnButton.Visible);
+    battle.Read(() => Assert.True(returnButton.Visible));
     returnButton.EmitSignal(Button.SignalName.Pressed);
     view.ShowReturn(false);
-    Assert.False(returnButton.Visible);
+    battle.Read(() => Assert.False(returnButton.Visible));
     view.ShowBattleOver("VICTORY");
 
-    Assert.Equal(1, confirms);
-    Assert.Equal(1, cancels);
-    Assert.Equal(1, returns);
-    Assert.True(ReferenceEquals(moveOption, selected));
+    battle.Read(() => Assert.Equal(1, confirms));
+    battle.Read(() => Assert.Equal(1, cancels));
+    battle.Read(() => Assert.Equal(1, returns));
+    battle.Read(() => Assert.True(ReferenceEquals(moveOption, selected)));
     var banner = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%BattleOverBanner");
-    Assert.True(banner.Visible);
-    Assert.Equal("VICTORY", banner.Text);
+    battle.Read(() => Assert.True(banner.Visible));
+    battle.Read(() => Assert.Equal("VICTORY", banner.Text));
   }
 }

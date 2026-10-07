@@ -29,7 +29,7 @@ public partial class ProgressionBattleApplicationTest
       TestData.MakeStep(1, TestData.MakeStatModEffect(new AimStatMod { Modifiers = [StatModifier.Add(10)] }))));
 
     var unit = battle.Spawn(combatant, new Vector3I(4, 0, 4));
-    Assert.Equal(75f, unit.EffectiveStat<AimStat>());
+    battle.Read(() => Assert.Equal(75f, unit.EffectiveStat<AimStat>()));
   }
 
   [TestCase(TestName = "Unlocked health step raises spawn MaxHealth and CurrentHealth")]
@@ -42,8 +42,8 @@ public partial class ProgressionBattleApplicationTest
       TestData.MakeStep(1, TestData.MakeStatModEffect(new HealthStatMod { Modifiers = [StatModifier.Add(5)] }))));
 
     var unit = battle.Spawn(combatant, new Vector3I(4, 0, 4));
-    Assert.Equal(25, unit.MaxHealth);
-    Assert.Equal(25, unit.CurrentHealth);
+    battle.Read(() => Assert.Equal(25, unit.MaxHealth));
+    battle.Read(() => Assert.Equal(25, unit.CurrentHealth));
   }
 
   [TestCase(TestName = "Unlocked buff grants surface via InnateBuffs and stack with innate grants")]
@@ -56,17 +56,17 @@ public partial class ProgressionBattleApplicationTest
     var innateOnly = TestData.MakeBuff("Innate", condition);
     var combatant = TestData.MakeCombatant("Charlie", faction, buffs: [shared, innateOnly]);
 
-    Assert.Equal(2, combatant.InnateBuffs.Count); // authored innate only, before training
+    battle.Read(() => Assert.Equal(2, combatant.InnateBuffs.Count)); // authored innate only, before training
 
     battle.UnlockFirstStep(combatant, TestData.MakePath("Guardian",
       TestData.MakeStep(1, TestData.MakeBuffGrantEffect(shared, TestData.MakeBuff("Learned", condition)))));
 
     // InnateBuffs is the single surface: authored innate ++ trained grants, live-computed.
-    Assert.Equal(4, combatant.InnateBuffs.Count); // shared, innateOnly, shared, learned
-    Assert.Equal(2, combatant.InnateBuffs.AsValueEnumerable().Count(buff => buff == shared));
+    battle.Read(() => Assert.Equal(4, combatant.InnateBuffs.Count)); // shared, innateOnly, shared, learned
+    battle.Read(() => Assert.Equal(2, combatant.InnateBuffs.AsValueEnumerable().Count(buff => buff == shared)));
 
     var unit = battle.Spawn(combatant, new Vector3I(4, 0, 4));
-    Assert.Equal(4, unit.Buffs.Count); // identical buffs stack, one entry per grant
-    Assert.Equal(2, unit.Buffs.AsValueEnumerable().Count(buff => buff == shared));
+    battle.Read(() => Assert.Equal(4, unit.Buffs.Count)); // identical buffs stack, one entry per grant
+    battle.Read(() => Assert.Equal(2, unit.Buffs.AsValueEnumerable().Count(buff => buff == shared)));
   }
 }
