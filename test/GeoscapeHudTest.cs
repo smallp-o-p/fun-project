@@ -63,8 +63,10 @@ public partial class GeoscapeHudTest
     Assert.False(hud.HasNode("%AlertScroll"));
   }
 
-  [TestCase(TestName = "Ordinary bound buttons forward fresh authored views through the signal")]
-  public async Task BoundButtonsForwardFreshViews()
+  [TestCase("%UnitsButton", typeof(UnitRoster), "res://scenes/geoscape/units/UnitRoster.tscn")]
+  [TestCase("%EngineeringButton", typeof(EngineeringView), "res://scenes/geoscape/engineering/EngineeringView.tscn")]
+  [TestCase("%ResearchButton", typeof(ResearchView), "res://scenes/geoscape/research/ResearchView.tscn")]
+  public async Task BoundButtonsForwardFreshViews(string buttonName, Type viewType, string scenePath)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var hud = BuildHud();
@@ -76,25 +78,17 @@ public partial class GeoscapeHudTest
         received.Add(view);
       })));
 
-    hud.GetNode<Button>("%UnitsButton").EmitSignal(Button.SignalName.Pressed);
-    hud.GetNode<Button>("%UnitsButton").EmitSignal(Button.SignalName.Pressed);
-    hud.GetNode<Button>("%EngineeringButton").EmitSignal(Button.SignalName.Pressed);
-    hud.GetNode<Button>("%ResearchButton").EmitSignal(Button.SignalName.Pressed);
-    hud.GetNode<Button>("%ResearchButton").EmitSignal(Button.SignalName.Pressed);
+    var button = hud.GetNode<Button>(buttonName);
+    button.EmitSignal(Button.SignalName.Pressed);
+    button.EmitSignal(Button.SignalName.Pressed);
 
-    Assert.Equal(5, received.Count);
-    Assert.True(received[0] is UnitRoster);
-    Assert.Equal("res://scenes/geoscape/units/UnitRoster.tscn", received[0].SceneFilePath);
-    Assert.True(received[1] is UnitRoster);
-    Assert.Equal("res://scenes/geoscape/units/UnitRoster.tscn", received[1].SceneFilePath);
-    Assert.False(ReferenceEquals(received[0], received[1])); // each Units press builds a fresh roster
-    Assert.True(received[2] is EngineeringView);
-    Assert.Equal("res://scenes/geoscape/engineering/EngineeringView.tscn", received[2].SceneFilePath);
-    Assert.True(received[3] is ResearchView);
-    Assert.Equal("res://scenes/geoscape/research/ResearchView.tscn", received[3].SceneFilePath);
-    Assert.True(received[4] is ResearchView);
-    Assert.Equal("res://scenes/geoscape/research/ResearchView.tscn", received[4].SceneFilePath);
-    Assert.False(ReferenceEquals(received[3], received[4]));
+    Assert.Equal(2, received.Count);
+    foreach (var view in received)
+    {
+      Assert.True(viewType.IsInstanceOfType(view));
+      Assert.Equal(scenePath, view.SceneFilePath);
+    }
+    Assert.False(ReferenceEquals(received[0], received[1]));
   }
 
   [TestCase(TestName = "An arbitrary ordinary button can bind another view")]

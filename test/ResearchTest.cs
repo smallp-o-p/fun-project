@@ -118,15 +118,22 @@ public class ResearchTest
     session.StartResearch(active).RequireRight();
     var job = session.ActiveResearch;
     campaign.ClearEvents();
-    Assert.Equal(ResearchStartFailure.UnknownProject, session.StartResearch(MakeResearch("Active")).RequireLeft());
-    Assert.Equal(ResearchStartFailure.Busy, session.StartResearch(active).RequireLeft());
-    Assert.Equal(ResearchStartFailure.AlreadyCompleted, session.StartResearch(completed).RequireLeft());
-    Assert.Equal(ResearchStartFailure.Locked, session.StartResearch(locked).RequireLeft());
-    Assert.Equal(job, session.ActiveResearch);
+    (ResearchProject Project, ResearchStartFailure Failure)[] requests =
+    [
+      (MakeResearch("Active"), ResearchStartFailure.UnknownProject),
+      (active, ResearchStartFailure.Busy),
+      (completed, ResearchStartFailure.AlreadyCompleted),
+      (locked, ResearchStartFailure.Locked),
+    ];
+    foreach (var (project, failure) in requests)
+    {
+      Assert.Equal(failure, session.StartResearch(project).RequireLeft());
+      Assert.Equal(job, session.ActiveResearch);
+      Assert.Equal(0, campaign.Events.Count);
+    }
     Assert.True(campaign.State.Research.IsCompleted(completed));
     Assert.False(campaign.State.Research.IsCompleted(active));
     Assert.False(campaign.State.Research.IsCompleted(locked));
-    Assert.Equal(0, campaign.Events.Count);
     Assert.Equal(0, campaign.State.Armory.ItemStock().Count);
   }
 
@@ -159,8 +166,7 @@ public class ResearchTest
     Assert.Equal(restarted, campaign.Events.SingleEvent<ResearchCompleted>().Job);
     Assert.True(campaign.State.Research.IsCompleted(first));
     Assert.False(campaign.State.Research.IsCompleted(second));
-    Assert.Equal(firstItem, session.GetManufacturingOptions()[0].Project.Item);
-    Assert.Equal(1, session.GetManufacturingOptions().Count);
+    Assert.Equal(firstItem, session.GetManufacturingOptions().AsValueEnumerable().Single().Project.Item);
     Assert.Equal(0, campaign.State.Armory.ItemStock().Count);
     Assert.Equal(3, campaign.Events.EventsOf<ResearchStarted>().Length);
   }

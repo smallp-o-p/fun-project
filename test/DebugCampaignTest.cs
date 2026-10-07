@@ -23,14 +23,12 @@ public class DebugCampaignTest
     var supply = start.ResearchProjects[1];
     Assert.Equal(1U, prototype.DurationDays);
     Assert.Equal(2U, supply.DurationDays);
-    Assert.Equal(sample, campaign.Session.GetManufacturingOptions()[0].Project.Item);
-    Assert.Equal(1, campaign.Session.GetManufacturingOptions().Count);
-    Assert.Equal(prototype, campaign.Session.GetAvailableResearchProjects()[0]);
-    Assert.Equal(1, campaign.Session.GetAvailableResearchProjects().Count);
+    Assert.Equal(sample, campaign.Session.GetManufacturingOptions().AsValueEnumerable().Single().Project.Item);
+    Assert.Equal(prototype, campaign.Session.GetAvailableResearchProjects().AsValueEnumerable().Single());
     campaign.Session.StartResearch(prototype).RequireRight();
     campaign.AdvanceTicks(1440);
     Assert.Equal(prototypeItem, campaign.Session.GetManufacturingOptions()[1].Project.Item);
-    Assert.Equal(supply, campaign.Session.GetAvailableResearchProjects()[0]);
+    Assert.Equal(supply, campaign.Session.GetAvailableResearchProjects().AsValueEnumerable().Single());
     campaign.Session.StartResearch(supply).RequireRight();
     campaign.AdvanceTicks(2880);
     Assert.Equal(supplyItem, campaign.Session.GetManufacturingOptions()[2].Project.Item);

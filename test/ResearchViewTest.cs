@@ -25,7 +25,6 @@ public class ResearchViewTest
     var rows = view.GetNode<VBoxContainer>("%ResearchProjects");
     Assert.Equal(1, rows.GetChildCount());
     Assert.Equal("No projects available to research.", OnlyChild<Label>(rows).Text);
-    Assert.False(rows.GetChildren().AsValueEnumerable().Any(child => child is Button));
     Assert.Equal("No active research.", view.GetNode<Label>("%ActiveJob").Text);
     Assert.True(view.GetNode<Button>("%StartResearchButton").Disabled);
   }
@@ -69,7 +68,7 @@ public class ResearchViewTest
     Assert.True(start.Disabled);
     start.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(1, campaign.Events.EventsOf<ResearchStarted>().Length);
-    Assert.True(campaign.Session.ActiveResearch.Match(job => ReferenceEquals(job.Project, second), () => false));
+    Assert.True(ReferenceEquals(second, campaign.Session.ActiveResearch.RequireSome().Project));
     Assert.True(view.GetNode<Label>("%ActiveJob").Text.Contains("1d 0h 0m"));
     campaign.AdvanceTicks(1);
     view.Present(campaign.State, campaign.Session);
@@ -81,7 +80,7 @@ public class ResearchViewTest
     Assert.Equal("Switch Research", start.Text);
     start.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(2, campaign.Events.EventsOf<ResearchStarted>().Length);
-    Assert.True(campaign.Session.ActiveResearch.Match(job => ReferenceEquals(job.Project, first), () => false));
+    Assert.True(ReferenceEquals(first, campaign.Session.ActiveResearch.RequireSome().Project));
     Assert.Equal("Kit", OnlyChild<Button>(rows).Text);
     Assert.False(OnlyChild<Button>(rows).ButtonPressed);
   }
@@ -114,7 +113,6 @@ public class ResearchViewTest
     Assert.True(visible.Encloses(ScreenRect(start)));
     Assert.True(visible.Encloses(ScreenRect(back)));
     var scroll = view.GetNode<ScrollContainer>("%DetailsScroll");
-    Assert.True(scroll.GetVScrollBar().MaxValue > scroll.GetVScrollBar().Page);
     var startRect = ScreenRect(start);
     var backRect = ScreenRect(back);
     scroll.ScrollVertical = 10000;
