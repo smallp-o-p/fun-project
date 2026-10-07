@@ -31,13 +31,8 @@ public sealed partial class ResearchView : GeoscapeView
   private void Refresh()
   {
     _projects = _session.GetAvailableResearchProjects();
-    _selection = _selection.Bind(selected =>
-    {
-      foreach (var project in _projects)
-        if (ReferenceEquals(project, selected))
-          return Some(project);
-      return None;
-    });
+    _selection = _selection.Filter(selected =>
+      _projects.AsValueEnumerable().Any(project => ReferenceEquals(project, selected)));
 
     GetNode<Label>("%Status").Text = "";
     GetNode<Label>("%ActiveJob").Text = _session.ActiveResearch.Match(
