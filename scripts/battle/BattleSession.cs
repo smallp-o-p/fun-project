@@ -14,7 +14,21 @@ namespace FunProject.Battle;
 public sealed class BattleSession
 {
   internal BattleAccessGuard? Access { get; private set; }
-  internal void BindBattleAccess(BattleAccessGuard access) => Access = access;
+  internal void BindBattleAccess(BattleAccessGuard access)
+  {
+    access.RequireMutationAccess();
+    if (Access is not null && !ReferenceEquals(Access, access))
+      throw new InvalidOperationException("Session already has a runtime owner.");
+    Access = access;
+    Board.BindBattleAccess(access);
+    _scheduler.BindBattleAccess(access);
+    foreach (var unit in _units) unit.BindBattleAccess(access);
+    foreach (var obj in _objects) obj.BindBattleAccess(access);
+    foreach (var list in _objectives.Values)
+      foreach (var objective in list) objective.BindBattleAccess(access);
+  }
+  internal void RequireReadAccess() => Access?.RequireReadAccess();
+  internal void RequireMutationAccess() => Access?.RequireMutationAccess();
   internal long Revision { get { Access?.RequireReadAccess(); return Access?.Revision ?? 0; } }
   internal readonly record struct SpawnedBattleUnit(BattleUnitState Unit);
 
@@ -59,27 +73,31 @@ public sealed class BattleSession
 
   public BattleBoardState Board { get; }
   internal UnitActionCache ActionOptions { get; }
-  public int TurnNumber { get; private set; } = 1;
-  public Faction ActiveSide => _scheduler.ActiveSide;
+  private int _turnNumber = 1;
+  public int TurnNumber { get { RequireReadAccess(); return _turnNumber; } private set { RequireMutationAccess(); _turnNumber = value; } }
+  public Faction ActiveSide { get { RequireReadAccess(); return _scheduler.ActiveSide; } }
   public Option<Faction> PlayerFaction { get; }
-  public Option<BattleOutcome> Outcome { get; private set; }
+  private Option<BattleOutcome> _outcome;
+  public Option<BattleOutcome> Outcome { get { RequireReadAccess(); return _outcome; } private set { RequireMutationAccess(); _outcome = value; } }
   // Raw views: the session holds and exposes plain unit state; proofs exist only as return
   // values (TryGetAlive, read-query results), never as session-held collections.
-  public IEnumerable<BattleUnitState> AliveUnits => _units.AsValueEnumerable().Where(unit => unit.IsAlive).ToArray();
-  public IEnumerable<BattleUnitState> DeadUnits => _units.AsValueEnumerable().Where(unit => unit.IsDead).ToArray();
+  public IEnumerable<BattleUnitState> AliveUnits { get { RequireReadAccess(); return _units.AsValueEnumerable().Where(unit => unit.IsAlive).ToArray(); } }
+  public IEnumerable<BattleUnitState> DeadUnits { get { RequireReadAccess(); return _units.AsValueEnumerable().Where(unit => unit.IsDead).ToArray(); } }
   // Raw view, snapshot like AliveUnits: plain object state; proofs only as return values.
-  public IEnumerable<BattleObjectState> Objects => _objects.AsValueEnumerable().ToArray();
+  public IEnumerable<BattleObjectState> Objects { get { RequireReadAccess(); return _objects.AsValueEnumerable().ToArray(); } }
 
   // Mints a proof iff the unit instance belongs to THIS session's alive storage (provenance +
   // aliveness in one check). The single door for callers holding a raw BattleUnitState.
   public Option<AliveUnit> TryGetAlive(BattleUnitState unit)
   {
+    RequireReadAccess();
     ArgumentNullException.ThrowIfNull(unit);
     return _units.Contains(unit) && unit.IsAlive ? Some(MintAlive(unit)) : None;
   }
 
   public Option<LiveObject> TryGetAliveObject(BattleObjectState obj)
   {
+    RequireReadAccess();
     ArgumentNullException.ThrowIfNull(obj);
     return _objects.Contains(obj) && obj.Status.IsNone
       ? Some(MintAliveObject(obj))
@@ -91,6 +109,7 @@ public sealed class BattleSession
   // (membership + position at mint) that may go stale across an executor commit.
   public Option<AttackTarget> TryGetAttackTarget(BattleEntity entity)
   {
+    RequireReadAccess();
     ArgumentNullException.ThrowIfNull(entity);
     return entity switch
     {
@@ -108,6 +127,7 @@ public sealed class BattleSession
   // session bug, not a caller error. Callers must pass a unit already known alive-in-session.
   internal AliveUnit MintAlive(BattleUnitState unit)
   {
+    RequireReadAccess();
     return GetUnitPosition(unit).Match(
       Some: position => new AliveUnit(unit, position),
       None: () => throw new InvalidOperationException($"Unit {unit.Id} is alive but not board-indexed."));
@@ -120,10 +140,11 @@ public sealed class BattleSession
 
   internal DeadUnit MintDead(BattleUnitState unit)
   {
+    RequireReadAccess();
     return new DeadUnit(unit);
   }
-  public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _scheduler.GlobalFactionTurnOrder;
-  public IReadOnlyCollection<Faction> TurnQueue => _scheduler.TurnQueue;
+  public IReadOnlyCollection<Faction> GlobalFactionTurnOrder { get { RequireReadAccess(); return _scheduler.GlobalFactionTurnOrder; } }
+  public IReadOnlyCollection<Faction> TurnQueue { get { RequireReadAccess(); return _scheduler.TurnQueue; } }
   private readonly Dictionary<BattleUnitState, List<BattleUnitState>> _killsByUnit = [];
 
   public event Action<BattleEvent> BattleEventCommitted = delegate { };
@@ -175,6 +196,7 @@ public sealed class BattleSession
 
   internal IEnumerable<BattleUnitState> GetFactionAliveUnits(Faction side)
   {
+    RequireReadAccess();
     ArgumentNullException.ThrowIfNull(side);
     return AliveUnits.AsValueEnumerable().Where(unit => unit.Side == side).ToArray();
   }
@@ -188,6 +210,7 @@ public sealed class BattleSession
 
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetFactionVisibleTiles(Faction side)
   {
+    RequireReadAccess();
     ArgumentNullException.ThrowIfNull(side);
     return GetFactionAliveUnits(side).AsValueEnumerable()
       .SelectMany(unit => unit.VisibleTiles)
@@ -196,12 +219,14 @@ public sealed class BattleSession
 
   internal IReadOnlySet<BattleBoardState.ValidatedPoint> GetFactionExploredTiles(Faction side)
   {
+    RequireReadAccess();
     ArgumentNullException.ThrowIfNull(side);
     return _visibility.GetExploredTiles(side);
   }
 
   internal bool IsUnitVisibleToFaction(Faction side, BattleUnitState target)
   {
+    RequireReadAccess();
     ArgumentNullException.ThrowIfNull(side);
     ArgumentNullException.ThrowIfNull(target);
 
@@ -214,12 +239,14 @@ public sealed class BattleSession
 
   internal bool IsTileVisibleToFaction(Faction side, BattleBoardState.ValidatedPoint tile)
   {
+    RequireReadAccess();
     ArgumentNullException.ThrowIfNull(side);
     return GetFactionAliveUnits(side).AsValueEnumerable().Any(unit => unit.VisibleTiles.Contains(tile));
   }
 
   internal bool IsUnitStillAvailableThisTurn(BattleUnitState unit)
   {
+    RequireReadAccess();
     ArgumentNullException.ThrowIfNull(unit);
     return _scheduler.IsUnitAvailable(unit);
   }
@@ -231,6 +258,7 @@ public sealed class BattleSession
   // pre-refresh action points.
   internal void BeginFirstTurn()
   {
+    RequireMutationAccess();
     RaiseEvents(new TurnStartedBattleEvent(ActiveSide, TurnNumber));
 
     // A turn-start objective flip (e.g. SurviveUntilTurn with TargetTurn 1) can end the
@@ -253,11 +281,13 @@ public sealed class BattleSession
     Option<ItemWith<ArmorCapability>> equippedArmor,
     IReadOnlyList<StatMod>? statMods = null)
   {
+    RequireMutationAccess();
     ArgumentNullException.ThrowIfNull(combatant);
     if (Outcome.IsSome)
       throw new InvalidOperationException("Cannot add units after the battle has ended.");
 
     var unit = new BattleUnitState(_units.Count, combatant, equippedWeapon, equippedArmor, statMods);
+    if (Access is { } access) unit.BindBattleAccess(access);
     bool occupantSet = Board.TryPlaceOccupant(position, unit.Id);
     if (!occupantSet)
       throw new InvalidOperationException($"Could not place unit {unit.Id} at {position.Raw}.");
@@ -281,6 +311,7 @@ public sealed class BattleSession
   internal void ApplyDamageTo(BattleObjectState obj, IReadOnlyList<Damage> bundle,
     Option<BattleUnitState> cause)
   {
+    RequireMutationAccess();
     ArgumentNullException.ThrowIfNull(obj);
     ArgumentNullException.ThrowIfNull(bundle);
     if (TryGetAliveObject(obj).IsNone)
@@ -302,6 +333,7 @@ public sealed class BattleSession
 
   internal void ApplyDamageTo(BattleUnitState unit, IReadOnlyList<Damage> bundle, Option<BattleUnitState> cause)
   {
+    RequireMutationAccess();
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(bundle);
     if (unit.IsDead)
@@ -385,6 +417,7 @@ public sealed class BattleSession
   // is a damage-pipeline concern and does not apply here. Does nothing if the unit is dead.
   internal void ApplyStatusEffectTo(BattleUnitState unit, StatusEffectSpecData spec)
   {
+    RequireMutationAccess();
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(spec);
     if (unit.IsDead)
@@ -424,6 +457,7 @@ public sealed class BattleSession
 
   internal void EndUnitActivation(BattleUnitState unit)
   {
+    RequireMutationAccess();
     ArgumentNullException.ThrowIfNull(unit);
     if (Outcome.IsSome)
       throw new InvalidOperationException("Cannot end a unit activation after the battle has ended.");
@@ -497,6 +531,7 @@ public sealed class BattleSession
 
   internal void EndFactionTurn(Faction expectedActiveSide)
   {
+    RequireMutationAccess();
     if (Outcome.IsSome)
       throw new InvalidOperationException("Cannot end a faction turn after the battle has ended.");
 
@@ -510,6 +545,7 @@ public sealed class BattleSession
 
   internal void EndBattle(BattleOutcome outcome)
   {
+    RequireMutationAccess();
     if (Outcome.IsSome)
       return;
 
@@ -532,24 +568,28 @@ public sealed class BattleSession
 
   internal Option<BattleBoardState.ValidatedPoint> GetUnitPosition(BattleUnitState unit)
   {
+    RequireReadAccess();
     ArgumentNullException.ThrowIfNull(unit);
     return Board.FindOccupantPosition(unit.Id);
   }
 
   internal Option<BattleUnitState> GetUnitAt(BattleBoardState.ValidatedPoint point)
   {
+    RequireReadAccess();
     return Board.GetOccupant(point).Bind(id =>
       id < _units.Count && _units[id].IsAlive ? Some(_units[id]) : None);
   }
 
   internal void MarkObjectInteracted(BattleObjectState obj)
   {
+    RequireMutationAccess();
     MarkObjectTerminal(obj, ObjectStatus.Interacted);
   }
 
   internal (BattleObjectState Object, BattleBoardState.ValidatedPoint Position) MarkObjectExpired(
     BattleObjectState obj)
   {
+    RequireMutationAccess();
     BattleBoardState.ValidatedPoint position = MarkObjectTerminal(obj, ObjectStatus.Expired);
     return (obj, position);
   }
@@ -573,6 +613,7 @@ public sealed class BattleSession
   internal void MoveUnit(BattleUnitState unit, BattleBoardState.ValidatedPoint source,
     BattleBoardState.ValidatedPoint destination)
   {
+    RequireMutationAccess();
     ArgumentNullException.ThrowIfNull(unit);
     if (unit.IsDead)
       throw new InvalidOperationException($"Cannot move unit {unit.Id} because it is dead.");
@@ -593,6 +634,7 @@ public sealed class BattleSession
 
   internal bool CanUnitActNow(BattleUnitState unit)
   {
+    RequireReadAccess();
     // A completed battle exposes a total availability answer: nothing can act.
     return Outcome.IsNone
       && unit.Side == ActiveSide
@@ -609,11 +651,13 @@ public sealed class BattleSession
 
   internal int RollPercent()
   {
+    RequireMutationAccess();
     return _random.Next(100);
   }
 
   internal bool HasLivingUnits(Faction side)
   {
+    RequireReadAccess();
     return GetFactionAliveUnits(side).AsValueEnumerable().Any();
   }
 
@@ -632,12 +676,14 @@ public sealed class BattleSession
   // occupancy events and are not otherwise caught by the incremental refresh machinery.
   internal void InvalidateVisibility()
   {
+    RequireMutationAccess();
     _visibilityFullRefreshPending = true;
   }
 
   // TODO: It may be nicer if this event raising is entirely handled by BattleSession
   internal void RaiseEvents(params BattleEvent[] events)
   {
+    RequireMutationAccess();
     foreach (var battleEvent in events)
     {
       ArgumentNullException.ThrowIfNull(battleEvent);
@@ -713,6 +759,7 @@ public sealed class BattleSession
 
   internal void AddObjective(Faction faction, Objective objective)
   {
+    RequireMutationAccess();
     ArgumentNullException.ThrowIfNull(faction);
     ArgumentNullException.ThrowIfNull(objective);
 
@@ -722,6 +769,7 @@ public sealed class BattleSession
       _scheduler.RegisterFaction(faction);
     }
 
+    if (Access is { } access) objective.BindBattleAccess(access);
     list.Add(objective);
     RaiseEvents(new ObjectiveAddedBattleEvent(faction, objective));
   }
@@ -730,6 +778,7 @@ public sealed class BattleSession
   // by ObjectiveSystem for an Ongoing objective it owns the routing of.
   internal void RecordObjectiveCompleted(Faction faction, Objective objective)
   {
+    RequireMutationAccess();
     ArgumentNullException.ThrowIfNull(faction);
     ArgumentNullException.ThrowIfNull(objective);
     if (objective.State != ObjectiveResult.Ongoing)
@@ -741,6 +790,7 @@ public sealed class BattleSession
 
   internal void RecordObjectiveFailed(Faction faction, Objective objective)
   {
+    RequireMutationAccess();
     ArgumentNullException.ThrowIfNull(faction);
     ArgumentNullException.ThrowIfNull(objective);
     if (objective.State != ObjectiveResult.Ongoing)
@@ -752,12 +802,14 @@ public sealed class BattleSession
 
   internal IReadOnlyList<Objective> GetObjectives(Faction faction)
   {
+    RequireReadAccess();
     ArgumentNullException.ThrowIfNull(faction);
-    return _objectives.TryGetValue(faction, out var list) ? list : [];
+    return _objectives.TryGetValue(faction, out var list) ? list.AsReadOnly() : [];
   }
 
   internal FactionBattleSummary GetFactionSummary(Faction faction)
   {
+    RequireReadAccess();
     return new FactionBattleSummary()
     {
       Faction = faction,

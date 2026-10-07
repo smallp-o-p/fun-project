@@ -32,10 +32,10 @@ public sealed partial class BattleRuntimeTest
 
     Option<BattleUnitState> queried = runtime.Query(new GetUnitAtTile(battle.Board.At(cell)));
 
-    Assert.Equal(battle.Session.GetUnitAt(battle.Board.At(cell)).RequireSome(), queried.RequireSome());
-    Assert.True(battle.Session.GetUnitPosition(
-      battle.Session.GetUnitAt(battle.Board.At(cell)).RequireSome()).IsSome);
-    Assert.True(battle.Events.EventsOf<UnitAddedBattleEvent>().Length > 0);
+    battle.Read(() => Assert.Equal(battle.Session.GetUnitAt(battle.Board.At(cell)).RequireSome(), queried.RequireSome()));
+    battle.Read(() => Assert.True(battle.Session.GetUnitPosition(
+      battle.Session.GetUnitAt(battle.Board.At(cell)).RequireSome()).IsSome));
+    battle.Read(() => Assert.True(battle.Events.EventsOf<UnitAddedBattleEvent>().Length > 0));
   }
 
   [TestCase(false, TestName = "RegisterHook affects runtime action execution")]
@@ -56,8 +56,8 @@ public sealed partial class BattleRuntimeTest
 
     runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [battle.Board.At(targetPosition)]));
 
-    Assert.Equal(1, log.Count);
-    Assert.Equal(label, log[0]);
+    battle.Read(() => Assert.Equal(1, log.Count));
+    battle.Read(() => Assert.Equal(label, log[0]));
   }
 
   [TestCase(TestName = "Disposed runtime no longer republishes session events")]
@@ -70,12 +70,8 @@ public sealed partial class BattleRuntimeTest
     runtime.BattleEventCommitted += observed.Add;
 
     runtime.Dispose();
-    // A retained replacement executor is safe here: the runtime's own executor was
-    // disposed with it, so this is still the session's only live executor, and it commits
-    // an event the disposed runtime must not re-raise.
-    using var replacement = new BattleActionExecutor(battle.Session);
-    replacement.Submit(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Alpha", faction), battle.Board.At(1, 0, 1)));
+    Assert.Throws<ObjectDisposedException>(() => new BattleActionExecutor(battle.Session));
+    Assert.Throws<ObjectDisposedException>(() => battle.Session.RaiseEvents([]));
 
     Assert.Equal(0, observed.Count);
     runtime.BattleEventCommitted -= observed.Add;
@@ -123,8 +119,8 @@ public sealed partial class BattleRuntimeTest
 
     int causeIndex = observed.EventIndex<UnitMovedBattleEvent>();
     int followUpIndex = observed.EventIndex<UnitDamagedBattleEvent>();
-    Assert.True(causeIndex >= 0);
-    Assert.True(followUpIndex > causeIndex);
+    battle.Read(() => Assert.True(causeIndex >= 0));
+    battle.Read(() => Assert.True(followUpIndex > causeIndex));
   }
 
   private sealed partial class RuntimeRecordingHook : BattleHook

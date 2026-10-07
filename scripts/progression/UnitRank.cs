@@ -1,3 +1,4 @@
+using FunProject.Battle;
 using System;
 using System.Collections.Generic;
 using FunProject.Buffs;
@@ -14,6 +15,10 @@ namespace FunProject.Progression;
 /// </summary>
 public sealed class UnitRank
 {
+  private readonly BattleAccessBinding _battleAccess = new(shared: true);
+  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access); }
+  internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
+
   public const int XpPerLevel = 100;
 
   private readonly RankTableData _table;
@@ -43,6 +48,7 @@ public sealed class UnitRank
   /// level-ups. No-op at max level; the bucket stays at 0.</summary>
   public void Gain(int rawAward)
   {
+    _battleAccess.RequireMutation();
     if (rawAward < 1)
       throw new ArgumentOutOfRangeException(nameof(rawAward), rawAward, "XP awards must be positive.");
     if (IsMaxLevel)
@@ -63,6 +69,7 @@ public sealed class UnitRank
   /// <summary>Permanent stat mods from held rungs, folding into stat contributions.</summary>
   public IReadOnlyList<StatMod> StatMods()
   {
+    _battleAccess.RequireRead();
     List<StatMod> result = [];
     foreach (UpgradeEffectData effect in HeldEffects())
       if (effect is StatModUpgradeEffectData statModEffect)
@@ -74,6 +81,7 @@ public sealed class UnitRank
   /// <summary>Buffs granted by held rungs, joining spawn-time buff grants.</summary>
   public IReadOnlyList<Buff> GrantedBuffs()
   {
+    _battleAccess.RequireRead();
     List<Buff> result = [];
     foreach (UpgradeEffectData effect in HeldEffects())
       if (effect is BuffGrantUpgradeEffectData buffEffect)
@@ -85,6 +93,7 @@ public sealed class UnitRank
   /// <summary>Abilities granted by held rungs; inert until the ability system consumes them.</summary>
   public IReadOnlyList<AbilityData> GrantedAbilities()
   {
+    _battleAccess.RequireRead();
     List<AbilityData> result = [];
     foreach ((int index, UpgradeEffectData effect) in HeldEffectsIndexed())
       if (effect is AbilityGrantUpgradeEffectData abilityEffect)

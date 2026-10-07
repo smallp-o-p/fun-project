@@ -13,6 +13,7 @@ internal sealed class BattleAccessGuard
   private int _mutationDepth;
   private bool _executing;
   private bool _disposed;
+  private readonly SysColGeneric.HashSet<BattleAccessBinding> _sharedBindings = [];
   internal long Revision { get; private set; }
   internal bool IsClosing => Volatile.Read(ref _closing) != 0;
   internal bool IsOwned => Monitor.IsEntered(_gate);
@@ -102,4 +103,47 @@ internal sealed class BattleAccessGuard
   }
   internal void FinishDisposal() { _disposed = true; Monitor.Exit(_gate); }
   internal void ExitDisposal() => Monitor.Exit(_gate);
+
+  internal void RequireDrainAccess()
+  {
+    RequireHostThread();
+    RequireReadAccess();
+    if (!IsClosing || _readDepth != 0 || _mutationDepth != 0)
+      throw new InvalidOperationException("Unbinding requires final drain ownership.");
+  }
+
+  internal void RetainSharedBinding(BattleAccessBinding binding)
+  {
+    RequireMutationAccess();
+    _sharedBindings.Add(binding);
+  }
+
+  internal void UnbindSharedState()
+  {
+    RequireDrainAccess();
+    foreach (var binding in _sharedBindings) binding.Unbind(this);
+    _sharedBindings.Clear();
+  }
+}
+
+// Binding shares the runtime's gate; it owns no synchronization mechanism.
+internal sealed class BattleAccessBinding(bool shared = false)
+{
+  internal BattleAccessGuard? Guard { get; private set; }
+  internal void Bind(BattleAccessGuard access)
+  {
+    access.RequireMutationAccess();
+    if (Guard is not null && !ReferenceEquals(Guard, access))
+      throw new InvalidOperationException("Mutable state is already deployed in another battle.");
+    Guard = access;
+    if (shared) access.RetainSharedBinding(this);
+  }
+  internal void Unbind(BattleAccessGuard access)
+  {
+    if (!ReferenceEquals(Guard, access)) return;
+    access.RequireDrainAccess();
+    Guard = null;
+  }
+  internal void RequireRead() => Guard?.RequireReadAccess();
+  internal void RequireMutation() => Guard?.RequireMutationAccess();
 }

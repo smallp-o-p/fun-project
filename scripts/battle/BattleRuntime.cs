@@ -24,10 +24,31 @@ public sealed class BattleRuntime : IDisposable
   {
     ArgumentNullException.ThrowIfNull(session);
     _session = session;
-    _session.BindBattleAccess(_access);
     _closingToken = _closing.Token;
     _session.BattleEventCommitted += RaiseBattleEventCommitted;
-    _actions = new BattleActionExecutor(session);
+    _access.TryMutation(execution: false);
+    try
+    {
+      _session.BindBattleAccess(_access);
+      _actions = new BattleActionExecutor(session);
+    }
+    catch
+    {
+      _session.BattleEventCommitted -= RaiseBattleEventCommitted;
+      _access.RequestClose();
+      _access.ExitMutation(execution: false);
+      if (_access.TryEnterDisposal())
+      {
+        _access.UnbindSharedState();
+        _access.FinishDisposal();
+      }
+      _closing.Dispose();
+      throw;
+    }
+    finally
+    {
+      if (_access.IsOwned) _access.ExitMutation(execution: false);
+    }
   }
 
   public Either<BattleAccessFailure, BattleQueryScope> TryAcquireQueryScope() => _access.TryRead();
@@ -146,6 +167,7 @@ public sealed class BattleRuntime : IDisposable
     {
       _session.BattleEventCommitted -= RaiseBattleEventCommitted;
       _actions.Dispose();
+      _access.UnbindSharedState();
       _closing.Dispose();
       _disposed = true;
     }

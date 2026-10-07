@@ -470,10 +470,13 @@ public class BattleVisibilityTest
     Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
 
     // Seal the entire x=1 column at runtime so sight cannot reach the target by any route.
-    battle.Board.GetTile(battle.At(new Vector3I(1, 0, 0))).BlocksLineOfSight = true;
-    battle.Board.GetTile(battle.At(new Vector3I(1, 0, 1))).BlocksLineOfSight = true;
-    battle.Board.GetTile(battle.At(new Vector3I(1, 0, 2))).BlocksLineOfSight = true;
-    battle.Session.InvalidateVisibility();
+    battle.Mutate(() =>
+    {
+      battle.Board.GetMutableTile(battle.At(new Vector3I(1, 0, 0))).BlocksLineOfSight = true;
+      battle.Board.GetMutableTile(battle.At(new Vector3I(1, 0, 1))).BlocksLineOfSight = true;
+      battle.Board.GetMutableTile(battle.At(new Vector3I(1, 0, 2))).BlocksLineOfSight = true;
+      battle.Session.InvalidateVisibility();
+    });
 
     battle.Move(mover, [new Vector3I(0, 0, 1)]);
 

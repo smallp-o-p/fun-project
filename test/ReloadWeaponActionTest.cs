@@ -17,17 +17,17 @@ public class ReloadWeaponActionTest
     var unit = battle.PlayerUnit;
 
     battle.Attack(unit, battle.EnemyUnit);
-    Assert.Equal(2, weapon.CurrentAmmo);
+    battle.Read(() => Assert.Equal(2, weapon.CurrentAmmo));
 
     battle.ClearEvents();
-    int actionPointsBefore = unit.CurrentActionPoints;
+    int actionPointsBefore = battle.Read(() => unit.CurrentActionPoints);
 
     battle.Reload(unit, weapon);
 
-    Assert.Equal(3, weapon.CurrentAmmo);
-    Assert.Equal(actionPointsBefore - BattleSession.DefaultReloadActionPointCost, unit.CurrentActionPoints);
+    battle.Read(() => Assert.Equal(3, weapon.CurrentAmmo));
+    battle.Read(() => Assert.Equal(actionPointsBefore - BattleSession.DefaultReloadActionPointCost, unit.CurrentActionPoints));
     var reloadEvent = battle.Events.SingleEvent<UnitReloadedWeaponBattleEvent>();
-    Assert.Equal(unit, reloadEvent.Unit);
+    battle.Read(() => Assert.Equal(unit, reloadEvent.Unit));
   }
 
   [TestCase(TestName = "Reloading a full magazine is rejected and spends nothing")]
@@ -42,14 +42,14 @@ public class ReloadWeaponActionTest
       Seed: 7));
     var unit = battle.Unit;
 
-    int actionPointsBefore = unit.CurrentActionPoints;
+    int actionPointsBefore = battle.Read(() => unit.CurrentActionPoints);
 
     // Parameters are trusted: a reload the caller should have gated surfaces as the
     // executor's invariant-break throw.
     Assert.Throws<System.InvalidOperationException>(
       () => battle.Submit(BattleAction.ReloadWeapon(battle.Alive(unit), weapon)));
 
-    Assert.Equal(actionPointsBefore, unit.CurrentActionPoints);
-    Assert.Equal(weapon.MagazineSize, weapon.CurrentAmmo);
+    battle.Read(() => Assert.Equal(actionPointsBefore, unit.CurrentActionPoints));
+    battle.Read(() => Assert.Equal(weapon.MagazineSize, weapon.CurrentAmmo));
   }
 }

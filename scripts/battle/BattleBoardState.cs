@@ -7,6 +7,10 @@ namespace FunProject.Battle;
 
 public sealed class BattleBoardState
 {
+  private readonly BattleAccessBinding _battleAccess = new();
+  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access);  }
+  internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
+
   public readonly struct ValidatedPoint : IEquatable<ValidatedPoint>
   {
     public readonly Vector3I Raw;
@@ -98,7 +102,8 @@ public sealed class BattleBoardState
 
   public void SetTileWalkable(ValidatedPoint point, bool walkable)
   {
-    GetTile(point).IsWalkable = walkable;
+    _battleAccess.RequireMutation();
+    GetMutableTile(point).IsWalkable = walkable;
   }
 
   private bool IsInBounds(Vector3I coordinates)
@@ -118,16 +123,19 @@ public sealed class BattleBoardState
 
   public bool IsOccupied(ValidatedPoint point)
   {
+    _battleAccess.RequireRead();
     return _occupants.ContainsKey(point);
   }
 
   public Option<int> GetOccupant(ValidatedPoint point)
   {
+    _battleAccess.RequireRead();
     return _occupants.TryGetValue(point, out int unitId) ? Some(unitId) : None;
   }
 
   public bool TryPlaceOccupant(ValidatedPoint point, int unitId)
   {
+    _battleAccess.RequireMutation();
     if (!GetTile(point).IsWalkable || _occupants.ContainsKey(point) || _objectOccupants.ContainsKey(point))
       return false;
 
@@ -138,6 +146,7 @@ public sealed class BattleBoardState
 
   public bool TryMoveOccupant(ValidatedPoint source, ValidatedPoint destination, int unitId)
   {
+    _battleAccess.RequireMutation();
     if (!_occupants.TryGetValue(source, out int sourceOccupant) || sourceOccupant != unitId)
       return false;
     if (source.Equals(destination))
@@ -153,6 +162,7 @@ public sealed class BattleBoardState
 
   public bool TryClearOccupant(ValidatedPoint point, int unitId)
   {
+    _battleAccess.RequireMutation();
     if (!_occupants.TryGetValue(point, out int occupant) || occupant != unitId)
       return false;
 
@@ -163,11 +173,13 @@ public sealed class BattleBoardState
 
   public Option<ValidatedPoint> FindOccupantPosition(int unitId)
   {
+    _battleAccess.RequireRead();
     return _positionByUnit.TryGetValue(unitId, out ValidatedPoint point) ? Some(point) : None;
   }
 
   public Option<ValidatedPoint> FindObjectPosition(int objectId)
   {
+    _battleAccess.RequireRead();
     return _positionByObject.TryGetValue(objectId, out ValidatedPoint point) ? Some(point) : None;
   }
 
@@ -185,6 +197,7 @@ public sealed class BattleBoardState
   /// <returns>A path of points from source to destination, or [] if no path can be found.</returns>
   public ValidatedPoint[] FindPath(ValidatedPoint source, ValidatedPoint destination)
   {
+    _battleAccess.RequireRead();
     if (source == destination)
       return [source];
     if (!CanOccupy(destination))
@@ -236,6 +249,7 @@ public sealed class BattleBoardState
 
   public bool CanOccupy(ValidatedPoint point)
   {
+    _battleAccess.RequireRead();
     return GetTile(point).IsWalkable && !_occupants.ContainsKey(point) && !_objectOccupants.ContainsKey(point);
   }
 
@@ -284,6 +298,7 @@ public sealed class BattleBoardState
   /// </summary>
   public bool HasOccupiableNeighbor(ValidatedPoint point)
   {
+    _battleAccess.RequireRead();
     foreach (Vector3I direction in AdjacentDirections)
     {
       if (IsOccupiable(point.Raw + direction) && CanStep(point, direction))
@@ -305,23 +320,32 @@ public sealed class BattleBoardState
     }
   }
 
-  // Use ref locals when retaining a mutable cell; ordinary value assignment makes a snapshot.
-  public ref BattleTileState GetTile(ValidatedPoint point)
+  // Public tile reads are detached values. Trusted writers require execution ownership.
+  public BattleTileState GetTile(ValidatedPoint point)
   {
-    return ref GetTileUnchecked(point.X, point.Y, point.Z);
+    _battleAccess.RequireRead();
+    return GetTileUnchecked(point.X, point.Y, point.Z);
   }
 
   // Unchecked Tile access, do NOT call this unless you've proven that the input is valid.
-  internal ref BattleTileState GetTileUnchecked(int x, int y, int z)
+  internal BattleTileState GetTileUnchecked(int x, int y, int z)
   {
-    return ref _tiles[x + Dimensions.X * (z + Dimensions.Z * y)];
+    _battleAccess.RequireRead();
+    return _tiles[x + Dimensions.X * (z + Dimensions.Z * y)];
+  }
+
+  internal ref BattleTileState GetMutableTile(ValidatedPoint point)
+  {
+    _battleAccess.RequireMutation();
+    return ref _tiles[point.X + Dimensions.X * (point.Z + Dimensions.Z * point.Y)];
   }
 
   public bool IsBlockedByObject(ValidatedPoint point)
-    => _objectOccupants.ContainsKey(point);
+    { _battleAccess.RequireRead(); return _objectOccupants.ContainsKey(point); }
 
   public bool TryPlaceObjectOccupant(ValidatedPoint point, int objectId)
   {
+    _battleAccess.RequireMutation();
     if (!GetTile(point).IsWalkable || _occupants.ContainsKey(point) || _objectOccupants.ContainsKey(point))
       return false;
 
@@ -332,6 +356,7 @@ public sealed class BattleBoardState
 
   public bool TryClearObjectOccupant(ValidatedPoint point, int objectId)
   {
+    _battleAccess.RequireMutation();
     if (!_objectOccupants.TryGetValue(point, out int occupant) || occupant != objectId)
       return false;
 
@@ -342,6 +367,7 @@ public sealed class BattleBoardState
 
   public IReadOnlyCollection<ValidatedPoint> GetReachableTiles(ValidatedPoint origin, int maxSteps)
   {
+    _battleAccess.RequireRead();
     // Bounded-depth flood over occupiable tiles, using the same neighbor rule FindPath searches.
     // The origin seeds the search unconditionally — its own occupation (the mover standing on
     // it) must not block the search — but is not itself part of the result.

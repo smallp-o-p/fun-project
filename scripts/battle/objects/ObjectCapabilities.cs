@@ -10,4 +10,8 @@ public abstract partial class SpecialObjectCapabilityData : Resource
 }
 
 /// <summary>Runtime marker base for board-object capabilities.</summary>
-public abstract class SpecialObjectCapability;
+public abstract class SpecialObjectCapability
+{
+  private protected readonly BattleAccessBinding _battleAccess = new();
+  internal void BindBattleAccess(BattleAccessGuard access) => _battleAccess.Bind(access);
+}

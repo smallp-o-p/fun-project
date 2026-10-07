@@ -4,10 +4,20 @@ using System.Runtime.InteropServices;
 
 namespace FunProject.Battle;
 
-public readonly struct BattleActionExecResult(BattleAction action, List<BattleEvent> log, int start, int count)
+/// <summary>The event span is borrowed: consume it under an outer scope, before await or another action.</summary>
+public readonly struct BattleActionExecResult
 {
-  public BattleAction Action { get; } = action;
-  public ReadOnlySpan<BattleEvent> EventsThatOccurred => CollectionsMarshal.AsSpan(log).Slice(start, count);
+  private readonly List<BattleEvent> _log;
+  private readonly int _start;
+  private readonly int _count;
+  private readonly BattleAccessGuard? _access;
+  public BattleAction Action { get; }
+  internal BattleActionExecResult(BattleAction action, List<BattleEvent> log, int start, int count, BattleAccessGuard? access)
+  { Action = action; _log = log; _start = start; _count = count; _access = access; }
+  public ReadOnlySpan<BattleEvent> EventsThatOccurred
+  {
+    get { _access?.RequireReadAccess(); return CollectionsMarshal.AsSpan(_log).Slice(_start, _count); }
+  }
 }
 
 /// <summary>
@@ -75,6 +85,7 @@ public sealed class BattleActionExecutor : IDisposable
   public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0)
     where TEventKey : BattleEventTag
   {
+    _session.RequireMutationAccess();
     ThrowIfDisposed();
     _hooks.Register<TEventKey>(hook, priority);
   }
@@ -82,6 +93,7 @@ public sealed class BattleActionExecutor : IDisposable
   public bool UnregisterHook<TEventKey>(BattleHook hook)
     where TEventKey : BattleEventTag
   {
+    _session.RequireMutationAccess();
     ThrowIfDisposed();
     return _hooks.Unregister<TEventKey>(hook);
   }
@@ -96,6 +108,7 @@ public sealed class BattleActionExecutor : IDisposable
   // work as a caller error, before any signal, queue mutation, or event. Disposal first.
   internal void EnsureCanSubmit()
   {
+    _session.RequireMutationAccess();
     ThrowIfDisposed();
     if (_session.Outcome.IsSome)
       throw new InvalidOperationException("Cannot submit actions to a completed battle.");
@@ -167,7 +180,7 @@ public sealed class BattleActionExecutor : IDisposable
       _session.ActionOptions.EndExecution();
     }
 
-    return new BattleActionExecResult(action, _eventLog, logStart, _eventLog.Count - logStart);
+    return new BattleActionExecResult(action, _eventLog, logStart, _eventLog.Count - logStart, _session.Access);
   }
 
   public void Dispose()
@@ -175,6 +188,7 @@ public sealed class BattleActionExecutor : IDisposable
     if (_disposed)
       return;
 
+    _session.Access?.RequireDrainAccess();
     _session.BattleEventCommitted -= OnEventCommitted;
     _disposed = true;
   }
