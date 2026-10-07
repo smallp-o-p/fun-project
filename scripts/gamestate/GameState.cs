@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using FunProject.Currencies;
 using FunProject.Engineering;
 using FunProject.Combatants;
 using FunProject.Research;
@@ -46,11 +48,15 @@ public sealed class GameState
   private readonly List<RegionData> _regions = [];
   private readonly Dictionary<string, int> _indexByName = [];
   private readonly List<Combatant> _roster = [];
+  private readonly Dictionary<Currency, long> _currencies = new(ReferenceEqualityComparer.Instance);
   private readonly DateTime _startTime = DateTime.UnixEpoch;
 
   public GameState(CampaignStartData start)
   {
     ArgumentNullException.ThrowIfNull(start);
+
+    foreach (var (currency, amount) in CurrencyCosts.Capture(start.StartingCurrencies))
+      _currencies.Add(currency, amount);
 
     GeoscapeMapData map = start.Map ?? throw new InvalidOperationException(
       "CampaignStartData requires a Map; assign one in the inspector.");
@@ -145,6 +151,33 @@ public sealed class GameState
   public EngineeringState Engineering { get; }
 
   public ResearchState Research { get; }
+
+  public IReadOnlyDictionary<Currency, long> Currencies
+    => new ReadOnlyDictionary<Currency, long>(new Dictionary<Currency, long>(_currencies, ReferenceEqualityComparer.Instance));
+
+  public long GetCurrencyBalance(Currency currency)
+  {
+    ArgumentNullException.ThrowIfNull(currency);
+    return _currencies.GetValueOrDefault(currency);
+  }
+
+  public IReadOnlyList<CurrencyShortfall> GetCurrencyShortfalls(IReadOnlyDictionary<Currency, long> costs)
+    => CurrencyCosts.Shortfalls(costs, _currencies);
+
+  internal bool TrySpendCurrencyCosts(IReadOnlyDictionary<Currency, long> costs)
+  {
+    if (GetCurrencyShortfalls(costs).Count > 0)
+      return false;
+
+    // Compute every checked result before mutation. Zero requirements create no keys.
+    var remaining = new Dictionary<Currency, long>(ReferenceEqualityComparer.Instance);
+    foreach (var (currency, required) in costs)
+      if (required > 0)
+        remaining.Add(currency, checked(GetCurrencyBalance(currency) - required));
+    foreach (var (currency, amount) in remaining)
+      _currencies[currency] = amount;
+    return true;
+  }
 
   public DateTime CurrentTime => _startTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
 

@@ -12,6 +12,7 @@ using FunProject.Items.Effects;
 using FunProject.Models;
 using FunProject.Progression;
 using FunProject.Research;
+using FunProject.Currencies;
 using FunProject.Stats;
 using FunProject.Strategic;
 using FunProject.Weapons;
@@ -636,7 +637,8 @@ internal static class TestData
     EquippableItemData[] manufacturableItems = null,
     ResearchProject[] researchProjects = null,
     CaptiveEntryData[] captives = null,
-    CombatantConditionRulesData? conditionRules = null)
+    CombatantConditionRulesData? conditionRules = null,
+    Godot.Collections.Dictionary<Currency, long> startingCurrencies = null)
   {
     return new CampaignStartData
     {
@@ -650,8 +652,11 @@ internal static class TestData
       ResearchProjects = researchProjects ?? [],
       StartingCaptives = captives ?? [],
       ConditionRules = conditionRules,
+      StartingCurrencies = startingCurrencies ?? [],
     };
   }
+
+  public static Currency MakeCurrency(string name = "Currency") => new() { Name = name };
 
   public static ResearchProject MakeResearch(
     string name = "Research", uint days = 1,

@@ -1,6 +1,7 @@
 using FunProject.Combatants;
 using FunProject.Combatants.Conditions;
 using FunProject.Core;
+using FunProject.Currencies;
 using FunProject.Items;
 using FunProject.Research;
 using FunProject.Stats;
@@ -39,4 +40,6 @@ public partial class CampaignStartData : NamedEntityData
   [Export] public EquippableItemData[] ManufacturableItems { get; set; } = [];
 
   [Export] public ResearchProject[] ResearchProjects { get; set; } = [];
+
+  [Export] public Godot.Collections.Dictionary<Currency, long> StartingCurrencies { get; set; } = [];
 }
