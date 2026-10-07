@@ -22,6 +22,7 @@ public sealed class BattleSession
     Access = access;
     Board.BindBattleAccess(access);
     _scheduler.BindBattleAccess(access);
+    _visibility.BindBattleAccess(access);
     foreach (var unit in _units) unit.BindBattleAccess(access);
     foreach (var obj in _objects) obj.BindBattleAccess(access);
     foreach (var list in _objectives.Values)
@@ -83,6 +84,7 @@ public sealed class BattleSession
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibilityAffectedUnits = [];
 
   public BattleBoardState Board { get; }
+  internal BattleObservationHistory ObservationHistory { get { RequireReadAccess(); return _visibility.History; } }
   internal UnitActionCache ActionOptions { get; }
   private int _turnNumber = 1;
   public int TurnNumber { get { RequireReadAccess(); return _turnNumber; } private set { RequireMutationAccess(); _turnNumber = value; } }
@@ -252,7 +254,7 @@ public sealed class BattleSession
   {
     RequireReadAccess();
     ArgumentNullException.ThrowIfNull(side);
-    return GetFactionAliveUnits(side).AsValueEnumerable().Any(unit => unit.VisibleTiles.Contains(tile));
+    return GetFactionAliveUnits(side).AsValueEnumerable().Any(unit => unit.CanSeeTile(tile));
   }
 
   internal bool IsUnitStillAvailableThisTurn(BattleUnitState unit)

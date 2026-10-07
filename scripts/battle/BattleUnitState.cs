@@ -40,10 +40,14 @@ public sealed class BattleUnitState
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _spottedUnits = [];
+  private bool _hasSeenHostile;
+  internal bool HasSeenHostile { get { _battleAccess.RequireRead(); return _hasSeenHostile; } }
+  internal void RecordHostileContact() { _battleAccess.RequireMutation(); _hasSeenHostile = true; }
+  internal bool CanSeeTile(BattleBoardState.ValidatedPoint tile) { _battleAccess.RequireRead(); return _visibleTiles.Contains(tile); }
   private readonly Dictionary<StatusEffectSpecData, ActiveStatusEffect> _activeStatusEffects = [];
   private readonly List<(Buff Buff, bool IsActive)> _buffs = [];
 
-  internal int Id { get; }
+  public int Id { get; }
   public Combatant Combatant { get; }
   public Faction Side => Combatant.OwningFaction;
   private Option<Weapon> _equippedWeapon;

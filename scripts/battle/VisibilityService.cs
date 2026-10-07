@@ -7,6 +7,8 @@ namespace FunProject.Battle;
 
 internal sealed class VisibilityService
 {
+  internal BattleObservationHistory History { get; } = new();
+  internal void BindBattleAccess(BattleAccessGuard access) => History.BindBattleAccess(access);
   private static readonly IReadOnlySet<BattleBoardState.ValidatedPoint> EmptyTileSet =
     new SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>();
 
@@ -94,7 +96,7 @@ internal sealed class VisibilityService
       // though this observer's visible-tile set itself was never recomputed.
       observer.ClearVisibleUnits();
       foreach (var (target, position) in positionedTargets)
-        if (!ReferenceEquals(target, observer) && observer.VisibleTiles.Contains(position))
+        if (!ReferenceEquals(target, observer) && observer.CanSeeTile(position))
           observer.AddVisibleUnit(target);
 
       foreach (var target in observer.VisibleUnits)
@@ -102,6 +104,7 @@ internal sealed class VisibilityService
           spotted.Add((observer, target));
     }
 
+    History.RecordRefresh(board, allUnits);
     spotted.Sort(CompareSpottedDelta);
     return spotted;
   }
