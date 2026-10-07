@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using CampaignGameState = FunProject.GameState.GameState;
 using FunProject.Engineering;
+using FunProject.Items;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
 using Godot;
@@ -47,16 +48,8 @@ public sealed partial class EngineeringView : GeoscapeView
     RefreshSelection();
   }
 
-  public void ShowFailure(ManufacturingStartFailure failure)
-  {
-    GetNode<Label>("%Status").Text = failure switch
-    {
-      ManufacturingStartFailure.UnknownItem => "This item is not available for manufacturing.",
-      ManufacturingStartFailure.Busy => "Another manufacturing project is already in progress.",
-      ManufacturingStartFailure.AlreadyAvailable => "Unlimited supply for this item is already established.",
-      _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, "Unknown manufacturing failure."),
-    };
-  }
+  public void ShowFailure(EquippableItemData item, ManufacturingStartFailure failure)
+    => GetNode<Label>("%Status").Text = $"Manufacturing start rejected for {item.Name}: {failure}.";
 
   private void OnManufacturePressed()
   {
@@ -66,7 +59,7 @@ public sealed partial class EngineeringView : GeoscapeView
     {
       var result = _session.StartManufacturing(option.Project.Item);
       Present(_session.GetManufacturingOptions(), _session.ActiveManufacturing, _session.Tick);
-      result.IfLeft(ShowFailure); // after the refresh: it clears the status line
+      result.IfLeft(reason => ShowFailure(option.Project.Item, reason)); // after the refresh: it clears the status line
     });
   }
 
@@ -118,8 +111,12 @@ public sealed partial class EngineeringView : GeoscapeView
       option => $"Duration: {option.Project.DurationDays}d", () => "");
     GetNode<Label>("%Stock").Text = _selection.Match(
       option => option.Project.UnlimitedStock ? "Stock: Not established" : $"Stock: {option.Remaining}", () => "");
+    GetNode<Label>("%CurrencyCosts").Text = _selection.Match(
+      option => CurrencyCostText.Format(option.Project.Costs, option.Shortfalls), () => "");
+    GetNode<Label>("%CurrencyCosts").Visible = _selection.IsSome;
     GetNode<Label>("%SupplyEffect").Text = _selection.Match(
       option => option.Project.UnlimitedStock ? "Establishes unlimited supply." : "Produces 1 item.", () => "");
-    GetNode<Button>("%ManufactureButton").Disabled = _active.IsSome || _selection.IsNone;
+    GetNode<Button>("%ManufactureButton").Disabled = _active.IsSome
+      || _selection.Match(option => option.Shortfalls.Count > 0, () => true);
   }
 }

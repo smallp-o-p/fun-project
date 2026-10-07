@@ -35,22 +35,24 @@ public class EngineeringViewTest
     Assert.True(view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0).ButtonPressed);
   }
 
-  [TestCase]
-  public async Task LongDescriptionScrollsWhileManufactureAndBackStayReachable()
+  [TestCase(800, 600)]
+  [TestCase(1600, 900)]
+  public async Task LongDescriptionScrollsWhileManufactureAndBackStayReachable(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var item = MakeItemData();
+    var currency = MakeCurrency("A currency with a deliberately long descriptive name for campaign production budgets");
+    var item = MakeItemData(manufacturingCosts: new() { [currency] = long.MaxValue });
     for (int i = 0; i < 30; i++)
       item.Description += "Engineering describes workshop production and the supply behavior of a utility kit. ";
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item], startingCurrencies: new() { [currency] = long.MaxValue }));
     var session = campaign.Session;
     var view = CreateEngineeringView();
-    CreateUiViewport(view, new Vector2I(800, 600));
+    CreateUiViewport(view, new Vector2I(width, height));
     view.Present(campaign.State, session);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
     await WaitForLayout(view);
 
-    var visible = new Rect2(0, 0, 800, 600);
+    var visible = new Rect2(0, 0, width, height);
     Assert.Equal(visible, ScreenRect(view));
     var action = view.GetNode<Button>("%ManufactureButton");
     var back = view.GetNode<Button>("%BackButton");
@@ -58,6 +60,8 @@ public class EngineeringViewTest
     Assert.True(visible.Encloses(ScreenRect(back)));
     var scroll = view.GetNode<ScrollContainer>("Content/Margin/Layout/Body/Details/DetailsScroll");
     Assert.True(scroll.ClipContents);
+    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(long.MaxValue.ToString()));
+    Assert.True(view.GetNode<Label>("%CurrencyCosts").Size.X <= scroll.Size.X);
     Assert.True(scroll.GetVScrollBar().MaxValue > scroll.GetVScrollBar().Page);
     var actionRect = ScreenRect(action);
     var backRect = ScreenRect(back);
@@ -285,14 +289,17 @@ public class EngineeringViewTest
     Assert.True(view.IsInsideTree() && !view.IsQueuedForDeletion()); // Back never frees the view itself
   }
 
-  [TestCase(ManufacturingStartFailure.UnknownItem, "This item is not available for manufacturing.")]
-  [TestCase(ManufacturingStartFailure.Busy, "Another manufacturing project is already in progress.")]
-  [TestCase(ManufacturingStartFailure.AlreadyAvailable, "Unlimited supply for this item is already established.")]
-  public void FailureExplainsRejectionAndNextPresentClearsIt(ManufacturingStartFailure failure, string message)
+  [TestCase(ManufacturingStartFailure.UnknownItem)]
+  [TestCase(ManufacturingStartFailure.Busy)]
+  [TestCase(ManufacturingStartFailure.AlreadyAvailable)]
+  [TestCase(ManufacturingStartFailure.InsufficientCurrencies)]
+  public void FailureExplainsRejectionAndNextPresentClearsIt(ManufacturingStartFailure failure)
   {
     var view = AddToTree(CreateEngineeringView());
-    view.ShowFailure(failure);
-    Assert.Equal(message, view.GetNode<Label>("%Status").Text);
+    var item = MakeItemData("Selected item");
+    view.ShowFailure(item, failure);
+    Assert.True(view.GetNode<Label>("%Status").Text.Contains(item.Name));
+    Assert.True(view.GetNode<Label>("%Status").Text.Contains(failure.ToString()));
     using var campaign = new GeoscapeFixture();
     view.Present(campaign.State, campaign.Session);
     Assert.Equal("", view.GetNode<Label>("%Status").Text);

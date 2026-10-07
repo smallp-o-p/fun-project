@@ -91,10 +91,11 @@ public class ResearchViewTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var reward = MakeItemData("A research reward with a long descriptive manufacturing name");
-    var project = MakeResearch(manufacturingUnlocks: [reward]);
+    var currency = MakeCurrency("A currency with a deliberately long descriptive name for campaign research budgets");
+    var project = MakeResearch(manufacturingUnlocks: [reward], costs: new() { [currency] = long.MaxValue });
     for (int i = 0; i < 80; i++)
       project.Description += "Research develops new equipment for Engineering and advances through campaign time on the map. ";
-    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project]));
+    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project], startingCurrencies: new() { [currency] = long.MaxValue }));
     var view = CreateResearchView();
     CreateUiViewport(view, new Vector2I(width, height));
     view.Present(campaign.State, campaign.Session);
@@ -113,6 +114,8 @@ public class ResearchViewTest
     Assert.True(visible.Encloses(ScreenRect(start)));
     Assert.True(visible.Encloses(ScreenRect(back)));
     var scroll = view.GetNode<ScrollContainer>("%DetailsScroll");
+    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(long.MaxValue.ToString()));
+    Assert.True(view.GetNode<Label>("%CurrencyCosts").Size.X <= scroll.Size.X);
     var startRect = ScreenRect(start);
     var backRect = ScreenRect(back);
     scroll.ScrollVertical = 10000;
