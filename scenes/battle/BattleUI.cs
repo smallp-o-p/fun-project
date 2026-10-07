@@ -31,10 +31,10 @@ public sealed partial class BattleUI : Node
     _hud.ReturnRequested += () => ReturnRequested?.Invoke();
   }
 
-  public void ShowUnits(IReadOnlyList<BattleUnitState> units)
+  public void ShowUnits(IReadOnlyList<UnitReadout> units)
     => _hud.ShowUnits(units);
 
-  public void ShowActionOptions(IReadOnlyList<UnitActionOption> options)
+  public void ShowActionOptions(IReadOnlyList<ActionOptionReadout> options)
     => _hud.ShowActionOptions(options);
 
   public void ShowBattleOver(string bannerText)

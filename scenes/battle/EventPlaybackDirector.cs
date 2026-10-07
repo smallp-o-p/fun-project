@@ -19,6 +19,7 @@ public partial class EventPlaybackDirector : Node
   private readonly Dictionary<BattleUnitState, Node3D> _unitMeshes = [];
   private bool _stepInProgress;
   private bool _wasBusy;
+  private BattleRuntime? _runtime;
 
   public bool Busy => _stepInProgress || _queue.Count > 0;
 
@@ -27,8 +28,17 @@ public partial class EventPlaybackDirector : Node
   public void Bind(BattleRuntime runtime)
   {
     ArgumentNullException.ThrowIfNull(runtime);
+    if (_runtime is not null) throw new InvalidOperationException("Playback director is already bound.");
+    _runtime = runtime;
     runtime.ActionCompleted += EnqueueResult;
   }
+
+  public void Unbind()
+  {
+    if (_runtime is not null) _runtime.ActionCompleted -= EnqueueResult;
+    _runtime = null;
+  }
+  public override void _ExitTree() => Unbind();
 
   public void RegisterUnitMesh(BattleUnitState unit, Node3D mesh)
   {

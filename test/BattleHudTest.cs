@@ -43,7 +43,7 @@ public partial class BattleHudTest
     var moveOption = new MoveActionOption(moveAction);
     var hud = BuildHud();
 
-    hud.ShowActionOptions([moveOption, new PassActionOption(passAction)]);
+    hud.ShowActionOptions(battle.Read(() => new[] { new ActionOptionReadout(moveOption, moveOption.IsAvailable), new ActionOptionReadout(new PassActionOption(passAction), passAction.IsAvailable) }));
 
     var verbs = hud.GetNode<Container>("%VerbButtons");
     Assert.Equal(2, verbs.GetChildCount());

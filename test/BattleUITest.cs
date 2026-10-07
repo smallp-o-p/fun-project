@@ -22,8 +22,8 @@ public partial class BattleUITest
   public void PushedViewModelsRender()
   {
     using var battle = BattleFixture.Duel();
-    var units = battle.Query(new GetFactionAliveUnits(battle.PlayerUnit.Side))
-      .AsValueEnumerable().Select(unit => unit.State).ToArray();
+    var units = battle.Read(() => battle.Query(new GetFactionAliveUnits(battle.PlayerUnit.Side))
+      .AsValueEnumerable().Select(unit => UnitReadout.Capture(unit.State)).ToArray());
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
     var moveOption = new MoveActionOption(
       actions.AsValueEnumerable().First(action => action.Action is MoveActionDefinition));
@@ -32,7 +32,7 @@ public partial class BattleUITest
     var view = BuildView();
 
     view.ShowUnits(units);
-    view.ShowActionOptions([moveOption, passOption]);
+    view.ShowActionOptions(battle.Read(() => new[] { new ActionOptionReadout(moveOption, moveOption.IsAvailable), new ActionOptionReadout(passOption, passOption.IsAvailable) }));
 
     var status = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%UnitStatus");
     Assert.True(status.Text.Contains("HP"));
@@ -87,7 +87,7 @@ public partial class BattleUITest
     var moveOption = new MoveActionOption(
       actions.AsValueEnumerable().First(action => action.Action is MoveActionDefinition));
     var view = BuildView();
-    view.ShowActionOptions([moveOption]);
+    view.ShowActionOptions(battle.Read(() => new[] { new ActionOptionReadout(moveOption, moveOption.IsAvailable) }));
     int confirms = 0;
     int cancels = 0;
     int returns = 0;

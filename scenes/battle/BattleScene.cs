@@ -21,6 +21,9 @@ public sealed partial class BattleScene : Node3D
   private Faction _playerFaction = null!;
   private bool _allowReturn;
   private bool _disposed;
+  private bool _refreshPending;
+  private bool _idlePending;
+  private bool _bannerPending;
 
   /// <summary>Requests campaign completion after terminal playback finishes.</summary>
   public event Action<FactionBattleSummary>? Completed;
@@ -43,6 +46,7 @@ public sealed partial class BattleScene : Node3D
       return;
     _disposed = true;
     _ui?.Dispose();
+    _director?.Unbind();
     _runtime?.Dispose();
   }
 
@@ -107,31 +111,56 @@ public sealed partial class BattleScene : Node3D
     Dispose();
   }
 
-  private bool CanReturn => _allowReturn && !_disposed
+  public override void _Process(double delta) => TickDeferredRefresh();
+
+  public void TickDeferredRefresh()
+  {
+    if (_disposed || _ui is null) return;
+    if (_runtime.IsClosing) { _refreshPending = _idlePending = _bannerPending = false; return; }
+    _ui.TickDeferredRefresh();
+    if (_refreshPending) RefreshView();
+    if (_bannerPending) ShowBattleOverBanner();
+    if (_idlePending) OnPlaybackIdle();
+  }
+
+  private bool TryRead(out BattleQueryScope? scope)
+  {
+    scope = null;
+    if (_disposed) return false;
+    var admission = _runtime.TryAcquireQueryScope();
+    if (admission.IsRight) { scope = admission.Match(Right: value => value, Left: failure => throw new InvalidOperationException($"Battle access failed: {failure}.")); return true; }
+    if (admission.Match(Left: failure => failure, Right: _ => throw new InvalidOperationException("Expected failed battle admission.")) == BattleAccessFailure.Busy) _refreshPending = true;
+    else _refreshPending = _idlePending = _bannerPending = false;
+    return false;
+  }
+
+  private bool CanReturnOwned => _allowReturn && !_disposed
     && _runtime.Query(new GetBattleOutcomeQuery()).IsSome && !_director.Busy;
 
   private void OnReturnIntent()
   {
-    if (CanReturn)
-      Completed?.Invoke(_runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
-        Right: summary => summary,
-        Left: failure => throw new InvalidOperationException(failure.Message)));
+    if (!TryRead(out var scope)) return;
+    FactionBattleSummary? summary = null;
+    using (scope)
+    {
+      if (CanReturnOwned)
+        summary = _runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
+          Right: value => value, Left: failure => throw new InvalidOperationException(failure.Message));
+    }
+    if (summary is not null) Completed?.Invoke(summary);
   }
 
   private void RefreshView()
   {
-    var queriedUnits = _runtime.Query(new GetFactionAliveUnits(_playerFaction))
-      .AsValueEnumerable().Select(unit => unit.State).ToArray();
-    _view.ShowUnits(queriedUnits);
-    _view.ShowActionOptions(_ui.ActionOptions);
-
-    bool targeting = _ui.State is UiState.Targeting or UiState.TargetingLocked;
-    if (targeting)
+    if (!TryRead(out var scope)) return;
+    bool canReturn;
+    using (scope) { canReturn = CanReturnOwned; _refreshPending = false; }
+    _view.ShowUnits(_ui.UnitReadouts);
+    _view.ShowActionOptions(_ui.ActionReadouts);
+    if (_ui.State is UiState.Targeting or UiState.TargetingLocked)
       _view.ShowTargeting(_ui.CandidateCells, _ui.LastPreview);
-    else
-      _view.HideTargeting();
-
-    _view.ShowReturn(CanReturn);
+    else _view.HideTargeting();
+    _view.ShowReturn(canReturn);
   }
 
   private void InstantiateMap()
@@ -175,23 +204,36 @@ public sealed partial class BattleScene : Node3D
 
   private void ShowBattleOverBanner()
   {
-    string text = _runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
-      Right: summary => summary.Outcome == BattleOutcome.Victory ? "VICTORY" : "DEFEAT",
-      Left: _ => "BATTLE OVER");
+    if (!TryRead(out var scope)) { if (!_runtime.IsClosing && !_disposed) _bannerPending = true; return; }
+    string text;
+    using (scope)
+    {
+      _bannerPending = false;
+      text = _runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
+        Right: summary => summary.Outcome == BattleOutcome.Victory ? "VICTORY" : "DEFEAT", Left: _ => "BATTLE OVER");
+    }
     _view.ShowBattleOver(text);
   }
 
   private void OnPlaybackIdle()
   {
+    if (!TryRead(out var scope)) { if (!_runtime.IsClosing && !_disposed) _idlePending = true; return; }
+    Faction? enemy = null;
+    long revision;
+    using (scope)
+    {
+      _idlePending = false;
+      revision = scope!.Revision;
+      if (_runtime.Query(new GetBattleOutcomeQuery()).IsNone)
+      {
+        var activeSide = _runtime.Query(new GetActiveSideQuery());
+        if (activeSide != _playerFaction) enemy = activeSide;
+      }
+    }
     RefreshView();
-    if (_runtime.Query(new GetBattleOutcomeQuery()).IsSome)
-      return;
-
-    Faction activeSide = _runtime.Query(new GetActiveSideQuery());
-    if (ReferenceEquals(activeSide, _playerFaction))
-      return;
-
-    // THROWAWAY: automatically end enemy turns until a real enemy controller exists.
-    _runtime.ExecuteAction(BattleAction.EndFactionTurn(activeSide));
+    if (enemy is null) return;
+    // Existing throwaway turn stub; no controller or policy is introduced here.
+    var result = _runtime.TryExecuteAction(runtime => BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())), Some(revision));
+    if (result.IsLeft && result.Match(Left: failure => failure, Right: _ => throw new InvalidOperationException("Expected failed battle admission.")) != BattleAccessFailure.Closed) _idlePending = true;
   }
 }
