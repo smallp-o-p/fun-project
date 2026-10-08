@@ -2,6 +2,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 /// <summary>
 /// Manages views in the Geoscape via a stack. The current view is on top of the stack.
 /// </summary>

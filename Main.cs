@@ -1,6 +1,8 @@
 using Godot;
 using System;
 
+namespace FunProject;
+
 public partial class Main : Control
 {
   // Called when the node enters the scene tree for the first time.
@@ -8,9 +10,9 @@ public partial class Main : Control
   {
   }
 
-  private double time = 0.0;
+  private double time;
 
-  private bool replaced = false;
+  private bool replaced;
   public override void _Process(double delta)
   {
     base._Process(delta);

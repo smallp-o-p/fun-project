@@ -2,6 +2,8 @@ using FunProject.Dialogue;
 using Godot;
 using System;
 
+namespace FunProject.Scenes;
+
 // Click-through dialogue screen: a transparent GeoscapeView whose dim wash covers the
 // active stack while the conversation plays. The view is in control while it is the
 // stack top: clicks on the dim wash and ui_accept both advance (skip-to-full first,

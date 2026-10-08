@@ -6,6 +6,8 @@ using GdUnit4;
 using static GdUnit4.Assertions;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class GeoscapeResolutionViewTest
@@ -14,7 +16,7 @@ public class GeoscapeResolutionViewTest
   // included) and the button -> outcome mapping. Re-presenting a consumed resolution
   // requests Back. The dialog is transparent with no backdrop of its own.
   [TestCase]
-  public async Task PresentRendersPendingResolutionWithRegionAndMapsTacticalOutcomes()
+  public static async Task PresentRendersPendingResolutionWithRegionAndMapsTacticalOutcomes()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var view = AddToTree(CreateResolutionView());
@@ -51,7 +53,7 @@ public class GeoscapeResolutionViewTest
   }
 
   [TestCase]
-  public void PresentRendersMapWideEventWithSingleContinueButton()
+  public static void PresentRendersMapWideEventWithSingleContinueButton()
   {
     var view = AddToTree(CreateResolutionView());
     using var campaign = GeoscapeFixture.WithFiredEvent(MakeEvent("Plot beat"));
@@ -66,7 +68,7 @@ public class GeoscapeResolutionViewTest
   }
 
   [TestCase]
-  public void PresentWithoutPendingResolutionRequestsBack()
+  public static void PresentWithoutPendingResolutionRequestsBack()
   {
     var view = AddToTree(CreateResolutionView());
     using var campaign = new GeoscapeFixture();
@@ -80,7 +82,7 @@ public class GeoscapeResolutionViewTest
   // Scene-level wiring: the composition root pushes the dialog on the session's opened
   // event and pops it on the committed close, restoring whatever the dialog covered.
   [TestCase]
-  public async Task MapEventPressPushesDialogAndDeclinePopsBackToCoveredRoot()
+  public static async Task MapEventPressPushesDialogAndDeclinePopsBackToCoveredRoot()
   {
     await using var cleanup = new DeferredNodeCleanup();
     // Regions need authored map visuals (GeoscapeMapControl.Setup), so the scene-level
@@ -130,7 +132,7 @@ public class GeoscapeResolutionViewTest
   }
 
   [TestCase]
-  public async Task MapEventMarkerDisappearsAtItsDeadlineWithoutRemovingOtherEvents()
+  public static async Task MapEventMarkerDisappearsAtItsDeadlineWithoutRemovingOtherEvents()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = AddToTree(CreateGeoscapeScene(MakeStart(timeline:

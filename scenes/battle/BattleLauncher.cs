@@ -2,6 +2,8 @@ using FunProject.Battle;
 using FunProject.Scenes.Ext;
 using Godot;
 
+namespace FunProject.Scenes;
+
 /// <summary>Starts the exported battle type and owns presentation-failure cleanup.</summary>
 public sealed partial class BattleLauncher : Node
 {

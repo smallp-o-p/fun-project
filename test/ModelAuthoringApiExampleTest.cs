@@ -3,6 +3,8 @@ using FunProject.Models;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ModelAuthoringApiExampleTest
@@ -21,7 +23,7 @@ public class ModelAuthoringApiExampleTest
   }
 
   [TestCase]
-  public void DocumentedExampleDrivesDiscoveredSyntheticCapabilities()
+  public static void DocumentedExampleDrivesDiscoveredSyntheticCapabilities()
   {
     using var fixture = ModelFixture.WithWardrobe();
     CharacterModel model = fixture.Model;
@@ -41,7 +43,7 @@ public class ModelAuthoringApiExampleTest
 
   [TestCase("res://scenes/models/ZhuYuan/ZhuYuan.scn")]
   [TestCase("res://scenes/models/Trigger/Trigger.scn")]
-  public void DocumentedExampleDrivesDiscoveredSceneCapabilities(string scenePath)
+  public static void DocumentedExampleDrivesDiscoveredSceneCapabilities(string scenePath)
   {
     using var fixture = ModelFixture.FromScene(scenePath);
     CharacterModel model = fixture.Model;

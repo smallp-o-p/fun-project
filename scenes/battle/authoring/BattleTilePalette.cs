@@ -1,6 +1,8 @@
 using Godot;
 using System;
 
+namespace FunProject.Scenes;
+
 // Palettes are ordinary MeshLibraries; native item IDs belong to their painted cells.
 public static class BattleTilePalette
 {

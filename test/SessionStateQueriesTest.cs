@@ -2,12 +2,14 @@ using FunProject.Battle;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public sealed partial class SessionStateQueriesTest
 {
   [TestCase(TestName = "Active side and outcome queries read live session truth")]
-  public void ActiveSideAndOutcomeQueriesReadSessionTruth()
+  public static void ActiveSideAndOutcomeQueriesReadSessionTruth()
   {
     using var battle = BattleFixture.Duel(player: new("Hero"), enemy: new("Goon"));
 
@@ -20,7 +22,7 @@ public sealed partial class SessionStateQueriesTest
   }
 
   [TestCase(TestName = "Outcome query reads absence during play and the decided outcome after completion")]
-  public void BattleOutcomeQueryReadsPlayAndCompletion()
+  public static void BattleOutcomeQueryReadsPlayAndCompletion()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
 

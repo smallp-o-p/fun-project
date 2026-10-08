@@ -8,6 +8,8 @@ using GdUnit4;
 using static GdUnit4.Assertions;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class GeoscapeViewManagerTest
@@ -38,7 +40,7 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public async Task OpeningAViewHidesTheMapAndHud()
+  public static async Task OpeningAViewHidesTheMapAndHud()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = AddToTree(CreateGeoscapeScene(MakeStart()));
@@ -59,7 +61,7 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public async Task PushShowsOnlyTheTopViewAndDisablesCoveredViews()
+  public static async Task PushShowsOnlyTheTopViewAndDisablesCoveredViews()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var manager = BuildManager();
@@ -106,7 +108,7 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public async Task PushPreservesAuthoredLayoutAcrossCoverAndPop()
+  public static async Task PushPreservesAuthoredLayoutAcrossCoverAndPop()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var manager = BuildManager();
@@ -135,7 +137,7 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public void BackOnTheRootIsASafeNoOp()
+  public static void BackOnTheRootIsASafeNoOp()
   {
     var manager = BuildManager();
     var root = manager.RootView;
@@ -151,7 +153,7 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public async Task AuthoredBackButtonPopsItsViewOnce()
+  public static async Task AuthoredBackButtonPopsItsViewOnce()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var manager = BuildManager();
@@ -169,7 +171,7 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public async Task InvalidPushesLeaveTheStackUnchanged()
+  public static async Task InvalidPushesLeaveTheStackUnchanged()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var manager = BuildManager();
@@ -201,7 +203,7 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public async Task ConcreteViewBuildsItsAssignedBackgroundAcrossCoverAndPop()
+  public static async Task ConcreteViewBuildsItsAssignedBackgroundAcrossCoverAndPop()
   {
     var manager = BuildManager();
     var view = CreateEngineeringView(); // real concrete controller, not a fake subclass
@@ -230,7 +232,7 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public void CoveredViewsCannotNavigate()
+  public static void CoveredViewsCannotNavigate()
   {
     var manager = BuildManager();
     var a = new FakeView { Name = "A" };
@@ -248,7 +250,7 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public async Task PoppedViewsCannotNavigateAndAreInvalidAfterFrame()
+  public static async Task PoppedViewsCannotNavigateAndAreInvalidAfterFrame()
   {
     var manager = BuildManager();
     var a = new FakeView { Name = "A" };
@@ -269,7 +271,7 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public async Task DisposalReleasesRetainedViewsAndBackgrounds()
+  public static async Task DisposalReleasesRetainedViewsAndBackgrounds()
   {
     var manager = BuildSelfFreeingManager();
     var root = (FakeView)manager.RootView;
@@ -290,7 +292,7 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public async Task BackgroundTracksTheScreenRegardlessOfMapCameraAndSurvivesCoveringUntilPop()
+  public static async Task BackgroundTracksTheScreenRegardlessOfMapCameraAndSurvivesCoveringUntilPop()
   {
     var scene = CreateGeoscapeScene(MakeStart());
     var viewport = CreateUiViewport(scene, new Vector2I(1600, 900));

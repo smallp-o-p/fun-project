@@ -3,13 +3,15 @@ using FunProject.GameState;
 using FunProject.Strategic;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class GeoscapeScheduleTest
 {
   [TestCase(3, "Raid", GeoscapeEventKind.TacticalBattle, 2, 3L)]
   [TestCase(0, "Immediate", GeoscapeEventKind.Plot, 0, 1L)]
-  public void ScheduledEventFiresAtFirstDueAdvancingTick(
+  public static void ScheduledEventFiresAtFirstDueAdvancingTick(
     int atTick, string title, GeoscapeEventKind kind, int beforeTicks, long expectedOccurredTick)
   {
     using var campaign = new GeoscapeFixture(timeline:
@@ -34,7 +36,7 @@ public class GeoscapeScheduleTest
   [TestCase(2, "Fading", 3, 4, 1, 1, 0)]
   [TestCase(1, "Everlasting", -1, 5000, 1, 0, 1)]
   [TestCase(2, "Blink", 0, 2, 0, 0, 0)]
-  public void ScheduledEventLifetimeRespectsExpiry(
+  public static void ScheduledEventLifetimeRespectsExpiry(
     int atTick, string title, int expiry, int firstAdvance, int firstCount, int extraTicks, int finalCount)
   {
     using var campaign = new GeoscapeFixture(timeline:
@@ -52,7 +54,7 @@ public class GeoscapeScheduleTest
   }
 
   [TestCase(TestName = "Firing and expiry are committed to the event stream in order")]
-  public void FireAndExpiryAreCommittedInOrder()
+  public static void FireAndExpiryAreCommittedInOrder()
   {
     using var campaign = new GeoscapeFixture(timeline:
     [
@@ -72,7 +74,7 @@ public class GeoscapeScheduleTest
   }
 
   [TestCase(TestName = "Expiry is baked at construction, immune to later resource edits")]
-  public void ExpiryIsBakedAtConstruction()
+  public static void ExpiryIsBakedAtConstruction()
   {
     var definition = TestData.MakeEvent("Guarded", expiresAfterTicks: 5);
     using var campaign = new GeoscapeFixture(timeline:
@@ -90,7 +92,7 @@ public class GeoscapeScheduleTest
   }
 
   [TestCase(TestName = "Malformed schedule authoring fails campaign construction")]
-  public void MalformedScheduleAuthoringFailsConstruction()
+  public static void MalformedScheduleAuthoringFailsConstruction()
   {
     (string Case, CampaignStartData Start)[] malformed =
     [
@@ -108,11 +110,11 @@ public class GeoscapeScheduleTest
         timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Bad", expiresAfterTicks: -2))])),
     ];
     foreach ((string name, CampaignStartData start) in malformed)
-      Assert.Throws<System.InvalidOperationException>(() => new CampaignGameState(start), name);
+      Assert.Throws<System.InvalidOperationException>(() => _ = new CampaignGameState(start), name);
   }
 
   [TestCase(TestName = "Tactical events retain a battle seed; other events carry none")]
-  public void TacticalEventRetainsBattleSeed()
+  public static void TacticalEventRetainsBattleSeed()
   {
     using var campaign = new GeoscapeFixture(timeline:
     [

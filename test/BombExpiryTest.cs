@@ -6,6 +6,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BombExpiryTest
@@ -37,7 +39,7 @@ public class BombExpiryTest
   }
 
   [TestCase(TestName = "Turn end at the deadline expires: damage applied, event raised, defused bombs skipped")]
-  public void ExpiryAtDeadline()
+  public static void ExpiryAtDeadline()
   {
     using var runtime = BattleFactory.Start(BombSetup(new Vector3I(1, 0, 0), MakeBomb(expireAfterTurns: 1))).RequireRight();
     var events = new System.Collections.Generic.List<BattleEvent>();
@@ -58,7 +60,7 @@ public class BombExpiryTest
   }
 
   [TestCase(TestName = "Player wipe defeat stays stable when the defuse objective also fails in the same expiry dispatch")]
-  public void ExpiryPlayerWipeDefeatHasStableOutcome()
+  public static void ExpiryPlayerWipeDefeatHasStableOutcome()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
@@ -93,7 +95,7 @@ public class BombExpiryTest
   }
 
   [TestCase(TestName = "Defused bombs do not expire")]
-  public void DefusedSkipsExpiry()
+  public static void DefusedSkipsExpiry()
   {
     using var runtime = BattleFactory.Start(BombSetup(new Vector3I(1, 0, 0), MakeBomb(expireAfterTurns: 1))).RequireRight();
     runtime.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
@@ -110,7 +112,7 @@ public class BombExpiryTest
   }
 
   [TestCase(TestName = "Expiry fires after the -100 upkeep systems")]
-  public void ExpiryRunsAfterUpkeep()
+  public static void ExpiryRunsAfterUpkeep()
   {
     var order = new System.Collections.Generic.List<string>();
     using var runtime = BattleFactory.Start(BombSetup(new Vector3I(1, 0, 1), MakeBomb(expireAfterTurns: 1))).RequireRight();
@@ -133,7 +135,7 @@ public class BombExpiryTest
   }
 
   [TestCase]
-  public void ExpiryPayloadDamagesObjectsThroughTheSharedResolver()
+  public static void ExpiryPayloadDamagesObjectsThroughTheSharedResolver()
   {
     var timer = new TimedEffectCapabilityData { FireAfterTurns = 1, EffectRadius = 1 };
     timer.Effects.Add(new DamageEffectData { BaseDamage = 8 });
@@ -152,13 +154,13 @@ public class BombExpiryTest
     battle.ClearEvents();
     battle.AdvanceTurn();
     Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
-    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(bomb)).IsNone);
+    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.BoardObject(bomb)).IsNone);
     Assert.Equal(12, crate.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
     battle.Events.EventBefore<ObjectDamagedBattleEvent, ObjectExpiredBattleEvent>();
   }
 
   [TestCase]
-  public void DestroyedBombNeverFiresItsPayloadOrExpiresLater()
+  public static void DestroyedBombNeverFiresItsPayloadOrExpiresLater()
   {
     var timer = new TimedEffectCapabilityData { FireAfterTurns = 1, EffectRadius = 1 };
     timer.Effects.Add(new DamageEffectData { BaseDamage = 99 });
@@ -177,6 +179,6 @@ public class BombExpiryTest
     Assert.Equal(Some(ObjectStatus.Destroyed), bomb.Status);
     Assert.Equal(battle.PlayerUnit.MaxHealth, battle.PlayerUnit.CurrentHealth);
     Assert.Equal(0, battle.Events.EventsOf<ObjectExpiredBattleEvent>().Length);
-    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(bomb)).IsNone);
+    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.BoardObject(bomb)).IsNone);
   }
 }

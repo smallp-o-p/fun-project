@@ -11,6 +11,8 @@ using Godot;
 using System;
 using FunProject.Scenes.Ext;
 
+namespace FunProject.Scenes;
+
 // Which slot the armory browser targets. Produced by slot-button clicks (or the test seam);
 // weapon/armor/utility/mod kinds each filter the browser differently.
 public enum UnitViewSlotKind
@@ -431,7 +433,7 @@ public sealed partial class UnitView : GeoscapeView
       Some: weapon => weapon.GetModSlots().Count > index ? weapon.GetModSlots()[index] : Option<ModSlot>.None,
       None: () => Option<ModSlot>.None);
 
-  private void AddLabelRow(Container parent, string text)
+  private static void AddLabelRow(Container parent, string text)
   {
     var label = new RichTextLabel
     {

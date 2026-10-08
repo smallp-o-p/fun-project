@@ -16,7 +16,7 @@ Each game concept has two layers. Detail: [equippable-item-architecture.md](equi
   - Inventory and equipment code depends on runtime base types.
 
 ### Stat system
-A stat's identity is its concrete subclass. `scripts/stats/concrete_stats/` holds the concrete subclasses of the abstract `Stat` base. Typed fields accept only that stat. Runtime lookup goes through `HasStats.GetStat<TStat>()`/`TryGetStat<TStat>()`. Modifiers form a hierarchy: `StatModifier` (numeric op) → `StatMod` (`TypedStatMod<TStat>`) → `EquippableMod` (`MultiStatMod` for many).
+A stat's identity is its concrete subclass. `scripts/stats/concrete_stats/` holds the concrete subclasses of the abstract `Stat` base. Typed fields accept only that stat. Runtime lookup goes through `IHasStats.GetStat<TStat>()`/`TryGetStat<TStat>()`. Modifiers form a hierarchy: `StatModifier` (numeric op) → `StatMod` (`TypedStatMod<TStat>`) → `EquippableMod` (`MultiStatMod` for many).
 
 Add a concrete subclass for each new stat or modifier. Items hold armor through `BaseArmorStat` on `ArmorCapabilityData`. Detail: [stat-system.md](stat-system.md).
 

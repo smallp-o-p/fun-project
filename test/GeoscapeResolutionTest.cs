@@ -1,6 +1,8 @@
 using FunProject.Strategic;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class GeoscapeResolutionTest
@@ -52,7 +54,7 @@ public class GeoscapeResolutionTest
   }
 
   [TestCase(TestName = "Opening while pending throws")]
-  public void DoubleOpenThrows()
+  public static void DoubleOpenThrows()
   {
     using var campaign = GeoscapeFixture.WithFiredEvent(TestData.MakeEvent("Incident"));
     var active = campaign.ActiveEvent;
@@ -62,7 +64,7 @@ public class GeoscapeResolutionTest
   }
 
   [TestCase(TestName = "Completing without pending throws")]
-  public void CompleteWithoutOpenThrows()
+  public static void CompleteWithoutOpenThrows()
   {
     using var campaign = GeoscapeFixture.WithFiredEvent(TestData.MakeEvent("Incident"));
 

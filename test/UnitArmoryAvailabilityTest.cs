@@ -4,6 +4,8 @@ using FunProject.Engineering;
 using GdUnit4;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class UnitArmoryAvailabilityTest
@@ -51,7 +53,7 @@ public class UnitArmoryAvailabilityTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public async Task UnitBrowserTracksAvailableSupply(bool unlimited)
+  public static async Task UnitBrowserTracksAvailableSupply(bool unlimited)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var item = MakeUtilityData(unlimited: unlimited);
@@ -78,7 +80,7 @@ public class UnitArmoryAvailabilityTest
   // Activation (returning from a covered view) refreshes the retained unit while keeping
   // the selected slot: the weapon filter survives and reflects stock that moved meanwhile.
   [TestCase]
-  public async Task ActivationRefreshesTheRetainedUnitWithoutClearingSlotSelection()
+  public static async Task ActivationRefreshesTheRetainedUnitWithoutClearingSlotSelection()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var rifle = MakeWeaponData(name: "Rifle");

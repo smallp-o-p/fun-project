@@ -4,6 +4,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 // Presentation-side UI state machine (pure C#, no Godot beyond Vector3I). Owns selection and
 // targeting sub-states. The runtime cache owns per-unit option identity; the UI memoizes presentation
 // adapters against the runtime's returned lists so the two can never disagree. Two transition sources,
@@ -137,7 +139,7 @@ public sealed class BattleUiController : IDisposable
 
     switch (option)
     {
-      case NeedsTargeting targeted:
+      case INeedsTargeting targeted:
         IActionTargeting handler = targeted.Targeting(_runtime);
         _targeter = Some(handler);
         handler.Begin();
@@ -256,7 +258,7 @@ public sealed class BattleUiController : IDisposable
     return options;
   }
 
-  private static IReadOnlyList<UnitActionOption> BuildOptions(IReadOnlyList<UnitAction> actions) =>
+  private static System.Collections.ObjectModel.ReadOnlyCollection<UnitActionOption> BuildOptions(IReadOnlyList<UnitAction> actions) =>
     actions.AsValueEnumerable().Select(MakeOption).ToList().AsReadOnly();
 
   private static UnitActionOption MakeOption(UnitAction action) => action.Action switch

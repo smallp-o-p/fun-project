@@ -2,6 +2,8 @@ using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Strategic;
 using Godot;
 
+namespace FunProject.Scenes;
+
 /// <summary>
 /// Base class for a screen in the Geoscape. Must implement a way to go back.
 /// This also accommodates "transparent" views e.g. modal dialogs.

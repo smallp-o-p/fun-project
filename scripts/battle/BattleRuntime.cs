@@ -76,14 +76,14 @@ public sealed class BattleRuntime : IDisposable
   }
 
   public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0)
-    where TEventKey : BattleEventTag
+    where TEventKey : IBattleEventTag
   {
     ThrowIfDisposed();
     _actions.RegisterHook<TEventKey>(hook, priority);
   }
 
   public bool UnregisterHook<TEventKey>(BattleHook hook)
-    where TEventKey : BattleEventTag
+    where TEventKey : IBattleEventTag
   {
     ThrowIfDisposed();
     return _actions.UnregisterHook<TEventKey>(hook);

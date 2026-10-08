@@ -8,9 +8,11 @@ using System;
 using System.Collections.Generic;
 using FunProject.Scenes.Ext;
 
+namespace FunProject.Scenes;
+
 public sealed partial class SkillProgressionView : GeoscapeView
 {
-  public Combatant? Unit;
+  public Combatant? Unit { get; set; }
 
   public override void _Ready()
   {
@@ -138,7 +140,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
   }
 
   private static string PrettyStatName(System.Type statType)
-    => statType.Name.EndsWith("Stat") ? statType.Name[..^"Stat".Length] : statType.Name;
+    => statType.Name.EndsWith("Stat", StringComparison.Ordinal) ? statType.Name[..^"Stat".Length] : statType.Name;
 
   private static string ModifierText(StatMod mod)
   {

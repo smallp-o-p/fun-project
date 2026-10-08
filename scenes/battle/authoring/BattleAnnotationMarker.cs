@@ -1,5 +1,7 @@
 using Godot;
 
+namespace FunProject.Scenes;
+
 [Tool, GlobalClass]
 public partial class BattleAnnotationMarker : MeshInstance3D
 {

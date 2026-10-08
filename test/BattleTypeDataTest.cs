@@ -3,6 +3,8 @@ using FunProject.Combatants;
 using GdUnit4;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleTypeDataTest
@@ -11,7 +13,7 @@ public partial class BattleTypeDataTest
   // on a live runtime: with Priority = -50 the expiry fires before a 0-priority observer,
   // so the observer must already see the bomb expired.
   [TestCase(TestName = "ObjectExpirySystemData registers its hook with the authored priority")]
-  public void ObjectExpiryRegistration()
+  public static void ObjectExpiryRegistration()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");

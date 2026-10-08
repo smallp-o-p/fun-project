@@ -9,7 +9,7 @@ namespace FunProject.Tests;
 public partial class GeoscapeFixtureTest
 {
   [TestCase]
-  public void StateSessionAndRecordingSurviveRepeatedOperations()
+  public static void StateSessionAndRecordingSurviveRepeatedOperations()
   {
     var definition = TestData.MakeEvent("Incident");
     using var campaign = new GeoscapeFixture(timeline: [TestData.MakeScheduled(1, definition)]);
@@ -29,7 +29,7 @@ public partial class GeoscapeFixtureTest
   }
 
   [TestCase]
-  public void NegativeTickAdvancementLeavesSessionUnchanged()
+  public static void NegativeTickAdvancementLeavesSessionUnchanged()
   {
     using var campaign = new GeoscapeFixture();
 
@@ -42,7 +42,7 @@ public partial class GeoscapeFixtureTest
   }
 
   [TestCase]
-  public void DisposalDetachesTheRecorderFromTheRetainedSession()
+  public static void DisposalDetachesTheRecorderFromTheRetainedSession()
   {
     var campaign = new GeoscapeFixture();
     var session = campaign.Session;

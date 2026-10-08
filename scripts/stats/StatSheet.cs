@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace FunProject.Stats;
 
 /// <summary>
-/// Type-keyed stat storage shared by HasStats implementors.
+/// Type-keyed stat storage shared by IHasStats implementors.
 /// </summary>
 public sealed class StatSheet
 {

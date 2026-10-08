@@ -6,6 +6,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleActionExecutorTest
@@ -27,7 +29,7 @@ public partial class BattleActionExecutorTest
   [TestCase(false, true, TestName = "Submit resolves a hook's interrupt within the same submission")]
   [TestCase(true, true, TestName = "Submit reports the submitted action once and resolves interrupts between its steps")]
   [TestCase(true, false, TestName = "MoveUnit submit reports only the submitted action")]
-  public void SubmitReportsMovementAndInterrupts(bool twoSteps, bool reaction)
+  public static void SubmitReportsMovementAndInterrupts(bool twoSteps, bool reaction)
   {
     var start = new Vector3I(0, 0, 0);
     var mid = new Vector3I(1, 0, 0);
@@ -66,7 +68,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "A stale interrupt on an already-dead target is interrupted, not thrown")]
-  public void StaleInterruptOnDeadTargetIsInterruptedNotThrown()
+  public static void StaleInterruptOnDeadTargetIsInterruptedNotThrown()
   {
     var factionA = TestData.MakeFaction("Alpha");
     var factionB = TestData.MakeFaction("Bravo");
@@ -96,7 +98,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "Interrupts whose actor died earlier in the submission are interrupted")]
-  public void InterruptWithDeadActorIsInterrupted()
+  public static void InterruptWithDeadActorIsInterrupted()
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), health: 10, actionPoints: 5);
     var unit = battle.Unit;
@@ -120,7 +122,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "A failed submission is unwound; the next Submit does not resume stale work")]
-  public void FailedSubmissionIsUnwoundForNextSubmit()
+  public static void FailedSubmissionIsUnwoundForNextSubmit()
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var faction = battle.PlayerFaction;
@@ -137,7 +139,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "A stun reaction after the first movement step interrupts the remaining route")]
-  public void StunReactionInterruptsRemainingMovementSteps()
+  public static void StunReactionInterruptsRemainingMovementSteps()
   {
     var start = new Vector3I(0, 0, 0);
     var mid = new Vector3I(1, 0, 0);
@@ -157,7 +159,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "MoveUnit emits movement and tile occupation events after commit")]
-  public void MoveUnitEmitsMovementAndTileOccupationEventsAfterCommit()
+  public static void MoveUnitEmitsMovementAndTileOccupationEventsAfterCommit()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(1, 0, 1), actionPoints: 5);
     var unit = battle.Unit;
@@ -173,7 +175,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "BattleEventCommitted subscribers observe committed session state")]
-  public void BattleEventCommittedSubscribersObserveCommittedSessionState()
+  public static void BattleEventCommittedSubscribersObserveCommittedSessionState()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(1, 0, 1), actionPoints: 5);
     var session = battle.Session;
@@ -193,7 +195,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "Executor supports hook registered to event shape")]
-  public void ExecutorSupportsHookRegisteredToEventShape()
+  public static void ExecutorSupportsHookRegisteredToEventShape()
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var unit = battle.Unit;
@@ -207,7 +209,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "Executor resolves interrupt actions in hook priority order")]
-  public void ExecutorResolvesInterruptActionsInHookPriorityOrder()
+  public static void ExecutorResolvesInterruptActionsInHookPriorityOrder()
   {
     var start = new Vector3I(0, 0, 0);
     var targetPosition = new Vector3I(1, 0, 0);
@@ -229,7 +231,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "Executor resolves interrupts across a step's events in commit order")]
-  public void ExecutorResolvesInterruptsAcrossEventsInCommitOrder()
+  public static void ExecutorResolvesInterruptsAcrossEventsInCommitOrder()
   {
     var start = new Vector3I(0, 0, 0);
     var targetPosition = new Vector3I(1, 0, 0);
@@ -254,7 +256,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "A rejected submission throws without consuming one-shot hooks")]
-  public void RejectedSubmissionThrowsWithoutConsumingOneShotHooks()
+  public static void RejectedSubmissionThrowsWithoutConsumingOneShotHooks()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), health: 10);
     var unit = battle.Unit;
@@ -275,7 +277,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "Executor supports multiple one-shot hook instances")]
-  public void ExecutorSupportsMultipleOneShotHookInstances()
+  public static void ExecutorSupportsMultipleOneShotHookInstances()
   {
     var start = new Vector3I(0, 0, 0);
     var firstTrap = new Vector3I(1, 0, 0);
@@ -294,7 +296,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "MoveUnit throws when an internal step becomes blocked")]
-  public void MoveUnitThrowsWhenAnInternalStepBecomesBlocked()
+  public static void MoveUnitThrowsWhenAnInternalStepBecomesBlocked()
   {
     var faction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -317,7 +319,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "MoveUnit stops quietly when a reaction kills the mover mid route")]
-  public void MoveUnitStopsQuietlyWhenAReactionKillsTheMoverMidRoute()
+  public static void MoveUnitStopsQuietlyWhenAReactionKillsTheMoverMidRoute()
   {
     var start = new Vector3I(0, 0, 0);
     var mid = new Vector3I(1, 0, 0);
@@ -337,7 +339,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "MoveUnit fails malformed route before moving")]
-  public void MoveUnitFailsMalformedRouteBeforeMoving()
+  public static void MoveUnitFailsMalformedRouteBeforeMoving()
   {
     var start = new Vector3I(0, 0, 0);
     var mid = new Vector3I(1, 0, 0);
@@ -354,7 +356,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "MoveUnit fails empty destinations before moving")]
-  public void MoveUnitFailsEmptyDestinationsBeforeMoving()
+  public static void MoveUnitFailsEmptyDestinationsBeforeMoving()
   {
     var start = new Vector3I(0, 0, 0);
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), start, actionPoints: 5);
@@ -367,7 +369,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "EndFactionTurn emits turn transition events after commit")]
-  public void EndFactionTurnEmitsTurnTransitionEventsAfterCommit()
+  public static void EndFactionTurnEmitsTurnTransitionEventsAfterCommit()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -413,7 +415,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "Consumable throwable without charges is removed after one throw")]
-  public void ConsumableThrowableWithoutChargesIsRemovedAfterOneThrow()
+  public static void ConsumableThrowableWithoutChargesIsRemovedAfterOneThrow()
   {
     using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1), actionPoints: 4);
     var unit = battle.Unit;
@@ -426,7 +428,7 @@ public partial class BattleActionExecutorTest
   }
 
   [TestCase(TestName = "Executor rejects stale end faction turn action after auto-advance")]
-  public void ExecutorRejectsStaleEndFactionTurnActionAfterAutoAdvance()
+  public static void ExecutorRejectsStaleEndFactionTurnActionAfterAutoAdvance()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -443,7 +445,7 @@ public partial class BattleActionExecutorTest
   }
 
   private sealed partial class DamageOnTileOccupiedHook<TEventKey> : BattleHook
-    where TEventKey : BattleEventTag
+    where TEventKey : IBattleEventTag
   {
     private readonly Vector3I _position;
     private readonly BattleUnitState _targetUnit;

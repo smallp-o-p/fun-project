@@ -3,12 +3,14 @@ using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ObjectiveTest
 {
   [TestCase(TestName = "EliminateAll passes only once all other factions are wiped")]
-  public void EliminateAllPassesWhenOpponentsWiped()
+  public static void EliminateAllPassesWhenOpponentsWiped()
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5),
@@ -26,7 +28,7 @@ public class ObjectiveTest
   }
 
   [TestCase(TestName = "EliminateAll fails when the owner is wiped")]
-  public void EliminateAllFailsWhenOwnerWiped()
+  public static void EliminateAllFailsWhenOwnerWiped()
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5),
@@ -42,7 +44,7 @@ public class ObjectiveTest
   }
 
   [TestCase]
-  public void EliminationIgnoresActionPointExhaustionAndImmobilization()
+  public static void EliminationIgnoresActionPointExhaustionAndImmobilization()
   {
     using var battle = BattleFixture.Duel();
     var objective = new EliminateAllOpposingForcesObjectiveData().Instantiate();
@@ -55,7 +57,7 @@ public class ObjectiveTest
   }
 
   [TestCase]
-  public void SurvivalStillCountsAnUnconsciousLivingOwner()
+  public static void SurvivalStillCountsAnUnconsciousLivingOwner()
   {
     using var battle = BattleFixture.Duel();
     var objective = new SurviveUntilTurnObjectiveData { TargetTurn = 1 }.Instantiate();

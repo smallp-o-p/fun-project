@@ -1,6 +1,8 @@
 using FunProject.Battle;
 using Godot;
 
+namespace FunProject.Scenes;
+
 /// <summary>
 /// DO NOT MODIFY!!! This an exported map that can be used in a tactical skirmish.
 /// </summary>

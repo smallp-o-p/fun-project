@@ -55,8 +55,8 @@ public sealed class BattleActionExecutor : IDisposable
     RegisterHook<UnitAddedBattleEvent>(new UnitSpawnedBuffHook());
 
     // Objectives are an ordinary default system, receiving every event through the
-    // BattleEventTag catch-all key and filtering their declared observed keys internally.
-    RegisterHook<BattleEventTag>(new ObjectiveSystem(_session), priority: 100);
+    // IBattleEventTag catch-all key and filtering their declared observed keys internally.
+    RegisterHook<IBattleEventTag>(new ObjectiveSystem(_session), priority: 100);
   }
 
   private void OnEventCommitted(BattleEvent battleEvent)
@@ -73,14 +73,14 @@ public sealed class BattleActionExecutor : IDisposable
   }
 
   public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0)
-    where TEventKey : BattleEventTag
+    where TEventKey : IBattleEventTag
   {
     ThrowIfDisposed();
     _hooks.Register<TEventKey>(hook, priority);
   }
 
   public bool UnregisterHook<TEventKey>(BattleHook hook)
-    where TEventKey : BattleEventTag
+    where TEventKey : IBattleEventTag
   {
     ThrowIfDisposed();
     return _hooks.Unregister<TEventKey>(hook);

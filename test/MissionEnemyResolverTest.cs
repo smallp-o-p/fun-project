@@ -4,12 +4,14 @@ using GdUnit4;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class MissionEnemyResolverTest
 {
   [TestCase(TestName = "Seeded forces repeat with fresh units and ordered additive specials")]
-  public void SeededForcesRepeatWithFreshUnitsAndAdditiveSpecials()
+  public static void SeededForcesRepeatWithFreshUnitsAndAdditiveSpecials()
   {
     var mission = TestData.MakeTacticalMission(minEnemyUnits: 2, maxEnemyUnits: 4);
     mission.OrdinaryEnemies.Add(new UnitLoadoutData
@@ -51,7 +53,7 @@ public class MissionEnemyResolverTest
   }
 
   [TestCase(TestName = "A specials-only mission needs no ordinary pool and produces exactly the specials")]
-  public void SpecialOnlyMissionNeedsNoOrdinaryPool()
+  public static void SpecialOnlyMissionNeedsNoOrdinaryPool()
   {
     var mission = TestData.MakeTacticalMission(minEnemyUnits: 0, maxEnemyUnits: 0);
     mission.OrdinaryEnemies.Clear();
@@ -67,7 +69,7 @@ public class MissionEnemyResolverTest
   }
 
   [TestCase(TestName = "Enemy count sampling observes both endpoints of an extreme inclusive range")]
-  public void ExtremeRangeSamplingObservesBothEndpoints()
+  public static void ExtremeRangeSamplingObservesBothEndpoints()
   {
     var size = new BattleSizeData
     {
@@ -92,7 +94,7 @@ public class MissionEnemyResolverTest
   }
 
   [TestCase(TestName = "Enemy count sampling respects small, zero, and fixed inclusive bounds")]
-  public void BoundedRangeSamplingStaysInclusive()
+  public static void BoundedRangeSamplingStaysInclusive()
   {
     var small = new BattleSizeData { MaxPlayerUnits = 1, MinEnemyUnits = 2, MaxEnemyUnits = 5 };
     var zero = new BattleSizeData { MaxPlayerUnits = 3, MinEnemyUnits = 0, MaxEnemyUnits = 0 };
@@ -109,7 +111,7 @@ public class MissionEnemyResolverTest
 
   [TestCase(true)]
   [TestCase(false)]
-  public void EnemyMinimumClampsWithoutLosingAssignmentOrder(bool minimumFirst)
+  public static void EnemyMinimumClampsWithoutLosingAssignmentOrder(bool minimumFirst)
   {
     using var size = new BattleSizeData();
     if (minimumFirst)
@@ -132,7 +134,7 @@ public class MissionEnemyResolverTest
   }
 
   [TestCase(TestName = "Battle size exports round trip with the authored minimum and unsigned maximum")]
-  public void BattleSizeResourceRoundTrip()
+  public static void BattleSizeResourceRoundTrip()
   {
     using var size = new BattleSizeData
     {

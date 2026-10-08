@@ -8,7 +8,7 @@ namespace FunProject.Tests;
 public class CurrencyTest
 {
   [TestCase]
-  public void StartingBalancesAreIndependentForEachCampaignAndCurrencyReference()
+  public static void StartingBalancesAreIndependentForEachCampaignAndCurrencyReference()
   {
     var currency = MakeCurrency();
     var sameName = MakeCurrency();
@@ -24,7 +24,7 @@ public class CurrencyTest
   }
 
   [TestCase]
-  public void MultiCurrencySpendIsAtomic()
+  public static void MultiCurrencySpendIsAtomic()
   {
     var a = MakeCurrency("A");
     var b = MakeCurrency("B");
@@ -41,7 +41,7 @@ public class CurrencyTest
   }
 
   [TestCase]
-  public void FreeAndMaximumUnsignedCostsDoNotWrap()
+  public static void FreeAndMaximumUnsignedCostsDoNotWrap()
   {
     var currency = MakeCurrency();
     var missing = MakeCurrency();

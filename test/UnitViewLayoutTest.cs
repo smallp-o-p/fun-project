@@ -4,12 +4,14 @@ using Godot;
 using GdUnit4;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class UnitViewLayoutTest
 {
   [TestCase]
-  public async Task OpeningUnitSelectsWeaponAndShowsItsArmoryImmediately()
+  public static async Task OpeningUnitSelectsWeaponAndShowsItsArmoryImmediately()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var rifle = MakeWeaponData(name: "Rifle");
@@ -26,7 +28,7 @@ public class UnitViewLayoutTest
   }
 
   [TestCase]
-  public async Task FifthUtilitySlotEquipsImmediatelyAndRetainsDetailsAfterRefresh()
+  public static async Task FifthUtilitySlotEquipsImmediatelyAndRetainsDetailsAfterRefresh()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var item = MakeUtilityData("Field Kit");
@@ -54,7 +56,7 @@ public class UnitViewLayoutTest
   }
 
   [TestCase]
-  public async Task UnequippingWeaponClearsItsDetailsTooltip()
+  public static async Task UnequippingWeaponClearsItsDetailsTooltip()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var rifle = MakeWeaponData(name: "Rifle");
@@ -71,7 +73,7 @@ public class UnitViewLayoutTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public async Task BothModSlotKindsEquipAndUnequipFromTheActiveInspector(bool weaponMod)
+  public static async Task BothModSlotKindsEquipAndUnequipFromTheActiveInspector(bool weaponMod)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var rifle = MakeWeaponData(name: "Rifle");
@@ -100,7 +102,7 @@ public class UnitViewLayoutTest
   }
 
   [TestCase]
-  public async Task CompactViewportScrollsToTheFifthUtilitySlotOnKeyboardFocus()
+  public static async Task CompactViewportScrollsToTheFifthUtilitySlotOnKeyboardFocus()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var rifle = MakeWeaponData(name: "Rifle");
@@ -125,7 +127,7 @@ public class UnitViewLayoutTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task LongSkillPathsScrollWhileNavigationAndPointsRemainVisible(int width, int height)
+  public static async Task LongSkillPathsScrollWhileNavigationAndPointsRemainVisible(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var campaign = new GeoscapeFixture(MakeStart(roster: [MakeEntry()]));
@@ -151,7 +153,7 @@ public class UnitViewLayoutTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task UnitLayoutKeepsIdentityAndActionsInsideViewport(int width, int height)
+  public static async Task UnitLayoutKeepsIdentityAndActionsInsideViewport(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var campaign = new GeoscapeFixture(MakeStart(roster: [MakeEntry()]));
@@ -175,7 +177,7 @@ public class UnitViewLayoutTest
   [TestCase(1920, 1080)]
   [TestCase(3440, 1440)]
   [TestCase(3840, 2160)]
-  public async Task EntireUnitBodyKeepsPaddingThroughViewportResizes(int width, int height)
+  public static async Task EntireUnitBodyKeepsPaddingThroughViewportResizes(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var campaign = new GeoscapeFixture(MakeStart(roster: [MakeEntry()]));

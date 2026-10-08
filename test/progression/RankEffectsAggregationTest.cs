@@ -7,6 +7,8 @@ using FunProject.Stats;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class RankEffectsAggregationTest
@@ -22,7 +24,7 @@ public partial class RankEffectsAggregationTest
       Seed: 7));
 
   [TestCase(TestName = "Combatants without a bespoke rank table use the authored default ladder")]
-  public void UsesAuthoredDefaultRankTable()
+  public static void UsesAuthoredDefaultRankTable()
   {
     var data = TestData.MakeCombatantData("Alpha");
     data.RankTable = null;
@@ -35,7 +37,7 @@ public partial class RankEffectsAggregationTest
   }
 
   [TestCase(TestName = "Held rung stat mods are cumulative and raise the spawned unit's effective aim")]
-  public void RungStatModsAreCumulative()
+  public static void RungStatModsAreCumulative()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = SeededBattle(faction);
@@ -70,7 +72,7 @@ public partial class RankEffectsAggregationTest
   }
 
   [TestCase(TestName = "Held rung buffs fold into InnateBuffs and stack at spawn")]
-  public void RungBuffsFoldIntoInnateBuffs()
+  public static void RungBuffsFoldIntoInnateBuffs()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = SeededBattle(faction);
@@ -97,7 +99,7 @@ public partial class RankEffectsAggregationTest
   }
 
   [TestCase(TestName = "Held rung abilities surface, and a null ability names its rung")]
-  public void RungAbilitiesSurface()
+  public static void RungAbilitiesSurface()
   {
     var faction = TestData.MakeFaction("Player");
     var combatant = TestData.MakeCombatant("Alpha", faction, health: 10, actionPoints: 2, movement: 8,

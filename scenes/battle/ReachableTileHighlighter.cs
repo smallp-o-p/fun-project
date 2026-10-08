@@ -1,6 +1,8 @@
 using Godot;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 // Renders a flat translucent marker over each reachable tile. One shared mesh/material; markers are
 // child MeshInstance3D nodes recreated on each Show.
 public sealed partial class ReachableTileHighlighter : Node3D

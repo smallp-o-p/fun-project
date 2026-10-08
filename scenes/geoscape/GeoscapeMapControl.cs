@@ -4,6 +4,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 // Draws the geoscape: region visuals are AUTHORED in the Godot editor as instances of the
 // RegionButton scene under this control (each with a Polygon2D "Fill" child and Line2D
 // outline — no collision shapes; buttons derive their hit area and hover from the Fill

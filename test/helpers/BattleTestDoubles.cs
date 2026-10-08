@@ -52,7 +52,7 @@ internal sealed partial class FixtureRecordingSystem : BattleTypeSystemData
   public FixtureRecordingSystem(List<BattleEvent> events) => _events = events;
 
   public override void Register(BattleHookRegistration hooks) =>
-    hooks.RegisterHook<BattleEventTag>(new Recorder(this), int.MinValue);
+    hooks.RegisterHook<IBattleEventTag>(new Recorder(this), int.MinValue);
 
   private sealed class Recorder(FixtureRecordingSystem owner) : BattleHook
   {
@@ -140,7 +140,7 @@ public sealed class FakeObjective : Objective
   public override IReadOnlyCollection<Type> ObservedEventKeys =>
     Observe is null ? [typeof(UnitKilledBattleEvent)] : [Observe];
 
-  public override ObjectiveResult Check(Faction _, BattleEvent battleEvent, BattleSession session)
+  public override ObjectiveResult Check(Faction owner, BattleEvent battleEvent, BattleSession session)
   {
     CheckCount++;
     if (Failed)

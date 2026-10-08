@@ -3,12 +3,14 @@ using FunProject.Stats;
 using GdUnit4;
 using System;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ObjectHealthTest
 {
   [TestCase]
-  public void HealthInstancesAreIndependentAndAuthoredHealthIsUnchanged()
+  public static void HealthInstancesAreIndependentAndAuthoredHealthIsUnchanged()
   {
     var stat = new HealthStat { BaseValue = 10 };
     var data = new ObjectHealthCapabilityData { HealthStat = stat };
@@ -25,7 +27,7 @@ public class ObjectHealthTest
   }
 
   [TestCase]
-  public void MissingNonpositiveAndDuplicateHealthAreRejected()
+  public static void MissingNonpositiveAndDuplicateHealthAreRejected()
   {
     Assert.Throws<InvalidOperationException>(() =>
       new ObjectHealthCapabilityData { HealthStat = null! }.CreateRuntime());
@@ -47,7 +49,7 @@ public class ObjectHealthTest
   }
 
   [TestCase]
-  public void MintRequiresHealthMembershipAndLivePlacement()
+  public static void MintRequiresHealthMembershipAndLivePlacement()
   {
     using var battle = BattleFixture.Duel(configure: setup => setup with
     {
@@ -62,9 +64,9 @@ public class ObjectHealthTest
       .Single(o => o.Position == new Vector3I(3, 0, 1));
     var scenery = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable()
       .Single(o => o.Position == new Vector3I(2, 0, 2));
-    var identity = new BattleEntity.Object(crate);
+    var identity = new BattleEntity.BoardObject(crate);
     Assert.True(ReferenceEquals(identity, battle.Runtime.TryGetAttackTarget(identity).RequireSome().Entity));
-    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(scenery)).IsNone);
+    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.BoardObject(scenery)).IsNone);
     Assert.True(foreign.Runtime.TryGetAttackTarget(identity).IsNone);
     Assert.True(foreign.Runtime.TryGetAttackTarget(new BattleEntity.Unit(battle.PlayerUnit)).IsNone);
     Assert.Equal(battle.Alive(battle.EnemyUnit).Position, battle.Target(battle.EnemyUnit).Position);

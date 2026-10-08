@@ -5,13 +5,15 @@ using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleOutcomeTest
 {
   [TestCase(false, BattleOutcome.Victory, TestName = "Knocking out the last enemy wins the battle")]
   [TestCase(true, BattleOutcome.Defeat, TestName = "Knocking out the last player unit loses the battle")]
-  public void LastConsciousUnitKnockoutEndsTheBattle(bool playerWiped, BattleOutcome expected)
+  public static void LastConsciousUnitKnockoutEndsTheBattle(bool playerWiped, BattleOutcome expected)
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.ClearEvents();
@@ -24,7 +26,7 @@ public class BattleOutcomeTest
 
   [TestCase(DamageKind.Stun, 20, TestName = "Without a player faction total knockout draws only after the current side ends")]
   [TestCase(DamageKind.Health, 999, TestName = "Without a player faction total annihilation resolves to Draw at the end of the turn")]
-  public void NoPlayerTotalLossResolvesToDraw(DamageKind kind, int amount)
+  public static void NoPlayerTotalLossResolvesToDraw(DamageKind kind, int amount)
   {
     using var battle = kind == DamageKind.Stun
       ? BattleFixture.Duel()
@@ -50,7 +52,7 @@ public class BattleOutcomeTest
   }
 
   [TestCase(TestName = "A session exposes its declared player faction and no outcome until it ends")]
-  public void SessionExposesPlayerFactionAndNoOutcomeUntilEnded()
+  public static void SessionExposesPlayerFactionAndNoOutcomeUntilEnded()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -65,7 +67,7 @@ public class BattleOutcomeTest
 
   [TestCase(true, BattleOutcome.Defeat, TestName = "A wiped player loses immediately")]
   [TestCase(false, BattleOutcome.Victory, TestName = "Player becoming the sole surviving side resolves to Victory the instant the last enemy dies")]
-  public void PlayerWipeResolvesOutcomeInstantly(bool playerWiped, BattleOutcome expected)
+  public static void PlayerWipeResolvesOutcomeInstantly(bool playerWiped, BattleOutcome expected)
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5),
@@ -83,7 +85,7 @@ public class BattleOutcomeTest
   }
 
   [TestCase(TestName = "Without a player faction a sole survivor keeps playing and the battle does not end")]
-  public void NoPlayerSoleSurvivorKeepsPlaying()
+  public static void NoPlayerSoleSurvivorKeepsPlaying()
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5),
@@ -108,7 +110,7 @@ public class BattleOutcomeTest
   }
 
   [TestCase(TestName = "An end-of-turn DoT kill that wipes the player resolves to Defeat without throwing")]
-  public void EndOfTurnDotKillResolvesOutcome()
+  public static void EndOfTurnDotKillResolvesOutcome()
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5),

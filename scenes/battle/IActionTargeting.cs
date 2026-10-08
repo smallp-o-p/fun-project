@@ -2,6 +2,8 @@ using FunProject.Battle;
 using Godot;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 public abstract record ActionPreview;
 public sealed record PathPreview(IReadOnlyList<Vector3I> Path) : ActionPreview;
 public sealed record AttackPreview(HitChanceBreakdown HitChance) : ActionPreview;
@@ -25,7 +27,7 @@ public interface IActionTargeting
   BattleAction Build(Vector3I target);
 }
 
-public interface NeedsTargeting
+public interface INeedsTargeting
 {
   public IActionTargeting Targeting(BattleRuntime runtime);
 }

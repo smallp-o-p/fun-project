@@ -5,12 +5,14 @@ using GdUnit4;
 using Godot;
 using System;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class MapDeploymentTest
 {
   [TestCase(TestName = "AssignSpawns pairs loadouts in sorted XYZ cell order, keeping each loadout reference")]
-  public void AssignSpawnsPairsLoadoutsInSortedCellOrder()
+  public static void AssignSpawnsPairsLoadoutsInSortedCellOrder()
   {
     Faction faction = TestData.MakeFaction("Player");
     // Authored in reverse sorted order: pairing must follow the XYZ sort, not input order.
@@ -38,7 +40,7 @@ public partial class MapDeploymentTest
   }
 
   [TestCase(TestName = "AssignSpawns returns an empty list for an empty roster")]
-  public void AssignSpawnsEmptyRosterReturnsEmptyList()
+  public static void AssignSpawnsEmptyRosterReturnsEmptyList()
   {
     Faction faction = TestData.MakeFaction("Player");
     BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4),
@@ -51,7 +53,7 @@ public partial class MapDeploymentTest
 
   [TestCase(1, 1, TestName = "AssignSpawns fails when the slot has no tagged cells")]
   [TestCase(0, 2, TestName = "AssignSpawns fails when there are too few spawn cells")]
-  public void AssignSpawnsFailsWhenTheSlotIsShort(int slot, int count)
+  public static void AssignSpawnsFailsWhenTheSlotIsShort(int slot, int count)
   {
     Faction faction = TestData.MakeFaction("Player");
     BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4),
@@ -66,7 +68,7 @@ public partial class MapDeploymentTest
   }
 
   [TestCase(TestName = "Pairing returns out-of-bounds tagged cells; Start(type) turns them into a cell failure")]
-  public void OutOfBoundsTaggedCellDelegatesToStartValidation()
+  public static void OutOfBoundsTaggedCellDelegatesToStartValidation()
   {
     Faction faction = TestData.MakeFaction("Player");
     BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4));
@@ -95,7 +97,7 @@ public partial class MapDeploymentTest
   }
 
   [TestCase(TestName = "AssignSpawns guards its required inputs")]
-  public void AssignSpawnsGuards()
+  public static void AssignSpawnsGuards()
   {
     Faction faction = TestData.MakeFaction("Player");
     BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4),

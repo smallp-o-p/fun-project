@@ -1,12 +1,14 @@
 using FunProject.GameState;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class CampaignStartDataTest
 {
   [TestCase(TestName = "Roster entry display name defaults to empty (fallback marker)")]
-  public void DisplayNameDefaultsToEmpty()
+  public static void DisplayNameDefaultsToEmpty()
   {
     var entry = new RosterEntryData
     {

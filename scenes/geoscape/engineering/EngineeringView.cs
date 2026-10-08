@@ -8,6 +8,8 @@ using FunProject.Scenes.Ext;
 using FunProject.Strategic;
 using Godot;
 
+namespace FunProject.Scenes;
+
 public sealed partial class EngineeringView : GeoscapeView
 {
   private GeoscapeSession _session = null!;

@@ -6,6 +6,8 @@ using GdUnit4;
 using static GdUnit4.Assertions;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class GeoscapeUnitNavigationTest
@@ -22,7 +24,7 @@ public class GeoscapeUnitNavigationTest
       .EmitSignal(Button.SignalName.Pressed);
 
   [TestCase]
-  public async Task UnitsButtonOpensTheRosterWithRowsOverTheHiddenMap()
+  public static async Task UnitsButtonOpensTheRosterWithRowsOverTheHiddenMap()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = BuildScene([MakeEntry(), MakeEntry()], []);
@@ -39,7 +41,7 @@ public class GeoscapeUnitNavigationTest
   }
 
   [TestCase]
-  public async Task RowClickOpensABoundUnitViewOverTheRetainedRoster()
+  public static async Task RowClickOpensABoundUnitViewOverTheRetainedRoster()
   {
     var scene = BuildScene([MakeEntry()], []);
     var manager = Manager(scene);
@@ -66,7 +68,7 @@ public class GeoscapeUnitNavigationTest
   }
 
   [TestCase]
-  public async Task PathsAwardCommitAndCloseRefreshAimWhileKeepingSlotSelection()
+  public static async Task PathsAwardCommitAndCloseRefreshAimWhileKeepingSlotSelection()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = BuildScene(

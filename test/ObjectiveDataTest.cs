@@ -2,12 +2,14 @@ using FunProject.Battle;
 using GdUnit4;
 using static GdUnit4.Assertions;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ObjectiveDataTest
 {
   [TestCase(TestName = "EliminateAll data instantiates the runtime objective bound to itself")]
-  public void EliminateAllInstantiatesRuntimeObjective()
+  public static void EliminateAllInstantiatesRuntimeObjective()
   {
     var data = new EliminateAllOpposingForcesObjectiveData();
 
@@ -18,7 +20,7 @@ public class ObjectiveDataTest
   }
 
   [TestCase(TestName = "SurviveUntilTurn data carries its target turn into the runtime objective")]
-  public void SurviveUntilTurnInstantiatesRuntimeObjective()
+  public static void SurviveUntilTurnInstantiatesRuntimeObjective()
   {
     var data = new SurviveUntilTurnObjectiveData { TargetTurn = 4 };
 

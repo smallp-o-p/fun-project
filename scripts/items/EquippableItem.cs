@@ -8,7 +8,7 @@ using System.Collections.Generic;
 
 namespace FunProject.Items;
 
-public class EquippableItem : HasModSlots, HasNameAndDescription
+public class EquippableItem : IHasModSlots, IHasNameAndDescription
 {
   private readonly System.Collections.Generic.List<ItemCapability> _capabilities = [];
 

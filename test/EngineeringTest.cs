@@ -1,3 +1,4 @@
+using CampaignGameState = global::FunProject.GameState.GameState;
 using System;
 using FunProject.Engineering;
 using FunProject.GameState;
@@ -5,13 +6,15 @@ using FunProject.Currencies;
 using FunProject.Strategic;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class EngineeringTest
 {
   [TestCase(false)]
   [TestCase(true)]
-  public void FirstManufactureCreatesShelfOnlyAtCompletion(bool unlimited)
+  public static void FirstManufactureCreatesShelfOnlyAtCompletion(bool unlimited)
   {
     var item = MakeItemData(unlimited: unlimited);
     var itemRecipe = MakeManufacturingRecipe(item);
@@ -36,7 +39,7 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void UnlimitedProductionCreatesSupplyOnce()
+  public static void UnlimitedProductionCreatesSupplyOnce()
   {
     var item = MakeItemData("Supply", unlimited: true);
     var itemRecipe = MakeManufacturingRecipe(item, days: 1);
@@ -89,7 +92,7 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void ScarceProductionAddsOnePerCompletedJob()
+  public static void ScarceProductionAddsOnePerCompletedJob()
   {
     var currency = MakeCurrency();
     var item = MakeItemData();
@@ -113,7 +116,7 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void InitiallySuppliedUnlimitedItemHasNoOptionAndRejectsWithoutEffects()
+  public static void InitiallySuppliedUnlimitedItemHasNoOptionAndRejectsWithoutEffects()
   {
     var item = MakeItemData(unlimited: true);
     var itemRecipe = MakeManufacturingRecipe(item);
@@ -133,7 +136,7 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void UnknownRecipePrecedesBusyAndUsesCatalogResourceIdentity()
+  public static void UnknownRecipePrecedesBusyAndUsesCatalogResourceIdentity()
   {
     var item = MakeItemData();
     var itemRecipe = MakeManufacturingRecipe(item);
@@ -163,7 +166,7 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void BusyPrecedesAlreadyAvailableWithoutReplacingJob()
+  public static void BusyPrecedesAlreadyAvailableWithoutReplacingJob()
   {
     var currency = MakeCurrency();
     var item = MakeItemData();
@@ -198,7 +201,7 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void OptionsPreserveAuthoredOrderWhileBusyAndReadCurrentArmorySnapshots()
+  public static void OptionsPreserveAuthoredOrderWhileBusyAndReadCurrentArmorySnapshots()
   {
     var first = MakeItemData("First");
     var firstRecipe = MakeManufacturingRecipe(first);
@@ -244,7 +247,7 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void LargeAdvanceCompletesJobOnceAtItsDeadlineWithStockAlreadyVisible()
+  public static void LargeAdvanceCompletesJobOnceAtItsDeadlineWithStockAlreadyVisible()
   {
     var product = MakeItemData("Product");
     var productRecipe = MakeManufacturingRecipe(product, days: 1);
@@ -284,7 +287,7 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void PausedAdvancePreservesJobWithoutAccumulatingProgress()
+  public static void PausedAdvancePreservesJobWithoutAccumulatingProgress()
   {
     var product = MakeItemData("Product");
     var productRecipe = MakeManufacturingRecipe(product, days: 1);
@@ -318,7 +321,7 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void PendingResolutionFreezesJobUntilCompleted()
+  public static void PendingResolutionFreezesJobUntilCompleted()
   {
     var product = MakeItemData("Product");
     var productRecipe = MakeManufacturingRecipe(product, days: 1);
@@ -346,11 +349,11 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void RebuiltSessionContinuesJobAndRetainsSupply()
+  public static void RebuiltSessionContinuesJobAndRetainsSupply()
   {
     var product = MakeItemData("Product", unlimited: true);
     var productRecipe = MakeManufacturingRecipe(product, days: 1);
-    var state = new GameState(MakeStart(manufacturingRecipes: [productRecipe]));
+    var state = new CampaignGameState(MakeStart(manufacturingRecipes: [productRecipe]));
     var original = new GeoscapeSession(state);
     Assert.True(original.StartManufacturing(productRecipe).IsRight);
     var job = original.ActiveManufacturing;
@@ -374,7 +377,7 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void CompletionTickOverflowThrowsBeforeAssigningJobOrChangingStock()
+  public static void CompletionTickOverflowThrowsBeforeAssigningJobOrChangingStock()
   {
     var currency = MakeCurrency();
     var item = MakeItemData();
@@ -403,7 +406,7 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void FailedCompletionEffectPropagatesWithoutBroadcastingOrRetrying()
+  public static void FailedCompletionEffectPropagatesWithoutBroadcastingOrRetrying()
   {
     var currency = MakeCurrency();
     var item = MakeItemData();

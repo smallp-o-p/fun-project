@@ -2,6 +2,8 @@ using FunProject.Battle;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class StandardHitChanceCalculatorTest
@@ -30,7 +32,7 @@ public partial class StandardHitChanceCalculatorTest
   [TestCase(65, CoverDirections.North, 40, 4, 7, 65, 0, TestName = "FlankingAttackerIgnoresCover")]
   [TestCase(30, CoverDirections.North, 50, 4, 1, 0, 1, TestName = "FinalChanceClampsToZero")]
   [TestCase(120, CoverDirections.None, 0, 4, 1, 100, 0, TestName = "FinalChanceClampsToOneHundred")]
-  public void HitChance(
+  public static void HitChance(
     int aim,
     CoverDirections coverDirections,
     int coverAmount,

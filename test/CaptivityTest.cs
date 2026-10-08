@@ -3,12 +3,14 @@ using FunProject.Combatants;
 using FunProject.GameState;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class CaptivityTest
 {
   [TestCase]
-  public void CaptivityDeduplicatesByCombatantReference()
+  public static void CaptivityDeduplicatesByCombatantReference()
   {
     var captivity = new Captivity();
     var data = TestData.MakeCombatantData("Hostile");
@@ -31,7 +33,7 @@ public class CaptivityTest
   }
 
   [TestCase]
-  public void ReturnedSnapshotDoesNotChangeWhenCaptivityGrows()
+  public static void ReturnedSnapshotDoesNotChangeWhenCaptivityGrows()
   {
     var captivity = new Captivity();
     var combatant = TestData.MakeCombatant("Hostile", TestData.MakeFaction("Enemy"));
@@ -44,7 +46,7 @@ public class CaptivityTest
   }
 
   [TestCase]
-  public void NullCombatantIsRejected()
+  public static void NullCombatantIsRejected()
   {
     var captivity = new Captivity();
     Assert.Throws<ArgumentNullException>(() => captivity.Add(null!));

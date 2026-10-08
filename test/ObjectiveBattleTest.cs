@@ -6,6 +6,8 @@ using GdUnit4;
 using Godot;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ObjectiveBattleTest
@@ -25,7 +27,7 @@ public class ObjectiveBattleTest
 
   [TestCase(true, TestName = "A completed Victory-directive objective ends the battle the moment its trigger commits")]
   [TestCase(false, TestName = "A failed Defeat-directive objective loses the battle the moment its trigger commits")]
-  public void DirectiveEndsBattleOnTheTriggeringEvent(bool complete)
+  public static void DirectiveEndsBattleOnTheTriggeringEvent(bool complete)
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5), playerControlled: true,
@@ -57,7 +59,7 @@ public class ObjectiveBattleTest
 
   [TestCase(2, TestName = "A SurviveUntilTurn objective wins when its target turn starts")]
   [TestCase(1, TestName = "SurviveUntilTurn target turn one wins during the opening dispatch")]
-  public void SurviveUntilTurnObjectiveWinsAtTargetTurn(int targetTurn)
+  public static void SurviveUntilTurnObjectiveWinsAtTargetTurn(int targetTurn)
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5), playerControlled: true,
@@ -80,7 +82,7 @@ public class ObjectiveBattleTest
   }
 
   [TestCase(TestName = "An activation-ended objective win stops the turn continuation")]
-  public void ActivationCompletionStopsTurnContinuation()
+  public static void ActivationCompletionStopsTurnContinuation()
   {
     using var battle = BattleFixture.Duel();
     battle.Session.AddObjective(battle.PlayerFaction, new FakeObjective(new FakeObjectiveData
@@ -100,7 +102,7 @@ public class ObjectiveBattleTest
   }
 
   [TestCase(TestName = "A queued follow-up observes the next event in the same committed batch")]
-  public void QueuedFollowUpObservesNextEventInSameBatch()
+  public static void QueuedFollowUpObservesNextEventInSameBatch()
   {
     var player = TestData.MakeFaction("Player");
     var followUp = new FakeObjectiveData
@@ -125,7 +127,7 @@ public class ObjectiveBattleTest
   }
 
   [TestCase]
-  public void MixedKillAndStunCompletesEliminationOnlyOnceEvenWhenTheBodyLaterDies()
+  public static void MixedKillAndStunCompletesEliminationOnlyOnceEvenWhenTheBodyLaterDies()
   {
     using var battle = BattleFixture.Duel();
     var secondEnemy = battle.Spawn(TestData.MakeCombatant("Second", battle.EnemyFaction), new Vector3I(0, 0, 0));
@@ -143,8 +145,8 @@ public class ObjectiveBattleTest
   }
 
   [TestCase(typeof(UnitUnconsciousBattleEvent), ObjectiveResult.Ongoing)]
-  [TestCase(typeof(BattleEventTag), ObjectiveResult.Passed)]
-  public void ObjectivesCannotOverrideFinalPlayerKnockout(Type observedEvent,
+  [TestCase(typeof(IBattleEventTag), ObjectiveResult.Passed)]
+  public static void ObjectivesCannotOverrideFinalPlayerKnockout(Type observedEvent,
     ObjectiveResult expectedObjectiveResult)
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
@@ -168,7 +170,7 @@ public class ObjectiveBattleTest
   }
 
   [TestCase(TestName = "A silent objective completion records once and leaves the battle running")]
-  public void SilentObjectiveCompletionRecordsOnceAndLeavesBattleRunning()
+  public static void SilentObjectiveCompletionRecordsOnceAndLeavesBattleRunning()
   {
     var player = TestData.MakeFaction("Player");
     using var battle = RunnerFixture(player, new FakeObjectiveData
@@ -187,7 +189,7 @@ public class ObjectiveBattleTest
   }
 
   [TestCase(TestName = "A mid-submission objective win drops remaining composite move steps")]
-  public void MidSubmissionObjectiveWinDropsRemainingCompositeMoveSteps()
+  public static void MidSubmissionObjectiveWinDropsRemainingCompositeMoveSteps()
   {
     var player = TestData.MakeFaction("Player");
     var mid = new Vector3I(1, 0, 0);
@@ -208,7 +210,7 @@ public class ObjectiveBattleTest
   }
 
   [TestCase(TestName = "The player's eliminate-all completes the instant a reaction kills the last enemy during the enemy's turn")]
-  public void CrossFactionCompletionResolvesInTheKillingDispatch()
+  public static void CrossFactionCompletionResolvesInTheKillingDispatch()
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5), playerControlled: true,
@@ -231,7 +233,7 @@ public class ObjectiveBattleTest
   }
 
   [TestCase(TestName = "A wiped player loses instantly even with silent directives")]
-  public void WipedPlayerLosesWithSilentDirectives()
+  public static void WipedPlayerLosesWithSilentDirectives()
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5), playerControlled: true,
@@ -247,7 +249,7 @@ public class ObjectiveBattleTest
 
   [TestCase(DamageKind.Health, TestName = "Directives cannot rescue a wiped player")]
   [TestCase(DamageKind.Stun, TestName = "Directives cannot rescue an unconscious player")]
-  public void DirectivesCannotRescueAWipedPlayer(DamageKind kind)
+  public static void DirectivesCannotRescueAWipedPlayer(DamageKind kind)
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5), playerControlled: true,
@@ -280,7 +282,7 @@ public class ObjectiveBattleTest
   }
 
   [TestCase(TestName = "A queued interrupt never runs after the battle ends mid-submission")]
-  public void MidSubmissionEndDropsQueuedInterrupts()
+  public static void MidSubmissionEndDropsQueuedInterrupts()
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5), playerControlled: true,

@@ -5,6 +5,8 @@ using FunProject.Stats;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class ProgressionBattleApplicationTest
@@ -20,7 +22,7 @@ public partial class ProgressionBattleApplicationTest
       Seed: 7));
 
   [TestCase(TestName = "Unlocked stat-mod step raises the spawned unit's effective aim")]
-  public void UnlockedStatModAppliesAtSpawn()
+  public static void UnlockedStatModAppliesAtSpawn()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = SeededBattle(faction);
@@ -33,7 +35,7 @@ public partial class ProgressionBattleApplicationTest
   }
 
   [TestCase(TestName = "Unlocked health step raises spawn MaxHealth and CurrentHealth")]
-  public void UnlockedHealthModRaisesSpawnHealth()
+  public static void UnlockedHealthModRaisesSpawnHealth()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = SeededBattle(faction);
@@ -47,7 +49,7 @@ public partial class ProgressionBattleApplicationTest
   }
 
   [TestCase(TestName = "Unlocked buff grants surface via InnateBuffs and stack with innate grants")]
-  public void UnlockedBuffGrantSurfacesAndStacks()
+  public static void UnlockedBuffGrantSurfacesAndStacks()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = SeededBattle(faction);

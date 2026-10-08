@@ -3,6 +3,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 // Visual playback of committed battle events. Receives action results from its host,
 // flattens each result's EventsThatOccurred into one FIFO queue, and drains it one
 // step per Tick (called from _Process). Consecutive per-tile move events for one unit are

@@ -6,12 +6,14 @@ using FunProject.Weapons;
 using GdUnit4;
 using System;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class DamagePipelineTest
 {
   [TestCase(TestName = "DamagePacketData derives amount from base damage with rounding")]
-  public void PacketDerivesAmountFromBaseDamage()
+  public static void PacketDerivesAmountFromBaseDamage()
   {
     Assert.Equal(new Damage(4, Element.Thermal),
       new DamagePacketData { Element = Element.Thermal, Multiplier = 0.7f }.Derive(6));
@@ -22,13 +24,13 @@ public class DamagePipelineTest
   }
 
   [TestCase(TestName = "DamagePacketData defaults to Kinetic at full multiplier")]
-  public void PacketDefaultsToKineticFullMultiplier()
+  public static void PacketDefaultsToKineticFullMultiplier()
   {
     Assert.Equal(new Damage(5, Element.Kinetic), new DamagePacketData().Derive(5));
   }
 
   [TestCase]
-  public void DerivationAndModifiersPreserveStunKind()
+  public static void DerivationAndModifiersPreserveStunKind()
   {
     var frame = new WeaponFrameData
     {
@@ -58,7 +60,7 @@ public class DamagePipelineTest
   }
 
   [TestCase(TestName = "PacketModifier scaling all elements folds ops over every packet")]
-  public void UniformFoldsOpsOverEveryPacket()
+  public static void UniformFoldsOpsOverEveryPacket()
   {
     var mod = new DamageBundleMod { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(2), StatModifier.Multiply(2f)] }] };
 
@@ -72,7 +74,7 @@ public class DamagePipelineTest
   }
 
   [TestCase(TestName = "PacketModifier element filter only touches matching packets")]
-  public void ElementFilterOnlyTouchesMatchingPackets()
+  public static void ElementFilterOnlyTouchesMatchingPackets()
   {
     var mod = new DamageBundleMod
     {
@@ -88,7 +90,7 @@ public class DamagePipelineTest
   }
 
   [TestCase(TestName = "DamageBundleMod AddedPackets appends a packet derived from base damage")]
-  public void AddPacketAppendsDerivedPacket()
+  public static void AddPacketAppendsDerivedPacket()
   {
     var mod = new DamageBundleMod
     {
@@ -102,7 +104,7 @@ public class DamagePipelineTest
   }
 
   [TestCase(TestName = "DamageBundleMod with a null added packet throws")]
-  public void AddPacketWithoutPacketThrows()
+  public static void AddPacketWithoutPacketThrows()
   {
     var mod = new DamageBundleMod { AddedPackets = [null] };
     Assert.Throws<ArgumentNullException>(
@@ -110,7 +112,7 @@ public class DamagePipelineTest
   }
 
   [TestCase(TestName = "PacketModifier remove drops all matching packets")]
-  public void RemoveElementRemovesAllMatchingPackets()
+  public static void RemoveElementRemovesAllMatchingPackets()
   {
     var mod = new DamageBundleMod { PacketModifiers = [new PacketModifier { Element = Element.Kinetic, Remove = true }] };
 
@@ -123,7 +125,7 @@ public class DamagePipelineTest
   }
 
   [TestCase(TestName = "DamageBundleEquippableMod resolves no stats and mounts in a mod slot")]
-  public void DamageBundleEquippableModResolvesNoStatsAndMounts()
+  public static void DamageBundleEquippableModResolvesNoStatsAndMounts()
   {
     var mod = new DamageBundleEquippableMod
     {
@@ -153,7 +155,7 @@ public class DamagePipelineTest
     new() { PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [.. ops] }] };
 
   [TestCase(TestName = "Emission pipeline: frame derivation, slot/ammo ordering, emission-only filtering, stat isolation")]
-  public void EmissionTable()
+  public static void EmissionTable()
   {
     (string Name, Func<FirearmWeapon> Make, Damage[] Expected, bool Whole)[] rows =
     [
@@ -213,12 +215,12 @@ public class DamagePipelineTest
   }
 
   [TestCase(TestName = "Weapon construction rejects a missing or empty frame")]
-  public void WeaponConstructionRejectsMissingOrEmptyFrame()
+  public static void WeaponConstructionRejectsMissingOrEmptyFrame()
   {
     var missingFrame = TestData.MakeFirearmWeaponData(damage: 4);
     missingFrame.Frame = null;
-    Assert.Throws<InvalidOperationException>(() => new FirearmWeapon(missingFrame));
+    Assert.Throws<InvalidOperationException>(() => _ = new FirearmWeapon(missingFrame));
     Assert.Throws<InvalidOperationException>(
-      () => new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: new WeaponFrameData { Packets = [] })));
+      () => _ = new FirearmWeapon(TestData.MakeFirearmWeaponData(damage: 4, frame: new WeaponFrameData { Packets = [] })));
   }
 }

@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using FunProject.Scenes.Ext;
 
+namespace FunProject.Scenes;
+
 /// <summary>
 /// Battle HUD widgets. Buttons raise intent events here; BattleScene subscribes to those events
 /// and pushes state updates to be presented.

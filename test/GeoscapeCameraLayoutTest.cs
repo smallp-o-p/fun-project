@@ -16,7 +16,7 @@ public class GeoscapeCameraLayoutTest
   [TestCase(1920, 1200)]
   [TestCase(2560, 1440)]
   [TestCase(3440, 1440)]
-  public async Task InitialFrameFitsTheWholeMapWithNativeWindowScaling(int width, int height)
+  public static async Task InitialFrameFitsTheWholeMapWithNativeWindowScaling(int width, int height)
   {
     var scene = CreateGeoscapeScene(TestData.MakeStart());
     var window = CreateScaledWindow(scene, new Vector2I(width, height));
@@ -27,7 +27,7 @@ public class GeoscapeCameraLayoutTest
   }
 
   [TestCase]
-  public async Task FixedFrameSurvivesNativeWindowResizesAndViewNavigation()
+  public static async Task FixedFrameSurvivesNativeWindowResizesAndViewNavigation()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = CreateGeoscapeScene(TestData.MakeStart());
@@ -53,7 +53,7 @@ public class GeoscapeCameraLayoutTest
   }
 
   [TestCase]
-  public async Task HudChangesDoNotTakeControlOfTheFixedCamera()
+  public static async Task HudChangesDoNotTakeControlOfTheFixedCamera()
   {
     var scene = CreateGeoscapeScene(TestData.MakeStart());
     var window = CreateScaledWindow(scene, new Vector2I(1600, 900));
@@ -70,7 +70,7 @@ public class GeoscapeCameraLayoutTest
   }
 
   [TestCase]
-  public async Task MouseAndKeyboardCameraInputCannotMoveOrZoomTheMap()
+  public static async Task MouseAndKeyboardCameraInputCannotMoveOrZoomTheMap()
   {
     var scene = CreateGeoscapeScene(TestData.MakeStart());
     var window = CreateScaledWindow(scene, new Vector2I(1600, 900));
@@ -99,7 +99,7 @@ public class GeoscapeCameraLayoutTest
 
   [TestCase]
   [GodotExceptionMonitor]
-  public async Task ClosingBeforeInitialLayoutCancelsFraming()
+  public static async Task ClosingBeforeInitialLayoutCancelsFraming()
   {
     var scene = CreateGeoscapeScene(TestData.MakeStart());
     var viewport = CreateUiViewport(scene, new Vector2I(800, 600));
@@ -110,7 +110,7 @@ public class GeoscapeCameraLayoutTest
 
   [TestCase(8)]
   [TestCase(1480)]
-  public async Task UpperCornerMapEventRemainsClickableBelowTimeControls(int x)
+  public static async Task UpperCornerMapEventRemainsClickableBelowTimeControls(int x)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = CreateGeoscapeScene(TestData.MakeStart(

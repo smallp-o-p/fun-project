@@ -2,13 +2,15 @@ using FunProject.Battle;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class UseItemActionTest
 {
   [TestCase("Medkit", 2, true, 1, TestName = "a Medkit with two charges keeps one after use")]
   [TestCase("Stim", 1, false, 0, TestName = "a one-charge Stim is removed with its last charge")]
-  public void SuccessfulUse(string item, int maxCharges, bool remainsInInventory, int expectedCurrent)
+  public static void SuccessfulUse(string item, int maxCharges, bool remainsInInventory, int expectedCurrent)
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(1, 0, 1), actionPoints: 4);
     var unit = battle.Unit;
@@ -27,7 +29,7 @@ public class UseItemActionTest
   }
 
   [TestCase(TestName = "Using a depleted item is interrupted without spending AP or raising the event")]
-  public void UsingADepletedItemIsInterruptedWithoutSpendingAp()
+  public static void UsingADepletedItemIsInterruptedWithoutSpendingAp()
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(1, 0, 1), actionPoints: 4);
     var unit = battle.Unit;

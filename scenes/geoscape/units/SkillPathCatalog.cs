@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using FunProject.Progression;
 using Godot;
 
+namespace FunProject.Scenes;
+
 // The skill-path catalog seam: loads the authored resources/skills/catalog.tres once and
 // exposes its paths. Authored references pack into exports automatically (no res://
 // directory scan, which does not survive export). Order is authored array order.
@@ -12,7 +14,7 @@ public static class SkillPathCatalog
 
   public static IReadOnlyList<SkillPathData> Paths => _paths ??= Load();
 
-  private static IReadOnlyList<SkillPathData> Load()
+  private static List<SkillPathData> Load()
   {
     var catalog = GD.Load<SkillPathCatalogData>("res://resources/skills/catalog.tres");
     if (catalog is null)

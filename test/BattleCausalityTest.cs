@@ -2,13 +2,15 @@ using FunProject.Battle;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleCausalityTest
 {
   [TestCase(20, TestName = "An attack hit carries the attacker as the damage event's cause")]
   [TestCase(5, TestName = "A killing blow carries the attacker on the kill event alone")]
-  public void AttackCarriesTheAttackerAsCause(int enemyHealth)
+  public static void AttackCarriesTheAttackerAsCause(int enemyHealth)
   {
     using var battle = BattleFixture.Duel(
       hitChanceCalculator: new AlwaysHitCalculator(),
@@ -34,7 +36,7 @@ public class BattleCausalityTest
   }
 
   [TestCase(TestName = "Direct damage without an attacker leaves the cause empty on damage and kill events")]
-  public void DirectDamageLeavesCauseEmpty()
+  public static void DirectDamageLeavesCauseEmpty()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), health: 20);
     battle.ClearEvents();

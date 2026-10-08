@@ -3,6 +3,8 @@ using FunProject.Combatants;
 using FunProject.Strategic;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 // Campaign condition integration: mission returns applied to roster combatants, deployment
 // eligibility, and timed recovery on geoscape ticks. Battles use the campaign's own roster
 // instances so returns write the persistent state the next mission will read. Assertions
@@ -23,7 +25,7 @@ public class GeoscapeConditionsTest
   [TestCase(BattleOutcome.Victory, false, 0, 30, 0)]
   [TestCase(BattleOutcome.Defeat, false, 25, 0, 2)]
   [TestCase(BattleOutcome.Victory, true, 0, 30, 0)]
-  public void SurvivorMissionReturnsApplyConditions(
+  public static void SurvivorMissionReturnsApplyConditions(
     BattleOutcome outcome, bool unconsciousCase, int damage, int stun, int expectedInjuryTier)
   {
     using var campaign = unconsciousCase
@@ -50,7 +52,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "Armor-absorbed returns earn fatigue but no injury")]
-  public void ArmorOnlyReturnsEarnFatigueWithoutInjury()
+  public static void ArmorOnlyReturnsEarnFatigueWithoutInjury()
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
@@ -72,7 +74,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "Dead participants are skipped, overkill or not")]
-  public void DeadParticipantsAreSkipped()
+  public static void DeadParticipantsAreSkipped()
   {
     using var campaign = NewCampaign(("Alpha", 100), ("Beta", 20), ("Charlie", 100));
     var alpha = campaign.State.Roster[0];
@@ -95,7 +97,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "All survivor states are applied before the first change is broadcast")]
-  public void AllSurvivorStatesAppliedBeforeFirstBroadcast()
+  public static void AllSurvivorStatesAppliedBeforeFirstBroadcast()
   {
     using var campaign = NewCampaign(("Alpha", 100), ("Beta", 100));
     var alpha = campaign.State.Roster[0];
@@ -121,7 +123,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "Applying the same report twice steps conditions each time")]
-  public void RepeatedReturnsApplyEachTime()
+  public static void RepeatedReturnsApplyEachTime()
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
@@ -140,7 +142,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "Zero-participant battles apply no changes and fire no events")]
-  public void ZeroParticipantBattlesApplyNoChanges()
+  public static void ZeroParticipantBattlesApplyNoChanges()
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
@@ -170,7 +172,7 @@ public class GeoscapeConditionsTest
   // independently check the session's mission-flag plumbing.
   [TestCase(25, 1, 1)]
   [TestCase(0, 3, 3)]
-  public void MissionDeploymentRejectsUnfitCombatants(int damage, int returns, int expectedFatigueTier)
+  public static void MissionDeploymentRejectsUnfitCombatants(int damage, int returns, int expectedFatigueTier)
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
@@ -188,7 +190,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "Recovery lands exactly on the deadline, not before")]
-  public void RecoveryLandsExactlyOnDeadline()
+  public static void RecoveryLandsExactlyOnDeadline()
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
@@ -206,7 +208,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "Paused time never recovers conditions")]
-  public void PausedTimeNeverRecovers()
+  public static void PausedTimeNeverRecovers()
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
@@ -221,7 +223,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "Pending resolutions freeze recovery")]
-  public void PendingResolutionsFreezeRecovery()
+  public static void PendingResolutionsFreezeRecovery()
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
@@ -236,7 +238,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "Multi-day catch-up walks the whole injury ladder in one advance")]
-  public void MultiDayCatchUpWalksTheLadder()
+  public static void MultiDayCatchUpWalksTheLadder()
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
@@ -254,7 +256,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "Rebuilt sessions continue recovery from campaign state")]
-  public void RebuiltSessionsPreserveRecovery()
+  public static void RebuiltSessionsPreserveRecovery()
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];
@@ -270,7 +272,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "Roster recovery runs last in the preserved tick order")]
-  public void TickOrderPutsRecoveryAfterResearch()
+  public static void TickOrderPutsRecoveryAfterResearch()
   {
     using var campaign = new GeoscapeFixture(TestData.MakeStart(
       regions: [TestData.MakeRegion("North")],
@@ -298,7 +300,7 @@ public class GeoscapeConditionsTest
   }
 
   [TestCase(TestName = "Critical injury and exhaustion recover independently down both ladders")]
-  public void CriticalAndExhaustedRecoverIndependently()
+  public static void CriticalAndExhaustedRecoverIndependently()
   {
     using var campaign = NewCampaign(("Alpha", 100));
     var alpha = campaign.State.Roster[0];

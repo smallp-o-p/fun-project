@@ -5,12 +5,14 @@ using FunProject.Progression;
 using FunProject.Stats;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class UnitProgressionAggregationTest
 {
   [TestCase(TestName = "Aggregation covers only unlocked steps across committed paths")]
-  public void AggregatesUnlockedOnly()
+  public static void AggregatesUnlockedOnly()
   {
     var progression = new UnitProgression();
     var aimMod = new AimStatMod { Modifiers = [StatModifier.Add(5)] };
@@ -44,7 +46,7 @@ public partial class UnitProgressionAggregationTest
   }
 
   [TestCase(TestName = "An ability grant with no assigned Ability throws at aggregation (authoring mistake)")]
-  public void NullAbilityThrows()
+  public static void NullAbilityThrows()
   {
     var progression = new UnitProgression();
     // Godot bypass shape: no Ability set

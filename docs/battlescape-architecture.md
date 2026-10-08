@@ -249,7 +249,7 @@ sequenceDiagram
 
 ## Battle Events
 
-Events are records rooted at `BattleEventTag`. Hook keys are event types or shared marker interfaces (`IUnitBattleEvent`, `IPositionedBattleEvent`, `ICausedByUnit`). Presentation observes `BattleSession.BattleEventCommitted` (or the runtime re-raise), which fires only after the state change committed.
+Events are records rooted at `IBattleEventTag`. Hook keys are event types or shared marker interfaces (`IUnitBattleEvent`, `IPositionedBattleEvent`, `ICausedByUnit`). Presentation observes `BattleSession.BattleEventCommitted` (or the runtime re-raise), which fires only after the state change committed.
 
 - Session and turns: `SessionStarted`, `SessionEnded`, `TurnStarted`, `TurnEnded`, `ActiveSideChanged`.
 - Units: `UnitAdded`, `UnitActivationEnded`, `UnitMoved`, `TileOccupied`, `UnitAttacked`, `UnitReloadedWeapon`, `UnitDamaged`, `UnitKilled`, `UnitUnconscious`, `UnitStunRecovered`, `UnitArmorRegenerated`, `UnitSpotted`.
@@ -264,7 +264,7 @@ Hooks register on the executor and fire once per committed event, after the broa
 - stun recovery (−90);
 - capability effects (`ItemThrownBattleEvent`);
 - buff evaluation (`TurnStartedBattleEvent` and `UnitAddedBattleEvent`);
-- `ObjectiveSystem` (catch-all `BattleEventTag` router at +100, filtering each objective's declared keys).
+- `ObjectiveSystem` (catch-all `IBattleEventTag` router at +100, filtering each objective's declared keys).
 
 Registration uses event-tag types.
 
@@ -274,4 +274,4 @@ Registration uses event-tag types.
 
 ## Canonical Vocabulary
 
-`BattleSession`, `BattleAction`, `BattleActionExecResult`, `BattleActionExecutor`, `BattleHook` (`BattleHook<TEvent>`, `HookContext`), `IBattleSessionQuery<TResult>`, `BattleQueryFailure`, `BattleRuntime`, `Either<BattleQueryFailure, TResult>`, `BattleEventTag`, `BattleBoardState`, `BattleTileState`, `BattleUnitState`, `BattleEvent`, `BattleScene`, `BattleUiController`, `EventPlaybackDirector`.
+`BattleSession`, `BattleAction`, `BattleActionExecResult`, `BattleActionExecutor`, `BattleHook` (`BattleHook<TEvent>`, `HookContext`), `IBattleSessionQuery<TResult>`, `BattleQueryFailure`, `BattleRuntime`, `Either<BattleQueryFailure, TResult>`, `IBattleEventTag`, `BattleBoardState`, `BattleTileState`, `BattleUnitState`, `BattleEvent`, `BattleScene`, `BattleUiController`, `EventPlaybackDirector`.

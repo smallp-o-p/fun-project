@@ -5,6 +5,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class InteractWithObjectTest
@@ -34,7 +36,7 @@ public class InteractWithObjectTest
     battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable().Single(o => o.Position == cell);
 
   [TestCase(TestName = "Adjacent interact spends AP, defuses, clears occupancy, raises event")]
-  public void HappyPathInteract()
+  public static void HappyPathInteract()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
@@ -55,12 +57,12 @@ public class InteractWithObjectTest
 
     ObjectInteractedBattleEvent @event = battle.Events.SingleEvent<ObjectInteractedBattleEvent>();
     Assert.Equal(unit, @event.Actor);
-    Assert.Equal(bomb, @event.Object);
+    Assert.Equal(bomb, @event.BoardObject);
     Assert.Equal(point, @event.Position);
   }
 
   [TestCase(TestName = "Interaction spending the actor's last AP refreshes that actor's retained actions")]
-  public void InteractionSpendingLastActionPointRefreshesActorOptions()
+  public static void InteractionSpendingLastActionPointRefreshesActorOptions()
   {
     var weapon = TestData.MakeWeapon("Rifle");
     using var battle = BattleFixture.Duel(
@@ -102,7 +104,7 @@ public class InteractWithObjectTest
   }
 
   [TestCase(TestName = "Insufficient action points throw before object mutation")]
-  public void InsufficientActionPointsDoNotMutateObject()
+  public static void InsufficientActionPointsDoNotMutateObject()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
@@ -123,7 +125,7 @@ public class InteractWithObjectTest
   }
 
   [TestCase(TestName = "Foreign object proofs interrupt instead of touching local occupancy")]
-  public void ForeignObjectProofIsInterrupted()
+  public static void ForeignObjectProofIsInterrupted()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
@@ -150,7 +152,7 @@ public class InteractWithObjectTest
   }
 
   [TestCase(TestName = "A defused object keeps stale proofs from executing")]
-  public void StaleProofIsInterrupted()
+  public static void StaleProofIsInterrupted()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");

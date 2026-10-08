@@ -5,6 +5,8 @@ using Godot;
 using System;
 using FunProject.Scenes.Ext;
 
+namespace FunProject.Scenes;
+
 /// <summary>
 /// Display the list of units the player has.
 /// </summary>

@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class GeoscapeMapControlTest
@@ -52,7 +54,7 @@ public class GeoscapeMapControlTest
 
   [TestCase(false, TestName = "A region without an authored button throws")]
   [TestCase(true, TestName = "An authored button without region data throws")]
-  public void RegionAndButtonDataMustMatch(bool extraButton)
+  public static void RegionAndButtonDataMustMatch(bool extraButton)
   {
     var map = BuildMap(extraButton
       ? [RegionButtonNamed("Alpha", Square), RegionButtonNamed("Extra", Square)]
@@ -65,7 +67,7 @@ public class GeoscapeMapControlTest
   }
 
   [TestCase(TestName = "Setup without an assigned marker scene throws")]
-  public void MissingMarkerSceneThrows()
+  public static void MissingMarkerSceneThrows()
   {
     var map = AutoFree(new GeoscapeMapControl()); // no EventMarkerScene assigned
     map.AddChild(RegionButtonNamed("Alpha", Square));
@@ -80,7 +82,7 @@ public class GeoscapeMapControlTest
     TestName = "An authored Anchor child places the plot marker, not the centroid")]
   [TestCase(false, GeoscapeEventKind.Plot,
     TestName = "A plot marker routes clicks and disappears after the resolution completes")]
-  public async Task MarkerUsesRegionAnchorAndRoutesItsLifecycle(bool explicitAnchor, GeoscapeEventKind kind)
+  public static async Task MarkerUsesRegionAnchorAndRoutesItsLifecycle(bool explicitAnchor, GeoscapeEventKind kind)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var map = BuildMap([RegionButtonNamed("Alpha", Square)]);
@@ -128,7 +130,7 @@ public class GeoscapeMapControlTest
 
   [TestCase(false, TestName = "Map-wide and nearby top-left event clusters are individually selectable")]
   [TestCase(true, TestName = "Map-wide and nearby bottom-right event clusters are individually selectable")]
-  public async Task ClusteredEventsStayInsideMapAndRouteActualClicks(bool bottomRight)
+  public static async Task ClusteredEventsStayInsideMapAndRouteActualClicks(bool bottomRight)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var mapSize = new Vector2I(560, 336);
@@ -188,7 +190,7 @@ public class GeoscapeMapControlTest
   }
 
   [TestCase(TestName = "A crowded small map scales every marker equally without hiding event choices")]
-  public async Task CrowdedMapRetainsEverySelectableEvent()
+  public static async Task CrowdedMapRetainsEverySelectableEvent()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var mapSize = new Vector2I(112, 112);
@@ -267,7 +269,7 @@ public class GeoscapeMapControlTest
   }
 
   [TestCase(TestName = "Pressing a region button emits RegionClicked")]
-  public void RegionPressedEmitsRegionClicked()
+  public static void RegionPressedEmitsRegionClicked()
   {
     // Non-button children of the map are ignored: Setup must succeed with one present.
     var map = BuildMap([RegionButtonNamed("Alpha", Square)]);

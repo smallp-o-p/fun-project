@@ -8,6 +8,8 @@ using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class AttackObjectTest
@@ -39,7 +41,7 @@ public partial class AttackObjectTest
   }
 
   [TestCase]
-  public void GuaranteedObjectShotSharesPreviewCostsAndEventIdentity()
+  public static void GuaranteedObjectShotSharesPreviewCostsAndEventIdentity()
   {
     var weapon = TestData.MakeAmmoWeapon("Rifle", magazine: 1, damage: 5);
     using var battle = BattleFixture.Duel(
@@ -66,7 +68,7 @@ public partial class AttackObjectTest
     Assert.True(shot.IsHit);
     Assert.Equal(preview.FinalChance, shot.Breakdown.FinalChance);
     Assert.True(shot.Roll >= 0 && shot.Roll < 100);
-    Assert.True(ReferenceEquals(obj, ((BattleEntity.Object)shot.Target).State));
+    Assert.True(ReferenceEquals(obj, ((BattleEntity.BoardObject)shot.Target).State));
     Assert.Equal(Some(battle.PlayerUnit), battle.Events.SingleEvent<ObjectDamagedBattleEvent>().MaybeCause);
     battle.Events.EventBefore<UnitAttackedBattleEvent, ObjectDamagedBattleEvent>();
     battle.ClearEvents();
@@ -76,7 +78,7 @@ public partial class AttackObjectTest
   }
 
   [TestCase]
-  public void DestructionIsTerminalAndClearsOccupancyBeforeBroadcast()
+  public static void DestructionIsTerminalAndClearsOccupancyBeforeBroadcast()
   {
     using var battle = BattleFixture.Duel(
       player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 99)),
@@ -87,7 +89,7 @@ public partial class AttackObjectTest
     {
       if (evt is not ObjectDestroyedBattleEvent destroyed) return;
       observed = true;
-      Assert.True(ReferenceEquals(obj, destroyed.Object));
+      Assert.True(ReferenceEquals(obj, destroyed.BoardObject));
       Assert.Equal(Some(ObjectStatus.Destroyed), obj.Status);
       Assert.True(battle.Board.FindObjectPosition(obj.Id).IsNone);
     };
@@ -95,7 +97,7 @@ public partial class AttackObjectTest
     battle.Attack(battle.PlayerUnit, obj);
     Assert.True(observed);
     Assert.Equal(0, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
-    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(obj)).IsNone);
+    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.BoardObject(obj)).IsNone);
     Assert.True(battle.Runtime.TryGetAliveObject(obj).IsNone);
     Assert.Equal(0, battle.Events.EventsOf<ObjectDamagedBattleEvent>().Length);
     Assert.Equal(Some(battle.PlayerUnit), battle.Events.SingleEvent<ObjectDestroyedBattleEvent>().MaybeCause);
@@ -104,7 +106,7 @@ public partial class AttackObjectTest
   }
 
   [TestCase]
-  public void StunAndStatusPayloadsAreIgnoredForObjects()
+  public static void StunAndStatusPayloadsAreIgnoredForObjects()
   {
     using var battle = BattleFixture.Duel(
       player: new("Stunner", Weapon: TestData.MakeStunWeapon()),
@@ -128,13 +130,13 @@ public partial class AttackObjectTest
     protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitMovedBattleEvent evt)
     {
       var actor = context.Session.TryGetAlive(shooter).RequireSome();
-      var proof = context.Session.TryGetAttackTarget(new BattleEntity.Object(target)).RequireSome();
+      var proof = context.Session.TryGetAttackTarget(new BattleEntity.BoardObject(target)).RequireSome();
       return [BattleAction.AttackEntity(actor, proof), BattleAction.AttackEntity(actor, proof)];
     }
   }
 
   [TestCase]
-  public void EarlierReactionDestroysTargetAndLaterReactionSpendsNothing()
+  public static void EarlierReactionDestroysTargetAndLaterReactionSpendsNothing()
   {
     var weapon = TestData.MakeAmmoWeapon("Rifle", magazine: 2, damage: 5);
     using var battle = BattleFixture.Duel(
@@ -161,7 +163,7 @@ public partial class AttackObjectTest
   }
 
   [TestCase]
-  public void ShotHookCanResolveTheTargetBeforeWeaponDamageResumes()
+  public static void ShotHookCanResolveTheTargetBeforeWeaponDamageResumes()
   {
     var weapon = TestData.MakeAmmoWeapon("Rifle", magazine: 2);
     using var battle = BattleFixture.Duel(
@@ -177,7 +179,7 @@ public partial class AttackObjectTest
   }
 
   [TestCase]
-  public void ExploredObjectsStillRequireTheAttackerSightAndRange()
+  public static void ExploredObjectsStillRequireTheAttackerSightAndRange()
   {
     using var battle = BattleFixture.Duel(configure: ObjectsAt(
       new ObjectPlacement(TestData.MakeObject("Crate", 20), new Vector3I(3, 0, 1))));
@@ -205,7 +207,7 @@ public partial class AttackObjectTest
   }
 
   [TestCase]
-  public void ObjectRangeIncludesTheBoundaryAndExcludesBeyondIt()
+  public static void ObjectRangeIncludesTheBoundaryAndExcludesBeyondIt()
   {
     using var battle = BattleFixture.Duel(
       player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", range: 2)),
@@ -219,7 +221,7 @@ public partial class AttackObjectTest
   }
 
   [TestCase]
-  public void IgnoredObjectStatusesDoNotConsumeExtraRandomRolls()
+  public static void IgnoredObjectStatusesDoNotConsumeExtraRandomRolls()
   {
     List<int> Rolls(Weapon weapon)
     {
@@ -239,7 +241,7 @@ public partial class AttackObjectTest
   }
 
   [TestCase]
-  public void ObjectDamageRejectsInvalidTargetsAndSeparatesHealthFromStun()
+  public static void ObjectDamageRejectsInvalidTargetsAndSeparatesHealthFromStun()
   {
     using var battle = BattleFixture.Duel(configure: ObjectsAt(
       new ObjectPlacement(TestData.MakeObject("Crate", 10), new Vector3I(3, 0, 2)),

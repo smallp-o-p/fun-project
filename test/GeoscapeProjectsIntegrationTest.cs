@@ -5,13 +5,15 @@ using GdUnit4;
 using Godot;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class GeoscapeProjectsIntegrationTest
 {
   [TestCase(false)]
   [TestCase(true)]
-  public async Task ProjectCostsUseAuthoredPricesAndLiveAffordability(bool research)
+  public static async Task ProjectCostsUseAuthoredPricesAndLiveAffordability(bool research)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var currency = MakeCurrency("Budget");
@@ -49,7 +51,7 @@ public class GeoscapeProjectsIntegrationTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public async Task StaleProjectSelectionRechecksAffordability(bool research)
+  public static async Task StaleProjectSelectionRechecksAffordability(bool research)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var currency = MakeCurrency("Budget");
@@ -98,7 +100,7 @@ public class GeoscapeProjectsIntegrationTest
   // A hosted view must stay in viewport pixels when the map camera moves or zooms.
   [TestCase(false)]
   [TestCase(true)]
-  public async Task ProjectControlsStayInViewportWhenCameraMovesAndViewportResizes(bool research)
+  public static async Task ProjectControlsStayInViewportWhenCameraMovesAndViewportResizes(bool research)
   {
     var scene = CreateGeoscapeScene(MakeStart());
     var viewport = CreateUiViewport(scene, new Vector2I(1600, 900));
@@ -136,7 +138,7 @@ public class GeoscapeProjectsIntegrationTest
   }
 
   [TestCase]
-  public async Task ReopeningResearchShowsProgressAndEngineeringUnlock()
+  public static async Task ReopeningResearchShowsProgressAndEngineeringUnlock()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = AddToTree(CreateDebugGeoscapeScene());
@@ -163,7 +165,7 @@ public class GeoscapeProjectsIntegrationTest
   }
 
   [TestCase]
-  public async Task BrowsingFreezesManufacturingAndReturningToMapRefreshesCompletion()
+  public static async Task BrowsingFreezesManufacturingAndReturningToMapRefreshesCompletion()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scarce = MakeItemData("Scanner");
@@ -231,7 +233,7 @@ public class GeoscapeProjectsIntegrationTest
   }
 
   [TestCase]
-  public async Task ClockStaysFrozenThroughNestedPushesAndResumesOnlyAtTheRoot()
+  public static async Task ClockStaysFrozenThroughNestedPushesAndResumesOnlyAtTheRoot()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = AddToTree(CreateGeoscapeScene(MakeStart(roster: [MakeEntry()])));
@@ -268,7 +270,7 @@ public class GeoscapeProjectsIntegrationTest
   }
 
   [TestCase]
-  public async Task ReopeningEngineeringStartsOneJobPerRequestAndClearsCompletedSummary()
+  public static async Task ReopeningEngineeringStartsOneJobPerRequestAndClearsCompletedSummary()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var item = MakeItemData("Field kit");

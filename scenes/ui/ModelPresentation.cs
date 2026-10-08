@@ -1,6 +1,8 @@
 using Godot;
 using System;
 
+namespace FunProject.Scenes;
+
 /// <summary>
 /// A presentation-only model in an isolated, transparent 3D world. Callers choose the
 /// scene explicitly; campaign combatants currently have no authored model association.

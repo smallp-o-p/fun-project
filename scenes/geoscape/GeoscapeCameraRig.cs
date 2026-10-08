@@ -1,5 +1,7 @@
 using Godot;
 
+namespace FunProject.Scenes;
+
 // Fixed, HUD-aware initial framing. Native canvas scaling handles window resizing;
 // there is no player pan/zoom input or automatic refit after setup.
 public sealed partial class GeoscapeCameraRig : Camera2D

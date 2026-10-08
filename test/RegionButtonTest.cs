@@ -4,6 +4,8 @@ using GdUnit4;
 using static GdUnit4.Assertions;
 using System;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class RegionButtonTest
@@ -37,7 +39,7 @@ public class RegionButtonTest
   [TestCase(true, 11, 11, true, TestName = "Offset fill hits just inside the shifted edge (11,11)")]
   [TestCase(true, 5, 5, false, TestName = "Offset fill rejects (5,5) below the Fill offset")]
   [TestCase(true, 150, 150, false, TestName = "Offset fill rejects (150,150) beyond the shifted polygon")]
-  public void FillPolygonDefinesTheHitArea(bool offsetFill, int x, int y, bool expected)
+  public static void FillPolygonDefinesTheHitArea(bool offsetFill, int x, int y, bool expected)
   {
     var button = offsetFill
       ? AuthoredRegion(
@@ -50,7 +52,7 @@ public class RegionButtonTest
   }
 
   [TestCase]
-  public void HitAreaTracksPolygonEdits()
+  public static void HitAreaTracksPolygonEdits()
   {
     var button = AuthoredRegion(Square);
     button.GetNode<Polygon2D>("Fill").Polygon =
@@ -63,7 +65,7 @@ public class RegionButtonTest
   }
 
   [TestCase]
-  public void HitAreaTracksFillTransformEdits()
+  public static void HitAreaTracksFillTransformEdits()
   {
     var button = AuthoredRegion(Square);
     var fill = button.GetNode<Polygon2D>("Fill");
@@ -78,7 +80,7 @@ public class RegionButtonTest
   }
 
   [TestCase]
-  public void MarkerAnchorTracksFillEdits()
+  public static void MarkerAnchorTracksFillEdits()
   {
     var button = AuthoredRegion(Square);
     var fill = button.GetNode<Polygon2D>("Fill");
@@ -93,7 +95,7 @@ public class RegionButtonTest
   }
 
   [TestCase(TestName = "Concave polygons exclude the notch")]
-  public void ConcavePolygonExcludesNotch()
+  public static void ConcavePolygonExcludesNotch()
   {
     // L-shape: the (80, 80) corner is carved out.
     var button = AuthoredRegion(
@@ -107,7 +109,7 @@ public class RegionButtonTest
   }
 
   [TestCase(TestName = "An unshaped button fails loud on hit-testing and marker anchors")]
-  public void UnshapedButtonFailsLoud()
+  public static void UnshapedButtonFailsLoud()
   {
     // A button whose Fill child is missing (deleted in the editor): it stays unshaped, so
     // hit-testing and marker anchoring are wiring/authoring bugs and fail loud.
@@ -120,7 +122,7 @@ public class RegionButtonTest
   }
 
   [TestCase(TestName = "Hover lightens the Fill; mouse exit restores it")]
-  public void HoverLightensFill()
+  public static void HoverLightensFill()
   {
     // Authored fills are colored before load (white is Polygon2D's default and cannot
     // lighten), so the color is part of the authored shape, not a runtime recolor.

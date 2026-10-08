@@ -2,12 +2,14 @@ using FunProject.Battle;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class CaptureBattleTest
 {
   [TestCase]
-  public void VictorySummaryRetainsTheExactEnemyCombatant()
+  public static void VictorySummaryRetainsTheExactEnemyCombatant()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     var combatant = battle.EnemyUnit.Combatant;
@@ -22,7 +24,7 @@ public class CaptureBattleTest
   }
 
   [TestCase]
-  public void KilledEnemyIsNotCaptured()
+  public static void KilledEnemyIsNotCaptured()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Health);
@@ -32,7 +34,7 @@ public class CaptureBattleTest
   }
 
   [TestCase]
-  public void ConsciousEnemyIsNotCapturedDuringObjectiveVictory()
+  public static void ConsciousEnemyIsNotCapturedDuringObjectiveVictory()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     var objective = new FakeObjective(new FakeObjectiveData
@@ -49,7 +51,7 @@ public class CaptureBattleTest
   }
 
   [TestCase]
-  public void UnconsciousFriendlyIsNotCapturedWhileConsciousSupportWins()
+  public static void UnconsciousFriendlyIsNotCapturedWhileConsciousSupportWins()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.Spawn(MakeCombatant("Support", battle.PlayerFaction), new Vector3I(0, 0, 0));
@@ -62,7 +64,7 @@ public class CaptureBattleTest
   }
 
   [TestCase]
-  public void PlayerDefeatCapturesNobodyEvenWithAnUnconsciousEnemy()
+  public static void PlayerDefeatCapturesNobodyEvenWithAnUnconsciousEnemy()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.Spawn(MakeCombatant("Support", battle.EnemyFaction), new Vector3I(0, 0, 0));
@@ -74,7 +76,7 @@ public class CaptureBattleTest
   }
 
   [TestCase]
-  public void DrawCapturesNobodyEvenWithAnUnconsciousEnemy()
+  public static void DrawCapturesNobodyEvenWithAnUnconsciousEnemy()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.Spawn(MakeCombatant("Support", battle.EnemyFaction), new Vector3I(0, 0, 0));
@@ -85,7 +87,7 @@ public class CaptureBattleTest
   }
 
   [TestCase]
-  public void NoDesignatedPlayerCapturesNobodyOnVictory()
+  public static void NoDesignatedPlayerCapturesNobodyOnVictory()
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
@@ -96,7 +98,7 @@ public class CaptureBattleTest
   }
 
   [TestCase]
-  public void VictoryIncludesUnconsciousCombatantsFromEveryOpposingFaction()
+  public static void VictoryIncludesUnconsciousCombatantsFromEveryOpposingFaction()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     var thirdFaction = MakeFaction("Third");

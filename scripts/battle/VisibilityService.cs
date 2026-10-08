@@ -150,7 +150,7 @@ internal sealed class VisibilityService
 
   // Computes the set of tiles visible from observerPosition using a 3D Euclidean range check
   // over a bounding-box scan, with a per-candidate LOS raytrace.
-  private SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> GetVisibleTiles(
+  private static SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> GetVisibleTiles(
     BattleBoardState board,
     BattleUnitState observer,
     BattleBoardState.ValidatedPoint observerPosition)
@@ -214,7 +214,7 @@ internal sealed class VisibilityService
   // monotonically from `from` toward `to`, so every cell it touches — intermediate cells, both
   // diagonal flanks, and the vertical upper/lower cell — lies within their bounding box and is in
   // bounds. Tiles are therefore read via GetTileUnchecked with no per-step bounds validation.
-  private bool IsLineOfSightClear(
+  private static bool IsLineOfSightClear(
     BattleBoardState board,
     BattleBoardState.ValidatedPoint from,
     BattleBoardState.ValidatedPoint to)

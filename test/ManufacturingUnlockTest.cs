@@ -10,7 +10,7 @@ namespace FunProject.Tests;
 public class ManufacturingUnlockTest
 {
   [TestCase]
-  public void UnlockRegistersUnknownRecipesOnceInFirstRegistrationOrderWithoutSideEffects()
+  public static void UnlockRegistersUnknownRecipesOnceInFirstRegistrationOrderWithoutSideEffects()
   {
     var initial = MakeItemData("Initial");
     var initialRecipe = MakeManufacturingRecipe(initial);

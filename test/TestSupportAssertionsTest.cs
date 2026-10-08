@@ -8,7 +8,7 @@ namespace FunProject.Tests;
 public partial class TestSupportAssertionsTest
 {
   [TestCase]
-  public void EitherExtractionPreservesItsExpectedSide()
+  public static void EitherExtractionPreservesItsExpectedSide()
   {
     Assert.Equal(4, Right<string, int>(4).RequireRight());
     Assert.Equal("failure", Left<string, int>("failure").RequireLeft());
@@ -17,7 +17,7 @@ public partial class TestSupportAssertionsTest
   }
 
   [TestCase]
-  public void EventChecksPreserveOrderAndRequireExactlyOneMatch()
+  public static void EventChecksPreserveOrderAndRequireExactlyOneMatch()
   {
     object[] events = ["cause", 3, 4];
     Assert.Equal(2, events.EventsOf<int>().Length);

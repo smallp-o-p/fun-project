@@ -28,7 +28,7 @@ Define item kinds with an `EquippableItemData` resource and its capability resou
 - `EquippableItem` — identity plus capability list built via `CreateRuntime()`. Duplicate capability types throw `InvalidOperationException` at construction (one-per-type invariant).
 - Runtime capabilities mirror the data and own their state: `ChargesCapability` (current charges), `ModSlotsCapability` (the `ModSlot` instances), `BlastCapability` (copies the effects list into an `IReadOnlyList`), `ThrowableCapability` (clamped values), `ArmorCapability` (`Max`, `Current`, `Element`, `RegenDelayRemaining`; methods `Reduce`, `RearmRegenDelay`, `TickRegen`).
 - Lookup: `item.FindCapability<TCap>()` returns `Option<TCap>` (linear scan — capability counts are single-digit; add a dictionary only with profiling evidence).
-- `HasModSlots` is implemented by delegation: `GetModSlots()` returns the `ModSlotsCapability` slots, or an empty array when absent.
+- `IHasModSlots` is implemented by delegation: `GetModSlots()` returns the `ModSlotsCapability` slots, or an empty array when absent.
 
 ## Capability proofs
 

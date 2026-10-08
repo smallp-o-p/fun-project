@@ -2,6 +2,8 @@ using FunProject.Battle;
 using Godot;
 using System;
 
+namespace FunProject.Scenes;
+
 // Thin Godot shell: translates pointer/keyboard input into tile and intent events by raycasting
 // through the camera rig; no UI knowledge.
 public sealed partial class BattleInputController : Node

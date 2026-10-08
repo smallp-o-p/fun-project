@@ -3,12 +3,14 @@ using GdUnit4;
 using Godot;
 using static GdUnit4.Assertions;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class MovementLineTest
 {
   [TestCase(TestName = "ShowPath shows a valid path, hides an invalid one, and applies the line color")]
-  public void ShowPathTogglesVisibilityAndAppliesLineColor()
+  public static void ShowPathTogglesVisibilityAndAppliesLineColor()
   {
     MovementLine line = AutoFree(new MovementLine());
     ((SceneTree)Engine.GetMainLoop()).Root.AddChild(line);

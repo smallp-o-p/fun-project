@@ -17,7 +17,7 @@ public class CurrencyAuthoringTest
   [TestCase(9223372036854775807UL)]
   [TestCase(9223372036854775808UL)]
   [TestCase(ulong.MaxValue)]
-  public void OwningResourceFilesRetainCurrencyCosts(ulong amount)
+  public static void OwningResourceFilesRetainCurrencyCosts(ulong amount)
   {
     string prefix = $"user://currency-authoring-{Guid.NewGuid():N}";
     string currencyPath = prefix + "-currency.tres";

@@ -12,6 +12,8 @@ using Godot;
 using GdUnit4;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 // Real host handoff at the authored scene boundary: mission preparation's Deploy presents the
 // battle inside the pushed mission view while the stack keeps the campaign and session,
 // and the terminal Return applies the campaign return exactly once before restoring the root.
@@ -100,7 +102,7 @@ public partial class GeoscapeBattleHandoffTest
 
   [TestCase(800, 600, TestName = "Opaque battle viewport covers retained geoscape at minimum size")]
   [TestCase(1600, 900, TestName = "Opaque battle viewport covers retained geoscape in a scaled window")]
-  public async Task BattleOwnsOpaqueViewport(int width, int height)
+  public static async Task BattleOwnsOpaqueViewport(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (_, manager, squad, _, session) = PreparedScene(SurvivalMission(1), out var capture,
@@ -151,7 +153,7 @@ public partial class GeoscapeBattleHandoffTest
   }
 
   [TestCase(TestName = "Two deployments restore the same geoscape and route fresh input")]
-  public async Task DeployPresentsBattleAndReturnRestoresGeoscape()
+  public static async Task DeployPresentsBattleAndReturnRestoresGeoscape()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var secondMission = MakeEvent("Second mission", GeoscapeEventKind.TacticalBattle,
@@ -254,7 +256,7 @@ public partial class GeoscapeBattleHandoffTest
   }
 
   [TestCase(TestName = "A wrong-root battle export leaves the mission pending with the selection")]
-  public async Task WrongRootBattleExportKeepsPreparation()
+  public static async Task WrongRootBattleExportKeepsPreparation()
   {
 
     await using var cleanup = new DeferredNodeCleanup();
@@ -274,7 +276,7 @@ public partial class GeoscapeBattleHandoffTest
 
   [TestCase(true, TestName = "A missing %GameCamera in a correctly typed battle export aborts the installation")]
   [TestCase(false, TestName = "A missing %BattleUI in a correctly typed battle export aborts the installation")]
-  public async Task CorrectlyTypedInstallFailureAbortsInstallationAndRestoresPreparation(bool dropCamera)
+  public static async Task CorrectlyTypedInstallFailureAbortsInstallationAndRestoresPreparation(bool dropCamera)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (scene, manager, squad, _, _) = PreparedScene(SurvivalMission(1), out var capture);
@@ -322,7 +324,7 @@ public partial class GeoscapeBattleHandoffTest
   }
 
   [TestCase(TestName = "A throwing startup system leaves no detached host and no association")]
-  public async Task StartupHookThrowLeavesNoDetachedHost()
+  public static async Task StartupHookThrowLeavesNoDetachedHost()
   {
     await using var cleanup = new DeferredNodeCleanup();
     TacticalMissionData mission = EliminationMission();
@@ -346,7 +348,7 @@ public partial class GeoscapeBattleHandoffTest
   }
 
   [TestCase(TestName = "Return intent at the host boundary waits for the director queue to idle")]
-  public async Task HostBoundaryReturnWaitsForPlaybackIdle()
+  public static async Task HostBoundaryReturnWaitsForPlaybackIdle()
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var fixture = new GeoscapeFixture(MakeStart(
@@ -384,7 +386,7 @@ public partial class GeoscapeBattleHandoffTest
   }
 
   [TestCase(TestName = "A throwing return subscriber still tears down the presentation once")]
-  public async Task ThrowingReturnSubscriberStillTearsDown()
+  public static async Task ThrowingReturnSubscriberStillTearsDown()
   {
 
     await using var cleanup = new DeferredNodeCleanup();
@@ -439,7 +441,7 @@ public partial class GeoscapeBattleHandoffTest
   }
 
   [TestCase(TestName = "A conditions subscriber throw before the close still retracts the consumed mission's marker")]
-  public async Task ConditionsThrowBeforeCloseStillRetractsConsumedMarker()
+  public static async Task ConditionsThrowBeforeCloseStillRetractsConsumedMarker()
   {
 
     await using var cleanup = new DeferredNodeCleanup();

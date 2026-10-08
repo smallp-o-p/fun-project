@@ -5,6 +5,8 @@ using FunProject.Stats;
 using GdUnit4;
 using System;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ArmorCapabilityTest
@@ -21,7 +23,7 @@ public class ArmorCapabilityTest
     };
 
   [TestCase(TestName = "Armor capability starts at max with the stat's element")]
-  public void StartsAtMaxWithElement()
+  public static void StartsAtMaxWithElement()
   {
     var capability = new ArmorCapability(MakeData(armor: 12, element: Element.Thermal));
 
@@ -33,7 +35,7 @@ public class ArmorCapabilityTest
   }
 
   [TestCase(TestName = "Reduce clamps current armor at zero")]
-  public void ReduceClampsAtZero()
+  public static void ReduceClampsAtZero()
   {
     var capability = new ArmorCapability(MakeData(armor: 5));
 
@@ -45,14 +47,14 @@ public class ArmorCapabilityTest
   }
 
   [TestCase(TestName = "Reduce rejects negative amounts")]
-  public void ReduceRejectsNegativeAmounts()
+  public static void ReduceRejectsNegativeAmounts()
   {
     var capability = new ArmorCapability(MakeData());
     Assert.Throws<ArgumentOutOfRangeException>(() => capability.Reduce(-1));
   }
 
   [TestCase(TestName = "Reduce does not re-arm the regen delay")]
-  public void ReduceDoesNotReArmRegenDelay()
+  public static void ReduceDoesNotReArmRegenDelay()
   {
     var capability = new ArmorCapability(MakeData(armor: 10, regenDelayTurns: 2, regenPerTurn: 3));
 
@@ -69,7 +71,7 @@ public class ArmorCapabilityTest
   }
 
   [TestCase(TestName = "Negative authored values clamp to zero")]
-  public void NegativeAuthoredValuesClampToZero()
+  public static void NegativeAuthoredValuesClampToZero()
   {
     var capability = new ArmorCapability(MakeData(armor: -5, regenDelayTurns: -1, regenPerTurn: -2));
 
@@ -81,14 +83,14 @@ public class ArmorCapabilityTest
   }
 
   [TestCase(TestName = "Armor capability without an armor stat throws")]
-  public void MissingArmorStatThrows()
+  public static void MissingArmorStatThrows()
   {
     Assert.Throws<InvalidOperationException>(
-      () => new ArmorCapability(new ArmorCapabilityData { ArmorStat = null! }));
+      () => _ = new ArmorCapability(new ArmorCapabilityData { ArmorStat = null! }));
   }
 
   [TestCase(TestName = "Item with armor capability data exposes the runtime capability")]
-  public void ItemExposesRuntimeCapability()
+  public static void ItemExposesRuntimeCapability()
   {
     var item = new EquippableItem(new EquippableItemData
     {

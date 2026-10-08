@@ -3,6 +3,8 @@ using FunProject.Buffs;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 public partial class AlwaysMetBuffCondition : FunProject.Buffs.BuffCondition
 {
   internal override bool IsMet(BattleSession session, BattleUnitState unit) => true;
@@ -13,7 +15,7 @@ public partial class AlwaysMetBuffCondition : FunProject.Buffs.BuffCondition
 public partial class BuffConditionTest
 {
   [TestCase(TestName = "Health predicate is false at the threshold and true strictly below")]
-  public void HealthBelowPercentThreshold()
+  public static void HealthBelowPercentThreshold()
   {
     using var battle = BattleFixture.Solo(new Vector3I(8, 1, 8), new Vector3I(4, 0, 4), health: 20);
     var condition = new FunProject.Buffs.HealthBelowPercentCondition { Percent = 50f };
@@ -27,7 +29,7 @@ public partial class BuffConditionTest
   }
 
   [TestCase(TestName = "Adjacent-enemy predicate reads the supplied battle")]
-  public void AdjacentEnemyRequiresAdjacency()
+  public static void AdjacentEnemyRequiresAdjacency()
   {
     using var adjacent = BattleFixture.Duel(
       player: new("Alpha", Position: new Vector3I(4, 0, 3)),
@@ -42,7 +44,7 @@ public partial class BuffConditionTest
   }
 
   [TestCase(TestName = "A condition subclass activates a buff without factory registration")]
-  public void ConditionSubclassNeedsNoRegistration()
+  public static void ConditionSubclassNeedsNoRegistration()
   {
     var faction = TestData.MakeFaction("Player");
     var buff = TestData.MakeBuff("Custom", new AlwaysMetBuffCondition());

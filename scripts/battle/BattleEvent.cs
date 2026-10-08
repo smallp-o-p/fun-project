@@ -9,17 +9,17 @@ using System.Collections.Generic;
 
 namespace FunProject.Battle;
 
-public interface BattleEventTag
+public interface IBattleEventTag
 {
 }
 
-public abstract record BattleEvent : BattleEventTag
+public abstract record BattleEvent : IBattleEventTag
 {
   internal abstract FrozenSet<Type> EventKeys { get; }
 }
 
 // Self-keyed: each closed BattleEvent<TSelf> owns one static per-closed-type dispatch-keys
-// frozen set — its concrete type plus its BattleEventTag-assignable interfaces. The set is
+// frozen set — its concrete type plus its IBattleEventTag-assignable interfaces. The set is
 // unordered; firing order comes from BattleHookRegistry.Fire's priority-then-registration
 // sort. Concrete events must be sealed so the runtime type always equals TSelf and the
 // static set stays authoritative for every instance.
@@ -32,18 +32,18 @@ public abstract record BattleEvent<TSelf> : BattleEvent
       .. typeof(TSelf)
         .GetInterfaces()
         .AsValueEnumerable()
-        .Where(interfaceType => typeof(BattleEventTag).IsAssignableFrom(interfaceType)),
+        .Where(interfaceType => typeof(IBattleEventTag).IsAssignableFrom(interfaceType)),
     ]);
 
   internal sealed override FrozenSet<Type> EventKeys => Keys;
 }
 
-public interface IUnitBattleEvent : BattleEventTag
+public interface IUnitBattleEvent : IBattleEventTag
 {
   BattleUnitState Unit { get; }
 }
 
-public interface IPositionedBattleEvent : BattleEventTag
+public interface IPositionedBattleEvent : IBattleEventTag
 {
   BattleBoardState.ValidatedPoint Position { get; }
 }
@@ -65,7 +65,7 @@ public sealed record SessionEndedBattleEvent : BattleEvent<SessionEndedBattleEve
 /// <summary>
 /// Event that may have been caused by a unit.
 /// </summary>
-public interface ICausedByUnit : BattleEventTag
+public interface ICausedByUnit : IBattleEventTag
 {
   Option<BattleUnitState> MaybeCause { get; }
 }
@@ -120,13 +120,13 @@ public sealed record UnitAddedBattleEvent : BattleEvent<UnitAddedBattleEvent>, I
 /// <summary>Raised when a special board object is placed onto a tile.</summary>
 public sealed record ObjectPlacedBattleEvent : BattleEvent<ObjectPlacedBattleEvent>, IPositionedBattleEvent
 {
-  public BattleObjectState Object { get; }
+  public BattleObjectState BoardObject { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
 
-  public ObjectPlacedBattleEvent(BattleObjectState @object, BattleBoardState.ValidatedPoint position)
+  public ObjectPlacedBattleEvent(BattleObjectState boardObject, BattleBoardState.ValidatedPoint position)
   {
-    ArgumentNullException.ThrowIfNull(@object);
-    Object = @object;
+    ArgumentNullException.ThrowIfNull(boardObject);
+    BoardObject = boardObject;
     Position = position;
   }
 }
@@ -135,15 +135,15 @@ public sealed record ObjectPlacedBattleEvent : BattleEvent<ObjectPlacedBattleEve
 public sealed record ObjectInteractedBattleEvent : BattleEvent<ObjectInteractedBattleEvent>, IPositionedBattleEvent
 {
   public BattleUnitState Actor { get; }
-  public BattleObjectState Object { get; }
+  public BattleObjectState BoardObject { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
 
-  public ObjectInteractedBattleEvent(BattleUnitState actor, BattleObjectState @object, BattleBoardState.ValidatedPoint position)
+  public ObjectInteractedBattleEvent(BattleUnitState actor, BattleObjectState boardObject, BattleBoardState.ValidatedPoint position)
   {
     ArgumentNullException.ThrowIfNull(actor);
-    ArgumentNullException.ThrowIfNull(@object);
+    ArgumentNullException.ThrowIfNull(boardObject);
     Actor = actor;
-    Object = @object;
+    BoardObject = boardObject;
     Position = position;
   }
 }
@@ -151,20 +151,20 @@ public sealed record ObjectInteractedBattleEvent : BattleEvent<ObjectInteractedB
 /// <summary>Raised after an object's expiry trigger resolves its payload.</summary>
 public sealed record ObjectExpiredBattleEvent : BattleEvent<ObjectExpiredBattleEvent>, IPositionedBattleEvent
 {
-  public BattleObjectState Object { get; }
+  public BattleObjectState BoardObject { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
 
-  public ObjectExpiredBattleEvent(BattleObjectState @object, BattleBoardState.ValidatedPoint position)
+  public ObjectExpiredBattleEvent(BattleObjectState boardObject, BattleBoardState.ValidatedPoint position)
   {
-    ArgumentNullException.ThrowIfNull(@object);
-    Object = @object;
+    ArgumentNullException.ThrowIfNull(boardObject);
+    BoardObject = boardObject;
     Position = position;
   }
 }
 
 public sealed record ObjectDamagedBattleEvent : BattleEvent<ObjectDamagedBattleEvent>, ICausedByUnit
 {
-  public BattleObjectState Object { get; }
+  public BattleObjectState BoardObject { get; }
   public IReadOnlyList<Damage> Bundle { get; }
   public int HealthDamage { get; }
   public Option<BattleUnitState> MaybeCause { get; }
@@ -175,7 +175,7 @@ public sealed record ObjectDamagedBattleEvent : BattleEvent<ObjectDamagedBattleE
     ArgumentNullException.ThrowIfNull(obj);
     ArgumentNullException.ThrowIfNull(bundle);
     ArgumentOutOfRangeException.ThrowIfNegativeOrZero(healthDamage);
-    Object = obj;
+    BoardObject = obj;
     Bundle = bundle;
     HealthDamage = healthDamage;
     MaybeCause = cause;
@@ -185,7 +185,7 @@ public sealed record ObjectDamagedBattleEvent : BattleEvent<ObjectDamagedBattleE
 public sealed record ObjectDestroyedBattleEvent : BattleEvent<ObjectDestroyedBattleEvent>,
   IPositionedBattleEvent, ICausedByUnit
 {
-  public BattleObjectState Object { get; }
+  public BattleObjectState BoardObject { get; }
   public BattleBoardState.ValidatedPoint Position { get; }
   public Option<BattleUnitState> MaybeCause { get; }
 
@@ -193,7 +193,7 @@ public sealed record ObjectDestroyedBattleEvent : BattleEvent<ObjectDestroyedBat
     BattleBoardState.ValidatedPoint position, Option<BattleUnitState> cause)
   {
     ArgumentNullException.ThrowIfNull(obj);
-    Object = obj;
+    BoardObject = obj;
     Position = position;
     MaybeCause = cause;
   }

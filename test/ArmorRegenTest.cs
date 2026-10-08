@@ -3,12 +3,14 @@ using FunProject.Core;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class ArmorRegenTest
 {
   [TestCase(TestName = "Regen waits out the delay then restores per owning-faction turn end")]
-  public void RegenWaitsOutDelayThenRestores()
+  public static void RegenWaitsOutDelayThenRestores()
   {
     // Thermal armor vs ApplyDamage's Kinetic packets: depletion stays at 1x.
     var armor = TestData.MakeArmor("Recharger", armor: 10, element: Element.Thermal, regenDelayTurns: 2, regenPerTurn: 3);
@@ -47,7 +49,7 @@ public partial class ArmorRegenTest
   }
 
   [TestCase(TestName = "Damage re-arms the regen delay: mid-countdown, stun-only, and health-only over depleted armor")]
-  public void DamageRearmRows()
+  public static void DamageRearmRows()
   {
     (string Name, int ArmorMax, int InitialDamage, int? CurrentAfterInitial, int? DelayAfterTurn,
       int NextDamage, DamageKind NextKind, int FinalDelay)[] rows =
@@ -79,7 +81,7 @@ public partial class ArmorRegenTest
   }
 
   [TestCase(TestName = "Armor without a regen rate never regenerates")]
-  public void ArmorWithoutRegenRateNeverRegenerates()
+  public static void ArmorWithoutRegenRateNeverRegenerates()
   {
     var armor = TestData.MakeArmor("Recharger", armor: 10, element: Element.Thermal, regenDelayTurns: 0, regenPerTurn: 0);
     using var battle = BattleFixture.Duel(
@@ -96,7 +98,7 @@ public partial class ArmorRegenTest
   }
 
   [TestCase(TestName = "Dead units are not ticked")]
-  public void DeadUnitsAreNotTicked()
+  public static void DeadUnitsAreNotTicked()
   {
     var armor = TestData.MakeArmor("Recharger", armor: 5, element: Element.Thermal, regenDelayTurns: 0, regenPerTurn: 5);
     using var battle = BattleFixture.Duel(
@@ -113,7 +115,7 @@ public partial class ArmorRegenTest
   }
 
   [TestCase(TestName = "Regen event lands between turn-ended and the next turn-started")]
-  public void RegenEventLandsAfterTurnEnded()
+  public static void RegenEventLandsAfterTurnEnded()
   {
     var armor = TestData.MakeArmor("Recharger", armor: 10, element: Element.Thermal, regenDelayTurns: 0, regenPerTurn: 3);
     using var battle = BattleFixture.Duel(

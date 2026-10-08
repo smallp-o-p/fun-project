@@ -2,6 +2,8 @@
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class MovementLineBuilderTest
@@ -11,7 +13,7 @@ public partial class MovementLineBuilderTest
   private const float Tolerance = 0.001f;
 
   [TestCase(TestName = "CreateMesh hides paths with fewer than two points")]
-  public void CreateMeshHidesPathsWithFewerThanTwoPoints()
+  public static void CreateMeshHidesPathsWithFewerThanTwoPoints()
   {
     ArrayMesh empty = MovementLineBuilder.CreateMesh([], cornerRadius: 0.25f, width: 0.2f);
     ArrayMesh single = MovementLineBuilder.CreateMesh(
@@ -24,7 +26,7 @@ public partial class MovementLineBuilderTest
   }
 
   [TestCase(TestName = "CreateMesh builds a straight tube spanning its endpoints")]
-  public void CreateMeshBuildsStraightTubeSpanningEndpoints()
+  public static void CreateMeshBuildsStraightTubeSpanningEndpoints()
   {
     float width = 0.2f;
     ArrayMesh mesh = MovementLineBuilder.CreateMesh(
@@ -48,7 +50,7 @@ public partial class MovementLineBuilderTest
   }
 
   [TestCase(TestName = "CreateMesh UVs advance from 0 to 1 along the path")]
-  public void CreateMeshUvsAdvanceAlongThePath()
+  public static void CreateMeshUvsAdvanceAlongThePath()
   {
     ArrayMesh mesh = MovementLineBuilder.CreateMesh(
       [new Vector3(0.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 1.0f)],
@@ -68,7 +70,7 @@ public partial class MovementLineBuilderTest
   }
 
   [TestCase(TestName = "CreateMesh rounds corners away from the corner vertex")]
-  public void CreateMeshRoundsCornersAwayFromTheCornerVertex()
+  public static void CreateMeshRoundsCornersAwayFromTheCornerVertex()
   {
     Vector3[] path = [new Vector3(0.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 1.0f)];
 

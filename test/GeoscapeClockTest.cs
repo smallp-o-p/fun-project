@@ -1,13 +1,15 @@
 using FunProject.Strategic;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class GeoscapeClockTest
 {
   [TestCase(0.009, false, 0L)]
   [TestCase(0.05, true, 1L)]
-  public void AccumulatorPreservesSubTickRemainder(double secondDelta, bool thirdHalfTick, long expectedTick)
+  public static void AccumulatorPreservesSubTickRemainder(double secondDelta, bool thirdHalfTick, long expectedTick)
   {
     using var campaign = new GeoscapeFixture();
     campaign.ChangeSpeed(TimeSpeed.Normal); // 0.1 real seconds per tick
@@ -25,7 +27,7 @@ public class GeoscapeClockTest
   [TestCase(TimeSpeed.Fast, 50)]
   [TestCase(TimeSpeed.VeryFast, 125)]
   [TestCase(TimeSpeed.VeryVeryFast, 250)]
-  public void FasterSpeedsTickMore(TimeSpeed speed, int expectedTicks)
+  public static void FasterSpeedsTickMore(TimeSpeed speed, int expectedTicks)
   {
     using var campaign = new GeoscapeFixture();
 
@@ -39,7 +41,7 @@ public class GeoscapeClockTest
 
   [TestCase(5.76, 2)] // 1440 ticks = 24 game-hours: the day rolls on elapsed hours
   [TestCase(3.84, 1)] // 960 ticks = 16 game-hours: elapsed hours, not calendar midnight, roll the day
-  public void ElapsedTimeControlsDayCounter(double delta, int expectedDay)
+  public static void ElapsedTimeControlsDayCounter(double delta, int expectedDay)
   {
     using var campaign = new GeoscapeFixture();
     campaign.ChangeSpeed(TimeSpeed.VeryVeryFast);

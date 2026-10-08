@@ -2,12 +2,14 @@ using System;
 using FunProject.Progression;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class UnitProgressionPurchaseTest
 {
   [TestCase(TestName = "Steps unlock strictly in chain order, deducting the authored cost")]
-  public void LinearUnlockOrderAndCost()
+  public static void LinearUnlockOrderAndCost()
   {
     var progression = new UnitProgression();
     var step1 = TestData.MakeStep(1);
@@ -29,7 +31,7 @@ public partial class UnitProgressionPurchaseTest
   }
 
   [TestCase(TestName = "Unaffordable or completed chains return None and leave state untouched")]
-  public void UnaffordableAndCompleteReturnNone()
+  public static void UnaffordableAndCompleteReturnNone()
   {
     var progression = new UnitProgression();
     var path = TestData.MakePath("Alpha", TestData.MakeStep(3));
@@ -47,7 +49,7 @@ public partial class UnitProgressionPurchaseTest
   }
 
   [TestCase(TestName = "A step costing less than one point throws (authoring mistake)")]
-  public void ZeroCostStepThrows()
+  public static void ZeroCostStepThrows()
   {
     var progression = new UnitProgression();
     var path = TestData.MakePath("Alpha", TestData.MakeStep(0));
@@ -58,7 +60,7 @@ public partial class UnitProgressionPurchaseTest
   }
 
   [TestCase(TestName = "An uncommitted path returns None and leaves state untouched")]
-  public void UncommittedPathReturnsNone()
+  public static void UncommittedPathReturnsNone()
   {
     var progression = new UnitProgression();
     var path = TestData.MakePath("Alpha", TestData.MakeStep(1));

@@ -3,12 +3,14 @@ using Godot;
 using System;
 using static GdUnit4.Assertions;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleEntityAnnotatorTest
 {
   [TestCase]
-  public void PaintedCellsUseAuthoredBrushMetadataWithoutCreatingOverrides()
+  public static void PaintedCellsUseAuthoredBrushMetadataWithoutCreatingOverrides()
   {
     var annotator = AutoFree(TestData.MakeEntityAnnotator())!;
     annotator.Grid.SetCellItem(Godot.Vector3I.Zero, 1);
@@ -22,7 +24,7 @@ public partial class BattleEntityAnnotatorTest
   }
 
   [TestCase]
-  public void AssignedPalettePreservesPaintAndExplicitFlags()
+  public static void AssignedPalettePreservesPaintAndExplicitFlags()
   {
     var flags = new BattleFootprintData { HasFloor = true };
     var annotator = AutoFree(TestData.MakeEntityAnnotator(new() { [Godot.Vector3I.Zero] = flags }))!;
@@ -44,7 +46,7 @@ public partial class BattleEntityAnnotatorTest
   }
 
   [TestCase]
-  public void ExactlyOneOccupiedCellIsRequired()
+  public static void ExactlyOneOccupiedCellIsRequired()
   {
     var annotator = AutoFree(TestData.MakeEntityAnnotator())!;
     annotator.Grid.SetCellItem(Godot.Vector3I.Zero, 0);
@@ -56,7 +58,7 @@ public partial class BattleEntityAnnotatorTest
   }
 
   [TestCase]
-  public void ErasedCellFlagsStayAtTheirCoordinateAndApplyWhenRepainted()
+  public static void ErasedCellFlagsStayAtTheirCoordinateAndApplyWhenRepainted()
   {
     var flags = new BattleFootprintData { HasFloor = true };
     var annotator = AutoFree(TestData.MakeEntityAnnotator(new() { [Godot.Vector3I.Zero] = flags }))!;
@@ -78,7 +80,7 @@ public partial class BattleEntityAnnotatorTest
   }
 
   [TestCase]
-  public void SavedAnnotationsAndMarkersRoundTrip()
+  public static void SavedAnnotationsAndMarkersRoundTrip()
   {
     var annotator = AutoFree(TestData.MakeEntityAnnotator(new()
     {
@@ -101,7 +103,7 @@ public partial class BattleEntityAnnotatorTest
   [TestCase(2)]
   [TestCase(3)]
   [TestCase(4)]
-  public void InvalidAnnotationPaintIsRejected(int scenario)
+  public static void InvalidAnnotationPaintIsRejected(int scenario)
   {
     var annotator = AutoFree(TestData.MakeEntityAnnotator(TestData.MakeFloorFootprint(1, 1)))!;
     if (scenario == 0) annotator.Grid.Position = Vector3.Right;

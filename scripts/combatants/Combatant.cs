@@ -12,7 +12,7 @@ namespace FunProject.Combatants;
 /// <summary>
 /// Saved state for a unit.
 /// </summary>
-public class Combatant : HasStats, HasModSlots
+public class Combatant : IHasStats, IHasModSlots
 {
   public string Name { get; }
   public Faction OwningFaction { get; internal set; }

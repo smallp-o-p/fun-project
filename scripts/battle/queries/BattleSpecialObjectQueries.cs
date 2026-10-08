@@ -23,7 +23,7 @@ public sealed class GetFactionDeadUnits(Faction side) : IBattleSessionQuery<IRea
 {
   public IReadOnlyCollection<DeadUnit> Execute(BattleSession session)
   {
-    return session.DeadUnits.AsValueEnumerable().Where(unit => unit.Side == side).Select(session.MintDead).ToArray();
+    return session.DeadUnits.AsValueEnumerable().Where(unit => unit.Side == side).Select(BattleSession.MintDead).ToArray();
   }
 }
 

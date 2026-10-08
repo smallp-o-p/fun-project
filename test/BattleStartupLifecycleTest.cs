@@ -8,6 +8,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleStartupLifecycleTest
@@ -26,20 +28,20 @@ public class BattleStartupLifecycleTest
   }
 
   [TestCase]
-  public void DeclaredSystemObservesFirstTurn()
+  public static void DeclaredSystemObservesFirstTurn()
   {
     var type = TestData.MakeDuelBattleType();
     var hook = new RecordingHook();
     type.Systems.Add(new SetupSystemData
     {
-      OnRegister = runtime => runtime.RegisterHook<BattleEventTag>(hook),
+      OnRegister = runtime => runtime.RegisterHook<IBattleEventTag>(hook),
     });
     using var runtime = BattleFactory.Start(type, seed: 7).RequireRight();
     Assert.Equal(1, hook.Received.EventsOf<TurnStartedBattleEvent>().Length);
   }
 
   [TestCase(TestName = "Declared systems observe spawns, object placement, session start, and the first turn")]
-  public void DeclaredSystemObservesStartupEvents()
+  public static void DeclaredSystemObservesStartupEvents()
   {
     var (setup, _, _) = GroupedSetup();
     var hook = new RecordingHook();
@@ -48,7 +50,7 @@ public class BattleStartupLifecycleTest
     {
       OnRegister = hooks =>
       {
-        hooks.RegisterHook<BattleEventTag>(hook);
+        hooks.RegisterHook<IBattleEventTag>(hook);
         hooks.RegisterHook<UnitAddedBattleEvent>(observations);
       },
     };
@@ -92,7 +94,7 @@ public class BattleStartupLifecycleTest
   }
 
   [TestCase(TestName = "Initial spottings follow every unit announcement in deterministic setup order")]
-  public void InitialSpottingsFollowUnitAnnouncements()
+  public static void InitialSpottingsFollowUnitAnnouncements()
   {
     var (setup, _, _) = GroupedSetup();
     var hook = new RecordingHook();
@@ -101,7 +103,7 @@ public class BattleStartupLifecycleTest
     {
       OnRegister = hooks =>
       {
-        hooks.RegisterHook<BattleEventTag>(hook);
+        hooks.RegisterHook<IBattleEventTag>(hook);
         hooks.RegisterHook<UnitAddedBattleEvent>(observations);
       },
     };
@@ -135,7 +137,7 @@ public class BattleStartupLifecycleTest
 
   [TestCase(false, TestName = "Without completion a startup interrupt executes once after the first turn-start event")]
   [TestCase(true, TestName = "With completion during placement, notifications finish but the queued interrupt is dropped")]
-  public void StartupInterruptsRunOnlyAfterBootstrap(bool endDuringPlacement)
+  public static void StartupInterruptsRunOnlyAfterBootstrap(bool endDuringPlacement)
   {
     var (setup, _, _) = GroupedSetup();
     var interrupt = new DamageFirstAddedUnitOnce();
@@ -163,7 +165,7 @@ public class BattleStartupLifecycleTest
       ],
       Systems =
       [
-        new SetupSystemData { OnRegister = runtime => runtime.RegisterHook<BattleEventTag>(hook) },
+        new SetupSystemData { OnRegister = runtime => runtime.RegisterHook<IBattleEventTag>(hook) },
         new SetupSystemData { OnRegister = runtime => runtime.RegisterHook<UnitAddedBattleEvent>(interrupt) },
       ],
     };
@@ -275,12 +277,12 @@ public class BattleStartupLifecycleTest
     // runtime — registering through it throws, and no runtime getter is added for tests.
     Assert.True(system.RegisteredHooks is not null);
     Assert.Throws<ObjectDisposedException>(() =>
-      system.RegisteredHooks!.RegisterHook<BattleEventTag>(new RecordingHook()));
+      system.RegisteredHooks!.RegisterHook<IBattleEventTag>(new RecordingHook()));
     return observed!;
   }
 
   [TestCase(TestName = "A throwing declared-system registration preserves the exception and disposes the runtime")]
-  public void ThrowingRegistrationDisposesRuntime()
+  public static void ThrowingRegistrationDisposesRuntime()
   {
     var (setup, _, _) = GroupedSetup();
     var expected = new InvalidOperationException("setup sentinel");
@@ -291,13 +293,13 @@ public class BattleStartupLifecycleTest
 
   [TestCase(typeof(UnitAddedBattleEvent), TestName = "A unit-added hook fault preserves the exception and disposes the runtime")]
   [TestCase(typeof(SessionStartedBattleEvent), TestName = "A session-start hook fault preserves the exception and disposes the runtime")]
-  public void HookFaultDisposesRuntime(Type eventType)
+  public static void HookFaultDisposesRuntime(Type eventType)
   {
     var (setup, _, _) = GroupedSetup();
     var expected = new InvalidOperationException("setup sentinel");
     var system = new SetupSystemData
     {
-      OnRegister = hooks => hooks.RegisterHook<BattleEventTag>(
+      OnRegister = hooks => hooks.RegisterHook<IBattleEventTag>(
         new ThrowOnSetupEvent(eventType, expected)),
     };
 
@@ -305,7 +307,7 @@ public class BattleStartupLifecycleTest
   }
 
   [TestCase(TestName = "A malformed spawn buff fails unit materialization before any registration")]
-  public void MalformedSpawnBuffFailsBeforeRegistration()
+  public static void MalformedSpawnBuffFailsBeforeRegistration()
   {
     var (setup, player, _) = GroupedSetup();
     var broken = setup with
@@ -341,7 +343,7 @@ public class BattleStartupLifecycleTest
   }
 
   [TestCase(TestName = "A battle with objectives but no units fails construction before any registration")]
-  public void EmptyRostersFailConstructionWithoutRegistration()
+  public static void EmptyRostersFailConstructionWithoutRegistration()
   {
     var (setup, _, _) = GroupedSetup();
     var empty = setup with
@@ -362,7 +364,7 @@ public class BattleStartupLifecycleTest
   }
 
   [TestCase(TestName = "Repeated starts from one setup get fresh board, objective, object, and hook state")]
-  public void IndependentStartsDoNotShareMutableState()
+  public static void IndependentStartsDoNotShareMutableState()
   {
     var (setup, _, _) = GroupedSetup();
     var hooks = new List<RecordingHook>();
@@ -372,7 +374,7 @@ public class BattleStartupLifecycleTest
       {
         var hook = new RecordingHook();
         hooks.Add(hook);
-        runtime.RegisterHook<BattleEventTag>(hook);
+        runtime.RegisterHook<IBattleEventTag>(hook);
       },
     };
     var reusable = setup with
@@ -405,7 +407,7 @@ public class BattleStartupLifecycleTest
   }
 
   [TestCase(TestName = "A terminal first-turn objective ends the battle during startup")]
-  public void TerminalObjectiveEndsBattleDuringStartup()
+  public static void TerminalObjectiveEndsBattleDuringStartup()
   {
     var (setup, _, _) = GroupedSetup();
     var terminal = setup with
@@ -441,7 +443,7 @@ public class BattleStartupLifecycleTest
   }
 
   [TestCase(TestName = "The startup AP refresh reads buffs activated during placement")]
-  public void StartupApRefreshReadsSpawnActivatedBuffs()
+  public static void StartupApRefreshReadsSpawnActivatedBuffs()
   {
     var apBuff = TestData.MakeBuff(
       "Adrenaline",
@@ -457,7 +459,7 @@ public class BattleStartupLifecycleTest
   }
 
   [TestCase(TestName = "Seed 7 produces the same combat rolls from the type and resolved setups")]
-  public void SeedDrivesIdenticalCombatRolls()
+  public static void SeedDrivesIdenticalCombatRolls()
   {
     var type = TestData.MakeDuelBattleType();
     type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(2, 1, 1),
@@ -474,7 +476,7 @@ public class BattleStartupLifecycleTest
   }
 
   [TestCase(TestName = "Optional hit-calculator injection survives the model change")]
-  public void HitCalculatorInjectionReachesCombat()
+  public static void HitCalculatorInjectionReachesCombat()
   {
     BattleSetup resolved = BattleSetupResolver.Resolve(
       TestData.MakeDuelBattleType(), seed: 7).RequireRight();

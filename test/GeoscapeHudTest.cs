@@ -8,6 +8,8 @@ using System;
 using System.Threading.Tasks;
 using static GdUnit4.Assertions;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class GeoscapeHudTest
@@ -20,7 +22,7 @@ public partial class GeoscapeHudTest
   [TestCase(2879L, "1d remaining")]
   [TestCase(2880L, "0d remaining")]
   [TestCase(3000L, "0d remaining")]
-  public void ManufacturingSummaryShowsOnlyCurrentJobAndRoundedUpDays(long tick, string expected)
+  public static void ManufacturingSummaryShowsOnlyCurrentJobAndRoundedUpDays(long tick, string expected)
   {
     var item = MakeItemData("Field kit");
     var itemRecipe = MakeManufacturingRecipe(item, days: 2);
@@ -36,7 +38,7 @@ public partial class GeoscapeHudTest
   }
 
   [TestCase]
-  public void IdleManufacturingClearsPreviousJobAndRemainingDays()
+  public static void IdleManufacturingClearsPreviousJobAndRemainingDays()
   {
     var item = MakeItemData("Field kit");
     var itemRecipe = MakeManufacturingRecipe(item, days: 2);
@@ -56,7 +58,7 @@ public partial class GeoscapeHudTest
   }
 
   [TestCase]
-  public void HudDoesNotContainAnActiveEventsPanel()
+  public static void HudDoesNotContainAnActiveEventsPanel()
   {
     var hud = BuildHud();
     Assert.False(hud.HasNode("AlertsPanel"));
@@ -67,7 +69,7 @@ public partial class GeoscapeHudTest
   [TestCase("%UnitsButton", typeof(UnitRoster), "res://scenes/geoscape/units/UnitRoster.tscn")]
   [TestCase("%EngineeringButton", typeof(EngineeringView), "res://scenes/geoscape/engineering/EngineeringView.tscn")]
   [TestCase("%ResearchButton", typeof(ResearchView), "res://scenes/geoscape/research/ResearchView.tscn")]
-  public async Task BoundButtonsForwardFreshViews(string buttonName, Type viewType, string scenePath)
+  public static async Task BoundButtonsForwardFreshViews(string buttonName, Type viewType, string scenePath)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var hud = BuildHud();
@@ -93,7 +95,7 @@ public partial class GeoscapeHudTest
   }
 
   [TestCase]
-  public void MissingOrWrongViewScenesAreAuthoringErrors()
+  public static void MissingOrWrongViewScenesAreAuthoringErrors()
   {
     var hud = BuildHud();
     GeoscapeView? received = null;
@@ -105,7 +107,7 @@ public partial class GeoscapeHudTest
   }
 
   [TestCase(TestName = "UpdateClock writes the pushed day and time to the clock label")]
-  public void UpdateClockWritesLabel()
+  public static void UpdateClockWritesLabel()
   {
     var hud = BuildHud();
 
@@ -115,7 +117,7 @@ public partial class GeoscapeHudTest
   }
 
   [TestCase(TestName = "Speed button cycles Normal → Fast → VeryFast → VeryVeryFast → Normal")]
-  public void SpeedButtonCyclesThroughSpeeds()
+  public static void SpeedButtonCyclesThroughSpeeds()
   {
     var hud = BuildHud();
     var requested = new System.Collections.Generic.List<TimeSpeed>();
@@ -136,7 +138,7 @@ public partial class GeoscapeHudTest
   }
 
   [TestCase(TestName = "Pausing requests Paused; unpausing requests the last active speed")]
-  public void PauseToggleRequestsPausedThenLastSpeed()
+  public static void PauseToggleRequestsPausedThenLastSpeed()
   {
     var hud = BuildHud();
     var requested = new System.Collections.Generic.List<TimeSpeed>();
@@ -152,7 +154,7 @@ public partial class GeoscapeHudTest
   }
 
   [TestCase(TestName = "Selecting a speed clears the pause toggle without requesting Paused")]
-  public void SpeedSelectionClearsPauseToggle()
+  public static void SpeedSelectionClearsPauseToggle()
   {
     var hud = BuildHud();
     var requested = new System.Collections.Generic.List<TimeSpeed>();

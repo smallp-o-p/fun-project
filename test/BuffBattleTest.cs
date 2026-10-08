@@ -6,6 +6,8 @@ using GdUnit4;
 using Godot;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BuffBattleTest
@@ -25,7 +27,7 @@ public partial class BuffBattleTest
       Seed: 7));
 
   [TestCase(TestName = "A buff whose condition already holds activates at spawn, after UnitAdded")]
-  public void SpawnEvaluatesBuffs()
+  public static void SpawnEvaluatesBuffs()
   {
     var faction = TestData.MakeFaction("Player");
     var alwaysOn = TestData.MakeBuff(
@@ -47,7 +49,7 @@ public partial class BuffBattleTest
   }
 
   [TestCase(TestName = "A condition met mid-turn activates at the NEXT turn start and shifts the hit-chance preview")]
-  public void ActivationWaitsForTurnStart()
+  public static void ActivationWaitsForTurnStart()
   {
     using var battle = BattleFixture.Duel(
       player: new("Alpha", Weapon: TestData.MakeWeapon("Saber", damage: 5), Buffs: [HealthBelowAimBuff()]));
@@ -73,7 +75,7 @@ public partial class BuffBattleTest
   }
 
   [TestCase(TestName = "An AP buff active at the owner's turn start is included in the refreshed action points")]
-  public void ApBuffLandsBeforeRefresh()
+  public static void ApBuffLandsBeforeRefresh()
   {
     var apBuff = TestData.MakeBuff(
       "Adrenaline",
@@ -95,7 +97,7 @@ public partial class BuffBattleTest
   }
 
   [TestCase(TestName = "A buff deactivates at the next turn start once its condition no longer holds")]
-  public void DeactivationOnTurnStart()
+  public static void DeactivationOnTurnStart()
   {
     var aura = TestData.MakeBuff(
       "Riposte",
@@ -132,7 +134,7 @@ public partial class BuffBattleTest
   }
 
   [TestCase(TestName = "A negative max-health buff activating at spawn clamps current health down")]
-  public void HealthClampOnActivation()
+  public static void HealthClampOnActivation()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");

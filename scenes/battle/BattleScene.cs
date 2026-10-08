@@ -3,6 +3,8 @@ using FunProject.Combatants;
 using Godot;
 using System;
 
+namespace FunProject.Scenes;
+
 // Owns the runtime and presentation lifetime. The controller owns selection/targeting;
 // the HUD owns widgets; the director receives committed results before the UI reconciles them.
 public sealed partial class BattleScene : Node3D

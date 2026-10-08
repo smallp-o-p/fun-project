@@ -224,7 +224,7 @@ public sealed class BattleUnitState
   public Option<float> TryEffectiveStat<TStat>() where TStat : Stat
     => Combatant.TryResolve<TStat>(GatherStatContributions());
 
-  private IEnumerable<StatMod> GatherStatContributions()
+  private StatMod[] GatherStatContributions()
     => Combatant.StatContributions()
          .AsValueEnumerable()
          .Concat(_loadoutStatMods)

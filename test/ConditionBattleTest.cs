@@ -7,6 +7,8 @@ using FunProject.Strategic;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 // Tactical condition integration: effective max health at spawn, the health-damage
 // bookkeeping that feeds mission returns, and the summary reports the campaign consumes.
 // Campaign roster instances participate directly (never copies) so condition penalties
@@ -26,7 +28,7 @@ public class ConditionBattleTest
       Seed: 7));
 
   [TestCase(TestName = "Spawn max health uses the loadout weapon and sees persistent conditions")]
-  public void SpawnMaxHealthUsesLoadoutWeaponAndConditions()
+  public static void SpawnMaxHealthUsesLoadoutWeaponAndConditions()
   {
     var faction = TestData.MakeFaction("Player");
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 100);
@@ -46,7 +48,7 @@ public class ConditionBattleTest
   }
 
   [TestCase(TestName = "The effective max health is floored at one")]
-  public void EffectiveMaxHealthIsFlooredAtOne()
+  public static void EffectiveMaxHealthIsFlooredAtOne()
   {
     var faction = TestData.MakeFaction("Player");
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 100);
@@ -70,7 +72,7 @@ public class ConditionBattleTest
   }
 
   [TestCase(TestName = "Overkill counts only the health actually lost")]
-  public void OverkillCountsOnlyHealthActuallyLost()
+  public static void OverkillCountsOnlyHealthActuallyLost()
   {
     var faction = TestData.MakeFaction("Player");
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 20);
@@ -88,7 +90,7 @@ public class ConditionBattleTest
   }
 
   [TestCase(TestName = "Stun-only damage never counts toward health metrics")]
-  public void StunOnlyDamageNeverCountsTowardHealthMetrics()
+  public static void StunOnlyDamageNeverCountsTowardHealthMetrics()
   {
     var faction = TestData.MakeFaction("Player");
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 20);
@@ -105,7 +107,7 @@ public class ConditionBattleTest
   }
 
   [TestCase(TestName = "Armor-absorbed damage never counts toward health metrics")]
-  public void ArmorAbsorbedDamageNeverCountsTowardHealthMetrics()
+  public static void ArmorAbsorbedDamageNeverCountsTowardHealthMetrics()
   {
     var faction = TestData.MakeFaction("Player");
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 100);
@@ -120,7 +122,7 @@ public class ConditionBattleTest
   }
 
   [TestCase(TestName = "Max-health clamping from stat changes is not damage taken")]
-  public void MaxHealthClampingIsNotDamageTaken()
+  public static void MaxHealthClampingIsNotDamageTaken()
   {
     var faction = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -148,7 +150,7 @@ public class ConditionBattleTest
   }
 
   [TestCase(TestName = "Injured roster spawns enter the next battle with combined penalties")]
-  public void InjuredRosterSpawnsEnterReducedWithCombinedPenalties()
+  public static void InjuredRosterSpawnsEnterReducedWithCombinedPenalties()
   {
     using var campaign = new GeoscapeFixture(TestData.MakeStart(
       roster: [TestData.MakeEntry("Alpha", TestData.MakeCombatantData(health: 100, aim: 60))]));
@@ -171,7 +173,7 @@ public class ConditionBattleTest
   }
 
   [TestCase(TestName = "Successive mission returns measure damage against the effective max health")]
-  public void SuccessiveReturnsUseEffectiveMaxHealth()
+  public static void SuccessiveReturnsUseEffectiveMaxHealth()
   {
     using var campaign = new GeoscapeFixture(TestData.MakeStart(
       roster: [TestData.MakeEntry("Alpha", TestData.MakeCombatantData(health: 100))]));
@@ -194,7 +196,7 @@ public class ConditionBattleTest
   }
 
   [TestCase(TestName = "Successive pipeline hits on one unit accumulate into the mission return")]
-  public void SuccessivePipelineHitsAccumulateIntoTheMissionReturn()
+  public static void SuccessivePipelineHitsAccumulateIntoTheMissionReturn()
   {
     using var campaign = new GeoscapeFixture(TestData.MakeStart(
       roster: [TestData.MakeEntry("Alpha", TestData.MakeCombatantData(health: 100))]));

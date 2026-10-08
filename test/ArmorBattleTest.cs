@@ -7,6 +7,8 @@ using FunProject.Items.Capabilities;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class ArmorBattleTest
@@ -23,7 +25,7 @@ public partial class ArmorBattleTest
       Seed: 7));
 
   [TestCase(TestName = "Spawned unit exposes its equipped armor at full pool")]
-  public void SpawnedUnitExposesEquippedArmor()
+  public static void SpawnedUnitExposesEquippedArmor()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var armor = TestData.MakeArmor("Plate", armor: 10, element: Element.Thermal);
@@ -39,7 +41,7 @@ public partial class ArmorBattleTest
   }
 
   [TestCase(TestName = "Units spawn without armor by default")]
-  public void UnitsSpawnWithoutArmorByDefault()
+  public static void UnitsSpawnWithoutArmorByDefault()
   {
     var playerFaction = TestData.MakeFaction("Player");
     using var battle = ArmoredSolo(playerFaction, TestData.MakeCombatant("Alpha", playerFaction));
@@ -52,7 +54,7 @@ public partial class ArmorBattleTest
   // element matching author Thermal armor so depletion stays at 1x and the numbers
   // read plainly; the attack test below covers the matched 1.5x path.
   [TestCase(TestName = "Damage depletes armor before health and the event carries the split")]
-  public void DamageDepletesArmorBeforeHealth()
+  public static void DamageDepletesArmorBeforeHealth()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var armor = TestData.MakeArmor("Plate", armor: 10, element: Element.Thermal);
@@ -73,7 +75,7 @@ public partial class ArmorBattleTest
   }
 
   [TestCase(TestName = "Spillover damages health and can kill through armor")]
-  public void SpilloverCanKillThroughArmor()
+  public static void SpilloverCanKillThroughArmor()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var armor = TestData.MakeArmor("Vest", armor: 3, element: Element.Thermal);
@@ -94,7 +96,7 @@ public partial class ArmorBattleTest
   }
 
   [TestCase(TestName = "Attack strips element-matched armor at 1.5x")]
-  public void AttackStripsMatchedArmorAtOnePointFive()
+  public static void AttackStripsMatchedArmorAtOnePointFive()
   {
     var armor = TestData.MakeArmor("Plate", armor: 6, element: Element.Kinetic);
     using var battle = BattleFixture.Duel(

@@ -1,6 +1,8 @@
 using Godot;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 public static class MovementLineBuilder
 {
   private const float RingSpacing = 0.025f;

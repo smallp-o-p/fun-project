@@ -3,6 +3,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 // Tile-path targeting: reachable tiles from GetPossibleMoveTilesForUnit; path preview/commit from
 // FindPathForUnit (source-inclusive, so the committed MoveUnit drops index 0). The handler owns the
 // reachable set as the single source the controller renders from, and caches the last previewed

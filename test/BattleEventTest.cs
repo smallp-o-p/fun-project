@@ -6,12 +6,14 @@ using Godot;
 using System;
 using System.Collections.Frozen;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleEventTest
 {
   [TestCase(TestName = "Committed battle events expose session domain objects")]
-  public void CommittedBattleEventsExposeSessionDomainObjects()
+  public static void CommittedBattleEventsExposeSessionDomainObjects()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new BattleSetup(
@@ -53,7 +55,7 @@ public class BattleEventTest
   }
 
   [TestCase(TestName = "Event dispatch keys contain exactly the concrete type and its tag interfaces")]
-  public void EventDispatchKeysContainExactlyConcreteTypeAndTagInterfaces()
+  public static void EventDispatchKeysContainExactlyConcreteTypeAndTagInterfaces()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new BattleSetup(
@@ -67,19 +69,19 @@ public class BattleEventTest
 
     Assert.Equal(4, keys.Count);
     Assert.True(keys.Contains(typeof(UnitAddedBattleEvent)), "Concrete event type missing from dispatch keys.");
-    Assert.True(keys.Contains(typeof(BattleEventTag)), "Root tag missing from dispatch keys.");
+    Assert.True(keys.Contains(typeof(IBattleEventTag)), "Root tag missing from dispatch keys.");
     Assert.True(keys.Contains(typeof(IUnitBattleEvent)), "IUnitBattleEvent missing from dispatch keys.");
     Assert.True(keys.Contains(typeof(IPositionedBattleEvent)), "IPositionedBattleEvent missing from dispatch keys.");
   }
 
   [TestCase(TestName = "An event without marker interfaces keys on its concrete type and the root tag only")]
-  public void EventWithoutMarkerInterfacesKeysOnConcreteTypeAndRootTag()
+  public static void EventWithoutMarkerInterfacesKeysOnConcreteTypeAndRootTag()
   {
     FrozenSet<Type> keys = new SessionStartedBattleEvent().EventKeys;
 
     Assert.Equal(2, keys.Count);
     Assert.True(keys.Contains(typeof(SessionStartedBattleEvent)), "Concrete event type missing from dispatch keys.");
-    Assert.True(keys.Contains(typeof(BattleEventTag)), "Root tag missing from dispatch keys.");
+    Assert.True(keys.Contains(typeof(IBattleEventTag)), "Root tag missing from dispatch keys.");
   }
 
   // No compile-time enforcement exists for the sealed/self-keyed contract that keeps the
@@ -87,7 +89,7 @@ public class BattleEventTest
   // offender. GetTypes() scans the Debug test-inclusive assembly, so test-defined events
   // (e.g. BattleHookTest's probe) are covered by the same scan — intended.
   [TestCase(TestName = "Every concrete battle event is sealed and self-keyed")]
-  public void EveryConcreteBattleEventIsSealedAndSelfKeyed()
+  public static void EveryConcreteBattleEventIsSealedAndSelfKeyed()
   {
     Type[] concreteEvents = typeof(BattleEvent).Assembly.GetTypes()
       .AsValueEnumerable()
@@ -116,7 +118,7 @@ public class BattleEventTest
   }
 
   [TestCase]
-  public void ObjectOutcomeEventsHaveTypedIdentityAndGuardTheirPayloads()
+  public static void ObjectOutcomeEventsHaveTypedIdentityAndGuardTheirPayloads()
   {
     using var battle = BattleFixture.Duel(
       player: new("Shooter", Aim: 100, Weapon: TestData.MakeWeapon("Rifle")),
@@ -126,11 +128,11 @@ public class BattleEventTest
       });
     var obj = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable()
       .Single(o => o.Name == "Crate");
-    Assert.Throws<ArgumentNullException>(() => new ObjectDamagedBattleEvent(null!, [], 1, None));
-    Assert.Throws<ArgumentNullException>(() => new ObjectDamagedBattleEvent(obj, null!, 1, None));
+    Assert.Throws<ArgumentNullException>(() => _ = new ObjectDamagedBattleEvent(null!, [], 1, None));
+    Assert.Throws<ArgumentNullException>(() => _ = new ObjectDamagedBattleEvent(obj, null!, 1, None));
     foreach (int amount in new[] { 0, -1 })
-      Assert.Throws<ArgumentOutOfRangeException>(() => new ObjectDamagedBattleEvent(obj, [], amount, None));
-    Assert.Throws<ArgumentNullException>(() => new ObjectDestroyedBattleEvent(null!, battle.At(3, 0, 2), None));
+      Assert.Throws<ArgumentOutOfRangeException>(() => _ = new ObjectDamagedBattleEvent(obj, [], amount, None));
+    Assert.Throws<ArgumentNullException>(() => _ = new ObjectDestroyedBattleEvent(null!, battle.At(3, 0, 2), None));
     BattleEvent damaged = new ObjectDamagedBattleEvent(obj, [new Damage(1, Element.Kinetic)], 1, None);
     BattleEvent destroyed = new ObjectDestroyedBattleEvent(obj, battle.At(3, 0, 2), None);
     Assert.True(damaged is ICausedByUnit);

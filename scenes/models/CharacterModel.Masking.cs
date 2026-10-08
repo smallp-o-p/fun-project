@@ -102,7 +102,7 @@ public partial class CharacterModel
     // combination is the valid bitset -1 and must still render.
     private long? _lastBits;
 
-    private long BitsOf(System.Collections.Generic.IEnumerable<Region> regions)
+    private static long BitsOf(System.Collections.Generic.IEnumerable<Region> regions)
     {
       long bits = 0;
       foreach (Region region in regions)

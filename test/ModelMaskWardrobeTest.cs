@@ -3,16 +3,20 @@ using FunProject.Models;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ModelMaskWardrobeTest
 {
+  private static readonly float[] OutlineSourceWeights = [10f, 11f, 12f, 13f, 14f, 15f];
+
   // ------------------------------------------------------------------
   // Wardrobe coordination
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void OutfitIndexAccessorCoercesAndClampsStoredSelections()
+  public static void OutfitIndexAccessorCoercesAndClampsStoredSelections()
   {
     // JSON import stores numeric selections as floats; the typed OutfitIndex
     // accessor must observe the stored float as its declared variant index.
@@ -31,7 +35,7 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void UnknownPieceComponentIsRejected()
+  public static void UnknownPieceComponentIsRejected()
   {
     using var fixture = ModelFixture.WithWardrobe();
     Assert.Throws<InvalidOperationException>(() => fixture.Model.SetPiece("Bogus", false));
@@ -39,7 +43,7 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void WardrobeChangeRetainsUnrelatedStoredBits()
+  public static void WardrobeChangeRetainsUnrelatedStoredBits()
   {
     // Three configured regions but the wardrobe rules only drive Mask0 and
     // Mask1, so Mask2 belongs to no rule: the derivation seeds its prepared
@@ -55,7 +59,7 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void OutfitWriteInsideTreeBeforeReadyIsRecordedAndAppliedOnReady()
+  public static void OutfitWriteInsideTreeBeforeReadyIsRecordedAndAppliedOnReady()
   {
     // Godot C# hot-reload restores serialized selections (OutfitIndex.set →
     // WriteSelection) while the root already sits in the tree but before its
@@ -90,7 +94,7 @@ public class ModelMaskWardrobeTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void SelectionsReplacementsApplyByLifecycle()
+  public static void SelectionsReplacementsApplyByLifecycle()
   {
     using var attached = ModelFixture.WithWardrobe();
     attached.Model.Selections = new Godot.Collections.Dictionary<string, Variant>
@@ -148,7 +152,7 @@ public class ModelMaskWardrobeTest
   // pieces/<name> selection per component from its authored default — never
   // outfit/clothing_enabled, and never an already-stored value.
   [TestCase]
-  public void InitializeMaterializesDefaultPieceSelectionsWithoutOverwrite()
+  public static void InitializeMaterializesDefaultPieceSelectionsWithoutOverwrite()
   {
     using var fixture = ModelFixture.WithWardrobe();
     Assert.True(fixture.GarmentA!.Visible);
@@ -179,7 +183,7 @@ public class ModelMaskWardrobeTest
   // prebuilt default mesh, and any other selection builds a compacted generated
   // variant recording the surviving source vertex indices per surface.
   [TestCase]
-  public void RegionSelectionsRenderSourceDefaultAndGeneratedVariants()
+  public static void RegionSelectionsRenderSourceDefaultAndGeneratedVariants()
   {
     using var fixture = ModelFixture.WithWardrobe();
     TestData.SelectMaskRegions(fixture.Model, fixture.MaskPath);
@@ -205,7 +209,7 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void EveryRegionCombinationRendersWithoutExpectedTriangleMetadata()
+  public static void EveryRegionCombinationRendersWithoutExpectedTriangleMetadata()
   {
     // The removed expected-triangle metadata used to gate region combinations
     // to an authored allowlist; every subset now selects and renders straight
@@ -231,7 +235,7 @@ public class ModelMaskWardrobeTest
   // Mask i hides triangle i (the fixture convention); hiding every triangle
   // collapses the surface to the all-hidden convention's degenerate sentinel.
   [TestCase]
-  public void AllHiddenTrianglesCollapseToTheDegenerateSentinel()
+  public static void AllHiddenTrianglesCollapseToTheDegenerateSentinel()
   {
     ArrayMesh source = TestData.MakeMaskedSourceMesh();
     ArrayMesh render = ModelMaskGeometry.BuildMesh(source, [[1L, 2L]], 3);
@@ -251,7 +255,7 @@ public class ModelMaskWardrobeTest
   // same vertex mapping, and renumbers indices to the compacted order.
   [TestCase(1, 3)]
   [TestCase(2, 0)]
-  public void BlendShapeAndSkinChannelsCompactWithTheirStride(int hiddenBits, int firstKeptVertex)
+  public static void BlendShapeAndSkinChannelsCompactWithTheirStride(int hiddenBits, int firstKeptVertex)
   {
     ArrayMesh source = TestData.MakeSkinSourceMesh();
     ArrayMesh render = ModelMaskGeometry.BuildMesh(source, [[1L, 2L]], hiddenBits);
@@ -308,7 +312,7 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void EightBoneWeightStrideIsPreserved()
+  public static void EightBoneWeightStrideIsPreserved()
   {
     ArrayMesh source = TestData.MakeSkinSourceMesh(eightBoneWeights: true, withBlendShape: false);
     ArrayMesh render = ModelMaskGeometry.BuildMesh(source, [[1L, 2L]], 2);
@@ -323,11 +327,11 @@ public class ModelMaskWardrobeTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void OutlineWeightsRebuildFromSourceVertexIndices()
+  public static void OutlineWeightsRebuildFromSourceVertexIndices()
   {
     using var fixture = ModelFixture.WithWardrobe();
     var outline = new ShaderMaterial();
-    outline.SetMeta("source_weights", new float[] { 10f, 11f, 12f, 13f, 14f, 15f });
+    outline.SetMeta("source_weights", OutlineSourceWeights);
     fixture.Body!.SetSurfaceOverrideMaterial(0, new ShaderMaterial { NextPass = outline });
 
     // Triangle 0 survives Mask1, so the texture carries source vertices 0..2.
@@ -340,7 +344,7 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void SurfaceMaterialWithoutOutlinePassStillMasks()
+  public static void SurfaceMaterialWithoutOutlinePassStillMasks()
   {
     // Real scenes carry materials without an outline NextPass; they must not
     // interfere with masking (outlined materials keep rebuilding their weights,
@@ -371,7 +375,7 @@ public class ModelMaskWardrobeTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void AllSixtyFourEnabledRegionsRenderOnFirstApply()
+  public static void AllSixtyFourEnabledRegionsRenderOnFirstApply()
   {
     // The all-64-enabled bitset is -1, the exact value a never-rendered
     // sentinel must not collide with: the initial render must still happen,
@@ -397,26 +401,29 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void ImportedMaskGeometryRejectsCorruptionBeforeRuntimeBinding()
+  public static void ImportedMaskGeometryRejectsCorruptionBeforeRuntimeBinding()
   {
     ArrayMesh source = TestData.MakeMaskedSourceMesh();
     ModelMaskConfiguration configuration = TestData.MakeModelMaskConfiguration(source);
-    Assert.Equal("", new ModelImportValidation().ValidateMaskGeometry(configuration, source));
+    using var validation = new ModelImportValidation();
+    Variant validationResult = validation.Call(nameof(ModelImportValidation.ValidateMaskGeometry), configuration, source);
+    Assert.Equal(Variant.Type.String, validationResult.VariantType);
+    Assert.Equal("", validationResult.AsString());
     configuration.GeometryHash = "stale";
-    Assert.True(new ModelImportValidation().ValidateMaskGeometry(configuration, source).Length > 0);
+    Assert.True(ModelImportValidation.ValidateMaskGeometry(configuration, source).Length > 0);
     configuration.GeometryHash = ModelImportValidation.GeometryHash(source);
     long[] flags = configuration.TriangleMasks[0];
     configuration.TriangleMasks[0] = flags[1..];
-    Assert.True(new ModelImportValidation().ValidateMaskGeometry(configuration, source).Length > 0);
+    Assert.True(ModelImportValidation.ValidateMaskGeometry(configuration, source).Length > 0);
     configuration.TriangleMasks[0] = flags;
-    Assert.Equal("", new ModelImportValidation().ValidateMaskGeometry(configuration, source));
+    Assert.Equal("", ModelImportValidation.ValidateMaskGeometry(configuration, source));
     using var fixture = ModelFixture.WithMask(source, configuration);
     TestData.SelectMaskRegions(fixture.Model, fixture.MaskPath, "Mask1");
     Assert.Equal(1, TestData.VisibleTriangles(fixture.Model.MaskRenderMesh(fixture.MaskPath)));
   }
 
   [TestCase]
-  public void WardrobeUsesBoundInstanceNodesAfterInitialization()
+  public static void WardrobeUsesBoundInstanceNodesAfterInitialization()
   {
     using var fixture = ModelFixture.WithWardrobe();
     fixture.GarmentA!.Name = "RenamedGarment";
@@ -427,7 +434,7 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void TwoEmptyResourcePathConfigurationsDoNotCollide()
+  public static void TwoEmptyResourcePathConfigurationsDoNotCollide()
   {
     // Configurations without a resource path key their caches by instance
     // identity, so identical synthetic setups stay independent — for stored
@@ -454,7 +461,7 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void GeneratedVariantCacheIsBoundedAndReused()
+  public static void GeneratedVariantCacheIsBoundedAndReused()
   {
     ArrayMesh source = TestData.MakeMaskedSourceMesh(3);
     using var fixture = ModelFixture.WithMask(source, TestData.MakeModelMaskConfiguration(source, 3));
@@ -483,7 +490,7 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void PieceWriteLeavesAnUnaffectedMaskOwnerUntouched()
+  public static void PieceWriteLeavesAnUnaffectedMaskOwnerUntouched()
   {
     using var fixture = ModelFixture.WithWardrobe(
       configuration: TestData.MakeWardrobeConfigurationWithComponentlessVariantRule(variant: 1),
@@ -497,7 +504,7 @@ public class ModelMaskWardrobeTest
   }
 
   [TestCase]
-  public void MaskStateIsIndependentAcrossInstances()
+  public static void MaskStateIsIndependentAcrossInstances()
   {
     using var configuration = TestData.MakeWardrobeConfiguration();
     using var first = ModelFixture.WithWardrobe(configuration: configuration);

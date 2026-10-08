@@ -3,12 +3,14 @@ using FunProject.Items.Capabilities;
 using GdUnit4;
 using System;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ItemCapabilityTest
 {
   [TestCase(TestName = "Charges capability initializes from data and spends down")]
-  public void ChargesCapabilityInitializesFromDataAndSpendsDown()
+  public static void ChargesCapabilityInitializesFromDataAndSpendsDown()
   {
     var capability = (ChargesCapability)new ChargesCapabilityData { MaxCharges = 2 }.CreateRuntime();
 
@@ -25,7 +27,7 @@ public class ItemCapabilityTest
   }
 
   [TestCase(TestName = "Negative max charges clamps to zero")]
-  public void NegativeMaxChargesClampsToZero()
+  public static void NegativeMaxChargesClampsToZero()
   {
     var capability = (ChargesCapability)new ChargesCapabilityData { MaxCharges = -3 }.CreateRuntime();
 
@@ -34,7 +36,7 @@ public class ItemCapabilityTest
   }
 
   [TestCase(TestName = "FindCapability returns Some for attached and None for absent")]
-  public void FindCapabilityReturnsSomeForAttachedAndNoneForAbsent()
+  public static void FindCapabilityReturnsSomeForAttachedAndNoneForAbsent()
   {
     var item = new EquippableItem(new EquippableItemData
     {
@@ -47,7 +49,7 @@ public class ItemCapabilityTest
   }
 
   [TestCase(TestName = "With returns a proof binding item and capability")]
-  public void WithReturnsProofBindingItemAndCapability()
+  public static void WithReturnsProofBindingItemAndCapability()
   {
     var item = new EquippableItem(new EquippableItemData
     {
@@ -62,9 +64,9 @@ public class ItemCapabilityTest
   }
 
   [TestCase(TestName = "Duplicate capability types throw at construction")]
-  public void DuplicateCapabilityTypesThrowAtConstruction()
+  public static void DuplicateCapabilityTypesThrowAtConstruction()
   {
-    Assert.Throws<InvalidOperationException>(() => new EquippableItem(new EquippableItemData
+    Assert.Throws<InvalidOperationException>(() => _ = new EquippableItem(new EquippableItemData
     {
       Name = "Broken",
       Capabilities = [new ThrowableCapabilityData(), new ThrowableCapabilityData()],

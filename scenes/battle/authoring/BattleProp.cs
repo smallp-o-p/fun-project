@@ -1,5 +1,7 @@
 using Godot;
 
+namespace FunProject.Scenes;
+
 // A finished mesh carries its resolved cells through Godot's native MeshLibrary export.
 [Tool, GlobalClass]
 public partial class BattleProp : MeshInstance3D

@@ -31,15 +31,15 @@ public abstract class TimedObjectObjective(ObjectiveData data) : Objective(data)
   {
     switch (battleEvent)
     {
-      case ObjectExpiredBattleEvent expired when expired.Object.FindCapability<TimedEffectCapability>().IsSome:
+      case ObjectExpiredBattleEvent expired when expired.BoardObject.FindCapability<TimedEffectCapability>().IsSome:
         return ObjectiveResult.Failed;
       case ObjectDestroyedBattleEvent destroyed
-        when destroyed.Object.FindCapability<TimedEffectCapability>().IsSome:
+        when destroyed.BoardObject.FindCapability<TimedEffectCapability>().IsSome:
         return ObjectiveResult.Failed;
-      case ObjectPlacedBattleEvent placed when placed.Object.FindCapability<TimedEffectCapability>().IsSome:
+      case ObjectPlacedBattleEvent placed when placed.BoardObject.FindCapability<TimedEffectCapability>().IsSome:
         _placed++;
         break;
-      case ObjectInteractedBattleEvent interacted when interacted.Object.FindCapability<TimedEffectCapability>().IsSome:
+      case ObjectInteractedBattleEvent interacted when interacted.BoardObject.FindCapability<TimedEffectCapability>().IsSome:
         _defused++;
         break;
     }

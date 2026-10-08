@@ -10,7 +10,7 @@ namespace FunProject.Tests;
 public class WindowScalingTest
 {
   [TestCase]
-  public async Task RootWindowScalesTheSameHudAtDesktopAspectRatios()
+  public static async Task RootWindowScalesTheSameHudAtDesktopAspectRatios()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var root = ((SceneTree)Engine.GetMainLoop()).Root;

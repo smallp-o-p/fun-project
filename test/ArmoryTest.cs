@@ -8,12 +8,14 @@ using LanguageExt.UnsafeValueAccess;
 using static GdUnit4.Assertions;
 using System;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ArmoryTest
 {
   [TestCase(TestName = "A listed scarce item seeds one; AddStock grows the count at runtime")]
-  public void ScarceEntrySeedsOneInstance()
+  public static void ScarceEntrySeedsOneInstance()
   {
     EquippableItemData data = TestData.MakeItemData("Pistol");
     var armory = new Armory([data], []);
@@ -30,7 +32,7 @@ public class ArmoryTest
   }
 
   [TestCase(TestName = "Unlimited entries always yield fresh distinct instances and ignore deposits")]
-  public void UnlimitedEntryInstantiates()
+  public static void UnlimitedEntryInstantiates()
   {
     EquippableItemData data = TestData.MakeItemData("Grenade", unlimited: true);
     var armory = new Armory([data], []);
@@ -44,7 +46,7 @@ public class ArmoryTest
   }
 
   [TestCase(TestName = "Depositing an item returns its equipped mods and counts it back into stock")]
-  public void DepositReturnsModsAndCountsIn()
+  public static void DepositReturnsModsAndCountsIn()
   {
     EquippableItemData data = new()
     {
@@ -65,7 +67,7 @@ public class ArmoryTest
   }
 
   [TestCase(TestName = "Mod shelf counts down and back up, and AddModStock grows it at runtime")]
-  public void ModShelfCounts()
+  public static void ModShelfCounts()
   {
     MultiStatMod mod = TestData.MakeMod("Chip");
     var armory = new Armory([], [mod]);
@@ -83,7 +85,7 @@ public class ArmoryTest
   }
 
   [TestCase(TestName = "Unlimited mods never run dry")]
-  public void UnlimitedMods()
+  public static void UnlimitedMods()
   {
     MultiStatMod mod = TestData.MakeMod("Chip", unlimited: true);
     var armory = new Armory([], [mod]);
@@ -95,7 +97,7 @@ public class ArmoryTest
   }
 
   [TestCase(TestName = "Stock lines report remaining counts and unlimited flags")]
-  public void StockLines()
+  public static void StockLines()
   {
     EquippableItemData pistol = TestData.MakeItemData("Pistol");
     EquippableItemData grenade = TestData.MakeItemData("Grenade", unlimited: true);
@@ -112,19 +114,19 @@ public class ArmoryTest
   }
 
   [TestCase(TestName = "Construction rejects null lists, null entries, and duplicates")]
-  public void ConstructionValidation()
+  public static void ConstructionValidation()
   {
-    Assert.Throws<ArgumentNullException>(() => new Armory(null!, []));
-    Assert.Throws<ArgumentNullException>(() => new Armory([null!], []));
-    Assert.Throws<ArgumentNullException>(() => new Armory([], [null!]));
+    Assert.Throws<ArgumentNullException>(() => _ = new Armory(null!, []));
+    Assert.Throws<ArgumentNullException>(() => _ = new Armory([null!], []));
+    Assert.Throws<ArgumentNullException>(() => _ = new Armory([], [null!]));
     EquippableItemData dupItem = TestData.MakeItemData("Dup");
-    Assert.Throws<InvalidOperationException>(() => new Armory([dupItem, dupItem], []));
+    Assert.Throws<InvalidOperationException>(() => _ = new Armory([dupItem, dupItem], []));
     MultiStatMod dupMod = TestData.MakeMod("Dup");
-    Assert.Throws<InvalidOperationException>(() => new Armory([], [dupMod, dupMod]));
+    Assert.Throws<InvalidOperationException>(() => _ = new Armory([], [dupMod, dupMod]));
   }
 
   [TestCase(TestName = "Runtime stock growth validates its inputs")]
-  public void RuntimeGrowthValidation()
+  public static void RuntimeGrowthValidation()
   {
     EquippableItemData scarce = TestData.MakeItemData("Pistol");
     EquippableItemData plentiful = TestData.MakeItemData("Grenade", unlimited: true);
@@ -142,7 +144,7 @@ public class ArmoryTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public void FirstDeliveryCreatesShelfUsingCapturedStockPolicy(bool unlimited)
+  public static void FirstDeliveryCreatesShelfUsingCapturedStockPolicy(bool unlimited)
   {
     var item = MakeItemData(unlimited: !unlimited);
     var armory = new Armory([], []);
@@ -160,7 +162,7 @@ public class ArmoryTest
   }
 
   [TestCase]
-  public void DeliveryAddsToExistingScarceShelf()
+  public static void DeliveryAddsToExistingScarceShelf()
   {
     var item = MakeItemData();
     var armory = new Armory([item], []);
@@ -170,7 +172,7 @@ public class ArmoryTest
   }
 
   [TestCase]
-  public void DeliveryRejectsNullAndExistingUnlimitedSupplyWithoutChangingStock()
+  public static void DeliveryRejectsNullAndExistingUnlimitedSupplyWithoutChangingStock()
   {
     var item = MakeItemData(unlimited: true);
     var armory = new Armory([], []);
@@ -185,7 +187,7 @@ public class ArmoryTest
   }
 
   [TestCase(TestName = "Unknown lookups return None")]
-  public void UnknownLookupReturnsNone()
+  public static void UnknownLookupReturnsNone()
   {
     var unknown = MakeItemData("Unknown");
     var armory = new Armory([MakeItemData("Known")], []);
@@ -195,7 +197,7 @@ public class ArmoryTest
   }
 
   [TestCase(TestName = "Depositing without a shelf throws before touching mods")]
-  public void DepositRejectsMissingShelf()
+  public static void DepositRejectsMissingShelf()
   {
     EquippableItemData data = new()
     {
@@ -214,7 +216,7 @@ public class ArmoryTest
   }
 
   [TestCase(TestName = "Counted stock growth uses checked arithmetic")]
-  public void CountedGrowthUsesCheckedArithmetic()
+  public static void CountedGrowthUsesCheckedArithmetic()
   {
     EquippableItemData item = MakeItemData("Pistol");
     MultiStatMod mod = MakeMod("Chip");

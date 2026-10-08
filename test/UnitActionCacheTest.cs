@@ -9,6 +9,8 @@ using GdUnit4;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class UnitActionCacheTest
@@ -121,7 +123,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void RetainedQueryListAndEntriesSurviveApSpendAndRefresh()
+  public static void RetainedQueryListAndEntriesSurviveApSpendAndRefresh()
   {
     using var battle = BattleFixture.Duel();
     var query = new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit));
@@ -153,7 +155,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void CompletionDisablesRetainedOptions()
+  public static void CompletionDisablesRetainedOptions()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     var query = new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit));
@@ -172,7 +174,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void AttackAndReloadTrackRetainedMagazineState()
+  public static void AttackAndReloadTrackRetainedMagazineState()
   {
     var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 1);
     using var battle = BattleFixture.Duel(
@@ -198,7 +200,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void UseAndThrowSpendingLastActionPointDisableActorVerbs()
+  public static void UseAndThrowSpendingLastActionPointDisableActorVerbs()
   {
     using var useBattle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1, Weapon: TestData.MakeWeapon("Rifle")));
     ItemWith<ChargesCapability> usable = TestData.MakeUsableItem("Medkit");
@@ -228,7 +230,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void PassDisablesOnlyPassedActorsVerbs()
+  public static void PassDisablesOnlyPassedActorsVerbs()
   {
     using var battle = BattleFixture.UiBattle();
     IReadOnlyList<UnitAction> actions = battle.Query(
@@ -244,7 +246,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void ActionPointBuffRefreshesRetainedAvailabilityAfterTurnStartedRead()
+  public static void ActionPointBuffRefreshesRetainedAvailabilityAfterTurnStartedRead()
   {
     var apBuff = TestData.MakeBuff(
       "Adrenaline",
@@ -282,7 +284,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void BuffClampIncapacitatesUnselectedUnitAndUpdatesRetainedOptions()
+  public static void BuffClampIncapacitatesUnselectedUnitAndUpdatesRetainedOptions()
   {
     var collapse = TestData.MakeBuff(
       "Collapse",
@@ -341,7 +343,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void StatusUnconsciousnessAndDeathDisableEveryRetainedOption()
+  public static void StatusUnconsciousnessAndDeathDisableEveryRetainedOption()
   {
     using var statusBattle = BattleFixture.UiBattle();
     IReadOnlyList<UnitAction> statusActions = statusBattle.Query(
@@ -366,7 +368,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void ImmobilizationExpiryUpdatesRetainedOptionsDuringUpkeepAndNextTurn()
+  public static void ImmobilizationExpiryUpdatesRetainedOptionsDuringUpkeepAndNextTurn()
   {
     using var battle = BattleFixture.Duel(enemy: new("Durable", Health: 100));
     IReadOnlyList<UnitAction> actions = battle.Query(
@@ -409,7 +411,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void AdjacentOccupancyChangesTargetingAndRetainsCachedEntries()
+  public static void AdjacentOccupancyChangesTargetingAndRetainsCachedEntries()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -446,7 +448,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void EnemyRangeAndSightChangesTargetingAndRetainsCachedEntries()
+  public static void EnemyRangeAndSightChangesTargetingAndRetainsCachedEntries()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -497,7 +499,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void SharedMagazineUpdatesRefreshHoldersRetainedOptions()
+  public static void SharedMagazineUpdatesRefreshHoldersRetainedOptions()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -582,7 +584,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase(TestName = "Reads during a continuation TurnStarted observe pre-refresh availability without caching")]
-  public void ReadsDuringContinuationTurnStartedObservePreRefreshWithoutCaching()
+  public static void ReadsDuringContinuationTurnStartedObservePreRefreshWithoutCaching()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -644,7 +646,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void MoveInterruptIncapacitationUpdatesOtherActorsRetainedEntries()
+  public static void MoveInterruptIncapacitationUpdatesOtherActorsRetainedEntries()
   {
     using var battle = BattleFixture.UiBattle();
     IReadOnlyList<UnitAction> supportActions = battle.Query(
@@ -660,7 +662,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void RejectingMoveInterruptInvalidatesRetainedEntriesAndClearsQueue()
+  public static void RejectingMoveInterruptInvalidatesRetainedEntriesAndClearsQueue()
   {
     using var battle = BattleFixture.Duel(
       player: new("Alpha", ActionPoints: 2),
@@ -693,13 +695,13 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void FailingMoveInterruptPreservesFailureAndCommittedStateAndClearsQueue()
+  public static void FailingMoveInterruptPreservesFailureAndCommittedStateAndClearsQueue()
   {
     using var battle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 2));
     IReadOnlyList<UnitAction> actions = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
     EvaluateAll(actions);
-    var failure = new ApplicationException("interrupt failed");
+    var failure = new InvalidOperationException("interrupt failed");
     battle.RegisterHook<UnitMovedBattleEvent>(new InterruptOnce(new SpendThenThrow(battle.PlayerUnit, failure)));
 
     Exception? caught = null;
@@ -722,13 +724,13 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void EventlessFailureRefreshesPlayerOptionsAfterSpentCost()
+  public static void EventlessFailureRefreshesPlayerOptionsAfterSpentCost()
   {
     using var battle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1));
     IReadOnlyList<UnitAction> playerActions = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
     EvaluateAll(playerActions);
-    var failure = new ApplicationException("eventless failure");
+    var failure = new InvalidOperationException("eventless failure");
 
     Exception? caught = null;
     try
@@ -747,7 +749,7 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void CleanReadsEvaluateOnceAndOnlyRelevantEventsReevaluateTheEntry()
+  public static void CleanReadsEvaluateOnceAndOnlyRelevantEventsReevaluateTheEntry()
   {
     using var battle = BattleFixture.Duel();
     var condition = new CountingCondition();
@@ -768,10 +770,10 @@ public class UnitActionCacheTest
   }
 
   [TestCase]
-  public void EvaluationFailureRetriesAndCachesSuccess()
+  public static void EvaluationFailureRetriesAndCachesSuccess()
   {
     using var battle = BattleFixture.Duel();
-    var failure = new ApplicationException("condition failed");
+    var failure = new InvalidOperationException("condition failed");
     var condition = new ThrowingCondition(failure);
     var action = new UnitAction(battle.Session.ActionOptions, battle.PlayerUnit,
       new TestActionDefinition(condition));

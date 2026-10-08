@@ -5,13 +5,15 @@ using FunProject.Core;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class StunRecoveryTest
 {
   [TestCase(8, 5u, 3)]
   [TestCase(3, 3u, 0)]
-  public void DefaultRecoveryReducesOnlyTheOwnersStun(int initialStun, uint recovered, int remaining)
+  public static void DefaultRecoveryReducesOnlyTheOwnersStun(int initialStun, uint recovered, int remaining)
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, initialStun, DamageKind.Stun);
@@ -26,7 +28,7 @@ public class StunRecoveryTest
   }
 
   [TestCase]
-  public void UnsignedMaximumRecoveryClampsToCurrentStun()
+  public static void UnsignedMaximumRecoveryClampsToCurrentStun()
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
@@ -38,7 +40,7 @@ public class StunRecoveryTest
   }
 
   [TestCase]
-  public void ZeroStunEmitsNoRecoveryEvent()
+  public static void ZeroStunEmitsNoRecoveryEvent()
   {
     using var battle = BattleFixture.Duel();
     battle.ClearEvents();
@@ -49,7 +51,7 @@ public class StunRecoveryTest
   }
 
   [TestCase]
-  public void UnconsciousUnitDoesNotRecoverAcrossItsFactionsTurns()
+  public static void UnconsciousUnitDoesNotRecoverAcrossItsFactionsTurns()
   {
     using var battle = BattleFixture.Duel();
     battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction), new Vector3I(0, 0, 0));
@@ -65,7 +67,7 @@ public class StunRecoveryTest
   }
 
   [TestCase]
-  public void DotCausesUnconsciousnessBeforeRecovery()
+  public static void DotCausesUnconsciousnessBeforeRecovery()
   {
     using var battle = BattleFixture.Duel();
     battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction), new Vector3I(0, 0, 0));
@@ -81,7 +83,7 @@ public class StunRecoveryTest
   }
 
   [TestCase]
-  public void DeadUnitsDoNotRecover()
+  public static void DeadUnitsDoNotRecover()
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
@@ -92,7 +94,7 @@ public class StunRecoveryTest
   }
 
   [TestCase]
-  public void ExhaustedAndImmobilizedUnitsStillRecover()
+  public static void ExhaustedAndImmobilizedUnitsStillRecover()
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
@@ -105,7 +107,7 @@ public class StunRecoveryTest
   }
 
   [TestCase]
-  public void RecoveryFollowsArmorRegeneration()
+  public static void RecoveryFollowsArmorRegeneration()
   {
     var armor = TestData.MakeArmor("Shield", element: Element.Thermal, regenPerTurn: 3);
     using var battle = BattleFixture.Duel(player: new("Alpha", Armor: armor));
@@ -119,7 +121,7 @@ public class StunRecoveryTest
   }
 
   [TestCase]
-  public void EndedSessionIgnoresRecoveryHook()
+  public static void EndedSessionIgnoresRecoveryHook()
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
@@ -133,11 +135,11 @@ public class StunRecoveryTest
   }
 
   [TestCase]
-  public void RecoveryEventRejectsInvalidPayloads()
+  public static void RecoveryEventRejectsInvalidPayloads()
   {
     using var battle = BattleFixture.Duel();
-    Assert.Throws<ArgumentNullException>(() => new UnitStunRecoveredBattleEvent(null, 1, 0));
-    Assert.Throws<ArgumentOutOfRangeException>(() => new UnitStunRecoveredBattleEvent(battle.PlayerUnit, 0, 0));
-    Assert.Throws<ArgumentOutOfRangeException>(() => new UnitStunRecoveredBattleEvent(battle.PlayerUnit, 1, -1));
+    Assert.Throws<ArgumentNullException>(() => _ = new UnitStunRecoveredBattleEvent(null, 1, 0));
+    Assert.Throws<ArgumentOutOfRangeException>(() => _ = new UnitStunRecoveredBattleEvent(battle.PlayerUnit, 0, 0));
+    Assert.Throws<ArgumentOutOfRangeException>(() => _ = new UnitStunRecoveredBattleEvent(battle.PlayerUnit, 1, -1));
   }
 }

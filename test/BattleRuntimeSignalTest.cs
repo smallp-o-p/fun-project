@@ -4,12 +4,14 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public sealed partial class BattleRuntimeSignalTest
 {
   [TestCase(TestName = "ExecuteAction raises ActionStarted then ActionCompleted with events attached")]
-  public void ExecuteActionRaisesLifecycleSignalsInOrder()
+  public static void ExecuteActionRaisesLifecycleSignalsInOrder()
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var runtime = battle.Runtime;
@@ -39,7 +41,7 @@ public sealed partial class BattleRuntimeSignalTest
   }
 
   [TestCase(TestName = "Completed never fires when Submit throws; Started marks the attempt")]
-  public void NoCompletedSignalWhenSubmitThrows()
+  public static void NoCompletedSignalWhenSubmitThrows()
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var runtime = battle.Runtime;
@@ -60,7 +62,7 @@ public sealed partial class BattleRuntimeSignalTest
   }
 
   [TestCase(TestName = "A completed battle rejects a new submission before either action signal fires")]
-  public void CompletedBattleRejectsSubmissionBeforeActionSignals()
+  public static void CompletedBattleRejectsSubmissionBeforeActionSignals()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.ApplyDamage(battle.EnemyUnit, 999); // the player's eliminate-all objective ends the battle

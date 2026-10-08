@@ -16,6 +16,6 @@ public sealed class BattleHookRegistration
   }
 
   public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0)
-    where TEventKey : BattleEventTag
+    where TEventKey : IBattleEventTag
     => _runtime.RegisterHook<TEventKey>(hook, priority);
 }

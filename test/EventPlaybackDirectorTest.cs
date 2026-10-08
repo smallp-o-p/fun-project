@@ -5,12 +5,14 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public sealed partial class EventPlaybackDirectorTest
 {
   [TestCase(TestName = "Queued events play in commit order; Busy toggles; idle fires once")]
-  public void EventsPlayInOrderAndIdleFiresOnce()
+  public static void EventsPlayInOrderAndIdleFiresOnce()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new BattleSetup(
@@ -42,7 +44,7 @@ public sealed partial class EventPlaybackDirectorTest
   }
 
   [TestCase(TestName = "Consecutive move steps coalesce into one path step; tile bookkeeping folds in")]
-  public void ConsecutiveMoveStepsCoalesceIntoOnePathStep()
+  public static void ConsecutiveMoveStepsCoalesceIntoOnePathStep()
   {
     using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1), unitName: "Mover");
     var director = battle.AttachDirector(new CaptureDirector());
@@ -68,7 +70,7 @@ public sealed partial class EventPlaybackDirectorTest
   }
 
   [TestCase(TestName = "An interrupting event breaks the path into separate runs")]
-  public void InterruptingEventBreaksThePathIntoSeparateRuns()
+  public static void InterruptingEventBreaksThePathIntoSeparateRuns()
   {
     using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1), unitName: "Mover");
     var director = battle.AttachDirector(new CaptureDirector());
@@ -97,7 +99,7 @@ public sealed partial class EventPlaybackDirectorTest
   }
 
   [TestCase(TestName = "Playback uses the stored unconscious event after the unit changes")]
-  public void PlaybackUsesStoredUnconsciousEventAfterUnitChanges()
+  public static void PlaybackUsesStoredUnconsciousEventAfterUnitChanges()
   {
     using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1));
     var director = battle.OwnNode(new BareDirector()); // unbound: steps are driven directly
@@ -122,7 +124,7 @@ public sealed partial class EventPlaybackDirectorTest
   }
 
   [TestCase]
-  public void StunDamageAndRecoveryPlaybackCompleteInstantly()
+  public static void StunDamageAndRecoveryPlaybackCompleteInstantly()
   {
     using var battle = BattleFixture.Duel();
     var director = battle.OwnNode(new BareDirector()); // unbound: steps are driven directly
@@ -148,7 +150,7 @@ public sealed partial class EventPlaybackDirectorTest
   }
 
   [TestCase(TestName = "Move steps for hidden (dead) meshes complete instantly without moving")]
-  public void MoveStepsForHiddenMeshesCompleteInstantlyWithoutMoving()
+  public static void MoveStepsForHiddenMeshesCompleteInstantlyWithoutMoving()
   {
     using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1), unitName: "Mover");
     var director = battle.OwnNode(new BareDirector()); // unbound: directly exercises PlayMoveStep

@@ -16,7 +16,7 @@ public class PersonnelLayoutTest
   [TestCase("squad/SquadLoadoutView")]
   [TestCase("captivity/CaptivityView")]
   [TestCase("engineering/EngineeringView")]
-  public void FullScreenViewsCoverLowerTransparentDialogs(string scenePath)
+  public static void FullScreenViewsCoverLowerTransparentDialogs(string scenePath)
   {
     var view = GD.Load<PackedScene>($"res://scenes/geoscape/{scenePath}.tscn").Instantiate<GeoscapeView>();
     try
@@ -34,7 +34,7 @@ public class PersonnelLayoutTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task RosterKeepsRowsScrollableAndDirectInspectionReachable(int width, int height)
+  public static async Task RosterKeepsRowsScrollableAndDirectInspectionReachable(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var fixture = new GeoscapeFixture(MakeStart(roster:
@@ -66,7 +66,7 @@ public class PersonnelLayoutTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task SquadShowsHorizontalCardsAndKeepsRosterAndBackInsideViewport(int width, int height)
+  public static async Task SquadShowsHorizontalCardsAndKeepsRosterAndBackInsideViewport(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var fixture = new GeoscapeFixture(MakeStart(roster: [MakeEntry("Alpha"), MakeEntry("Bravo")]));
@@ -99,7 +99,7 @@ public class PersonnelLayoutTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task CaptivityKeepsListDetailsAndPreparationVisible(int width, int height)
+  public static async Task CaptivityKeepsListDetailsAndPreparationVisible(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var fixture = new GeoscapeFixture();

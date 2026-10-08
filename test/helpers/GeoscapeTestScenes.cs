@@ -35,7 +35,7 @@ internal static partial class GeoscapeTestScenes
 
   public static void AssertBattleDisposed(HookCaptureSystemData capture)
     => Assert.Throws<ObjectDisposedException>(() =>
-      capture.Captured!.RegisterHook<BattleEventTag>(new RecordingHook()));
+      capture.Captured!.RegisterHook<IBattleEventTag>(new RecordingHook()));
 
   public static Button EndTurnButton(BattleScene battle)
     => battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Container>("%TurnButtons")

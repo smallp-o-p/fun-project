@@ -3,6 +3,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 // Unit- and object-target attack targeting: candidate tiles are attackable enemies and
 // destructible objects under the attacker's current visibility and weapon range, resolved
 // through the shared hit-chance query so discovery and preview can never drift; preview is
@@ -44,7 +46,7 @@ public sealed class AttackTargeting : IActionTargeting
           AddCandidate(new BattleEntity.Unit(enemy.State));
 
         foreach (BattleObjectState obj in _runtime.Query(new GetBattleSpecialObjectsQuery()))
-          AddCandidate(new BattleEntity.Object(obj));
+          AddCandidate(new BattleEntity.BoardObject(obj));
       });
   }
 

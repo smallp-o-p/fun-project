@@ -4,12 +4,14 @@ using GdUnit4;
 using Godot;
 using static GdUnit4.Assertions;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class GameCameraTest
 {
   [TestCase(TestName = "Viewport ray query uses the camera projection and requested length")]
-  public void ViewportRayQueryUsesTheCameraProjectionAndRequestedLength()
+  public static void ViewportRayQueryUsesTheCameraProjectionAndRequestedLength()
   {
     var camera = AutoFree(new Camera3D
     {
@@ -33,13 +35,13 @@ public partial class GameCameraTest
   }
 
   [TestCase(TestName = "Viewport ray query throws when camera is missing")]
-  public void ViewportRayQueryThrowsWhenCameraIsMissing()
+  public static void ViewportRayQueryThrowsWhenCameraIsMissing()
   {
     Assert.Throws<ArgumentNullException>(() => GameCamera.CreateViewportRayQuery(null, Vector2.Zero));
   }
 
   [TestCase(TestName = "Viewport ray query throws when ray length is invalid")]
-  public void ViewportRayQueryThrowsWhenRayLengthIsInvalid()
+  public static void ViewportRayQueryThrowsWhenRayLengthIsInvalid()
   {
     var camera = AutoFree(new Camera3D());
 
@@ -47,7 +49,7 @@ public partial class GameCameraTest
   }
 
   [TestCase(TestName = "Viewport raycast throws when world is missing")]
-  public void ViewportRaycastThrowsWhenWorldIsMissing()
+  public static void ViewportRaycastThrowsWhenWorldIsMissing()
   {
     var camera = AutoFree(new Camera3D());
 

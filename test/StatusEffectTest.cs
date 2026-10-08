@@ -3,12 +3,14 @@ using FunProject.Core;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class StatusEffectTest
 {
   [TestCase(TestName = "Packets carry their authored status spec into the emitted bundle")]
-  public void PacketsCarryStatusSpecIntoBundle()
+  public static void PacketsCarryStatusSpecIntoBundle()
   {
     var burn = TestData.MakeBurn();
     var frame = new WeaponFrameData { Name = "Frame", Packets = [] };
@@ -30,7 +32,7 @@ public partial class StatusEffectTest
   }
 
   [TestCase(TestName = "Applying a status tracks it and re-applying refreshes the duration")]
-  public void ApplyStatusTracksAndRefreshes()
+  public static void ApplyStatusTracksAndRefreshes()
   {
     var unit = MakeUnit();
     var burn = TestData.MakeBurn(duration: 3);
@@ -47,7 +49,7 @@ public partial class StatusEffectTest
   }
 
   [TestCase(TestName = "Distinct spec resources are distinct statuses")]
-  public void DistinctSpecResourcesAreDistinctStatuses()
+  public static void DistinctSpecResourcesAreDistinctStatuses()
   {
     var unit = MakeUnit();
     unit.ApplyStatusEffect(TestData.MakeBurn());
@@ -57,7 +59,7 @@ public partial class StatusEffectTest
   }
 
   [TestCase(TestName = "IsImmobilized tracks active immobilize statuses")]
-  public void IsImmobilizedTracksActiveImmobilizeStatuses()
+  public static void IsImmobilizedTracksActiveImmobilizeStatuses()
   {
     var unit = MakeUnit();
     Assert.False(unit.IsImmobilized);
@@ -74,7 +76,7 @@ public partial class StatusEffectTest
   }
 
   [TestCase(TestName = "An expired immobilize no longer immobilizes even before removal")]
-  public void ExpiredImmobilizeNoLongerImmobilizes()
+  public static void ExpiredImmobilizeNoLongerImmobilizes()
   {
     var unit = MakeUnit();
     var applied = unit.ApplyStatusEffect(TestData.MakeStun(duration: 1));
@@ -86,7 +88,7 @@ public partial class StatusEffectTest
   }
 
   [TestCase(TestName = "Removing a status that is not active returns false")]
-  public void RemovingInactiveStatusReturnsFalse()
+  public static void RemovingInactiveStatusReturnsFalse()
   {
     var unit = MakeUnit();
 

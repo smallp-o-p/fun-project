@@ -2,6 +2,8 @@ using FunProject.Battle;
 using Godot;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 /// <summary>
 /// Runtime-free targeting overlays. The authored HUD owns its widgets and intent events.
 /// </summary>

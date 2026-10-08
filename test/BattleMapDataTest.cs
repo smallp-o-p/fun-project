@@ -2,12 +2,14 @@ using FunProject.Battle;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleMapDataTest
 {
   [TestCase(TestName = "Board from map data applies tile data to runtime tiles")]
-  public void BoardFromMapDataAppliesTileDataToRuntimeTiles()
+  public static void BoardFromMapDataAppliesTileDataToRuntimeTiles()
   {
     BattleMapData mapData = TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(1, 0, 1), TestData.WallTile()));
@@ -20,7 +22,7 @@ public partial class BattleMapDataTest
   }
 
   [TestCase(TestName = "Board from map data copies cover into runtime tiles")]
-  public void BoardFromMapDataCopiesCoverIntoRuntimeTiles()
+  public static void BoardFromMapDataCopiesCoverIntoRuntimeTiles()
   {
     BattleMapData mapData = TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(1, 0, 1), new BattleMapTileData
@@ -38,7 +40,7 @@ public partial class BattleMapDataTest
   }
 
   [TestCase(TestName = "Cells not in the dictionary are holes")]
-  public void CellsNotInTheDictionaryAreHoles()
+  public static void CellsNotInTheDictionaryAreHoles()
   {
     BattleMapData mapData = TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(1, 0, 1), TestData.FloorTile()));
@@ -52,7 +54,7 @@ public partial class BattleMapDataTest
   }
 
   [TestCase(TestName = "Board from map data supports stacked levels")]
-  public void BoardFromMapDataSupportsStackedLevels()
+  public static void BoardFromMapDataSupportsStackedLevels()
   {
     var mapData = TestData.MakeMapData(new Vector3I(2, 2, 2),
       (new Vector3I(0, 0, 0), TestData.FloorTile()),
@@ -69,7 +71,7 @@ public partial class BattleMapDataTest
   }
 
   [TestCase(TestName = "Clearing cover directions zeroes cover amount")]
-  public void ClearingCoverDirectionsZeroesCoverAmount()
+  public static void ClearingCoverDirectionsZeroesCoverAmount()
   {
     var tile = new BattleMapTileData { CoverDirections = CoverDirections.North, CoverAmount = 40 };
     Assert.Equal(40, tile.CoverAmount);
@@ -82,7 +84,7 @@ public partial class BattleMapDataTest
   }
 
   [TestCase(TestName = "Walkable, BlocksLineOfSight and cover are independent")]
-  public void WalkableBlocksLineOfSightAndCoverAreIndependent()
+  public static void WalkableBlocksLineOfSightAndCoverAreIndependent()
   {
     var smoke = new BattleMapTileData { Walkable = true, BlocksLineOfSight = true };
     Assert.True(smoke.Walkable);
@@ -96,7 +98,7 @@ public partial class BattleMapDataTest
 
   [TestCase(true, TestName = "BlocksVerticalLineOfSight bakes into runtime tile")]
   [TestCase(false, TestName = "A tile without the vertical flag bakes false")]
-  public void BlocksVerticalLineOfSightBakesIntoRuntimeTile(bool flag)
+  public static void BlocksVerticalLineOfSightBakesIntoRuntimeTile(bool flag)
   {
     BattleMapData mapData = TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(1, 0, 1), new BattleMapTileData { BlocksVerticalLineOfSight = flag }));

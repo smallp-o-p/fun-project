@@ -3,12 +3,14 @@ using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ReloadWeaponActionTest
 {
   [TestCase(TestName = "Reload refills the magazine, spends AP, and raises the reload event")]
-  public void ReloadRefillsSpendsApAndRaisesEvent()
+  public static void ReloadRefillsSpendsApAndRaisesEvent()
   {
     var weapon = TestData.MakeAmmoWeapon("SMG", magazine: 3, damage: 1);
     using var battle = BattleFixture.Duel(
@@ -31,7 +33,7 @@ public class ReloadWeaponActionTest
   }
 
   [TestCase(TestName = "Reloading a full magazine is rejected and spends nothing")]
-  public void FullMagazineReloadRejected()
+  public static void FullMagazineReloadRejected()
   {
     var faction = TestData.MakeFaction("Player");
     var weapon = TestData.MakeAmmoWeapon("SMG");
