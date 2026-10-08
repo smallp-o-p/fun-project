@@ -4,9 +4,6 @@ using Point = FunProject.Battle.BattleBoardState.ValidatedPoint;
 
 namespace FunProject.Battle;
 
-internal readonly record struct SearchPath(Point[] Points, bool IsEstimated);
-internal readonly record struct SearchReachableTile(Point Point, bool IsEstimated);
-
 internal static class BattlePathSearch
 {
   // Order is part of exact movement's shortest-path tie break. Y has no diagonals.
@@ -30,13 +27,13 @@ internal static class BattlePathSearch
     return x == TraversalKnowledge.Blocked && z == TraversalKnowledge.Blocked ? TraversalKnowledge.Blocked : TraversalKnowledge.Unknown;
   }
 
-  internal static SearchPath FindPath(Vector3I dimensions, Point source, Point destination, Func<Point, TraversalKnowledge> knowledge)
+  internal static Point[] FindPath(Vector3I dimensions, Point source, Point destination, Func<Point, TraversalKnowledge> knowledge)
   {
-    if (source == destination) return new([source], false);
-    if (knowledge(destination) == TraversalKnowledge.Blocked) return new([], false);
-    Dictionary<Point, (Point Parent, bool Estimated)> parents = [];
+    if (source == destination) return [source];
+    if (knowledge(destination) == TraversalKnowledge.Blocked) return [];
+    Dictionary<Point, Point> parents = [];
     Queue<Point> frontier = new();
-    parents[source] = (source, false);
+    parents[source] = source;
     frontier.Enqueue(source);
     while (frontier.Count > 0)
     {
@@ -44,9 +41,9 @@ internal static class BattlePathSearch
       if (current == destination)
       {
         List<Point> reversed = [];
-        for (var point = destination; point != source; point = parents[point].Parent) reversed.Add(point);
+        for (var point = destination; point != source; point = parents[point]) reversed.Add(point);
         reversed.Add(source);
-        return new(reversed.AsValueEnumerable().Reverse().ToArray(), parents[destination].Estimated);
+        return reversed.AsValueEnumerable().Reverse().ToArray();
       }
       foreach (var direction in AdjacentDirections)
       {
@@ -58,23 +55,23 @@ internal static class BattlePathSearch
         if (tile == TraversalKnowledge.Blocked) continue;
         var step = StepKnowledge(dimensions, current, direction, knowledge);
         if (step == TraversalKnowledge.Blocked) continue;
-        parents[next] = (current, parents[current].Estimated || tile == TraversalKnowledge.Unknown || step == TraversalKnowledge.Unknown);
+        parents[next] = current;
         frontier.Enqueue(next);
       }
     }
-    return new([], false);
+    return [];
   }
 
-  internal static IReadOnlyList<SearchReachableTile> GetReachableTiles(Vector3I dimensions, Point origin, int maxSteps,
+  internal static IReadOnlyList<Point> GetReachableTiles(Vector3I dimensions, Point origin, int maxSteps,
     Func<Point, TraversalKnowledge> knowledge)
   {
-    List<SearchReachableTile> reachable = [];
+    List<Point> reachable = [];
     SysColGeneric.HashSet<Point> visited = [origin];
-    Queue<(Point Point, int Steps, bool Estimated)> frontier = new();
-    frontier.Enqueue((origin, 0, false));
+    Queue<(Point Point, int Steps)> frontier = new();
+    frontier.Enqueue((origin, 0));
     while (frontier.Count > 0)
     {
-      var (current, steps, estimated) = frontier.Dequeue();
+      var (current, steps) = frontier.Dequeue();
       if (steps >= maxSteps) continue;
       foreach (var direction in AdjacentDirections)
       {
@@ -87,9 +84,8 @@ internal static class BattlePathSearch
         if (tile == TraversalKnowledge.Blocked) continue;
         var step = StepKnowledge(dimensions, current, direction, knowledge);
         if (step == TraversalKnowledge.Blocked) continue;
-        bool nextEstimated = estimated || tile == TraversalKnowledge.Unknown || step == TraversalKnowledge.Unknown;
-        reachable.Add(new(next, nextEstimated));
-        frontier.Enqueue((next, steps + 1, nextEstimated));
+        reachable.Add(next);
+        frontier.Enqueue((next, steps + 1));
       }
     }
     return reachable.AsReadOnly();
