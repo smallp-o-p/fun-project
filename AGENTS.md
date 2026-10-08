@@ -63,7 +63,6 @@ Read the relevant sections of [docs/architecture-reference.md](docs/architecture
 ## Conventions
 - Prefer collection expressions over explicitly instantiating container types.
 - **LanguageExt** globally imported (`GlobalUsings.cs`); prefer `Option<T>` over nullable returns for optional domain data.
-- No `System.Linq` — ZLinq; every chain starts with `.AsValueEnumerable()`.
 - `SysColGeneric` = alias for `System.Collections.Generic` (LanguageExt shadows some names).
 - File-scoped namespaces under `FunProject.*` (assembly root `funproject`); two-space indent; PascalCase types/members, camelCase locals/params, `_camelCase` private fields.
 - Run `dotnet format` after any code change.
