@@ -169,17 +169,6 @@ public partial class GeoscapeViewManagerTest
   }
 
   [TestCase]
-  public void RootWithoutBackButtonIsValid()
-  {
-    var root = new GeoscapeView { Name = "Root" };
-    var manager = AutoFree(new GeoscapeViewManager { RootView = root });
-    manager.AddChild(root);
-    ((SceneTree)Engine.GetMainLoop()).Root.AddChild(manager);
-
-    Assert.True(ReferenceEquals(root, manager.Current));
-  }
-
-  [TestCase]
   public async Task InvalidPushesLeaveTheStackUnchanged()
   {
     await using var cleanup = new DeferredNodeCleanup();

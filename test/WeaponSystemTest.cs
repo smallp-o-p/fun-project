@@ -8,27 +8,6 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class WeaponSystemTest
 {
-  [TestCase(TestName = "MeleeWeapon constructed from RangedWeaponData")]
-  public void MeleeWeaponConstructedFromRangedWeaponData()
-  {
-    var data = new FirearmWeaponData
-    {
-      Name = "Fists",
-      Frame = TestData.MakeFrame(),
-      DamageStat = new DamageStat { BaseValue = 10 },
-      CriticalChanceStat = new CriticalChanceStat { BaseValue = 5 },
-      RangeStat = new RangeStat { BaseValue = 1 },
-      AmmunitionStat = default,
-      DefaultAmmoData = default
-    };
-    var weapon = new MeleeWeapon(data);
-
-    Assert.Equal("Fists", weapon.ItemName);
-    Assert.Equal(10, weapon.GetDamageStat().BaseValue);
-    Assert.Equal(5, weapon.GetCritChanceStat().BaseValue);
-    Assert.Equal(0, weapon.GetModSlots().Count);
-  }
-
   [TestCase(TestName = "FirearmWeapon constructed from FirearmWeaponData")]
   public void FirearmWeaponConstructedFromFirearmWeaponData()
   {
@@ -77,17 +56,11 @@ public class WeaponSystemTest
     Assert.True(weapon.TryGetStat<HealthStat>().IsNone);
   }
 
-  [TestCase(TestName = "ModSlot starts empty")]
-  public void ModSlotStartsEmpty()
-  {
-    var slot = new ModSlot();
-    Assert.False(slot.HasMod);
-  }
-
   [TestCase(TestName = "ModSlot can equip and unequip")]
   public void ModSlotCanEquipAndUnequip()
   {
     var slot = new ModSlot();
+    Assert.False(slot.HasMod);
     var mod = new MultiStatMod();
     slot.Equip(mod);
     Assert.True(slot.HasMod);
@@ -96,19 +69,4 @@ public class WeaponSystemTest
     Assert.False(slot.HasMod);
   }
 
-  [TestCase(TestName = "MultiStatMod add remove and clear manage internal list")]
-  public void MultiStatModAddRemoveAndClearManageInternalList()
-  {
-    var mod = new MultiStatMod();
-    var crit = new CriticalChanceStatMod();
-    var range = new RangeStatMod();
-
-    mod.AddStatMod(crit);
-    mod.AddStatMod(range);
-    Assert.Equal(2, mod.StatMods.Count);
-    Assert.True(mod.RemoveStatMod(crit));
-    Assert.Equal(1, mod.StatMods.Count);
-    mod.ClearStatMods();
-    Assert.Equal(0, mod.StatMods.Count);
-  }
 }

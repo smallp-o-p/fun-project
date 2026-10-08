@@ -98,6 +98,10 @@ public class ObjectiveSystemBattleTest
 
     battle.ApplyDamage(enemyUnit, 999); // main fails on the kill; follow-up queued on the SAME dispatch
 
+    Assert.Equal(2, battle.Session.GetObjectives(player).Count);
+    Assert.Equal(ObjectiveResult.Failed, battle.Session.GetObjectives(player)[0].State);
+    Assert.Equal(ObjectiveResult.Ongoing, battle.Session.GetObjectives(player)[1].State);
+
     // The follow-up must NOT have been checked against the killing event: candidates were
     // snapshotted before the directive added it. Its target is TurnStarted anyway, so the
     // battle continues...

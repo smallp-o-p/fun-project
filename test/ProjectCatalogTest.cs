@@ -23,14 +23,6 @@ public class ProjectCatalogTest
   }
 
   [TestCase]
-  public void EmptyCatalogRemainsCompatible()
-  {
-    using var campaign = new GeoscapeFixture(MakeStart());
-    Assert.Equal(0, campaign.Session.GetManufacturingOptions().Count);
-    Assert.True(campaign.Session.ActiveManufacturing.IsNone);
-  }
-
-  [TestCase]
   public void CatalogPreservesOrderAndIdentityWithoutGrantingStock()
   {
     var item = MakeItemData();

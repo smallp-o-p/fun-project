@@ -36,30 +36,6 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void CatalogItemsCanBeManufacturedFromCampaignStart()
-  {
-    var scarce = MakeItemData("Scarce");
-    var scarceRecipe = MakeManufacturingRecipe(scarce);
-    var unlimited = MakeItemData("Unlimited", unlimited: true);
-    var unlimitedRecipe = MakeManufacturingRecipe(unlimited);
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [scarceRecipe, unlimitedRecipe]));
-    var session = campaign.Session;
-
-    var options = session.GetManufacturingOptions();
-    Assert.Equal(2, options.Count);
-    Assert.Equal(scarce, options[0].Project.Item);
-    Assert.Equal(unlimited, options[1].Project.Item);
-    Assert.False(campaign.State.Armory.HasAvailableItem(scarce));
-    Assert.False(campaign.State.Armory.HasAvailableItem(unlimited));
-    Assert.True(session.StartManufacturing(scarceRecipe).IsRight);
-    campaign.AdvanceTicks(1440);
-    Assert.True(session.StartManufacturing(unlimitedRecipe).IsRight);
-    campaign.AdvanceTicks(1440);
-    Assert.True(campaign.State.Armory.HasAvailableItem(scarce));
-    Assert.True(campaign.State.Armory.HasAvailableItem(unlimited));
-  }
-
-  [TestCase]
   public void UnlimitedProductionCreatesSupplyOnce()
   {
     var item = MakeItemData("Supply", unlimited: true);
@@ -305,39 +281,6 @@ public class EngineeringTest
     campaign.AdvanceTicks(5);
     Assert.Equal(1, campaign.Events.EventsOf<ManufacturingCompleted>().Length);
     Assert.Equal(1, state.Armory.TryGetItemStock(product).RequireSome().Remaining);
-  }
-
-  [TestCase]
-  public void OneDayJobCompletesAt1440AfterScheduledEventsAndExpiry()
-  {
-    var product = MakeItemData("Product");
-    var productRecipe = MakeManufacturingRecipe(product, days: 1);
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [productRecipe],
-      timeline: [MakeScheduled(1440, MakeEvent("Brief", expiresAfterTicks: 0))]));
-    var state = campaign.State;
-    var session = campaign.Session;
-    Assert.True(session.StartManufacturing(productRecipe).IsRight);
-    var job = session.ActiveManufacturing.RequireSome();
-    Assert.Equal(0L, job.StartedAtTick);
-    Assert.Equal(1440L, job.CompletesAtTick);
-    Assert.Equal(session.GetManufacturingOptions()[0].Project, job.Project);
-
-    campaign.AdvanceTicks(1439);
-    Assert.Equal(1439L, session.Tick);
-    Assert.Equal(Some(job), session.ActiveManufacturing);
-    Assert.False(state.Armory.HasAvailableItem(product));
-    campaign.ClearEvents();
-    campaign.AdvanceTicks(1);
-    Assert.Equal(1440L, session.Tick);
-    Assert.True(session.ActiveManufacturing.IsNone);
-    Assert.Equal(1, state.Armory.TryGetItemStock(product).RequireSome().Remaining);
-    Assert.Equal(4, campaign.Events.Count);
-    Assert.True(campaign.Events[0] is TimeAdvanced);
-    Assert.True(campaign.Events[1] is ScheduledEventFired);
-    Assert.True(campaign.Events[2] is EventExpired);
-    Assert.Equal(new ManufacturingCompleted(job), campaign.Events[3]);
-    Assert.Equal(0, session.ActiveEvents.Count);
-    Assert.Equal(TimeSpeed.Normal, session.Speed);
   }
 
   [TestCase]

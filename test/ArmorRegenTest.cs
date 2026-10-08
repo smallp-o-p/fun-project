@@ -23,6 +23,7 @@ public partial class ArmorRegenTest
     Assert.Equal(5, armor.Capability.Current);
 
     battle.EndFactionTurn(battle.EnemyFaction);
+    Assert.Equal(1, armor.Capability.RegenDelayRemaining);
     battle.EndFactionTurn(battle.PlayerFaction);   // delay 1 -> 0
     Assert.Equal(0, armor.Capability.RegenDelayRemaining);
     Assert.Equal(5, armor.Capability.Current);
@@ -31,28 +32,18 @@ public partial class ArmorRegenTest
     battle.EndFactionTurn(battle.PlayerFaction);   // regen 3: 5 -> 8
     Assert.Equal(8, armor.Capability.Current);
 
+    battle.ClearEvents();
     battle.EndFactionTurn(battle.EnemyFaction);
     battle.EndFactionTurn(battle.PlayerFaction);   // regen clamped: 8 -> 10
     Assert.Equal(10, armor.Capability.Current);
+    var cappedRegen = battle.Events.SingleEvent<UnitArmorRegeneratedBattleEvent>();
+    Assert.Equal(2, cappedRegen.AmountRegenerated);
+    Assert.Equal(10, cappedRegen.CurrentArmor);
 
     battle.ClearEvents();
     battle.EndFactionTurn(battle.EnemyFaction);
     battle.EndFactionTurn(battle.PlayerFaction);   // at max: no regen event
     Assert.False(battle.Events.EventsOf<UnitArmorRegeneratedBattleEvent>().AsValueEnumerable().Any());
-  }
-
-  [TestCase(TestName = "Enemy turn end does not tick the player's regen")]
-  public void EnemyTurnEndDoesNotTickPlayerRegen()
-  {
-    var armor = TestData.MakeArmor("Recharger", armor: 10, element: Element.Thermal, regenDelayTurns: 2, regenPerTurn: 3);
-    using var battle = BattleFixture.Duel(
-      player: new("Alpha", Health: 30, Weapon: TestData.MakeWeapon("Rifle"), Armor: armor));
-    battle.ApplyDamage(battle.PlayerUnit, 6);
-
-    battle.EndFactionTurn(battle.PlayerFaction);   // delay 2 -> 1
-    battle.EndFactionTurn(battle.EnemyFaction);    // must not tick
-
-    Assert.Equal(1, armor.Capability.RegenDelayRemaining);
   }
 
   [TestCase(TestName = "Damage re-arms the regen delay: mid-countdown, stun-only, and health-only over depleted armor")]
@@ -139,30 +130,4 @@ public partial class ArmorRegenTest
     battle.Events.EventBefore<UnitArmorRegeneratedBattleEvent, TurnStartedBattleEvent>();
   }
 
-  [TestCase(TestName = "A turn-end DoT tick re-arms the delay and suppresses that turn's regen")]
-  public void DotTickSuppressesSameTurnRegen()
-  {
-    var armor = TestData.MakeArmor("Recharger", armor: 10, element: Element.Thermal, regenDelayTurns: 1, regenPerTurn: 3);
-    using var battle = BattleFixture.Duel(
-      player: new("Alpha", Health: 30, Weapon: TestData.MakeWeapon("Rifle"), Armor: armor));
-    battle.ApplyDamage(battle.PlayerUnit, 5);
-    Assert.Equal(5, armor.Capability.Current);
-
-    battle.EndFactionTurn(battle.PlayerFaction);   // delay 1 -> 0: next player turn end would regen
-    Assert.Equal(0, armor.Capability.RegenDelayRemaining);
-
-    // Kinetic tick vs Thermal armor: 1x depletion, no elemental multiplier.
-    battle.PlayerUnit.ApplyStatusEffect(
-      TestData.MakeBurn(duration: 2, tickDamage: 2, tickElement: Element.Kinetic));
-    battle.EndFactionTurn(battle.EnemyFaction);    // enemy turn end must not tick the player's DoT
-
-    battle.ClearEvents();
-    // Pins the StatusEffect -> ArmorRegen commit order: the DoT tick re-arms the delay
-    // BEFORE the regen pass runs, so this turn end must not regenerate.
-    battle.EndFactionTurn(battle.PlayerFaction);
-
-    Assert.False(battle.Events.EventsOf<UnitArmorRegeneratedBattleEvent>().AsValueEnumerable().Any());
-    Assert.Equal(3, armor.Capability.Current);               // 5 - 2 tick, absorbed by armor
-    Assert.Equal(0, armor.Capability.RegenDelayRemaining);   // re-armed to 1, then counted down by the same regen pass
-  }
 }

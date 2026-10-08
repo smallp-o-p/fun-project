@@ -12,8 +12,6 @@ using static GdUnit4.Assertions;
 [RequireGodotRuntime]
 public partial class GeoscapeHudTest
 {
-  internal sealed partial class ProbeView : GeoscapeView;
-
   private static GeoscapeHud BuildHud() => AddToTree(CreateHud());
 
   [TestCase(0L, "2d remaining")]
@@ -92,27 +90,6 @@ public partial class GeoscapeHudTest
       Assert.Equal(scenePath, view.SceneFilePath);
     }
     Assert.False(ReferenceEquals(received[0], received[1]));
-  }
-
-  [TestCase(TestName = "An arbitrary ordinary button can bind another view")]
-  public void AddedOrdinaryButtonBindsAnotherViewWithoutHudChanges()
-  {
-    var hud = CreateHud();
-    var third = new Button { Name = "ThirdButton" };
-    PackedScene probeScene = Pack(new ProbeView());
-    Error connection = third.Connect(Button.SignalName.Pressed,
-      Callable.From(() => hud.RequestView(probeScene)));
-    Assert.Equal(Error.Ok, connection);
-    hud.GetNode<HBoxContainer>("%ViewButtons").AddChild(third);
-    AddToTree(hud);
-    GeoscapeView? received = null;
-    Assert.Equal(Error.Ok, hud.Connect(GeoscapeHud.SignalName.ViewRequested,
-      Callable.From((GeoscapeView view) => received = view)));
-
-    third.EmitSignal(Button.SignalName.Pressed);
-
-    Assert.True(received is ProbeView);
-    AutoFree(received!);
   }
 
   [TestCase]

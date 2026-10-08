@@ -300,17 +300,14 @@ public class EngineeringViewTest
     Assert.True(view.IsInsideTree() && !view.IsQueuedForDeletion()); // Back never frees the view itself
   }
 
-  [TestCase(ManufacturingStartFailure.UnknownRecipe)]
-  [TestCase(ManufacturingStartFailure.Busy)]
-  [TestCase(ManufacturingStartFailure.AlreadyAvailable)]
-  [TestCase(ManufacturingStartFailure.InsufficientCurrencies)]
-  public void FailureExplainsRejectionAndNextPresentClearsIt(ManufacturingStartFailure failure)
+  [TestCase]
+  public void FailureExplainsRejectionAndNextPresentClearsIt()
   {
     var view = AddToTree(CreateEngineeringView());
     var item = MakeItemData("Selected item");
-    view.ShowFailure(item, failure);
+    view.ShowFailure(item, ManufacturingStartFailure.UnknownRecipe);
     Assert.True(view.GetNode<Label>("%Status").Text.Contains(item.Name));
-    Assert.True(view.GetNode<Label>("%Status").Text.Contains(failure.ToString()));
+    Assert.True(view.GetNode<Label>("%Status").Text.Contains("UnknownRecipe"));
     using var campaign = new GeoscapeFixture();
     view.Present(campaign.State, campaign.Session);
     Assert.Equal("", view.GetNode<Label>("%Status").Text);

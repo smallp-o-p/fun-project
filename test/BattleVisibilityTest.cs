@@ -397,23 +397,6 @@ public class BattleVisibilityTest
     Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
   }
 
-  [TestCase(TestName = "Own units remain known to their faction without direct line of sight")]
-  public void OwnUnitsRemainKnownToTheirFactionWithoutDirectLineOfSight()
-  {
-    var playerFaction = TestData.MakeFaction("Player");
-    using var battle = VisibilityFixture(new Vector3I(5, 1, 1),
-      [
-        (playerFaction, "Alpha", new Vector3I(0, 0, 0), 1),
-        (playerFaction, "Bravo", new Vector3I(4, 0, 0), 1),
-      ]);
-    var alpha = UnitAt(battle, new Vector3I(0, 0, 0));
-    var bravo = UnitAt(battle, new Vector3I(4, 0, 0));
-
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(alpha), battle.Alive(bravo))));
-    Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(bravo))));
-    Assert.Equal(2, battle.Query(new GetAllVisibleUnitsForFaction(playerFaction)).Count);
-  }
-
   [TestCase(TestName = "Faction visibility queries partition allies and visible hostiles in roster order")]
   public void FactionVisibilityPartitionsAlliesAndHostiles()
   {
@@ -432,6 +415,7 @@ public class BattleVisibilityTest
     var reserve = UnitAt(battle, new Vector3I(7, 0, 0));
     var seen = UnitAt(battle, new Vector3I(2, 0, 0));
     Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutA), battle.Alive(reserve))));
+    Assert.True(battle.Query(new IsUnitVisibleToFaction(player, battle.Alive(reserve))));
     Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutA), battle.Alive(seen))));
     Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutB), battle.Alive(seen))));
     Assert.True(battle.Query(new GetVisibleAlliedUnitsForFaction(player)).AsValueEnumerable()

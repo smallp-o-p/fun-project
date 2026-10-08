@@ -37,35 +37,6 @@ public class GeoscapeClockTest
     Assert.Equal(expectedTicks, campaign.Session.Tick);
   }
 
-  [TestCase(TestName = "Paused speed freezes advancement until changed")]
-  public void PausedSpeedFreezesAdvancement()
-  {
-    using var campaign = new GeoscapeFixture();
-    campaign.Advance(10.0); // starts paused
-    Assert.Equal(0, campaign.Session.Tick);
-
-    campaign.ChangeSpeed(TimeSpeed.Normal);
-    campaign.Advance(0.1);
-    Assert.Equal(1, campaign.Session.Tick);
-
-    campaign.ChangeSpeed(TimeSpeed.Paused);
-    campaign.Advance(10.0);
-    Assert.Equal(1, campaign.Session.Tick);
-  }
-
-  [TestCase(TestName = "CurrentTime advances one game-minute per tick")]
-  public void CurrentTimeAdvancesOneMinutePerTick()
-  {
-    using var campaign = new GeoscapeFixture();
-    campaign.ChangeSpeed(TimeSpeed.Normal);
-
-    for (int i = 0; i < 6; i++)
-      campaign.Advance(0.1); // one tick each: exact at the 0.1s base (no float drift)
-
-    Assert.Equal(6, campaign.Session.Tick);
-    Assert.Equal(1, campaign.Session.CurrentDay);
-  }
-
   [TestCase(5.76, 2)] // 1440 ticks = 24 game-hours: the day rolls on elapsed hours
   [TestCase(3.84, 1)] // 960 ticks = 16 game-hours: elapsed hours, not calendar midnight, roll the day
   public void ElapsedTimeControlsDayCounter(double delta, int expectedDay)

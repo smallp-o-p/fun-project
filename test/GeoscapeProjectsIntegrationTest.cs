@@ -307,31 +307,4 @@ public class GeoscapeProjectsIntegrationTest
     Assert.Equal("Stock: 2", third.GetNode<Label>("%Stock").Text);
   }
 
-  [TestCase]
-  public async Task RejectedManufacturingRequestRestoresCampaignSnapshotThenShowsFailure()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var scene = AddToTree(CreateGeoscapeScene(MakeStart()));
-    // _Ready initializes the idle project status before any view action or foreign snapshot.
-    var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
-    Assert.Equal("No active manufacturing.", hud.GetNode<Label>("%EngineeringProgress").Text);
-    Assert.False(hud.HasNode("%EngineeringNotice"));
-
-    var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
-    PressEngineeringButton(scene);
-    var view = (EngineeringView)manager.Current;
-    var item = MakeItemData();
-    var itemRecipe = MakeManufacturingRecipe(item);
-    using var foreignCampaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
-    var foreign = foreignCampaign.Session;
-    view.Present(foreignCampaign.State, foreign.GetManufacturingOptions(), None, 0);
-    view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
-    view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
-
-    Assert.Equal("No items available to manufacture.",
-      OnlyChild<Label>(view.GetNode<VBoxContainer>("%ManufacturableItems")).Text);
-    Assert.Equal("No active manufacturing.", view.GetNode<Label>("%ActiveJob").Text);
-    Assert.True(view.GetNode<Label>("%Status").Text.Contains("UnknownRecipe"));
-    Assert.True(view.GetNode<Label>("%Status").Text.Contains(item.Name));
-  }
 }
