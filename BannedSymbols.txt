@@ -1,2 +1,2 @@
-// Enforce AGENTS.md's no-System.Linq rule for the namespace and its descendants.
+// Ban regular LINQ APIs throughout the namespace and its descendants.
 N:System.Linq;Use ZLinq instead: start each chain with ZLinq.AsValueEnumerable() (values.AsValueEnumerable()).
