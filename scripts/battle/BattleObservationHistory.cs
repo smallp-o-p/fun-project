@@ -25,7 +25,6 @@ internal sealed class BattleObservationHistory
       foreach (var point in observer.VisibleTiles) terrain[point] = board.GetTile(point);
       foreach (var target in observer.VisibleUnits.AsValueEnumerable().Where(target => target.Side != observer.Side))
       {
-        observer.RecordHostileContact();
         if (!_contacts.TryGetValue(observer.Side, out var contacts)) _contacts.Add(observer.Side, contacts = []);
         var position = board.FindOccupantPosition(target.Id).Match(point => point.Raw,
           () => throw new InvalidOperationException("Visible living target must be board indexed."));

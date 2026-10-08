@@ -18,9 +18,6 @@ public sealed class BattleUnitState
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _spottedUnits = [];
-  private bool _hasSeenHostile;
-  internal bool HasSeenHostile { get { return _hasSeenHostile; } }
-  internal void RecordHostileContact() { _hasSeenHostile = true; }
   internal bool CanSeeTile(BattleBoardState.ValidatedPoint tile) { return _visibleTiles.Contains(tile); }
   private readonly Dictionary<StatusEffectSpecData, ActiveStatusEffect> _activeStatusEffects = [];
   private readonly List<(Buff Buff, bool IsActive)> _buffs = [];
