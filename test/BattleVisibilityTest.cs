@@ -62,10 +62,10 @@ public class BattleVisibilityTest
     var observer = UnitAt(battle, new Vector3I(0, 0, 0));
     var target = UnitAt(battle, new Vector3I(2, 0, 0));
 
-    Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
-    Assert.Equal(!blocked, observer.VisibleUnits.Contains(target));
-    Assert.Equal(!blocked, observer.VisibleTiles.Contains(battle.At(new Vector3I(2, 0, 0))));
+    battle.Read(() => Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
+    battle.Read(() => Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target)))));
+    battle.Read(() => Assert.Equal(!blocked, observer.VisibleUnits.Contains(target)));
+    battle.Read(() => Assert.Equal(!blocked, observer.VisibleTiles.Contains(battle.At(new Vector3I(2, 0, 0)))));
   }
 
   // Verifies that a blocking tile is visible (it IS the wall you look at) but the tile directly
@@ -82,11 +82,11 @@ public class BattleVisibilityTest
     BattleBoardState.ValidatedPoint openTile = battle.At(new Vector3I(0, 0, 1));
 
     // The wall tile itself is visible (endpoint rule — you see the wall you look at).
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, blockingTile)));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, blockingTile))));
     // The tile directly behind the wall on the straight line is in shadow.
-    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, shadowedTile)));
+    battle.Read(() => Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, shadowedTile))));
     // An off-axis tile with no blocker on its LOS ray is still visible.
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, openTile)));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, openTile))));
   }
 
   [TestCase(TestName = "Zero vision units see only their own tile")]
@@ -98,8 +98,8 @@ public class BattleVisibilityTest
     BattleBoardState.ValidatedPoint observerTile = battle.At(new Vector3I(0, 0, 0));
     BattleBoardState.ValidatedPoint adjacentTile = battle.At(new Vector3I(1, 0, 0));
 
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, observerTile)));
-    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, adjacentTile)));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, observerTile))));
+    battle.Read(() => Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, adjacentTile))));
   }
 
   [TestCase(TestName = "Adjacent diagonal tiles remain visible around corners")]
@@ -112,8 +112,8 @@ public class BattleVisibilityTest
     BattleBoardState.ValidatedPoint blockingTile = battle.At(new Vector3I(1, 0, 0));
     BattleBoardState.ValidatedPoint diagonalTile = battle.At(new Vector3I(1, 0, 1));
 
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, blockingTile)));
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, diagonalTile)));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, blockingTile))));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, diagonalTile))));
   }
 
   [TestCase(TestName = "Diagonal corner peeking does not reveal tiles behind blockers")]
@@ -127,9 +127,9 @@ public class BattleVisibilityTest
     BattleBoardState.ValidatedPoint secondBlockingTile = battle.At(new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint hiddenTile = battle.At(new Vector3I(2, 0, 1));
 
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, firstBlockingTile)));
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, secondBlockingTile)));
-    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, hiddenTile)));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, firstBlockingTile))));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, secondBlockingTile))));
+    battle.Read(() => Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, hiddenTile))));
   }
 
   [TestCase(TestName = "Adjacent diagonal peeking does not see through sealed corners")]
@@ -143,9 +143,9 @@ public class BattleVisibilityTest
     BattleBoardState.ValidatedPoint secondBlockingTile = battle.At(new Vector3I(0, 0, 1));
     BattleBoardState.ValidatedPoint sealedCornerTile = battle.At(new Vector3I(1, 0, 1));
 
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, firstBlockingTile)));
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, secondBlockingTile)));
-    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, sealedCornerTile)));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, firstBlockingTile))));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, secondBlockingTile))));
+    battle.Read(() => Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, sealedCornerTile))));
   }
 
   // With no vertical blocking flag, a unit sees down an open column; BlocksVerticalLineOfSight
@@ -165,8 +165,8 @@ public class BattleVisibilityTest
     var observer = UnitAt(battle, new Vector3I(0, 1, 0));
     var target = UnitAt(battle, new Vector3I(0, 0, 0));
 
-    Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.Equal(!blocked, battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(0, 0, 0)))));
+    battle.Read(() => Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
+    battle.Read(() => Assert.Equal(!blocked, battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(0, 0, 0))))));
   }
 
   // With no vertical blocking flag, a unit sees up an open column; BlocksVerticalLineOfSight
@@ -186,8 +186,8 @@ public class BattleVisibilityTest
     var observer = UnitAt(battle, new Vector3I(0, 0, 0));
     var target = UnitAt(battle, new Vector3I(0, 2, 0));
 
-    Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.Equal(!blocked, battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(0, 2, 0)))));
+    battle.Read(() => Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
+    battle.Read(() => Assert.Equal(!blocked, battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(0, 2, 0))))));
   }
 
   // A 3D-diagonal ray (X and Y both change, simultaneous crossing) is sealed when the mid cell
@@ -208,7 +208,7 @@ public class BattleVisibilityTest
     var observer = UnitAt(battle, new Vector3I(0, 0, 0));
     var target = UnitAt(battle, new Vector3I(2, 2, 0));
 
-    Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    battle.Read(() => Assert.Equal(!blocked, battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
   }
 
   [TestCase(TestName = "Vision stat changes which targets are visible")]
@@ -226,8 +226,8 @@ public class BattleVisibilityTest
     var longSighted = UnitAt(battle, new Vector3I(0, 0, 1));
     var target = UnitAt(battle, new Vector3I(2, 0, 2));
 
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(shortSighted), battle.Alive(target))));
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(longSighted), battle.Alive(target))));
+    battle.Read(() => Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(shortSighted), battle.Alive(target)))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(longSighted), battle.Alive(target)))));
   }
 
   [TestCase(TestName = "Knockout removes only its own vision contribution before broadcast")]
@@ -244,7 +244,7 @@ public class BattleVisibilityTest
     var observer = UnitAt(battle, new Vector3I(0, 0, 0));
     var exclusiveTile = battle.At(3, 0, 0);
     var sharedTile = battle.At(0, 0, 1);
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile)));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile))));
 
     bool observedKnockout = false;
     battle.Session.BattleEventCommitted += battleEvent =>
@@ -252,13 +252,13 @@ public class BattleVisibilityTest
       if (battleEvent is not UnitUnconsciousBattleEvent)
         return;
       observedKnockout = true;
-      Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile)));
-      Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, sharedTile)));
+      battle.Read(() => Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, exclusiveTile))));
+      battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, sharedTile))));
     };
 
     battle.ApplyDamage(observer, 20, DamageKind.Stun);
 
-    Assert.True(observedKnockout);
+    battle.Read(() => Assert.True(observedKnockout));
   }
 
   [TestCase(TestName = "Knockout preserves explored tiles")]
@@ -269,7 +269,7 @@ public class BattleVisibilityTest
 
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
 
-    Assert.True(battle.Query(new HasFactionExploredTile(battle.PlayerFaction, enemyTile)));
+    battle.Read(() => Assert.True(battle.Query(new HasFactionExploredTile(battle.PlayerFaction, enemyTile))));
   }
 
   [TestCase(false)]
@@ -281,12 +281,12 @@ public class BattleVisibilityTest
     var support = battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction, vision: 1), Vector3I.Zero);
     battle.ApplyDamage(observer, 20, DamageKind.Stun);
     if (forceFullRebuild)
-      battle.Session.InvalidateVisibility();
+      battle.Mutate(() => battle.Session.InvalidateVisibility());
 
     battle.Move(support, [new Vector3I(0, 0, 1)]);
 
-    Assert.Equal(0, observer.VisibleTiles.Count);
-    Assert.Equal(0, observer.VisibleUnits.Count);
+    battle.Read(() => Assert.Equal(0, observer.VisibleTiles.Count));
+    battle.Read(() => Assert.Equal(0, observer.VisibleUnits.Count));
   }
 
   [TestCase(TestName = "Faction visible tiles are the union of conscious allies")]
@@ -299,9 +299,9 @@ public class BattleVisibilityTest
         (playerFaction, "Bravo", new Vector3I(4, 0, 4), 1),
       ]);
 
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(1, 0, 0)))));
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(4, 0, 3)))));
-    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(2, 0, 2)))));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(1, 0, 0))))));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(4, 0, 3))))));
+    battle.Read(() => Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(2, 0, 2))))));
   }
 
   [TestCase(TestName = "Tile visibility includes tiles at the edge of vision range")]
@@ -311,8 +311,8 @@ public class BattleVisibilityTest
     using var battle = VisibilityFixture(new Vector3I(6, 1, 1),
       [(playerFaction, "Scout", new Vector3I(0, 0, 0), 3)]);
 
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(3, 0, 0)))));
-    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(4, 0, 0)))));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(3, 0, 0))))));
+    battle.Read(() => Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, battle.At(new Vector3I(4, 0, 0))))));
   }
 
   [TestCase(TestName = "Explored tiles persist after they leave current visibility")]
@@ -324,16 +324,16 @@ public class BattleVisibilityTest
     var observer = UnitAt(battle, new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint tile = battle.At(new Vector3I(3, 0, 1));
 
-    Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, tile)));
+    battle.Read(() => Assert.True(battle.Query(new IsTileVisibleToFaction(playerFaction, tile))));
 
     battle.Move(observer, [new Vector3I(0, 0, 1)]);
 
-    Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, tile)));
-    Assert.True(battle.Query(new HasFactionExploredTile(playerFaction, tile)));
+    battle.Read(() => Assert.False(battle.Query(new IsTileVisibleToFaction(playerFaction, tile))));
+    battle.Read(() => Assert.True(battle.Query(new HasFactionExploredTile(playerFaction, tile))));
   }
 
   [TestCase(TestName = "Visible objects follow explored-tile memory for each faction")]
-  public void VisibleObjectsFollowExploredTileMemory()
+  public void VisibleObjectsFollowCurrentFactionTiles()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -357,17 +357,17 @@ public class BattleVisibilityTest
     BattleObjectState nearObject = battle.Query(new GetBattleSpecialObjectsQuery())[0];
 
     var playerVisible = battle.Query(new GetFactionVisibleObjectsQuery(playerFaction));
-    Assert.Equal(1, playerVisible.Count);
-    Assert.Equal(nearObject, playerVisible[0]);
-    Assert.Equal(0, battle.Query(new GetFactionVisibleObjectsQuery(enemyFaction)).Count);
+    battle.Read(() => Assert.Equal(1, playerVisible.Count));
+    battle.Read(() => Assert.Equal(nearObject, playerVisible[0]));
+    battle.Read(() => Assert.Equal(0, battle.Query(new GetFactionVisibleObjectsQuery(enemyFaction)).Count));
 
     battle.Submit(BattleAction.InteractWithObject(
       battle.Alive(player),
       battle.Live(nearObject)));
 
     playerVisible = battle.Query(new GetFactionVisibleObjectsQuery(playerFaction));
-    Assert.Equal(1, playerVisible.Count);
-    Assert.Equal(Some(ObjectStatus.Interacted), playerVisible[0].Status);
+    battle.Read(() => Assert.Equal(1, playerVisible.Count));
+    battle.Read(() => Assert.Equal(Some(ObjectStatus.Interacted), playerVisible[0].Status));
   }
 
   private static BattleSpecialObjectData MakeBombData(string name)
@@ -390,11 +390,11 @@ public class BattleVisibilityTest
     var observer = UnitAt(battle, new Vector3I(1, 0, 0));
     var target = UnitAt(battle, new Vector3I(4, 0, 0));
 
-    Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target)))));
 
     battle.Move(observer, [new Vector3I(0, 0, 0)]);
 
-    Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+    battle.Read(() => Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target)))));
   }
 
   [TestCase(TestName = "Own units remain known to their faction without direct line of sight")]
@@ -409,9 +409,9 @@ public class BattleVisibilityTest
     var alpha = UnitAt(battle, new Vector3I(0, 0, 0));
     var bravo = UnitAt(battle, new Vector3I(4, 0, 0));
 
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(alpha), battle.Alive(bravo))));
-    Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(bravo))));
-    Assert.Equal(2, battle.Query(new GetAllVisibleUnitsForFaction(playerFaction)).Count);
+    battle.Read(() => Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(alpha), battle.Alive(bravo)))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(bravo)))));
+    battle.Read(() => Assert.Equal(2, battle.Query(new GetAllVisibleUnitsForFaction(playerFaction)).Count));
   }
 
   [TestCase(TestName = "Faction visibility queries partition allies and visible hostiles in roster order")]
@@ -431,15 +431,18 @@ public class BattleVisibilityTest
     var scoutB = UnitAt(battle, new Vector3I(1, 0, 0));
     var reserve = UnitAt(battle, new Vector3I(7, 0, 0));
     var seen = UnitAt(battle, new Vector3I(2, 0, 0));
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutA), battle.Alive(reserve))));
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutA), battle.Alive(seen))));
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutB), battle.Alive(seen))));
-    Assert.True(battle.Query(new GetVisibleAlliedUnitsForFaction(player)).AsValueEnumerable()
-      .Select(unit => unit.State).SequenceEqual(new[] { scoutA, scoutB, reserve }));
-    Assert.True(battle.Query(new GetVisibleHostileUnitsForFaction(player)).AsValueEnumerable()
-      .Select(unit => unit.State).SequenceEqual(new[] { seen }));
-    Assert.True(battle.Query(new GetAllVisibleUnitsForFaction(player)).AsValueEnumerable()
-      .Select(unit => unit.State).SequenceEqual(new[] { scoutA, scoutB, reserve, seen }));
+    battle.Read(() =>
+    {
+      Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutA), battle.Alive(reserve))));
+      Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutA), battle.Alive(seen))));
+      Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutB), battle.Alive(seen))));
+      Assert.True(battle.Query(new GetVisibleAlliedUnitsForFaction(player)).AsValueEnumerable()
+        .Select(unit => unit.State).SequenceEqual(new[] { scoutA, scoutB, reserve }));
+      Assert.True(battle.Query(new GetVisibleHostileUnitsForFaction(player)).AsValueEnumerable()
+        .Select(unit => unit.State).SequenceEqual(new[] { seen }));
+      Assert.True(battle.Query(new GetAllVisibleUnitsForFaction(player)).AsValueEnumerable()
+        .Select(unit => unit.State).SequenceEqual(new[] { scoutA, scoutB, reserve, seen }));
+    });
   }
 
   [TestCase(TestName = "SpawnUnit refreshes visibility caches")]
@@ -451,7 +454,7 @@ public class BattleVisibilityTest
       [(playerFaction, "Observer", new Vector3I(0, 0, 0), 4)]);
     var target = battle.Spawn(TestData.MakeCombatant("Target", enemyFaction, vision: 1), new Vector3I(2, 0, 0));
 
-    Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target)))));
   }
 
   [TestCase(TestName = "Lethal damage refreshes visibility caches")]
@@ -471,12 +474,12 @@ public class BattleVisibilityTest
     var observer = UnitAt(battle, new Vector3I(0, 0, 0));
     var target = UnitAt(battle, new Vector3I(2, 0, 0));
 
-    Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target)))));
 
     battle.ApplyDamage(observer, 10);
 
-    Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
-    Assert.Equal(0, battle.Query(new GetAllVisibleUnitsForFaction(playerFaction)).Count);
+    battle.Read(() => Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target)))));
+    battle.Read(() => Assert.Equal(0, battle.Query(new GetAllVisibleUnitsForFaction(playerFaction)).Count));
   }
 
   [TestCase(TestName = "InvalidateVisibility forces recompute after runtime tile LOS change")]
@@ -495,17 +498,20 @@ public class BattleVisibilityTest
     var mover = UnitAt(battle, new Vector3I(0, 0, 2));
     var target = UnitAt(battle, new Vector3I(3, 0, 0));
 
-    Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target)))));
 
     // Seal the entire x=1 column at runtime so sight cannot reach the target by any route.
-    battle.Board.GetTile(battle.At(new Vector3I(1, 0, 0))).BlocksLineOfSight = true;
-    battle.Board.GetTile(battle.At(new Vector3I(1, 0, 1))).BlocksLineOfSight = true;
-    battle.Board.GetTile(battle.At(new Vector3I(1, 0, 2))).BlocksLineOfSight = true;
-    battle.Session.InvalidateVisibility();
+    battle.Mutate(() =>
+    {
+      battle.Board.GetMutableTile(battle.At(new Vector3I(1, 0, 0))).BlocksLineOfSight = true;
+      battle.Board.GetMutableTile(battle.At(new Vector3I(1, 0, 1))).BlocksLineOfSight = true;
+      battle.Board.GetMutableTile(battle.At(new Vector3I(1, 0, 2))).BlocksLineOfSight = true;
+      battle.Session.InvalidateVisibility();
+    });
 
     battle.Move(mover, [new Vector3I(0, 0, 1)]);
 
-    Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
+    battle.Read(() => Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target)))));
   }
 
   // 3D Euclidean range check includes Y: a target one level up within vision² by 3D distance
@@ -530,9 +536,9 @@ public class BattleVisibilityTest
     var enemyB = UnitAt(battle, new Vector3I(2, 1, 0));
 
     // Enemy A is at exactly the vision boundary in XZ (distance² == vision²): visible.
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(enemyA))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(enemyA)))));
     // Enemy B is one step above A: the added Y distance pushes it beyond vision²: not visible.
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(enemyB))));
+    battle.Read(() => Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(enemyB)))));
   }
 
   // UnitSpottedBattleEvent fires exactly once for a unit that newly enters the observer's sight,
@@ -558,16 +564,16 @@ public class BattleVisibilityTest
     var enemyA = UnitAt(battle, new Vector3I(0, 0, 0));
     var enemyB = UnitAt(battle, new Vector3I(5, 0, 0));
 
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(enemyA))));
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(enemyB))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(enemyA)))));
+    battle.Read(() => Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(enemyB)))));
 
     battle.ClearEvents();
     battle.Move(observer, [new Vector3I(3, 0, 0)]);
 
     // Exactly one spotted event: observer newly sees enemy B.
-    Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable().Count(e => ReferenceEquals(e.Unit, observer) && ReferenceEquals(e.Target, enemyB)));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable().Count(e => ReferenceEquals(e.Unit, observer) && ReferenceEquals(e.Target, enemyB))));
     // No spotted event for enemy A (it was already visible, then dropped — never newly spotted).
-    Assert.Equal(0, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable().Count(e => ReferenceEquals(e.Target, enemyA)));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable().Count(e => ReferenceEquals(e.Target, enemyA))));
   }
 
   // A unit that leaves and re-enters an observer's line of sight is spotted only ONCE: the observer
@@ -588,25 +594,25 @@ public class BattleVisibilityTest
     var observer = UnitAt(battle, new Vector3I(0, 0, 0));
     var target = UnitAt(battle, new Vector3I(3, 0, 0));
 
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    battle.Read(() => Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
 
     battle.ClearEvents();
 
     // Step into sight: (0,0,0) → (1,0,0), distance 2 ≤ 2 → first spotting fires.
     battle.Move(observer, [new Vector3I(1, 0, 0)]);
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.Equal(1, MatchingSpottings(battle, observer, target));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
+    battle.Read(() => Assert.Equal(1, MatchingSpottings(battle, observer, target)));
 
     // Step back out of sight: (1,0,0) → (0,0,0), distance 3 > 2 → target drops from sight.
     battle.Move(observer, [new Vector3I(0, 0, 0)]);
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    battle.Read(() => Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
 
     // Step back into sight: (0,0,0) → (1,0,0). Re-entering sight does not re-fire; the observer
     // remembers the target, so the count stays at one.
     battle.Move(observer, [new Vector3I(1, 0, 0)]);
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
 
-    Assert.Equal(1, MatchingSpottings(battle, observer, target));
+    battle.Read(() => Assert.Equal(1, MatchingSpottings(battle, observer, target)));
   }
 
   // Mirror of the spot-on-move tests with the roles reversed: the TARGET moves while the
@@ -628,17 +634,17 @@ public class BattleVisibilityTest
     var observer = UnitAt(battle, new Vector3I(4, 0, 0));
     var target = UnitAt(battle, new Vector3I(3, 0, 0));
 
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
 
     // Still within sight at distance 2, then out of sight at distance 3.
     battle.Move(target, [new Vector3I(2, 0, 0)]);
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
     battle.Move(target, [new Vector3I(1, 0, 0)]);
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    battle.Read(() => Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
 
     // Returning to distance 2 makes the target visible to the observer again.
     battle.Move(target, [new Vector3I(2, 0, 0)]);
-    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
+    battle.Read(() => Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target)))));
   }
 
   private static int MatchingSpottings(BattleFixture battle, BattleUnitState observer, BattleUnitState target) =>

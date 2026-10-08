@@ -166,6 +166,7 @@ public sealed class GameState
 
   /// <summary>Campaign-held deployment for the active mission.</summary>
   internal Option<MissionDeployment> ActiveMission { get; set; }
+  internal bool IsMissionLaunching { get; set; }
 
   /// <summary>Removes reported deaths and their condition records. Equipment stays with the combatants.</summary>
   internal void RemoveDeadFromRoster(IReadOnlySet<Combatant> dead)

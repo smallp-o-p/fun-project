@@ -12,12 +12,15 @@ public sealed record FactionUnitKnowledge(IReadOnlyList<ObservedUnitInfo> Curren
 
 internal sealed class BattleObservationHistory
 {
+  private readonly BattleAccessBinding _access = new();
   private readonly Dictionary<Faction, Dictionary<int, LastSeenContact>> _contacts = [];
   private readonly Dictionary<Faction, Dictionary<BattleBoardState.ValidatedPoint, BattleTileState>> _terrain = [];
   private long _revision;
+  internal void BindBattleAccess(BattleAccessGuard access) => _access.Bind(access);
 
   internal void RecordRefresh(BattleBoardState board, IReadOnlyList<BattleUnitState> units)
   {
+    _access.RequireMutation();
     _revision = checked(_revision + 1);
     foreach (var observer in units.AsValueEnumerable().Where(observer => observer.IsAlive && !observer.IsUnconscious))
     {
@@ -35,11 +38,13 @@ internal sealed class BattleObservationHistory
 
   internal Option<BattleTileState> GetTerrain(Faction faction, BattleBoardState.ValidatedPoint tile)
   {
+    _access.RequireRead();
     return _terrain.TryGetValue(faction, out var terrain) && terrain.TryGetValue(tile, out var value) ? Some(value) : None;
   }
 
   internal IReadOnlyList<LastSeenContact> GetContacts(Faction faction)
   {
+    _access.RequireRead();
     ArgumentNullException.ThrowIfNull(faction);
     return _contacts.TryGetValue(faction, out var contacts)
       ? System.Array.AsReadOnly(contacts.Values.AsValueEnumerable().OrderBy(contact => contact.UnitId).ToArray()) : [];

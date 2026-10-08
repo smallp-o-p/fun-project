@@ -37,11 +37,11 @@ public class ObjectiveSystemBattleTest
     var bUnit = battle.UnitAt(new Vector3I(2, 0, 0));
     // The fixture's executor (and its ObjectiveSystem) already exists from construction;
     // the objective is read from session state when the later kill event is routed.
-    battle.Session.AddObjective(a, new FakeObjective { Complete = true });
+    battle.Mutate(() => battle.Session.AddObjective(a, new FakeObjective { Complete = true }));
 
     battle.ApplyDamage(bUnit, 999);
 
-    Assert.Equal(1, battle.Session.GetObjectives(a).AsValueEnumerable().Count(o => o.State == ObjectiveResult.Passed));
+    battle.Read(() => Assert.Equal(1, battle.Session.GetObjectives(a).AsValueEnumerable().Count(o => o.State == ObjectiveResult.Passed)));
   }
 
   [TestCase(TestName = "AddObjective raises an ObjectiveAdded event")]
@@ -51,9 +51,9 @@ public class ObjectiveSystemBattleTest
     using var battle = SoloFixture(a, new FakeObjectiveData());
     battle.ClearEvents();
 
-    battle.Session.AddObjective(a, new FakeObjective());
+    battle.Mutate(() => battle.Session.AddObjective(a, new FakeObjective()));
 
-    Assert.Equal(1, battle.Events.EventsOf<ObjectiveAddedBattleEvent>().AsValueEnumerable().Count());
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<ObjectiveAddedBattleEvent>().AsValueEnumerable().Count()));
   }
 
   [TestCase(TestName = "An objective is only checked against events it observes")]
@@ -63,14 +63,14 @@ public class ObjectiveSystemBattleTest
     using var battle = SoloFixture(a, new EliminateAllOpposingForcesObjectiveData());
     var unit = battle.Unit;
     var objective = new FakeObjective { Observe = typeof(UnitKilledBattleEvent) };
-    battle.Session.AddObjective(a, objective);
+    battle.Mutate(() => battle.Session.AddObjective(a, objective));
 
     battle.ApplyDamage(unit, 1); // UnitDamaged — not observed
     battle.Pass(unit);           // UnitActivationEnded — not observed
-    Assert.Equal(0, objective.CheckCount);
+    battle.Read(() => Assert.Equal(0, objective.CheckCount));
 
     battle.ApplyDamage(unit, 999); // UnitKilled — observed
-    Assert.Equal(1, objective.CheckCount);
+    battle.Read(() => Assert.Equal(1, objective.CheckCount));
   }
 
   [TestCase(TestName = "A queued follow-up is visible starting with the next event")]
@@ -101,12 +101,12 @@ public class ObjectiveSystemBattleTest
     // The follow-up must NOT have been checked against the killing event: candidates were
     // snapshotted before the directive added it. Its target is TurnStarted anyway, so the
     // battle continues...
-    Assert.True(battle.Session.Outcome.IsNone);
+    battle.Read(() => Assert.True(battle.Session.Outcome.IsNone));
 
     battle.AdvanceTurn(); // enemy turn 1 ends -> round rolls -> TurnStarted(player, 2) -> follow-up completes -> Defeat
 
-    Assert.True(battle.Session.Outcome.IsSome);
-    Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
+    battle.Read(() => Assert.True(battle.Session.Outcome.IsSome));
+    battle.Read(() => Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome()));
   }
 
   [TestCase(false, TestName = "Flips resolve in add order and the first EndBattle wins")]
@@ -137,12 +137,12 @@ public class ObjectiveSystemBattleTest
       Complete = true,
       Observe = typeof(UnitKilledBattleEvent),
     };
-    battle.Session.AddObjective(player, first);
-    battle.Session.AddObjective(player, second);
+    battle.Mutate(() => battle.Session.AddObjective(player, first));
+    battle.Mutate(() => battle.Session.AddObjective(player, second));
 
     battle.ApplyDamage(enemyUnit, 999); // both flip on the same kill; add order wins
 
-    Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
+    battle.Read(() => Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome()));
   }
 
   [TestCase(TestName = "GetObjectivesForFaction returns the faction's objectives")]
@@ -153,7 +153,7 @@ public class ObjectiveSystemBattleTest
 
     Option<IReadOnlyList<Objective>> result = battle.Query(new GetObjectivesForFaction(a));
 
-    Assert.True(result.IsSome);
-    Assert.Equal(1, result.RequireSome().Count);
+    battle.Read(() => Assert.True(result.IsSome));
+    battle.Read(() => Assert.Equal(1, result.RequireSome().Count));
   }
 }

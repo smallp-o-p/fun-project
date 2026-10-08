@@ -40,21 +40,22 @@ public sealed partial class BattleHud : CanvasLayer
     _returnButton.Pressed += () => ReturnRequested?.Invoke();
   }
 
-  public void ShowUnits(IReadOnlyList<BattleUnitState> units)
+  public void ShowUnits(IReadOnlyList<UnitReadout> units)
     => _unitStatusLabel.Text = string.Join("\n", units.AsValueEnumerable().Select(FormatUnitReadout).ToArray());
 
-  public void ShowActionOptions(IReadOnlyList<UnitActionOption> options)
+  public void ShowActionOptions(IReadOnlyList<ActionOptionReadout> options)
   {
     _verbButtons.QueueFreeAllChildren();
     _turnButtons.QueueFreeAllChildren();
 
-    foreach (UnitActionOption option in options)
+    foreach (ActionOptionReadout readout in options)
     {
+      UnitActionOption option = readout.Option;
       var button = new Button
       {
         Text = LabelFor(option),
         CustomMinimumSize = new Vector2(72, 40),
-        Disabled = !option.IsAvailable,
+        Disabled = !readout.IsAvailable,
       };
       UnitActionOption captured = option;
       button.Pressed += () => VerbSelected?.Invoke(captured);
@@ -80,8 +81,8 @@ public sealed partial class BattleHud : CanvasLayer
   public void ShowReturn(bool available)
     => _returnButton.Visible = available;
 
-  internal static string FormatUnitReadout(BattleUnitState unit)
-    => $"{unit.Combatant.Name}  HP {unit.CurrentHealth}/{unit.MaxHealth}  STUN {unit.CurrentStun}"
+  internal static string FormatUnitReadout(UnitReadout unit)
+    => $"{unit.Name}  HP {unit.Health}/{unit.MaxHealth}  STUN {unit.Stun}"
       + (unit.IsUnconscious ? "  Unconscious" : "");
 
   private static string LabelFor(UnitActionOption option) => option switch

@@ -50,29 +50,29 @@ public partial class AttackObjectTest
     var obj = ObjectAt(battle, new Vector3I(4, 0, 2));
     var attackOption = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)))
       .AsValueEnumerable().Single(option => option.Action is AttackActionDefinition);
-    Assert.True(attackOption.IsAvailable);
+    battle.Read(() => Assert.True(attackOption.IsAvailable));
     var preview = battle.Query(new GetHitChanceForAttack(
       battle.Alive(battle.PlayerUnit), battle.Target(obj))).RequireRight();
     battle.ClearEvents();
-    int beforeAp = battle.PlayerUnit.CurrentActionPoints;
+    int beforeAp = battle.Read(() => battle.PlayerUnit.CurrentActionPoints);
     battle.Attack(battle.PlayerUnit, obj);
-    Assert.Equal(100, preview.FinalChance);
-    Assert.Equal(0, preview.Modifiers.Count);
-    Assert.Equal(15, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
-    Assert.Equal(beforeAp - 1, battle.PlayerUnit.CurrentActionPoints);
-    Assert.Equal(0, weapon.CurrentAmmo);
-    Assert.False(attackOption.IsAvailable);
+    battle.Read(() => Assert.Equal(100, preview.FinalChance));
+    battle.Read(() => Assert.Equal(0, preview.Modifiers.Count));
+    battle.Read(() => Assert.Equal(15, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth));
+    battle.Read(() => Assert.Equal(beforeAp - 1, battle.PlayerUnit.CurrentActionPoints));
+    battle.Read(() => Assert.Equal(0, weapon.CurrentAmmo));
+    battle.Read(() => Assert.False(attackOption.IsAvailable));
     var shot = battle.Events.SingleEvent<UnitAttackedBattleEvent>();
-    Assert.True(shot.IsHit);
-    Assert.Equal(preview.FinalChance, shot.Breakdown.FinalChance);
-    Assert.True(shot.Roll >= 0 && shot.Roll < 100);
-    Assert.True(ReferenceEquals(obj, ((BattleEntity.Object)shot.Target).State));
-    Assert.Equal(Some(battle.PlayerUnit), battle.Events.SingleEvent<ObjectDamagedBattleEvent>().MaybeCause);
+    battle.Read(() => Assert.True(shot.IsHit));
+    battle.Read(() => Assert.Equal(preview.FinalChance, shot.Breakdown.FinalChance));
+    battle.Read(() => Assert.True(shot.Roll >= 0 && shot.Roll < 100));
+    battle.Read(() => Assert.True(ReferenceEquals(obj, ((BattleEntity.Object)shot.Target).State)));
+    battle.Read(() => Assert.Equal(Some(battle.PlayerUnit), battle.Events.SingleEvent<ObjectDamagedBattleEvent>().MaybeCause));
     battle.Events.EventBefore<UnitAttackedBattleEvent, ObjectDamagedBattleEvent>();
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, obj);
-    Assert.Equal(beforeAp - 1, battle.PlayerUnit.CurrentActionPoints);
-    Assert.Equal(0, battle.Events.Count);
+    battle.Read(() => Assert.Equal(beforeAp - 1, battle.PlayerUnit.CurrentActionPoints));
+    battle.Read(() => Assert.Equal(0, battle.Events.Count));
   }
 
   [TestCase]
@@ -87,20 +87,20 @@ public partial class AttackObjectTest
     {
       if (evt is not ObjectDestroyedBattleEvent destroyed) return;
       observed = true;
-      Assert.True(ReferenceEquals(obj, destroyed.Object));
-      Assert.Equal(Some(ObjectStatus.Destroyed), obj.Status);
-      Assert.True(battle.Board.FindObjectPosition(obj.Id).IsNone);
+      battle.Read(() => Assert.True(ReferenceEquals(obj, destroyed.Object)));
+      battle.Read(() => Assert.Equal(Some(ObjectStatus.Destroyed), obj.Status));
+      battle.Read(() => Assert.True(battle.Board.FindObjectPosition(obj.Id).IsNone));
     };
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, obj);
-    Assert.True(observed);
-    Assert.Equal(0, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
-    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(obj)).IsNone);
-    Assert.True(battle.Runtime.TryGetAliveObject(obj).IsNone);
-    Assert.Equal(0, battle.Events.EventsOf<ObjectDamagedBattleEvent>().Length);
-    Assert.Equal(Some(battle.PlayerUnit), battle.Events.SingleEvent<ObjectDestroyedBattleEvent>().MaybeCause);
+    battle.Read(() => Assert.True(observed));
+    battle.Read(() => Assert.Equal(0, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth));
+    battle.Read(() => Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(obj)).IsNone));
+    battle.Read(() => Assert.True(battle.Runtime.TryGetAliveObject(obj).IsNone));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<ObjectDamagedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(Some(battle.PlayerUnit), battle.Events.SingleEvent<ObjectDestroyedBattleEvent>().MaybeCause));
     battle.Events.EventBefore<UnitAttackedBattleEvent, ObjectDestroyedBattleEvent>();
-    Assert.True(battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable().Contains(obj));
+    battle.Read(() => Assert.True(battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable().Contains(obj)));
   }
 
   [TestCase]
@@ -113,13 +113,13 @@ public partial class AttackObjectTest
     var obj = ObjectAt(battle, new Vector3I(4, 0, 2));
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, obj);
-    Assert.Equal(20, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
-    Assert.Equal(1, battle.Events.Count);
-    Assert.True(battle.Events.SingleEvent<UnitAttackedBattleEvent>().IsHit);
+    battle.Read(() => Assert.Equal(20, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth));
+    battle.Read(() => Assert.Equal(1, battle.Events.Count));
+    battle.Read(() => Assert.True(battle.Events.SingleEvent<UnitAttackedBattleEvent>().IsHit));
     // Primitives/preview allow the other side; existing availability belongs to the caller.
     battle.Attack(battle.EnemyUnit, obj);
-    Assert.Equal(17, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
-    Assert.Equal(0, battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().Length);
+    battle.Read(() => Assert.Equal(17, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().Length));
   }
 
   private sealed class TwoObjectShots(BattleUnitState shooter, BattleObjectState target)
@@ -143,12 +143,12 @@ public partial class AttackObjectTest
     var obj = ObjectAt(battle, new Vector3I(3, 0, 3));
     battle.RegisterHook<UnitMovedBattleEvent>(new TwoObjectShots(battle.EnemyUnit, obj));
     battle.ClearEvents();
-    int beforeAp = battle.EnemyUnit.CurrentActionPoints;
+    int beforeAp = battle.Read(() => battle.EnemyUnit.CurrentActionPoints);
     battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2)]);
-    Assert.Equal(1, battle.Events.EventsOf<UnitAttackedBattleEvent>().Length);
-    Assert.Equal(1, battle.Events.EventsOf<ObjectDestroyedBattleEvent>().Length);
-    Assert.Equal(1, weapon.CurrentAmmo);
-    Assert.Equal(beforeAp - 1, battle.EnemyUnit.CurrentActionPoints);
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<UnitAttackedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<ObjectDestroyedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(1, weapon.CurrentAmmo));
+    battle.Read(() => Assert.Equal(beforeAp - 1, battle.EnemyUnit.CurrentActionPoints));
   }
 
   private sealed class DestroyDuringShot(BattleObjectState obj) : BattleHook<UnitAttackedBattleEvent>
@@ -171,9 +171,9 @@ public partial class AttackObjectTest
     battle.RegisterHook<UnitAttackedBattleEvent>(new DestroyDuringShot(obj));
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, obj);
-    Assert.Equal(1, weapon.CurrentAmmo);
-    Assert.Equal(1, battle.Events.EventsOf<ObjectDestroyedBattleEvent>().Length);
-    Assert.Equal(0, battle.Events.EventsOf<ObjectDamagedBattleEvent>().Length);
+    battle.Read(() => Assert.Equal(1, weapon.CurrentAmmo));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<ObjectDestroyedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<ObjectDamagedBattleEvent>().Length));
   }
 
   [TestCase]
@@ -190,18 +190,18 @@ public partial class AttackObjectTest
     var unarmed = battle.Spawn(TestData.MakeCombatant("Unarmed", battle.PlayerFaction),
       new Vector3I(1, 0, 0));
     var obj = ObjectAt(battle, new Vector3I(3, 0, 1));
-    Assert.True(battle.Query(new GetFactionVisibleObjectsQuery(battle.PlayerFaction)).AsValueEnumerable().Contains(obj));
+    battle.Read(() => Assert.True(battle.Query(new GetFactionVisibleObjectsQuery(battle.PlayerFaction)).AsValueEnumerable().Contains(obj)));
     foreach (var actor in new[] { blind, shortRange, unarmed })
     {
-      int ap = actor.CurrentActionPoints;
+      int ap = battle.Read(() => actor.CurrentActionPoints);
       battle.ClearEvents();
-      Assert.True(battle.Query(new GetHitChanceForAttack(battle.Alive(actor), battle.Target(obj))).IsLeft);
+      battle.Read(() => Assert.True(battle.Query(new GetHitChanceForAttack(battle.Alive(actor), battle.Target(obj))).IsLeft));
       battle.Attack(actor, obj);
-      Assert.Equal(ap, actor.CurrentActionPoints);
-      Assert.Equal(0, battle.Events.Count);
+      battle.Read(() => Assert.Equal(ap, actor.CurrentActionPoints));
+      battle.Read(() => Assert.Equal(0, battle.Events.Count));
     }
-    Assert.Equal(6, blindWeapon.CurrentAmmo);
-    Assert.Equal(6, shortWeapon.CurrentAmmo);
+    battle.Read(() => Assert.Equal(6, blindWeapon.CurrentAmmo));
+    battle.Read(() => Assert.Equal(6, shortWeapon.CurrentAmmo));
   }
 
   [TestCase]
@@ -214,8 +214,8 @@ public partial class AttackObjectTest
         new ObjectPlacement(TestData.MakeObject("Beyond", 20), new Vector3I(1, 0, 1))));
     var boundary = ObjectAt(battle, new Vector3I(2, 0, 1));
     var beyond = ObjectAt(battle, new Vector3I(1, 0, 1));
-    Assert.True(battle.Query(new GetHitChanceForAttack(battle.Alive(battle.PlayerUnit), battle.Target(boundary))).IsRight);
-    Assert.True(battle.Query(new GetHitChanceForAttack(battle.Alive(battle.PlayerUnit), battle.Target(beyond))).IsLeft);
+    battle.Read(() => Assert.True(battle.Query(new GetHitChanceForAttack(battle.Alive(battle.PlayerUnit), battle.Target(boundary))).IsRight));
+    battle.Read(() => Assert.True(battle.Query(new GetHitChanceForAttack(battle.Alive(battle.PlayerUnit), battle.Target(beyond))).IsLeft));
   }
 
   [TestCase]
@@ -247,17 +247,17 @@ public partial class AttackObjectTest
     using var foreign = BattleFixture.Duel();
     var obj = ObjectAt(battle, new Vector3I(3, 0, 2));
     var scenery = ObjectAt(battle, new Vector3I(2, 0, 2));
-    Assert.Throws<InvalidOperationException>(() => battle.Session.ApplyDamageTo(scenery, [], None));
-    Assert.Throws<InvalidOperationException>(() => foreign.Session.ApplyDamageTo(obj, [], None));
-    Assert.Throws<ArgumentNullException>(() => battle.Session.ApplyDamageTo(obj, null!, None));
+    Assert.Throws<InvalidOperationException>(() => battle.Mutate(() => battle.Session.ApplyDamageTo(scenery, [], None)));
+    Assert.Throws<InvalidOperationException>(() => foreign.Mutate(() => foreign.Session.ApplyDamageTo(obj, [], None)));
+    Assert.Throws<ArgumentNullException>(() => battle.Mutate(() => battle.Session.ApplyDamageTo(obj, null!, None)));
     battle.ClearEvents();
-    battle.Session.ApplyDamageTo(obj,
-      [new Damage(7, Element.Kinetic, Kind: DamageKind.Stun), new Damage(3, Element.Thermal)], None);
-    Assert.Equal(7, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
-    Assert.Equal(3, battle.Events.SingleEvent<ObjectDamagedBattleEvent>().HealthDamage);
-    battle.Session.ApplyDamageTo(obj, [new Damage(999, Element.Kinetic)], None);
+    battle.Mutate(() => battle.Session.ApplyDamageTo(obj,
+      [new Damage(7, Element.Kinetic, Kind: DamageKind.Stun), new Damage(3, Element.Thermal)], None));
+    battle.Read(() => Assert.Equal(7, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth));
+    battle.Read(() => Assert.Equal(3, battle.Events.SingleEvent<ObjectDamagedBattleEvent>().HealthDamage));
+    battle.Mutate(() => battle.Session.ApplyDamageTo(obj, [new Damage(999, Element.Kinetic)], None));
     Assert.Throws<InvalidOperationException>(() =>
-      battle.Session.ApplyDamageTo(obj, [new Damage(1, Element.Kinetic)], None));
-    Assert.Equal(1, battle.Events.EventsOf<ObjectDestroyedBattleEvent>().Length);
+      battle.Mutate(() => battle.Session.ApplyDamageTo(obj, [new Damage(1, Element.Kinetic)], None)));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<ObjectDestroyedBattleEvent>().Length));
   }
 }

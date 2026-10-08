@@ -58,8 +58,8 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(bomb).RequireSome()));
 
-    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome);
-    Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome);
+    runtime.Read(() => Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome));
+    runtime.Read(() => Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome));
   }
 
   [TestCase(TestName = "A expiry fails the objective and ends the battle in defeat")]
@@ -73,9 +73,9 @@ public class DefuseAllBombsObjectiveTest
     for (int turn = 0; turn < 6 && runtime.Query(new GetBattleOutcomeQuery()).IsNone; turn++)
       runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
-    Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
-    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome);
-    Assert.Equal(BattleOutcome.Defeat, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome);
+    runtime.Read(() => Assert.Equal(Some(ObjectStatus.Expired), bomb.Status));
+    runtime.Read(() => Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome));
+    runtime.Read(() => Assert.Equal(BattleOutcome.Defeat, runtime.Query(new GetFactionEndOfBattleSummary(player)).RequireRight().Outcome));
   }
 
   // The counting implementation's distinguishing cases: only the delivered stream counts,
@@ -98,9 +98,9 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(bombs[0]).RequireSome()));
 
-    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsNone);
-    Assert.Equal(Some(ObjectStatus.Interacted), bombs[0].Status);
-    Assert.True(bombs[1].Status.IsNone);
+    runtime.Read(() => Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsNone));
+    runtime.Read(() => Assert.Equal(Some(ObjectStatus.Interacted), bombs[0].Status));
+    runtime.Read(() => Assert.True(bombs[1].Status.IsNone));
   }
 
   [TestCase(TestName = "Interacting with a non-timed object does not count as a defusal")]
@@ -121,7 +121,7 @@ public class DefuseAllBombsObjectiveTest
       runtime.TryGetAlive(defuser).RequireSome(),
       runtime.TryGetAliveObject(crate).RequireSome()));
 
-    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsNone);
+    runtime.Read(() => Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsNone));
   }
 
   [TestCase]
@@ -150,14 +150,14 @@ public class DefuseAllBombsObjectiveTest
     var bomb = objects.AsValueEnumerable().Single(o => o.Name == "Bomb");
     var crate = objects.AsValueEnumerable().Single(o => o.Name == "Crate");
     battle.Attack(battle.PlayerUnit, crate);
-    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsNone);
+    battle.Read(() => Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsNone));
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, bomb);
-    Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsSome);
-    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
-    Assert.Equal(1, battle.Events.EventsOf<ObjectiveFailedBattleEvent>().Length);
-    Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().Length);
-    Assert.Equal(0, battle.Events.EventsOf<ObjectExpiredBattleEvent>().Length);
+    battle.Read(() => Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsSome));
+    battle.Read(() => Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<ObjectiveFailedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<ObjectExpiredBattleEvent>().Length));
   }
 
   [TestCase]
@@ -182,14 +182,14 @@ public class DefuseAllBombsObjectiveTest
       .Single(o => o.Name == "Bomb");
     var grenade = TestData.MakeGrenade("Frag", throwRange: 10, blastRadius: 0,
       effects: [new DamageEffectData { BaseDamage = 5 }]);
-    battle.PlayerUnit.AddInventoryItem(grenade.Item);
+    battle.Mutate(() => battle.PlayerUnit.AddInventoryItem(grenade.Item));
     battle.ClearEvents();
     battle.Throw(battle.PlayerUnit, grenade, cell);
-    Assert.Equal(Some(ObjectStatus.Destroyed), bomb.Status);
-    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
-    Assert.Equal(1, battle.Events.EventsOf<ObjectiveFailedBattleEvent>().Length);
-    Assert.Equal(1, battle.Events.EventsOf<CapabilityResolvedBattleEvent>().Length);
-    Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().Length);
-    Assert.Equal(0, battle.Events.EventsOf<ObjectExpiredBattleEvent>().Length);
+    battle.Read(() => Assert.Equal(Some(ObjectStatus.Destroyed), bomb.Status));
+    battle.Read(() => Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<ObjectiveFailedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<CapabilityResolvedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<ObjectInteractedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<ObjectExpiredBattleEvent>().Length));
   }
 }

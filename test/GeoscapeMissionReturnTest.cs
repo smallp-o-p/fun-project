@@ -148,6 +148,8 @@ public class GeoscapeMissionReturnTest
         }
       };
 
+      battle.Runtime.Dispose();
+      Assert.True(battle.Runtime.TryFinishDisposal());
       rebuilt.CompleteMission(summary);
       Assert.True(closed);
       Assert.True(rebuilt.ActiveMission.IsNone);
@@ -180,7 +182,10 @@ public class GeoscapeMissionReturnTest
       Assert.Equal(BattleOutcome.Defeat, PlayerSummary(battle, campaign.State).Outcome);
 
       campaign.ClearEvents();
-      campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
+      var summary = PlayerSummary(battle, campaign.State);
+      battle.Runtime.Dispose();
+      Assert.True(battle.Runtime.TryFinishDisposal());
+      campaign.Session.CompleteMission(summary);
 
       Assert.False(Holds(campaign.State.Roster, alpha), "The reported death leaves the roster.");
       Assert.Equal(3, campaign.State.Roster.Count);
@@ -231,7 +236,10 @@ public class GeoscapeMissionReturnTest
       Exception? caught = null;
       try
       {
-        campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
+        var summary = PlayerSummary(battle, campaign.State);
+        battle.Runtime.Dispose();
+        Assert.True(battle.Runtime.TryFinishDisposal());
+        campaign.Session.CompleteMission(summary);
       }
       catch (Exception exception)
       {

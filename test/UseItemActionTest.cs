@@ -13,17 +13,17 @@ public class UseItemActionTest
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(1, 0, 1), actionPoints: 4);
     var unit = battle.Unit;
     var usable = TestData.MakeUsableItem(item, maxCharges: maxCharges);
-    unit.AddInventoryItem(usable.Item);
+    battle.Mutate(() => unit.AddInventoryItem(usable.Item));
     battle.ClearEvents();
 
     battle.Use(unit, usable);
 
-    Assert.Equal(remainsInInventory, unit.HasInventoryItem(usable.Item));
-    Assert.Equal(expectedCurrent, usable.Capability.Current);
-    Assert.Equal(4 - BattleSession.DefaultUseItemActionPointCost, unit.CurrentActionPoints);
+    battle.Read(() => Assert.Equal(remainsInInventory, unit.HasInventoryItem(usable.Item)));
+    battle.Read(() => Assert.Equal(expectedCurrent, usable.Capability.Current));
+    battle.Read(() => Assert.Equal(4 - BattleSession.DefaultUseItemActionPointCost, unit.CurrentActionPoints));
     var usedEvent = battle.Events.SingleEvent<ItemUsedBattleEvent>();
-    Assert.True(ReferenceEquals(unit, usedEvent.Unit));
-    Assert.True(ReferenceEquals(usable.Item, usedEvent.Item));
+    battle.Read(() => Assert.True(ReferenceEquals(unit, usedEvent.Unit)));
+    battle.Read(() => Assert.True(ReferenceEquals(usable.Item, usedEvent.Item)));
   }
 
   [TestCase(TestName = "Using a depleted item is interrupted without spending AP or raising the event")]
@@ -32,20 +32,20 @@ public class UseItemActionTest
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(1, 0, 1), actionPoints: 4);
     var unit = battle.Unit;
     var usable = TestData.MakeUsableItem("Flare", maxCharges: 1);
-    unit.AddInventoryItem(usable.Item);
+    battle.Mutate(() => unit.AddInventoryItem(usable.Item));
     battle.Use(unit, usable);
-    int apAfterFirstUse = unit.CurrentActionPoints;
+    int apAfterFirstUse = battle.Read(() => unit.CurrentActionPoints);
     // The item was removed with the last charge; re-adding the same depleted instance
     // simulates a caller that failed to check before constructing the action. Execution
     // re-checks depletion — the same check that protects interleaved interrupts — and
     // interrupts quietly: no charge spent, no event, no AP.
-    unit.AddInventoryItem(usable.Item);
+    battle.Mutate(() => unit.AddInventoryItem(usable.Item));
     battle.ClearEvents();
 
     battle.Use(unit, usable);
 
-    Assert.Equal(0, usable.Capability.Current);
-    Assert.Equal(apAfterFirstUse, unit.CurrentActionPoints);
-    Assert.False(battle.Events.EventsOf<ItemUsedBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.Equal(0, usable.Capability.Current));
+    battle.Read(() => Assert.Equal(apAfterFirstUse, unit.CurrentActionPoints));
+    battle.Read(() => Assert.False(battle.Events.EventsOf<ItemUsedBattleEvent>().AsValueEnumerable().Any()));
   }
 }

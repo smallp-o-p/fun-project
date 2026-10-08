@@ -13,46 +13,98 @@ namespace FunProject.Battle;
 
 public sealed class BattleUnitState
 {
+  private readonly BattleAccessBinding _battleAccess = new();
+  internal void BindBattleAccess(BattleAccessGuard access)
+  {
+    _battleAccess.Bind(access);
+    Combatant.BindBattleAccess(access);
+    EquippedWeapon.IfSome(weapon => weapon.BindBattleAccess(access));
+    EquippedArmor.IfSome(armor => armor.Item.BindBattleAccess(access));
+    foreach (var item in _inventory) item.BindBattleAccess(access);
+    foreach (var status in _activeStatusEffects.Values) status.BindBattleAccess(access);
+    PrepareStatInputs();
+  }
+  internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
+
   private readonly List<EquippableItem> _inventory;
   private readonly StatMod[] _loadoutStatMods;
+  private BattleStatInputs? _statInputs;
+  internal void PrepareStatInputs()
+  {
+    _battleAccess.RequireMutation();
+    _statInputs = BattleStatInputs.Capture(Combatant.CopyBaseValues(),
+      Combatant.StatContributions().AsValueEnumerable().Concat(_loadoutStatMods)
+        .Concat(EquippedWeapon.Match<IEnumerable<StatMod>>(weapon => weapon.StatContributions, () => []))
+        .ToArray(), Buffs);
+  }
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _spottedUnits = [];
-  internal bool CanSeeTile(BattleBoardState.ValidatedPoint tile) { return _visibleTiles.Contains(tile); }
+  internal bool CanSeeTile(BattleBoardState.ValidatedPoint tile) { _battleAccess.RequireRead(); return _visibleTiles.Contains(tile); }
   private readonly Dictionary<StatusEffectSpecData, ActiveStatusEffect> _activeStatusEffects = [];
   private readonly List<(Buff Buff, bool IsActive)> _buffs = [];
 
   public int Id { get; }
   public Combatant Combatant { get; }
   public Faction Side => Combatant.OwningFaction;
-  public Option<Weapon> EquippedWeapon { get; private set; }
+  private Option<Weapon> _equippedWeapon;
+  public Option<Weapon> EquippedWeapon
+  {
+    get { _battleAccess.RequireRead(); return _equippedWeapon; }
+    private set { _battleAccess.RequireMutation(); _equippedWeapon = value; }
+  }
   public Option<ItemWith<ArmorCapability>> EquippedArmor { get; }
-  public IReadOnlyList<EquippableItem> Inventory => _inventory;
-  internal IReadOnlySet<BattleUnitState> VisibleUnits => _visibleUnits;
-  internal IReadOnlySet<BattleBoardState.ValidatedPoint> VisibleTiles => _visibleTiles;
+  public IReadOnlyList<EquippableItem> Inventory { get { _battleAccess.RequireRead(); return _inventory.AsReadOnly(); } }
+  internal IReadOnlySet<BattleUnitState> VisibleUnits { get { _battleAccess.RequireRead(); return _visibleUnits.AsValueEnumerable().ToHashSet(); } }
+  internal IReadOnlySet<BattleBoardState.ValidatedPoint> VisibleTiles { get { _battleAccess.RequireRead(); return _visibleTiles.AsValueEnumerable().ToHashSet(); } }
 
   public int MaxHealth => Mathf.RoundToInt(EffectiveStat<HealthStat>());
-  public int CurrentHealth { get; private set; }
-  public long TotalHealthDamageTaken { get; private set; }
-  public int CurrentStun { get; private set; }
+  private int _currentHealth;
+  public int CurrentHealth
+  {
+    get { _battleAccess.RequireRead(); return _currentHealth; }
+    private set { _battleAccess.RequireMutation(); _currentHealth = value; }
+  }
+  private long _totalHealthDamageTaken;
+  public long TotalHealthDamageTaken
+  {
+    get { _battleAccess.RequireRead(); return _totalHealthDamageTaken; }
+    private set { _battleAccess.RequireMutation(); _totalHealthDamageTaken = value; }
+  }
+  private int _currentStun;
+  public int CurrentStun
+  {
+    get { _battleAccess.RequireRead(); return _currentStun; }
+    private set { _battleAccess.RequireMutation(); _currentStun = value; }
+  }
   public int MaxActionPoints => Mathf.RoundToInt(EffectiveStat<ActionPointsStat>());
-  public int CurrentActionPoints { get; private set; }
+  private int _currentActionPoints;
+  public int CurrentActionPoints
+  {
+    get { _battleAccess.RequireRead(); return _currentActionPoints; }
+    private set { _battleAccess.RequireMutation(); _currentActionPoints = value; }
+  }
   public int Vision => Mathf.RoundToInt(EffectiveStat<VisionStat>());
   public bool IsAlive => CurrentHealth > 0;
   public bool IsDead => !IsAlive;
   public bool IsUnconscious => IsAlive && CurrentStun >= CurrentHealth;
   public bool IsIncapacitated => IsDead || IsUnconscious || IsImmobilized;
-  public IReadOnlyCollection<ActiveStatusEffect> ActiveStatusEffects => _activeStatusEffects.Values;
-  public bool IsImmobilized => _activeStatusEffects.Values.AsValueEnumerable().Any(effect => !effect.IsExpired && effect.BlocksAction);
+  public IReadOnlyCollection<ActiveStatusEffect> ActiveStatusEffects { get { _battleAccess.RequireRead(); return _activeStatusEffects.Values.AsValueEnumerable().ToArray(); } }
+  public bool IsImmobilized { get { _battleAccess.RequireRead(); return _activeStatusEffects.Values.AsValueEnumerable().Any(effect => !effect.IsExpired && effect.BlocksAction); } }
   public IReadOnlyList<Buff> Buffs
-    => _buffs.AsValueEnumerable().Select(entry => entry.Buff).ToArray();
+  { get { _battleAccess.RequireRead(); return _buffs.AsValueEnumerable().Select(entry => entry.Buff).ToArray(); } }
 
   public IEnumerable<Buff> ActiveBuffs
-    => _buffs.AsValueEnumerable().Where(entry => entry.IsActive)
-      .Select(entry => entry.Buff).ToArray();
+  {
+    get
+    {
+      _battleAccess.RequireRead(); return _buffs.AsValueEnumerable().Where(entry => entry.IsActive)
+    .Select(entry => entry.Buff).ToArray();
+    }
+  }
 
   internal IEnumerable<DamageBundleMod> ActiveBuffDamageMods
-    => ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.DamageMods).ToArray();
+  { get { _battleAccess.RequireRead(); return ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.DamageMods).ToArray(); } }
 
   internal BattleUnitState(
     int unitId,
@@ -98,11 +150,13 @@ public sealed class BattleUnitState
 
   public void RefreshForNewTurn()
   {
+    _battleAccess.RequireMutation();
     CurrentActionPoints = MaxActionPoints;
   }
 
   public bool TrySpendActionPoints(int cost)
   {
+    _battleAccess.RequireMutation();
     if (cost < 0 || CurrentActionPoints < cost)
       return false;
 
@@ -114,6 +168,7 @@ public sealed class BattleUnitState
   // a failed spend here is a broken invariant — not a rejectable outcome — and throws.
   internal void SpendActionPoints(int cost)
   {
+    _battleAccess.RequireMutation();
     if (!TrySpendActionPoints(cost))
       throw new InvalidOperationException(
         $"Unit {Id} cannot spend {cost} action points (has {CurrentActionPoints}).");
@@ -121,6 +176,7 @@ public sealed class BattleUnitState
 
   public void ReceiveDamage(int amount)
   {
+    _battleAccess.RequireMutation();
     if (amount <= 0)
       return;
 
@@ -133,12 +189,14 @@ public sealed class BattleUnitState
 
   internal void ReceiveStun(int amount)
   {
+    _battleAccess.RequireMutation();
     ArgumentOutOfRangeException.ThrowIfNegative(amount);
     CurrentStun = checked(CurrentStun + amount);
   }
 
   internal uint RecoverStun(uint maximum)
   {
+    _battleAccess.RequireMutation();
     if (IsDead || IsUnconscious)
       return 0;
     uint recovered = Math.Min((uint)CurrentStun, maximum);
@@ -148,6 +206,7 @@ public sealed class BattleUnitState
 
   internal ActiveStatusEffect ApplyStatusEffect(StatusEffectSpecData spec)
   {
+    _battleAccess.RequireMutation();
     ArgumentNullException.ThrowIfNull(spec);
     if (_activeStatusEffects.TryGetValue(spec, out var existing))
     {
@@ -156,12 +215,14 @@ public sealed class BattleUnitState
     }
 
     var applied = ActiveStatusEffect.Create(spec);
+    if (_battleAccess.Guard is { } access) applied.BindBattleAccess(access);
     _activeStatusEffects[spec] = applied;
     return applied;
   }
 
   internal bool RemoveStatusEffect(StatusEffectSpecData spec)
   {
+    _battleAccess.RequireMutation();
     ArgumentNullException.ThrowIfNull(spec);
     return _activeStatusEffects.Remove(spec);
   }
@@ -175,54 +236,67 @@ public sealed class BattleUnitState
 
   public void AddInventoryItem(EquippableItem item)
   {
+    _battleAccess.RequireMutation();
+    if (_battleAccess.Guard is { } access) item.BindBattleAccess(access);
     _inventory.Add(item);
   }
 
   public bool HasInventoryItem(EquippableItem item)
   {
+    _battleAccess.RequireRead();
     return _inventory.Contains(item);
   }
 
   public bool RemoveInventoryItem(EquippableItem item)
   {
+    _battleAccess.RequireMutation();
     return _inventory.Remove(item);
   }
 
   internal void ClearVisibility()
   {
+    _battleAccess.RequireMutation();
     _visibleUnits.Clear();
     _visibleTiles.Clear();
   }
 
   internal void ClearVisibleUnits()
   {
+    _battleAccess.RequireMutation();
     _visibleUnits.Clear();
   }
 
   internal void AddVisibleTile(BattleBoardState.ValidatedPoint tile)
   {
+    _battleAccess.RequireMutation();
     _visibleTiles.Add(tile);
   }
 
   internal void AddVisibleUnit(BattleUnitState unit)
   {
+    _battleAccess.RequireMutation();
     ArgumentNullException.ThrowIfNull(unit);
     _visibleUnits.Add(unit);
   }
 
   internal bool RecordFirstSpotting(BattleUnitState unit)
   {
+    _battleAccess.RequireMutation();
     ArgumentNullException.ThrowIfNull(unit);
     return _spottedUnits.Add(unit);
   }
 
-  public bool CanAct() => CurrentActionPoints > 0 && !IsIncapacitated;
+  public bool CanAct() { _battleAccess.RequireRead(); return CurrentActionPoints > 0 && !IsIncapacitated; }
 
   public float EffectiveStat<TStat>() where TStat : Stat
-    => Combatant.Resolve<TStat>(GatherStatContributions());
+  { _battleAccess.RequireRead(); return TryEffectiveStat<TStat>().IfNone(0f); }
 
   public Option<float> TryEffectiveStat<TStat>() where TStat : Stat
-    => Combatant.TryResolve<TStat>(GatherStatContributions());
+  {
+    _battleAccess.RequireRead(); return _battleAccess.Guard is null
+    ? Combatant.TryResolve<TStat>(GatherStatContributions())
+    : (_statInputs ?? throw new InvalidOperationException("Bound unit inputs are not prepared.")).TryResolve<TStat>(ActiveBuffs);
+  }
 
   private IEnumerable<StatMod> GatherStatContributions()
     => Combatant.StatContributions()
@@ -234,6 +308,7 @@ public sealed class BattleUnitState
 
   internal void ClampCurrentHealthToMax()
   {
+    _battleAccess.RequireMutation();
     // Floor at 1: buffs adjust stats, they never kill. A buff pushing MaxHealth to 0 or
     // below must not bypass the death pipeline (HandleUnitDeath) by zeroing health here.
     CurrentHealth = Math.Min(CurrentHealth, Math.Max(MaxHealth, 1));
@@ -241,6 +316,7 @@ public sealed class BattleUnitState
 
   internal void EvaluateBuffs(BattleSession session)
   {
+    _battleAccess.RequireMutation();
     for (int i = 0; i < _buffs.Count; i++)
     {
       (Buff buff, bool wasActive) = _buffs[i];

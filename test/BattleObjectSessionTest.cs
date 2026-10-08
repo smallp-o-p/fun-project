@@ -34,12 +34,12 @@ public class BattleObjectSessionTest
     var session = battle.Session;
 
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 2));
-    BattleObjectState[] objects = [.. session.Objects];
-    Assert.Equal(1, objects.Length);
+    BattleObjectState[] objects = battle.Read<BattleObjectState[]>(() => [.. session.Objects]);
+    battle.Read(() => Assert.Equal(1, objects.Length));
     BattleObjectState bomb = objects[0];
-    Assert.True(bomb.Status.IsNone);
-    Assert.Equal(point, battle.Live(bomb).Position);
-    Assert.Equal(point.Raw, bomb.Position);
+    battle.Read(() => Assert.True(bomb.Status.IsNone));
+    battle.Read(() => Assert.Equal(point, battle.Live(bomb).Position));
+    battle.Read(() => Assert.Equal(point.Raw, bomb.Position));
 
     // Occupancy: a unit cannot spawn onto the object tile (a rejected SpawnUnit surfaces
     // from Submit as an InvalidOperationException — trusted parameters). The duplicate-

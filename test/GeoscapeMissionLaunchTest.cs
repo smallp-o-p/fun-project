@@ -218,6 +218,9 @@ public partial class GeoscapeMissionLaunchTest
     var battle = campaign.Session.LaunchMission(active, squad).RequireRight();
     try
     {
+      Assert.Throws<InvalidOperationException>(() => new GeoscapeSession(campaign.State).AbortMissionPresentation());
+      battle.Runtime.Dispose();
+      Assert.True(battle.Runtime.TryFinishDisposal());
       new GeoscapeSession(campaign.State).AbortMissionPresentation();
 
       Assert.True(campaign.Session.ActiveMission.IsNone);
@@ -226,8 +229,8 @@ public partial class GeoscapeMissionLaunchTest
       Assert.Equal(seed, active.BattleSeed.RequireSome(), "The retained event keeps its generation seed.");
       Assert.True(campaign.Session.ActiveEvents.AsValueEnumerable()
         .Any(member => ReferenceEquals(member, active)));
-      Assert.True(battle.Runtime.TryGetTile(Vector3I.Zero).IsSome,
-        "Abort must not dispose the host-owned runtime.");
+      Assert.Equal(BattleAccessFailure.Closed, battle.Runtime.TryAcquireQueryScope().RequireLeft(),
+        "The host finished draining before the campaign association is cleared.");
 
       var retry = campaign.Session.LaunchMission(active, squad).RequireRight();
       try

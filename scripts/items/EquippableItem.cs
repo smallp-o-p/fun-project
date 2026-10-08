@@ -1,3 +1,4 @@
+using FunProject.Battle;
 using FunProject.Buffs;
 using FunProject.Core;
 using FunProject.Items.Capabilities;
@@ -10,6 +11,18 @@ namespace FunProject.Items;
 
 public class EquippableItem : HasModSlots, HasNameAndDescription
 {
+  private protected readonly BattleAccessBinding _battleAccess = new(shared: true);
+  internal virtual void BindBattleAccess(BattleAccessGuard access)
+  {
+    _battleAccess.Bind(access);
+    foreach (var capability in _capabilities) capability.BindBattleAccess(access);
+  }
+  internal virtual void UnbindBattleAccess(BattleAccessGuard access)
+  {
+    foreach (var capability in _capabilities) capability.UnbindBattleAccess(access);
+    _battleAccess.Unbind(access);
+  }
+
   private readonly System.Collections.Generic.List<ItemCapability> _capabilities = [];
 
   public string ItemName { get; }
@@ -47,9 +60,11 @@ public class EquippableItem : HasModSlots, HasNameAndDescription
     => FindCapability<TCap>().Map(capability => new ItemWith<TCap>(this, capability));
 
   public Array<ModSlot> GetModSlots()
-    => FindCapability<ModSlotsCapability>().Match(
-        capability => capability.Slots,
-        () => new Array<ModSlot>());
+  {
+    _battleAccess.RequireRead(); _battleAccess.Guard?.RequireHostThread(); return FindCapability<ModSlotsCapability>().Match(
+      capability => capability.Slots,
+      () => new Array<ModSlot>());
+  }
 
   public IReadOnlyList<Buff> GrantedBuffs
     => FindCapability<BuffGrantCapability>().Match(

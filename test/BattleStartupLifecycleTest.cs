@@ -35,7 +35,7 @@ public class BattleStartupLifecycleTest
       OnRegister = runtime => runtime.RegisterHook<BattleEventTag>(hook),
     });
     using var runtime = BattleFactory.Start(type, seed: 7).RequireRight();
-    Assert.Equal(1, hook.Received.EventsOf<TurnStartedBattleEvent>().Length);
+    runtime.Read(() => Assert.Equal(1, hook.Received.EventsOf<TurnStartedBattleEvent>().Length));
   }
 
   [TestCase(TestName = "Declared systems observe spawns, object placement, session start, and the first turn")]
@@ -60,35 +60,35 @@ public class BattleStartupLifecycleTest
     }).RequireRight();
 
     var added = hook.Received.EventsOf<UnitAddedBattleEvent>();
-    Assert.Equal(2, added.Length);
-    Assert.True(ReferenceEquals(setup.Sides[0].Faction, added[0].Unit.Side));
-    Assert.True(ReferenceEquals(setup.Sides[1].Faction, added[1].Unit.Side));
-    Assert.Equal(1, hook.Received.EventsOf<ObjectPlacedBattleEvent>().Length);
+    runtime.Read(() => Assert.Equal(2, added.Length));
+    runtime.Read(() => Assert.True(ReferenceEquals(setup.Sides[0].Faction, added[0].Unit.Side)));
+    runtime.Read(() => Assert.True(ReferenceEquals(setup.Sides[1].Faction, added[1].Unit.Side)));
+    runtime.Read(() => Assert.Equal(1, hook.Received.EventsOf<ObjectPlacedBattleEvent>().Length));
     hook.Received.EventBefore<UnitAddedBattleEvent, ObjectPlacedBattleEvent>();
     hook.Received.EventBefore<ObjectPlacedBattleEvent, SessionStartedBattleEvent>();
     hook.Received.EventBefore<SessionStartedBattleEvent, TurnStartedBattleEvent>();
-    Assert.True(ReferenceEquals(setup.Sides[0].Faction,
-      hook.Received.SingleEvent<TurnStartedBattleEvent>().Faction));
+    runtime.Read(() => Assert.True(ReferenceEquals(setup.Sides[0].Faction,
+      hook.Received.SingleEvent<TurnStartedBattleEvent>().Faction)));
     var order = runtime.Query(new GetGlobalFactionTurnOrderQuery());
     for (int sideIndex = 0; sideIndex < setup.Sides.Count; sideIndex++)
     {
       BattleSideSetup side = setup.Sides[sideIndex];
-      Assert.True(ReferenceEquals(side.Faction, order[sideIndex]));
+      runtime.Read(() => Assert.True(ReferenceEquals(side.Faction, order[sideIndex])));
       var objectives = runtime.Query(new GetObjectivesForFaction(side.Faction)).RequireSome();
-      Assert.Equal(side.Objectives.Count, objectives.Count);
+      runtime.Read(() => Assert.Equal(side.Objectives.Count, objectives.Count));
       for (int objectiveIndex = 0; objectiveIndex < objectives.Count; objectiveIndex++)
-        Assert.True(ReferenceEquals(side.Objectives[objectiveIndex], objectives[objectiveIndex].Data));
+        runtime.Read(() => Assert.True(ReferenceEquals(side.Objectives[objectiveIndex], objectives[objectiveIndex].Data)));
     }
 
     // Startup hooks observe the COMPLETE initial board with valid turn state: the second
     // unit and the placed object already exist when the first unit-added notification
     // fires, and the active side's availability is established.
-    Assert.True(observations.Observed);
-    Assert.Equal(2, observations.AliveUnitCount);
-    Assert.Equal(1, observations.ObjectCount);
-    Assert.True(ReferenceEquals(setup.Sides[0].Faction, observations.ActiveSide));
-    Assert.True(observations.FirstUnitAvailable);
-    Assert.True(observations.FirstUnitCanAct);
+    runtime.Read(() => Assert.True(observations.Observed));
+    runtime.Read(() => Assert.Equal(2, observations.AliveUnitCount));
+    runtime.Read(() => Assert.Equal(1, observations.ObjectCount));
+    runtime.Read(() => Assert.True(ReferenceEquals(setup.Sides[0].Faction, observations.ActiveSide)));
+    runtime.Read(() => Assert.True(observations.FirstUnitAvailable));
+    runtime.Read(() => Assert.True(observations.FirstUnitCanAct));
   }
 
   [TestCase(TestName = "Initial spottings follow every unit announcement in deterministic setup order")]
@@ -108,29 +108,29 @@ public class BattleStartupLifecycleTest
     using var runtime = BattleFactory.Start(setup with { Systems = [system] }).RequireRight();
 
     var added = hook.Received.EventsOf<UnitAddedBattleEvent>();
-    Assert.Equal(2, added.Length);
+    runtime.Read(() => Assert.Equal(2, added.Length));
     var spotted = hook.Received.EventsOf<UnitSpottedBattleEvent>();
-    Assert.Equal(2, spotted.Length);
+    runtime.Read(() => Assert.Equal(2, spotted.Length));
     // Exactly one spotting per directed pair; ids follow setup order (0,1) then (1,0).
-    Assert.True(ReferenceEquals(added[0].Unit, spotted[0].Unit));
-    Assert.True(ReferenceEquals(added[1].Unit, spotted[0].Target));
-    Assert.True(ReferenceEquals(added[1].Unit, spotted[1].Unit));
-    Assert.True(ReferenceEquals(added[0].Unit, spotted[1].Target));
-    Assert.Equal(added[0].Unit.Id, spotted[0].Unit.Id);
-    Assert.Equal(added[1].Unit.Id, spotted[0].Target.Id);
-    Assert.Equal(added[1].Unit.Id, spotted[1].Unit.Id);
-    Assert.Equal(added[0].Unit.Id, spotted[1].Target.Id);
+    runtime.Read(() => Assert.True(ReferenceEquals(added[0].Unit, spotted[0].Unit)));
+    runtime.Read(() => Assert.True(ReferenceEquals(added[1].Unit, spotted[0].Target)));
+    runtime.Read(() => Assert.True(ReferenceEquals(added[1].Unit, spotted[1].Unit)));
+    runtime.Read(() => Assert.True(ReferenceEquals(added[0].Unit, spotted[1].Target)));
+    runtime.Read(() => Assert.Equal(added[0].Unit.Id, spotted[0].Unit.Id));
+    runtime.Read(() => Assert.Equal(added[1].Unit.Id, spotted[0].Target.Id));
+    runtime.Read(() => Assert.Equal(added[1].Unit.Id, spotted[1].Unit.Id));
+    runtime.Read(() => Assert.Equal(added[0].Unit.Id, spotted[1].Target.Id));
     // Each spotting's observer and target were announced first.
     for (int i = 0; i < spotted.Length; i++)
     {
       int spottedIndex = hook.Received.IndexOf(spotted[i]);
-      Assert.True(hook.Received.IndexOf(added[0]) < spottedIndex);
-      Assert.True(hook.Received.IndexOf(added[1]) < spottedIndex);
+      runtime.Read(() => Assert.True(hook.Received.IndexOf(added[0]) < spottedIndex));
+      runtime.Read(() => Assert.True(hook.Received.IndexOf(added[1]) < spottedIndex));
     }
 
     // Full visibility is already computed at the FIRST placement notification.
-    Assert.True(observations.Observed);
-    Assert.True(observations.MutuallyVisible);
+    runtime.Read(() => Assert.True(observations.Observed));
+    runtime.Read(() => Assert.True(observations.MutuallyVisible));
   }
 
   [TestCase(false, TestName = "Without completion a startup interrupt executes once after the first turn-start event")]
@@ -169,30 +169,30 @@ public class BattleStartupLifecycleTest
     };
     using var runtime = BattleFactory.Start(ready).RequireRight();
 
-    Assert.True(interrupt.HadSourceAction);
+    runtime.Read(() => Assert.True(interrupt.HadSourceAction));
     var added = hook.Received.EventsOf<UnitAddedBattleEvent>();
-    Assert.Equal(2, added.Length);
-    Assert.Equal(1, hook.Received.EventsOf<ObjectPlacedBattleEvent>().Length);
+    runtime.Read(() => Assert.Equal(2, added.Length));
+    runtime.Read(() => Assert.Equal(1, hook.Received.EventsOf<ObjectPlacedBattleEvent>().Length));
 
     if (!endDuringPlacement)
     {
-      Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsNone);
+      runtime.Read(() => Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsNone));
       var damaged = hook.Received.EventsOf<UnitDamagedBattleEvent>();
-      Assert.Equal(1, damaged.Length);
+      runtime.Read(() => Assert.Equal(1, damaged.Length));
       hook.Received.EventBefore<TurnStartedBattleEvent, UnitDamagedBattleEvent>();
       // The interrupt waited for the whole startup primitive: even the LAST unit-added
       // notification precedes the damage.
       int damageIndex = hook.Received.IndexOf(damaged[0]);
-      Assert.True(hook.Received.IndexOf(added[1]) < damageIndex);
-      Assert.Equal(added[0].Unit.MaxHealth - 1, added[0].Unit.CurrentHealth);
+      runtime.Read(() => Assert.True(hook.Received.IndexOf(added[1]) < damageIndex));
+      runtime.Read(() => Assert.Equal(added[0].Unit.MaxHealth - 1, added[0].Unit.CurrentHealth));
     }
     else
     {
-      Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetBattleOutcomeQuery()).RequireSome());
-      Assert.Equal(0, hook.Received.EventsOf<SessionStartedBattleEvent>().Length);
-      Assert.Equal(0, hook.Received.EventsOf<TurnStartedBattleEvent>().Length);
-      Assert.Equal(added[0].Unit.MaxHealth, added[0].Unit.CurrentHealth);
-      Assert.Equal(1, hook.Received.EventsOf<SessionEndedBattleEvent>().Length);
+      runtime.Read(() => Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetBattleOutcomeQuery()).RequireSome()));
+      runtime.Read(() => Assert.Equal(0, hook.Received.EventsOf<SessionStartedBattleEvent>().Length));
+      runtime.Read(() => Assert.Equal(0, hook.Received.EventsOf<TurnStartedBattleEvent>().Length));
+      runtime.Read(() => Assert.Equal(added[0].Unit.MaxHealth, added[0].Unit.CurrentHealth));
+      runtime.Read(() => Assert.Equal(1, hook.Received.EventsOf<SessionEndedBattleEvent>().Length));
     }
   }
 
@@ -382,26 +382,31 @@ public class BattleStartupLifecycleTest
       Systems = [system],
     };
     using var first = BattleFactory.Start(reusable).RequireRight();
-    using var second = BattleFactory.Start(reusable).RequireRight();
     var point = new Vector3I(0, 0, 0);
+    var faction = setup.Sides[0].Faction;
     var firstUnit = first.Query(new GetUnitAtTile(first.TryGetTile(point).RequireSome())).RequireSome();
+    var firstObjective = first.Query(new GetObjectivesForFaction(faction)).RequireSome()[0];
+    var firstObjects = first.Query(new GetBattleSpecialObjectsQuery());
+    Assert.Equal(1, firstObjects.Count);
+    first.ExecuteAction(BattleAction.ApplyDamage(first.TryGetAlive(firstUnit).RequireSome(), 1));
+    int firstEventCount = hooks[0].Received.Count;
+    first.Dispose();
+    Assert.True(first.TryFinishDisposal());
+
+    using var second = BattleFactory.Start(reusable).RequireRight();
     var secondUnit = second.Query(new GetUnitAtTile(second.TryGetTile(point).RequireSome())).RequireSome();
+    var secondObjective = second.Query(new GetObjectivesForFaction(faction)).RequireSome()[0];
+    var secondObjects = second.Query(new GetBattleSpecialObjectsQuery());
     Assert.False(ReferenceEquals(firstUnit, secondUnit));
     Assert.True(ReferenceEquals(firstUnit.Combatant, secondUnit.Combatant));
-    var faction = setup.Sides[0].Faction;
-    var firstObjective = first.Query(new GetObjectivesForFaction(faction)).RequireSome()[0];
-    var secondObjective = second.Query(new GetObjectivesForFaction(faction)).RequireSome()[0];
     Assert.False(ReferenceEquals(firstObjective, secondObjective));
-    var firstObjects = first.Query(new GetBattleSpecialObjectsQuery());
-    var secondObjects = second.Query(new GetBattleSpecialObjectsQuery());
-    Assert.Equal(1, firstObjects.Count);
     Assert.Equal(1, secondObjects.Count);
     Assert.False(ReferenceEquals(firstObjects[0], secondObjects[0]));
     Assert.False(ReferenceEquals(hooks[0], hooks[1]));
-    int secondEventCount = hooks[1].Received.Count;
-    first.ExecuteAction(BattleAction.ApplyDamage(first.TryGetAlive(firstUnit).RequireSome(), 1));
-    Assert.Equal(secondUnit.MaxHealth, secondUnit.CurrentHealth);
-    Assert.Equal(secondEventCount, hooks[1].Received.Count);
+    second.Read(() => Assert.Equal(secondUnit.MaxHealth, secondUnit.CurrentHealth));
+    second.ExecuteAction(BattleAction.ApplyDamage(second.TryGetAlive(secondUnit).RequireSome(), 1));
+    Assert.Equal(firstEventCount, hooks[0].Received.Count);
+
   }
 
   [TestCase(TestName = "A terminal first-turn objective ends the battle during startup")]
@@ -430,14 +435,14 @@ public class BattleStartupLifecycleTest
         OnRegister = hooks => hooks.RegisterHook<TurnStartedBattleEvent>(new SpendActiveSideApOnTurnStart()),
       }],
     }).RequireRight();
-    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome);
-    Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetBattleResultQuery()).RequireRight().Outcome);
+    runtime.Read(() => Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome));
+    runtime.Read(() => Assert.Equal(BattleOutcome.Victory, runtime.Query(new GetBattleResultQuery()).RequireRight().Outcome));
 
     // The observer's spend happened during the terminal turn-start dispatch and no refresh
     // followed it: the battle ended before any AP restoration could run.
     var playerUnit = runtime.Query(new GetFactionAliveUnits(setup.Sides[0].Faction))
       .AsValueEnumerable().Single().State;
-    Assert.Equal(playerUnit.MaxActionPoints - 1, playerUnit.CurrentActionPoints);
+    runtime.Read(() => Assert.Equal(playerUnit.MaxActionPoints - 1, playerUnit.CurrentActionPoints));
   }
 
   [TestCase(TestName = "The startup AP refresh reads buffs activated during placement")]
@@ -453,7 +458,7 @@ public class BattleStartupLifecycleTest
 
     // Placement activated the adjacency buff (spawn evaluation); the first-turn refresh
     // read the buffed maximum — the ordering BuffBattleTest pins for later turns.
-    Assert.Equal(6, battle.PlayerUnit.CurrentActionPoints);
+    battle.Read(() => Assert.Equal(6, battle.PlayerUnit.CurrentActionPoints));
   }
 
   [TestCase(TestName = "Seed 7 produces the same combat rolls from the type and resolved setups")]
@@ -491,6 +496,7 @@ public class BattleStartupLifecycleTest
     var result = runtime.ExecuteAction(BattleAction.AttackEntity(
       runtime.TryGetAlive(attacker).RequireSome(),
       runtime.TryGetAttackTarget(new BattleEntity.Unit(target)).RequireSome()));
+    using var scope = runtime.TryAcquireQueryScope().RequireRight();
     foreach (BattleEvent battleEvent in result.EventsThatOccurred)
       if (battleEvent is UnitAttackedBattleEvent attacked)
         return attacked;

@@ -79,16 +79,19 @@ public sealed class BattleObservationHistoryTest
     using var alive = Contacts(); using var hiddenDeath = Contacts();
     var visibleSnapshot = hiddenDeath.Query(new GetFactionUnitKnowledge(hiddenDeath.PlayerFaction));
     int targetId = hiddenDeath.EnemyUnit.Id;
-    int observedHealth = hiddenDeath.EnemyUnit.CurrentHealth;
+    int observedHealth = hiddenDeath.Read(() => hiddenDeath.EnemyUnit.CurrentHealth);
     foreach (var battle in new[] { alive, hiddenDeath })
     {
       battle.EndFactionTurn(battle.PlayerFaction);
       battle.Move(battle.EnemyUnit, [new Vector3I(3, 0, 0)]);
     }
     hiddenDeath.ApplyDamage(hiddenDeath.EnemyUnit, 999);
-    var hiddenWeapon = (AmmunitionedWeapon)hiddenDeath.EnemyUnit.EquippedWeapon.RequireSome();
-    Assert.True(hiddenWeapon.TrySpendShot().IsSome);
-    Assert.True(hiddenWeapon.CanReload());
+    hiddenDeath.Mutate(() =>
+    {
+      var hiddenWeapon = (AmmunitionedWeapon)hiddenDeath.EnemyUnit.EquippedWeapon.RequireSome();
+      Assert.True(hiddenWeapon.TrySpendShot().IsSome);
+      Assert.True(hiddenWeapon.CanReload());
+    });
     var retainedTarget = visibleSnapshot.Current.AsValueEnumerable().Single(unit => unit.UnitId == targetId);
     Assert.Equal(new Vector3I(2, 0, 0), retainedTarget.Position);
     Assert.Equal(observedHealth, retainedTarget.Health);
@@ -113,7 +116,7 @@ public sealed class BattleObservationHistoryTest
     Assert.Equal(1, battle.Query(new GetFactionVisibleObjectsQuery(faction)).Count);
     battle.Move(battle.PlayerUnit, [new Vector3I(1, 0, 0)]);
     Assert.True(battle.Query(new HasFactionExploredTile(faction, battle.At(3, 0, 0))));
-    battle.Session.ApplyDamageTo(obj, [new Damage(10, Element.Kinetic)], None);
+    battle.Mutate(() => battle.Session.ApplyDamageTo(obj, [new Damage(10, Element.Kinetic)], None));
     Assert.Equal(0, battle.Query(new GetFactionVisibleObjectsQuery(faction)).Count);
   }
 }

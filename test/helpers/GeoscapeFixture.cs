@@ -105,7 +105,7 @@ public sealed class GeoscapeFixture : IDisposable
       if (stun > 0)
         battle.ApplyDamage(unit, stun, DamageKind.Stun);
     }
-    battle.Session.EndBattle(outcome);
+    battle.Mutate(() => battle.Session.EndBattle(outcome));
     return battle.Query(new GetFactionEndOfBattleSummary(State.PlayerFaction)).RequireRight();
   }
 

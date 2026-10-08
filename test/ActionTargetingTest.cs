@@ -74,9 +74,9 @@ public class ActionTargetingTest
       new Vector3I(4, 0, 0), new Vector3I(4, 0, 2), new Vector3I(3, 0, 1), new Vector3I(5, 0, 1)));
     var move = new MoveTargeting(battle.Runtime, battle.PlayerUnit);
 
-    Assert.Equal(0, move.Begin().Count);
-    Assert.False(move.CanCommit(new Vector3I(4, 0, 4))); // the enemy's tile
-    Assert.False(move.CanCommit(new Vector3I(0, 0, 0))); // an open tile
+    battle.Read(() => Assert.Equal(0, move.Begin().Count));
+    battle.Read(() => Assert.False(move.CanCommit(new Vector3I(4, 0, 4)))); // the enemy's tile
+    battle.Read(() => Assert.False(move.CanCommit(new Vector3I(0, 0, 0)))); // an open tile
   }
 
   [TestCase(TestName = "Out-of-range enemy: Attack row stays available with no committable tiles")]
@@ -89,10 +89,10 @@ public class ActionTargetingTest
       enemy: new("Goon", Position: new Vector3I(7, 0, 7)));
 
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    Assert.True(Row<AttackActionDefinition>(actions).IsAvailable);
+    battle.Read(() => Assert.True(Row<AttackActionDefinition>(actions).IsAvailable));
     var targeting = new AttackTargeting(battle.Runtime, battle.PlayerUnit);
-    Assert.Equal(0, targeting.Begin().Count);
-    Assert.False(targeting.CanCommit(new Vector3I(7, 0, 7)));
+    battle.Read(() => Assert.Equal(0, targeting.Begin().Count));
+    battle.Read(() => Assert.False(targeting.CanCommit(new Vector3I(7, 0, 7))));
   }
 
   [TestCase]
@@ -114,16 +114,16 @@ public class ActionTargetingTest
     var obj = objects.AsValueEnumerable().Single(o => o.Position == cell);
     var scenery = objects.AsValueEnumerable().Single(o => o.Position == new Vector3I(2, 0, 2));
     var targeting = new AttackTargeting(battle.Runtime, battle.PlayerUnit);
-    Assert.True(targeting.Begin().AsValueEnumerable().Contains(cell));
-    Assert.False(targeting.Candidates.AsValueEnumerable().Contains(scenery.Position));
+    battle.Read(() => Assert.True(targeting.Begin().AsValueEnumerable().Contains(cell)));
+    battle.Read(() => Assert.False(targeting.Candidates.AsValueEnumerable().Contains(scenery.Position)));
     var preview = (AttackPreview)targeting.Preview(cell).RequireRight();
-    Assert.Equal(100, preview.HitChance.FinalChance);
-    Assert.True(targeting.CanCommit(cell));
+    battle.Read(() => Assert.Equal(100, preview.HitChance.FinalChance));
+    battle.Read(() => Assert.True(targeting.CanCommit(cell)));
     battle.Submit(targeting.Build(cell));
-    Assert.Equal(Some(ObjectStatus.Destroyed), obj.Status);
-    Assert.True(targeting.Preview(cell).IsLeft);
+    battle.Read(() => Assert.Equal(Some(ObjectStatus.Destroyed), obj.Status));
+    battle.Read(() => Assert.True(targeting.Preview(cell).IsLeft));
     Assert.Throws<InvalidOperationException>(() => targeting.Build(cell));
-    Assert.False(targeting.Begin().AsValueEnumerable().Contains(cell));
+    battle.Read(() => Assert.False(targeting.Begin().AsValueEnumerable().Contains(cell)));
   }
 
   [TestCase]
@@ -140,8 +140,8 @@ public class ActionTargetingTest
     var shortRange = battle.Spawn(TestData.MakeCombatant("Short", battle.PlayerFaction),
       new Vector3I(0, 0, 1), shortWeapon);
     var obj = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable().Single();
-    Assert.True(battle.Query(new GetFactionVisibleObjectsQuery(battle.PlayerFaction)).AsValueEnumerable().Contains(obj));
-    Assert.False(new AttackTargeting(battle.Runtime, blind).Begin().AsValueEnumerable().Contains(obj.Position));
-    Assert.False(new AttackTargeting(battle.Runtime, shortRange).Begin().AsValueEnumerable().Contains(obj.Position));
+    battle.Read(() => Assert.True(battle.Query(new GetFactionVisibleObjectsQuery(battle.PlayerFaction)).AsValueEnumerable().Contains(obj)));
+    battle.Read(() => Assert.False(new AttackTargeting(battle.Runtime, blind).Begin().AsValueEnumerable().Contains(obj.Position)));
+    battle.Read(() => Assert.False(new AttackTargeting(battle.Runtime, shortRange).Begin().AsValueEnumerable().Contains(obj.Position)));
   }
 }

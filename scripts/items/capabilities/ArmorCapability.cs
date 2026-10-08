@@ -6,11 +6,21 @@ namespace FunProject.Items.Capabilities;
 public class ArmorCapability : ItemCapability
 {
   public int Max { get; }
-  public int Current { get; private set; }
+  private int _current;
+  public int Current
+  {
+    get { _battleAccess.RequireRead(); return _current; }
+    private set { _battleAccess.RequireMutation(); _current = value; }
+  }
   public Element Element { get; }
   public int RegenDelayTurns { get; }
   public int RegenPerTurn { get; }
-  public int RegenDelayRemaining { get; private set; }
+  private int _regenDelayRemaining;
+  public int RegenDelayRemaining
+  {
+    get { _battleAccess.RequireRead(); return _regenDelayRemaining; }
+    private set { _battleAccess.RequireMutation(); _regenDelayRemaining = value; }
+  }
 
   public bool CanRegen => RegenPerTurn > 0;
   public bool IsDepleted => Current <= 0;
@@ -30,17 +40,20 @@ public class ArmorCapability : ItemCapability
 
   public void Reduce(int amount)
   {
+    _battleAccess.RequireMutation();
     ArgumentOutOfRangeException.ThrowIfLessThan(amount, 0);
     Current = Math.Max(Current - amount, 0);
   }
 
   public void RearmRegenDelay()
   {
+    _battleAccess.RequireMutation();
     RegenDelayRemaining = RegenDelayTurns;
   }
 
   public int TickRegen()
   {
+    _battleAccess.RequireMutation();
     if (RegenDelayRemaining > 0)
     {
       RegenDelayRemaining--;

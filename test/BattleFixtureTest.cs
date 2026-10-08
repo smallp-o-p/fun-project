@@ -25,17 +25,17 @@ public partial class BattleFixtureTest
     using var battle = new BattleFixture(SingleUnitSetup(faction));
     var unit = battle.UnitAt(new Vector3I(0, 0, 0));
 
-    Assert.True(ReferenceEquals(unit, battle.UnitAt(new Vector3I(0, 0, 0))));
-    Assert.Equal(1, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
-    Assert.Equal(1, battle.Events.EventsOf<SessionStartedBattleEvent>().Length);
-    Assert.True(ReferenceEquals(battle.Board, battle.Session.Board));
+    battle.Read(() => Assert.True(ReferenceEquals(unit, battle.UnitAt(new Vector3I(0, 0, 0)))));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<UnitAddedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<SessionStartedBattleEvent>().Length));
+    battle.Read(() => Assert.True(ReferenceEquals(battle.Board, battle.Session.Board)));
 
     battle.ClearEvents();
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 0)]));
-    Assert.Equal(new Vector3I(1, 0, 0), battle.Alive(unit).Position.Raw);
-    Assert.Equal(1, battle.Events.EventsOf<UnitMovedBattleEvent>().Length);
-    Assert.Equal(0, battle.Events.EventsOf<UnitAddedBattleEvent>().Length);
-    Assert.Equal(0, battle.Events.EventsOf<SessionStartedBattleEvent>().Length);
+    battle.Read(() => Assert.Equal(new Vector3I(1, 0, 0), battle.Alive(unit).Position.Raw));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<UnitMovedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<UnitAddedBattleEvent>().Length));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<SessionStartedBattleEvent>().Length));
   }
 
   [TestCase]
@@ -45,9 +45,9 @@ public partial class BattleFixtureTest
     battle.ClearEvents();
     battle.Move(battle.Unit, [new Vector3I(1, 0, 0)]);
     battle.Move(battle.Unit, [new Vector3I(2, 0, 0)]);
-    Assert.Equal(new Vector3I(2, 0, 0), battle.Alive(battle.Unit).Position.Raw);
-    Assert.Equal(2, battle.Unit.CurrentActionPoints);
-    Assert.Equal(2, battle.Events.EventsOf<UnitMovedBattleEvent>().Length);
+    battle.Read(() => Assert.Equal(new Vector3I(2, 0, 0), battle.Alive(battle.Unit).Position.Raw));
+    battle.Read(() => Assert.Equal(2, battle.Unit.CurrentActionPoints));
+    battle.Read(() => Assert.Equal(2, battle.Events.EventsOf<UnitMovedBattleEvent>().Length));
   }
 
   [TestCase]
@@ -56,7 +56,7 @@ public partial class BattleFixtureTest
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var action = BattleAction.MoveUnit(battle.Alive(battle.Unit), [battle.At(2, 0, 0)]);
     Assert.Throws<InvalidOperationException>(() => battle.Submit(action));
-    Assert.Equal(new Vector3I(0, 0, 0), battle.Alive(battle.Unit).Position.Raw);
+    battle.Read(() => Assert.Equal(new Vector3I(0, 0, 0), battle.Alive(battle.Unit).Position.Raw));
   }
 
   // Two inert-objective sides with no designated player faction: a startup hook can wipe and
@@ -94,11 +94,11 @@ public partial class BattleFixtureTest
 
     // The interrupt spawned after the bootstrap's complete placement primitive...
     var interloper = battle.UnitAt(new Vector3I(7, 0, 7));
-    Assert.Equal("Interloper", interloper.Combatant.Name);
+    battle.Read(() => Assert.Equal("Interloper", interloper.Combatant.Name));
     // ...but the authored placement still owns the enemy role.
-    Assert.True(ReferenceEquals(battle.EnemyUnit.Combatant, authoredEnemy));
-    Assert.False(ReferenceEquals(battle.EnemyUnit, interloper));
-    Assert.Equal("Alpha", battle.PlayerUnit.Combatant.Name);
+    battle.Read(() => Assert.True(ReferenceEquals(battle.EnemyUnit.Combatant, authoredEnemy)));
+    battle.Read(() => Assert.False(ReferenceEquals(battle.EnemyUnit, interloper)));
+    battle.Read(() => Assert.Equal("Alpha", battle.PlayerUnit.Combatant.Name));
   }
 
   [TestCase(TestName = "A startup replacement reusing the authored combatant and cell cannot steal the authored raw unit")]
@@ -125,15 +125,15 @@ public partial class BattleFixtureTest
 
     // The replacement actually committed on the authored lookup key and the battle survived
     // the mid-startup wipe, so the role contract below is exercised, not vacuous.
-    Assert.Equal(2, adds.Length);
-    Assert.True(battle.Session.Outcome.IsNone);
+    battle.Read(() => Assert.Equal(2, adds.Length));
+    battle.Read(() => Assert.True(battle.Session.Outcome.IsNone));
     // The authored role stays the originally recorded unit: dead but retained...
-    Assert.True(ReferenceEquals(battle.EnemyUnit, adds[0]));
-    Assert.True(battle.EnemyUnit.IsDead);
+    battle.Read(() => Assert.True(ReferenceEquals(battle.EnemyUnit, adds[0])));
+    battle.Read(() => Assert.True(battle.EnemyUnit.IsDead));
     // ...while the replacement occupies the cell, alive and distinct.
     BattleUnitState replacement = battle.UnitAt(authoredCell);
-    Assert.True(replacement.IsAlive);
-    Assert.False(ReferenceEquals(battle.EnemyUnit, replacement));
+    battle.Read(() => Assert.True(replacement.IsAlive));
+    battle.Read(() => Assert.False(ReferenceEquals(battle.EnemyUnit, replacement)));
   }
 
   private sealed class ReinforceOnceOnFirstUnitAdded(Combatant reinforcement, Vector3I where)
@@ -185,7 +185,7 @@ public partial class BattleFixtureTest
       TestData.MakeCombatant("Extra", battle.PlayerFaction), battle.At(0, 0, 1)));
     // Tick exactly once per committed event: a second Bind subscription would leave the
     // duplicated copies queued after this loop and fail the idle assertion below.
-    int committed = spawn.EventsThatOccurred.Length;
+    int committed = battle.Read(() => spawn.EventsThatOccurred.Length);
     Assert.True(committed > 0);
     for (int step = 0; step < committed; step++)
     {
@@ -211,9 +211,8 @@ public partial class BattleFixtureTest
     battle.Dispose();
     battle.Dispose();
 
-    using var replacement = new BattleActionExecutor(battle.Session);
-    replacement.Submit(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Later", faction), battle.Board.At(2, 0, 2)));
+    Assert.Throws<ObjectDisposedException>(() => new BattleActionExecutor(battle.Session));
+    Assert.Throws<ObjectDisposedException>(() => battle.Session.RaiseEvents([]));
     Assert.Equal(recorded, battle.Events.Count);
     Assert.Throws<ObjectDisposedException>(() => battle.Query(new GetBattleOutcomeQuery()));
     Assert.Throws<ObjectDisposedException>(() => battle.ClearEvents());

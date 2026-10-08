@@ -5,14 +5,12 @@ using System.Collections.Generic;
 
 // Tile-path targeting: reachable tiles from GetPossibleMoveTilesForUnit; path preview/commit from
 // FindPathForUnit (source-inclusive, so the committed MoveUnit drops index 0). The handler owns the
-// reachable set as the single source the controller renders from, and caches the last previewed
-// (target, path) so commit reuses the hover preview's path instead of re-querying the path search.
+// reachable set as the single source the controller renders from, and rebuilds the route at submission under execution ownership.
 public sealed class MoveTargeting : IActionTargeting
 {
   private readonly BattleRuntime _runtime;
   private readonly BattleUnitState _unit;
   private readonly SysColGeneric.HashSet<Vector3I> _reachable = [];
-  private Option<(Vector3I Target, BattleBoardState.ValidatedPoint[] Path)> _lastPath;
 
   public MoveTargeting(BattleRuntime runtime, BattleUnitState unit)
   {
@@ -29,7 +27,6 @@ public sealed class MoveTargeting : IActionTargeting
   public IReadOnlyCollection<Vector3I> Begin()
   {
     _reachable.Clear();
-    _lastPath = None;
     IReadOnlyCollection<BattleBoardState.ValidatedPoint> tiles =
       _runtime.TryGetAlive(_unit).Match(
         Some: proof => _runtime.Query(new GetPossibleMoveTilesForUnit(proof)),
@@ -43,7 +40,6 @@ public sealed class MoveTargeting : IActionTargeting
     ResolvePath(target).Match(
       Right: path =>
       {
-        _lastPath = Some((target, path));
         return Right<BattleQueryFailure, ActionPreview>(new PathPreview(path.AsValueEnumerable().Select(point => point.Raw).ToArray()));
       },
       Left: Left<BattleQueryFailure, ActionPreview>);
@@ -52,11 +48,8 @@ public sealed class MoveTargeting : IActionTargeting
 
   public BattleAction Build(Vector3I target)
   {
-    // Reuse the path the immediately-preceding hover preview already computed for this target;
-    // fall back to a fresh query only if no matching cached path exists.
-    BattleBoardState.ValidatedPoint[] path = _lastPath.Match(
-      Some: cached => cached.Target == target ? cached.Path : QueryPath(target),
-      None: () => QueryPath(target));
+    // Submission rebuilds the route under execution ownership.
+    BattleBoardState.ValidatedPoint[] path = QueryPath(target);
     // Fresh proof at the write boundary: the mover may have died since Begin().
     return _runtime.TryGetAlive(_unit).Match(
       mover => BattleAction.MoveUnit(mover, path.AsValueEnumerable().Skip(1).ToArray()),

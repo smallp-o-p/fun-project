@@ -8,7 +8,7 @@ public class StatFoldTest
 {
   [TestCase(TestName = "Empty modifier list returns the base value")]
   public void EmptyReturnsBase() =>
-    Assert.Equal(10f, HasStats.Fold(10f, []));
+    Assert.Equal(10f, HasStats.Fold(10f, System.Array.Empty<StatModifier>()));
 
   [TestCase(TestName = "Add modifiers sum onto the base")]
   public void AddsSum() =>

@@ -13,6 +13,10 @@ public enum ObjectStatus
 /// <summary>Mutable runtime state for one special board object.</summary>
 public sealed class BattleObjectState
 {
+  private readonly BattleAccessBinding _battleAccess = new();
+  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access); foreach (var capability in _capabilities) capability.BindBattleAccess(access); }
+  internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
+
   private readonly SysColGeneric.List<SpecialObjectCapability> _capabilities = [];
 
   /// <summary>Stable runtime identifier for this object within one session.</summary>
@@ -23,7 +27,12 @@ public sealed class BattleObjectState
   /// board — presence on the board already says "placed" — and
   /// <see cref="ObjectStatus.Interacted"/>, <see cref="ObjectStatus.Expired"/>, or
   /// <see cref="ObjectStatus.Destroyed"/> after.</summary>
-  public Option<ObjectStatus> Status { get; internal set; }
+  private Option<ObjectStatus> _status;
+  public Option<ObjectStatus> Status
+  {
+    get { _battleAccess.RequireRead(); return _status; }
+    internal set { _battleAccess.RequireMutation(); _status = value; }
+  }
   /// <summary>The object's board position; special objects never move.</summary>
   public Vector3I Position { get; }
   /// <summary>Convenience access to <see cref="BattleSpecialObjectData.Name"/>.</summary>

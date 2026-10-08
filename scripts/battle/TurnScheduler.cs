@@ -12,6 +12,10 @@ namespace FunProject.Battle;
 // depend on the live unit pool (session state) are injected as delegates.
 internal sealed class TurnScheduler
 {
+  private readonly BattleAccessBinding _battleAccess = new();
+  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access); }
+  internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
+
   private readonly Func<Faction, bool> _hasConsciousUnits;
   private readonly Func<Faction, IEnumerable<BattleUnitState>> _eligibleUnitsOf;
 
@@ -48,13 +52,19 @@ internal sealed class TurnScheduler
     RefreshActiveFactionAvailability();
   }
 
-  public Faction ActiveSide { get; private set; }
-  public IReadOnlyCollection<Faction> GlobalFactionTurnOrder => _globalFactionOrder;
-  public IReadOnlyCollection<Faction> TurnQueue => _turnQueue;
+  private Faction _activeSide = null!;
+  public Faction ActiveSide
+  {
+    get { _battleAccess.RequireRead(); return _activeSide; }
+    private set { _battleAccess.RequireMutation(); _activeSide = value; }
+  }
+  public IReadOnlyCollection<Faction> GlobalFactionTurnOrder { get { _battleAccess.RequireRead(); return _globalFactionOrder.AsValueEnumerable().ToArray(); } }
+  public IReadOnlyCollection<Faction> TurnQueue { get { _battleAccess.RequireRead(); return _turnQueue.AsValueEnumerable().ToArray(); } }
 
   // Registers a faction in the global turn order. Returns true iff it was newly added.
   public bool RegisterFaction(Faction side)
   {
+    _battleAccess.RequireMutation();
     if (_globalFactionOrder.Contains(side))
       return false;
 
@@ -69,6 +79,7 @@ internal sealed class TurnScheduler
   // active identity is retained and no active faction is invented.
   public AdvanceResult Advance()
   {
+    _battleAccess.RequireMutation();
     _sidesActedThisRound.Add(ActiveSide);
     _turnQueue.Dequeue();
     RemoveEliminatedSidesFromQueue();
@@ -95,6 +106,7 @@ internal sealed class TurnScheduler
   // it joins the active side, otherwise queue its side unless it already acted or is queued).
   public void AddSpawnedUnit(BattleUnitState unit)
   {
+    _battleAccess.RequireMutation();
     if (!unit.IsAlive || unit.IsUnconscious)
       return;
 
@@ -118,6 +130,7 @@ internal sealed class TurnScheduler
   // kept until explicit end-turn; active-side identity is a scheduler-owned fact.
   public void OnFactionEliminated(Faction side)
   {
+    _battleAccess.RequireMutation();
     _sidesActedThisRound.Remove(side);
     if (side == ActiveSide)
     {
@@ -130,11 +143,13 @@ internal sealed class TurnScheduler
 
   public bool TryConsumeAvailableUnit(BattleUnitState unit)
   {
+    _battleAccess.RequireMutation();
     return _activeFactionUnitsAvailable.Remove(unit);
   }
 
   public bool IsUnitAvailable(BattleUnitState unit)
   {
+    _battleAccess.RequireRead();
     return _activeFactionUnitsAvailable.Contains(unit);
   }
 
@@ -142,6 +157,7 @@ internal sealed class TurnScheduler
   // completed battles keep historical reads total.
   public void Stop()
   {
+    _battleAccess.RequireMutation();
     _turnQueue.Clear();
     _activeFactionUnitsAvailable.Clear();
   }

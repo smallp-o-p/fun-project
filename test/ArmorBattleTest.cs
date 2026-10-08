@@ -32,10 +32,10 @@ public partial class ArmorBattleTest
       TestData.MakeWeapon("Rifle"), armor);
     var unit = battle.Unit;
 
-    Assert.True(unit.EquippedArmor.IsSome);
+    battle.Read(() => Assert.True(unit.EquippedArmor.IsSome));
     var equipped = unit.EquippedArmor.RequireSome();
-    Assert.Equal(10, equipped.Capability.Current);
-    Assert.Equal(Element.Thermal, equipped.Capability.Element);
+    battle.Read(() => Assert.Equal(10, equipped.Capability.Current));
+    battle.Read(() => Assert.Equal(Element.Thermal, equipped.Capability.Element));
   }
 
   [TestCase(TestName = "Units spawn without armor by default")]
@@ -45,7 +45,7 @@ public partial class ArmorBattleTest
     using var battle = ArmoredSolo(playerFaction, TestData.MakeCombatant("Alpha", playerFaction));
     var unit = battle.Unit;
 
-    Assert.True(unit.EquippedArmor.IsNone);
+    battle.Read(() => Assert.True(unit.EquippedArmor.IsNone));
   }
 
   // NOTE: BattleAction.ApplyDamage emits a Kinetic packet. Tests that are not about
@@ -64,12 +64,12 @@ public partial class ArmorBattleTest
     battle.ClearEvents();
     battle.ApplyDamage(unit, 4);
 
-    Assert.Equal(6, armor.Capability.Current);
-    Assert.Equal(20, unit.CurrentHealth);
+    battle.Read(() => Assert.Equal(6, armor.Capability.Current));
+    battle.Read(() => Assert.Equal(20, unit.CurrentHealth));
     var damagedEvent = battle.Events.SingleEvent<UnitDamagedBattleEvent>();
-    Assert.Equal(4, damagedEvent.ArmorDamage);
-    Assert.Equal(0, damagedEvent.HealthDamage);
-    Assert.Equal(4, damagedEvent.TotalAmount);
+    battle.Read(() => Assert.Equal(4, damagedEvent.ArmorDamage));
+    battle.Read(() => Assert.Equal(0, damagedEvent.HealthDamage));
+    battle.Read(() => Assert.Equal(4, damagedEvent.TotalAmount));
   }
 
   [TestCase(TestName = "Spillover damages health and can kill through armor")]
@@ -85,12 +85,12 @@ public partial class ArmorBattleTest
     battle.ClearEvents();
     battle.ApplyDamage(unit, 10);
 
-    Assert.Equal(0, armor.Capability.Current);
-    Assert.Equal(0, unit.CurrentHealth);
-    Assert.True(unit.IsDead);
+    battle.Read(() => Assert.Equal(0, armor.Capability.Current));
+    battle.Read(() => Assert.Equal(0, unit.CurrentHealth));
+    battle.Read(() => Assert.True(unit.IsDead));
     // A killing blow commits death only: no damage event accompanies the kill.
-    Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
-    Assert.True(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any()));
+    battle.Read(() => Assert.True(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Any()));
   }
 
   [TestCase(TestName = "Attack strips element-matched armor at 1.5x")]
@@ -107,11 +107,11 @@ public partial class ArmorBattleTest
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
     // Default weapon frame emits one Kinetic packet of 5: matched -> min(6, 7) = 6 armor, no spill.
-    Assert.Equal(0, armor.Capability.Current);
-    Assert.Equal(20, battle.EnemyUnit.CurrentHealth);
+    battle.Read(() => Assert.Equal(0, armor.Capability.Current));
+    battle.Read(() => Assert.Equal(20, battle.EnemyUnit.CurrentHealth));
     var damagedEvent = battle.Events.SingleEvent<UnitDamagedBattleEvent>();
-    Assert.Equal(6, damagedEvent.ArmorDamage);
-    Assert.Equal(0, damagedEvent.HealthDamage);
-    Assert.Equal(5, damagedEvent.TotalAmount);
+    battle.Read(() => Assert.Equal(6, damagedEvent.ArmorDamage));
+    battle.Read(() => Assert.Equal(0, damagedEvent.HealthDamage));
+    battle.Read(() => Assert.Equal(5, damagedEvent.TotalAmount));
   }
 }

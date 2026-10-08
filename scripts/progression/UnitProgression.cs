@@ -1,3 +1,4 @@
+using FunProject.Battle;
 using System;
 using System.Collections.Generic;
 using FunProject.Buffs;
@@ -12,16 +13,26 @@ namespace FunProject.Progression;
 /// </summary>
 public sealed class UnitProgression
 {
+  private readonly BattleAccessBinding _battleAccess = new(shared: true);
+  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access); }
+  internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
+
   public const int MaxCommittedPaths = 2;
 
   private readonly List<SkillPathData> _committedPaths = [];
   private readonly Dictionary<SkillPathData, int> _unlockedStepsByPath = [];
 
-  public int CurrencyPoints { get; private set; }
-  public IReadOnlyList<SkillPathData> CommittedPaths => _committedPaths;
+  private int _currencyPoints;
+  public int CurrencyPoints
+  {
+    get { _battleAccess.RequireRead(); return _currencyPoints; }
+    private set { _battleAccess.RequireMutation(); _currencyPoints = value; }
+  }
+  public IReadOnlyList<SkillPathData> CommittedPaths { get { _battleAccess.RequireRead(); return _committedPaths.AsReadOnly(); } }
 
   public void AwardPoints(int amount)
   {
+    _battleAccess.RequireMutation();
     if (amount < 1)
       throw new ArgumentOutOfRangeException(nameof(amount), amount, "Currency awards must be positive.");
     CurrencyPoints += amount;
@@ -30,6 +41,7 @@ public sealed class UnitProgression
   /// <summary>Free commitment of an available path; false when both slots are full or it is already held.</summary>
   public bool TryCommit(SkillPathData path)
   {
+    _battleAccess.RequireMutation();
     ArgumentNullException.ThrowIfNull(path);
     if (path.Steps.Count == 0)
       throw new InvalidOperationException(
@@ -45,6 +57,7 @@ public sealed class UnitProgression
   /// <summary>How many steps of the chain are unlocked (0 = committed, nothing bought).</summary>
   public int StepsUnlockedFor(SkillPathData path)
   {
+    _battleAccess.RequireRead();
     ArgumentNullException.ThrowIfNull(path);
     return _unlockedStepsByPath.TryGetValue(path, out int unlocked) ? unlocked : 0;
   }
@@ -52,6 +65,7 @@ public sealed class UnitProgression
   /// <summary>The next purchasable step of a committed path, or None when not committed or the chain is complete.</summary>
   public Option<SkillUpgradeStepData> NextStep(SkillPathData path)
   {
+    _battleAccess.RequireRead();
     ArgumentNullException.ThrowIfNull(path);
     if (!_unlockedStepsByPath.TryGetValue(path, out int unlocked))
       return Option<SkillUpgradeStepData>.None;
@@ -63,6 +77,7 @@ public sealed class UnitProgression
   /// committed, the chain is complete, or the step is unaffordable.</summary>
   public Option<UnlockedStep> TryUnlockNext(SkillPathData path)
   {
+    _battleAccess.RequireMutation();
     ArgumentNullException.ThrowIfNull(path);
     if (!_unlockedStepsByPath.ContainsKey(path))
       return Option<UnlockedStep>.None;
@@ -78,6 +93,7 @@ public sealed class UnitProgression
 
         CurrencyPoints -= next.Cost;
         _unlockedStepsByPath[path] += 1;
+        _battleAccess.Guard?.NotifyStatSourcesChanged();
         return Some(new UnlockedStep(path, next));
       },
       None: () => Option<UnlockedStep>.None);
@@ -86,6 +102,7 @@ public sealed class UnitProgression
   /// <summary>Permanent stat mods from unlocked steps, folding into stat contributions.</summary>
   public IReadOnlyList<StatMod> StatMods()
   {
+    _battleAccess.RequireRead();
     List<StatMod> result = [];
     foreach (var (_, _, step) in UnlockedSteps())
       foreach (UpgradeEffectData effect in step.Effects)
@@ -98,6 +115,7 @@ public sealed class UnitProgression
   /// <summary>Buffs granted by unlocked steps, joining spawn-time buff grants.</summary>
   public IReadOnlyList<Buff> GrantedBuffs()
   {
+    _battleAccess.RequireRead();
     List<Buff> result = [];
     foreach (var (_, _, step) in UnlockedSteps())
       foreach (UpgradeEffectData effect in step.Effects)
@@ -110,6 +128,7 @@ public sealed class UnitProgression
   /// <summary>Abilities granted by unlocked steps; inert until the ability system consumes them.</summary>
   public IReadOnlyList<AbilityData> GrantedAbilities()
   {
+    _battleAccess.RequireRead();
     List<AbilityData> result = [];
     foreach (var (path, stepIndex, step) in UnlockedSteps())
       foreach (UpgradeEffectData effect in step.Effects)

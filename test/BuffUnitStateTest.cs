@@ -37,11 +37,11 @@ public partial class BuffUnitStateTest
       TestData.MakeWeapon("Charm Blade", grantedBuffs: [shared]));
     var unit = battle.Unit;
 
-    Assert.Equal(3, unit.Buffs.Count);
-    Assert.Equal(2, unit.Buffs.AsValueEnumerable().Count(buff => buff == shared));
-    Assert.Equal(shared, unit.Buffs[0]);
-    Assert.Equal(innateOnly, unit.Buffs[1]);
-    Assert.Equal(shared, unit.Buffs[2]);
+    battle.Read(() => Assert.Equal(3, unit.Buffs.Count));
+    battle.Read(() => Assert.Equal(2, unit.Buffs.AsValueEnumerable().Count(buff => buff == shared)));
+    battle.Read(() => Assert.Equal(shared, unit.Buffs[0]));
+    battle.Read(() => Assert.Equal(innateOnly, unit.Buffs[1]));
+    battle.Read(() => Assert.Equal(shared, unit.Buffs[2]));
   }
 
   [TestCase(TestName = "Active buff StatMods flow into EffectiveStat; inactive contribute nothing")]
@@ -52,14 +52,14 @@ public partial class BuffUnitStateTest
       TestData.MakeCombatant("Alpha", faction, health: 20, aim: 65, buffs: [AimBuff()]));
     var buffed = battle.Unit;
 
-    Assert.Equal(65f, buffed.EffectiveStat<AimStat>());
-    Assert.False(buffed.ActiveBuffDamageMods.AsValueEnumerable().Any());
+    battle.Read(() => Assert.Equal(65f, buffed.EffectiveStat<AimStat>()));
+    battle.Read(() => Assert.False(buffed.ActiveBuffDamageMods.AsValueEnumerable().Any()));
 
     battle.ApplyDamage(buffed, 11); // 9/20: condition holds
-    buffed.EvaluateBuffs(battle.Session);
+    battle.Mutate(() => buffed.EvaluateBuffs(battle.Session));
 
-    Assert.Equal(75f, buffed.EffectiveStat<AimStat>());
-    Assert.Equal(1, buffed.ActiveBuffs.AsValueEnumerable().Count());
+    battle.Read(() => Assert.Equal(75f, buffed.EffectiveStat<AimStat>()));
+    battle.Read(() => Assert.Equal(1, buffed.ActiveBuffs.AsValueEnumerable().Count()));
   }
 
   [TestCase(TestName = "ClampCurrentHealthToMax lowers current health to a reduced max and never raises it")]
@@ -75,13 +75,13 @@ public partial class BuffUnitStateTest
       TestData.MakeCombatant("Alpha", faction, health: 20, buffs: [intimidation]));
     var unit = battle.Unit;
 
-    unit.ClampCurrentHealthToMax();
+    battle.Mutate(() => unit.ClampCurrentHealthToMax());
 
-    Assert.Equal(15, unit.MaxHealth);
-    Assert.Equal(15, unit.CurrentHealth);
+    battle.Read(() => Assert.Equal(15, unit.MaxHealth));
+    battle.Read(() => Assert.Equal(15, unit.CurrentHealth));
 
-    unit.ClampCurrentHealthToMax(); // idempotent; never raises
-    Assert.Equal(15, unit.CurrentHealth);
+    battle.Mutate(() => unit.ClampCurrentHealthToMax()); // idempotent; never raises
+    battle.Read(() => Assert.Equal(15, unit.CurrentHealth));
   }
 
   [TestCase(TestName = "A buff that would push max health to zero clamps current health to 1, never killing")]
@@ -96,8 +96,8 @@ public partial class BuffUnitStateTest
       TestData.MakeCombatant("Alpha", faction, health: 20, buffs: [crushing]));
     var unit = battle.Unit;
 
-    Assert.True(unit.IsAlive);
-    Assert.Equal(1, unit.CurrentHealth);
+    battle.Read(() => Assert.True(unit.IsAlive));
+    battle.Read(() => Assert.Equal(1, unit.CurrentHealth));
   }
 
   [TestCase(TestName = "Sharing a buff resource preserves independent unit activation snapshots")]
@@ -109,25 +109,25 @@ public partial class BuffUnitStateTest
       enemy: new("Hostile", Buffs: [shared]));
     var player = battle.PlayerUnit;
     var enemy = battle.EnemyUnit;
-    var before = player.ActiveBuffs;
+    var before = battle.Read(() => player.ActiveBuffs);
     battle.ClearEvents();
 
-    Assert.True(ReferenceEquals(shared, player.Buffs[0]));
-    Assert.True(ReferenceEquals(shared, enemy.Buffs[0]));
+    battle.Read(() => Assert.True(ReferenceEquals(shared, player.Buffs[0])));
+    battle.Read(() => Assert.True(ReferenceEquals(shared, enemy.Buffs[0])));
     battle.ApplyDamage(player, 11);
-    Assert.Equal(0, player.ActiveBuffs.AsValueEnumerable().Count());
-    Assert.Equal(65f, player.EffectiveStat<AimStat>());
+    battle.Read(() => Assert.Equal(0, player.ActiveBuffs.AsValueEnumerable().Count()));
+    battle.Read(() => Assert.Equal(65f, player.EffectiveStat<AimStat>()));
 
     battle.EndFactionTurn(battle.PlayerFaction);
-    Assert.Equal(1, player.ActiveBuffs.AsValueEnumerable().Count());
-    Assert.Equal(0, enemy.ActiveBuffs.AsValueEnumerable().Count());
-    Assert.Equal(0, before.AsValueEnumerable().Count());
-    Assert.Equal(75f, player.EffectiveStat<AimStat>());
-    Assert.Equal(65f, enemy.EffectiveStat<AimStat>());
-    Assert.Equal(player, battle.Events.SingleEvent<UnitBuffActivatedBattleEvent>().Unit);
+    battle.Read(() => Assert.Equal(1, player.ActiveBuffs.AsValueEnumerable().Count()));
+    battle.Read(() => Assert.Equal(0, enemy.ActiveBuffs.AsValueEnumerable().Count()));
+    battle.Read(() => Assert.Equal(0, before.AsValueEnumerable().Count()));
+    battle.Read(() => Assert.Equal(75f, player.EffectiveStat<AimStat>()));
+    battle.Read(() => Assert.Equal(65f, enemy.EffectiveStat<AimStat>()));
+    battle.Read(() => Assert.Equal(player, battle.Events.SingleEvent<UnitBuffActivatedBattleEvent>().Unit));
 
     battle.EndFactionTurn(battle.EnemyFaction);
-    Assert.Equal(1, battle.Events.EventsOf<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count());
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count()));
   }
 
   [TestCase(TestName = "Duplicate grants keep separate flags and evaluate after each health clamp")]
@@ -146,36 +146,36 @@ public partial class BuffUnitStateTest
     var player = battle.PlayerUnit;
     battle.ClearEvents();
 
-    Assert.Equal(2, player.Buffs.Count);
-    Assert.True(ReferenceEquals(shared, player.Buffs[0]));
-    Assert.True(ReferenceEquals(shared, player.Buffs[1]));
+    battle.Read(() => Assert.Equal(2, player.Buffs.Count));
+    battle.Read(() => Assert.True(ReferenceEquals(shared, player.Buffs[0])));
+    battle.Read(() => Assert.True(ReferenceEquals(shared, player.Buffs[1])));
     battle.ApplyDamage(player, 6); // 14/20: first grant can activate.
     battle.EndFactionTurn(battle.PlayerFaction);
 
     // First activation lowers max to 10 and clamps health to 10. The second
     // grant sees 10/10, fails the 75% threshold, and remains inactive.
-    Assert.Equal(1, player.ActiveBuffs.AsValueEnumerable().Count());
-    Assert.Equal(10, player.MaxHealth);
-    Assert.Equal(10, player.CurrentHealth);
-    Assert.Equal(75f, player.EffectiveStat<AimStat>());
-    Assert.Equal(shared, battle.Events.SingleEvent<UnitBuffActivatedBattleEvent>().Buff);
+    battle.Read(() => Assert.Equal(1, player.ActiveBuffs.AsValueEnumerable().Count()));
+    battle.Read(() => Assert.Equal(10, player.MaxHealth));
+    battle.Read(() => Assert.Equal(10, player.CurrentHealth));
+    battle.Read(() => Assert.Equal(75f, player.EffectiveStat<AimStat>()));
+    battle.Read(() => Assert.Equal(shared, battle.Events.SingleEvent<UnitBuffActivatedBattleEvent>().Buff));
 
     battle.EndFactionTurn(battle.EnemyFaction);
     // First deactivates at 10/10, restoring max 20 without healing. The second
     // now sees 10/20 and activates. A resource-keyed flag cannot represent this.
-    Assert.Equal(1, player.ActiveBuffs.AsValueEnumerable().Count());
-    Assert.Equal(10, player.MaxHealth);
-    Assert.Equal(10, player.CurrentHealth);
-    Assert.Equal(75f, player.EffectiveStat<AimStat>());
+    battle.Read(() => Assert.Equal(1, player.ActiveBuffs.AsValueEnumerable().Count()));
+    battle.Read(() => Assert.Equal(10, player.MaxHealth));
+    battle.Read(() => Assert.Equal(10, player.CurrentHealth));
+    battle.Read(() => Assert.Equal(75f, player.EffectiveStat<AimStat>()));
     var flips = battle.Events.AsValueEnumerable()
       .Where(evt => evt is UnitBuffActivatedBattleEvent or UnitBuffDeactivatedBattleEvent)
       .ToArray();
-    Assert.Equal(3, flips.Length);
-    Assert.True(flips[0] is UnitBuffActivatedBattleEvent);
-    Assert.True(flips[1] is UnitBuffDeactivatedBattleEvent);
-    Assert.True(flips[2] is UnitBuffActivatedBattleEvent);
-    Assert.Equal(shared, ((UnitBuffDeactivatedBattleEvent)flips[1]).Buff);
-    Assert.Equal(shared, ((UnitBuffActivatedBattleEvent)flips[2]).Buff);
+    battle.Read(() => Assert.Equal(3, flips.Length));
+    battle.Read(() => Assert.True(flips[0] is UnitBuffActivatedBattleEvent));
+    battle.Read(() => Assert.True(flips[1] is UnitBuffDeactivatedBattleEvent));
+    battle.Read(() => Assert.True(flips[2] is UnitBuffActivatedBattleEvent));
+    battle.Read(() => Assert.Equal(shared, ((UnitBuffDeactivatedBattleEvent)flips[1]).Buff));
+    battle.Read(() => Assert.Equal(shared, ((UnitBuffActivatedBattleEvent)flips[2]).Buff));
   }
 
   [TestCase(TestName = "Duplicate active grants both contribute stats and attack damage")]
@@ -201,14 +201,14 @@ public partial class BuffUnitStateTest
 
     battle.ApplyDamage(player, 11);
     battle.EndFactionTurn(battle.PlayerFaction);
-    Assert.Equal(2, player.ActiveBuffs.AsValueEnumerable().Count());
-    Assert.Equal(85f, player.EffectiveStat<AimStat>());
-    Assert.Equal(2, battle.Events.EventsOf<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count());
+    battle.Read(() => Assert.Equal(2, player.ActiveBuffs.AsValueEnumerable().Count()));
+    battle.Read(() => Assert.Equal(85f, player.EffectiveStat<AimStat>()));
+    battle.Read(() => Assert.Equal(2, battle.Events.EventsOf<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count()));
 
     battle.EndFactionTurn(battle.EnemyFaction);
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
-    Assert.Equal(19, battle.EnemyUnit.CurrentHealth); // 30 - (5 + 3 + 3)
-    Assert.Equal(2, battle.Events.EventsOf<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count());
+    battle.Read(() => Assert.Equal(19, battle.EnemyUnit.CurrentHealth)); // 30 - (5 + 3 + 3)
+    battle.Read(() => Assert.Equal(2, battle.Events.EventsOf<UnitBuffActivatedBattleEvent>().AsValueEnumerable().Count()));
   }
 
   [TestCase(TestName = "A missing authored condition fails at unit construction")]

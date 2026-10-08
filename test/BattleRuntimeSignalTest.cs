@@ -28,14 +28,17 @@ public sealed partial class BattleRuntimeSignalTest
       TestData.MakeCombatant("Reinforcement", battle.PlayerFaction),
       battle.Board.At(1, 0, 1)));
 
-    Assert.Equal(2, order.Count);
-    Assert.Equal("started", order[0]);
-    Assert.Equal("completed", order[1]);
-    Assert.Equal(1, completed.Count);
+    battle.Read(() => Assert.Equal(2, order.Count));
+    battle.Read(() => Assert.Equal("started", order[0]));
+    battle.Read(() => Assert.Equal("completed", order[1]));
+    battle.Read(() => Assert.Equal(1, completed.Count));
     bool unitAdded = false;
-    foreach (BattleEvent battleEvent in completed[0].EventsThatOccurred)
-      unitAdded |= battleEvent is UnitAddedBattleEvent;
-    Assert.True(unitAdded);
+    battle.Read(() =>
+    {
+      foreach (BattleEvent battleEvent in completed[0].EventsThatOccurred)
+        unitAdded |= battleEvent is UnitAddedBattleEvent;
+    });
+    battle.Read(() => Assert.True(unitAdded));
   }
 
   [TestCase(TestName = "Completed never fires when Submit throws; Started marks the attempt")]
@@ -55,8 +58,8 @@ public sealed partial class BattleRuntimeSignalTest
 
     // Started marks the attempt (fires before Submit); Completed is the reaction signal and
     // must never fire for a failed submission — spec: "no reaction runs".
-    Assert.Equal(2, started);
-    Assert.Equal(1, completed);
+    battle.Read(() => Assert.Equal(2, started));
+    battle.Read(() => Assert.Equal(1, completed));
   }
 
   [TestCase(TestName = "A completed battle rejects a new submission before either action signal fires")]
@@ -74,9 +77,9 @@ public sealed partial class BattleRuntimeSignalTest
 
     Assert.Throws<InvalidOperationException>(() => battle.Submit(action));
 
-    Assert.Equal(0, started);
-    Assert.Equal(0, completed);
-    Assert.Equal(0, battle.Events.Count);
-    Assert.True(battle.Query(new GetUnitAtTile(battle.At(0, 0, 0))).IsNone);
+    battle.Read(() => Assert.Equal(0, started));
+    battle.Read(() => Assert.Equal(0, completed));
+    battle.Read(() => Assert.Equal(0, battle.Events.Count));
+    battle.Read(() => Assert.True(battle.Query(new GetUnitAtTile(battle.At(0, 0, 0))).IsNone));
   }
 }

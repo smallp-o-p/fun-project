@@ -37,8 +37,8 @@ public class BattleFactoryTest
     List<BattleEvent> committed = [];
     runtime.BattleEventCommitted += committed.Add;
     runtime.ExecuteAction(BattleAction.EndFactionTurn(faction));
-    Assert.Equal(3, unit.State.CurrentStun);
-    Assert.Equal(5u, committed.SingleEvent<UnitStunRecoveredBattleEvent>().AmountRecovered);
+    runtime.Read(() => Assert.Equal(3, unit.State.CurrentStun));
+    runtime.Read(() => Assert.Equal(5u, committed.SingleEvent<UnitStunRecoveredBattleEvent>().AmountRecovered));
   }
 
   // --- tests ---------------------------------------------------------------
@@ -53,13 +53,13 @@ public class BattleFactoryTest
     var playerUnit = runtime.Query(new GetFactionAliveUnits(player)).AsValueEnumerable().Single();
     var enemyUnit = runtime.Query(new GetFactionAliveUnits(enemy)).AsValueEnumerable().Single();
 
-    Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw);
-    Assert.Equal(new Vector3I(3, 0, 3), enemyUnit.Position.Raw);
-    Assert.Equal(player, runtime.Query(new GetPlayerFactionQuery()).RequireSome());
+    runtime.Read(() => Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw));
+    runtime.Read(() => Assert.Equal(new Vector3I(3, 0, 3), enemyUnit.Position.Raw));
+    runtime.Read(() => Assert.Equal(player, runtime.Query(new GetPlayerFactionQuery()).RequireSome()));
 
     // InProgress + player (Sides[0]) is the active side: it can act, enemy cannot yet.
-    Assert.True(runtime.Query(new CanUnitActNow(playerUnit.State)));
-    Assert.False(runtime.Query(new CanUnitActNow(enemyUnit.State)));
+    runtime.Read(() => Assert.True(runtime.Query(new CanUnitActNow(playerUnit.State))));
+    runtime.Read(() => Assert.False(runtime.Query(new CanUnitActNow(enemyUnit.State))));
   }
 
   // Runs one failure-matrix row: a fresh inert system rides along so the test proves typed
@@ -318,15 +318,15 @@ public class BattleFactoryTest
         if (runtime.Query(new GetUnitAtTile(
               runtime.TryGetTile(new Vector3I(x, 0, z)).RequireSome())).IsSome)
           units++;
-    Assert.Equal(3, units);
+    runtime.Read(() => Assert.Equal(3, units));
 
     var objects = runtime.Query(new GetBattleSpecialObjectsQuery());
-    Assert.Equal(1, objects.Count);
-    Assert.True(objects[0].Status.IsNone);
+    runtime.Read(() => Assert.Equal(1, objects.Count));
+    runtime.Read(() => Assert.True(objects[0].Status.IsNone));
 
     for (int turn = 0; turn < 6 && runtime.Query(new GetBattleOutcomeQuery()).IsNone; turn++)
       runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
-    Assert.Equal(Some(ObjectStatus.Expired), runtime.Query(new GetBattleSpecialObjectsQuery())[0].Status);
+    runtime.Read(() => Assert.Equal(Some(ObjectStatus.Expired), runtime.Query(new GetBattleSpecialObjectsQuery())[0].Status));
   }
 
   private static BattleTypeData MakeBombDefusalType()
@@ -394,8 +394,8 @@ public class BattleFactoryTest
     Faction enemy = runtime.Query(new GetGlobalFactionTurnOrderQuery())
       .AsValueEnumerable().Single(f => !ReferenceEquals(f, player));
     var enemyUnit = runtime.Query(new GetFactionAliveUnits(enemy)).AsValueEnumerable().Single();
-    Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw);
-    Assert.Equal(new Vector3I(1, 0, 0), enemyUnit.Position.Raw);
+    runtime.Read(() => Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw));
+    runtime.Read(() => Assert.Equal(new Vector3I(1, 0, 0), enemyUnit.Position.Raw));
   }
 
   [TestCase(TestName = "Type start fails when a slot has fewer cells than its roster")]
@@ -458,11 +458,11 @@ public class BattleFactoryTest
     using var runtime = BattleFactory.Start(type, seed: 7,
       playerDeployment: Some(deployment)).RequireRight();
 
-    Assert.True(ReferenceEquals(campaign,
-      runtime.Query(new GetPlayerFactionQuery()).RequireSome()));
+    runtime.Read(() => Assert.True(ReferenceEquals(campaign,
+      runtime.Query(new GetPlayerFactionQuery()).RequireSome())));
     var unit = runtime.Query(new GetFactionAliveUnits(campaign)).AsValueEnumerable().Single();
-    Assert.True(ReferenceEquals(campaign, unit.State.Side));
-    Assert.True(ReferenceEquals(veteran, unit.State.Combatant));
+    runtime.Read(() => Assert.True(ReferenceEquals(campaign, unit.State.Side)));
+    runtime.Read(() => Assert.True(ReferenceEquals(veteran, unit.State.Combatant)));
   }
 
   [TestCase(TestName = "Empty map pool is a typed failure")]
