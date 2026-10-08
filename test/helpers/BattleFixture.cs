@@ -321,8 +321,7 @@ public sealed class BattleFixture : IDisposable
   }
 
   // Owns and binds the supplied concrete director to the fixture's runtime exactly once,
-  // returning it so local test doubles keep their type. EventPlaybackDirector.Bind has no
-  // unbind, so the publisher and the director share the fixture's lifetime.
+  // returning it so local test doubles keep their type. The fixture owns the subscription.
   public T AttachDirector<T>(T director) where T : EventPlaybackDirector
   {
     ThrowIfDisposed();
@@ -330,7 +329,7 @@ public sealed class BattleFixture : IDisposable
     if (!_directors.Contains(director))
     {
       OwnNode(director);
-      director.Bind(Runtime);
+      Runtime.ActionCompleted += director.EnqueueResult;
       _directors.Add(director);
     }
     return director;
@@ -338,8 +337,7 @@ public sealed class BattleFixture : IDisposable
 
   // Disposes the UI, frees owned nodes in reverse registration order, then closes the
   // runtime — all under one idempotent flag set at entry. Events and the raw Session/Board
-  // handles stay inspectable afterwards for lifecycle tests. The runtime and any bound
-  // directors share this lifetime because Bind exposes no unbind.
+  // handles stay inspectable afterwards for lifecycle tests.
   public void Dispose()
   {
     if (_disposed)
@@ -353,6 +351,8 @@ public sealed class BattleFixture : IDisposable
       }
       finally
       {
+        foreach (EventPlaybackDirector director in _directors)
+          Runtime.ActionCompleted -= director.EnqueueResult;
         for (int i = _ownedNodes.Count - 1; i >= 0; i--)
           if (Godot.GodotObject.IsInstanceValid(_ownedNodes[i]))
             _ownedNodes[i].Free();

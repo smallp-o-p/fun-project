@@ -3,14 +3,8 @@ using FunProject.Combatants;
 using Godot;
 using System;
 
-// Presentation host: receives a started BattleRuntime via Present, instances the pooled battle
-// map and builds unit meshes in code, keeps the presentation FSM plus refresh orchestration and
-// input routing here, and pushes view models into the runtime-free view (authored BattleUI)
-// while intents flow back through events. The environment (WorldEnvironment, sun, authored
-// GameCamera rig instance) is authored in the scene. The standalone debug host is BattleLauncher
-// (allowReturn false); the geoscape handoff presents with allowReturn true and routes
-// Completed into the campaign return.
-// Deliberately throwaway — to be superseded by the real BattleScene later.
+// Owns the runtime and presentation lifetime. The controller owns selection/targeting;
+// the HUD owns widgets; the director receives committed results before the UI reconciles them.
 public sealed partial class BattleScene : Node3D
 {
   private BattleRuntime _runtime = null!;
@@ -42,6 +36,12 @@ public sealed partial class BattleScene : Node3D
     if (_disposed)
       return;
     _disposed = true;
+    ProcessMode = ProcessModeEnum.Disabled;
+    if (_director is not null)
+    {
+      _runtime.ActionCompleted -= _director.EnqueueResult;
+      _director.PlaybackIdle -= OnPlaybackIdle;
+    }
     _ui?.Dispose();
     _runtime?.Dispose();
   }
@@ -49,6 +49,7 @@ public sealed partial class BattleScene : Node3D
   // The installer runs fallible setup after tree attachment and recovers exceptions directly.
   public void InitializePresentation()
   {
+    ObjectDisposedException.ThrowIf(_disposed, this);
     if (_runtime is null || _setup is null)
       throw new System.InvalidOperationException(
         "BattleScene requires Present(runtime, setup) before initialization.");
@@ -62,10 +63,9 @@ public sealed partial class BattleScene : Node3D
     InstantiateMap();
     GameCamera rig = ConfigureGameCamera();
 
-    var director = new EventPlaybackDirector { Name = "EventPlaybackDirector" };
-    AddChild(director);
-    director.Bind(_runtime);
-    _director = director;
+    _director = new EventPlaybackDirector { Name = "EventPlaybackDirector" };
+    AddChild(_director);
+    _runtime.ActionCompleted += _director.EnqueueResult;
 
     var unitMeshes = new BattleUnitMeshes { Name = "UnitMeshes" };
     AddChild(unitMeshes);
@@ -90,7 +90,6 @@ public sealed partial class BattleScene : Node3D
     _director.PlaybackIdle += OnPlaybackIdle;
 
     RefreshView();
-
   }
 
   public override void _ExitTree()
