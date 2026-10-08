@@ -3,14 +3,8 @@ using FunProject.Combatants;
 using Godot;
 using System;
 
-// Presentation host: receives a started BattleRuntime via Present, instances the pooled battle
-// map and builds unit meshes in code, keeps the presentation FSM plus refresh orchestration and
-// input routing here, and pushes view models into the runtime-free view (authored BattleUI)
-// while intents flow back through events. The environment (WorldEnvironment, sun, authored
-// GameCamera rig instance) is authored in the scene. The standalone debug host is BattleLauncher
-// (allowReturn false); the geoscape handoff presents with allowReturn true and routes
-// Completed into the campaign return.
-// Deliberately throwaway — to be superseded by the real BattleScene later.
+// Owns the runtime and presentation lifetime. The controller owns selection/targeting;
+// the HUD owns widgets; the director receives committed results before the UI reconciles them.
 public sealed partial class BattleScene : Node3D
 {
   private BattleRuntime _runtime = null!;
@@ -42,6 +36,12 @@ public sealed partial class BattleScene : Node3D
     if (_disposed)
       return;
     _disposed = true;
+    ProcessMode = ProcessModeEnum.Disabled;
+    if (_director is not null)
+    {
+      _runtime.ActionCompleted -= _director.EnqueueResult;
+      _director.PlaybackIdle -= OnPlaybackIdle;
+    }
     _ui?.Dispose();
     _runtime?.Dispose();
   }
@@ -49,6 +49,7 @@ public sealed partial class BattleScene : Node3D
   // The installer runs fallible setup after tree attachment and recovers exceptions directly.
   public void InitializePresentation()
   {
+    ObjectDisposedException.ThrowIf(_disposed, this);
     if (_runtime is null || _setup is null)
       throw new System.InvalidOperationException(
         "BattleScene requires Present(runtime, setup) before initialization.");
@@ -62,10 +63,9 @@ public sealed partial class BattleScene : Node3D
     InstantiateMap();
     GameCamera rig = ConfigureGameCamera();
 
-    var director = new EventPlaybackDirector { Name = "EventPlaybackDirector" };
-    AddChild(director);
-    director.Bind(_runtime);
-    _director = director;
+    _director = new EventPlaybackDirector { Name = "EventPlaybackDirector" };
+    AddChild(_director);
+    _runtime.ActionCompleted += _director.EnqueueResult;
 
     var unitMeshes = new BattleUnitMeshes { Name = "UnitMeshes" };
     AddChild(unitMeshes);
@@ -77,29 +77,19 @@ public sealed partial class BattleScene : Node3D
     AddChild(input);
     input.Initialize(rig);
     _view = GetNode<BattleUI>("%BattleUI");
-    _view.ConfirmRequested += () => _ui.Confirm();
-    _view.CancelRequested += _ui.Cancel;
-    _view.VerbSelected += _ui.BeginAction;
-    _view.ReturnRequested += OnReturnIntent;
+    _view.Hud.ConfirmRequested += () => _ui.Confirm();
+    _view.Hud.CancelRequested += _ui.Cancel;
+    _view.Hud.VerbSelected += _ui.BeginAction;
+    _view.Hud.ReturnRequested += OnReturnIntent;
     input.TileClicked += tile => _ui.ClickTile(tile);
     input.TileHovered += OnTileHovered;
     input.ConfirmPressed += () => _ui.Confirm();
     input.CancelPressed += _ui.Cancel;
 
-    _ui.StateChanged += RefreshView;
-    _ui.ReadoutsChanged += RefreshView;
-    _ui.StateChanged += () =>
-    {
-      if (_ui.State == UiState.BattleOver)
-        ShowBattleOverBanner();
-    };
+    _ui.Changed += RefreshView;
     _director.PlaybackIdle += OnPlaybackIdle;
 
     RefreshView();
-
-    // Show startup-terminal results immediately.
-    if (_ui.State == UiState.BattleOver)
-      ShowBattleOverBanner();
   }
 
   public override void _ExitTree()
@@ -122,8 +112,8 @@ public sealed partial class BattleScene : Node3D
   {
     var queriedUnits = _runtime.Query(new GetFactionAliveUnits(_playerFaction))
       .AsValueEnumerable().Select(unit => unit.State).ToArray();
-    _view.ShowUnits(queriedUnits);
-    _view.ShowActionOptions(_ui.ActionOptions);
+    _view.Hud.ShowUnits(queriedUnits);
+    _view.Hud.ShowActionOptions(_ui.ActionOptions);
 
     bool targeting = _ui.State is UiState.Targeting or UiState.TargetingLocked;
     if (targeting)
@@ -131,7 +121,9 @@ public sealed partial class BattleScene : Node3D
     else
       _view.HideTargeting();
 
-    _view.ShowReturn(CanReturn);
+    _view.Hud.ShowReturn(CanReturn);
+    if (_ui.State == UiState.BattleOver)
+      ShowBattleOverBanner();
   }
 
   private void InstantiateMap()
@@ -159,17 +151,6 @@ public sealed partial class BattleScene : Node3D
       return;
 
     _ui.PreviewAt(tile);
-    RefreshPreviewOnly();
-  }
-
-  private void RefreshPreviewOnly()
-  {
-    if (_ui.State is not (UiState.Targeting or UiState.TargetingLocked))
-    {
-      _view.HidePreview();
-      return;
-    }
-
     _ui.LastPreview.Match(_view.ShowPreview, _view.HidePreview);
   }
 
@@ -178,7 +159,7 @@ public sealed partial class BattleScene : Node3D
     string text = _runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
       Right: summary => summary.Outcome == BattleOutcome.Victory ? "VICTORY" : "DEFEAT",
       Left: _ => "BATTLE OVER");
-    _view.ShowBattleOver(text);
+    _view.Hud.ShowBattleOver(text);
   }
 
   private void OnPlaybackIdle()

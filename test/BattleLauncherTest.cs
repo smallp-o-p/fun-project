@@ -80,4 +80,55 @@ public partial class BattleLauncherTest
 
     Assert.Throws<ArgumentNullException>(() => scene.Present(null!, null!));
   }
+
+  [TestCase(TestName = "Disposing an attached host detaches pending playback before runtime teardown")]
+  public void DisposeDetachesPendingPlayback()
+  {
+    var setup = BattleSetupResolver.Resolve(TestData.MakeDuelBattleType()).RequireRight();
+    using var runtime = BattleFactory.Start(setup).RequireRight();
+    var scene = CreateBattleScene();
+    scene.Present(runtime, setup);
+    AddToTree(scene);
+    scene.InitializePresentation();
+    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
+    var director = Director(scene);
+    Assert.True(director.Busy);
+
+    scene.Dispose();
+    scene.Dispose(); // teardown remains idempotent
+    DrainDirector(scene); // a retained completion must not query the disposed runtime
+
+    Assert.False(director.Busy);
+    Assert.Equal(Node.ProcessModeEnum.Disabled, scene.ProcessMode);
+    Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetActiveSideQuery()));
+  }
+
+  [TestCase(TestName = "Pointer picking uses the delivered event position even after the cursor moves")]
+  public async Task PointerPickingUsesDeliveredPosition()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var launcher = AddToTree(new BattleLauncher { BattleType = TestData.MakeDuelBattleType() });
+    var battle = (BattleScene)launcher.GetChild(0);
+    await SelectFirstBattleUnit(battle); // shared collider and physics setup
+    var camera = battle.GetNode<Camera3D>("GameCamera/CameraPath/PathFollow3D/Camera");
+    Vector2 delivered = camera.UnprojectPosition(new Vector3(0.5f, 0, 0.5f));
+    battle.GetViewport().WarpMouse(Vector2.Zero);
+    GD.Print($"Pointer probe delivered={delivered}, sampled={battle.GetViewport().GetMousePosition()}");
+    var input = battle.GetNode<BattleInputController>("BattleInputController");
+    Option<Vector3I> clicked = None;
+    Option<Vector3I> hovered = None;
+    input.TileClicked += tile => clicked = Some(tile);
+    input.TileHovered += tile => hovered = Some(tile);
+
+    input._UnhandledInput(new InputEventMouseMotion { Position = delivered });
+    input._UnhandledInput(new InputEventMouseButton
+    {
+      Position = delivered,
+      ButtonIndex = MouseButton.Left,
+      Pressed = true,
+    });
+
+    Assert.Equal(Vector3I.Zero, hovered.RequireSome());
+    Assert.Equal(Vector3I.Zero, clicked.RequireSome());
+  }
 }

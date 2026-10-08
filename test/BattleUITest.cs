@@ -9,8 +9,7 @@ using static GdUnit4.Assertions;
 namespace FunProject.Tests;
 
 // Exercises the authored scenes/battle/BattleUI.tscn as a pure view: view models are pushed in
-// with no runtime or FSM present, widgets and overlays must react, and intents raised by the
-// nested HUD must re-raise through the BattleUI root.
+// with no runtime or FSM present; the authored HUD and overlays must render and expose intents.
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleUITest
@@ -31,8 +30,8 @@ public partial class BattleUITest
       actions.AsValueEnumerable().First(action => action.Action is PassActionDefinition));
     var view = BuildView();
 
-    view.ShowUnits(units);
-    view.ShowActionOptions([moveOption, passOption]);
+    view.Hud.ShowUnits(units);
+    view.Hud.ShowActionOptions([moveOption, passOption]);
 
     var status = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%UnitStatus");
     Assert.True(status.Text.Contains("HP"));
@@ -82,8 +81,8 @@ public partial class BattleUITest
     Assert.False(hitChance.Visible);
   }
 
-  [TestCase(TestName = "HUD intents re-raise through the BattleUI root")]
-  public void HudIntentsRaiseThroughRoot()
+  [TestCase(TestName = "Authored HUD intents and widgets are available through the battle view")]
+  public void AuthoredHudIntentsAndWidgets()
   {
     using var battle = BattleFixture.Duel();
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
@@ -91,15 +90,15 @@ public partial class BattleUITest
       actions.AsValueEnumerable().First(action => action.Action is MoveActionDefinition));
     var view = BuildView();
     Assert.False(view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%BattleOverBanner").Visible);
-    view.ShowActionOptions([moveOption]);
+    view.Hud.ShowActionOptions([moveOption]);
     int confirms = 0;
     int cancels = 0;
     int returns = 0;
     UnitActionOption? selected = null;
-    view.ConfirmRequested += () => confirms++;
-    view.CancelRequested += () => cancels++;
-    view.ReturnRequested += () => returns++;
-    view.VerbSelected += option => selected = option;
+    view.Hud.ConfirmRequested += () => confirms++;
+    view.Hud.CancelRequested += () => cancels++;
+    view.Hud.ReturnRequested += () => returns++;
+    view.Hud.VerbSelected += option => selected = option;
 
     view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ConfirmButton").EmitSignal(Button.SignalName.Pressed);
     view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%CancelButton").EmitSignal(Button.SignalName.Pressed);
@@ -107,12 +106,12 @@ public partial class BattleUITest
       .EmitSignal(Button.SignalName.Pressed);
     var returnButton = view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ReturnButton");
     Assert.False(returnButton.Visible);
-    view.ShowReturn(true);
+    view.Hud.ShowReturn(true);
     Assert.True(returnButton.Visible);
     returnButton.EmitSignal(Button.SignalName.Pressed);
-    view.ShowReturn(false);
+    view.Hud.ShowReturn(false);
     Assert.False(returnButton.Visible);
-    view.ShowBattleOver("VICTORY");
+    view.Hud.ShowBattleOver("VICTORY");
 
     Assert.Equal(1, confirms);
     Assert.Equal(1, cancels);

@@ -54,8 +54,14 @@ internal static partial class GeoscapeTestScenes
     var tree = (SceneTree)Engine.GetMainLoop();
     await battle.ToSignal(tree, SceneTree.SignalName.PhysicsFrame);
     await battle.ToSignal(tree, SceneTree.SignalName.PhysicsFrame);
+    PushBattlePointer(battle, Vector3I.Zero, MouseButton.Left, throughContainer);
+  }
+
+  public static void PushBattlePointer(BattleScene battle, Vector3I tile,
+    MouseButton? button = null, bool throughContainer = false)
+  {
     var camera = battle.GetNode<Camera3D>("GameCamera/CameraPath/PathFollow3D/Camera");
-    Vector2 pointer = camera.UnprojectPosition(new Vector3(0.5f, 0, 0.5f));
+    Vector2 pointer = camera.UnprojectPosition(BoardCoordinates.TileToWorldCenter(tile));
     var viewport = battle.GetViewport();
     // Convert projected viewport pixels to the container's parent viewport for forwarded input.
     Viewport inputViewport = viewport;
@@ -65,18 +71,19 @@ internal static partial class GeoscapeTestScenes
       pointer = container.GetGlobalTransformWithCanvas() * pointer;
       inputViewport = container.GetViewport();
     }
-    inputViewport.WarpMouse(pointer);
     inputViewport.PushInput(new InputEventMouseMotion { Position = pointer, GlobalPosition = pointer }, inLocalCoords: true);
+    if (button is not MouseButton clickedButton)
+      return;
     inputViewport.PushInput(new InputEventMouseButton
     {
       Position = pointer,
-      ButtonIndex = MouseButton.Left,
+      ButtonIndex = clickedButton,
       Pressed = true,
     }, inLocalCoords: true);
     inputViewport.PushInput(new InputEventMouseButton
     {
       Position = pointer,
-      ButtonIndex = MouseButton.Left,
+      ButtonIndex = clickedButton,
       Pressed = false,
     }, inLocalCoords: true);
   }

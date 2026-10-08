@@ -429,15 +429,18 @@ public class UnitActionCacheTest
       new GetAvailableActionsForUnit(battle.Alive(observer)));
     var targeting = new MoveTargeting(battle.Runtime, observer);
 
-    Assert.False(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(2, 0, 0)));
+    targeting.Begin();
+    Assert.False(targeting.Candidates.AsValueEnumerable().Contains(new Vector3I(2, 0, 0)));
 
     battle.Move(ally, [new Vector3I(3, 0, 0)]);
 
-    Assert.True(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(2, 0, 0)));
+    targeting.Begin();
+    Assert.True(targeting.Candidates.AsValueEnumerable().Contains(new Vector3I(2, 0, 0)));
 
     battle.Move(ally, [new Vector3I(2, 0, 0)]);
 
-    Assert.False(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(2, 0, 0)));
+    targeting.Begin();
+    Assert.False(targeting.Candidates.AsValueEnumerable().Contains(new Vector3I(2, 0, 0)));
     Assert.True(ReferenceEquals(actions, battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(observer)))));
   }
@@ -459,7 +462,8 @@ public class UnitActionCacheTest
     BattleUnitState target = battle.UnitAt(new Vector3I(3, 0, 0));
     var targeting = new AttackTargeting(battle.Runtime, observer);
 
-    Assert.True(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(3, 0, 0)));
+    targeting.Begin();
+    Assert.True(targeting.Candidates.AsValueEnumerable().Contains(new Vector3I(3, 0, 0)));
     Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable()
       .Count(e => ReferenceEquals(e.Unit, observer) && ReferenceEquals(e.Target, target)));
 
@@ -470,19 +474,22 @@ public class UnitActionCacheTest
     battle.Move(target, [new Vector3I(4, 0, 0)]);
 
     Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.False(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(4, 0, 0)));
+    targeting.Begin();
+    Assert.False(targeting.Candidates.AsValueEnumerable().Contains(new Vector3I(4, 0, 0)));
 
     battle.Move(target, [new Vector3I(5, 0, 0)]);
 
     Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(observer), battle.Alive(target))));
-    Assert.False(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(5, 0, 0)));
+    targeting.Begin();
+    Assert.False(targeting.Candidates.AsValueEnumerable().Contains(new Vector3I(5, 0, 0)));
     Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable()
       .Count(e => ReferenceEquals(e.Unit, observer) && ReferenceEquals(e.Target, target)));
 
     battle.Move(target, [new Vector3I(4, 0, 0), new Vector3I(3, 0, 0)]);
 
     Assert.Equal(0, target.CurrentActionPoints);
-    Assert.True(targeting.Begin().AsValueEnumerable().Contains(new Vector3I(3, 0, 0)));
+    targeting.Begin();
+    Assert.True(targeting.Candidates.AsValueEnumerable().Contains(new Vector3I(3, 0, 0)));
     Assert.Equal(1, battle.Events.EventsOf<UnitSpottedBattleEvent>().AsValueEnumerable()
       .Count(e => ReferenceEquals(e.Unit, observer) && ReferenceEquals(e.Target, target)));
     Assert.True(ReferenceEquals(actions, battle.Query(

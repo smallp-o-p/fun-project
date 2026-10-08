@@ -26,7 +26,7 @@ public sealed class MoveTargeting : IActionTargeting
 
   public IReadOnlyCollection<Vector3I> Candidates => _reachable;
 
-  public IReadOnlyCollection<Vector3I> Begin()
+  public void Begin()
   {
     _reachable.Clear();
     _lastPath = None;
@@ -36,7 +36,6 @@ public sealed class MoveTargeting : IActionTargeting
         None: () => System.Array.Empty<BattleBoardState.ValidatedPoint>());
     foreach (BattleBoardState.ValidatedPoint point in tiles)
       _reachable.Add(point.Raw);
-    return _reachable;
   }
 
   public Either<BattleQueryFailure, ActionPreview> Preview(Vector3I target) =>

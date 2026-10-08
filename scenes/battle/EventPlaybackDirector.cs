@@ -3,8 +3,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
-// Visual playback of committed battle events. Subscribes to the runtime's ActionCompleted
-// signal, flattens each result's EventsThatOccurred into one FIFO queue, and drains it one
+// Visual playback of committed battle events. Receives action results from its host,
+// flattens each result's EventsThatOccurred into one FIFO queue, and drains it one
 // step per Tick (called from _Process). Consecutive per-tile move events for one unit are
 // COALESCED into a single path step at dequeue time, so movement animates as one continuous
 // path; anything that interleaves (an interrupting shot, another unit's move) breaks the run
@@ -23,12 +23,6 @@ public partial class EventPlaybackDirector : Node
   public bool Busy => _stepInProgress || _queue.Count > 0;
 
   public event Action PlaybackIdle = delegate { };
-
-  public void Bind(BattleRuntime runtime)
-  {
-    ArgumentNullException.ThrowIfNull(runtime);
-    runtime.ActionCompleted += EnqueueResult;
-  }
 
   public void RegisterUnitMesh(BattleUnitState unit, Node3D mesh)
   {
@@ -61,9 +55,6 @@ public partial class EventPlaybackDirector : Node
         _stepInProgress = true;
         PlayStep(next, OnStepDone);
       }
-
-      RaiseIdleIfDrained();
-      return;
     }
 
     RaiseIdleIfDrained();
@@ -78,7 +69,7 @@ public partial class EventPlaybackDirector : Node
     }
   }
 
-  private void EnqueueResult(BattleActionExecResult result)
+  internal void EnqueueResult(BattleActionExecResult result)
   {
     foreach (BattleEvent battleEvent in result.EventsThatOccurred)
       _queue.Enqueue(battleEvent);
@@ -123,16 +114,10 @@ public partial class EventPlaybackDirector : Node
   // timing. Move events never reach this method - they are coalesced into PlayMoveStep.
   protected virtual void PlayStep(BattleEvent battleEvent, Action done)
   {
-    switch (battleEvent)
-    {
-      case UnitKilledBattleEvent killed when _unitMeshes.TryGetValue(killed.Unit, out Node3D? deadMesh) && deadMesh is not null:
-        deadMesh.Visible = false;
-        done();
-        break;
-      default:
-        done(); // no v1 visual: instant
-        break;
-    }
+    if (battleEvent is UnitKilledBattleEvent killed
+      && _unitMeshes.TryGetValue(killed.Unit, out Node3D? deadMesh))
+      deadMesh.Visible = false;
+    done(); // remaining v1 events have no visual
   }
 
   // One continuous path step for a coalesced run of move events: constant speed along the

@@ -57,11 +57,8 @@ public sealed partial class BattleUiControllerTest
     Assert.True(ui.CandidateCells.Count > 0);
     Assert.True(ui.PendingTarget.IsSome);
     Assert.True(ui.LastPreview.IsSome);
-    int stateChanges = 0;
-    int readoutsChanged = 0;
-    ui.StateChanged += () => stateChanges++;
-    ui.ReadoutsChanged += () => readoutsChanged++;
-
+    int updates = 0;
+    ui.Changed += () => updates++;
     ui.Dispose();
 
     Assert.True(ui.SelectedUnit.IsNone);
@@ -72,8 +69,7 @@ public sealed partial class BattleUiControllerTest
 
     battle.Move(battle.SupportUnit, [new Vector3I(6, 0, 7)]);
 
-    Assert.Equal(0, stateChanges);
-    Assert.Equal(0, readoutsChanged);
+    Assert.Equal(0, updates);
     Assert.True(ui.SelectedUnit.IsNone);
     Assert.Equal(0, ui.ActionOptions.Count);
     Assert.Equal(0, ui.CandidateCells.Count);
@@ -90,21 +86,35 @@ public sealed partial class BattleUiControllerTest
     Assert.Equal(UiState.Unselected, battle.Ui.State);
   }
 
-  [TestCase(TestName = "Cancel deselects; StateChanged fires only on transitions")]
-  public void CancelDeselectsAndStateChangedFiresOnlyOnTransitions()
+  [TestCase(TestName = "Selection and cancel each publish one complete update")]
+  public void SelectionAndCancelPublishCompleteUpdates()
   {
     using var battle = BattleFixture.UiBattle();
     int changes = 0;
-    battle.Ui.StateChanged += () => changes++;
+    battle.Ui.Changed += () =>
+    {
+      changes++;
+      if (battle.Ui.State == UiState.UnitSelected)
+      {
+        Assert.Equal(battle.PlayerUnit, battle.Ui.SelectedUnit.RequireSome());
+        Assert.True(battle.Ui.ActionOptions.Count > 0);
+      }
+      else
+      {
+        Assert.Equal(UiState.Unselected, battle.Ui.State);
+        Assert.True(battle.Ui.SelectedUnit.IsNone);
+        Assert.Equal(0, battle.Ui.ActionOptions.Count);
+      }
+    };
 
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)); // re-select same unit: no transition
-    Assert.Equal(1, changes);
+    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)); // reselect refreshes current readouts
+    Assert.Equal(2, changes);
 
     battle.Ui.Cancel();
     Assert.Equal(UiState.Unselected, battle.Ui.State);
     Assert.True(battle.Ui.SelectedUnit.IsNone);
-    Assert.Equal(2, changes);
+    Assert.Equal(3, changes);
   }
 
   [TestCase(UiState.UnitSelected, 20, DamageKind.Stun, TestName = "A foreign stun of the selected unit deselects")]
@@ -292,7 +302,19 @@ public sealed partial class BattleUiControllerTest
     battle.Ui.BeginAction(battle.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
     battle.Ui.ClickTile(new Vector3I(4, 0, 2));
 
+    int updates = 0;
+    void ObserveRetarget()
+    {
+      updates++;
+      Assert.Equal(new Vector3I(3, 0, 1), battle.Ui.PendingTarget.RequireSome());
+      var path = (PathPreview)battle.Ui.LastPreview.RequireSome();
+      Assert.Equal(new Vector3I(3, 0, 1), path.Path[^1]);
+    }
+    battle.Ui.Changed += ObserveRetarget;
+
     Assert.False(battle.Ui.ClickTile(new Vector3I(3, 0, 1))); // different valid tile: re-target
+    Assert.Equal(1, updates);
+    battle.Ui.Changed -= ObserveRetarget;
     Assert.Equal(UiState.TargetingLocked, battle.Ui.State);
     Assert.Equal(new Vector3I(3, 0, 1), battle.Ui.PendingTarget.RequireSome());
 
@@ -452,21 +474,24 @@ public sealed partial class BattleUiControllerTest
     Assert.True(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));
   }
 
-  [TestCase(TestName = "Switching selection refreshes readouts without a state transition")]
-  public void SwitchingSelectionRefreshesReadoutsOnly()
+  [TestCase(TestName = "Switching selection publishes current unit readouts")]
+  public void SwitchingSelectionPublishesCurrentReadouts()
   {
     using var battle = BattleFixture.UiBattle();
-    int stateChanges = 0;
-    int readoutsChanged = 0;
-    battle.Ui.StateChanged += () => stateChanges++;
-    battle.Ui.ReadoutsChanged += () => readoutsChanged++;
+    int updates = 0;
+    battle.Ui.Changed += () =>
+    {
+      updates++;
+      Assert.Equal(UiState.UnitSelected, battle.Ui.State);
+      Assert.True(battle.Ui.ActionOptions.AsValueEnumerable()
+        .All(option => ReferenceEquals(option.Unit, battle.Ui.SelectedUnit.RequireSome())));
+    };
 
     Assert.True(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));  // Hero
     Assert.True(battle.Ui.TrySelectAt(new Vector3I(7, 0, 7)));  // Support: switch
 
     Assert.Equal(UiState.UnitSelected, battle.Ui.State);
-    Assert.Equal(1, stateChanges);          // transition fired once (Unselected -> UnitSelected)
-    Assert.True(readoutsChanged >= 2);      // both selections mutated readouts
+    Assert.Equal(2, updates);
     Assert.Equal(battle.SupportUnit, battle.Ui.SelectedUnit.RequireSome());
     // The cached options now belong to the NEW unit:
     Assert.True(battle.Ui.ActionOptions.AsValueEnumerable().All(o => ReferenceEquals(o.Unit, battle.SupportUnit)));

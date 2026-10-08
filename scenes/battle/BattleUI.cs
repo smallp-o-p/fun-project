@@ -1,47 +1,22 @@
 using FunProject.Battle;
 using Godot;
-using System;
 using System.Collections.Generic;
 
 /// <summary>
-/// Runtime-free battle view: owns the HUD widgets, the movement line, and the reachable-tile
-/// highlighter. BattleScene pushes view models in to be presented; intents flow back out
-/// through events.
+/// Runtime-free targeting overlays. The authored HUD owns its widgets and intent events.
 /// </summary>
 public sealed partial class BattleUI : Node
 {
-  private BattleHud _hud = null!;
+  public BattleHud Hud { get; private set; } = null!;
   private MovementLine _movementLine = null!;
   private ReachableTileHighlighter _highlighter = null!;
 
-  public event Action? ConfirmRequested;
-  public event Action? CancelRequested;
-  public event Action<UnitActionOption>? VerbSelected;
-  public event Action? ReturnRequested;
-
   public override void _Ready()
   {
-    _hud = GetNode<BattleHud>("%BattleHud");
+    Hud = GetNode<BattleHud>("%BattleHud");
     _movementLine = GetNode<MovementLine>("%MovementLine");
     _highlighter = GetNode<ReachableTileHighlighter>("%ReachableTileHighlighter");
-
-    _hud.ConfirmRequested += () => ConfirmRequested?.Invoke();
-    _hud.CancelRequested += () => CancelRequested?.Invoke();
-    _hud.VerbSelected += option => VerbSelected?.Invoke(option);
-    _hud.ReturnRequested += () => ReturnRequested?.Invoke();
   }
-
-  public void ShowUnits(IReadOnlyList<BattleUnitState> units)
-    => _hud.ShowUnits(units);
-
-  public void ShowActionOptions(IReadOnlyList<UnitActionOption> options)
-    => _hud.ShowActionOptions(options);
-
-  public void ShowBattleOver(string bannerText)
-    => _hud.ShowBattleOver(bannerText);
-
-  public void ShowReturn(bool available)
-    => _hud.ShowReturn(available);
 
   public void ShowTargeting(IReadOnlyCollection<Vector3I> candidateCells, Option<ActionPreview> preview)
   {
@@ -60,12 +35,12 @@ public sealed partial class BattleUI : Node
     switch (preview)
     {
       case PathPreview p:
-        _hud.HideHitChance();
+        Hud.HideHitChance();
         DrawLine(p.Path);
         break;
       case AttackPreview a:
         _movementLine.Visible = false;
-        _hud.ShowHitChance(a.HitChance.FinalChance);
+        Hud.ShowHitChance(a.HitChance.FinalChance);
         break;
     }
   }
@@ -73,7 +48,7 @@ public sealed partial class BattleUI : Node
   public void HidePreview()
   {
     _movementLine.Visible = false;
-    _hud.HideHitChance();
+    Hud.HideHitChance();
   }
 
   private void DrawLine(IReadOnlyList<Vector3I> path)

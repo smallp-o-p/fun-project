@@ -12,8 +12,6 @@ public sealed partial class BattleHud : CanvasLayer
 {
   private HFlowContainer _verbButtons = null!;
   private HBoxContainer _turnButtons = null!;
-  private Button _confirmButton = null!;
-  private Button _cancelButton = null!;
   private Button _returnButton = null!;
   private Label _unitStatusLabel = null!;
   private Label _hitChanceLabel = null!;
@@ -28,15 +26,13 @@ public sealed partial class BattleHud : CanvasLayer
   {
     _verbButtons = GetNode<HFlowContainer>("%VerbButtons");
     _turnButtons = GetNode<HBoxContainer>("%TurnButtons");
-    _confirmButton = GetNode<Button>("%ConfirmButton");
-    _cancelButton = GetNode<Button>("%CancelButton");
     _returnButton = GetNode<Button>("%ReturnButton");
     _unitStatusLabel = GetNode<Label>("%UnitStatus");
     _hitChanceLabel = GetNode<Label>("%HitChance");
     _bannerLabel = GetNode<Label>("%BattleOverBanner");
 
-    _confirmButton.Pressed += () => ConfirmRequested?.Invoke();
-    _cancelButton.Pressed += () => CancelRequested?.Invoke();
+    GetNode<Button>("%ConfirmButton").Pressed += () => ConfirmRequested?.Invoke();
+    GetNode<Button>("%CancelButton").Pressed += () => CancelRequested?.Invoke();
     _returnButton.Pressed += () => ReturnRequested?.Invoke();
   }
 
