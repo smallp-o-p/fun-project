@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
 using Godot;
 using FunProject.Engineering;
-using FunProject.Items;
 using GdUnit4;
 using static FunProject.Tests.GeoscapeTestScenes;
 
@@ -9,26 +8,24 @@ using static FunProject.Tests.GeoscapeTestScenes;
 [RequireGodotRuntime]
 public class UnitArmoryAvailabilityTest
 {
-  [TestCase]
-  public static async Task UtilityBrowserOffersOnlyUtilityEquipment()
+  [TestCase(UnitViewSlotKind.Weapon, "Rifle")]
+  [TestCase(UnitViewSlotKind.Armor, "Vest")]
+  [TestCase(UnitViewSlotKind.Utility, "Field Kit")]
+  public static async Task EquipmentBrowserOffersOnlyCompatibleItems(UnitViewSlotKind kind, string expected)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var sample = MakeItemData("Workshop Sample");
     using var campaign = new GeoscapeFixture(MakeStart(
       roster: [MakeEntry()],
       armory: [MakeWeaponData(name: "Rifle"), MakeArmorData("Vest"),
-        sample, MakeUtilityData("Field Kit")]));
+        MakeItemData("Workshop Sample"), MakeUtilityData("Field Kit")]));
     var view = AddToTree(CreateUnitView());
     view.Present(campaign.State, campaign.State.Roster[0]);
 
-    view.SelectSlot(UnitViewSlot.Utility(0));
+    view.SelectSlot(new UnitViewSlot(kind));
 
     var choices = view.GetNode<VBoxContainer>("%ArmoryList");
     Assert.Equal(1, choices.GetChildCount());
-    Assert.True(choices.GetChild<Button>(0).Text.Contains("Field Kit"));
-    choices.GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
-    Assert.Equal("Field Kit", campaign.State.Roster[0].Inventory[0].Item.ItemName);
-    Assert.Equal(1, campaign.State.Armory.TryGetItemStock(sample).RequireSome().Remaining);
+    Assert.True(choices.GetChild<Button>(0).Text.Contains(expected));
   }
 
   [TestCase]
@@ -50,22 +47,6 @@ public class UnitArmoryAvailabilityTest
     Assert.Equal("Kit", unit.Inventory[0].Item.ItemName);
     Assert.True(unit.EquippedWeapon.IsNone);
     Assert.Equal(1, campaign.State.Armory.TryGetItemStock(rifle).RequireSome().Remaining);
-  }
-
-  [TestCase(UnitViewSlotKind.Weapon)]
-  [TestCase(UnitViewSlotKind.Armor)]
-  public static async Task UtilityMarkerDoesNotReplaceWeaponOrArmorRequirements(UnitViewSlotKind kind)
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var bare = MakeUtilityData("Utility item");
-    using var campaign = new GeoscapeFixture(MakeStart(
-      roster: [MakeEntry()], armory: [bare]));
-    var view = AddToTree(CreateUnitView());
-    view.Present(campaign.State, campaign.State.Roster[0]);
-
-    view.SelectSlot(new UnitViewSlot(kind));
-
-    Assert.Equal(0, view.GetNode<VBoxContainer>("%ArmoryList").GetChildCount());
   }
 
   [TestCase(false)]

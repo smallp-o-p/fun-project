@@ -256,7 +256,6 @@ internal static class TestData
         new ThrowableCapabilityData { ThrowRange = throwRange, ActionPointCost = actionPointCost, ConsumesOnUse = true },
         new BlastCapabilityData { BlastRadius = blastRadius, Effects = blastEffects },
         new ChargesCapabilityData { MaxCharges = 1 },
-        new UtilityCapabilityData(),
       ],
     });
     return item.With<ThrowableCapability>().RequireSome();
@@ -268,7 +267,7 @@ internal static class TestData
     {
       Name = name,
       Description = $"{name} throwable",
-      Capabilities = [new UtilityCapabilityData(), new ThrowableCapabilityData { ThrowRange = throwRange, ActionPointCost = actionPointCost, ConsumesOnUse = consumesOnUse }],
+      Capabilities = [new ThrowableCapabilityData { ThrowRange = throwRange, ActionPointCost = actionPointCost, ConsumesOnUse = consumesOnUse }],
     });
     return item.With<ThrowableCapability>().RequireSome();
   }
@@ -279,7 +278,7 @@ internal static class TestData
     {
       Name = name,
       Description = $"{name} usable item",
-      Capabilities = [new UtilityCapabilityData(), new ChargesCapabilityData { MaxCharges = maxCharges }],
+      Capabilities = [new ChargesCapabilityData { MaxCharges = maxCharges }],
     });
     return item.With<ChargesCapability>().RequireSome();
   }

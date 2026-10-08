@@ -365,12 +365,7 @@ public sealed partial class UnitView : GeoscapeView
   };
 
   private static bool HasCapability<TCapability>(EquippableItemData data) where TCapability : ItemCapabilityData
-  {
-    foreach (ItemCapabilityData capability in data.Capabilities)
-      if (capability is TCapability)
-        return true;
-    return false;
-  }
+    => data.Capabilities.AsValueEnumerable().Any(capability => capability is TCapability);
 
   private void EquipItem(ArmoryItemStock line)
   {
@@ -394,8 +389,7 @@ public sealed partial class UnitView : GeoscapeView
           break;
         case UnitViewSlotKind.Utility:
           // Parse before displacing the current item.
-          ItemWith<UtilityCapability> utility = item.With<UtilityCapability>().Match(
-            proof => proof,
+          var utility = item.With<UtilityCapability>().IfNone(
             () => throw new InvalidOperationException("The selected item does not support the utility slot."));
           _unit!.UnequipItem(slot.Index).IfSome(old => _state.Armory.DepositItem(old.Item));
           _unit.EquipItem(utility, slot.Index);

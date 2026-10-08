@@ -34,40 +34,31 @@ public class UtilityEquipmentTest
   }
 
   [TestCase]
-  public static void UtilityMarkerPreservesWeaponRuntimeThroughDeployment()
+  public static void UtilityMarkerComposesWithWeaponAndArmorThroughDeployment()
   {
     var data = MakeFirearmWeaponData(magazine: 3);
     data.Capabilities.Add(new UtilityCapabilityData());
     var weapon = (FirearmWeapon)ItemRuntimeFactory.Create(data);
     using var campaign = new GeoscapeFixture(MakeStart(roster: [MakeEntry()]));
     var unit = campaign.State.Roster[0];
+    var armorData = MakeArmorData("Shield Gadget");
+    armorData.Capabilities.Add(new UtilityCapabilityData());
+    var armor = ItemRuntimeFactory.Create(armorData);
+    unit.EquipArmor(armor.With<ArmorCapability>().RequireSome());
+    unit.EquipItem(unit.UnequipArmor().RequireSome().Item.With<UtilityCapability>().RequireSome(), 0);
     unit.EquipItem(weapon.With<UtilityCapability>().RequireSome(), 4);
     using var battle = BattleFixture.Started(new Vector3I(2, 1, 2),
       new UnitPlacement(new UnitLoadout(unit), Vector3I.Zero));
 
-    Assert.Equal(1, battle.Unit.Inventory.Count);
-    Assert.True(ReferenceEquals(weapon, battle.Unit.Inventory[0]));
+    Assert.Equal(2, battle.Unit.Inventory.Count);
+    Assert.True(ReferenceEquals(armor, battle.Unit.Inventory[0]));
+    Assert.True(ReferenceEquals(weapon, battle.Unit.Inventory[1]));
     Assert.True(weapon.TrySpendShot().IsSome);
     Assert.Equal(2, weapon.CurrentAmmo);
     var removed = unit.UnequipItem(4).RequireSome();
     Assert.True(ReferenceEquals(weapon, removed.Item));
     unit.EquipWeapon((Weapon)removed.Item);
     Assert.Equal(2, ((FirearmWeapon)unit.EquippedWeapon.RequireSome()).CurrentAmmo);
-  }
-
-  [TestCase]
-  public static void UtilityMarkerComposesWithArmor()
-  {
-    var data = MakeArmorData("Shield Gadget");
-    data.Capabilities.Add(new UtilityCapabilityData());
-    var item = ItemRuntimeFactory.Create(data);
-    using var campaign = new GeoscapeFixture(MakeStart(roster: [MakeEntry()]));
-    var unit = campaign.State.Roster[0];
-
-    unit.EquipArmor(item.With<ArmorCapability>().RequireSome());
-    Assert.True(ReferenceEquals(item, unit.UnequipArmor().RequireSome().Item));
-    unit.EquipItem(item.With<UtilityCapability>().RequireSome(), 0);
-    Assert.True(ReferenceEquals(item, unit.Inventory[0].Item));
   }
 
   [TestCase("frag_grenade", true)]
