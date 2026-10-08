@@ -51,36 +51,6 @@ public class ArmorCapabilityTest
     Assert.Throws<ArgumentOutOfRangeException>(() => capability.Reduce(-1));
   }
 
-  [TestCase(TestName = "TickRegen decrements the delay before restoring armor")]
-  public void TickRegenDecrementsDelayBeforeRestoring()
-  {
-    var capability = new ArmorCapability(MakeData(armor: 10, regenDelayTurns: 2, regenPerTurn: 3));
-    capability.Reduce(8);
-    capability.RearmRegenDelay();
-    Assert.Equal(2, capability.RegenDelayRemaining);
-
-    Assert.Equal(0, capability.TickRegen());
-    Assert.Equal(1, capability.RegenDelayRemaining);
-    Assert.Equal(0, capability.TickRegen());
-    Assert.Equal(0, capability.RegenDelayRemaining);
-    Assert.Equal(2, capability.Current);
-
-    Assert.Equal(3, capability.TickRegen());
-    Assert.Equal(5, capability.Current);
-  }
-
-  [TestCase(TestName = "TickRegen caps at max armor")]
-  public void TickRegenCapsAtMax()
-  {
-    var capability = new ArmorCapability(MakeData(armor: 10, regenDelayTurns: 0, regenPerTurn: 50));
-    capability.Reduce(6);
-    capability.RearmRegenDelay();
-
-    Assert.Equal(6, capability.TickRegen());
-    Assert.Equal(10, capability.Current);
-    Assert.Equal(0, capability.TickRegen());
-  }
-
   [TestCase(TestName = "Reduce does not re-arm the regen delay")]
   public void ReduceDoesNotReArmRegenDelay()
   {

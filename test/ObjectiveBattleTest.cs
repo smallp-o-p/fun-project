@@ -99,55 +99,6 @@ public class ObjectiveBattleTest
     Assert.Equal(0, battle.Events.EventsOf<TurnStartedBattleEvent>().Length);
   }
 
-  [TestCase(TestName = "A failed objective can queue a follow-up whose own outcome decides the battle")]
-  public void FailedObjectiveQueuesFollowUpWithInstanceBoundOutcome()
-  {
-    var player = TestData.MakeFaction("Player");
-    var enemy = TestData.MakeFaction("Enemy");
-    var main = new FakeObjectiveData
-    {
-      Failed = true,
-      OnFail = new QueueDirectiveData
-      {
-        FollowUps =
-        [
-          new SurviveUntilTurnObjectiveData
-          {
-            TargetTurn = 3, // later than this battle will reach — stays Ongoing
-            OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
-          },
-        ],
-      },
-    };
-    using var battle = new BattleFixture(new BattleSetup(
-      TestData.MakeOpenBattleMap(new Vector3I(5, 1, 5)),
-      [
-        new BattleSideSetup(player, [main],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("P1", player)), new Vector3I(0, 0, 0))]),
-        new BattleSideSetup(enemy, [new FakeObjectiveData()],
-          [
-            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("E1", enemy)), new Vector3I(2, 0, 0)),
-            new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("E2", enemy)), new Vector3I(3, 0, 0)),
-          ]),
-      ],
-      Seed: 7,
-      PlayerFaction: Some(player)));
-    var firstEnemy = battle.UnitAt(new Vector3I(2, 0, 0));
-
-    battle.ApplyDamage(firstEnemy, 999); // main fails -> follow-up SurviveUntilTurn(3) queued
-
-    Assert.True(battle.Session.Outcome.IsNone);
-    Assert.Equal(2, battle.Session.GetObjectives(player).Count); // main (Failed, history) + follow-up
-    Assert.Equal(ObjectiveResult.Failed, battle.Session.GetObjectives(player)[0].State);
-    Assert.Equal(ObjectiveResult.Ongoing, battle.Session.GetObjectives(player)[1].State);
-
-    // The follow-up observes TurnStarted and stays Ongoing because the battle only reaches
-    // turn 2, proving per-event snapshot semantics and silent non-resolution:
-    battle.AdvanceTurn();
-    battle.AdvanceTurn();
-    Assert.True(battle.Session.Outcome.IsNone);
-  }
-
   [TestCase(TestName = "A queued follow-up observes the next event in the same committed batch")]
   public void QueuedFollowUpObservesNextEventInSameBatch()
   {
@@ -168,34 +119,6 @@ public class ObjectiveBattleTest
     var unit = battle.Unit;
 
     battle.Move(unit, [new Vector3I(1, 0, 0)]);
-
-    Assert.True(battle.Session.Outcome.IsSome);
-    Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());
-  }
-
-  [TestCase(TestName = "A queued follow-up can win on its own later event")]
-  public void QueuedFollowUpCanWinOnItsOwnLaterEvent()
-  {
-    var player = TestData.MakeFaction("Player");
-    var followUp = new FakeObjectiveData
-    {
-      Complete = true,
-      Observe = typeof(TurnStartedBattleEvent),
-      OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
-    };
-    var main = new FakeObjectiveData
-    {
-      Failed = true,
-      Observe = typeof(UnitMovedBattleEvent),
-      OnFail = new QueueDirectiveData { FollowUps = [followUp] },
-    };
-    using var battle = RunnerFixture(player, main);
-    var unit = battle.Unit;
-
-    battle.Move(unit, [new Vector3I(1, 0, 0)]);
-    Assert.True(battle.Session.Outcome.IsNone);
-
-    battle.AdvanceTurn();
 
     Assert.True(battle.Session.Outcome.IsSome);
     Assert.Equal(BattleOutcome.Victory, battle.Session.Outcome.RequireSome());

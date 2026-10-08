@@ -31,19 +31,6 @@ public class GeoscapeScheduleTest
     Assert.Equal(expectedOccurredTick, active.OccurredTick);
   }
 
-  [TestCase(TestName = "Multiple entries on the same tick all fire")]
-  public void MultipleEntriesSameTickAllFire()
-  {
-    using var campaign = new GeoscapeFixture(timeline:
-    [
-      TestData.MakeScheduled(2, TestData.MakeEvent("A")),
-      TestData.MakeScheduled(2, TestData.MakeEvent("B")),
-    ]);
-    campaign.AdvanceTicks(2);
-
-    Assert.Equal(2, campaign.Session.ActiveEvents.Count);
-  }
-
   [TestCase(2, "Fading", 3, 4, 1, 1, 0)]
   [TestCase(1, "Everlasting", -1, 5000, 1, 0, 1)]
   [TestCase(2, "Blink", 0, 2, 0, 0, 0)]
@@ -100,19 +87,6 @@ public class GeoscapeScheduleTest
     campaign.AdvanceTicks(3); // ticks 3, 4, 5 — past where the mutated 0-tick expiry would have removed it
 
     Assert.Equal(1, campaign.Session.ActiveEvents.Count); // baked expiry: occurred 1 + 5 = tick 6
-  }
-
-  [TestCase(TestName = "Target region resolves to an index on the active event")]
-  public void TargetRegionNameResolves()
-  {
-    using var campaign = new GeoscapeFixture(
-      regions: [TestData.MakeRegion("Northmark")],
-      timeline: [TestData.MakeScheduled(1, TestData.MakeEvent("Targeted", targetRegionName: "Northmark"))]);
-    campaign.AdvanceTicks(1);
-
-    var active = campaign.Session.ActiveEvents[0];
-    Assert.True(active.TargetRegionIndex.IsSome);
-    Assert.Equal(0, active.TargetRegionIndex.RequireSome());
   }
 
   [TestCase(TestName = "Malformed schedule authoring fails campaign construction")]

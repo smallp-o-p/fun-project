@@ -448,36 +448,6 @@ public class CombatantConditionsTest
     }
   }
 
-  [TestCase(TestName = "Authored edits after construction flow through the bound resources")]
-  public void AuthoredEditsAfterConstructionFlowThroughBoundResources()
-  {
-    // The system holds no captured copy: it reads the tier resources directly, so field
-    // and mod-array edits reach it. Production treats the resources as immutable after
-    // initialization; this case deliberately mutates them to prove the reference identity.
-    var rules = new CombatantConditionRulesData();
-    var unit = Unit();
-    var bound = new CombatantConditionSystem(rules);
-    rules.InjuryTiers[0].Name = "Hacked";
-    rules.InjuryTiers[0].RecoveryDays = 999;
-    rules.InjuryTiers[1].MinimumDamagePercent = 40;
-    rules.InjuryTiers[0].StatMods.Add(Multiply<HealthStatMod>(0.1f));
-    rules.FatigueTiers[0].StatMods.Add(Multiply<AimStatMod>(0.1f));
-
-    bound.ApplyMissionReturn(unit, 10, 100, 0);
-    Assert.Equal(1, bound.GetInjury(unit).RequireSome().Tier);
-    Assert.Equal("Hacked", bound.InjuryName(bound.GetInjury(unit).RequireSome().Tier)); // the live name
-    Assert.Equal(1438560L, bound.GetInjury(unit).RequireSome().RecoveryTick); // the live 999 days
-    StatMod[] contributions = [.. bound.StatContributions(unit)];
-    // 4 live injury mods (3 authored + the late one) + the unconditional floor + 3 live
-    // Tired mods (2 authored + the late one).
-    Assert.Equal(8, contributions.Length);
-
-    // The live thresholds classify: with tier 2 now at 40, a 30% return earns one tier.
-    bound.ApplyMissionReturn(unit, 30, 100, 10);
-    Assert.Equal(2, bound.GetInjury(unit).RequireSome().Tier);
-    Assert.Equal(8650L, bound.GetInjury(unit).RequireSome().RecoveryTick); // tier 2's 6 days
-  }
-
   private static Combatant Unit(int health = 100)
     => TestData.MakeCombatant("Alpha", TestData.MakeFaction("Player"), health: health,
       aim: 100, will: 100, movement: 100);

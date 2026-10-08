@@ -9,9 +9,8 @@ using Godot;
 [RequireGodotRuntime]
 public partial class BattleCombatQueriesTest
 {
-  [TestCase(false, TestName = "Hit chance preview returns the literal cover-modified breakdown")]
-  [TestCase(true, TestName = "Hit chance preview matches the breakdown the attack resolves with")]
-  public void HitChancePreviewMatchesResolution(bool execute)
+  [TestCase(TestName = "Hit chance preview matches the breakdown the attack resolves with")]
+  public void HitChancePreviewMatchesResolution()
   {
     List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
     for (int x = 0; x < 8; x++)
@@ -24,7 +23,7 @@ public partial class BattleCombatQueriesTest
       }
     using var battle = BattleFixture.Duel(
       map: TestData.MakeMapData(new Vector3I(8, 1, 8), [.. tiles]),
-      randomSeed: execute ? 99 : null,
+      randomSeed: 99,
       player: new("Alpha", Weapon: TestData.MakeWeapon("Rifle")));
 
     var previewed = battle.Query(new GetHitChanceForAttack(
@@ -33,11 +32,6 @@ public partial class BattleCombatQueriesTest
     Assert.Equal(65, previewed.BaseChance);
     Assert.Equal(-40, previewed.Modifiers.AsValueEnumerable().Single().Amount);
     Assert.Equal(25, previewed.FinalChance);
-
-    if (!execute)
-    {
-      return;
-    }
 
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);

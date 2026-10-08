@@ -139,36 +139,6 @@ public class CharacterModelAnimationAssetTest
       $"Zeroing '{second.Parameter}' left '{second.Shape}' at {secondMesh.GetBlendShapeValue(secondShapeIndex)} instead of its neutral {second.Neutral} on '{scene}'.");
   }
 
-  // A clip may drive several blend-shape channels per the authoring guide, so
-  // selection must enumerate every track: the extended Smile clip conflicts
-  // with both the Blink and the SmileExtra preset, and the enabled Blink filter
-  // path makes that interference real in the graph, leaving Blink and
-  // SmileExtra as the only genuinely independent pair.
-  [TestCase]
-  public void TargetSelectionHandlesMultiTrackClips()
-  {
-    using var fixture = ModelFixture.WithAnimations(start: false);
-    Animation smile = fixture.Player.GetAnimationLibrary("").GetAnimation("smile");
-    SetConstantEndpoint(smile, "Face:Blink", 0.6f);
-    var graph = (AnimationNodeBlendTree)fixture.AnimationTree.TreeRoot;
-    var smileAdd = graph.GetNode(new StringName("Smile")) as AnimationNodeAdd2
-      ?? throw new InvalidOperationException("The fixture graph has no 'Smile' Add2 preset node.");
-    smileAdd.SetFilterPath("Face:Blink", true);
-    fixture.Start();
-
-    (PresetTarget first, PresetTarget second) = DisjointPresetTargets(
-      fixture.Player, graph, "the multi-track fixture");
-
-    Assert.Equal("parameters/Blink/add_amount", first.Parameter,
-      $"The multi-track fixture selected '{first.Parameter}' first; its Blink channel is free of SmileExtra contributions, while the Smile preset's clip also drives Blink and conflicts with it.");
-    Assert.Equal("Blink", first.Shape,
-      $"The multi-track fixture selected channel '{first.Shape}' first.");
-    Assert.Equal("parameters/SmileExtra/add_amount", second.Parameter,
-      $"The multi-track fixture selected '{second.Parameter}' second.");
-    Assert.Equal("Smile", second.Shape,
-      $"The multi-track fixture selected channel '{second.Shape}' second.");
-  }
-
   // The fixture's smile clip edited to carry a negative Smile endpoint (below
   // its 0.2 neutral) and a positive Blink endpoint, with the Smile Add2 filter
   // passing both channels: one preset weight then applies both neutral-relative

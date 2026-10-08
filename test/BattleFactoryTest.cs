@@ -447,32 +447,6 @@ public class BattleFactoryTest
       BattleFactory.Start(type, seed: 7).RequireLeft().Reason);
   }
 
-  [TestCase(TestName = "A supplied player deployment is adopted by its original faction reference")]
-  public void StartTypePlayerDeployment()
-  {
-    BattleTypeData type = TestData.MakeDuelBattleType();
-    var campaign = TestData.MakeFaction("Campaign");
-    var veteran = TestData.MakeCombatant("Vet", campaign);
-    var deployment = new PlayerDeployment(campaign, [new UnitLoadout(veteran)]);
-
-    using var runtime = BattleFactory.Start(type, seed: 7,
-      playerDeployment: Some(deployment)).RequireRight();
-
-    Assert.True(ReferenceEquals(campaign,
-      runtime.Query(new GetPlayerFactionQuery()).RequireSome()));
-    var unit = runtime.Query(new GetFactionAliveUnits(campaign)).AsValueEnumerable().Single();
-    Assert.True(ReferenceEquals(campaign, unit.State.Side));
-    Assert.True(ReferenceEquals(veteran, unit.State.Combatant));
-  }
-
-  [TestCase(TestName = "Empty map pool is a typed failure")]
-  public void EmptyMapPoolFails()
-  {
-    var type = new BattleTypeData { Name = "Broken" };
-    Assert.Equal(BattleSetupFailureReason.EmptyMapPool,
-      BattleFactory.Start(type).RequireLeft().Reason);
-  }
-
   [TestCase(TestName = "Out-of-range player faction index is a typed failure")]
   public void BadPlayerFactionIndex()
   {

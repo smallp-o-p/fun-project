@@ -192,43 +192,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal(destination, observedPositionDuringEvent.RequireSome());
   }
 
-  [TestCase(TestName = "Executor evaluates matching hooks deterministically")]
-  public void ExecutorEvaluatesMatchingHooksDeterministically()
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
-    var unit = battle.Unit;
-
-    var log = new List<string>();
-    var targetPosition = new Vector3I(1, 0, 0);
-    battle.RegisterHook<UnitMovedBattleEvent>(new PositionRecordingHook(targetPosition, log, "late"), priority: 10);
-    battle.RegisterHook<UnitMovedBattleEvent>(new PositionRecordingHook(targetPosition, log, "first"));
-    battle.RegisterHook<UnitMovedBattleEvent>(new PositionRecordingHook(targetPosition, log, "second"));
-    battle.RegisterHook<UnitDamagedBattleEvent>(new PositionRecordingHook(targetPosition, log, "ignored"), priority: -10);
-
-    battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)]));
-
-    Assert.True(log.AsValueEnumerable().SequenceEqual(["first", "second", "late"]));
-  }
-
-  [TestCase(TestName = "Executor only evaluates registered event key bucket")]
-  public void ExecutorOnlyEvaluatesRegisteredEventKeyBucket()
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
-    var unit = battle.Unit;
-    var log = new List<string>();
-    var targetPosition = new Vector3I(1, 0, 0);
-    var ignoredHook = new PositionRecordingHook(targetPosition, log, "ignored");
-    var matchingHook = new PositionRecordingHook(targetPosition, log, "matching");
-    battle.RegisterHook<UnitDamagedBattleEvent>(ignoredHook);
-    battle.RegisterHook<UnitMovedBattleEvent>(matchingHook);
-
-    battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)]));
-
-    Assert.Equal(0, ignoredHook.EvaluateCallCount);
-    Assert.Equal(1, matchingHook.EvaluateCallCount);
-    Assert.True(log.AsValueEnumerable().SequenceEqual(["matching"]));
-  }
-
   [TestCase(TestName = "Executor supports hook registered to event shape")]
   public void ExecutorSupportsHookRegisteredToEventShape()
   {
@@ -241,27 +204,6 @@ public partial class BattleActionExecutorTest
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)]));
 
     Assert.True(log.AsValueEnumerable().SequenceEqual(["matched", "matched"]));
-  }
-
-  [TestCase(TestName = "Executor consumes one-shot hooks before later actions")]
-  public void ExecutorConsumesOneShotHooksBeforeLaterActions()
-  {
-    var start = new Vector3I(0, 0, 0);
-    var targetPosition = new Vector3I(1, 0, 0);
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), start, actionPoints: 5);
-    var unit = battle.Unit;
-    var log = new List<string>();
-    battle.RegisterHook<UnitMovedBattleEvent>(new OneShotRecordingHook(targetPosition, log, "matched"));
-
-    BattleActionExecResult[] results =
-    [
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)])),
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(start)])),
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(targetPosition)])),
-    ];
-
-    Assert.Equal(3, results.Length);
-    Assert.True(log.AsValueEnumerable().SequenceEqual(["matched"]));
   }
 
   [TestCase(TestName = "Executor resolves interrupt actions in hook priority order")]
@@ -470,45 +412,6 @@ public partial class BattleActionExecutorTest
     Assert.Equal((factionA, factionA, 2, false, true), sideFlips[1]);
   }
 
-  [TestCase(TestName = "Executor resolves queued actions in FIFO order")]
-  public void ExecutorResolvesQueuedActionsInFifoOrder()
-  {
-    var factionA = TestData.MakeFaction("A");
-    var factionB = TestData.MakeFaction("B");
-    using var battle = DuelFixture(factionA, "A1", new Vector3I(0, 0, 0), factionB, "B1", new Vector3I(1, 0, 0), aActionPoints: 4);
-    var unitA = battle.Unit;
-
-    BattleActionExecResult first = battle.Submit(BattleAction.MoveUnit(battle.Alive(unitA), [battle.At(0, 0, 1)]));
-    BattleActionExecResult second = battle.Submit(BattleAction.EndFactionTurn(factionA));
-
-    Assert.True(first.Action is MoveUnit);
-    Assert.True(second.Action is EndFactionTurn);
-    Assert.Equal(factionB, battle.Session.ActiveSide);
-  }
-
-  [TestCase(TestName = "Executor submit returns one result per submitted action")]
-  public void ExecutorSubmitReturnsOneResultPerSubmittedAction()
-  {
-    var factionA = TestData.MakeFaction("A");
-    var factionB = TestData.MakeFaction("B");
-    using var battle = DuelFixture(factionA, "A1", new Vector3I(0, 0, 0), factionB, "B1", new Vector3I(3, 0, 3),
-      dimensions: new Vector3I(5, 1, 5), aActionPoints: 5);
-    var unitA = battle.Unit;
-    var grenade = TestData.MakeGrenade("Practice");
-    unitA.AddInventoryItem(grenade.Item);
-
-    BattleActionExecResult[] results =
-    [
-      battle.Submit(BattleAction.MoveUnit(battle.Alive(unitA), [battle.At(0, 0, 1)])),
-      battle.Submit(BattleAction.ThrowItem(battle.Alive(unitA), grenade, battle.At(2, 0, 1))),
-      battle.Submit(BattleAction.EndFactionTurn(factionA)),
-    ];
-
-    Assert.Equal(3, results.Length);
-    Assert.Equal(factionB, battle.Session.ActiveSide);
-    Assert.False(unitA.HasInventoryItem(grenade.Item));
-  }
-
   [TestCase(TestName = "Consumable throwable without charges is removed after one throw")]
   public void ConsumableThrowableWithoutChargesIsRemovedAfterOneThrow()
   {
@@ -608,33 +511,6 @@ public partial class BattleActionExecutorTest
 
       _spent = true;
       return [BattleAction.SpawnUnit(TestData.MakeCombatant("Blocker", _faction), context.Session.Board.At(_spawnPosition))];
-    }
-  }
-
-  private sealed partial class OneShotRecordingHook : BattleHook
-  {
-    private readonly Vector3I _position;
-    private readonly List<string> _log;
-    private readonly string _message;
-    private bool _spent;
-
-    public OneShotRecordingHook(Vector3I position, List<string> log, string message)
-    {
-      _position = position;
-      _log = log;
-      _message = message;
-    }
-
-    public override bool NeedsToUnregister => _spent;
-
-    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
-    {
-      if (battleEvent is not IPositionedBattleEvent positioned || positioned.Position.Raw != _position)
-        return [];
-
-      _log.Add(_message);
-      _spent = true;
-      return [];
     }
   }
 

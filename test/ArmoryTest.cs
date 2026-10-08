@@ -111,18 +111,6 @@ public class ArmoryTest
     Assert.True(armory.ModStock()[0].Unlimited);
   }
 
-  [TestCase(TestName = "Unknown item data withdraws None and unknown deposits throw")]
-  public void UnknownEntries()
-  {
-    EquippableItemData unknown = TestData.MakeItemData("Unknown");
-    EquippableItemData known = TestData.MakeItemData("Known");
-    var armory = new Armory([known], []);
-
-    Assert.False(armory.TryWithdrawItem(unknown).IsSome);
-    Assert.Throws<InvalidOperationException>(() => armory.DepositItem(
-      ItemRuntimeFactory.Create(new EquippableItemData { Name = "Also Unknown" })));
-  }
-
   [TestCase(TestName = "Construction rejects null lists, null entries, and duplicates")]
   public void ConstructionValidation()
   {

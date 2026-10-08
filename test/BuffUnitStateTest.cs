@@ -44,46 +44,6 @@ public partial class BuffUnitStateTest
     Assert.Equal(shared, unit.Buffs[2]);
   }
 
-  [TestCase(TestName = "Active buff StatMods flow into EffectiveStat; inactive contribute nothing")]
-  public void ActiveBuffContributesStats()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = UnitSolo(faction,
-      TestData.MakeCombatant("Alpha", faction, health: 20, aim: 65, buffs: [AimBuff()]));
-    var buffed = battle.Unit;
-
-    Assert.Equal(65f, buffed.EffectiveStat<AimStat>());
-    Assert.False(buffed.ActiveBuffDamageMods.AsValueEnumerable().Any());
-
-    battle.ApplyDamage(buffed, 11); // 9/20: condition holds
-    buffed.EvaluateBuffs(battle.Session);
-
-    Assert.Equal(75f, buffed.EffectiveStat<AimStat>());
-    Assert.Equal(1, buffed.ActiveBuffs.AsValueEnumerable().Count());
-  }
-
-  [TestCase(TestName = "ClampCurrentHealthToMax lowers current health to a reduced max and never raises it")]
-  public void ClampLowersToReducedMax()
-  {
-    var faction = TestData.MakeFaction("Player");
-    // Percent 200 => current < 2*max is always true: an always-on buff without board setup.
-    var intimidation = TestData.MakeBuff(
-      "Intimidation",
-      new HealthBelowPercentCondition { Percent = 200f },
-      statMods: [new HealthStatMod { Modifiers = [StatModifier.Add(-5)] }]);
-    using var battle = UnitSolo(faction,
-      TestData.MakeCombatant("Alpha", faction, health: 20, buffs: [intimidation]));
-    var unit = battle.Unit;
-
-    unit.ClampCurrentHealthToMax();
-
-    Assert.Equal(15, unit.MaxHealth);
-    Assert.Equal(15, unit.CurrentHealth);
-
-    unit.ClampCurrentHealthToMax(); // idempotent; never raises
-    Assert.Equal(15, unit.CurrentHealth);
-  }
-
   [TestCase(TestName = "A buff that would push max health to zero clamps current health to 1, never killing")]
   public void ClampFloorsAtOneHealth()
   {

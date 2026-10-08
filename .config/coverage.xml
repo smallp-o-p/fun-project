@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>
+  <CodeCoverage>
+    <ModulePaths>
+      <Include><ModulePath>.*[\\/]fun-project\.dll$</ModulePath></Include>
+    </ModulePaths>
+    <Sources>
+      <Exclude>
+        <Source>.*[\\/]test[\\/].*</Source>
+        <Source>.*[\\/]gdunit4_testadapter_v5[\\/].*</Source>
+        <Source>.*[\\/]\.godot[\\/].*</Source>
+        <Source>.*[\\/]obj[\\/].*</Source>
+      </Exclude>
+    </Sources>
+    <CollectFromChildProcesses>True</CollectFromChildProcesses>
+    <EnableDynamicNativeInstrumentation>False</EnableDynamicNativeInstrumentation>
+    <EnableStaticNativeInstrumentation>False</EnableStaticNativeInstrumentation>
+  </CodeCoverage>
+</Configuration>

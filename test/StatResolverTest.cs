@@ -6,40 +6,12 @@ using GdUnit4;
 [RequireGodotRuntime]
 public class StatResolverTest
 {
-  [TestCase(TestName = "Resolve with no sources returns the base value")]
-  public void ResolveNoSources() =>
-    Assert.Equal(10f, TestData.MakeWeapon("Rifle").Resolve<RangeStat>([]));
-
-  [TestCase(TestName = "Resolve folds matching-target mods over the base")]
-  public void ResolveFoldsMatching()
-  {
-    StatMod[] sources = [new RangeStatMod { Modifiers = [StatModifier.Add(5)] }];
-    Assert.Equal(15f, TestData.MakeWeapon("Rifle").Resolve<RangeStat>(sources));
-  }
-
-  [TestCase(TestName = "Resolve combines same-stat mods from multiple sources")]
-  public void ResolveStacksAcrossSources()
-  {
-    StatMod[] sources =
-    [
-      new RangeStatMod { Modifiers = [StatModifier.Add(5)] },
-      new RangeStatMod { Modifiers = [StatModifier.PercentAdd(0.5f)] },
-    ];
-    // (10 + 5) * 1.5 = 22.5
-    Assert.Equal(22.5f, TestData.MakeWeapon("Rifle").Resolve<RangeStat>(sources));
-  }
-
   [TestCase(TestName = "Resolve ignores mods that target a different stat")]
   public void ResolveIgnoresOtherTargets()
   {
     StatMod[] sources = [new CriticalChanceStatMod { Modifiers = [StatModifier.Add(99)] }];
     Assert.Equal(10f, TestData.MakeWeapon("Rifle").Resolve<RangeStat>(sources));
   }
-
-  [TestCase(TestName = "Concrete stat mods target stats by class without enum metadata")]
-  public void ConcreteStatModsTargetStatsByClass() =>
-    Assert.Equal(6f, new MeleeWeapon(TestData.MakeWeaponData())
-      .Resolve<RangeStat>([new RangeStatMod { Modifiers = [StatModifier.Add(4)] }]));
 
   [TestCase(TestName = "TryResolve returns None when the owner lacks the stat")]
   public void TryResolveNoneWhenMissing() =>

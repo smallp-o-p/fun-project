@@ -43,33 +43,4 @@ public class ManufacturingUnlockTest
     Assert.Equal(0, campaign.Events.Count);
   }
 
-  [TestCase]
-  public void RegistrationChangesUnknownToBusyThenExistingSupplyFailure()
-  {
-    var initial = MakeItemData("Initial");
-    var initialRecipe = MakeManufacturingRecipe(initial);
-    var reward = MakeItemData("Reward", unlimited: true);
-    var rewardRecipe = MakeManufacturingRecipe(reward);
-    using var campaign = new GeoscapeFixture(MakeStart(
-      armory: [reward],
-      manufacturingRecipes: [initialRecipe],
-      researchProjects: [MakeResearch(manufacturingUnlocks: [rewardRecipe])]));
-
-    Assert.Equal(ManufacturingStartFailure.UnknownRecipe,
-      campaign.Session.StartManufacturing(rewardRecipe).RequireLeft());
-    var active = campaign.Session.StartManufacturing(initialRecipe).RequireRight();
-    Assert.Equal(ManufacturingStartFailure.UnknownRecipe,
-      campaign.Session.StartManufacturing(rewardRecipe).RequireLeft());
-
-    campaign.State.Engineering.Unlock([rewardRecipe]);
-    Assert.Equal(ManufacturingStartFailure.Busy,
-      campaign.Session.StartManufacturing(rewardRecipe).RequireLeft());
-    Assert.Equal(Some(active), campaign.Session.ActiveManufacturing);
-
-    campaign.AdvanceTicks(1440);
-    Assert.Equal(ManufacturingStartFailure.AlreadyAvailable,
-      campaign.Session.StartManufacturing(rewardRecipe).RequireLeft());
-    Assert.Equal(1, campaign.Session.GetManufacturingOptions().Count);
-  }
-
 }

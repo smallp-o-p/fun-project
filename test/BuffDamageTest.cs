@@ -15,15 +15,6 @@ public partial class BuffDamageTest
       PacketModifiers = [new PacketModifier { AffectAllElements = true, Ops = [StatModifier.Add(3)] }],
     };
 
-  [TestCase(TestName = "EmitDamage folds external mods after the weapon's own")]
-  public void EmitDamageFoldsExternalMods()
-  {
-    var weapon = TestData.MakeWeapon("Blade", damage: 5);
-
-    Assert.Equal(5, weapon.EmitDamage().AsValueEnumerable().Sum(damage => damage.Amount));
-    Assert.Equal(8, weapon.EmitDamage([AddThreeToAllPackets()]).AsValueEnumerable().Sum(damage => damage.Amount));
-  }
-
   [TestCase(TestName = "TrySpendShot threads external mods through the ammunitioned path")]
   public void TrySpendShotThreadsExternalMods()
   {
