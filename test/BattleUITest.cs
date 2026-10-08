@@ -31,8 +31,8 @@ public partial class BattleUITest
       actions.AsValueEnumerable().First(action => action.Action is PassActionDefinition));
     var view = BuildView();
 
-    view.ShowUnits(units);
-    view.ShowActionOptions([moveOption, passOption]);
+    view.Hud.ShowUnits(units);
+    view.Hud.ShowActionOptions([moveOption, passOption]);
 
     var status = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%UnitStatus");
     Assert.True(status.Text.Contains("HP"));
@@ -79,23 +79,23 @@ public partial class BattleUITest
     Assert.Equal("65%", hitChance.Text);
   }
 
-  [TestCase(TestName = "HUD intents re-raise through the BattleUI root")]
-  public void HudIntentsRaiseThroughRoot()
+  [TestCase(TestName = "Authored HUD intents and widgets are available through the battle view")]
+  public void AuthoredHudIntentsAndWidgets()
   {
     using var battle = BattleFixture.Duel();
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
     var moveOption = new MoveActionOption(
       actions.AsValueEnumerable().First(action => action.Action is MoveActionDefinition));
     var view = BuildView();
-    view.ShowActionOptions([moveOption]);
+    view.Hud.ShowActionOptions([moveOption]);
     int confirms = 0;
     int cancels = 0;
     int returns = 0;
     UnitActionOption? selected = null;
-    view.ConfirmRequested += () => confirms++;
-    view.CancelRequested += () => cancels++;
-    view.ReturnRequested += () => returns++;
-    view.VerbSelected += option => selected = option;
+    view.Hud.ConfirmRequested += () => confirms++;
+    view.Hud.CancelRequested += () => cancels++;
+    view.Hud.ReturnRequested += () => returns++;
+    view.Hud.VerbSelected += option => selected = option;
 
     view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ConfirmButton").EmitSignal(Button.SignalName.Pressed);
     view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%CancelButton").EmitSignal(Button.SignalName.Pressed);
@@ -103,12 +103,12 @@ public partial class BattleUITest
       .EmitSignal(Button.SignalName.Pressed);
     var returnButton = view.GetNode<BattleHud>("%BattleHud").GetNode<Button>("%ReturnButton");
     Assert.False(returnButton.Visible);
-    view.ShowReturn(true);
+    view.Hud.ShowReturn(true);
     Assert.True(returnButton.Visible);
     returnButton.EmitSignal(Button.SignalName.Pressed);
-    view.ShowReturn(false);
+    view.Hud.ShowReturn(false);
     Assert.False(returnButton.Visible);
-    view.ShowBattleOver("VICTORY");
+    view.Hud.ShowBattleOver("VICTORY");
 
     Assert.Equal(1, confirms);
     Assert.Equal(1, cancels);

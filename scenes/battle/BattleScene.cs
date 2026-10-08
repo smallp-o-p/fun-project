@@ -77,10 +77,10 @@ public sealed partial class BattleScene : Node3D
     AddChild(input);
     input.Initialize(rig);
     _view = GetNode<BattleUI>("%BattleUI");
-    _view.ConfirmRequested += () => _ui.Confirm();
-    _view.CancelRequested += _ui.Cancel;
-    _view.VerbSelected += _ui.BeginAction;
-    _view.ReturnRequested += OnReturnIntent;
+    _view.Hud.ConfirmRequested += () => _ui.Confirm();
+    _view.Hud.CancelRequested += _ui.Cancel;
+    _view.Hud.VerbSelected += _ui.BeginAction;
+    _view.Hud.ReturnRequested += OnReturnIntent;
     input.TileClicked += tile => _ui.ClickTile(tile);
     input.TileHovered += OnTileHovered;
     input.ConfirmPressed += () => _ui.Confirm();
@@ -113,8 +113,8 @@ public sealed partial class BattleScene : Node3D
   {
     var queriedUnits = _runtime.Query(new GetFactionAliveUnits(_playerFaction))
       .AsValueEnumerable().Select(unit => unit.State).ToArray();
-    _view.ShowUnits(queriedUnits);
-    _view.ShowActionOptions(_ui.ActionOptions);
+    _view.Hud.ShowUnits(queriedUnits);
+    _view.Hud.ShowActionOptions(_ui.ActionOptions);
 
     bool targeting = _ui.State is UiState.Targeting or UiState.TargetingLocked;
     if (targeting)
@@ -122,7 +122,7 @@ public sealed partial class BattleScene : Node3D
     else
       _view.HideTargeting();
 
-    _view.ShowReturn(CanReturn);
+    _view.Hud.ShowReturn(CanReturn);
     if (_ui.State == UiState.BattleOver)
       ShowBattleOverBanner();
   }
@@ -160,7 +160,7 @@ public sealed partial class BattleScene : Node3D
     string text = _runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
       Right: summary => summary.Outcome == BattleOutcome.Victory ? "VICTORY" : "DEFEAT",
       Left: _ => "BATTLE OVER");
-    _view.ShowBattleOver(text);
+    _view.Hud.ShowBattleOver(text);
   }
 
   private void OnPlaybackIdle()
