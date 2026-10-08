@@ -86,20 +86,11 @@ public sealed partial class BattleScene : Node3D
     input.ConfirmPressed += () => _ui.Confirm();
     input.CancelPressed += _ui.Cancel;
 
-    _ui.StateChanged += RefreshView;
-    _ui.ReadoutsChanged += RefreshView;
-    _ui.StateChanged += () =>
-    {
-      if (_ui.State == UiState.BattleOver)
-        ShowBattleOverBanner();
-    };
+    _ui.Changed += RefreshView;
     _director.PlaybackIdle += OnPlaybackIdle;
 
     RefreshView();
 
-    // Show startup-terminal results immediately.
-    if (_ui.State == UiState.BattleOver)
-      ShowBattleOverBanner();
   }
 
   public override void _ExitTree()
@@ -132,6 +123,8 @@ public sealed partial class BattleScene : Node3D
       _view.HideTargeting();
 
     _view.ShowReturn(CanReturn);
+    if (_ui.State == UiState.BattleOver)
+      ShowBattleOverBanner();
   }
 
   private void InstantiateMap()
@@ -159,17 +152,6 @@ public sealed partial class BattleScene : Node3D
       return;
 
     _ui.PreviewAt(tile);
-    RefreshPreviewOnly();
-  }
-
-  private void RefreshPreviewOnly()
-  {
-    if (_ui.State is not (UiState.Targeting or UiState.TargetingLocked))
-    {
-      _view.HidePreview();
-      return;
-    }
-
     _ui.LastPreview.Match(_view.ShowPreview, _view.HidePreview);
   }
 

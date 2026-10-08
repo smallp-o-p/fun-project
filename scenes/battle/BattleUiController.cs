@@ -30,11 +30,8 @@ public sealed class BattleUiController : IDisposable
   private Option<Vector3I> _pendingTarget;
   private Option<ActionPreview> _lastPreview;
 
-  public event Action StateChanged = delegate { };
-
-  // Raised whenever readouts mutate without a state transition (selection switch, options
-  // refresh). StateChanged stays transition-only; HUD refresh subscribes to both.
-  public event Action ReadoutsChanged = delegate { };
+  // Observers see one complete selection/targeting update. Hover previews are read directly.
+  public event Action Changed = delegate { };
 
   public BattleUiController(BattleRuntime runtime, Faction playerFaction, Func<bool> playbackBusy)
   {
@@ -99,7 +96,6 @@ public sealed class BattleUiController : IDisposable
         ResetTargeting();
         _selected = Some(unit);
         RefreshOptions();
-        ReadoutsChanged.Invoke();
         SetState(UiState.UnitSelected);
         return true;
       },
@@ -126,7 +122,6 @@ public sealed class BattleUiController : IDisposable
         ResetTargeting();
         _selected = None;
         _options = [];
-        ReadoutsChanged.Invoke();
         SetState(UiState.Unselected);
         break;
     }
@@ -200,6 +195,7 @@ public sealed class BattleUiController : IDisposable
             _lastPreview = handler.Preview(tile).Match(
               Right: preview => Some(preview),
               Left: _ => None);
+            SetState(UiState.TargetingLocked);
           }
           return false;
         }
@@ -247,35 +243,13 @@ public sealed class BattleUiController : IDisposable
     if (_state == UiState.BattleOver)
       return;
 
-    if (_runtime.Query(new GetBattleOutcomeQuery()).IsSome)
-    {
-      ResetTargeting();
-      _selected = None;
-      _options = [];
-      ReadoutsChanged.Invoke();
-      SetState(UiState.BattleOver);
-      return;
-    }
-
-    _selected = _selected.Bind(_runtime.TryGetAlive).Map(alive => alive.State)
+    bool battleOver = _runtime.Query(new GetBattleOutcomeQuery()).IsSome;
+    _selected = battleOver ? None : _selected.Bind(_runtime.TryGetAlive).Map(alive => alive.State)
       .Filter(unit => !unit.IsUnconscious);
-    if (_selected.IsNone)
-    {
-      ResetTargeting();
-      _options = [];
-      ReadoutsChanged.Invoke();
-      SetState(UiState.Unselected);
-      return;
-    }
-
-    if (_state is UiState.Targeting or UiState.TargetingLocked)
-    {
-      ResetTargeting();
-      SetState(UiState.UnitSelected);
-    }
-
+    ResetTargeting();
     RefreshOptions();
-    ReadoutsChanged.Invoke();
+    SetState(battleOver ? UiState.BattleOver
+      : _selected.IsSome ? UiState.UnitSelected : UiState.Unselected);
   }
 
   private void RefreshOptions()
@@ -321,9 +295,7 @@ public sealed class BattleUiController : IDisposable
 
   private void SetState(UiState next)
   {
-    if (_state == next)
-      return;
     _state = next;
-    StateChanged.Invoke();
+    Changed.Invoke();
   }
 }
