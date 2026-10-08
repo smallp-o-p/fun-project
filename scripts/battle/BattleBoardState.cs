@@ -185,7 +185,7 @@ public sealed class BattleBoardState
   /// <returns>A path of points from source to destination, or [] if no path can be found.</returns>
   public ValidatedPoint[] FindPath(ValidatedPoint source, ValidatedPoint destination)
   {
-    return BattlePathSearch.FindPath(Dimensions, source, destination, ExactKnowledge).Points;
+    return BattlePathSearch.FindPath(Dimensions, source, destination, ExactKnowledge);
   }
 
   private TraversalKnowledge ExactKnowledge(ValidatedPoint point) => CanOccupy(point) ? TraversalKnowledge.Clear : TraversalKnowledge.Blocked;
@@ -278,6 +278,6 @@ public sealed class BattleBoardState
   public IReadOnlyCollection<ValidatedPoint> GetReachableTiles(ValidatedPoint origin, int maxSteps)
   {
     return BattlePathSearch.GetReachableTiles(Dimensions, origin, maxSteps, ExactKnowledge)
-      .AsValueEnumerable().Select(tile => tile.Point).ToArray();
+      .AsValueEnumerable().ToArray();
   }
 }

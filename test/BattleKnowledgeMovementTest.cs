@@ -13,7 +13,7 @@ public sealed class BattleKnowledgeMovementTest
       new UnitLoadout(TestData.MakeCombatant("Observer", side, vision: vision)), position ?? Vector3I.Zero));
   }
 
-  private static KnownPath Path(BattleFixture battle, Vector3I destination) => battle.Query(
+  private static Vector3I[] Path(BattleFixture battle, Vector3I destination) => battle.Query(
     new FindKnownPathForUnit(battle.PlayerFaction, battle.Alive(battle.PlayerUnit), battle.At(destination)));
 
   [TestCase]
@@ -24,9 +24,7 @@ public sealed class BattleKnowledgeMovementTest
     blocked.Board.SetTileWalkable(blocked.At(3, 0, 0), false);
     blocked.Spawn(TestData.MakeCombatant("Hidden", TestData.MakeFaction("Enemy")), new Vector3I(2, 0, 0));
     var a = Path(open, new Vector3I(4, 0, 0)); var b = Path(blocked, new Vector3I(4, 0, 0));
-    Assert.True(a.Points.AsValueEnumerable().SequenceEqual(b.Points));
-    Assert.True(a.IsEstimated);
-    Assert.True(b.IsEstimated);
+    Assert.True(a.AsValueEnumerable().SequenceEqual(b));
     var reachA = open.Query(new GetKnownMoveTilesForUnit(open.PlayerFaction, open.Alive(open.PlayerUnit)));
     var reachB = blocked.Query(new GetKnownMoveTilesForUnit(blocked.PlayerFaction, blocked.Alive(blocked.PlayerUnit)));
     Assert.True(reachA.AsValueEnumerable().SequenceEqual(reachB));
@@ -38,16 +36,13 @@ public sealed class BattleKnowledgeMovementTest
     using var battle = Observer(new Vector3I(4, 1, 3), 4, new Vector3I(0, 0, 1));
     battle.Spawn(TestData.MakeCombatant("Ally", battle.PlayerFaction), new Vector3I(1, 0, 1));
     var path = Path(battle, new Vector3I(2, 0, 1));
-    Assert.Equal(3, path.Points.Length);
-    Assert.False(path.Points.AsValueEnumerable().Contains(new Vector3I(1, 0, 1)));
-    Assert.False(path.IsEstimated);
+    Assert.Equal(3, path.Length);
+    Assert.False(path.AsValueEnumerable().Contains(new Vector3I(1, 0, 1)));
     Assert.Equal(TraversalKnowledge.Blocked, battle.Query(new GetTileKnowledgeForFaction(battle.PlayerFaction, battle.At(1, 0, 1))).Occupancy);
-    Assert.Throws<System.ArgumentException>(() => battle.Query(new FindKnownPathForUnit(
-      TestData.MakeFaction("Foreign"), battle.Alive(battle.PlayerUnit), battle.At(2, 0, 1))));
   }
 
   [TestCase]
-  public void UnknownDiagonalFlankMarksEstimate()
+  public void UnknownDiagonalFlanksRemainTraversable()
   {
     var side = TestData.MakeFaction("Observer");
     using var battle = BattleFixture.Started(new Vector3I(3, 1, 3),
@@ -59,11 +54,9 @@ public sealed class BattleKnowledgeMovementTest
     Assert.Equal(TraversalKnowledge.Unknown, battle.Query(new GetTileKnowledgeForFaction(side, battle.At(1, 0, 0))).Occupancy);
     Assert.Equal(TraversalKnowledge.Unknown, battle.Query(new GetTileKnowledgeForFaction(side, battle.At(0, 0, 1))).Occupancy);
     var path = Path(battle, new Vector3I(1, 0, 1));
-    Assert.Equal(2, path.Points.Length);
-    Assert.True(path.IsEstimated);
-    var diagonal = battle.Query(new GetKnownMoveTilesForUnit(battle.PlayerFaction, battle.Alive(battle.PlayerUnit)))
-      .AsValueEnumerable().Single(tile => tile.Position == new Vector3I(1, 0, 1));
-    Assert.True(diagonal.IsEstimated);
+    Assert.Equal(2, path.Length);
+    Assert.True(battle.Query(new GetKnownMoveTilesForUnit(battle.PlayerFaction, battle.Alive(battle.PlayerUnit)))
+      .AsValueEnumerable().Contains(new Vector3I(1, 0, 1)));
   }
 
   [TestCase]
@@ -76,12 +69,10 @@ public sealed class BattleKnowledgeMovementTest
     var destination = battle.At(2, 1, 2);
     var actual = battle.Query(new FindPathForUnit(battle.Alive(battle.PlayerUnit), destination));
     var known = Path(battle, destination.Raw);
-    Assert.True(actual.AsValueEnumerable().Select(point => point.Raw).SequenceEqual(known.Points));
-    Assert.False(known.IsEstimated);
+    Assert.True(actual.AsValueEnumerable().Select(point => point.Raw).SequenceEqual(known));
     var actualReach = battle.Query(new GetPossibleMoveTilesForUnit(battle.Alive(battle.PlayerUnit), 0));
     var knownReach = battle.Query(new GetKnownMoveTilesForUnit(battle.PlayerFaction, battle.Alive(battle.PlayerUnit), 0));
-    Assert.True(actualReach.AsValueEnumerable().Select(point => point.Raw).SequenceEqual(knownReach.AsValueEnumerable().Select(tile => tile.Position)));
-    Assert.False(knownReach.AsValueEnumerable().Any(tile => tile.IsEstimated));
+    Assert.True(actualReach.AsValueEnumerable().Select(point => point.Raw).SequenceEqual(knownReach));
   }
 
   [TestCase]

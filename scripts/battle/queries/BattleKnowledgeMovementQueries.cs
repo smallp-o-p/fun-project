@@ -6,8 +6,6 @@ namespace FunProject.Battle;
 
 public enum TraversalKnowledge { Blocked, Clear, Unknown }
 public readonly record struct TileKnowledge(Option<BattleTileState> Terrain, TraversalKnowledge Occupancy);
-public readonly record struct KnownPath(Vector3I[] Points, bool IsEstimated);
-public readonly record struct KnownReachableTile(Vector3I Position, bool IsEstimated);
 
 public sealed class GetTileKnowledgeForFaction(Faction faction, BattleBoardState.ValidatedPoint tile) : IBattleSessionQuery<TileKnowledge>
 {
@@ -17,10 +15,14 @@ public sealed class GetTileKnowledgeForFaction(Faction faction, BattleBoardState
     var terrain = session.ObservationHistory.GetTerrain(faction, tile);
     // Current vision admits occupancy. Outside it only an own-side unit is known;
     // neither hidden blockers nor remembered contacts may influence an estimate.
-    var occupancy = session.IsTileVisibleToFaction(faction, tile)
-      ? (session.Board.IsOccupied(tile) || session.Board.IsBlockedByObject(tile) ? TraversalKnowledge.Blocked : TraversalKnowledge.Clear)
-      : session.GetFactionAliveUnits(faction).AsValueEnumerable().Any(unit => session.GetUnitPosition(unit).Contains(tile))
-        ? TraversalKnowledge.Blocked : TraversalKnowledge.Unknown;
+    TraversalKnowledge occupancy;
+    if (session.IsTileVisibleToFaction(faction, tile))
+      occupancy = session.Board.IsOccupied(tile) || session.Board.IsBlockedByObject(tile)
+        ? TraversalKnowledge.Blocked : TraversalKnowledge.Clear;
+    else if (session.GetFactionAliveUnits(faction).AsValueEnumerable().Any(unit => session.GetUnitPosition(unit).Contains(tile)))
+      occupancy = TraversalKnowledge.Blocked;
+    else
+      occupancy = TraversalKnowledge.Unknown;
     return new(terrain, occupancy);
   }
 
@@ -32,35 +34,27 @@ public sealed class GetTileKnowledgeForFaction(Faction faction, BattleBoardState
     return known.Terrain.IsSome && known.Occupancy == TraversalKnowledge.Clear ? TraversalKnowledge.Clear : TraversalKnowledge.Unknown;
   }
 
-  internal static void RequireActor(BattleSession session, Faction faction, AliveUnit unit)
-  {
-    ArgumentNullException.ThrowIfNull(faction);
-    if (unit.State.Side != faction || session.TryGetAlive(unit.State).IsNone)
-      throw new ArgumentException("Knowledge movement requires a living actor belonging to this session and faction.", nameof(unit));
-  }
 }
 
-public sealed class FindKnownPathForUnit(Faction faction, AliveUnit unit, BattleBoardState.ValidatedPoint destination) : IBattleSessionQuery<KnownPath>
+public sealed class FindKnownPathForUnit(Faction faction, AliveUnit unit, BattleBoardState.ValidatedPoint destination) : IBattleSessionQuery<Vector3I[]>
 {
-  public KnownPath Execute(BattleSession session)
+  public Vector3I[] Execute(BattleSession session)
   {
-    GetTileKnowledgeForFaction.RequireActor(session, faction, unit);
     var path = BattlePathSearch.FindPath(session.Board.Dimensions, unit.Position, destination,
       tile => GetTileKnowledgeForFaction.Traversal(session, faction, tile));
-    return new(path.Points.AsValueEnumerable().Select(point => point.Raw).ToArray(), path.IsEstimated);
+    return path.AsValueEnumerable().Select(point => point.Raw).ToArray();
   }
 }
 
-public sealed class GetKnownMoveTilesForUnit(Faction faction, AliveUnit unit, int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost) : IBattleSessionQuery<IReadOnlyList<KnownReachableTile>>
+public sealed class GetKnownMoveTilesForUnit(Faction faction, AliveUnit unit, int actionPointCostPerStep = BattleSession.DefaultMovementStepActionPointCost) : IBattleSessionQuery<IReadOnlyList<Vector3I>>
 {
-  public IReadOnlyList<KnownReachableTile> Execute(BattleSession session)
+  public IReadOnlyList<Vector3I> Execute(BattleSession session)
   {
-    GetTileKnowledgeForFaction.RequireActor(session, faction, unit);
     ArgumentOutOfRangeException.ThrowIfLessThan(actionPointCostPerStep, 0);
     if (unit.State.IsIncapacitated || unit.State.CurrentActionPoints < actionPointCostPerStep) return [];
     int steps = actionPointCostPerStep == 0 ? int.MaxValue : unit.State.CurrentActionPoints / actionPointCostPerStep;
     return System.Array.AsReadOnly(BattlePathSearch.GetReachableTiles(session.Board.Dimensions, unit.Position, steps,
       tile => GetTileKnowledgeForFaction.Traversal(session, faction, tile)).AsValueEnumerable()
-      .Select(tile => new KnownReachableTile(tile.Point.Raw, tile.IsEstimated)).ToArray());
+      .Select(tile => tile.Raw).ToArray());
   }
 }
