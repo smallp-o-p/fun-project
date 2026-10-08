@@ -18,10 +18,11 @@ public sealed class BattleUnitState
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibleUnits = [];
   private readonly SysColGeneric.HashSet<BattleBoardState.ValidatedPoint> _visibleTiles = [];
   private readonly SysColGeneric.HashSet<BattleUnitState> _spottedUnits = [];
+  internal bool CanSeeTile(BattleBoardState.ValidatedPoint tile) { return _visibleTiles.Contains(tile); }
   private readonly Dictionary<StatusEffectSpecData, ActiveStatusEffect> _activeStatusEffects = [];
   private readonly List<(Buff Buff, bool IsActive)> _buffs = [];
 
-  internal int Id { get; }
+  public int Id { get; }
   public Combatant Combatant { get; }
   public Faction Side => Combatant.OwningFaction;
   public Option<Weapon> EquippedWeapon { get; private set; }

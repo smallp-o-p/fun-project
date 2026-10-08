@@ -6,12 +6,14 @@ using FunProject.Combatants.Conditions;
 using FunProject.Core;
 using FunProject.Dialogue;
 using FunProject.GameState;
+using FunProject.Engineering;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
 using FunProject.Models;
 using FunProject.Progression;
 using FunProject.Research;
+using FunProject.Currencies;
 using FunProject.Stats;
 using FunProject.Strategic;
 using FunProject.Weapons;
@@ -282,13 +284,15 @@ internal static class TestData
   }
 
   // Bare armory stock entries: no capabilities, so withdrawal materializes plain items.
-  public static EquippableItemData MakeItemData(string name = "Item", bool unlimited = false,
-    uint manufacturingDays = 1) => new()
-    {
-      Name = name,
-      UnlimitedStock = unlimited,
-      ManufacturingDurationDays = manufacturingDays,
-    };
+  public static EquippableItemData MakeItemData(string name = "Item", bool unlimited = false) => new()
+  {
+    Name = name,
+    UnlimitedStock = unlimited,
+  };
+
+  public static ManufacturingRecipe MakeManufacturingRecipe(EquippableItemData item, uint days = 1,
+    Godot.Collections.Dictionary<Currency, ulong> costs = null)
+    => new() { Item = item, DurationDays = days, Costs = costs ?? [] };
 
   public static MultiStatMod MakeMod(string name, bool unlimited = false) =>
     new() { Name = name, UnlimitedStock = unlimited };
@@ -507,20 +511,30 @@ internal static class TestData
 
   // Two-faction duel on a 2x1x1 map: one spawn cell per side, one unit per side (health 20,
   // aim 65, damage-1 range-10 weapon), one inert objective each.
-  public static BattleTypeData MakeDuelBattleType()
+  public static BattleTypeData MakeDuelBattleType() => MakeTacticalBattleType();
+
+  // One map row of spawn cells — the first playerCells feed the player slot, the rest feed
+  // the enemy slot — with one standard roster entry and objective per side. Mission tests
+  // size squads and enemy forces against the cell counts.
+  public static BattleTypeData MakeTacticalBattleType(int playerCells = 1, int enemyCells = 1)
   {
     var type = new BattleTypeData { Name = "Setup duel" };
-    type.MapPool.Add(MakeMapScene(MakeMapData(new Vector3I(2, 1, 1),
-      (new Vector3I(0, 0, 0), SpawnTile(0)),
-      (new Vector3I(1, 0, 0), SpawnTile(1)))));
+    List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
+    for (int x = 0; x < playerCells + enemyCells; x++)
+      tiles.Add((new Vector3I(x, 0, 0), SpawnTile(x < playerCells ? 0 : 1)));
+    type.MapPool.Add(MakeMapScene(MakeMapData(
+      new Vector3I(playerCells + enemyCells, 1, 1), [.. tiles])));
     string[] names = ["Player", "Enemy"];
-    foreach (string name in names)
+    foreach (string sideName in names)
     {
-      var side = new FactionDeploymentData { Faction = new FactionData { Name = name } };
+      var side = new FactionDeploymentData { Faction = new FactionData { Name = sideName } };
       side.Roster.Add(new FunProject.Battle.RosterEntryData
       {
-        Combatant = MakeCombatantData(name, health: 20, aim: 65),
-        Weapon = MakeWeaponData(damage: 1, critChance: 0, range: 10),
+        Loadout = new UnitLoadoutData
+        {
+          Combatant = MakeCombatantData(sideName, health: 20, aim: 65),
+          Weapon = MakeWeaponData(damage: 1, critChance: 0, range: 10),
+        },
       });
       side.Objectives.Add(new FakeObjectiveData());
       type.Factions.Add(side);
@@ -543,7 +557,8 @@ internal static class TestData
     string targetRegionName = "",
     int expiresAfterTicks = -1,
     bool allowUnfitDeployment = false,
-    DialogueSequenceData? dialogue = null)
+    DialogueSequenceData? dialogue = null,
+    TacticalMissionData? tacticalMission = null)
   {
     return new GeoscapeEventDefinition
     {
@@ -554,7 +569,33 @@ internal static class TestData
       TargetRegionName = targetRegionName,
       AllowUnfitDeployment = allowUnfitDeployment,
       Dialogue = dialogue,
+      TacticalMission = tacticalMission ?? (kind == GeoscapeEventKind.TacticalBattle ? MakeTacticalMission() : null),
     };
+  }
+
+  // Valid tactical-mission default over the duel battle type. The ordinary pool entry is
+  // only present when a positive maximum can draw from it, so zero-range (specials-only)
+  // missions stay pool-less; tests add specials or shrink bounds explicitly.
+  public static TacticalMissionData MakeTacticalMission(
+    BattleTypeData? type = null, int maxPlayerUnits = 3, int minEnemyUnits = 1, int maxEnemyUnits = 1)
+  {
+    var mission = new TacticalMissionData
+    {
+      BattleType = type ?? MakeDuelBattleType(),
+      Size = new BattleSizeData
+      {
+        MaxPlayerUnits = (uint)maxPlayerUnits,
+        MinEnemyUnits = (uint)minEnemyUnits,
+        MaxEnemyUnits = (uint)maxEnemyUnits,
+      },
+      EnemyFactionIndex = 1,
+    };
+    if (maxEnemyUnits > 0)
+      mission.OrdinaryEnemies.Add(new UnitLoadoutData
+      {
+        Combatant = MakeCombatantData("Grunt", health: 20, aim: 65),
+      });
+    return mission;
   }
 
   public static ScheduledEventData MakeScheduled(int atTick, GeoscapeEventDefinition evt)
@@ -596,10 +637,11 @@ internal static class TestData
     RosterEntryData[] roster = null,
     EquippableItemData[] armory = null,
     EquippableMod[] modStock = null,
-    EquippableItemData[] manufacturableItems = null,
+    ManufacturingRecipe[] manufacturingRecipes = null,
     ResearchProject[] researchProjects = null,
     CaptiveEntryData[] captives = null,
-    CombatantConditionRulesData? conditionRules = null)
+    CombatantConditionRulesData? conditionRules = null,
+    Godot.Collections.Dictionary<Currency, ulong> startingCurrencies = null)
   {
     return new CampaignStartData
     {
@@ -609,23 +651,28 @@ internal static class TestData
       StartingRoster = roster ?? [],
       Armory = armory ?? [],
       ModStock = modStock ?? [],
-      ManufacturableItems = manufacturableItems ?? [],
+      ManufacturingRecipes = manufacturingRecipes ?? [],
       ResearchProjects = researchProjects ?? [],
       StartingCaptives = captives ?? [],
       ConditionRules = conditionRules,
+      StartingCurrencies = startingCurrencies ?? [],
     };
   }
+
+  public static Currency MakeCurrency(string name = "Currency") => new() { Name = name };
 
   public static ResearchProject MakeResearch(
     string name = "Research", uint days = 1,
     ResearchCondition condition = null,
-    EquippableItemData[] manufacturingUnlocks = null)
+    ManufacturingRecipe[] manufacturingUnlocks = null,
+    Godot.Collections.Dictionary<Currency, ulong> costs = null)
     => new()
     {
       Name = name,
       DurationDays = days,
       Condition = condition ?? new AlwaysResearchCondition(),
       ManufacturingUnlocks = manufacturingUnlocks ?? [],
+      Costs = costs ?? [],
     };
 
   public static SkillPathData MakePath(string name, params SkillUpgradeStepData[] steps)

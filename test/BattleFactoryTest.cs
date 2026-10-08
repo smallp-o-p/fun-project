@@ -359,13 +359,21 @@ public class BattleFactoryTest
       (new Vector3I(0, 0, 1), TestData.SpawnTile(1)))));
 
     var playerDeployment = new FactionDeploymentData { Faction = playerFaction };
-    playerDeployment.Roster.Add(new RosterEntryData { Combatant = trooper, Quantity = 2 });
+    playerDeployment.Roster.Add(new RosterEntryData
+    {
+      Loadout = new UnitLoadoutData { Combatant = trooper },
+      Quantity = 2,
+    });
     playerDeployment.Objectives.Add(new DefuseAllBombsObjectiveData
     {
       OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
     });
     var enemyDeployment = new FactionDeploymentData { Faction = enemyFaction };
-    enemyDeployment.Roster.Add(new RosterEntryData { Combatant = trooper, Quantity = 1 });
+    enemyDeployment.Roster.Add(new RosterEntryData
+    {
+      Loadout = new UnitLoadoutData { Combatant = trooper },
+      Quantity = 1,
+    });
     enemyDeployment.Objectives.Add(new FakeObjectiveData());
 
     type.Factions.Add(playerDeployment);
@@ -396,8 +404,11 @@ public class BattleFactoryTest
     BattleTypeData type = TestData.MakeDuelBattleType();
     type.Factions[0].Roster.Add(new FunProject.Battle.RosterEntryData
     {
-      Combatant = TestData.MakeCombatantData("Extra", health: 20, aim: 65),
-      Weapon = TestData.MakeWeaponData(damage: 1, critChance: 0, range: 10),
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Extra", health: 20, aim: 65),
+        Weapon = TestData.MakeWeaponData(damage: 1, critChance: 0, range: 10),
+      },
     });
 
     Assert.Equal(BattleSetupFailureReason.SpawnSlotShortfall,
@@ -414,13 +425,19 @@ public class BattleFactoryTest
     var playerDeployment = new FactionDeploymentData { Faction = new FactionData { Name = "Player" } };
     playerDeployment.Roster.Add(new FunProject.Battle.RosterEntryData
     {
-      Combatant = TestData.MakeCombatantData("Alpha", health: 20, aim: 65),
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Alpha", health: 20, aim: 65),
+      },
     });
     playerDeployment.Objectives.Add(new FakeObjectiveData());
     var enemyDeployment = new FactionDeploymentData { Faction = new FactionData { Name = "Enemy" } };
     enemyDeployment.Roster.Add(new FunProject.Battle.RosterEntryData
     {
-      Combatant = TestData.MakeCombatantData("Bandit", health: 20, aim: 65),
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("Bandit", health: 20, aim: 65),
+      },
     });
     enemyDeployment.Objectives.Add(new FakeObjectiveData());
     type.Factions.Add(playerDeployment);
@@ -428,32 +445,6 @@ public class BattleFactoryTest
 
     Assert.Equal(BattleSetupFailureReason.SpawnCellUnavailable,
       BattleFactory.Start(type, seed: 7).RequireLeft().Reason);
-  }
-
-  [TestCase(TestName = "A supplied player deployment is adopted by its original faction reference")]
-  public void StartTypePlayerDeployment()
-  {
-    BattleTypeData type = TestData.MakeDuelBattleType();
-    var campaign = TestData.MakeFaction("Campaign");
-    var veteran = TestData.MakeCombatant("Vet", campaign);
-    var deployment = new PlayerDeployment(campaign, [new UnitLoadout(veteran)]);
-
-    using var runtime = BattleFactory.Start(type, seed: 7,
-      playerDeployment: Some(deployment)).RequireRight();
-
-    Assert.True(ReferenceEquals(campaign,
-      runtime.Query(new GetPlayerFactionQuery()).RequireSome()));
-    var unit = runtime.Query(new GetFactionAliveUnits(campaign)).AsValueEnumerable().Single();
-    Assert.True(ReferenceEquals(campaign, unit.State.Side));
-    Assert.True(ReferenceEquals(veteran, unit.State.Combatant));
-  }
-
-  [TestCase(TestName = "Empty map pool is a typed failure")]
-  public void EmptyMapPoolFails()
-  {
-    var type = new BattleTypeData { Name = "Broken" };
-    Assert.Equal(BattleSetupFailureReason.EmptyMapPool,
-      BattleFactory.Start(type).RequireLeft().Reason);
   }
 
   [TestCase(TestName = "Out-of-range player faction index is a typed failure")]

@@ -16,6 +16,7 @@
 [ext_resource type="Script" uid="uid://bace8m8tw5wcn" path="res://scripts/combatants/FactionData.cs" id="10_faction_data"]
 [ext_resource type="Script" uid="uid://b4l4d4rc7pmef" path="res://scripts/battle/types/ObjectPlacementData.cs" id="15_pjrh5"]
 [ext_resource type="Script" uid="uid://nmkf8wn0ice" path="res://scripts/battle/types/BattleTypeSystemData.cs" id="16_pqhio"]
+[ext_resource type="Script" uid="uid://ctwonv3i1dx1r" path="res://scripts/battle/types/UnitLoadoutData.cs" id="17_loadout"]
 
 [sub_resource type="Resource" id="Resource_player_faction"]
 script = ExtResource("10_faction_data")
@@ -29,11 +30,15 @@ script = ExtResource("6_end")
 script = ExtResource("5_eliminate")
 OnComplete = SubResource("Resource_end_victory")
 
+[sub_resource type="Resource" id="Resource_trooper_loadout"]
+script = ExtResource("17_loadout")
+Combatant = ExtResource("7_trooper")
+Weapon = ExtResource("9_pistol")
+
 [sub_resource type="Resource" id="Resource_trooper_entry"]
 script = ExtResource("4_roster")
-Combatant = ExtResource("7_trooper")
+Loadout = SubResource("Resource_trooper_loadout")
 Quantity = 3
-Weapon = ExtResource("9_pistol")
 
 [sub_resource type="Resource" id="Resource_player_deployment"]
 script = ExtResource("3_faction")
@@ -54,9 +59,13 @@ Outcome = 2
 script = ExtResource("5_eliminate")
 OnComplete = SubResource("Resource_end_defeat")
 
+[sub_resource type="Resource" id="Resource_grunt_loadout"]
+script = ExtResource("17_loadout")
+Combatant = ExtResource("8_grunt")
+
 [sub_resource type="Resource" id="Resource_grunt_entry"]
 script = ExtResource("4_roster")
-Combatant = ExtResource("8_grunt")
+Loadout = SubResource("Resource_grunt_loadout")
 Quantity = 3
 
 [sub_resource type="Resource" id="Resource_enemy_deployment"]

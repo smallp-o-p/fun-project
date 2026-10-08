@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using FunProject.Engineering;
-using FunProject.Items;
 using FunProject.Research;
 using FunProject.Combatants;
 
@@ -13,7 +12,13 @@ public sealed record GeoscapeEvent(
   GeoscapeEventDefinition Definition,
   Option<int> TargetRegionIndex,
   long OccurredTick,
-  Option<long> ExpiresAtTick);
+  Option<long> ExpiresAtTick)
+{
+  /// <summary>Seed minted once when a tactical event fires and retained on the active record,
+  /// so battle resolution reproduces the same force across session rebuilds. Non-tactical
+  /// events carry None.</summary>
+  public Option<int> BattleSeed { get; init; } = Option<int>.None;
+}
 
 public sealed record ManufacturingStarted(ManufacturingJob Job) : IGeoscapeEvent;
 
@@ -22,7 +27,7 @@ public sealed record ManufacturingCompleted(ManufacturingJob Job) : IGeoscapeEve
 public sealed record ResearchStarted(ResearchJob Job) : IGeoscapeEvent;
 
 public sealed record ResearchCompleted(ResearchJob Job,
-  IReadOnlyList<EquippableItemData> ManufacturingUnlocks) : IGeoscapeEvent;
+  IReadOnlyList<ManufacturingRecipe> ManufacturingUnlocks) : IGeoscapeEvent;
 
 public sealed record TimeAdvanced(long Tick, DateTime CurrentTime) : IGeoscapeEvent;
 

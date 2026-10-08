@@ -1,6 +1,7 @@
 using FunProject.Dialogue;
 using FunProject.GameState;
 using FunProject.Strategic;
+using FunProject.Scenes.Ext;
 using CampaignGameState = global::FunProject.GameState.GameState;
 using Godot;
 using System;
@@ -53,12 +54,9 @@ public partial class GeoscapeScene : Control
     _hud.UpdateManufacturing(_session.ActiveManufacturing, _session.Tick);
 
     _viewManager = GetNode<GeoscapeViewManager>("%ViewManager");
-    // HUD buttons produce their views; their requests route through the permanent root so
-    // the manager only ever hears from stack members. ViewChanged presents the active
-    // view; the root is presented once here because the manager's _Ready (and its
-    // install) ran before this subscription existed.
+    // The stack presents each active view with the retained campaign and session.
     _hud.ViewRequested += _viewManager.RootView.RequestView;
-    _viewManager.ViewChanged += view => view.Present(_state, _session);
+    _viewManager.ViewChanged += HandleViewChanged;
     _viewManager.RootView.Present(_state, _session);
   }
 
@@ -80,6 +78,13 @@ public partial class GeoscapeScene : Control
     var camera = new GeoscapeCameraRig { Name = "Camera" };
     viewport.AddChild(camera);
     camera.Setup(mapSize, new Rect2(new Vector2(0, top), new Vector2(viewportSize.X, bottom - top)));
+  }
+
+  private void HandleViewChanged(GeoscapeView view)
+  {
+    if (view == _viewManager.RootView)
+      _map.RemoveInactiveEventMarkers();
+    view.Present(_state, _session);
   }
 
   // Construction hook for derived scenes (debug playtests): the state exists before the
@@ -119,8 +124,8 @@ public partial class GeoscapeScene : Control
         PushEventDialogue(opened.Pending);
         break;
       case ResolutionEventClosed:
-        // The dialog's buttons are the only close path, so it is the stack top here; the
-        // type check keeps a stray close from popping an innocent view.
+        // Direct resolution closes pop the dialog; covered dialogs close themselves
+        // when re-presented after their pending event has been consumed.
         if (_viewManager.Current is GeoscapeEventResolution)
           _viewManager.Pop();
         _map.RefreshEvents();
@@ -130,19 +135,7 @@ public partial class GeoscapeScene : Control
 
   // A fresh dialog per pending resolution: the manager frees popped views.
   private GeoscapeEventResolution InstantiateResolutionView()
-    => InstantiateRoot<GeoscapeEventResolution>(_resolutionViewScene, "ResolutionViewScene");
-
-  private T InstantiateRoot<T>(PackedScene scene, string exportName) where T : Node
-  {
-    Node instance = scene.Instantiate();
-    if (instance is not T view)
-    {
-      string kind = instance.GetClass();
-      instance.Free(); // free now: rejected roots must not linger to frame end
-      throw new InvalidOperationException($"{exportName} root must be a {typeof(T).Name}; got {kind}.");
-    }
-    return view;
-  }
+    => _resolutionViewScene.InstantiateAs<GeoscapeEventResolution>("ResolutionViewScene");
 
   // A dialogue-carrying event plays its conversation over the just-pushed resolution
   // view: the dialogue covers it and pops back to the retained dialog when finished.
@@ -152,7 +145,7 @@ public partial class GeoscapeScene : Control
     if (dialogue is null)
       return;
 
-    DialogueView view = InstantiateRoot<DialogueView>(_dialogueViewScene, "DialogueViewScene");
+    DialogueView view = _dialogueViewScene.InstantiateAs<DialogueView>("DialogueViewScene");
     view.Configure(dialogue);
     _viewManager.Push(view);
   }

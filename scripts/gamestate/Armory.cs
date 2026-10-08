@@ -74,7 +74,7 @@ public sealed class Armory
     }
   }
 
-  /// <summary>Add one produced item using the campaign's captured stock policy.
+  /// <summary>Add one produced item using its recipe's stock policy.
   /// Creates missing shelves; existing unlimited supply rejects another delivery.</summary>
   internal void AddItem(EquippableItemData data, bool unlimited)
   {

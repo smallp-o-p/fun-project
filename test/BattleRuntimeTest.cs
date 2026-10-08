@@ -16,15 +16,14 @@ public sealed partial class BattleRuntimeTest
         [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(unitName, faction)), new Vector3I(0, 0, 0))])],
       Seed: 7);
 
-  [TestCase(0, TestName = "Query executes against the session")]
-  [TestCase(1, TestName = "ExecuteAction delegates to the executor and the runtime republishes session events")]
-  public void RuntimeForwardsQueriesActionsAndEvents(int z)
+  [TestCase(TestName = "Runtime forwards queries, actions and committed events")]
+  public void RuntimeForwardsQueriesActionsAndEvents()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(SingleUnitSetup(faction));
     var runtime = battle.Runtime;
     battle.ClearEvents();
-    var cell = new Vector3I(1, 0, z);
+    var cell = new Vector3I(1, 0, 1);
     // Runtime-only driving (no conveniences): the fixture's runtime owns this session's
     // only executor; the spawn is an ordinary reinforcement into the started battle.
     runtime.ExecuteAction(BattleAction.SpawnUnit(

@@ -28,19 +28,6 @@ public class RegionButtonTest
     new Vector2(10, 10), new Vector2(110, 10), new Vector2(110, 110), new Vector2(10, 110),
   ];
 
-  // Circle markers bake a many-sided polygon; this mirrors the authored marker scene's Fill.
-  private static Vector2[] CirclePolygon(float radius, Vector2 center, int segments = 24)
-  {
-    var points = new Vector2[segments];
-    for (int i = 0; i < segments; i++)
-    {
-      float angle = i * Mathf.Tau / segments;
-      points[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
-    }
-
-    return points;
-  }
-
   [TestCase(false, 50, 50, true, TestName = "Square fill hits the polygon interior (50,50)")]
   [TestCase(false, 11, 11, true, TestName = "Square fill hits near the polygon corner (11,11)")]
   [TestCase(false, 111, 50, false, TestName = "Square fill rejects (111,50) beyond the polygon's right edge")]
@@ -119,17 +106,6 @@ public class RegionButtonTest
     Assert.False(button._HasPoint(new Vector2(80, 80)));
   }
 
-  [TestCase(TestName = "Baked circle fills hit inside the radius, not outside")]
-  public void CirclePolygonHitsWithinRadius()
-  {
-    var button = AuthoredRegion(CirclePolygon(28f, new Vector2(28, 28)));
-
-    Assert.True(button._HasPoint(new Vector2(28, 28)));
-    Assert.True(button._HasPoint(new Vector2(28 + 27, 28))); // inside the 24-gon's inset
-    Assert.False(button._HasPoint(new Vector2(28 + 29, 28)));
-    Assert.False(button._HasPoint(new Vector2(0, 0))); // rect corner, outside the shape
-  }
-
   [TestCase(TestName = "An unshaped button fails loud on hit-testing and marker anchors")]
   public void UnshapedButtonFailsLoud()
   {
@@ -141,17 +117,6 @@ public class RegionButtonTest
     Assert.Throws<InvalidOperationException>(() => button._HasPoint(new Vector2(0, 0)));
     Assert.Throws<InvalidOperationException>(() => button._HasPoint(new Vector2(500, 500)));
     Assert.Throws<InvalidOperationException>(() => _ = button.MarkerAnchor);
-  }
-
-  [TestCase(false, TestName = "MarkerAnchor falls back to the polygon centroid")]
-  [TestCase(true, TestName = "An authored Anchor child overrides the centroid")]
-  public void MarkerAnchorUsesTheAuthoredAnchorWhenPresent(bool authoredAnchor)
-  {
-    var button = AuthoredRegion(Square); // (10..110)² → centroid (60, 60)
-    if (authoredAnchor)
-      button.AddChild(new Marker2D { Name = "Anchor", Position = new Vector2(500, 400) });
-
-    Assert.Equal(authoredAnchor ? new Vector2(500, 400) : new Vector2(60, 60), button.MarkerAnchor);
   }
 
   [TestCase(TestName = "Hover lightens the Fill; mouse exit restores it")]

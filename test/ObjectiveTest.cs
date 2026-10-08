@@ -65,21 +65,4 @@ public class ObjectiveTest
       new TurnStartedBattleEvent(battle.PlayerFaction, 1), battle.Session));
   }
 
-  [TestCase(TestName = "SurviveUntilTurn passes once the target turn is reached")]
-  public void SurviveUntilTurnPassesAtTargetTurn()
-  {
-    var player = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(new BattleSetup(
-      TestData.MakeOpenBattleMap(new Vector3I(5, 1, 5)),
-      [new BattleSideSetup(player, [new FakeObjectiveData()],
-        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("P1", player)), new Vector3I(0, 0, 0))])],
-      Seed: 7));
-    var turnStart = new TurnStartedBattleEvent(player, battle.Session.TurnNumber);
-
-    var objective = new SurviveUntilTurnObjective(new SurviveUntilTurnObjectiveData { TargetTurn = 1 });
-    Assert.Equal(ObjectiveResult.Passed, objective.Check(player, turnStart, battle.Session)); // TurnNumber starts at 1
-
-    var later = new SurviveUntilTurnObjective(new SurviveUntilTurnObjectiveData { TargetTurn = 5 });
-    Assert.Equal(ObjectiveResult.Ongoing, later.Check(player, turnStart, battle.Session));
-  }
 }

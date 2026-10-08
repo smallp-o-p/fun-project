@@ -82,7 +82,10 @@ public partial class MapDeploymentTest
     var side = new FactionDeploymentData { Faction = new FactionData { Name = "Player" } };
     side.Roster.Add(new FunProject.Battle.RosterEntryData
     {
-      Combatant = TestData.MakeCombatantData("A", health: 20, aim: 65),
+      Loadout = new UnitLoadoutData
+      {
+        Combatant = TestData.MakeCombatantData("A", health: 20, aim: 65),
+      },
     });
     side.Objectives.Add(new FakeObjectiveData());
     type.Factions.Add(side);

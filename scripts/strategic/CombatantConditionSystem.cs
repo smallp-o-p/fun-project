@@ -42,6 +42,12 @@ public sealed class CombatantConditionSystem
   public Option<FatigueState> GetFatigue(Combatant combatant)
     => _fatigues.TryGetValue(combatant, out var fatigue) ? Some(fatigue) : None;
 
+  internal void Forget(Combatant combatant)
+  {
+    _injuries.Remove(combatant);
+    _fatigues.Remove(combatant);
+  }
+
   public string InjuryName(int position)
     => position == 0 ? "Healthy" : InjuryTierAt(position).Name;
 

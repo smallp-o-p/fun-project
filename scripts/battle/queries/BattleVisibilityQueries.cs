@@ -47,7 +47,7 @@ public sealed class GetVisibleEnemiesForUnit(AliveUnit observer) : IBattleSessio
   }
 }
 
-public sealed class GetVisibleUnitsForFaction(Faction faction) : IBattleSessionQuery<IReadOnlyCollection<AliveUnit>>
+public sealed class GetAllVisibleUnitsForFaction(Faction faction) : IBattleSessionQuery<IReadOnlyCollection<AliveUnit>>
 {
   public IReadOnlyCollection<AliveUnit> Execute(BattleSession session)
   {
@@ -68,4 +68,18 @@ public sealed class GetVisibleUnitsForFaction(Faction faction) : IBattleSessionQ
       .Select(session.MintAlive)
       .ToArray();
   }
+}
+
+// Allies are the same faction; every living own-side unit remains faction-known without LOS.
+public sealed class GetVisibleAlliedUnitsForFaction(Faction faction) : IBattleSessionQuery<IReadOnlyCollection<AliveUnit>>
+{
+  public IReadOnlyCollection<AliveUnit> Execute(BattleSession session) => session.GetFactionAliveUnits(faction)
+    .AsValueEnumerable().Select(session.MintAlive).ToArray();
+}
+
+// Existing tactical hostility is different-faction identity, without diplomatic standings.
+public sealed class GetVisibleHostileUnitsForFaction(Faction faction) : IBattleSessionQuery<IReadOnlyCollection<AliveUnit>>
+{
+  public IReadOnlyCollection<AliveUnit> Execute(BattleSession session) => new GetAllVisibleUnitsForFaction(faction).Execute(session)
+    .AsValueEnumerable().Where(unit => unit.State.Side != faction).ToArray();
 }

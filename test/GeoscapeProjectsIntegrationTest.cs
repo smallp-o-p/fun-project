@@ -1,4 +1,6 @@
 using System.Threading.Tasks;
+using FunProject.Geoscape;
+using FunProject.Engineering;
 using GdUnit4;
 using Godot;
 using static FunProject.Tests.GeoscapeTestScenes;
@@ -7,8 +9,86 @@ using static FunProject.Tests.GeoscapeTestScenes;
 [RequireGodotRuntime]
 public class GeoscapeProjectsIntegrationTest
 {
+  [TestCase(false)]
+  [TestCase(true)]
+  public async Task ProjectCostsUseAuthoredPricesAndLiveAffordability(bool research)
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var currency = MakeCurrency("Budget");
+    var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item, costs: new() { [currency] = 10 });
+    var old = MakeResearch("Old");
+    var project = MakeResearch(costs: new() { [currency] = 10 });
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe], researchProjects: [old, project],
+      startingCurrencies: new() { [currency] = 5 }));
+    var active = campaign.Session.StartResearch(old).RequireRight();
+    itemRecipe.Costs[currency] = 99;
+    project.Costs[currency] = 99;
+    GeoscapeView view = research ? CreateResearchView() : CreateEngineeringView();
+    AddToTree(view);
+    view.Present(campaign.State, campaign.Session);
+    var rows = view.GetNode<VBoxContainer>(research ? "%ResearchProjects" : "%ManufacturableItems");
+    OnlyChild<Button>(rows).EmitSignal(Button.SignalName.Pressed);
+    string text = view.GetNode<Label>("%CurrencyCosts").Text;
+    Assert.Equal("Cost: Budget: 99", text);
+    Assert.Equal(Colors.Red, view.GetNode<Label>("%CurrencyCosts").GetThemeColor("font_color"));
+    var start = view.GetNode<Button>(research ? "%StartResearchButton" : "%ManufactureButton");
+    Assert.True(start.Disabled);
+    start.EmitSignal(Button.SignalName.Pressed);
+    Assert.Equal(Some(active), campaign.Session.ActiveResearch);
+    Assert.True(campaign.Session.ActiveManufacturing.IsNone);
+
+    using var free = new GeoscapeFixture(MakeStart(manufacturingRecipes: [MakeManufacturingRecipe(MakeItemData(), costs: new() { [currency] = 0 })],
+      researchProjects: [MakeResearch()]));
+    view.Present(free.State, free.Session);
+    OnlyChild<Button>(rows).EmitSignal(Button.SignalName.Pressed);
+    Assert.Equal("Cost: Free", view.GetNode<Label>("%CurrencyCosts").Text);
+    Assert.False(view.GetNode<Label>("%CurrencyCosts").HasThemeColorOverride("font_color"));
+    Assert.False(start.Disabled);
+  }
+
+  [TestCase(false)]
+  [TestCase(true)]
+  public async Task StaleProjectSelectionRechecksAffordability(bool research)
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var currency = MakeCurrency("Budget");
+    var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item, costs: new() { [currency] = 10 });
+    var project = MakeResearch(costs: new() { [currency] = 10 });
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe], researchProjects: [project],
+      startingCurrencies: new() { [currency] = 10 }));
+    GeoscapeView view = research ? CreateResearchView() : CreateEngineeringView();
+    AddToTree(view);
+    view.Present(campaign.State, campaign.Session);
+    OnlyChild<Button>(view.GetNode<VBoxContainer>(research ? "%ResearchProjects" : "%ManufacturableItems"))
+      .EmitSignal(Button.SignalName.Pressed);
+    var start = view.GetNode<Button>(research ? "%StartResearchButton" : "%ManufactureButton");
+    Assert.False(start.Disabled);
+    if (research)
+      campaign.Session.StartManufacturing(itemRecipe).RequireRight();
+    else
+      campaign.Session.StartResearch(project).RequireRight();
+    campaign.ClearEvents();
+    start.EmitSignal(Button.SignalName.Pressed);
+    Assert.True(start.Disabled);
+    Assert.Equal(0UL, campaign.State.GetCurrencyBalance(currency));
+    Assert.Equal("Cost: Budget: 10", view.GetNode<Label>("%CurrencyCosts").Text);
+    Assert.Equal(Colors.Red, view.GetNode<Label>("%CurrencyCosts").GetThemeColor("font_color"));
+    string status = view.GetNode<Label>("%Status").Text;
+    Assert.True(status.Contains("InsufficientCurrencies"));
+    Assert.True(status.Contains(research ? project.Name : item.Name));
+    Assert.True(research ? campaign.Session.ActiveResearch.IsNone : campaign.Session.ActiveManufacturing.IsNone);
+    Assert.True(research ? campaign.Session.ActiveManufacturing.IsSome : campaign.Session.ActiveResearch.IsSome);
+    Assert.Equal(0, campaign.Events.Count);
+  }
+
   private static void PressEngineeringButton(GeoscapeScene scene)
     => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Button>("%EngineeringButton")
+      .EmitSignal(Button.SignalName.Pressed);
+
+  private static void PressResearchButton(GeoscapeScene scene)
+    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Button>("%ResearchButton")
       .EmitSignal(Button.SignalName.Pressed);
 
   // Synchronous tests: automatic frames cannot race manual clock steps. Completion paths
@@ -16,14 +96,18 @@ public class GeoscapeProjectsIntegrationTest
   // The authored scenes supply bindings and layout; manual clock assertions run
   // synchronously, and async tests await layout/deletion boundaries.
   // A hosted view must stay in viewport pixels when the map camera moves or zooms.
-  [TestCase]
-  public async Task ProjectControlsStayInViewportWhenCameraMovesAndViewportResizes()
+  [TestCase(false)]
+  [TestCase(true)]
+  public async Task ProjectControlsStayInViewportWhenCameraMovesAndViewportResizes(bool research)
   {
     var scene = CreateGeoscapeScene(MakeStart());
     var viewport = CreateUiViewport(scene, new Vector2I(1600, 900));
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
-    PressEngineeringButton(scene);
-    var view = (EngineeringView)manager.Current;
+    if (research)
+      PressResearchButton(scene);
+    else
+      PressEngineeringButton(scene);
+    var view = manager.Current;
     await WaitForLayout(scene);
     Assert.Equal(new Rect2(0, 0, 1600, 900), ScreenRect(view));
 
@@ -45,17 +129,49 @@ public class GeoscapeProjectsIntegrationTest
     Assert.False(GodotObject.IsInstanceValid(view));
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
     Assert.True(scene.GetNode<GeoscapeMapControl>("%Map").IsVisibleInTree());
-    Assert.True(scene.GetNode<GeoscapeHud>("%GeoscapeHud").IsVisibleInTree());
+    var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
+    Assert.True(hud.IsVisibleInTree());
+    Assert.True(visible.Encloses(ScreenRect(hud.GetNode<Button>("%ResearchButton"))));
+    Assert.True(visible.Encloses(ScreenRect(hud.GetNode<Label>("%EngineeringProgress"))));
+  }
+
+  [TestCase]
+  public async Task ReopeningResearchShowsProgressAndEngineeringUnlock()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var scene = AddToTree(CreateDebugGeoscapeScene());
+    var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
+    PressResearchButton(scene);
+    var research = (ResearchView)manager.Current;
+    OnlyChild<Button>(research.GetNode<VBoxContainer>("%ResearchProjects"))
+      .EmitSignal(Button.SignalName.Pressed);
+    research.GetNode<Button>("%StartResearchButton").EmitSignal(Button.SignalName.Pressed);
+    research.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
+    SpeedButton(scene).EmitSignal(Button.SignalName.Pressed);
+    for (int i = 0; i < 1439; i++)
+      scene._PhysicsProcess(0.02);
+
+    PressResearchButton(scene);
+    var reopened = (ResearchView)manager.Current;
+    Assert.Equal("Research: Prototype Kit Research - 1m remaining", reopened.GetNode<Label>("%ActiveJob").Text);
+    reopened.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed);
+    scene._PhysicsProcess(0.02);
+    PressEngineeringButton(scene);
+    var engineering = (EngineeringView)manager.Current;
+    Assert.True(engineering.GetNode<VBoxContainer>("%ManufacturableItems").GetChildren()
+      .AsValueEnumerable().OfType<Button>().Any(button => button.Text == "Prototype Kit"));
   }
 
   [TestCase]
   public async Task BrowsingFreezesManufacturingAndReturningToMapRefreshesCompletion()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var scarce = MakeItemData("Scanner", manufacturingDays: 1);
-    var unlimited = MakeItemData("Field kit", unlimited: true, manufacturingDays: 2);
+    var scarce = MakeItemData("Scanner");
+    var scarceRecipe = MakeManufacturingRecipe(scarce, days: 1);
+    var unlimited = MakeItemData("Field kit", unlimited: true);
+    var unlimitedRecipe = MakeManufacturingRecipe(unlimited, days: 2);
     var scene = AddToTree(CreateGeoscapeScene(MakeStart(
-      manufacturableItems: [scarce, unlimited])));
+      manufacturingRecipes: [scarceRecipe, unlimitedRecipe])));
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
     PressEngineeringButton(scene);
@@ -155,8 +271,9 @@ public class GeoscapeProjectsIntegrationTest
   public async Task ReopeningEngineeringStartsOneJobPerRequestAndClearsCompletedSummary()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var item = MakeItemData("Field kit", manufacturingDays: 1);
-    var scene = AddToTree(CreateGeoscapeScene(MakeStart(manufacturableItems: [item])));
+    var item = MakeItemData("Field kit");
+    var itemRecipe = MakeManufacturingRecipe(item, days: 1);
+    var scene = AddToTree(CreateGeoscapeScene(MakeStart(manufacturingRecipes: [itemRecipe])));
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
     PressEngineeringButton(scene);
@@ -190,30 +307,4 @@ public class GeoscapeProjectsIntegrationTest
     Assert.Equal("Stock: 2", third.GetNode<Label>("%Stock").Text);
   }
 
-  [TestCase]
-  public async Task RejectedManufacturingRequestRestoresCampaignSnapshotThenShowsFailure()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var scene = AddToTree(CreateGeoscapeScene(MakeStart()));
-    // _Ready initializes the idle project status before any view action or foreign snapshot.
-    var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
-    Assert.Equal("No active manufacturing.", hud.GetNode<Label>("%EngineeringProgress").Text);
-    Assert.False(hud.HasNode("%EngineeringNotice"));
-
-    var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
-    PressEngineeringButton(scene);
-    var view = (EngineeringView)manager.Current;
-    var item = MakeItemData();
-    using var foreignCampaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
-    var foreign = foreignCampaign.Session;
-    view.Present(foreign.GetManufacturingOptions(), None, 0);
-    view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
-    view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
-
-    Assert.Equal("No items available to manufacture.",
-      OnlyChild<Label>(view.GetNode<VBoxContainer>("%ManufacturableItems")).Text);
-    Assert.Equal("No active manufacturing.", view.GetNode<Label>("%ActiveJob").Text);
-    Assert.Equal("This item is not available for manufacturing.",
-      view.GetNode<Label>("%Status").Text);
-  }
 }

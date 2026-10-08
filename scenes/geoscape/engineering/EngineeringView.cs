@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using CampaignGameState = FunProject.GameState.GameState;
 using FunProject.Engineering;
+using FunProject.Currencies;
+using FunProject.Items;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
 using Godot;
@@ -9,6 +11,7 @@ using Godot;
 public sealed partial class EngineeringView : GeoscapeView
 {
   private GeoscapeSession _session = null!;
+  private CampaignGameState _state = null!;
   private IReadOnlyList<ManufacturingOption> _options = [];
   private Option<ManufacturingJob> _active = None;
   private Option<ManufacturingOption> _selection = None;
@@ -23,18 +26,19 @@ public sealed partial class EngineeringView : GeoscapeView
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
     _session = session;
-    Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    Present(state, session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
   }
 
-  public void Present(IReadOnlyList<ManufacturingOption> options,
+  public void Present(CampaignGameState state, IReadOnlyList<ManufacturingOption> options,
     Option<ManufacturingJob> active, long tick)
   {
+    _state = state;
     _options = options;
     _active = active;
     _selection = _selection.Bind(selected =>
     {
       foreach (var option in _options)
-        if (ReferenceEquals(option.Project.Item, selected.Project.Item))
+        if (ReferenceEquals(option.Project, selected.Project))
           return Some(option);
       return None;
     });
@@ -47,16 +51,8 @@ public sealed partial class EngineeringView : GeoscapeView
     RefreshSelection();
   }
 
-  public void ShowFailure(ManufacturingStartFailure failure)
-  {
-    GetNode<Label>("%Status").Text = failure switch
-    {
-      ManufacturingStartFailure.UnknownItem => "This item is not available for manufacturing.",
-      ManufacturingStartFailure.Busy => "Another manufacturing project is already in progress.",
-      ManufacturingStartFailure.AlreadyAvailable => "Unlimited supply for this item is already established.",
-      _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, "Unknown manufacturing failure."),
-    };
-  }
+  public void ShowFailure(EquippableItemData item, ManufacturingStartFailure failure)
+    => GetNode<Label>("%Status").Text = $"Manufacturing start rejected for {item.Name}: {failure}.";
 
   private void OnManufacturePressed()
   {
@@ -64,9 +60,9 @@ public sealed partial class EngineeringView : GeoscapeView
       return;
     _selection.IfSome(option =>
     {
-      var result = _session.StartManufacturing(option.Project.Item);
-      Present(_session.GetManufacturingOptions(), _session.ActiveManufacturing, _session.Tick);
-      result.IfLeft(ShowFailure); // after the refresh: it clears the status line
+      var result = _session.StartManufacturing(option.Project);
+      Present(_state, _session.GetManufacturingOptions(), _session.ActiveManufacturing, _session.Tick);
+      result.IfLeft(reason => ShowFailure(option.Project.Item, reason)); // after the refresh: it clears the status line
     });
   }
 
@@ -107,7 +103,7 @@ public sealed partial class EngineeringView : GeoscapeView
     {
       int rowIndex = index;
       rows.GetChild<Button>(index).SetPressedNoSignal(_selection.Match(
-        selected => ReferenceEquals(selected.Project.Item, _options[rowIndex].Project.Item),
+        selected => ReferenceEquals(selected.Project, _options[rowIndex].Project),
         () => false));
     }
     GetNode<Label>("%ItemName").Text = _selection.Match(
@@ -117,9 +113,17 @@ public sealed partial class EngineeringView : GeoscapeView
     GetNode<Label>("%ManufacturingDuration").Text = _selection.Match(
       option => $"Duration: {option.Project.DurationDays}d", () => "");
     GetNode<Label>("%Stock").Text = _selection.Match(
-      option => option.Project.UnlimitedStock ? "Stock: Not established" : $"Stock: {option.Remaining}", () => "");
+      option => option.Project.Item.UnlimitedStock ? "Stock: Not established" : $"Stock: {option.Remaining}", () => "");
+    var costLabel = GetNode<Label>("%CurrencyCosts");
+    costLabel.Text = _selection.Match(option => Currency.FormatCosts(option.Project.Costs), () => "");
+    costLabel.Visible = _selection.IsSome;
+    bool affordable = _selection.Exists(option => _state.CanAffordCurrencyCosts(option.Project.Costs));
+    if (_selection.IsSome && !affordable)
+      costLabel.AddThemeColorOverride("font_color", Colors.Red);
+    else
+      costLabel.RemoveThemeColorOverride("font_color");
     GetNode<Label>("%SupplyEffect").Text = _selection.Match(
-      option => option.Project.UnlimitedStock ? "Establishes unlimited supply." : "Produces 1 item.", () => "");
-    GetNode<Button>("%ManufactureButton").Disabled = _active.IsSome || _selection.IsNone;
+      option => option.Project.Item.UnlimitedStock ? "Establishes unlimited supply." : "Produces 1 item.", () => "");
+    GetNode<Button>("%ManufactureButton").Disabled = _active.IsSome || !affordable;
   }
 }

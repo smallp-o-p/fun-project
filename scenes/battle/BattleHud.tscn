@@ -149,6 +149,17 @@ custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Cancel"
 
+[node name="ReturnButton" type="Button" parent="Screen"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 136.0
+offset_bottom = 60.0
+text = "Return"
+
 [node name="BattleOverBanner" type="Label" parent="Screen"]
 unique_name_in_owner = true
 visible = false

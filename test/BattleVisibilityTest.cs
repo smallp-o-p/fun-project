@@ -397,21 +397,33 @@ public class BattleVisibilityTest
     Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
   }
 
-  [TestCase(TestName = "Own units remain known to their faction without direct line of sight")]
-  public void OwnUnitsRemainKnownToTheirFactionWithoutDirectLineOfSight()
+  [TestCase(TestName = "Faction visibility queries partition allies and visible hostiles in roster order")]
+  public void FactionVisibilityPartitionsAlliesAndHostiles()
   {
-    var playerFaction = TestData.MakeFaction("Player");
-    using var battle = VisibilityFixture(new Vector3I(5, 1, 1),
+    var player = TestData.MakeFaction("Player");
+    var enemy = TestData.MakeFaction("Enemy");
+    using var battle = VisibilityFixture(new Vector3I(8, 1, 1),
       [
-        (playerFaction, "Alpha", new Vector3I(0, 0, 0), 1),
-        (playerFaction, "Bravo", new Vector3I(4, 0, 0), 1),
+        (player, "Scout A", new Vector3I(0, 0, 0), 2),
+        (player, "Scout B", new Vector3I(1, 0, 0), 2),
+        (player, "Reserve", new Vector3I(7, 0, 0), 1),
+        (enemy, "Seen", new Vector3I(2, 0, 0), 1),
+        (enemy, "Hidden", new Vector3I(5, 0, 0), 1),
       ]);
-    var alpha = UnitAt(battle, new Vector3I(0, 0, 0));
-    var bravo = UnitAt(battle, new Vector3I(4, 0, 0));
-
-    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(alpha), battle.Alive(bravo))));
-    Assert.True(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(bravo))));
-    Assert.Equal(2, battle.Query(new GetVisibleUnitsForFaction(playerFaction)).Count);
+    var scoutA = UnitAt(battle, new Vector3I(0, 0, 0));
+    var scoutB = UnitAt(battle, new Vector3I(1, 0, 0));
+    var reserve = UnitAt(battle, new Vector3I(7, 0, 0));
+    var seen = UnitAt(battle, new Vector3I(2, 0, 0));
+    Assert.False(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutA), battle.Alive(reserve))));
+    Assert.True(battle.Query(new IsUnitVisibleToFaction(player, battle.Alive(reserve))));
+    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutA), battle.Alive(seen))));
+    Assert.True(battle.Query(new IsUnitVisibleToUnit(battle.Alive(scoutB), battle.Alive(seen))));
+    Assert.True(battle.Query(new GetVisibleAlliedUnitsForFaction(player)).AsValueEnumerable()
+      .Select(unit => unit.State).SequenceEqual(new[] { scoutA, scoutB, reserve }));
+    Assert.True(battle.Query(new GetVisibleHostileUnitsForFaction(player)).AsValueEnumerable()
+      .Select(unit => unit.State).SequenceEqual(new[] { seen }));
+    Assert.True(battle.Query(new GetAllVisibleUnitsForFaction(player)).AsValueEnumerable()
+      .Select(unit => unit.State).SequenceEqual(new[] { scoutA, scoutB, reserve, seen }));
   }
 
   [TestCase(TestName = "SpawnUnit refreshes visibility caches")]
@@ -448,7 +460,7 @@ public class BattleVisibilityTest
     battle.ApplyDamage(observer, 10);
 
     Assert.False(battle.Query(new IsUnitVisibleToFaction(playerFaction, battle.Alive(target))));
-    Assert.Equal(0, battle.Query(new GetVisibleUnitsForFaction(playerFaction)).Count);
+    Assert.Equal(0, battle.Query(new GetAllVisibleUnitsForFaction(playerFaction)).Count);
   }
 
   [TestCase(TestName = "InvalidateVisibility forces recompute after runtime tile LOS change")]

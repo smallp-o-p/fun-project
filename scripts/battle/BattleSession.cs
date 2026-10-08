@@ -55,6 +55,7 @@ public sealed class BattleSession
   private readonly SysColGeneric.HashSet<BattleUnitState> _visibilityAffectedUnits = [];
 
   public BattleBoardState Board { get; }
+  internal BattleObservationHistory ObservationHistory => _visibility.History;
   internal UnitActionCache ActionOptions { get; }
   public int TurnNumber { get; private set; } = 1;
   public Faction ActiveSide => _scheduler.ActiveSide;

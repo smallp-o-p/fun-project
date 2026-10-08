@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ManufacturingRecipe" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/engineering/ManufacturingRecipe.cs" id="1_recipe"]
+[ext_resource type="Resource" path="res://resources/items/workshop_sample.tres" id="2_item"]
+
+[resource]
+script = ExtResource("1_recipe")
+Item = ExtResource("2_item")
+DurationDays = 1

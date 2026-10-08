@@ -7,6 +7,7 @@ using FunProject.Engineering;
 using FunProject.GameState;
 using FunProject.Items;
 using FunProject.Research;
+using LanguageExt.UnsafeValueAccess;
 
 namespace FunProject.Strategic;
 
@@ -59,6 +60,9 @@ public sealed class GeoscapeSession
 
   public Option<PendingResolution> PendingResolution => _state.Pending;
 
+  /// <summary>Campaign-held association for the currently launched mission, if any.</summary>
+  public Option<MissionDeployment> ActiveMission => _state.ActiveMission;
+
   public Option<ManufacturingJob> ActiveManufacturing => _state.Engineering.ActiveJob;
 
   public Option<ResearchJob> ActiveResearch => _state.Research.ActiveJob;
@@ -69,21 +73,25 @@ public sealed class GeoscapeSession
     => _state.Research.GetAvailableProjects(_state);
 
   public Either<ResearchStartFailure, ResearchJob> StartResearch(ResearchProject project)
-    => _state.Research.ResolveResearch(project, _state).Map(definition =>
+    => _state.Research.ResolveResearch(project, _state).Bind<ResearchJob>(definition =>
     {
       var job = new ResearchJob(definition.Project, Tick, CompletionTick(definition.DurationDays));
+      if (!_state.TrySpendCurrencyCosts(definition.Project.Costs))
+        return ResearchStartFailure.InsufficientCurrencies;
       var started = _state.Research.Start(job);
       Commit(started);
       return started.Job;
     });
 
   public IReadOnlyList<ManufacturingOption> GetManufacturingOptions()
-    => _state.Engineering.GetManufacturingOptions(_state.Armory);
+    => _state.Engineering.GetManufacturingOptions(_state);
 
-  public Either<ManufacturingStartFailure, ManufacturingJob> StartManufacturing(EquippableItemData data)
-    => _state.Engineering.ResolveManufacturing(data, _state.Armory).Map(project =>
+  public Either<ManufacturingStartFailure, ManufacturingJob> StartManufacturing(ManufacturingRecipe recipe)
+    => _state.Engineering.ResolveManufacturing(recipe, _state.Armory).Bind<ManufacturingJob>(project =>
     {
       var job = new ManufacturingJob(project, Tick, CompletionTick(project.DurationDays));
+      if (!_state.TrySpendCurrencyCosts(project.Costs))
+        return ManufacturingStartFailure.InsufficientCurrencies;
       ManufacturingStarted started = _state.Engineering.Start(job);
       Commit(started);
       return started.Job;
@@ -107,6 +115,9 @@ public sealed class GeoscapeSession
   {
     if (_state.Pending.IsNone)
       throw new InvalidOperationException("CompleteResolution called with no resolution pending.");
+    if (_state.ActiveMission.IsSome)
+      throw new InvalidOperationException(
+        "The active mission must complete before its resolution closes.");
 
     // Clear before committing: synchronous subscribers (HUD/map refreshes) must observe the
     // resolution as already closed — the battle layer's "hooks act on post-state" convention.
@@ -121,6 +132,59 @@ public sealed class GeoscapeSession
   public void ChangeSpeed(TimeSpeed speed)
   {
     Speed = speed;
+  }
+
+  /// <summary>Starts the selected mission and stores its deployment after startup succeeds.
+  /// The view owns the returned runtime.</summary>
+  public Either<BattleSetupFailure, MissionBattle> LaunchMission(
+    GeoscapeEvent mission, IReadOnlyList<Combatant> squad)
+  {
+    TacticalMissionData authored = mission.Definition.TacticalMission!;
+    // Capture ordered, unique participants before startup callbacks can change the selection.
+    var deployment = new MissionDeployment([.. squad.AsValueEnumerable().Distinct()
+      .Take((int)Math.Min(authored.Size.MaxPlayerUnits, (uint)squad.Count))]);
+    int seed = mission.BattleSeed.ValueUnsafe();
+
+    var player = new PlayerDeployment(_state.PlayerFaction,
+      [.. deployment.Participants.AsValueEnumerable().Select(combatant => new UnitLoadout(
+        combatant, combatant.EquippedWeapon, combatant.EquippedArmor)
+      {
+        StatMods = _state.Conditions.StatContributions(combatant),
+      })]);
+    SideDeployment side = MissionEnemyResolver.Resolve(authored, seed);
+
+    return BattleSetupResolver.Resolve(authored.BattleType, seed, Some(player), Some(side))
+      .Bind(setup => BattleFactory.Start(setup).Map(runtime =>
+      {
+        _state.ActiveMission = Some(deployment);
+        return new MissionBattle(deployment, setup, runtime);
+      }));
+  }
+
+  /// <summary>Installation failed; retain the pending event and seed for another attempt.
+  /// Runtime disposal belongs to the view.</summary>
+  public void AbortMissionPresentation() => _state.ActiveMission = None;
+
+  /// <summary>Applies the active mission's terminal summary and consumes the mission before
+  /// broadcasting. The completion signal supplies the trusted player summary.</summary>
+  internal void CompleteMission(FactionBattleSummary summary)
+  {
+    PendingResolution pending = _state.Pending.ValueUnsafe()!;
+
+    foreach ((Combatant combatant, BattleHealthSummary health) in summary.HealthByCombatant)
+      _state.Conditions.ApplyMissionReturn(combatant, health.HealthDamageTaken, health.MaxHealth, Tick);
+    _state.RemoveDeadFromRoster(summary.CombatantsDead);
+    foreach (Combatant captured in summary.CapturedEnemies)
+      _state.Captivity.Add(captured);
+
+    // Commit campaign consumption before notifying observers.
+    _state.ActiveMission = Option<MissionDeployment>.None;
+    _state.Pending = Option<PendingResolution>.None;
+    _state.ActiveEvents.Remove(pending.Event);
+
+    foreach (Combatant combatant in summary.HealthByCombatant.Keys)
+      Commit(new CombatantConditionsChanged(combatant));
+    Commit(new ResolutionEventClosed(pending, ResolutionOutcome.Engaged));
   }
 
   public void ApplyMissionReturn(FactionBattleSummary summary)
@@ -169,7 +233,7 @@ public sealed class GeoscapeSession
   private void Handle(ManufacturingCompleted completed)
   {
     var project = completed.Job.Project;
-    _state.Armory.AddItem(project.Item, project.UnlimitedStock);
+    _state.Armory.AddItem(project.Item, project.Item.UnlimitedStock);
     Commit(completed);
   }
 
@@ -196,7 +260,12 @@ public sealed class GeoscapeSession
         fire.Definition,
         fire.TargetRegionIndex >= 0 ? Some(fire.TargetRegionIndex) : Option<int>.None,
         Tick,
-        fire.ExpiresAtTick);
+        fire.ExpiresAtTick)
+      {
+        BattleSeed = fire.Definition.Kind == GeoscapeEventKind.TacticalBattle
+          ? Some(Random.Shared.Next())
+          : Option<int>.None,
+      };
       _state.ActiveEvents.Add(active);
       Commit(new ScheduledEventFired(active));
     }

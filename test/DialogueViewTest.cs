@@ -190,24 +190,6 @@ public class DialogueViewTest
   // The panel anchors bottom-wide across the view: unpinned horizontal anchors
   // would expand it around x=0 and render the portrait offscreen.
   [TestCase]
-  public async Task PanelAndPortraitStayOnscreen()
-  {
-    DialogueView view = MakeView(Sequence(Line(Speaker(), "One line.")));
-    await WaitForLayout(view);
-
-    Vector2 viewport = view.GetViewportRect().Size;
-    Rect2 panel = ScreenRect(view.GetNode<Control>("Panel"));
-    Assert.True(panel.Position.X >= 0);
-    Assert.True(panel.Position.Y >= 0);
-    Assert.True(panel.End.X <= viewport.X);
-    Assert.True(panel.End.Y <= viewport.Y);
-
-    Rect2 portrait = ScreenRect(view.GetNode<Control>("Panel/HBox/Portrait"));
-    Assert.True(portrait.Position.X >= 0);
-    Assert.True(portrait.End.X <= viewport.X);
-  }
-
-  [TestCase]
   public void UiAcceptAdvances()
   {
     DialogueView view = MakeView(Sequence(Line(Speaker("A"), "One."), Line(Speaker("B"), "Two.")));

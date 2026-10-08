@@ -1,5 +1,6 @@
 #nullable disable warnings
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using FunProject.Combatants;
 using FunProject.Geoscape;
@@ -43,8 +44,18 @@ public class GeoscapeSquadLoadoutTest
     var view = AddToTree(CreateSquadLoadoutView());
     // The opener supplies the mission configuration: title, three editable slots, and the
     // pending mission itself as explicit deployment context.
-    view.Configure(pending.Event.Definition.Title, 3, allowEquipmentEditing: true,
-      mission: pending.Event.Definition);
+    view.Configure(pending.Event.Definition.Title, 3, allowEquipmentEditing: true);
+    view.Present(state, session);
+    return view;
+  }
+
+  // Mission preparation as the resolution opener now performs it: the entire active event
+  // handed to ConfigureMission, which derives title, gate, and capacity from it.
+  private static SquadLoadoutView PresentedMissionView(PendingResolution pending,
+    CampaignGameState state, GeoscapeSession session)
+  {
+    var view = AddToTree(CreateMissionView());
+    view.ConfigureMission(pending.Event);
     view.Present(state, session);
     return view;
   }
@@ -153,6 +164,52 @@ public class GeoscapeSquadLoadoutTest
     {
       view.Free(); // never entered the tree; keep the orphan monitor clean
     }
+  }
+
+  [TestCase(TestName = "Mission size controls preparation capacity and Deploy readiness")]
+  public async Task MissionSizeControlsPreparationCapacity()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (fixture, pending) = Mission([MakeEntry("Alpha")],
+      mission: MakeEvent("Operation Iron", GeoscapeEventKind.TacticalBattle,
+        tacticalMission: MakeTacticalMission(maxPlayerUnits: 1)));
+    using var _ = fixture;
+    var squad = PresentedMissionView(pending, fixture.State, fixture.Session);
+
+    Assert.Equal(1, squad.GetNode<BoxContainer>("%Slots").GetChildCount());
+    Assert.Equal("Squad: 0/1", squad.GetNode<Label>("%SquadCount").Text);
+    Assert.True(SquadDeployButton(squad).Visible); // configured tactical mission
+    Assert.True(SquadDeployButton(squad).Disabled); // empty selection
+    ChooseSquadUnit(squad, 0, "Alpha");
+    Assert.False(SquadDeployButton(squad).Disabled);
+  }
+
+  [TestCase(TestName = "Setup failure preserves selection for a corrected retry")]
+  public async Task SetupFailurePreservesSelectionAndRetry()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (fixture, pending) = Mission([MakeEntry("Alpha"), MakeEntry("Bravo")],
+      mission: MakeEvent("Operation Iron", GeoscapeEventKind.TacticalBattle,
+        tacticalMission: MakeTacticalMission(MakeTacticalBattleType(playerCells: 1, enemyCells: 2),
+          maxPlayerUnits: 2, minEnemyUnits: 1, maxEnemyUnits: 1)));
+    using var _ = fixture;
+    var view = PresentedMissionView(pending, fixture.State, fixture.Session);
+    ChooseSquadUnit(view, 0, "Alpha");
+    ChooseSquadUnit(view, 1, "Bravo");
+    SquadDeployButton(view).EmitSignal(Button.SignalName.Pressed);
+
+    Assert.True(fixture.Session.ActiveMission.IsNone);
+    Assert.True(fixture.Session.PendingResolution.IsSome);
+    Assert.Equal(2, view.GetSelectedCombatants().Count);
+    Assert.True(view.GetNode<Control>("Content").Visible);
+    Assert.False(view.GetNode<Control>("Background").Visible);
+    Assert.Equal(0, view.GetNode<SubViewport>("Background/Viewport").GetChildCount());
+    Assert.True(view.GetNodeOrNull<Label>("%DeploymentFailure") is null);
+
+    Press(SquadSlot(view, 1).GetNode<Button>("%RemoveUnit"));
+    SquadDeployButton(view).EmitSignal(Button.SignalName.Pressed);
+    Assert.True(fixture.Session.ActiveMission.IsSome);
+    Assert.True(MissionBattleHost(view).IsInsideTree());
   }
 
   [TestCase(TestName = "Choices are inert without a destination and occupied units stay unavailable")]
@@ -273,8 +330,7 @@ public class GeoscapeSquadLoadoutTest
     var manager = CreatePresentedManager(fixture);
 
     var view = CreateSquadLoadoutView();
-    view.Configure(pending.Event.Definition.Title, 3, allowEquipmentEditing: true,
-      mission: pending.Event.Definition);
+    view.Configure(pending.Event.Definition.Title, 3, allowEquipmentEditing: true);
     manager.Push(view); // ViewChanged presents the configured view
     ChooseSquadUnit(view, 0, "Alpha");
 
@@ -359,7 +415,7 @@ public class GeoscapeSquadLoadoutTest
     Combatant alpha = fixture.State.Roster[0];
     fixture.ReturnFromMission((alpha, 25, 0)); // 25% damage: Injured (6d) plus Tired (1d)
 
-    var view = PresentedSquadView(pending, fixture.State, fixture.Session);
+    var view = PresentedMissionView(pending, fixture.State, fixture.Session);
 
     string choice = SquadChoice(view, "Alpha").Text;
     Assert.True(choice.Contains("Injured (6d)"), $"Expected the injury label with countdown, got '{choice}'.");
@@ -389,7 +445,7 @@ public class GeoscapeSquadLoadoutTest
     fixture.ReturnFromMission((charlie, 0, 0));
     fixture.ReturnFromMission((charlie, 0, 0)); // Weary
 
-    var view = PresentedSquadView(pending, fixture.State, fixture.Session);
+    var view = PresentedMissionView(pending, fixture.State, fixture.Session);
     SquadSlot(view, 0).GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
 
     Assert.True(SquadChoice(view, "Alpha").Disabled);
@@ -416,7 +472,7 @@ public class GeoscapeSquadLoadoutTest
     fixture.ReturnFromMission((bravo, 0, 0));
     fixture.ReturnFromMission((bravo, 0, 0)); // Exhausted
 
-    var view = PresentedSquadView(pending, fixture.State, fixture.Session);
+    var view = PresentedMissionView(pending, fixture.State, fixture.Session);
 
     Assert.True(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional deployment"));
 
@@ -447,7 +503,7 @@ public class GeoscapeSquadLoadoutTest
     Combatant alpha = fixture.State.Roster[0];
     fixture.ReturnFromMission((alpha, 25, 0)); // Injured multipliers on top of Tired's
 
-    var view = PresentedSquadView(pending, fixture.State, fixture.Session);
+    var view = PresentedMissionView(pending, fixture.State, fixture.Session);
     ChooseSquadUnit(view, 0, "Alpha");
 
     string card = CardText(SquadSlot(view, 0));
@@ -472,7 +528,7 @@ public class GeoscapeSquadLoadoutTest
     fixture.ReturnFromMission((alpha, 0, 0)); // Tired until tick 1440
     fixture.AdvanceTicks(1439); // the mission fires one tick before the fatigue deadline
     fixture.OpenResolution(fixture.ActiveEvent);
-    var view = PresentedSquadView(
+    var view = PresentedMissionView(
       fixture.Session.PendingResolution.RequireSome("Expected pending mission."),
       fixture.State, fixture.Session);
 
@@ -495,9 +551,8 @@ public class GeoscapeSquadLoadoutTest
 
     var manager = CreatePresentedManager(fixture);
 
-    var view = CreateSquadLoadoutView();
-    view.Configure(pending.Event.Definition.Title, 3, allowEquipmentEditing: true,
-      mission: pending.Event.Definition);
+    var view = CreateMissionView();
+    view.ConfigureMission(pending.Event);
     manager.Push(view); // ViewChanged presents the configured mission context
     ChooseSquadUnit(view, 0, "Alpha");
 
@@ -517,59 +572,38 @@ public class GeoscapeSquadLoadoutTest
     Assert.True(card.Contains("Exhausted"), card);
   }
 
-  [TestCase(TestName = "Generic interrogation selects injured units without any pending mission")]
-  public async Task GenericInterrogationAllowsInjuredUnitsWithoutAPendingMission()
+  [TestCase(TestName = "Generic interrogation retains injured selections when a mission becomes pending")]
+  public async Task GenericInterrogationIgnoresMissionContext()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var fixture = new GeoscapeFixture(MakeStart(roster: [MakeConditionEntry("Alpha")]));
-    using var _ = fixture;
+    using var fixture = new GeoscapeFixture(MakeStart(
+      roster: [MakeConditionEntry("Alpha")],
+      timeline: [MakeScheduled(1,
+        MakeEvent("Last Stand", GeoscapeEventKind.TacticalBattle, allowUnfitDeployment: true))]));
     Combatant alpha = fixture.State.Roster[0];
-    fixture.ReturnFromMission((alpha, 25, 0)); // Injured + Tired
-
+    fixture.ReturnFromMission((alpha, 25, 0));
     var view = AddToTree(CreateSquadLoadoutView());
-    view.Configure("Interrogation — Alpha (Cult)", 2, allowEquipmentEditing: false);
+    view.Configure("Interrogation", 2, allowEquipmentEditing: false);
     view.Present(fixture.State, fixture.Session);
-
-    Assert.False(fixture.Session.PendingResolution.IsSome); // no mission anywhere to infer from
-    Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"),
-      "A generic configuration carries no exceptional-deployment notice.");
-    string choice = SquadChoice(view, "Alpha").Text;
-    Assert.True(choice.Contains("Injured (6d)"), $"Expected the condition label, got '{choice}'.");
-
-    ChooseSquadUnit(view, 0, "Alpha"); // deployment rules do not restrict interrogation
-    var selected = view.GetSelectedCombatants();
-    Assert.Equal(1, selected.Count);
-    Assert.True(ReferenceEquals(alpha, selected[0]));
-    Assert.False(SquadSlot(view, 0).GetNode<Button>("%EditUnit").Visible); // editing stays disabled
-  }
-
-  [TestCase(TestName = "Reconfiguring to generic clears mission policy and picks despite a pending override")]
-  public async Task ReconfiguringToGenericClearsMissionPolicyAndPicks()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var (fixture, pending) = Mission([MakeConditionEntry("Alpha"), MakeConditionEntry("Bravo")],
-      mission: MakeEvent("Last Stand", GeoscapeEventKind.TacticalBattle, allowUnfitDeployment: true));
-    using var _ = fixture;
-    Combatant alpha = fixture.State.Roster[0];
-    fixture.ReturnFromMission((alpha, 25, 0)); // Injured + Tired: barred from the mission itself
-
-    var view = AddToTree(CreateSquadLoadoutView());
-    view.Configure(pending.Event.Definition.Title, 3, allowEquipmentEditing: true,
-      mission: pending.Event.Definition);
-    view.Present(fixture.State, fixture.Session);
-    Assert.True(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional deployment"));
-    ChooseSquadUnit(view, 0, "Alpha"); // the override authorizes the unfit unit in mission prep
-    ChooseSquadUnit(view, 1, "Bravo"); // two picks exist to prove the reset below
-
-    view.Configure("Interrogation", 2, allowEquipmentEditing: false); // generic: context cleared
-    view.Present(fixture.State, fixture.Session);
-
-    Assert.True(fixture.Session.PendingResolution.IsSome); // the unrelated override is still pending
-    Assert.Equal("Squad: 0/2", view.GetNode<Label>("%SquadCount").Text); // picks were reset
+    Assert.True(fixture.Session.PendingResolution.IsNone);
     Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"));
-    ChooseSquadUnit(view, 0, "Alpha"); // injured unit selectable for interrogation
-    var selected = view.GetSelectedCombatants();
-    Assert.Equal(1, selected.Count);
-    Assert.True(ReferenceEquals(alpha, selected[0]));
+    Assert.True(SquadChoice(view, "Alpha").Text.Contains("Injured (6d)"));
+    ChooseSquadUnit(view, 0, "Alpha");
+    Assert.True(ReferenceEquals(alpha, view.GetSelectedCombatants()[0]));
+    Assert.False(SquadSlot(view, 0).GetNode<Button>("%EditUnit").Visible);
+
+    fixture.AdvanceTicks(1);
+    fixture.OpenResolution(fixture.ActiveEvent);
+    view.Present(fixture.State, fixture.Session);
+
+    Assert.True(fixture.Session.PendingResolution.IsSome);
+    Assert.Equal("Squad: 1/2", view.GetNode<Label>("%SquadCount").Text);
+    Press(SquadSlot(view, 0).GetNode<Button>("%RemoveUnit"));
+    ChooseSquadUnit(view, 0, "Alpha");
+    Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"));
+    Assert.True(view.GetNodeOrNull<Button>("%DeployButton") is null);
+    Assert.True(ReferenceEquals(alpha, view.GetSelectedCombatants()[0]));
+    Assert.False(SquadSlot(view, 0).GetNode<Button>("%EditUnit").Visible);
   }
+
 }

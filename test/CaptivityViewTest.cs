@@ -213,17 +213,15 @@ public class CaptivityViewTest
     Assert.Equal(title, squad.GetNode<Label>("%Title").TooltipText); // inspectable when clipped
     Assert.Equal(2, squad.GetNode<BoxContainer>("%Slots").GetChildCount());
     Assert.Equal("Squad: 0/2", squad.GetNode<Label>("%SquadCount").Text);
+    Assert.True(squad.GetNodeOrNull<Button>("%DeployButton") is null);
   }
 
-  [TestCase(false, TestName = "Interrogation preparation leaves campaign truth untouched")]
-  [TestCase(true, TestName = "Interrogation squad enforces two distinct roster units")]
-  public async Task InterrogationPreparationSelectsDistinctRosterWithoutCampaignEffects(bool secondInterrogator)
+  [TestCase(TestName = "Interrogation preparation selects distinct roster units without campaign effects")]
+  public async Task InterrogationPreparationSelectsDistinctRosterWithoutCampaignEffects()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var captive = MakeCombatant("Alpha", MakeFaction("Cult"));
-    var roster = secondInterrogator
-      ? new RosterEntryData[] { MakeEntry("Scout"), MakeEntry("Medic") }
-      : new RosterEntryData[] { MakeEntry("Scout") };
+    RosterEntryData[] roster = [MakeEntry("Scout"), MakeEntry("Medic")];
     using var fixture = CaptiveCampaign([captive], roster);
     var view = AddToTree(CreateCaptivityView());
     view.Present(fixture.State, fixture.Session);
@@ -249,25 +247,18 @@ public class CaptivityViewTest
     Assert.True(fixture.State.Roster[0].EquippedWeapon.IsNone); // nothing moved to the Armory
     Assert.Equal(0, fixture.Events.Count); // no session lifecycle was committed
 
-    if (secondInterrogator)
-    {
-      squad.GetNode<BoxContainer>("%Slots").GetChild<Control>(1)
-        .GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed); // mark slot 2
-      Assert.True(SquadChoice(squad, "Scout").Disabled); // occupied units stay unavailable
-      Assert.False(SquadChoice(squad, "Medic").Disabled);
+    Assert.Equal(1, squad.GetSelectedCombatants().Count);
+    Assert.True(ReferenceEquals(fixture.State.Roster[0], squad.GetSelectedCombatants()[0]));
+    squad.GetNode<BoxContainer>("%Slots").GetChild<Control>(1)
+      .GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed); // mark slot 2
+    Assert.True(SquadChoice(squad, "Scout").Disabled); // occupied units stay unavailable
+    Assert.False(SquadChoice(squad, "Medic").Disabled);
 
-      ChooseSquadUnit(squad, 1, "Medic"); // the open destination takes the second distinct unit
-      var selected = squad.GetSelectedCombatants();
-      Assert.Equal(2, selected.Count);
-      Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
-      Assert.True(ReferenceEquals(fixture.State.Roster[1], selected[1]));
-    }
-    else
-    {
-      var selected = squad.GetSelectedCombatants();
-      Assert.Equal(1, selected.Count);
-      Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
-    }
+    ChooseSquadUnit(squad, 1, "Medic"); // the open destination takes the second distinct unit
+    var selected = squad.GetSelectedCombatants();
+    Assert.Equal(2, selected.Count);
+    Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
+    Assert.True(ReferenceEquals(fixture.State.Roster[1], selected[1]));
   }
 
   [TestCase(TestName = "Back from interrogation returns to the retained captivity selection")]

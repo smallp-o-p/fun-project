@@ -19,27 +19,6 @@ public partial class BlastResolutionTest
         new UnitLoadout(TestData.MakeCombatant(u.UnitName, u.Faction, health: u.Health)),
         u.Position))]);
 
-  [TestCase(TestName = "Thrown grenade damages an enemy within the blast radius")]
-  public void ThrownGrenadeDamagesEnemyWithinBlastRadius()
-  {
-    var playerFaction = TestData.MakeFaction("Player");
-    var enemyFaction = TestData.MakeFaction("Enemy");
-    using var battle = BlastFixture(
-      (playerFaction, "Thrower", new Vector3I(1, 0, 1), 20),
-      (enemyFaction, "Hostile", new Vector3I(3, 0, 1), 20));
-    var thrower = battle.UnitAt(new Vector3I(1, 0, 1));
-    var enemy = battle.UnitAt(new Vector3I(3, 0, 1));
-
-    var grenade = TestData.MakeGrenade("Frag", throwRange: 6, blastRadius: 1, effects: [new DamageEffectData { BaseDamage = 8, Element = Element.Kinetic }]);
-    thrower.AddInventoryItem(grenade.Item);
-    battle.ClearEvents();
-    battle.Throw(thrower, grenade, new Vector3I(3, 0, 1));
-
-    Assert.Equal(12, enemy.CurrentHealth);
-    Assert.True(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, enemy)));
-    Assert.True(battle.Events.EventsOf<CapabilityResolvedBattleEvent>().AsValueEnumerable().Any());
-  }
-
   [TestCase(TestName = "A unit outside the blast radius is unaffected")]
   public void UnitOutsideBlastRadiusIsUnaffected()
   {
@@ -59,6 +38,8 @@ public partial class BlastResolutionTest
     battle.Throw(thrower, grenade, new Vector3I(3, 0, 1));
 
     Assert.Equal(12, nearEnemy.CurrentHealth);
+    Assert.True(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, nearEnemy)));
+    Assert.True(battle.Events.EventsOf<CapabilityResolvedBattleEvent>().AsValueEnumerable().Any());
     Assert.Equal(20, farEnemy.CurrentHealth);
     Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any(e => ReferenceEquals(e.Unit, farEnemy)));
   }

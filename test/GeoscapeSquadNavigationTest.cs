@@ -52,10 +52,10 @@ public class GeoscapeSquadNavigationTest
     return squad;
   }
 
-  [TestCase("Operation", TestName = "Engage produces a squad view without resolving the mission")]
-  [TestCase("Operation Iron", TestName = "Engage produces a squad view configured with the mission title")]
-  public async Task EngageProducesConfiguredSquadWithoutResolving(string title)
+  [TestCase(TestName = "Engage produces a squad view configured with the mission title without resolving")]
+  public async Task EngageProducesConfiguredSquadWithoutResolving()
   {
+    const string title = "Operation Iron";
     await using var cleanup = new DeferredNodeCleanup();
     using var fixture = GeoscapeFixture.WithFiredEvent(
       MakeEvent(title, GeoscapeEventKind.TacticalBattle));
@@ -113,21 +113,17 @@ public class GeoscapeSquadNavigationTest
     Assert.True(ReferenceEquals(alpha, selected[0]));
   }
 
-  [TestCase(false, true, 0, false,
+  [TestCase(true, 0, false,
     TestName = "Full round trip keeps the mission and Decline still resolves")]
-  [TestCase(false, false, 1, true,
+  [TestCase(false, 1, true,
     TestName = "Re-engaging starts empty while equipment edits persist")]
-  [TestCase(true, false, 0, false,
-    TestName = "Engage covers the dialog with squad preparation")]
-  public async Task PreparationRoundTrip(bool preparationOnly, bool bravoInRoster, int selectedSlot, bool reEngage)
+  public async Task PreparationRoundTrip(bool bravoInRoster, int selectedSlot, bool reEngage)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var roster = bravoInRoster
       ? new[] { MakeEntry("Alpha"), MakeEntry("Bravo") }
       : new[] { MakeEntry("Alpha") };
-    var (scene, manager) = preparationOnly
-      ? TacticalScene(roster)
-      : TacticalScene(roster, armory: [MakeFirearmWeaponData("Rifle")]);
+    var (scene, manager) = TacticalScene(roster, armory: [MakeFirearmWeaponData("Rifle")]);
     OpenResolutionViaMapEvent(scene);
     var dialog = (GeoscapeEventResolution)manager.Current;
 
@@ -140,9 +136,6 @@ public class GeoscapeSquadNavigationTest
     scene._PhysicsProcess(1.0); // covered views freeze the clock at the composition root
     Assert.Equal(clock, Clock(scene).Text);
     Assert.Equal(1, MapEventMarkers(scene).Length); // the mission stays active: its marker remains
-    if (preparationOnly)
-      return;
-
     ChooseSquadUnit(squad, selectedSlot, "Alpha");
     squad.GetNode<BoxContainer>("%Slots").GetChild<Control>(selectedSlot)
       .GetNode<Button>("%EditUnit").EmitSignal(Button.SignalName.Pressed);

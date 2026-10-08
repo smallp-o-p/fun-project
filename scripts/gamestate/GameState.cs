@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FunProject.Currencies;
 using FunProject.Engineering;
 using FunProject.Combatants;
 using FunProject.Research;
@@ -11,6 +12,7 @@ namespace FunProject.GameState;
 /// <summary>
 /// The campaign truth container: everything that holds for the life of the campaign —
 /// clock position, the baked event timeline, active events, the pending resolution, the
+/// active mission association, the
 /// region binding, the roster, the player faction, and the condition registry
 /// (<see cref="Conditions"/>). <see cref="Strategic.GeoscapeSession"/> is the ephemeral runtime
 /// constructed over this state (the BattleSession-over-BattleBoardState pattern);
@@ -45,11 +47,15 @@ public sealed class GameState
   private readonly List<RegionData> _regions = [];
   private readonly Dictionary<string, int> _indexByName = [];
   private readonly List<Combatant> _roster = [];
+  private readonly Dictionary<Currency, ulong> _currencies = new(ReferenceEqualityComparer.Instance);
   private readonly DateTime _startTime = DateTime.UnixEpoch;
 
   public GameState(CampaignStartData start)
   {
     ArgumentNullException.ThrowIfNull(start);
+
+    foreach (var (currency, amount) in start.StartingCurrencies)
+      _currencies.Add(currency, amount);
 
     GeoscapeMapData map = start.Map ?? throw new InvalidOperationException(
       "CampaignStartData requires a Map; assign one in the inspector.");
@@ -107,7 +113,7 @@ public sealed class GameState
 
     Conditions = new CombatantConditionSystem(start.ConditionRules);
 
-    Engineering = new EngineeringState(start.ManufacturableItems);
+    Engineering = new EngineeringState(start.ManufacturingRecipes);
     Armory = new Armory(start.Armory, start.ModStock);
   }
 
@@ -145,6 +151,21 @@ public sealed class GameState
 
   public ResearchState Research { get; }
 
+  public ulong GetCurrencyBalance(Currency currency) => _currencies.GetValueOrDefault(currency);
+
+  public bool CanAffordCurrencyCosts(Godot.Collections.Dictionary<Currency, ulong> costs)
+    => costs.AsValueEnumerable().All(pair => GetCurrencyBalance(pair.Key) >= pair.Value);
+
+  internal bool TrySpendCurrencyCosts(Godot.Collections.Dictionary<Currency, ulong> costs)
+  {
+    if (!CanAffordCurrencyCosts(costs)) return false;
+    // No callbacks occur between checking every balance and deducting payment.
+    foreach (var (currency, required) in costs)
+      if (required > 0)
+        _currencies[currency] = checked(_currencies[currency] - required);
+    return true;
+  }
+
   public DateTime CurrentTime => _startTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
 
   // Days of game time elapsed since the start, 1-based: Day 1 spans the first 24 game-hours,
@@ -162,6 +183,17 @@ public sealed class GameState
   internal List<GeoscapeEvent> ActiveEvents { get; } = [];
 
   internal Option<PendingResolution> Pending { get; set; }
+
+  /// <summary>Campaign-held deployment for the active mission.</summary>
+  internal Option<MissionDeployment> ActiveMission { get; set; }
+
+  /// <summary>Removes reported deaths and their condition records. Equipment stays with the combatants.</summary>
+  internal void RemoveDeadFromRoster(IReadOnlySet<Combatant> dead)
+  {
+    foreach (Combatant combatant in dead)
+      if (_roster.Remove(combatant))
+        Conditions.Forget(combatant);
+  }
 
   // Bakes one authored entry into an immutable firing. Unset events and out-of-range expiry
   // are authoring mistakes: they fail the load instead of being silently dropped.

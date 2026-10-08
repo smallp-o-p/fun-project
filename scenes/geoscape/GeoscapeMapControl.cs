@@ -1,3 +1,4 @@
+using FunProject.Scenes.Ext;
 using FunProject.Strategic;
 using Godot;
 using System;
@@ -20,7 +21,7 @@ public sealed partial class GeoscapeMapControl : Control
   private GeoscapeSession _session = null!;
   private Vector2I _mapSize;
   private Vector2?[] _markerAnchors = [];
-  private readonly List<RegionButton> _markerNodes = [];
+  private readonly List<(GeoscapeEvent Event, RegionButton Marker)> _markerNodes = [];
 
   [Export] public PackedScene? EventMarkerScene { get; set; }
 
@@ -61,7 +62,7 @@ public sealed partial class GeoscapeMapControl : Control
   {
     // Detach before queueing the deferred free: replacement markers must not coexist with
     // stale ones (still hit-testable and drawn) until the end of frame.
-    foreach (Node marker in _markerNodes)
+    foreach ((_, RegionButton marker) in _markerNodes)
     {
       RemoveChild(marker);
       marker.QueueFree();
@@ -77,9 +78,10 @@ public sealed partial class GeoscapeMapControl : Control
 
       // Keep the authored visual, hit shape, and signal for every event. Placement uses
       // the full extent, so no later sibling can intercept another marker's clicks.
-      var marker = (RegionButton)EventMarkerScene!.Instantiate();
+      var marker = EventMarkerScene!.InstantiateAs<RegionButton>(
+        "GeoscapeMapControl EventMarkerScene");
       AddChild(marker);
-      _markerNodes.Add(marker);
+      _markerNodes.Add((active, marker));
       marker.Pressed += () => EmitSignal(SignalName.EventClicked, new GeoscapeEventAdapter { Event = active });
     }
 
@@ -92,7 +94,7 @@ public sealed partial class GeoscapeMapControl : Control
     List<Rect2> placed = [];
     for (int index = 0; index < _markerNodes.Count; index++)
     {
-      RegionButton marker = _markerNodes[index];
+      RegionButton marker = _markerNodes[index].Marker;
       Vector2 limit = (Vector2)_mapSize - marker.Size;
       if (limit.X < 0 || limit.Y < 0)
         return false;
@@ -156,7 +158,7 @@ public sealed partial class GeoscapeMapControl : Control
     // Greedy anchor placement can exhaust the available space. Retry in uniform cells,
     // choosing the grid with the largest shared scale; every event keeps its own button.
     Vector2 largest = Vector2.Zero;
-    foreach (RegionButton marker in _markerNodes)
+    foreach ((_, RegionButton marker) in _markerNodes)
       largest = new Vector2(Mathf.Max(largest.X, marker.Size.X), Mathf.Max(largest.Y, marker.Size.Y));
 
     int columns = 1;
@@ -179,10 +181,32 @@ public sealed partial class GeoscapeMapControl : Control
     var cellSize = new Vector2((float)_mapSize.X / columns, (float)_mapSize.Y / rowCount);
     for (int index = 0; index < _markerNodes.Count; index++)
     {
-      RegionButton marker = _markerNodes[index];
+      RegionButton marker = _markerNodes[index].Marker;
       marker.Scale = Vector2.One * scale;
       marker.Position = new Vector2(index % columns, index / columns) * cellSize
         + (cellSize - marker.Size * scale) / 2f;
+    }
+  }
+
+  // Reconcile retained markers with campaign truth when the root view resumes.
+  public void RemoveInactiveEventMarkers()
+  {
+    for (int index = _markerNodes.Count - 1; index >= 0; index--)
+    {
+      (GeoscapeEvent markerEvent, RegionButton marker) = _markerNodes[index];
+      bool active = false;
+      foreach (GeoscapeEvent activeEvent in _session.ActiveEvents)
+        if (ReferenceEquals(activeEvent, markerEvent))
+        {
+          active = true;
+          break;
+        }
+      if (active)
+        continue;
+
+      RemoveChild(marker);
+      marker.QueueFree();
+      _markerNodes.RemoveAt(index);
     }
   }
 }

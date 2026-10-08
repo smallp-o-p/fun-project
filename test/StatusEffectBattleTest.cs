@@ -227,6 +227,8 @@ public partial class StatusEffectBattleTest
     battle.EndFactionTurn(battle.EnemyFaction);           // tick: armor 7 -> 5 and delay re-armed before regen runs
     Assert.Equal(5, armor.Current);
 
+    Assert.Equal(0, armor.RegenDelayRemaining);
+
     battle.EndFactionTurn(battle.PlayerFaction);
     battle.EndFactionTurn(battle.EnemyFaction);           // tick: armor 5 -> 3, burn expires; regen still suppressed
     Assert.Equal(3, armor.Current);

@@ -11,8 +11,8 @@ using static FunProject.Tests.GeoscapeTestScenes;
 public class GeoscapeResolutionViewTest
 {
   // Direct-view contracts: rendering the session's pending resolution (region suffix
-  // included) and the button -> outcome mapping. Presenting without a pending resolution
-  // is a caller bug. The dialog is a transparent GeoscapeView with no backdrop of its own.
+  // included) and the button -> outcome mapping. Re-presenting a consumed resolution
+  // requests Back. The dialog is transparent with no backdrop of its own.
   [TestCase]
   public async Task PresentRendersPendingResolutionWithRegionAndMapsTacticalOutcomes()
   {
@@ -66,13 +66,15 @@ public class GeoscapeResolutionViewTest
   }
 
   [TestCase]
-  public void PresentWithoutPendingResolutionThrows()
+  public void PresentWithoutPendingResolutionRequestsBack()
   {
     var view = AddToTree(CreateResolutionView());
     using var campaign = new GeoscapeFixture();
 
-    Assert.Throws<System.InvalidOperationException>(
-      () => view.Present(campaign.State, campaign.Session));
+    int backRequests = 0;
+    view.BackRequested += () => backRequests++;
+    view.Present(campaign.State, campaign.Session);
+    Assert.Equal(1, backRequests);
   }
 
   // Scene-level wiring: the composition root pushes the dialog on the session's opened
