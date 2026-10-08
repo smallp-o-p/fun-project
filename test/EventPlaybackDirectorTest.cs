@@ -26,7 +26,7 @@ public sealed partial class EventPlaybackDirectorTest
 
     BattleActionExecResult result = battle.Submit(BattleAction.SpawnUnit(
       TestData.MakeCombatant("Alpha", battle.PlayerFaction), battle.At(1, 0, 1)));
-    BattleEvent[] committed = result.EventsThatOccurred.ToArray();
+    BattleEvent[] committed = battle.Read(() => result.EventsThatOccurred.ToArray());
 
     Assert.True(director.Busy); // queued but not yet ticked
     director.Tick();
@@ -106,9 +106,9 @@ public sealed partial class EventPlaybackDirectorTest
     var unconscious = new UnitUnconsciousBattleEvent(battle.Unit, battle.At(1, 0, 1), None);
 
     BattleActionExecResult killResult = battle.ApplyDamage(battle.Unit, 999);
-    UnitKilledBattleEvent killed = killResult.EventsThatOccurred.AsValueEnumerable()
+    UnitKilledBattleEvent killed = battle.Read(() => killResult.EventsThatOccurred.AsValueEnumerable()
       .OfType<UnitKilledBattleEvent>()
-      .Single();
+      .Single());
 
     bool done = false;
     director.PlayStepPublic(unconscious, () => done = true);

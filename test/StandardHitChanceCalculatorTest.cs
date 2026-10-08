@@ -16,7 +16,7 @@ public partial class StandardHitChanceCalculatorTest
     var board = new BattleBoardState(new Vector3I(8, 1, 8));
     var attackerPoint = board.At(attackerPosition);
     var defenderPoint = board.At(defenderPosition);
-    board.GetTile(defenderPoint).Cover = defenderCover;
+    board.GetMutableTile(defenderPoint).Cover = defenderCover;
 
     var weapon = TestData.MakeWeapon("Rifle");
     var attacker = new BattleUnitState(1, TestData.MakeCombatant("Alpha", attackerFaction, aim: aim), Some(weapon), None);

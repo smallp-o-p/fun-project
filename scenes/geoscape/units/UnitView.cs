@@ -73,6 +73,7 @@ public sealed partial class UnitView : GeoscapeView
 
   private void OnPathsPressed()
   {
+    if (_unit?.IsDeployedInBattle == true) return;
     if (_unit is null)
       throw new InvalidOperationException(
         "UnitView requires a bound combatant before opening skill paths.");
@@ -85,6 +86,7 @@ public sealed partial class UnitView : GeoscapeView
   /// <summary>Test seam mirroring a slot-button click; production clicks call this too.</summary>
   public void SelectSlot(UnitViewSlot slot)
   {
+    if (_unit?.IsDeployedInBattle == true) return;
     _selection = slot;
     RefreshSlotSelection();
     RebuildBrowser();
@@ -92,6 +94,7 @@ public sealed partial class UnitView : GeoscapeView
 
   private void RebuildAll()
   {
+    if (_unit?.IsDeployedInBattle == true) return;
     if (_state is null || _unit is null)
       return;
 
@@ -334,6 +337,7 @@ public sealed partial class UnitView : GeoscapeView
 
   private void OnUnequipPressed()
   {
+    if (_unit?.IsDeployedInBattle == true) return;
     UnitViewSlot slot = _selection!.Value;
     switch (slot.Kind)
     {
@@ -374,6 +378,7 @@ public sealed partial class UnitView : GeoscapeView
 
   private void EquipItem(ArmoryItemStock line)
   {
+    if (_unit?.IsDeployedInBattle == true) return;
     UnitViewSlot slot = _selection!.Value;
     // AcceptsItem's _ => false arm prevents non-item slots from reaching this withdrawal.
     Option<EquippableItem> withdrawn = _state!.Armory.TryWithdrawItem(line.Data);
@@ -401,6 +406,7 @@ public sealed partial class UnitView : GeoscapeView
 
   private void EquipMod(ArmoryModStock line)
   {
+    if (_unit?.IsDeployedInBattle == true) return;
     UnitViewSlot slot = _selection!.Value;
     if (slot.Kind == UnitViewSlotKind.WeaponMod && WeaponModSlot(slot.Index).IsNone)
       return;

@@ -16,9 +16,9 @@ public class CaptureBattleTest
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
 
     var summary = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
-    Assert.Equal(1, summary.CapturedEnemies.Count);
-    Assert.True(ReferenceEquals(combatant, summary.CapturedEnemies[0]));
-    Assert.True(ReferenceEquals(originalFaction, combatant.OwningFaction));
+    battle.Read(() => Assert.Equal(1, summary.CapturedEnemies.Count));
+    battle.Read(() => Assert.True(ReferenceEquals(combatant, summary.CapturedEnemies[0])));
+    battle.Read(() => Assert.True(ReferenceEquals(originalFaction, combatant.OwningFaction)));
   }
 
   [TestCase]
@@ -27,8 +27,8 @@ public class CaptureBattleTest
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Health);
 
-    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
-    Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count);
+    battle.Read(() => Assert.Equal(BattleOutcome.Victory, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome));
+    battle.Read(() => Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count));
   }
 
   [TestCase]
@@ -41,11 +41,11 @@ public class CaptureBattleTest
       Observe = typeof(TurnEndedBattleEvent),
       OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
     });
-    battle.Session.AddObjective(battle.PlayerFaction, objective);
+    battle.Mutate(() => battle.Session.AddObjective(battle.PlayerFaction, objective));
     battle.EndFactionTurn(battle.PlayerFaction);
 
-    Assert.Equal(BattleOutcome.Victory, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
-    Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count);
+    battle.Read(() => Assert.Equal(BattleOutcome.Victory, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome));
+    battle.Read(() => Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count));
   }
 
   [TestCase]
@@ -57,8 +57,8 @@ public class CaptureBattleTest
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
 
     var summary = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
-    Assert.Equal(1, summary.CapturedEnemies.Count);
-    Assert.True(ReferenceEquals(battle.EnemyUnit.Combatant, summary.CapturedEnemies[0]));
+    battle.Read(() => Assert.Equal(1, summary.CapturedEnemies.Count));
+    battle.Read(() => Assert.True(ReferenceEquals(battle.EnemyUnit.Combatant, summary.CapturedEnemies[0])));
   }
 
   [TestCase]
@@ -69,8 +69,8 @@ public class CaptureBattleTest
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
 
-    Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome);
-    Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count);
+    battle.Read(() => Assert.Equal(BattleOutcome.Defeat, battle.Query(new GetBattleResultQuery()).RequireRight().Outcome));
+    battle.Read(() => Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count));
   }
 
   [TestCase]
@@ -79,9 +79,9 @@ public class CaptureBattleTest
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.Spawn(MakeCombatant("Support", battle.EnemyFaction), new Vector3I(0, 0, 0));
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
-    battle.Session.EndBattle(BattleOutcome.Draw);
+    battle.Mutate(() => battle.Session.EndBattle(BattleOutcome.Draw));
 
-    Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count);
+    battle.Read(() => Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count));
   }
 
   [TestCase]
@@ -89,10 +89,10 @@ public class CaptureBattleTest
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
-    battle.Session.EndBattle(BattleOutcome.Victory);
+    battle.Mutate(() => battle.Session.EndBattle(BattleOutcome.Victory));
 
-    Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count);
-    Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.EnemyFaction)).RequireRight().CapturedEnemies.Count);
+    battle.Read(() => Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight().CapturedEnemies.Count));
+    battle.Read(() => Assert.Equal(0, battle.Query(new GetFactionEndOfBattleSummary(battle.EnemyFaction)).RequireRight().CapturedEnemies.Count));
   }
 
   [TestCase]
@@ -101,13 +101,13 @@ public class CaptureBattleTest
     using var battle = BattleFixture.Duel(playerControlled: true);
     var thirdFaction = MakeFaction("Third");
     var third = battle.Spawn(MakeCombatant("Third hostile", thirdFaction), new Vector3I(0, 0, 0));
-    battle.Session.AddObjective(thirdFaction, new EliminateAllOpposingForcesObjectiveData().Instantiate());
+    battle.Mutate(() => battle.Session.AddObjective(thirdFaction, new EliminateAllOpposingForcesObjectiveData().Instantiate()));
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
     battle.ApplyDamage(third, 20, DamageKind.Stun);
 
     var summary = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
-    Assert.Equal(2, summary.CapturedEnemies.Count);
-    Assert.True(summary.CapturedEnemies.AsValueEnumerable().Any(c => ReferenceEquals(c, third.Combatant)));
-    Assert.True(summary.CapturedEnemies.AsValueEnumerable().Any(c => ReferenceEquals(c, battle.EnemyUnit.Combatant)));
+    battle.Read(() => Assert.Equal(2, summary.CapturedEnemies.Count));
+    battle.Read(() => Assert.True(summary.CapturedEnemies.AsValueEnumerable().Any(c => ReferenceEquals(c, third.Combatant))));
+    battle.Read(() => Assert.True(summary.CapturedEnemies.AsValueEnumerable().Any(c => ReferenceEquals(c, battle.EnemyUnit.Combatant))));
   }
 }

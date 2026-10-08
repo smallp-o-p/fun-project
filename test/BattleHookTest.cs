@@ -76,9 +76,9 @@ public partial class BattleHookTest
     };
     using var battle = new BattleFixture(setup);
 
-    Assert.Equal(1, turnStartedListener.Received.Count);
-    Assert.True(turnStartedListener.Received.AsValueEnumerable().Single() is TurnStartedBattleEvent);
-    Assert.Equal(0, damagedListener.Received.Count);
+    battle.Read(() => Assert.Equal(1, turnStartedListener.Received.Count));
+    battle.Read(() => Assert.True(turnStartedListener.Received.AsValueEnumerable().Single() is TurnStartedBattleEvent));
+    battle.Read(() => Assert.Equal(0, damagedListener.Received.Count));
   }
 
   [TestCase(TestName = "Hook registered for a marker interface receives implementing events")]
@@ -90,7 +90,7 @@ public partial class BattleHookTest
 
     battle.Spawn(TestData.MakeCombatant("Reinforcement", battle.PlayerFaction), new Vector3I(1, 0, 1));
 
-    Assert.True(unitEventsListener.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
+    battle.Read(() => Assert.True(unitEventsListener.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any()));
   }
 
   [TestCase(TestName = "A hook registered under the root event tag receives every committed event")]
@@ -109,13 +109,13 @@ public partial class BattleHookTest
     };
     using var battle = new BattleFixture(setup);
 
-    Assert.True(catchAll.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
-    Assert.True(catchAll.Received.AsValueEnumerable().OfType<TurnStartedBattleEvent>().Any());
+    battle.Read(() => Assert.True(catchAll.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any()));
+    battle.Read(() => Assert.True(catchAll.Received.AsValueEnumerable().OfType<TurnStartedBattleEvent>().Any()));
 
     battle.ClearEvents();
     battle.Submit(BattleAction.EndFactionTurn(faction));
 
-    Assert.True(catchAll.Received.AsValueEnumerable().OfType<TurnEndedBattleEvent>().Any());
+    battle.Read(() => Assert.True(catchAll.Received.AsValueEnumerable().OfType<TurnEndedBattleEvent>().Any()));
   }
 
   [TestCase(TestName = "Hook firing order follows priority then registration across different event keys")]
@@ -129,7 +129,7 @@ public partial class BattleHookTest
 
     battle.Spawn(TestData.MakeCombatant("Reinforcement", battle.PlayerFaction), new Vector3I(1, 0, 1));
 
-    Assert.Equal("positioned-low-priority|unit-default|concrete-default", string.Join("|", log));
+    battle.Read(() => Assert.Equal("positioned-low-priority|unit-default|concrete-default", string.Join("|", log)));
   }
 
   [TestCase(TestName = "A hook registered under concrete and interface keys fires once for one event")]
@@ -143,7 +143,7 @@ public partial class BattleHookTest
 
     battle.ApplyDamage(unit, 999);
 
-    Assert.Equal(1, hook.Received.Count);
+    battle.Read(() => Assert.Equal(1, hook.Received.Count));
   }
 
   [TestCase(TestName = "Event raised by a hook dispatches after the current event and reaches other hooks")]
@@ -172,7 +172,7 @@ public partial class BattleHookTest
 
     battle.Events.EventBefore<TurnEndedBattleEvent, ProbeBattleEvent>();
     battle.Events.EventBefore<ProbeBattleEvent, TurnStartedBattleEvent>();
-    Assert.Equal(1, hook.Evaluations);
+    battle.Read(() => Assert.Equal(1, hook.Evaluations));
   }
 
   private sealed class RaiseThenThrowOnceOnTurnEndedHook : BattleHook
@@ -210,10 +210,10 @@ public partial class BattleHookTest
     // session clears its dispatch queue on the way out.
     Assert.Throws<InvalidOperationException>(
       () => battle.Submit(BattleAction.EndFactionTurn(faction)));
-    Assert.False(battle.Events.EventsOf<ProbeBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.False(battle.Events.EventsOf<ProbeBattleEvent>().AsValueEnumerable().Any()));
 
     battle.Submit(BattleAction.EndFactionTurn(faction));
-    Assert.False(battle.Events.EventsOf<ProbeBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.False(battle.Events.EventsOf<ProbeBattleEvent>().AsValueEnumerable().Any()));
   }
 
   private sealed partial class InterruptingHook : BattleHook
@@ -239,22 +239,23 @@ public partial class BattleHookTest
     battle.RegisterHook<UnitMovedBattleEvent>(
       new InterruptingHook(context => BattleAction.EndFactionTurn(context.Session.ActiveSide)));
 
-    // Session-direct mutation keeps this at the real no-in-flight boundary without a start
-    // operation: the hook sees the movement event outside any executor action window.
-    var from = battle.Session.GetUnitPosition(unit).RequireSome();
+    // ActionCompleted is owned but the executor has cleared its in-flight action.
+    // The movement therefore reaches the real no-in-flight interrupt boundary.
+    var from = battle.Read(() => battle.Session.GetUnitPosition(unit).RequireSome());
     var to = battle.Board.At(new Vector3I(1, 0, 0));
     InvalidOperationException thrown = null;
     try
     {
-      battle.Session.MoveUnit(unit, from, to);
+      battle.Runtime.ActionCompleted += _ => battle.Session.MoveUnit(unit, from, to);
+      battle.Mutate(() => { });
     }
     catch (InvalidOperationException exception)
     {
       thrown = exception;
     }
 
-    Assert.True(thrown is not null, "Expected the session mutation to throw when a hook returns interrupts outside an executor action.");
-    Assert.True(thrown.Message.Contains("interrupt"));
+    battle.Read(() => Assert.True(thrown is not null, "Expected the session mutation to throw when a hook returns interrupts outside an executor action."));
+    battle.Read(() => Assert.True(thrown.Message.Contains("interrupt")));
   }
 
   [TestCase(TestName = "Hooks receive the in-flight action as SourceAction during executor dispatches")]
@@ -268,8 +269,8 @@ public partial class BattleHookTest
 
     battle.Submit(BattleAction.MoveUnit(battle.Alive(unit), [battle.At(1, 0, 2)]));
 
-    Assert.True(hook.ObservedSourceAction.IsSome);
-    Assert.True(hook.ObservedSourceAction.RequireSome() is MoveUnit);
+    battle.Read(() => Assert.True(hook.ObservedSourceAction.IsSome));
+    battle.Read(() => Assert.True(hook.ObservedSourceAction.RequireSome() is MoveUnit));
   }
 
   [TestCase(false, TestName = "One-shot hook retires itself by signalling NeedsToUnregister")]
@@ -291,7 +292,7 @@ public partial class BattleHookTest
     battle.AdvanceTurn();
     battle.AdvanceTurn();
 
-    Assert.Equal(1, hook.Evaluations);
+    battle.Read(() => Assert.Equal(1, hook.Evaluations));
   }
 
   private sealed class SelfRetiringHook : BattleHook

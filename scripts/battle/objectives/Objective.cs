@@ -14,7 +14,14 @@ public abstract class Objective
 {
   public ObjectiveData Data { get; }
 
-  public ObjectiveResult State { get; internal set; } = ObjectiveResult.Ongoing;
+  private readonly BattleAccessBinding _battleAccess = new();
+  internal void BindBattleAccess(BattleAccessGuard access) => _battleAccess.Bind(access);
+  private ObjectiveResult _state = ObjectiveResult.Ongoing;
+  public ObjectiveResult State
+  {
+    get { _battleAccess.RequireRead(); return _state; }
+    internal set { _battleAccess.RequireMutation(); _state = value; }
+  }
 
   protected Objective(ObjectiveData data)
   {

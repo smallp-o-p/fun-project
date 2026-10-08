@@ -18,7 +18,12 @@ public sealed partial class ObjectHealthCapabilityData : SpecialObjectCapability
 public sealed class ObjectHealthCapability : SpecialObjectCapability
 {
   public int MaxHealth { get; }
-  public int CurrentHealth { get; private set; }
+  private int _currentHealth;
+  public int CurrentHealth
+  {
+    get { _battleAccess.RequireRead(); return _currentHealth; }
+    private set { _battleAccess.RequireMutation(); _currentHealth = value; }
+  }
 
   public ObjectHealthCapability(ObjectHealthCapabilityData data)
   {
@@ -32,6 +37,7 @@ public sealed class ObjectHealthCapability : SpecialObjectCapability
 
   internal void Reduce(int amount)
   {
+    _battleAccess.RequireMutation();
     ArgumentOutOfRangeException.ThrowIfNegative(amount);
     CurrentHealth = Math.Max(0, CurrentHealth - amount);
   }

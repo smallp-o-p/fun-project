@@ -20,9 +20,9 @@ public class StunRecoveryTest
 
     battle.EndFactionTurn(battle.PlayerFaction);
 
-    Assert.Equal(remaining, battle.PlayerUnit.CurrentStun);
-    Assert.Equal(8, battle.EnemyUnit.CurrentStun);
-    Assert.Equal(recovered, battle.Events.SingleEvent<UnitStunRecoveredBattleEvent>().AmountRecovered);
+    battle.Read(() => Assert.Equal(remaining, battle.PlayerUnit.CurrentStun));
+    battle.Read(() => Assert.Equal(8, battle.EnemyUnit.CurrentStun));
+    battle.Read(() => Assert.Equal(recovered, battle.Events.SingleEvent<UnitStunRecoveredBattleEvent>().AmountRecovered));
   }
 
   [TestCase]
@@ -31,10 +31,11 @@ public class StunRecoveryTest
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
 
-    uint recovered = battle.PlayerUnit.RecoverStun(uint.MaxValue);
+    uint recovered = 0;
+    battle.Mutate(() => recovered = battle.PlayerUnit.RecoverStun(uint.MaxValue));
 
-    Assert.Equal(0, battle.PlayerUnit.CurrentStun);
-    Assert.Equal(8u, recovered);
+    battle.Read(() => Assert.Equal(0, battle.PlayerUnit.CurrentStun));
+    battle.Read(() => Assert.Equal(8u, recovered));
   }
 
   [TestCase]
@@ -45,7 +46,7 @@ public class StunRecoveryTest
 
     battle.EndFactionTurn(battle.PlayerFaction);
 
-    Assert.False(battle.Events.EventsOf<UnitStunRecoveredBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.False(battle.Events.EventsOf<UnitStunRecoveredBattleEvent>().AsValueEnumerable().Any()));
   }
 
   [TestCase]
@@ -60,8 +61,8 @@ public class StunRecoveryTest
     battle.EndFactionTurn(battle.EnemyFaction);
     battle.EndFactionTurn(battle.PlayerFaction);
 
-    Assert.Equal(20, battle.PlayerUnit.CurrentStun);
-    Assert.False(battle.Events.EventsOf<UnitStunRecoveredBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.Equal(20, battle.PlayerUnit.CurrentStun));
+    battle.Read(() => Assert.False(battle.Events.EventsOf<UnitStunRecoveredBattleEvent>().AsValueEnumerable().Any()));
   }
 
   [TestCase]
@@ -70,14 +71,14 @@ public class StunRecoveryTest
     using var battle = BattleFixture.Duel();
     battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction), new Vector3I(0, 0, 0));
     battle.ApplyDamage(battle.PlayerUnit, 10, DamageKind.Stun);
-    battle.PlayerUnit.ApplyStatusEffect(TestData.MakeBurn(duration: 2, tickDamage: 10));
+    battle.Mutate(() => battle.PlayerUnit.ApplyStatusEffect(TestData.MakeBurn(duration: 2, tickDamage: 10)));
     battle.ClearEvents();
 
     battle.EndFactionTurn(battle.PlayerFaction);
 
-    Assert.Equal(10, battle.PlayerUnit.CurrentStun);
-    Assert.True(battle.PlayerUnit.IsUnconscious);
-    Assert.False(battle.Events.EventsOf<UnitStunRecoveredBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.Equal(10, battle.PlayerUnit.CurrentStun));
+    battle.Read(() => Assert.True(battle.PlayerUnit.IsUnconscious));
+    battle.Read(() => Assert.False(battle.Events.EventsOf<UnitStunRecoveredBattleEvent>().AsValueEnumerable().Any()));
   }
 
   [TestCase]
@@ -87,8 +88,8 @@ public class StunRecoveryTest
     battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
     battle.ApplyDamage(battle.PlayerUnit, 20);
 
-    Assert.Equal(0u, battle.PlayerUnit.RecoverStun(5));
-    Assert.Equal(8, battle.PlayerUnit.CurrentStun);
+    battle.Mutate(() => Assert.Equal(0u, battle.PlayerUnit.RecoverStun(5)));
+    battle.Read(() => Assert.Equal(8, battle.PlayerUnit.CurrentStun));
   }
 
   [TestCase]
@@ -96,12 +97,12 @@ public class StunRecoveryTest
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
-    battle.PlayerUnit.SpendActionPoints(battle.PlayerUnit.CurrentActionPoints);
-    battle.PlayerUnit.ApplyStatusEffect(TestData.MakeStun(duration: 2));
+    battle.Mutate(() => battle.PlayerUnit.SpendActionPoints(battle.PlayerUnit.CurrentActionPoints));
+    battle.Mutate(() => battle.PlayerUnit.ApplyStatusEffect(TestData.MakeStun(duration: 2)));
 
     battle.EndFactionTurn(battle.PlayerFaction);
 
-    Assert.Equal(3, battle.PlayerUnit.CurrentStun);
+    battle.Read(() => Assert.Equal(3, battle.PlayerUnit.CurrentStun));
   }
 
   [TestCase]
@@ -123,13 +124,13 @@ public class StunRecoveryTest
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 8, DamageKind.Stun);
-    battle.Session.EndBattle(BattleOutcome.Draw);
+    battle.Mutate(() => battle.Session.EndBattle(BattleOutcome.Draw));
     BattleHook hook = new StunRecoverySystem();
 
-    hook.OnEvent(new HookContext(battle.Session, None),
-      new TurnEndedBattleEvent(battle.PlayerFaction, battle.Session.TurnNumber));
+    battle.Read(() => hook.OnEvent(new HookContext(battle.Session, None),
+      new TurnEndedBattleEvent(battle.PlayerFaction, battle.Session.TurnNumber)));
 
-    Assert.Equal(8, battle.PlayerUnit.CurrentStun);
+    battle.Read(() => Assert.Equal(8, battle.PlayerUnit.CurrentStun));
   }
 
   [TestCase]

@@ -37,6 +37,10 @@ public sealed class StatSheet
       () => throw new InvalidOperationException());
   }
 
+  internal IReadOnlyDictionary<Type, float> CopyBaseValues()
+    => new System.Collections.ObjectModel.ReadOnlyDictionary<Type, float>(
+      _stats.AsValueEnumerable().ToDictionary(entry => entry.Key, entry => (float)entry.Value.BaseValue));
+
   internal void Set<TStat>(TStat stat) where TStat : Stat
   {
     _stats[typeof(TStat)] = stat;

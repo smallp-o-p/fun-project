@@ -100,6 +100,26 @@ public sealed class BattleFixture : IDisposable
 
   public T Query<T>(IBattleSessionQuery<T> query) => Runtime.Query(query);
 
+  public void Read(Action assertion)
+  {
+    using var scope = Runtime.TryAcquireQueryScope().RequireRight();
+    assertion();
+  }
+
+  public T Read<T>(Func<T> read)
+  {
+    using var scope = Runtime.TryAcquireQueryScope().RequireRight();
+    return read();
+  }
+
+  // Test-only setup after startup still uses the session's sole executor.
+  public void Mutate(Action mutation) => Submit(new FixtureMutation(mutation));
+
+  internal sealed class FixtureMutation(Action mutation) : BattleAction
+  {
+    public override Result Execute(BattleSession session) { mutation(); return Result.Completed; }
+  }
+
   public AliveUnit Alive(BattleUnitState unit) => Runtime.TryGetAlive(unit).RequireSome();
 
   public LiveObject Live(BattleObjectState obj) => Runtime.TryGetAliveObject(obj).RequireSome();

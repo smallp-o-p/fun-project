@@ -57,16 +57,16 @@ public partial class RankEffectsAggregationTest
       health: 10, actionPoints: 2, movement: 8, rankTable: table);
 
     var unit = battle.Spawn(combatant, new Vector3I(4, 0, 4));
-    Assert.Equal(65f, unit.EffectiveStat<AimStat>()); // rung 1 holds nothing
+    battle.Read(() => Assert.Equal(65f, unit.EffectiveStat<AimStat>())); // rung 1 holds nothing
 
-    combatant.Rank.Gain(100); // -> Squaddie
+    battle.Mutate(() => combatant.Rank.Gain(100)); // -> Squaddie
     var squaddie = battle.Spawn(combatant, new Vector3I(4, 0, 5));
-    Assert.Equal(70f, squaddie.EffectiveStat<AimStat>());
+    battle.Read(() => Assert.Equal(70f, squaddie.EffectiveStat<AimStat>()));
 
-    combatant.Rank.Gain(100); // -> Corporal: both rungs' mods stack
+    battle.Mutate(() => combatant.Rank.Gain(100)); // -> Corporal: both rungs' mods stack
     var corporal = battle.Spawn(combatant, new Vector3I(4, 0, 6));
-    Assert.Equal(80f, corporal.EffectiveStat<AimStat>());
-    Assert.Equal(2, combatant.Rank.StatMods().Count);
+    battle.Read(() => Assert.Equal(80f, corporal.EffectiveStat<AimStat>()));
+    battle.Read(() => Assert.Equal(2, combatant.Rank.StatMods().Count));
   }
 
   [TestCase(TestName = "Held rung buffs fold into InnateBuffs and stack at spawn")]
@@ -87,13 +87,13 @@ public partial class RankEffectsAggregationTest
     var combatant = TestData.MakeCombatant("Alpha", faction,
       health: 10, actionPoints: 2, movement: 8, rankTable: table);
 
-    Assert.Equal(0, combatant.InnateBuffs.Count); // nothing held yet
+    battle.Read(() => Assert.Equal(0, combatant.InnateBuffs.Count)); // nothing held yet
 
-    combatant.Rank.Gain(100); // -> Squaddie
-    Assert.Equal(1, combatant.InnateBuffs.Count); // live surface picks up the promotion
+    battle.Mutate(() => combatant.Rank.Gain(100)); // -> Squaddie
+    battle.Read(() => Assert.Equal(1, combatant.InnateBuffs.Count)); // live surface picks up the promotion
 
     var unit = battle.Spawn(combatant, new Vector3I(4, 0, 4));
-    Assert.Equal(1, unit.Buffs.Count);
+    battle.Read(() => Assert.Equal(1, unit.Buffs.Count));
   }
 
   [TestCase(TestName = "Held rung abilities surface, and a null ability names its rung")]

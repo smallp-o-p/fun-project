@@ -22,6 +22,7 @@ public sealed class UnitAction
   {
     get
     {
+      _owner.Session.RequireReadAccess();
       if (_owner.IsExecuting)
         return Evaluate();
       if (_isDirty)
@@ -42,6 +43,7 @@ public sealed class UnitAction
 
   internal void Invalidate(BattleEvent battleEvent)
   {
+    _owner.Session.RequireMutationAccess();
     if (_isDirty)
       return;
     if (UnitActionCondition.IncapacityMayChange(battleEvent, Unit)
@@ -50,7 +52,7 @@ public sealed class UnitAction
       _isDirty = true;
   }
 
-  internal void MarkDirty() => _isDirty = true;
+  internal void MarkDirty() { _owner.Session.RequireMutationAccess(); _isDirty = true; }
 }
 
 internal sealed class UnitActionCache(BattleSession session)
@@ -62,6 +64,7 @@ internal sealed class UnitActionCache(BattleSession session)
 
   internal IReadOnlyList<UnitAction> GetFor(AliveUnit unit)
   {
+    Session.RequireReadAccess();
     if (_entries.TryGetValue(unit.State, out IReadOnlyList<UnitAction>? actions))
       return actions;
 
@@ -76,6 +79,7 @@ internal sealed class UnitActionCache(BattleSession session)
 
   internal void Invalidate(BattleEvent battleEvent)
   {
+    Session.RequireMutationAccess();
     foreach (IReadOnlyList<UnitAction> actions in _entries.Values)
       foreach (UnitAction action in actions)
         action.Invalidate(battleEvent);
@@ -83,12 +87,13 @@ internal sealed class UnitActionCache(BattleSession session)
 
   internal void InvalidateAll()
   {
+    Session.RequireMutationAccess();
     foreach (IReadOnlyList<UnitAction> actions in _entries.Values)
       foreach (UnitAction action in actions)
         action.MarkDirty();
   }
 
-  internal void BeginExecution() => IsExecuting = true;
+  internal void BeginExecution() { Session.RequireMutationAccess(); IsExecuting = true; }
 
-  internal void EndExecution() => IsExecuting = false;
+  internal void EndExecution() { Session.RequireMutationAccess(); IsExecuting = false; }
 }

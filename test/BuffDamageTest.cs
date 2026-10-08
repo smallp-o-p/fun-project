@@ -48,13 +48,13 @@ public partial class BuffDamageTest
     var enemy = battle.EnemyUnit;
 
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit); // buff inactive: base 5
-    Assert.Equal(15, enemy.CurrentHealth);
+    battle.Read(() => Assert.Equal(15, enemy.CurrentHealth));
 
     battle.ApplyDamage(battle.PlayerUnit, 11);      // player 9/20: condition holds
     battle.EndFactionTurn(battle.PlayerFaction);    // enemy turn (buff activates)
     battle.EndFactionTurn(battle.EnemyFaction);     // player turn again
 
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit); // buff active: 5 + 3
-    Assert.Equal(7, enemy.CurrentHealth);
+    battle.Read(() => Assert.Equal(7, enemy.CurrentHealth));
   }
 }

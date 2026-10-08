@@ -101,9 +101,12 @@ public sealed class BattleObservationHistoryTest
       battle.Move(battle.EnemyUnit, [new Vector3I(3, 0, 0)]);
     }
     hiddenDeath.ApplyDamage(hiddenDeath.EnemyUnit, 999);
-    var hiddenWeapon = (AmmunitionedWeapon)hiddenDeath.EnemyUnit.EquippedWeapon.RequireSome();
-    Assert.True(hiddenWeapon.TrySpendShot().IsSome);
-    Assert.True(hiddenWeapon.CanReload());
+    hiddenDeath.Mutate(() =>
+    {
+      var hiddenWeapon = (AmmunitionedWeapon)hiddenDeath.EnemyUnit.EquippedWeapon.RequireSome();
+      Assert.True(hiddenWeapon.TrySpendShot().IsSome);
+      Assert.True(hiddenWeapon.CanReload());
+    });
     var a = alive.Query(new GetFactionUnitKnowledge(alive.PlayerFaction));
     var b = hiddenDeath.Query(new GetFactionUnitKnowledge(hiddenDeath.PlayerFaction));
     Assert.True(a.Current.AsValueEnumerable().SequenceEqual(b.Current));
@@ -124,7 +127,7 @@ public sealed class BattleObservationHistoryTest
     Assert.Equal(1, battle.Query(new GetFactionVisibleObjectsQuery(faction)).Count);
     battle.Move(battle.PlayerUnit, [new Vector3I(1, 0, 0)]);
     Assert.True(battle.Query(new HasFactionExploredTile(faction, battle.At(3, 0, 0))));
-    battle.Session.ApplyDamageTo(obj, [new Damage(10, Element.Kinetic)], None);
+    battle.Mutate(() => battle.Session.ApplyDamageTo(obj, [new Damage(10, Element.Kinetic)], None));
     Assert.Equal(0, battle.Query(new GetFactionVisibleObjectsQuery(faction)).Count);
   }
 }

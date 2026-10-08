@@ -17,6 +17,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
     base._Ready();
     GetNode<Button>("%AwardButton").Pressed += () =>
     {
+      if (Unit?.IsDeployedInBattle == true) return;
       Unit?.Progression.AwardPoints(5); // DEBUG: stands in for unwired mission/kill rewards
       Rebuild();
     };
@@ -30,7 +31,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
 
   private void Rebuild()
   {
-    if (Unit is null)
+    if (Unit is null || Unit.IsDeployedInBattle)
       return;
 
     GetNode<RichTextLabel>("%Title").Text = $"{Unit.Name} — Skill Paths";
@@ -64,6 +65,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
         button.Disabled = Unit.Progression.CurrencyPoints < next.Cost;
         button.Pressed += () =>
         {
+          if (Unit.IsDeployedInBattle) return;
           progression.TryUnlockNext(path);
           Rebuild();
         };
@@ -103,6 +105,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
         button.TooltipText = button.Text;
         button.Pressed += () =>
         {
+          if (Unit.IsDeployedInBattle) return;
           progression.TryCommit(path);
           Rebuild();
         };

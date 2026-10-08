@@ -22,14 +22,14 @@ public partial class AttackUnitTest
     battle.ClearEvents();
     battle.Attack(attacker, target);
 
-    Assert.Equal(target.MaxHealth - 5, target.CurrentHealth);
-    Assert.Equal(attacker.MaxActionPoints - 1, attacker.CurrentActionPoints);
+    battle.Read(() => Assert.Equal(target.MaxHealth - 5, target.CurrentHealth));
+    battle.Read(() => Assert.Equal(attacker.MaxActionPoints - 1, attacker.CurrentActionPoints));
 
     var attackEvent = battle.Events.SingleEvent<UnitAttackedBattleEvent>();
-    Assert.True(attackEvent.IsHit);
-    Assert.Equal(100, attackEvent.Breakdown.FinalChance);
-    Assert.True(attackEvent.Roll >= 0);
-    Assert.True(attackEvent.Roll < 100);
+    battle.Read(() => Assert.True(attackEvent.IsHit));
+    battle.Read(() => Assert.Equal(100, attackEvent.Breakdown.FinalChance));
+    battle.Read(() => Assert.True(attackEvent.Roll >= 0));
+    battle.Read(() => Assert.True(attackEvent.Roll < 100));
 
     battle.Events.EventBefore<UnitAttackedBattleEvent, UnitDamagedBattleEvent>();
   }
@@ -45,10 +45,10 @@ public partial class AttackUnitTest
     battle.ClearEvents();
     battle.Attack(attacker, target);
 
-    Assert.Equal(target.MaxHealth, target.CurrentHealth);
-    Assert.Equal(attacker.MaxActionPoints - 1, attacker.CurrentActionPoints);
-    Assert.False(battle.Events.SingleEvent<UnitAttackedBattleEvent>().IsHit);
-    Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.Equal(target.MaxHealth, target.CurrentHealth));
+    battle.Read(() => Assert.Equal(attacker.MaxActionPoints - 1, attacker.CurrentActionPoints));
+    battle.Read(() => Assert.False(battle.Events.SingleEvent<UnitAttackedBattleEvent>().IsHit));
+    battle.Read(() => Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any()));
   }
 
   [TestCase(TestName = "Applicable cover lowers the resolved hit chance")]
@@ -71,9 +71,9 @@ public partial class AttackUnitTest
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
     var attackEvent = battle.Events.SingleEvent<UnitAttackedBattleEvent>();
-    Assert.Equal(0, attackEvent.Breakdown.FinalChance);
-    Assert.False(attackEvent.IsHit);
-    Assert.Equal(StandardHitChanceCalculator.CoverModifierLabel, attackEvent.Breakdown.Modifiers.AsValueEnumerable().Single().Label);
+    battle.Read(() => Assert.Equal(0, attackEvent.Breakdown.FinalChance));
+    battle.Read(() => Assert.False(attackEvent.IsHit));
+    battle.Read(() => Assert.Equal(StandardHitChanceCalculator.CoverModifierLabel, attackEvent.Breakdown.Modifiers.AsValueEnumerable().Single().Label));
   }
 
   [TestCase(TestName = "Injected calculator replaces the hit chance algorithm")]
@@ -85,7 +85,7 @@ public partial class AttackUnitTest
 
     battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
 
-    Assert.Equal(battle.EnemyUnit.MaxHealth - 5, battle.EnemyUnit.CurrentHealth);
+    battle.Read(() => Assert.Equal(battle.EnemyUnit.MaxHealth - 5, battle.EnemyUnit.CurrentHealth));
   }
 
   [TestCase(TestName = "Infeasible attacks throw without spending action points")]
@@ -123,9 +123,9 @@ public partial class AttackUnitTest
     // spent, and the submission completes.
     void AssertInfeasible(Func<BattleAction> makeAttack, BattleUnitState unit)
     {
-      int actionPointsBefore = unit.CurrentActionPoints;
+      int actionPointsBefore = battle.Read(() => unit.CurrentActionPoints);
       battle.Submit(makeAttack());
-      Assert.Equal(actionPointsBefore, unit.CurrentActionPoints);
+      battle.Read(() => Assert.Equal(actionPointsBefore, unit.CurrentActionPoints));
     }
 
     AssertInfeasible(
@@ -175,12 +175,12 @@ public partial class AttackUnitTest
     ]));
     battle.ClearEvents();
 
-    Vector3I from = battle.Session.GetUnitPosition(mover).RequireSome().Raw;
+    Vector3I from = battle.Read(() => battle.Session.GetUnitPosition(mover).RequireSome().Raw);
     battle.Move(mover, [from + new Vector3I(0, 0, 1)]);
 
-    Assert.True(mover.IsDead);
-    Assert.Equal(1, battle.Events.EventsOf<UnitAttackedBattleEvent>().AsValueEnumerable().Count());
-    Assert.Equal(1, weapon.CurrentAmmo);
+    battle.Read(() => Assert.True(mover.IsDead));
+    battle.Read(() => Assert.Equal(1, battle.Events.EventsOf<UnitAttackedBattleEvent>().AsValueEnumerable().Count()));
+    battle.Read(() => Assert.Equal(1, weapon.CurrentAmmo));
   }
 
   [TestCase(TestName = "Same seed produces the same attack outcome sequence")]
@@ -203,10 +203,10 @@ public partial class AttackUnitTest
     battle.Attack(battle.PlayerUnit, target);
 
     var damagedEvent = battle.Events.SingleEvent<UnitDamagedBattleEvent>();
-    Assert.Equal(6, damagedEvent.TotalAmount); // 4 Thermal + 2 Electrical
-    Assert.Equal(target.MaxHealth - 6, target.CurrentHealth);
-    Assert.True(damagedEvent.Bundle.AsValueEnumerable().SequenceEqual(
-      new[] { new Damage(4, Element.Thermal), new Damage(2, Element.Electrical) }));
+    battle.Read(() => Assert.Equal(6, damagedEvent.TotalAmount)); // 4 Thermal + 2 Electrical
+    battle.Read(() => Assert.Equal(target.MaxHealth - 6, target.CurrentHealth));
+    battle.Read(() => Assert.True(damagedEvent.Bundle.AsValueEnumerable().SequenceEqual(
+      new[] { new Damage(4, Element.Thermal), new Damage(2, Element.Electrical) })));
   }
 
   [TestCase(TestName = "Int damage path wraps the amount as a single Kinetic packet")]
@@ -218,8 +218,8 @@ public partial class AttackUnitTest
     solo.ApplyDamage(solo.Unit, 3);
 
     var damagedEvent = solo.Events.SingleEvent<UnitDamagedBattleEvent>();
-    Assert.Equal(3, damagedEvent.TotalAmount);
-    Assert.True(damagedEvent.Bundle.AsValueEnumerable().SequenceEqual(new[] { new Damage(3, Element.Kinetic) }));
+    solo.Read(() => Assert.Equal(3, damagedEvent.TotalAmount));
+    solo.Read(() => Assert.True(damagedEvent.Bundle.AsValueEnumerable().SequenceEqual(new[] { new Damage(3, Element.Kinetic) })));
   }
 
   [TestCase(TestName = "An empty magazine interrupts the attack without spending AP or raising events")]
@@ -233,15 +233,15 @@ public partial class AttackUnitTest
     var target = battle.EnemyUnit;
 
     battle.Attack(attacker, target);
-    Assert.Equal(0, weapon.CurrentAmmo);
+    battle.Read(() => Assert.Equal(0, weapon.CurrentAmmo));
 
     battle.ClearEvents();
-    int actionPointsBefore = attacker.CurrentActionPoints;
+    int actionPointsBefore = battle.Read(() => attacker.CurrentActionPoints);
 
     battle.Attack(attacker, target);
 
-    Assert.Equal(actionPointsBefore, attacker.CurrentActionPoints);
-    Assert.False(battle.Events.EventsOf<UnitAttackedBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.Equal(actionPointsBefore, attacker.CurrentActionPoints));
+    battle.Read(() => Assert.False(battle.Events.EventsOf<UnitAttackedBattleEvent>().AsValueEnumerable().Any()));
   }
 
   [TestCase(TestName = "A missed shot still spends ammunition")]
@@ -254,8 +254,8 @@ public partial class AttackUnitTest
 
     battle.Attack(battle.PlayerUnit, target);
 
-    Assert.Equal(target.MaxHealth, target.CurrentHealth); // aim 0 -> guaranteed miss
-    Assert.Equal(2, weapon.CurrentAmmo);
+    battle.Read(() => Assert.Equal(target.MaxHealth, target.CurrentHealth)); // aim 0 -> guaranteed miss
+    battle.Read(() => Assert.Equal(2, weapon.CurrentAmmo));
   }
 
   private static List<bool> RunSeededAttackOutcomes(int seed)

@@ -21,7 +21,7 @@ public sealed class BattleKnowledgeMovementTest
   {
     using var open = Observer(new Vector3I(5, 1, 1), 1);
     using var blocked = Observer(new Vector3I(5, 1, 1), 1);
-    blocked.Board.SetTileWalkable(blocked.At(3, 0, 0), false);
+    blocked.Mutate(() => blocked.Board.SetTileWalkable(blocked.At(3, 0, 0), false));
     blocked.Spawn(TestData.MakeCombatant("Hidden", TestData.MakeFaction("Enemy")), new Vector3I(2, 0, 0));
     var a = Path(open, new Vector3I(4, 0, 0)); var b = Path(blocked, new Vector3I(4, 0, 0));
     Assert.True(a.Points.AsValueEnumerable().SequenceEqual(b.Points));
@@ -70,8 +70,7 @@ public sealed class BattleKnowledgeMovementTest
   public void ActualAndKnowledgeSearchShareNeighborhood()
   {
     using var battle = Observer(new Vector3I(3, 2, 3), 10);
-    battle.Board.SetTileWalkable(battle.At(1, 0, 0), false);
-    battle.Session.InvalidateVisibility();
+    battle.Mutate(() => { battle.Board.SetTileWalkable(battle.At(1, 0, 0), false); battle.Session.InvalidateVisibility(); });
     battle.EndFactionTurn(battle.PlayerFaction);
     var destination = battle.At(2, 1, 2);
     var actual = battle.Query(new FindPathForUnit(battle.Alive(battle.PlayerUnit), destination));
@@ -90,7 +89,7 @@ public sealed class BattleKnowledgeMovementTest
     using var battle = Observer(new Vector3I(5, 1, 1), 1, new Vector3I(2, 0, 0));
     var seen = battle.Query(new GetTileKnowledgeForFaction(battle.PlayerFaction, battle.At(3, 0, 0)));
     battle.Move(battle.PlayerUnit, [new Vector3I(1, 0, 0)]);
-    battle.Board.SetTileWalkable(battle.At(3, 0, 0), false);
+    battle.Mutate(() => battle.Board.SetTileWalkable(battle.At(3, 0, 0), false));
     var unseen = battle.Query(new GetTileKnowledgeForFaction(battle.PlayerFaction, battle.At(3, 0, 0)));
     Assert.Equal(seen.Terrain, unseen.Terrain);
     Assert.Equal(TraversalKnowledge.Unknown, unseen.Occupancy);

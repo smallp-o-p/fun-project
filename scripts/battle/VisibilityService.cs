@@ -8,6 +8,7 @@ namespace FunProject.Battle;
 internal sealed class VisibilityService
 {
   internal BattleObservationHistory History { get; } = new();
+  internal void BindBattleAccess(BattleAccessGuard access) => History.BindBattleAccess(access);
   private static readonly IReadOnlySet<BattleBoardState.ValidatedPoint> EmptyTileSet =
     new SysColGeneric.HashSet<BattleBoardState.ValidatedPoint>();
 

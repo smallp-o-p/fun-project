@@ -135,36 +135,60 @@ public sealed class GeoscapeSession
   public Either<BattleSetupFailure, MissionBattle> LaunchMission(
     GeoscapeEvent mission, IReadOnlyList<Combatant> squad)
   {
-    TacticalMissionData authored = mission.Definition.TacticalMission!;
-    // Capture ordered, unique participants before startup callbacks can change the selection.
-    var deployment = new MissionDeployment([.. squad.AsValueEnumerable().Distinct()
+    if (_state.ActiveMission.IsSome || _state.IsMissionLaunching || squad.AsValueEnumerable().Any(unit => unit.IsDeployedInBattle))
+      return Left(new BattleSetupFailure(BattleSetupFailureReason.MissionAlreadyActive, "A mission is active, starting or draining."));
+    _state.IsMissionLaunching = true;
+    try
+    {
+      TacticalMissionData authored = mission.Definition.TacticalMission!;
+      // Capture ordered, unique participants before startup callbacks can change the selection.
+      var deployment = new MissionDeployment([.. squad.AsValueEnumerable().Distinct()
       .Take((int)Math.Min(authored.Size.MaxPlayerUnits, (uint)squad.Count))]);
-    int seed = mission.BattleSeed.ValueUnsafe();
+      int seed = mission.BattleSeed.ValueUnsafe();
 
-    var player = new PlayerDeployment(_state.PlayerFaction,
-      [.. deployment.Participants.AsValueEnumerable().Select(combatant => new UnitLoadout(
+      var player = new PlayerDeployment(_state.PlayerFaction,
+        [.. deployment.Participants.AsValueEnumerable().Select(combatant => new UnitLoadout(
         combatant, combatant.EquippedWeapon, combatant.EquippedArmor)
       {
         StatMods = _state.Conditions.StatContributions(combatant),
       })]);
-    SideDeployment side = MissionEnemyResolver.Resolve(authored, seed);
+      SideDeployment side = MissionEnemyResolver.Resolve(authored, seed);
 
-    return BattleSetupResolver.Resolve(authored.BattleType, seed, Some(player), Some(side))
-      .Bind(setup => BattleFactory.Start(setup).Map(runtime =>
-      {
-        _state.ActiveMission = Some(deployment);
-        return new MissionBattle(deployment, setup, runtime);
-      }));
+      return BattleSetupResolver.Resolve(authored.BattleType, seed, Some(player), Some(side))
+        .Bind(setup => BattleFactory.Start(setup).Map(runtime =>
+        {
+          _state.ActiveMission = Some(deployment);
+          return new MissionBattle(deployment, setup, runtime);
+        }));
+    }
+    finally { _state.IsMissionLaunching = false; }
   }
 
   /// <summary>Installation failed; retain the pending event and seed for another attempt.
   /// Runtime disposal belongs to the view.</summary>
-  public void AbortMissionPresentation() => _state.ActiveMission = None;
+  public void AbortMissionPresentation()
+  {
+    _state.ActiveMission.IfSome(deployment => RequireUndeployed(deployment.Participants));
+    _state.ActiveMission = None;
+  }
+
+  internal void AbortMissionPresentation(MissionDeployment expected)
+  {
+    if (_state.ActiveMission.Match(active => ReferenceEquals(active, expected), () => false)) AbortMissionPresentation();
+  }
+
+  private static void RequireUndeployed(IEnumerable<Combatant> participants)
+  {
+    if (participants.AsValueEnumerable().Any(unit => unit.IsDeployedInBattle))
+      throw new InvalidOperationException("Campaign mutation requires the battle runtime to finish draining.");
+  }
 
   /// <summary>Applies the active mission's terminal summary and consumes the mission before
   /// broadcasting. The completion signal supplies the trusted player summary.</summary>
   internal void CompleteMission(FactionBattleSummary summary)
   {
+    _state.ActiveMission.IfSome(deployment => RequireUndeployed(deployment.Participants));
+    RequireUndeployed(summary.HealthByCombatant.Keys);
     PendingResolution pending = _state.Pending.ValueUnsafe()!;
 
     foreach ((Combatant combatant, BattleHealthSummary health) in summary.HealthByCombatant)
@@ -185,6 +209,7 @@ public sealed class GeoscapeSession
 
   public void ApplyMissionReturn(FactionBattleSummary summary)
   {
+    RequireUndeployed(summary.HealthByCombatant.Keys);
     foreach ((Combatant combatant, BattleHealthSummary health) in summary.HealthByCombatant)
       _state.Conditions.ApplyMissionReturn(combatant, health.HealthDamageTaken, health.MaxHealth, Tick);
     foreach (Combatant combatant in summary.HealthByCombatant.Keys)
@@ -192,7 +217,7 @@ public sealed class GeoscapeSession
   }
 
   public bool CanDeploy(Combatant combatant, GeoscapeEventDefinition mission)
-    => _state.Conditions.CanDeploy(combatant, mission.AllowUnfitDeployment);
+    => !combatant.IsDeployedInBattle && _state.Conditions.CanDeploy(combatant, mission.AllowUnfitDeployment);
 
   public void Advance(double deltaSeconds)
   {

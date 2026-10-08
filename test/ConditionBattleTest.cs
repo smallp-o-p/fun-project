@@ -42,7 +42,7 @@ public class ConditionBattleTest
     var unit = battle.Unit;
 
     // MaxHealth carries the loadout weapon and the injury: (100 + 30) x 0.75 = 97.5 -> 98.
-    Assert.Equal(98, unit.MaxHealth);
+    battle.Read(() => Assert.Equal(98, unit.MaxHealth));
   }
 
   [TestCase(TestName = "The effective max health is floored at one")]
@@ -65,8 +65,8 @@ public class ConditionBattleTest
     { StatMods = conditions.StatContributions(alpha) });
     var unit = battle.Unit;
 
-    Assert.True(unit.IsAlive);
-    Assert.Equal(1, unit.MaxHealth);
+    battle.Read(() => Assert.True(unit.IsAlive));
+    battle.Read(() => Assert.Equal(1, unit.MaxHealth));
   }
 
   [TestCase(TestName = "Overkill counts only the health actually lost")]
@@ -79,12 +79,12 @@ public class ConditionBattleTest
 
     battle.ApplyDamage(unit, 999);
 
-    Assert.True(unit.IsDead);
-    Assert.Equal(20L, unit.TotalHealthDamageTaken);
-    battle.Session.EndBattle(BattleOutcome.Victory);
+    battle.Read(() => Assert.True(unit.IsDead));
+    battle.Read(() => Assert.Equal(20L, unit.TotalHealthDamageTaken));
+    battle.Mutate(() => battle.Session.EndBattle(BattleOutcome.Victory));
     var summary = battle.Query(new GetFactionEndOfBattleSummary(faction)).RequireRight();
-    Assert.False(summary.HealthByCombatant.ContainsKey(alpha),
-      "Dead participants are not part of the health report.");
+    battle.Read(() => Assert.False(summary.HealthByCombatant.ContainsKey(alpha),
+      "Dead participants are not part of the health report."));
   }
 
   [TestCase(TestName = "Stun-only damage never counts toward health metrics")]
@@ -97,11 +97,11 @@ public class ConditionBattleTest
 
     battle.ApplyDamage(unit, 15, DamageKind.Stun);
 
-    Assert.Equal(20, unit.CurrentHealth);
-    Assert.Equal(0L, unit.TotalHealthDamageTaken);
-    battle.Session.EndBattle(BattleOutcome.Victory);
+    battle.Read(() => Assert.Equal(20, unit.CurrentHealth));
+    battle.Read(() => Assert.Equal(0L, unit.TotalHealthDamageTaken));
+    battle.Mutate(() => battle.Session.EndBattle(BattleOutcome.Victory));
     var summary = battle.Query(new GetFactionEndOfBattleSummary(faction)).RequireRight();
-    Assert.Equal(0L, summary.HealthByCombatant[alpha].HealthDamageTaken);
+    battle.Read(() => Assert.Equal(0L, summary.HealthByCombatant[alpha].HealthDamageTaken));
   }
 
   [TestCase(TestName = "Armor-absorbed damage never counts toward health metrics")]
@@ -115,8 +115,8 @@ public class ConditionBattleTest
 
     battle.ApplyDamage(unit, 5);
 
-    Assert.Equal(100, unit.CurrentHealth);
-    Assert.Equal(0L, unit.TotalHealthDamageTaken);
+    battle.Read(() => Assert.Equal(100, unit.CurrentHealth));
+    battle.Read(() => Assert.Equal(0L, unit.TotalHealthDamageTaken));
   }
 
   [TestCase(TestName = "Max-health clamping from stat changes is not damage taken")]
@@ -132,19 +132,19 @@ public class ConditionBattleTest
 
     using var battle = DeployedSolo(faction, new UnitLoadout(alpha));
     var unit = battle.Unit;
-    Assert.Equal(100, unit.CurrentHealth); // no adjacent enemy yet
+    battle.Read(() => Assert.Equal(100, unit.CurrentHealth)); // no adjacent enemy yet
     battle.Spawn(TestData.MakeCombatant("Enemy", enemy), new Vector3I(1, 0, 0));
     battle.EndFactionTurn(faction); // enemy turn...
     battle.EndFactionTurn(enemy);   // ...then the player's turn-start hook evaluates Alpha's now-satisfied condition
 
-    Assert.Equal(40, unit.CurrentHealth);
-    Assert.Equal(0L, unit.TotalHealthDamageTaken);
-    battle.Session.EndBattle(BattleOutcome.Victory);
+    battle.Read(() => Assert.Equal(40, unit.CurrentHealth));
+    battle.Read(() => Assert.Equal(0L, unit.TotalHealthDamageTaken));
+    battle.Mutate(() => battle.Session.EndBattle(BattleOutcome.Victory));
     var summary = battle.Query(new GetFactionEndOfBattleSummary(faction)).RequireRight();
-    Assert.Equal(40, summary.HealthByCombatant[alpha].MaxHealth,
-      "The report reads the current effective max health, not a spawn snapshot.");
-    Assert.Equal(0L, summary.HealthByCombatant[alpha].HealthDamageTaken,
-      "Health clamps are not damage.");
+    battle.Read(() => Assert.Equal(40, summary.HealthByCombatant[alpha].MaxHealth,
+      "The report reads the current effective max health, not a spawn snapshot."));
+    battle.Read(() => Assert.Equal(0L, summary.HealthByCombatant[alpha].HealthDamageTaken,
+      "Health clamps are not damage."));
   }
 
   [TestCase(TestName = "Injured roster spawns enter the next battle with combined penalties")]
@@ -162,12 +162,12 @@ public class ConditionBattleTest
       new UnitLoadout(alpha) { StatMods = campaign.State.Conditions.StatContributions(alpha) });
     var unit = battle.Unit;
 
-    Assert.Equal(75, unit.MaxHealth);
-    Assert.Equal(75, unit.CurrentHealth);
+    battle.Read(() => Assert.Equal(75, unit.MaxHealth));
+    battle.Read(() => Assert.Equal(75, unit.CurrentHealth));
     // Injured cuts aim and movement by 10%; Tired cuts aim another 10%: 60 -> 48.6 -> 49,
     // 12 -> 10.8 -> 11.
-    Assert.Equal(48.6f, unit.EffectiveStat<AimStat>());
-    Assert.Equal(10.8f, unit.EffectiveStat<MovementStat>());
+    battle.Read(() => Assert.Equal(48.6f, unit.EffectiveStat<AimStat>()));
+    battle.Read(() => Assert.Equal(10.8f, unit.EffectiveStat<MovementStat>()));
   }
 
   [TestCase(TestName = "Successive mission returns measure damage against the effective max health")]
@@ -206,12 +206,14 @@ public class ConditionBattleTest
     // overwrite would report 10 and under-award the return's injury tiers.
     battle.ApplyDamage(unit, 20);
     battle.ApplyDamage(unit, 10);
-    battle.Session.EndBattle(BattleOutcome.Victory);
+    battle.Mutate(() => battle.Session.EndBattle(BattleOutcome.Victory));
 
     var summary = battle.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
-    Assert.Equal(100, summary.HealthByCombatant[alpha].MaxHealth);
-    Assert.Equal(30L, summary.HealthByCombatant[alpha].HealthDamageTaken);
+    battle.Read(() => Assert.Equal(100, summary.HealthByCombatant[alpha].MaxHealth));
+    battle.Read(() => Assert.Equal(30L, summary.HealthByCombatant[alpha].HealthDamageTaken));
 
+    battle.Dispose();
+    Assert.True(battle.Runtime.TryFinishDisposal());
     campaign.Session.ApplyMissionReturn(summary);
     // 30% of max health earns two tiers: Healthy -> LightlyInjured -> Injured.
     Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier);

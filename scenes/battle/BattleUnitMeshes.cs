@@ -2,36 +2,33 @@ using FunProject.Battle;
 using FunProject.Combatants;
 using Godot;
 using System.Collections.Generic;
+using System;
 
 /// <summary>Presents alive units as capsule meshes and registers them with the playback director.</summary>
 public sealed partial class BattleUnitMeshes : Node3D
 {
   public void Initialize(BattleRuntime runtime, EventPlaybackDirector director, Faction playerFaction)
   {
-    var capsule = new CapsuleMesh { Radius = 0.3f, Height = 1.0f };
-
-    foreach (Faction faction in runtime.Query(new GetGlobalFactionTurnOrderQuery()))
+    List<(BattleUnitState Unit, Vector3I Tile, bool Player)> placements = [];
+    using (var scope = runtime.TryAcquireQueryScope().Match(Right: value => value, Left: failure => throw new InvalidOperationException($"Battle access failed: {failure}.")))
     {
-      IReadOnlyCollection<AliveUnit> units = runtime.Query(new GetFactionAliveUnits(faction));
-
-      var material = new StandardMaterial3D
+      foreach (var faction in runtime.Query(new GetGlobalFactionTurnOrderQuery()))
+        foreach (var unit in runtime.Query(new GetFactionAliveUnits(faction)))
+          placements.Add((unit.State, unit.Position.Raw, faction == playerFaction));
+    }
+    var capsule = new CapsuleMesh { Radius = 0.3f, Height = 1.0f };
+    var playerMaterial = new StandardMaterial3D { AlbedoColor = Colors.SteelBlue };
+    var enemyMaterial = new StandardMaterial3D { AlbedoColor = Colors.IndianRed };
+    foreach (var placement in placements)
+    {
+      var mesh = new MeshInstance3D
       {
-        AlbedoColor = faction == playerFaction ? Colors.SteelBlue : Colors.IndianRed,
+        Mesh = capsule,
+        MaterialOverride = placement.Player ? playerMaterial : enemyMaterial,
+        Position = BoardCoordinates.TileToWorldCenter(placement.Tile) + new Vector3(0f, 0.5f, 0f),
       };
-
-      foreach (AliveUnit unit in units)
-      {
-        Vector3I tile = unit.Position.Raw;
-
-        var mesh = new MeshInstance3D
-        {
-          Mesh = capsule,
-          MaterialOverride = material,
-          Position = BoardCoordinates.TileToWorldCenter(tile) + new Vector3(0f, 0.5f, 0f),
-        };
-        AddChild(mesh);
-        director.RegisterUnitMesh(unit.State, mesh);
-      }
+      AddChild(mesh);
+      director.RegisterUnitMesh(placement.Unit, mesh);
     }
   }
 }

@@ -21,16 +21,16 @@ public class BattleCausalityTest
     if (enemyHealth == 20)
     {
       var damagedEvent = battle.Events.SingleEvent<UnitDamagedBattleEvent>();
-      Assert.Equal(battle.PlayerUnit, damagedEvent.MaybeCause.RequireSome());
+      battle.Read(() => Assert.Equal(battle.PlayerUnit, damagedEvent.MaybeCause.RequireSome()));
       return;
     }
 
-    Assert.True(battle.EnemyUnit.IsDead);
+    battle.Read(() => Assert.True(battle.EnemyUnit.IsDead));
     // A killing blow commits death only: no damage event accompanies the kill.
-    Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any()));
     var killedEvent = battle.Events.SingleEvent<UnitKilledBattleEvent>();
-    Assert.Equal(battle.EnemyUnit, killedEvent.Unit);
-    Assert.Equal(battle.PlayerUnit, killedEvent.MaybeCause.RequireSome());
+    battle.Read(() => Assert.Equal(battle.EnemyUnit, killedEvent.Unit));
+    battle.Read(() => Assert.Equal(battle.PlayerUnit, killedEvent.MaybeCause.RequireSome()));
   }
 
   [TestCase(TestName = "Direct damage without an attacker leaves the cause empty on damage and kill events")]
@@ -42,7 +42,7 @@ public class BattleCausalityTest
     battle.ApplyDamage(battle.Unit, 3);
     battle.ApplyDamage(battle.Unit, 999);
 
-    Assert.True(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().All(damagedEvent => damagedEvent.MaybeCause.IsNone));
-    Assert.True(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Single().MaybeCause.IsNone);
+    battle.Read(() => Assert.True(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().All(damagedEvent => damagedEvent.MaybeCause.IsNone)));
+    battle.Read(() => Assert.True(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Single().MaybeCause.IsNone));
   }
 }

@@ -37,14 +37,14 @@ public class BattleSetupResolverTest
     var unit = runtime.Query(new GetFactionAliveUnits(campaign))
       .AsValueEnumerable().Single().State;
 
-    Assert.True(ReferenceEquals(campaign, runtime.Query(new GetPlayerFactionQuery()).RequireSome()));
-    Assert.True(ReferenceEquals(campaign, veteran.OwningFaction));
-    Assert.True(ReferenceEquals(veteran, unit.Combatant));
-    Assert.True(ReferenceEquals(weapon, unit.EquippedWeapon.RequireSome()));
-    Assert.True(ReferenceEquals(armor.Item, unit.EquippedArmor.RequireSome().Item));
-    Assert.Equal(42, unit.MaxHealth); // 20 + campaign 10 + deployment 12
+    runtime.Read(() => Assert.True(ReferenceEquals(campaign, runtime.Query(new GetPlayerFactionQuery()).RequireSome())));
+    runtime.Read(() => Assert.True(ReferenceEquals(campaign, veteran.OwningFaction)));
+    runtime.Read(() => Assert.True(ReferenceEquals(veteran, unit.Combatant)));
+    runtime.Read(() => Assert.True(ReferenceEquals(weapon, unit.EquippedWeapon.RequireSome())));
+    runtime.Read(() => Assert.True(ReferenceEquals(armor.Item, unit.EquippedArmor.RequireSome().Item)));
+    runtime.Read(() => Assert.Equal(42, unit.MaxHealth)); // 20 + campaign 10 + deployment 12
     mods.Clear();
-    Assert.Equal(42, unit.MaxHealth);
+    runtime.Read(() => Assert.Equal(42, unit.MaxHealth));
   }
 
   [TestCase(TestName = "Concrete-setup StatMods capture at spawn and stay stable afterwards")]
@@ -66,10 +66,10 @@ public class BattleSetupResolverTest
     var unit = runtime.Query(new GetFactionAliveUnits(player))
       .AsValueEnumerable().Single().State;
 
-    Assert.Equal(32, unit.MaxHealth); // 20 + deployment 12
-    Assert.Equal(32, unit.CurrentHealth);
+    runtime.Read(() => Assert.Equal(32, unit.MaxHealth)); // 20 + deployment 12
+    runtime.Read(() => Assert.Equal(32, unit.CurrentHealth));
     mods.Clear();
-    Assert.Equal(32, unit.MaxHealth);
+    runtime.Read(() => Assert.Equal(32, unit.MaxHealth));
   }
 
   [TestCase(TestName = "Resolve preserves the seed and selects the map with a separate stream")]
@@ -213,11 +213,11 @@ public class BattleSetupResolverTest
     using var runtime = BattleFactory.Start(type, seed: 7,
       playerDeployment: Some(deployment)).RequireRight();
 
-    Assert.True(ReferenceEquals(campaign, runtime.Query(new GetPlayerFactionQuery()).RequireSome()));
-    Assert.Equal(0, runtime.Query(new GetFactionAliveUnits(campaign)).Count);
+    runtime.Read(() => Assert.True(ReferenceEquals(campaign, runtime.Query(new GetPlayerFactionQuery()).RequireSome())));
+    runtime.Read(() => Assert.Equal(0, runtime.Query(new GetFactionAliveUnits(campaign)).Count));
     Faction enemy = runtime.Query(new GetGlobalFactionTurnOrderQuery())
       .AsValueEnumerable().Single(f => !ReferenceEquals(f, campaign));
-    Assert.Equal(1, runtime.Query(new GetFactionAliveUnits(enemy)).Count);
+    runtime.Read(() => Assert.Equal(1, runtime.Query(new GetFactionAliveUnits(enemy)).Count));
   }
 
   [TestCase(TestName = "Without a deployment the authored player faction bonuses apply")]
@@ -232,7 +232,7 @@ public class BattleSetupResolverTest
     var unit = runtime.Query(new GetFactionAliveUnits(player))
       .AsValueEnumerable().Single().State;
 
-    Assert.Equal(30, unit.MaxHealth); // 20 + authored player bonus 10
+    runtime.Read(() => Assert.Equal(30, unit.MaxHealth)); // 20 + authored player bonus 10
   }
 
   [TestCase(TestName = "Other sides stay authored with fresh factions and their own bonuses")]
@@ -247,20 +247,19 @@ public class BattleSetupResolverTest
 
     using BattleRuntime first = BattleFactory.Start(type, seed: 7,
       playerDeployment: Some(deployment)).RequireRight();
-    using BattleRuntime second = BattleFactory.Start(type, seed: 7,
-      playerDeployment: Some(deployment)).RequireRight();
-
     Faction firstEnemy = first.Query(new GetGlobalFactionTurnOrderQuery())
-      .AsValueEnumerable().Single(f => !ReferenceEquals(f, campaign));
-    Faction secondEnemy = second.Query(new GetGlobalFactionTurnOrderQuery())
       .AsValueEnumerable().Single(f => !ReferenceEquals(f, campaign));
     var firstEnemyUnit = first.Query(new GetFactionAliveUnits(firstEnemy))
       .AsValueEnumerable().Single().State;
-    var secondEnemyUnit = second.Query(new GetFactionAliveUnits(secondEnemy))
-      .AsValueEnumerable().Single().State;
-
-    Assert.Equal(80, Mathf.RoundToInt(firstEnemyUnit.EffectiveStat<AimStat>())); // 65 + 15
+    first.Read(() => Assert.Equal(80, Mathf.RoundToInt(firstEnemyUnit.EffectiveStat<AimStat>()))); // 65 + 15
+    first.Dispose();
+    Assert.True(first.TryFinishDisposal());
+    using BattleRuntime second = BattleFactory.Start(type, seed: 7,
+      playerDeployment: Some(deployment)).RequireRight();
+    Faction secondEnemy = second.Query(new GetGlobalFactionTurnOrderQuery())
+      .AsValueEnumerable().Single(f => !ReferenceEquals(f, campaign));
     Assert.False(ReferenceEquals(firstEnemy, secondEnemy));
+
   }
 
   [TestCase(TestName = "Authored loadouts expand into fresh combatant, weapon, and armor instances per unit")]
@@ -486,7 +485,7 @@ public class BattleSetupResolverTest
     var unit = runtime.Query(new GetFactionAliveUnits(campaign))
       .AsValueEnumerable().Single().State;
 
-    Assert.True(unit.EquippedWeapon.IsNone);
-    Assert.True(unit.EquippedArmor.IsNone);
+    runtime.Read(() => Assert.True(unit.EquippedWeapon.IsNone));
+    runtime.Read(() => Assert.True(unit.EquippedArmor.IsNone));
   }
 }

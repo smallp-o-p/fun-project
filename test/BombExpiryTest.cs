@@ -47,14 +47,14 @@ public class BombExpiryTest
     BattleObjectState bomb = runtime.Query(new GetBattleSpecialObjectsQuery())[0];
     BattleUnitState victim = runtime.Query(new GetUnitAtTile(
       runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
-    int hpBefore = victim.CurrentHealth;
+    int hpBefore = runtime.Read(() => victim.CurrentHealth);
 
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
-    Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
-    Assert.Equal(new Vector3I(1, 0, 0), bomb.Position);
-    Assert.True(events.AsValueEnumerable().OfType<ObjectExpiredBattleEvent>().Any());
-    Assert.True(hpBefore > victim.CurrentHealth);
+    runtime.Read(() => Assert.Equal(Some(ObjectStatus.Expired), bomb.Status));
+    runtime.Read(() => Assert.Equal(new Vector3I(1, 0, 0), bomb.Position));
+    runtime.Read(() => Assert.True(events.AsValueEnumerable().OfType<ObjectExpiredBattleEvent>().Any()));
+    runtime.Read(() => Assert.True(hpBefore > victim.CurrentHealth));
   }
 
   [TestCase(TestName = "Player wipe defeat stays stable when the defuse objective also fails in the same expiry dispatch")]
@@ -83,13 +83,13 @@ public class BombExpiryTest
 
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
-    Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome);
-    Assert.Equal(
+    runtime.Read(() => Assert.True(runtime.Query(new GetBattleOutcomeQuery()).IsSome));
+    runtime.Read(() => Assert.Equal(
       BattleOutcome.Defeat,
-      runtime.Query(new GetBattleResultQuery()).RequireRight().Outcome);
-    Assert.Equal(1, events.AsValueEnumerable().OfType<SessionEndedBattleEvent>().Count());
-    Assert.True(events.AsValueEnumerable().OfType<ObjectExpiredBattleEvent>().Any());
-    Assert.True(events.AsValueEnumerable().OfType<ObjectiveFailedBattleEvent>().Any());
+      runtime.Query(new GetBattleResultQuery()).RequireRight().Outcome));
+    runtime.Read(() => Assert.Equal(1, events.AsValueEnumerable().OfType<SessionEndedBattleEvent>().Count()));
+    runtime.Read(() => Assert.True(events.AsValueEnumerable().OfType<ObjectExpiredBattleEvent>().Any()));
+    runtime.Read(() => Assert.True(events.AsValueEnumerable().OfType<ObjectiveFailedBattleEvent>().Any()));
   }
 
   [TestCase(TestName = "Defused bombs do not expire")]
@@ -106,7 +106,7 @@ public class BombExpiryTest
       runtime.TryGetAliveObject(bomb).RequireSome()));
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
-    Assert.Equal(Some(ObjectStatus.Interacted), bomb.Status);
+    runtime.Read(() => Assert.Equal(Some(ObjectStatus.Interacted), bomb.Status));
   }
 
   [TestCase(TestName = "Expiry fires after the -100 upkeep systems")]
@@ -119,7 +119,7 @@ public class BombExpiryTest
 
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
-    Assert.Equal("upkeep,expiry", string.Join(",", order));
+    runtime.Read(() => Assert.Equal("upkeep,expiry", string.Join(",", order)));
   }
 
   private sealed class MarkerHook(System.Action onFire) : BattleHook
@@ -151,9 +151,9 @@ public class BombExpiryTest
     battle.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
     battle.ClearEvents();
     battle.AdvanceTurn();
-    Assert.Equal(Some(ObjectStatus.Expired), bomb.Status);
-    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(bomb)).IsNone);
-    Assert.Equal(12, crate.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
+    battle.Read(() => Assert.Equal(Some(ObjectStatus.Expired), bomb.Status));
+    battle.Read(() => Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(bomb)).IsNone));
+    battle.Read(() => Assert.Equal(12, crate.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth));
     battle.Events.EventBefore<ObjectDamagedBattleEvent, ObjectExpiredBattleEvent>();
   }
 
@@ -174,9 +174,9 @@ public class BombExpiryTest
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, bomb);
     battle.AdvanceTurn();
-    Assert.Equal(Some(ObjectStatus.Destroyed), bomb.Status);
-    Assert.Equal(battle.PlayerUnit.MaxHealth, battle.PlayerUnit.CurrentHealth);
-    Assert.Equal(0, battle.Events.EventsOf<ObjectExpiredBattleEvent>().Length);
-    Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(bomb)).IsNone);
+    battle.Read(() => Assert.Equal(Some(ObjectStatus.Destroyed), bomb.Status));
+    battle.Read(() => Assert.Equal(battle.PlayerUnit.MaxHealth, battle.PlayerUnit.CurrentHealth));
+    battle.Read(() => Assert.Equal(0, battle.Events.EventsOf<ObjectExpiredBattleEvent>().Length));
+    battle.Read(() => Assert.True(battle.Runtime.TryGetAttackTarget(new BattleEntity.Object(bomb)).IsNone));
   }
 }

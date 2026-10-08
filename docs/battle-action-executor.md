@@ -37,7 +37,7 @@ The constructor registers the default systems:
 - `UnitSpawnedBuffHook` — `UnitAddedBattleEvent`.
 - `ObjectiveSystem` — catch-all `BattleEventTag` at +100. It receives every event and filters each objective's declared observed keys internally.
 
-Keep one live executor per session through ownership. Duplicate executors register duplicate upkeep handlers, causing statuses, armor regen, and stun recovery to tick twice. Production `BattleRuntime` owns the session's single executor. It subscribes the `BattleEventCommitted` re-raise before it constructs the executor, so subscribers observe cause events before follow-up events from hooks. Tests reuse `BattleFixture.Runtime`. Code disposes the previous owner before creating a lifecycle replacement.
+Keep one live executor per session through ownership. Duplicate executors register duplicate upkeep handlers, causing statuses, armor regen, and stun recovery to tick twice. Production `BattleRuntime` owns the session's single executor. It subscribes the `BattleEventCommitted` re-raise before it constructs the executor, so subscribers observe cause events before follow-up events from hooks. Tests reuse `BattleFixture.Runtime`. A closed bound session cannot be reused by a replacement executor.
 
 ## Execution Flow
 
@@ -80,9 +80,15 @@ Recovery requires a living conscious unit. AP and immobilization are independent
 
 When the designated player loses all conscious units, `ObjectiveSystem` suppresses routing on the unit death or unconscious event. The suppression keeps the player-wipe defeat rule authoritative. Other events still update objective history and can queue follow-ups after the battle ends. The first `EndBattle` freezes victory capture membership before `SessionEndedBattleEvent` observers query it. Executor queue clearing then drops remaining work. Applying captures to the campaign is deferred (see [battlescape-architecture.md](battlescape-architecture.md)).
 
-## Single-Threaded Execution
+## Execution ownership
 
-Authoritative execution is single-threaded: outcomes stay deterministic, ordering stays explicit, and interrupts stay tractable. A later change may move pure read-only work such as path previews to other threads. The executor and the session action path must stay single-threaded.
+The host remains the sole active submitter. `BattleRuntime` automatically admits queries and actions through one exclusive `Monitor`; this also serializes lazy `UnitActionCache` evaluation. A worker can acquire an outer `BattleQueryScope` for a complete synchronous read-only decision. Borrowed proofs/state/options and event spans require ownership through their use. Scopes are thread-affine and cannot cross `await`; built-in stat inputs are prepared managed values. Trusted extension code must obey the same contract.
+
+Release read ownership before `TryExecuteAction(factory, expectedRevision)`. Busy/Closed/StaleRevision admission does not invoke the factory. Once admitted, the runtime advances revision before construction, constructs current proofs and routes the action through the sole executor. Execution ownership covers signals, mutations, hooks, cleanup and `ActionCompleted`; owner callbacks may query. Nested submissions and read-to-write promotion are rejected. Faults release ownership and preserve committed state/events.
+
+Consume `EventsThatOccurred` synchronously under ownership (as playback does in `ActionCompleted`). A span obtained earlier is still borrowed and must not survive release, another execution or an await. Retained playback uses captured event fields and meshes, so animation continues while queries are busy.
+
+Closing rejects new admission, requests cancellation and lets admitted reads finish. The host polls final disposal without waiting. The retained drain host releases shared campaign bindings before mission completion/abort or progression/equipment edits. A disposed bound battle session cannot be reopened.
 
 ## Relationship To Visuals
 

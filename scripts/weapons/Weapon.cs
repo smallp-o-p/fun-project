@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using FunProject.Items;
+using FunProject.Battle;
 using FunProject.Stats;
 
 namespace FunProject.Weapons;
@@ -10,6 +11,19 @@ public class Weapon : EquippableItem, HasStats
 {
   protected readonly StatSheet _stats;
   protected readonly WeaponFrameData _frame;
+  private BattleStatInputs? _statInputs;
+  protected int PreparedPacketCount { get; private set; }
+  internal override void BindBattleAccess(BattleAccessGuard access)
+  {
+    base.BindBattleAccess(access);
+    PrepareStatInputs();
+  }
+  internal void PrepareStatInputs()
+  {
+    _battleAccess.RequireMutation();
+    PreparedPacketCount = _frame.Packets.Count;
+    _statInputs = BattleStatInputs.Capture(_stats.CopyBaseValues(), StatContributions.AsValueEnumerable().ToArray(), []);
+  }
 
   public Weapon(WeaponData data) : base(data)
   {
@@ -65,7 +79,10 @@ public class Weapon : EquippableItem, HasStats
   /// overrides this with ammunition gating.
   /// </summary>
   public virtual Option<List<Damage>> TrySpendShot(IEnumerable<DamageBundleMod> externalMods)
-    => EmitDamage(externalMods);
+  {
+    _battleAccess.RequireMutation();
+    return EmitDamage(externalMods);
+  }
 
   /// <summary>Whether this weapon can fire right now. Weapons without a magazine are always loaded.</summary>
   public virtual bool IsLoaded => true;
@@ -77,13 +94,16 @@ public class Weapon : EquippableItem, HasStats
   public virtual bool CanReload() => false;
 
   public float EffectiveStat<TStat>() where TStat : Stat
-    => this.Resolve<TStat>(StatContributions);
+  {
+    _battleAccess.RequireRead(); return _battleAccess.Guard is null ? this.Resolve<TStat>(StatContributions)
+      : (_statInputs ?? throw new InvalidOperationException("Bound weapon inputs are not prepared.")).TryResolve<TStat>([]).IfNone(0f);
+  }
 
   public int EffectiveRange => Mathf.RoundToInt(EffectiveStat<RangeStat>());
 
   /// <summary>StatMods this weapon contributes to resolution; override to add more (e.g. ammunition).</summary>
   public virtual IEnumerable<StatMod> StatContributions
-    => this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).ToArray();
+  { get { _battleAccess.RequireRead(); _battleAccess.Guard?.RequireHostThread(); return this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).ToArray(); } }
 
   /// <summary>
   /// DamageBundleMods this weapon contributes to every emission, folded before any external
@@ -91,7 +111,7 @@ public class Weapon : EquippableItem, HasStats
   /// <see cref="StatContributions"/>.
   /// </summary>
   protected virtual IEnumerable<DamageBundleMod> DamageContributions
-    => this.EquippedMods().AsValueEnumerable().OfType<DamageBundleEquippableMod>().SelectMany(m => m.BundleMods).ToArray();
+  { get { _battleAccess.RequireRead(); return this.EquippedMods().AsValueEnumerable().OfType<DamageBundleEquippableMod>().SelectMany(m => m.BundleMods).ToArray(); } }
 
   public DamageStat GetDamageStat() => GetStat<DamageStat>();
   public RangeStat GetRangeStat() => GetStat<RangeStat>();
@@ -106,7 +126,12 @@ public class AmmunitionedWeapon : Weapon
 {
   // Runtime magazine state. Plain int on the runtime wrapper — never a Stat resource,
   // so battle-time spending can never write through to the authored template.
-  public int CurrentAmmo { get; private set; }
+  private int _currentAmmo;
+  public int CurrentAmmo
+  {
+    get { _battleAccess.RequireRead(); return _currentAmmo; }
+    private set { _battleAccess.RequireMutation(); _currentAmmo = value; }
+  }
 
   public AmmunitionedWeapon(AmmunitionedWeaponData data) : base(data)
   {
@@ -117,7 +142,7 @@ public class AmmunitionedWeapon : Weapon
   public int MagazineSize => Mathf.RoundToInt(EffectiveStat<AmmunitionStat>());
 
   // One shot spends one round per frame packet.
-  public int ShotCost => _frame.Packets.Count;
+  public int ShotCost { get { _battleAccess.RequireRead(); return _battleAccess.Guard is null ? _frame.Packets.Count : PreparedPacketCount; } }
 
   public override bool IsLoaded => !NeedsToReload();
 
@@ -127,10 +152,11 @@ public class AmmunitionedWeapon : Weapon
 
   public bool NeedsToReload() => CurrentAmmo < ShotCost;
 
-  public void Reload() => CurrentAmmo = MagazineSize;
+  public void Reload() { _battleAccess.RequireMutation(); CurrentAmmo = MagazineSize; }
 
   public override Option<List<Damage>> TrySpendShot(IEnumerable<DamageBundleMod> externalMods)
   {
+    _battleAccess.RequireMutation();
     if (NeedsToReload())
       return None;
 
@@ -141,8 +167,18 @@ public class AmmunitionedWeapon : Weapon
 
 public class FirearmWeapon(FirearmWeaponData data) : AmmunitionedWeapon(data)
 {
-  public FirearmArchetype Archetype { get; set; } = data.Archetype;
-  public Option<Ammunition> AmmoType { get; set; } = Optional(data.DefaultAmmoData);
+  private FirearmArchetype _archetype = data.Archetype;
+  public FirearmArchetype Archetype
+  {
+    get { _battleAccess.RequireRead(); return _archetype; }
+    set { _battleAccess.RequireMutation(); _archetype = value; _battleAccess.Guard?.NotifyStatSourcesChanged(); }
+  }
+  private Option<Ammunition> _ammoType = Optional(data.DefaultAmmoData);
+  public Option<Ammunition> AmmoType
+  {
+    get { _battleAccess.RequireRead(); return _ammoType; }
+    set { _battleAccess.RequireMutation(); _ammoType = value; _battleAccess.Guard?.NotifyStatSourcesChanged(); }
+  }
 
   protected override IEnumerable<DamageBundleMod> DamageContributions
     => base.DamageContributions.AsValueEnumerable().Concat(AmmunitionBundleMods()).ToArray();

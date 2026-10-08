@@ -52,3 +52,8 @@ public sealed class GetBattleOutcomeQuery : IBattleSessionQuery<Option<BattleOut
 {
   public Option<BattleOutcome> Execute(BattleSession session) => session.Outcome;
 }
+
+public sealed class GetBattleRevisionQuery : IBattleSessionQuery<long>
+{
+  public long Execute(BattleSession session) => session.Revision;
+}

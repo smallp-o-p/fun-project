@@ -44,7 +44,7 @@ The session/board/queries/actions/executor/hooks core is scene-independent C# an
   - Unconscious bodies keep their tile, block movement, stay in alive storage, and remain targetable. Their observer caches are empty.
   - Faction vision comes from conscious units. Elimination and scheduling count living conscious units, regardless of AP or immobilization.
 - **`BattleBoardState`** — The board stores a flat materialized `BattleTileState[]`, occupancy, and eight-way adjacency. A diagonal step needs one open flank. A pure-C# breadth-first search with fixed direction order provides pathfinding. Coordinates are the engine-agnostic `Vector3I` (X width, Y height, Z depth). Cells use the index `x + width * (z + depth * y)`.
-  - `GetTile` returns a cell by reference. A `ref` local retains a mutable cell. Value assignment takes a snapshot.
+  - `GetTile` returns a detached cell value. Trusted writers use internal guarded `GetMutableTile`; there is no public writable alias.
   - Board construction copies baked values into independent runtime cells. Missing map cells are non-walkable, transparent, and uncovered. Dimension-only boards are walkable.
   - Saved maps use three byte arrays for flags and cover plus sparse spawn slots. Repository maps are migrated. Old Resource-per-cell dictionaries require a rebake before loading.
 - **Reads** — Gameplay code reads state through `IBattleSessionQuery<TResult>` questions via `runtime.Query(...)`. The result shape is contract:
@@ -85,8 +85,22 @@ The session/board/queries/actions/executor/hooks core is scene-independent C# an
   - The first turn's refresh covers all living units. Later turns cover only the turning side's living units.
   - Buff flips apply before the refresh reads (possibly buffed) `MaxActionPoints`. A dispatch that decides the battle skips the refresh. All upkeep is event-keyed.
 
+### Guarded reads and lifetime
+
+`BattleRuntime` owns one exclusive `Monitor` for queries, action execution, lazy option-cache publication and lifetime. Queries and proof doors acquire it automatically. `TryQuery`/`TryAcquireQueryScope` return `BattleAccessFailure.Busy` or `Closed`; presentation never waits for another owner. Bare `Query` is for callers expecting admission and throws on an unexpected access failure.
+
+A returned unit, object, proof, equipment wrapper, action option or live collection is borrowed. Hold one outer `BattleQueryScope` through the complete decision and every dereference. Acquire and dispose synchronously on the same thread; never retain it across `await`. Detached numeric records, copied tile states, contact information and evaluated `UnitActionFact` values can survive release. An event span also requires ownership through consumption and cannot cross another submission, scope release or `await`.
+
+Built-in worker queries resolve from managed stat values prepared on the host when units/weapons bind or their permitted sources change. Live buff activation still resolves under the gate. Trusted custom queries, conditions and calculators must be read-only and compatible with their calling thread. They must not marshal to the scene thread while holding ownership. Authored Resource editing during deployment is outside this contract.
+
+The host is the sole active submitter. Release a decision read scope before `TryExecuteAction(factory, expectedRevision)`. Admission checks the revision before invoking the factory, then advances it conservatively before any possible mutation, including faulting submissions. Construct current proofs, paths and targets inside the factory; action execution remains authoritative. Ownership covers execution cleanup and synchronous `ActionCompleted` callbacks. Callbacks may query under that ownership; nested submission and read-to-write promotion are caller errors.
+
+Every committed visibility refresh records faction contact positions and observed terrain before spotting events. `HasSeenHostile` is monotonic for each unit. Current knowledge includes own units and currently visible hostiles; remembered contact values neither follow hidden positions nor inspect hidden death/equipment. Visible object information uses current vision, not explored membership. Known movement uses last-observed terrain and unknown unseen occupancy, marks uncertainty (including diagonal flanks), and shares exact movement's neighborhood/order. An estimated route is not a movement proof.
+
+`RequestClose` cancels future work without waiting on the host. Already admitted reads retain their dependencies. `TryFinishDisposal` polls on the host and unbinds shared campaign wrappers only after owners and cancellation callbacks finish. `BattleRuntimeDrainHost` retains pending runtimes before deferred root attachment, including removal from `_ExitTree`; it is teardown retention, not a controller. Mission completion/abort and campaign equipment/progression mutation occur after drain. Active/starting/draining missions reject another launch. Whole-process exit requests cancellation without waiting.
+
 ### Presentation boundary
-Scenes in `scenes/battle/` include the `BattleScene` host, the standalone `BattleLauncher` host, `BattleUiController`, `BattleInputController`, `EventPlaybackDirector`, and the authored `BattleUI` view. `BattleScene` receives a started runtime via `Present` and instances `setup.MapScene`. `BattleUiController` owns the selection/targeting FSM with memoized read-only `UnitActionOption` adapters. The adapters delegate live availability and create fresh `AliveUnit` proofs for actions. `BattleInputController` picks tiles. `EventPlaybackDirector` subscribes `ActionCompleted` and plays committed events in commit order.
+Scenes in `scenes/battle/` include the `BattleScene` host, the standalone `BattleLauncher` host, `BattleUiController`, `BattleInputController`, `EventPlaybackDirector`, and the authored `BattleUI` view. `BattleScene` receives a started runtime via `Present` and instances `setup.MapScene`. `BattleUiController` owns the selection/targeting FSM with memoized read-only `UnitActionOption` adapters. The adapters retain identities; detached unit/action readouts supply the HUD. Busy intents are inert, while refresh, the latest hover and playback-idle state work retry on presentation ticks. Submission factories refresh availability and proofs. `BattleInputController` picks tiles. `EventPlaybackDirector` subscribes `ActionCompleted` and plays committed events in commit order.
 
 The UI owns selection. Scene code reads through `runtime.Query(...)` and submits actions through the runtime.
 

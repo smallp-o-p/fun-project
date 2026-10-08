@@ -18,7 +18,7 @@ public class BattleOutcomeTest
 
     battle.ApplyDamage(playerWiped ? battle.PlayerUnit : battle.EnemyUnit, 20, DamageKind.Stun);
 
-    Assert.Equal(expected, battle.Session.Outcome.RequireSome());
+    battle.Read(() => Assert.Equal(expected, battle.Session.Outcome.RequireSome()));
     battle.Events.EventBefore<UnitUnconsciousBattleEvent, SessionEndedBattleEvent>();
   }
 
@@ -36,15 +36,15 @@ public class BattleOutcomeTest
 
     battle.ApplyDamage(battle.EnemyUnit, amount, kind);
     battle.ApplyDamage(battle.PlayerUnit, amount, kind);
-    Assert.True(battle.Session.Outcome.IsNone);
+    battle.Read(() => Assert.True(battle.Session.Outcome.IsNone));
 
     if (kind == DamageKind.Stun)
       battle.EndFactionTurn(battle.PlayerFaction);
     else
       battle.AdvanceTurn();
 
-    Assert.True(battle.Session.Outcome.IsSome);
-    Assert.Equal(BattleOutcome.Draw, battle.Session.Outcome.RequireSome());
+    battle.Read(() => Assert.True(battle.Session.Outcome.IsSome));
+    battle.Read(() => Assert.Equal(BattleOutcome.Draw, battle.Session.Outcome.RequireSome()));
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
     Assert.Equal(BattleOutcome.Draw, ended.Outcome);
   }
@@ -76,10 +76,10 @@ public class BattleOutcomeTest
 
     battle.ApplyDamage(playerWiped ? battle.PlayerUnit : battle.EnemyUnit, 999);
 
-    Assert.True(battle.Session.Outcome.IsSome);
-    Assert.Equal(expected, battle.Session.Outcome.RequireSome());
+    battle.Read(() => Assert.True(battle.Session.Outcome.IsSome));
+    battle.Read(() => Assert.Equal(expected, battle.Session.Outcome.RequireSome()));
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
-    Assert.Equal(expected, ended.Outcome);
+    battle.Read(() => Assert.Equal(expected, ended.Outcome));
   }
 
   [TestCase(TestName = "Without a player faction a sole survivor keeps playing and the battle does not end")]
@@ -94,17 +94,17 @@ public class BattleOutcomeTest
     battle.ApplyDamage(battle.EnemyUnit, 999);
     battle.AdvanceTurn();
 
-    Assert.True(battle.Session.Outcome.IsNone);
-    Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.True(battle.Session.Outcome.IsNone));
+    battle.Read(() => Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any()));
 
     // A lone survivor keeps taking turns across the round boundary — the path adjacent
     // to the scheduler's exhaustion boundary — without ending.
     battle.AdvanceTurn();
 
-    Assert.True(battle.Session.Outcome.IsNone);
-    Assert.Equal(3, battle.Session.TurnNumber);
-    Assert.True(battle.Session.Outcome.IsNone);
-    Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
+    battle.Read(() => Assert.True(battle.Session.Outcome.IsNone));
+    battle.Read(() => Assert.Equal(3, battle.Session.TurnNumber));
+    battle.Read(() => Assert.True(battle.Session.Outcome.IsNone));
+    battle.Read(() => Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any()));
   }
 
   [TestCase(TestName = "An end-of-turn DoT kill that wipes the player resolves to Defeat without throwing")]
@@ -117,19 +117,19 @@ public class BattleOutcomeTest
       enemy: new("Bandit", Position: new Vector3I(2, 0, 0)));
     battle.ClearEvents();
 
-    battle.PlayerUnit.ApplyStatusEffect(new DamageOverTimeStatusSpecData
+    battle.Mutate(() => battle.PlayerUnit.ApplyStatusEffect(new DamageOverTimeStatusSpecData
     {
       Name = "Burn",
       DurationTurns = 2,
       TickDamage = 5,
       TickElement = Element.Kinetic,
-    });
+    }));
 
     battle.AdvanceTurn();
 
-    Assert.True(battle.Session.Outcome.IsSome);
-    Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome());
+    battle.Read(() => Assert.True(battle.Session.Outcome.IsSome));
+    battle.Read(() => Assert.Equal(BattleOutcome.Defeat, battle.Session.Outcome.RequireSome()));
     var ended = battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Single();
-    Assert.Equal(BattleOutcome.Defeat, ended.Outcome);
+    battle.Read(() => Assert.Equal(BattleOutcome.Defeat, ended.Outcome));
   }
 }

@@ -12,8 +12,17 @@ namespace FunProject.Battle;
 /// </summary>
 public abstract class ActiveStatusEffect
 {
+  private readonly BattleAccessBinding _battleAccess = new();
+  internal void BindBattleAccess(BattleAccessGuard access) { _battleAccess.Bind(access); }
+  internal void UnbindBattleAccess(BattleAccessGuard access) => _battleAccess.Unbind(access);
+
   public StatusEffectSpecData Spec { get; }
-  public int RemainingTurns { get; private set; }
+  private int _remainingTurns;
+  public int RemainingTurns
+  {
+    get { _battleAccess.RequireRead(); return _remainingTurns; }
+    private set { _battleAccess.RequireMutation(); _remainingTurns = value; }
+  }
   public bool IsExpired => RemainingTurns <= 0;
 
   protected ActiveStatusEffect(StatusEffectSpecData spec)
@@ -49,11 +58,13 @@ public abstract class ActiveStatusEffect
 
   internal void Refresh()
   {
+    _battleAccess.RequireMutation();
     RemainingTurns = Math.Max(RemainingTurns, Math.Max(1, Spec.DurationTurns));
   }
 
   internal void TickDown()
   {
+    _battleAccess.RequireMutation();
     if (RemainingTurns <= 0)
       throw new InvalidOperationException("Cannot tick down an expired status effect.");
     RemainingTurns--;

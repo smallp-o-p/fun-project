@@ -4,6 +4,7 @@ namespace FunProject.Battle;
 /// <summary>
 /// A fancy way to check if a unit can do a certain action. Unit actions should compose these condition objects
 /// to check its availability.
+/// Custom conditions are trusted read-only code and must be worker compatible for worker queries.
 /// </summary>
 public abstract class UnitActionCondition
 {
