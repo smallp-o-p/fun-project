@@ -24,9 +24,12 @@ public sealed class BattleKnowledgeMovementTest
     blocked.Board.SetTileWalkable(blocked.At(3, 0, 0), false);
     blocked.Spawn(TestData.MakeCombatant("Hidden", TestData.MakeFaction("Enemy")), new Vector3I(2, 0, 0));
     var a = Path(open, new Vector3I(4, 0, 0)); var b = Path(blocked, new Vector3I(4, 0, 0));
+    Assert.True(a.AsValueEnumerable().SequenceEqual([
+      Vector3I.Zero, new Vector3I(1, 0, 0), new Vector3I(2, 0, 0), new Vector3I(3, 0, 0), new Vector3I(4, 0, 0)]));
     Assert.True(a.AsValueEnumerable().SequenceEqual(b));
     var reachA = open.Query(new GetKnownMoveTilesForUnit(open.PlayerFaction, open.Alive(open.PlayerUnit)));
     var reachB = blocked.Query(new GetKnownMoveTilesForUnit(blocked.PlayerFaction, blocked.Alive(blocked.PlayerUnit)));
+    Assert.True(reachA.AsValueEnumerable().Contains(new Vector3I(2, 0, 0)));
     Assert.True(reachA.AsValueEnumerable().SequenceEqual(reachB));
   }
 
