@@ -15,13 +15,11 @@ public class EquippableItem : HasModSlots, HasNameAndDescription
   public string ItemName { get; }
   public string ItemDescription { get; }
   public EquippableItemData Data { get; }
-  public EquipmentSlot CompatibleSlots { get; }
 
   public EquippableItem(EquippableItemData data)
   {
     ArgumentNullException.ThrowIfNull(data);
     Data = data;
-    CompatibleSlots = data.CompatibleSlots;
     ItemName = data.Name;
     ItemDescription = data.Description;
 
@@ -37,9 +35,6 @@ public class EquippableItem : HasModSlots, HasNameAndDescription
 
   public string GetName() => ItemName;
   public string GetDescription() => ItemDescription;
-
-  public Option<UtilityItem> ForUtilitySlot()
-    => CompatibleSlots.Supports(EquipmentSlot.Utility) ? new UtilityItem(this) : None;
 
   public Option<TCap> FindCapability<TCap>() where TCap : ItemCapability
   {

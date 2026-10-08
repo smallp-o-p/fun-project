@@ -7,6 +7,11 @@
 [ext_resource type="Script" uid="uid://c72syv6ko056w" path="res://scripts/items/capabilities/BlastCapabilityData.cs" id="4_blast"]
 [ext_resource type="Script" uid="uid://dag1dcqmvtcvs" path="res://scripts/items/effects/DamageEffectData.cs" id="5_damage"]
 
+[ext_resource type="Script" path="res://scripts/items/capabilities/UtilityCapabilityData.cs" id="utility"]
+
+[sub_resource type="Resource" id="Resource_utility"]
+script = ExtResource("utility")
+
 [sub_resource type="Resource" id="Resource_throw"]
 script = ExtResource("3_throw")
 
@@ -20,8 +25,7 @@ Effects = Array[ExtResource("3_m3e40")]([SubResource("Resource_damage")])
 
 [resource]
 script = ExtResource("1_item")
-Capabilities = Array[ExtResource("2_base")]([SubResource("Resource_throw"), SubResource("Resource_blast")])
+Capabilities = Array[ExtResource("2_base")]([SubResource("Resource_utility"), SubResource("Resource_throw"), SubResource("Resource_blast")])
 UnlimitedStock = true
-CompatibleSlots = 4
 Name = "Frag Grenade"
 Description = "Standard fragmentation grenade. Throw it at problems."

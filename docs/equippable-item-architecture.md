@@ -13,9 +13,9 @@ Define item kinds with an `EquippableItemData` resource and its capability resou
 ### Data layer (authored, `[GlobalClass]` resources)
 
 - `EquippableItemData : NamedEntityData` — name/description plus `Capabilities : Array<ItemCapabilityData>`.
-- `CompatibleSlots : EquipmentSlot` is an exported flags field, separate from capabilities. `None` is the default; author weapon, armor, and/or utility destinations explicitly. Multiple destinations are supported. Weapons still require `WeaponData`, and armor slots still require `ArmorCapabilityData`.
 - `ItemCapabilityData : Resource` (abstract) — `CreateRuntime()` factory.
 - Concrete capabilities (in `scripts/items/capabilities/`):
+  - `UtilityCapabilityData` - marker for campaign utility-slot eligibility
   - `ThrowableCapabilityData` — throw range, action-point cost, consumes-on-use
   - `BlastCapabilityData` — blast radius, `Array<BattleEffectData>` payload
   - `ChargesCapabilityData` — max charges
@@ -32,9 +32,9 @@ Define item kinds with an `EquippableItemData` resource and its capability resou
 
 ## Capability proofs
 
-Campaign utility equipment takes a `UtilityItem` proof from `item.ForUtilitySlot()`. The runtime captures compatibility at construction, so authored changes cannot invalidate a minted proof. `Combatant.EquipItem` accepts this proof rather than any `EquippableItem`. Weapon and armor equip retain their typed inputs and reject missing destination flags before replacing gear. The unit browser applies the same flags plus weapon/armor shape requirements, and rechecks the current selection before withdrawing stock.
+Campaign utility inventory stores `ItemWith<UtilityCapability>` proofs, minted by `item.With<UtilityCapability>()`. `Combatant.EquipItem` accepts this proof, and `UnequipItem` returns it. Battle deployment unwraps the same runtime item, preserving identity and mutable state. The unit browser checks for authored `UtilityCapabilityData` and rechecks the current selection before withdrawing stock. Weapon slots continue to require weapons, and armor slots require an armor capability proof.
 
-The Frag Grenade, Prototype Kit, and Supply Kit declare utility compatibility. Ballistic Vest declares armor; Service Pistol and Combat Rifle declare weapon. Workshop Sample has no declared equipment destination. Capabilities describe behavior, so a utility item may deal damage or provide armor without changing its slot compatibility.
+The Frag Grenade, Prototype Kit, and Supply Kit declare the utility marker. Ballistic Vest, Service Pistol, Combat Rifle, and Workshop Sample do not. The marker composes with other capabilities, so intended utility items may deal damage or provide armor.
 
 `item.With<TCap>()` returns `Option<ItemWith<TCap>>`, binding the item to its capability. `ThrowItem` requires `ItemWith<ThrowableCapability>`; `UseItem` requires `ItemWith<ChargesCapability>`. These parameter types enforce capability requirements at compile time. Capability membership stays fixed for the item's lifetime, so the proof remains valid.
 

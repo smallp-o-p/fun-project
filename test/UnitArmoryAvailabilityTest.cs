@@ -27,7 +27,7 @@ public class UnitArmoryAvailabilityTest
     Assert.Equal(1, choices.GetChildCount());
     Assert.True(choices.GetChild<Button>(0).Text.Contains("Field Kit"));
     choices.GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
-    Assert.Equal("Field Kit", campaign.State.Roster[0].Inventory[0].ItemName);
+    Assert.Equal("Field Kit", campaign.State.Roster[0].Inventory[0].Item.ItemName);
     Assert.Equal(1, campaign.State.Armory.TryGetItemStock(sample).RequireSome().Remaining);
   }
 
@@ -47,18 +47,17 @@ public class UnitArmoryAvailabilityTest
 
     oldWeaponChoice.EmitSignal(Button.SignalName.Pressed);
 
-    Assert.Equal("Kit", unit.Inventory[0].ItemName);
+    Assert.Equal("Kit", unit.Inventory[0].Item.ItemName);
     Assert.True(unit.EquippedWeapon.IsNone);
     Assert.Equal(1, campaign.State.Armory.TryGetItemStock(rifle).RequireSome().Remaining);
   }
 
   [TestCase(UnitViewSlotKind.Weapon)]
   [TestCase(UnitViewSlotKind.Armor)]
-  public static async Task CompatibilityFlagsDoNotReplaceWeaponOrArmorRequirements(UnitViewSlotKind kind)
+  public static async Task UtilityMarkerDoesNotReplaceWeaponOrArmorRequirements(UnitViewSlotKind kind)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var bare = MakeItemData("Bare item");
-    bare.CompatibleSlots = EquipmentSlot.Weapon | EquipmentSlot.Armor;
+    var bare = MakeUtilityData("Utility item");
     using var campaign = new GeoscapeFixture(MakeStart(
       roster: [MakeEntry()], armory: [bare]));
     var view = AddToTree(CreateUnitView());

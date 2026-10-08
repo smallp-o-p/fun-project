@@ -18,8 +18,8 @@ public class Combatant : HasStats, HasModSlots
   public Faction OwningFaction { get; internal set; }
   private readonly StatSheet _stats;
   private readonly Godot.Collections.Array<ModSlot> _modSlots = [];
-  private readonly Dictionary<int, EquippableItem> _inventory = [];
-  public IReadOnlyDictionary<int, EquippableItem> Inventory => _inventory;
+  private readonly Dictionary<int, ItemWith<UtilityCapability>> _inventory = [];
+  public IReadOnlyDictionary<int, ItemWith<UtilityCapability>> Inventory => _inventory;
   public int MaxInventorySize { get; }
 
   /// <summary>Battle-facing weapon slot; mirrors BattleUnitState.EquippedWeapon.</summary>
@@ -81,22 +81,20 @@ public class Combatant : HasStats, HasModSlots
          .Concat(Rank.StatMods())
          .ToArray();
 
-  public void EquipItem(UtilityItem item, int slot)
+  public void EquipItem(ItemWith<UtilityCapability> item, int slot)
   {
-    ArgumentNullException.ThrowIfNull(item);
+    ArgumentNullException.ThrowIfNull(item.Item);
     if (slot < 0 || slot >= MaxInventorySize)
       throw new InvalidOperationException(
         $"EquipItem slot {slot} is out of range for an inventory of size {MaxInventorySize}.");
 
-    _inventory[slot] = item.Item;
+    _inventory[slot] = item;
   }
 
   /// <summary>Equip the weapon slot; returns the displaced weapon (if any) for the caller to return to the armory.</summary>
   public Option<Weapon> EquipWeapon(Weapon weapon)
   {
     ArgumentNullException.ThrowIfNull(weapon);
-    if (!weapon.CompatibleSlots.Supports(EquipmentSlot.Weapon))
-      throw new InvalidOperationException($"Item '{weapon.ItemName}' is not compatible with the weapon slot.");
     Option<Weapon> displaced = EquippedWeapon;
     EquippedWeapon = weapon;
     return displaced;
@@ -113,8 +111,6 @@ public class Combatant : HasStats, HasModSlots
   /// <summary>Equip the armor slot from a capability proof; returns the displaced proof (if any).</summary>
   public Option<ItemWith<ArmorCapability>> EquipArmor(ItemWith<ArmorCapability> armor)
   {
-    if (!armor.Item.CompatibleSlots.Supports(EquipmentSlot.Armor))
-      throw new InvalidOperationException($"Item '{armor.Item.ItemName}' is not compatible with the armor slot.");
     Option<ItemWith<ArmorCapability>> displaced = EquippedArmor;
     EquippedArmor = armor;
     return displaced;
@@ -129,12 +125,12 @@ public class Combatant : HasStats, HasModSlots
   }
 
   /// <summary>Clear one utility inventory slot; returns what was there for the caller to return to the armory.</summary>
-  public Option<EquippableItem> UnequipItem(int slot)
+  public Option<ItemWith<UtilityCapability>> UnequipItem(int slot)
   {
     if (slot < 0 || slot >= MaxInventorySize)
       throw new InvalidOperationException(
         $"UnequipItem slot {slot} is out of range for an inventory of size {MaxInventorySize}.");
 
-    return _inventory.Remove(slot, out EquippableItem? item) ? item : None;
+    return _inventory.Remove(slot, out ItemWith<UtilityCapability> item) ? item : None;
   }
 }

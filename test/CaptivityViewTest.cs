@@ -6,6 +6,7 @@ using FunProject.Combatants;
 using FunProject.Geoscape;
 using FunProject.GameState;
 using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using FunProject.Weapons;
 using Godot;
@@ -135,7 +136,7 @@ public class CaptivityViewTest
     { StatMods = [new AimStatMod { Modifiers = [StatModifier.Add(10)] }] });
     equipped.EquipWeapon(rifle);
     equipped.EquipArmor(MakeArmor("Vest"));
-    equipped.EquipItem(new EquippableItem(MakeUtilityData("Medkit")).ForUtilitySlot().RequireSome(), 0);
+    equipped.EquipItem(new EquippableItem(MakeUtilityData("Medkit")).With<UtilityCapability>().RequireSome(), 0);
     var bare = MakeCombatant("Bare", MakeFaction("Hybrids"));
     using var fixture = CaptiveCampaign([equipped, bare]);
     var view = AddToTree(CreateCaptivityView());

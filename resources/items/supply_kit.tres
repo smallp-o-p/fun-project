@@ -1,10 +1,16 @@
-[gd_resource type="Resource" script_class="EquippableItemData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EquippableItemData" format=3]
 
 [ext_resource type="Script" path="res://scripts/items/EquippableItemData.cs" id="1_item"]
 
+[ext_resource type="Script" path="res://scripts/items/capabilities/UtilityCapabilityData.cs" id="utility"]
+[ext_resource type="Script" path="res://scripts/items/capabilities/ItemCapabilityData.cs" id="2_base"]
+
+[sub_resource type="Resource" id="Resource_utility"]
+script = ExtResource("utility")
+
 [resource]
 script = ExtResource("1_item")
+Capabilities = Array[ExtResource("2_base")]([SubResource("Resource_utility")])
 Name = "Supply Kit"
 Description = "Manufacture once to establish unlimited utility-kit supply."
 UnlimitedStock = true
-CompatibleSlots = 4

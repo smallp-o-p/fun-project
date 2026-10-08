@@ -43,7 +43,7 @@ public class UnitViewLayoutTest
     ArmoryButton(view, "Field Kit").EmitSignal(Button.SignalName.Pressed);
     view.Present(campaign.State, campaign.Session);
 
-    Assert.Equal("Field Kit", unit.Inventory[4].ItemName);
+    Assert.Equal("Field Kit", unit.Inventory[4].Item.ItemName);
     Assert.Equal("Field Kit", view.GetNode<Label>("%SelectedItemName").Text);
     Assert.True(view.GetNode<RichTextLabel>("%SelectedItemDetails").Text.Contains(item.Description));
     Assert.True(slots.GetChild<Button>(4).ButtonPressed);
