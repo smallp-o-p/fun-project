@@ -22,22 +22,6 @@ public partial class Currency : NamedEntityData
     return new ReadOnlyDictionary<Currency, long>(captured);
   }
 
-  internal static IReadOnlyList<(Currency Currency, long Required, long Available)> GetShortfalls(
-    IReadOnlyDictionary<Currency, long> costs, IReadOnlyDictionary<Currency, long> balances)
-  {
-    ArgumentNullException.ThrowIfNull(costs);
-    ArgumentNullException.ThrowIfNull(balances);
-    var shortfalls = new List<(Currency Currency, long Required, long Available)>();
-    foreach (var (currency, required) in costs)
-    {
-      ValidateAmount(currency, required);
-      long available = balances.GetValueOrDefault(currency);
-      if (required > available)
-        shortfalls.Add((currency, required, available));
-    }
-    return shortfalls.AsReadOnly();
-  }
-
   internal static void ValidateAmount(Currency currency, long amount)
   {
     ArgumentNullException.ThrowIfNull(currency);

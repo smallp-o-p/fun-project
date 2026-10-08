@@ -91,7 +91,7 @@ public sealed class GeoscapeSession
     });
 
   public IReadOnlyList<ManufacturingOption> GetManufacturingOptions()
-    => _state.Engineering.GetManufacturingOptions(_state.Armory, _state.Currencies);
+    => _state.Engineering.GetManufacturingOptions(_state);
 
   public Either<ManufacturingStartFailure, ManufacturingJob> StartManufacturing(ManufacturingRecipe recipe)
     => _state.Engineering.ResolveManufacturing(recipe, _state.Armory).Bind<ManufacturingJob>(project =>

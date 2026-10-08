@@ -166,20 +166,36 @@ public sealed class GameState
   }
 
   public IReadOnlyList<(Currency Currency, long Required, long Available)> GetCurrencyShortfalls(IReadOnlyDictionary<Currency, long> costs)
-    => Currency.GetShortfalls(costs, _currencies);
+  {
+    ArgumentNullException.ThrowIfNull(costs);
+    var shortfalls = new List<(Currency Currency, long Required, long Available)>();
+    foreach (var (currency, required) in costs)
+    {
+      Currency.ValidateAmount(currency, required);
+      long available = _currencies.GetValueOrDefault(currency);
+      if (required > available)
+        shortfalls.Add((currency, required, available));
+    }
+    return shortfalls.AsReadOnly();
+  }
 
   internal bool TrySpendCurrencyCosts(IReadOnlyDictionary<Currency, long> costs)
   {
-    if (GetCurrencyShortfalls(costs).Count > 0)
-      return false;
+    ArgumentNullException.ThrowIfNull(costs);
+    bool affordable = true;
+    foreach (var (currency, required) in costs)
+    {
+      Currency.ValidateAmount(currency, required);
+      if (required > _currencies.GetValueOrDefault(currency))
+        affordable = false;
+    }
+    if (!affordable) return false;
 
-    // Compute every checked result before mutation. Zero requirements create no keys.
-    var remaining = new Dictionary<Currency, long>(ReferenceEqualityComparer.Instance);
+    // Nonnegative costs bounded by each balance cannot underflow. No callbacks occur
+    // between preflight and deduction; zero requirements create no keys.
     foreach (var (currency, required) in costs)
       if (required > 0)
-        remaining.Add(currency, checked(GetCurrencyBalance(currency) - required));
-    foreach (var (currency, amount) in remaining)
-      _currencies[currency] = amount;
+        _currencies[currency] = checked(_currencies[currency] - required);
     return true;
   }
 

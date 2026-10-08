@@ -14,7 +14,7 @@ public class ProjectCatalogTest
     var item = MakeItemData();
     var itemRecipe = MakeManufacturingRecipe(item, days: days);
     using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
-    Assert.Equal(days, campaign.State.Engineering.GetManufacturingOptions(campaign.State.Armory, campaign.State.Currencies)[0].Project.DurationDays);
+    Assert.Equal(days, campaign.State.Engineering.GetManufacturingOptions(campaign.State)[0].Project.DurationDays);
 
     campaign.AdvanceTicks(17);
     var job = campaign.Session.StartManufacturing(itemRecipe).RequireRight();
@@ -40,7 +40,7 @@ public class ProjectCatalogTest
     var itemRecipe = MakeManufacturingRecipe(item, days: 0);
     var state = new GameState(MakeStart(armory: [item]));
     Assert.True(state.Armory.HasAvailableItem(item));
-    Assert.Equal(0, state.Engineering.GetManufacturingOptions(state.Armory, state.Currencies).Count);
+    Assert.Equal(0, state.Engineering.GetManufacturingOptions(state).Count);
   }
 
   [TestCase]
@@ -60,7 +60,7 @@ public class ProjectCatalogTest
     var secondItemRecipe = MakeManufacturingRecipe(secondItem, days: 2);
     var state = new GameState(MakeStart(armory: [firstItem],
       manufacturingRecipes: [secondItemRecipe, firstItemRecipe]));
-    var options = state.Engineering.GetManufacturingOptions(state.Armory, state.Currencies);
+    var options = state.Engineering.GetManufacturingOptions(state);
     Assert.Equal(2, options.Count);
     Assert.Equal(secondItemRecipe, options[0].Project.Recipe);
     Assert.Equal(firstItemRecipe, options[1].Project.Recipe);
@@ -88,7 +88,7 @@ public class ProjectCatalogTest
     itemRecipe.Item = replacement;
     item.UnlimitedStock = true;
 
-    var options = state.Engineering.GetManufacturingOptions(state.Armory, state.Currencies);
+    var options = state.Engineering.GetManufacturingOptions(state);
     Assert.Equal(item, options[0].Project.Item);
     Assert.Equal(2U, options[0].Project.DurationDays);
     Assert.False(options[0].Project.UnlimitedStock);

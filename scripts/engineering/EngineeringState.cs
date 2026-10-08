@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using FunProject.Currencies;
 using FunProject.GameState;
+using CampaignGameState = FunProject.GameState.GameState;
 using FunProject.Items;
 using FunProject.Strategic;
 
@@ -23,13 +24,11 @@ public sealed class EngineeringState
   internal void Unlock(IReadOnlyList<ManufacturingRecipe> recipes)
   {
     ArgumentNullException.ThrowIfNull(recipes);
-    foreach (var recipe in recipes)
-      ArgumentNullException.ThrowIfNull(recipe);
-
     var pending = new List<ManufacturingProject>();
     var seen = new SysColGeneric.HashSet<ManufacturingRecipe>(ReferenceEqualityComparer.Instance);
     foreach (var recipe in recipes)
     {
+      ArgumentNullException.ThrowIfNull(recipe);
       if (_projectsByRecipe.ContainsKey(recipe) || !seen.Add(recipe)) continue;
       ArgumentNullException.ThrowIfNull(recipe.Item);
       var project = new ManufacturingProject(recipe, recipe.Item, recipe.DurationDays, recipe.Item.UnlimitedStock,
@@ -45,17 +44,18 @@ public sealed class EngineeringState
 
   public Option<ManufacturingJob> ActiveJob { get; private set; }
 
-  public IReadOnlyList<ManufacturingOption> GetManufacturingOptions(Armory armory,
-    IReadOnlyDictionary<Currency, long> balances)
+  public IReadOnlyList<ManufacturingOption> GetManufacturingOptions(CampaignGameState state)
   {
-    ArgumentNullException.ThrowIfNull(armory);
-    ArgumentNullException.ThrowIfNull(balances);
-    return _projects.AsValueEnumerable()
-      .Where(project => !project.UnlimitedStock || armory.TryGetItemStock(project.Item).IsNone)
-      .Select(project => new ManufacturingOption(project,
-        armory.TryGetItemStock(project.Item).Match(stock => stock.Remaining, () => 0),
-        Currency.GetShortfalls(project.Costs, balances)))
-      .ToImmutableList();
+    ArgumentNullException.ThrowIfNull(state);
+    var options = new List<ManufacturingOption>();
+    foreach (var project in _projects)
+    {
+      var stock = state.Armory.TryGetItemStock(project.Item);
+      if (project.UnlimitedStock && stock.IsSome) continue;
+      options.Add(new ManufacturingOption(project,
+        stock.Match(entry => entry.Remaining, () => 0), state.GetCurrencyShortfalls(project.Costs)));
+    }
+    return options.AsReadOnly();
   }
 
   public Either<ManufacturingStartFailure, ManufacturingProject> ResolveManufacturing(ManufacturingRecipe recipe, Armory armory)
