@@ -6,4 +6,5 @@ public enum ResearchStartFailure
   Busy,
   AlreadyCompleted,
   Locked,
+  InsufficientCurrencies,
 }

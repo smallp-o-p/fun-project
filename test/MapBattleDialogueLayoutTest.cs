@@ -18,9 +18,10 @@ public class MapBattleDialogueLayoutTest
   {
     var hud = CreateHud();
     var viewport = CreateUiViewport(hud, new Vector2I(width, height));
-    var item = TestData.MakeItemData(new string('W', 160), manufacturingDays: 2);
-    using var campaign = new GeoscapeFixture(TestData.MakeStart(manufacturableItems: [item]));
-    Assert.True(campaign.Session.StartManufacturing(item).IsRight);
+    var item = TestData.MakeItemData(new string('W', 160), unlimited: false);
+    var recipe = TestData.MakeManufacturingRecipe(item, days: 2);
+    using var campaign = new GeoscapeFixture(TestData.MakeStart(manufacturingRecipes: [recipe]));
+    Assert.True(campaign.Session.StartManufacturing(recipe).IsRight);
     hud.UpdateManufacturing(campaign.Session.ActiveManufacturing, 1);
     await WaitForLayout(viewport);
 
@@ -67,9 +68,10 @@ public class MapBattleDialogueLayoutTest
   {
     var hud = CreateHud();
     var viewport = CreateUiViewport(hud, new Vector2I(width, height));
-    var item = TestData.MakeItemData("Prototype Kit", manufacturingDays: 2);
-    using var campaign = new GeoscapeFixture(TestData.MakeStart(manufacturableItems: [item]));
-    Assert.True(campaign.Session.StartManufacturing(item).IsRight);
+    var item = TestData.MakeItemData("Prototype Kit", unlimited: false);
+    var recipe = TestData.MakeManufacturingRecipe(item, days: 2);
+    using var campaign = new GeoscapeFixture(TestData.MakeStart(manufacturingRecipes: [recipe]));
+    Assert.True(campaign.Session.StartManufacturing(recipe).IsRight);
     hud.UpdateManufacturing(campaign.Session.ActiveManufacturing, 1);
     await WaitForLayout(viewport);
 

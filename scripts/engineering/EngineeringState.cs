@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FunProject.GameState;
-using FunProject.Items;
+using CampaignGameState = FunProject.GameState.GameState;
 using FunProject.Strategic;
 
 namespace FunProject.Engineering;
@@ -9,54 +9,49 @@ namespace FunProject.Engineering;
 /// <summary>Campaign-owned manufacturing catalog, queries, and job progress.</summary>
 public sealed class EngineeringState
 {
-  private readonly List<ManufacturingProject> _projects = [];
-  private readonly Dictionary<EquippableItemData, ManufacturingProject> _projectsByItem = new(ReferenceEqualityComparer.Instance);
+  private readonly List<ManufacturingRecipe> _projects = [];
+  private readonly SysColGeneric.HashSet<ManufacturingRecipe> _registered = new(ReferenceEqualityComparer.Instance);
 
-  internal EngineeringState(IReadOnlyList<EquippableItemData> initialItems)
+  internal EngineeringState(IReadOnlyList<ManufacturingRecipe> initialRecipes)
   {
-    Unlock(initialItems);
+    Unlock(initialRecipes);
   }
 
-  // Registers unseen item references, baking duration and stock policy at first registration.
-  // Validate the whole batch first so null input never leaves a partial registry update.
-  internal void Unlock(IReadOnlyList<EquippableItemData> items)
+  // Register each recipe reference once, preserving authored order.
+  internal void Unlock(IReadOnlyList<ManufacturingRecipe> recipes)
   {
-    ArgumentNullException.ThrowIfNull(items);
-    foreach (var item in items)
-      ArgumentNullException.ThrowIfNull(item);
-
-    foreach (var item in items)
-    {
-      if (_projectsByItem.ContainsKey(item)) continue;
-      var project = new ManufacturingProject(item, item.ManufacturingDurationDays, item.UnlimitedStock);
-      _projectsByItem.Add(item, project);
-      _projects.Add(project);
-    }
+    foreach (var recipe in recipes)
+      if (_registered.Add(recipe))
+        _projects.Add(recipe);
   }
 
   public Option<ManufacturingJob> ActiveJob { get; private set; }
 
-  public IReadOnlyList<ManufacturingOption> GetManufacturingOptions(Armory armory)
+  public IReadOnlyList<ManufacturingOption> GetManufacturingOptions(CampaignGameState state)
   {
-    ArgumentNullException.ThrowIfNull(armory);
-    return _projects.AsValueEnumerable()
-      .Where(project => !project.UnlimitedStock || armory.TryGetItemStock(project.Item).IsNone)
-      .Select(project => new ManufacturingOption(project,
-        armory.TryGetItemStock(project.Item).Match(stock => stock.Remaining, () => 0)))
-      .ToImmutableList();
+    ArgumentNullException.ThrowIfNull(state);
+    var options = new List<ManufacturingOption>();
+    foreach (var project in _projects)
+    {
+      var stock = state.Armory.TryGetItemStock(project.Item);
+      if (project.Item.UnlimitedStock && stock.IsSome) continue;
+      options.Add(new ManufacturingOption(project,
+        stock.Match(entry => entry.Remaining, () => 0)));
+    }
+    return options.AsReadOnly();
   }
 
-  public Either<ManufacturingStartFailure, ManufacturingProject> ResolveManufacturing(EquippableItemData item, Armory armory)
+  public Either<ManufacturingStartFailure, ManufacturingRecipe> ResolveManufacturing(ManufacturingRecipe recipe, Armory armory)
   {
-    ArgumentNullException.ThrowIfNull(item);
+    ArgumentNullException.ThrowIfNull(recipe);
     ArgumentNullException.ThrowIfNull(armory);
-    if (!_projectsByItem.TryGetValue(item, out var project))
-      return ManufacturingStartFailure.UnknownItem;
+    if (!_registered.Contains(recipe))
+      return ManufacturingStartFailure.UnknownRecipe;
     if (ActiveJob.IsSome)
       return ManufacturingStartFailure.Busy;
-    if (project.UnlimitedStock && armory.TryGetItemStock(item).IsSome)
+    if (recipe.Item.UnlimitedStock && armory.TryGetItemStock(recipe.Item).IsSome)
       return ManufacturingStartFailure.AlreadyAvailable;
-    return project;
+    return recipe;
   }
 
   // GeoscapeSession schedules the resolved project before starting it.

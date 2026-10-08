@@ -137,6 +137,11 @@ unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
+[node name="CurrencyCosts" type="Label" parent="ResearchPanel/Margin/Layout/DetailsScroll/Text"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
 [node name="ManufacturingUnlocks" type="Label" parent="ResearchPanel/Margin/Layout/DetailsScroll/Text"]
 unique_name_in_owner = true
 layout_mode = 2

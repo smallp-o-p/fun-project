@@ -73,21 +73,25 @@ public sealed class GeoscapeSession
     => _state.Research.GetAvailableProjects(_state);
 
   public Either<ResearchStartFailure, ResearchJob> StartResearch(ResearchProject project)
-    => _state.Research.ResolveResearch(project, _state).Map(definition =>
+    => _state.Research.ResolveResearch(project, _state).Bind<ResearchJob>(definition =>
     {
       var job = new ResearchJob(definition.Project, Tick, CompletionTick(definition.DurationDays));
+      if (!_state.TrySpendCurrencyCosts(definition.Project.Costs))
+        return ResearchStartFailure.InsufficientCurrencies;
       var started = _state.Research.Start(job);
       Commit(started);
       return started.Job;
     });
 
   public IReadOnlyList<ManufacturingOption> GetManufacturingOptions()
-    => _state.Engineering.GetManufacturingOptions(_state.Armory);
+    => _state.Engineering.GetManufacturingOptions(_state);
 
-  public Either<ManufacturingStartFailure, ManufacturingJob> StartManufacturing(EquippableItemData data)
-    => _state.Engineering.ResolveManufacturing(data, _state.Armory).Map(project =>
+  public Either<ManufacturingStartFailure, ManufacturingJob> StartManufacturing(ManufacturingRecipe recipe)
+    => _state.Engineering.ResolveManufacturing(recipe, _state.Armory).Bind<ManufacturingJob>(project =>
     {
       var job = new ManufacturingJob(project, Tick, CompletionTick(project.DurationDays));
+      if (!_state.TrySpendCurrencyCosts(project.Costs))
+        return ManufacturingStartFailure.InsufficientCurrencies;
       ManufacturingStarted started = _state.Engineering.Start(job);
       Commit(started);
       return started.Job;
@@ -229,7 +233,7 @@ public sealed class GeoscapeSession
   private void Handle(ManufacturingCompleted completed)
   {
     var project = completed.Job.Project;
-    _state.Armory.AddItem(project.Item, project.UnlimitedStock);
+    _state.Armory.AddItem(project.Item, project.Item.UnlimitedStock);
     Commit(completed);
   }
 

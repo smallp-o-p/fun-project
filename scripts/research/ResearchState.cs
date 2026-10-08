@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using FunProject.Items;
+using FunProject.Engineering;
 using FunProject.Strategic;
 using CampaignGameState = global::FunProject.GameState.GameState;
 
@@ -15,7 +15,7 @@ namespace FunProject.Research;
 public sealed class ResearchState
 {
   internal sealed record Definition(ResearchProject Project, uint DurationDays,
-    ResearchCondition Condition, IReadOnlyList<EquippableItemData> ManufacturingUnlocks);
+    ResearchCondition Condition, IReadOnlyList<ManufacturingRecipe> ManufacturingUnlocks);
 
   private readonly List<Definition> _definitions = [];
   private readonly Dictionary<ResearchProject, Definition> _byProject = new(ReferenceEqualityComparer.Instance);
@@ -31,8 +31,6 @@ public sealed class ResearchState
       ArgumentNullException.ThrowIfNull(project.Condition);
       ArgumentNullException.ThrowIfNull(project.ManufacturingUnlocks);
       project.Condition.CheckAuthoring();
-      foreach (var item in project.ManufacturingUnlocks)
-        ArgumentNullException.ThrowIfNull(item);
       var definition = new Definition(project, project.DurationDays, project.Condition,
         project.ManufacturingUnlocks.AsValueEnumerable().ToImmutableList());
       _definitions.Add(definition);

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FunProject.Currencies;
 using FunProject.Engineering;
 using FunProject.Combatants;
 using FunProject.Research;
@@ -46,11 +47,15 @@ public sealed class GameState
   private readonly List<RegionData> _regions = [];
   private readonly Dictionary<string, int> _indexByName = [];
   private readonly List<Combatant> _roster = [];
+  private readonly Dictionary<Currency, ulong> _currencies = new(ReferenceEqualityComparer.Instance);
   private readonly DateTime _startTime = DateTime.UnixEpoch;
 
   public GameState(CampaignStartData start)
   {
     ArgumentNullException.ThrowIfNull(start);
+
+    foreach (var (currency, amount) in start.StartingCurrencies)
+      _currencies.Add(currency, amount);
 
     GeoscapeMapData map = start.Map ?? throw new InvalidOperationException(
       "CampaignStartData requires a Map; assign one in the inspector.");
@@ -108,7 +113,7 @@ public sealed class GameState
 
     Conditions = new CombatantConditionSystem(start.ConditionRules);
 
-    Engineering = new EngineeringState(start.ManufacturableItems);
+    Engineering = new EngineeringState(start.ManufacturingRecipes);
     Armory = new Armory(start.Armory, start.ModStock);
   }
 
@@ -145,6 +150,21 @@ public sealed class GameState
   public EngineeringState Engineering { get; }
 
   public ResearchState Research { get; }
+
+  public ulong GetCurrencyBalance(Currency currency) => _currencies.GetValueOrDefault(currency);
+
+  public bool CanAffordCurrencyCosts(Godot.Collections.Dictionary<Currency, ulong> costs)
+    => costs.AsValueEnumerable().All(pair => GetCurrencyBalance(pair.Key) >= pair.Value);
+
+  internal bool TrySpendCurrencyCosts(Godot.Collections.Dictionary<Currency, ulong> costs)
+  {
+    if (!CanAffordCurrencyCosts(costs)) return false;
+    // No callbacks occur between checking every balance and deducting payment.
+    foreach (var (currency, required) in costs)
+      if (required > 0)
+        _currencies[currency] = checked(_currencies[currency] - required);
+    return true;
+  }
 
   public DateTime CurrentTime => _startTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
 

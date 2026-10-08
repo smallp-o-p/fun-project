@@ -1,6 +1,7 @@
 using System;
 using CampaignGameState = FunProject.GameState.GameState;
 using FunProject.Research;
+using FunProject.Currencies;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
 using Godot;
@@ -13,6 +14,7 @@ public sealed partial class ResearchView : GeoscapeView
   [Export] public PackedScene EmptyCatalogScene { get; set; } = null!;
 
   private GeoscapeSession _session = null!;
+  private CampaignGameState _state = null!;
   private SysColGeneric.IReadOnlyList<ResearchProject> _projects = [];
   private Option<ResearchProject> _selection = None;
 
@@ -25,6 +27,7 @@ public sealed partial class ResearchView : GeoscapeView
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
     _session = session;
+    _state = state;
     Refresh();
   }
 
@@ -78,6 +81,7 @@ public sealed partial class ResearchView : GeoscapeView
 
   private void RefreshSelection()
   {
+    var start = GetNode<Button>("%StartResearchButton");
     var rows = GetNode<VBoxContainer>("%ResearchProjects");
     for (int index = 0; index < _projects.Count; index++)
     {
@@ -89,22 +93,30 @@ public sealed partial class ResearchView : GeoscapeView
       GetNode<Label>("%ProjectName").Text = project.Name;
       GetNode<Label>("%ProjectDescription").Text = project.Description;
       GetNode<Label>("%ResearchDuration").Text = $"Duration: {project.DurationDays}d";
+      var costLabel = GetNode<Label>("%CurrencyCosts");
+      costLabel.Text = Currency.FormatCosts(project.Costs);
+      start.Disabled = !_state.CanAffordCurrencyCosts(project.Costs);
+      if (start.Disabled)
+        costLabel.AddThemeColorOverride("font_color", Colors.Red);
+      else
+        costLabel.RemoveThemeColorOverride("font_color");
       GetNode<Label>("%ManufacturingUnlocks").Text = "Manufacturing unlocks: " + (project.ManufacturingUnlocks.Length == 0
         ? "None"
-        : string.Join(", ", project.ManufacturingUnlocks.AsValueEnumerable().Select(item => item.Name).ToArray()));
+        : string.Join(", ", project.ManufacturingUnlocks.AsValueEnumerable().Select(recipe => recipe.Item.Name).ToArray()));
     }
     else
     {
       GetNode<Label>("%ProjectName").Text = "Select a project to research.";
       GetNode<Label>("%ProjectDescription").Text = "";
       GetNode<Label>("%ResearchDuration").Text = "";
+      GetNode<Label>("%CurrencyCosts").Text = "";
+      start.Disabled = true;
       GetNode<Label>("%ManufacturingUnlocks").Text = "";
     }
     GetNode<Label>("%ProjectDescription").Visible = _selection.IsSome;
     GetNode<Label>("%ResearchDuration").Visible = _selection.IsSome;
+    GetNode<Label>("%CurrencyCosts").Visible = _selection.IsSome;
     GetNode<Label>("%ManufacturingUnlocks").Visible = _selection.IsSome;
-    var start = GetNode<Button>("%StartResearchButton");
-    start.Disabled = _selection.IsNone;
     start.Text = _session.ActiveResearch.IsSome ? "Switch Research" : "Start Research";
     GetNode<Label>("%SwitchHint").Visible = _session.ActiveResearch.IsSome;
   }

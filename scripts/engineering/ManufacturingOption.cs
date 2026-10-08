@@ -1,3 +1,3 @@
 namespace FunProject.Engineering;
 
-public sealed record ManufacturingOption(ManufacturingProject Project, int Remaining);
+public sealed record ManufacturingOption(ManufacturingRecipe Project, int Remaining);
