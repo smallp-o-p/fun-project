@@ -4,6 +4,12 @@ using FunProject.Combatants;
 
 namespace FunProject.Battle;
 
+// Observations are detached values: retaining a live unit would expose later unseen changes
+// and require a battle read scope when guarded worker access is enabled.
+public readonly record struct LastSeenContact(int UnitId, Vector3I Position, long VisibilityRevision);
+public readonly record struct ObservedUnitInfo(int UnitId, bool IsOwnSide, Vector3I Position, int Health, int ActionPoints, bool IsUnconscious);
+public sealed record FactionUnitKnowledge(IReadOnlyList<ObservedUnitInfo> Current, IReadOnlyList<LastSeenContact> Remembered);
+
 internal sealed class BattleObservationHistory
 {
   private readonly Dictionary<Faction, Dictionary<int, LastSeenContact>> _contacts = [];
@@ -13,14 +19,12 @@ internal sealed class BattleObservationHistory
   internal void RecordRefresh(BattleBoardState board, IReadOnlyList<BattleUnitState> units)
   {
     _revision = checked(_revision + 1);
-    foreach (var observer in units)
+    foreach (var observer in units.AsValueEnumerable().Where(observer => observer.IsAlive && !observer.IsUnconscious))
     {
-      if (!observer.IsAlive || observer.IsUnconscious) continue;
       if (!_terrain.TryGetValue(observer.Side, out var terrain)) _terrain.Add(observer.Side, terrain = []);
       foreach (var point in observer.VisibleTiles) terrain[point] = board.GetTile(point);
-      foreach (var target in observer.VisibleUnits)
+      foreach (var target in observer.VisibleUnits.AsValueEnumerable().Where(target => target.Side != observer.Side))
       {
-        if (target.Side == observer.Side) continue;
         observer.RecordHostileContact();
         if (!_contacts.TryGetValue(observer.Side, out var contacts)) _contacts.Add(observer.Side, contacts = []);
         var position = board.FindOccupantPosition(target.Id).Match(point => point.Raw,
