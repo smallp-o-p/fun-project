@@ -31,7 +31,7 @@ public sealed class BattleObservationHistoryTest
     });
     Assert.True(recorded);
     Assert.Equal(1, battle.Query(new GetFactionLastSeenContacts(battle.PlayerFaction)).Count);
-    Assert.True(battle.Query(new GetHasSeenHostile(battle.Alive(battle.PlayerUnit))));
+    battle.Read(() => Assert.True(battle.PlayerUnit.HasSeenHostile));
   }
 
   private sealed class VerifyBootstrapHistory(System.Action found) : BattleHook<UnitSpottedBattleEvent>
@@ -67,13 +67,13 @@ public sealed class BattleObservationHistoryTest
   public void BriefMidActionContactSurvivesLoss()
   {
     using var battle = Contacts(4);
-    Assert.False(battle.Query(new GetHasSeenHostile(battle.Alive(battle.PlayerUnit))));
+    battle.Read(() => Assert.False(battle.PlayerUnit.HasSeenHostile));
     battle.EndFactionTurn(battle.PlayerFaction);
     battle.Move(battle.EnemyUnit, [new Vector3I(3, 0, 0), new Vector3I(2, 0, 0), new Vector3I(3, 0, 0)]);
     var knowledge = battle.Query(new GetFactionUnitKnowledge(battle.PlayerFaction));
     Assert.Equal(1, knowledge.Current.Count);
     Assert.Equal(new Vector3I(2, 0, 0), knowledge.Remembered[0].Position);
-    Assert.True(battle.Query(new GetHasSeenHostile(battle.Alive(battle.PlayerUnit))));
+    battle.Read(() => Assert.True(battle.PlayerUnit.HasSeenHostile));
   }
 
   [TestCase]
@@ -83,18 +83,21 @@ public sealed class BattleObservationHistoryTest
     battle.EndFactionTurn(battle.PlayerFaction);
     battle.Move(battle.EnemyUnit, [new Vector3I(3, 0, 0)]);
     battle.EndFactionTurn(battle.EnemyFaction);
-    Assert.True(battle.Query(new GetHasSeenHostile(battle.Alive(battle.PlayerUnit))));
+    battle.Read(() => Assert.True(battle.PlayerUnit.HasSeenHostile));
     var faction = TestData.MakeFaction("Ally");
     using var allies = BattleFixture.Started(new Vector3I(4, 1, 1),
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", faction)), new Vector3I(0, 0, 0)),
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", faction)), new Vector3I(1, 0, 0)));
-    Assert.False(allies.Query(new GetHasSeenHostile(allies.Alive(allies.PlayerUnit))));
+    allies.Read(() => Assert.False(allies.PlayerUnit.HasSeenHostile));
   }
 
   [TestCase]
   public void HiddenDeathAndEquipmentCannotChangeKnowledge()
   {
     using var alive = Contacts(); using var hiddenDeath = Contacts();
+    var visibleSnapshot = hiddenDeath.Query(new GetFactionUnitKnowledge(hiddenDeath.PlayerFaction));
+    int targetId = hiddenDeath.EnemyUnit.Id;
+    int observedHealth = hiddenDeath.Read(() => hiddenDeath.EnemyUnit.CurrentHealth);
     foreach (var battle in new[] { alive, hiddenDeath })
     {
       battle.EndFactionTurn(battle.PlayerFaction);
@@ -107,6 +110,10 @@ public sealed class BattleObservationHistoryTest
       Assert.True(hiddenWeapon.TrySpendShot().IsSome);
       Assert.True(hiddenWeapon.CanReload());
     });
+    var retainedTarget = visibleSnapshot.Current.AsValueEnumerable().Single(unit => unit.UnitId == targetId);
+    Assert.Equal(new Vector3I(2, 0, 0), retainedTarget.Position);
+    Assert.Equal(observedHealth, retainedTarget.Health);
+    Assert.True(visibleSnapshot.Remembered.Count == 0);
     var a = alive.Query(new GetFactionUnitKnowledge(alive.PlayerFaction));
     var b = hiddenDeath.Query(new GetFactionUnitKnowledge(hiddenDeath.PlayerFaction));
     Assert.True(a.Current.AsValueEnumerable().SequenceEqual(b.Current));
