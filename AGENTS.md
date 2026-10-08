@@ -58,7 +58,7 @@ Read the relevant sections of [docs/architecture-reference.md](docs/architecture
 - Hooks fire once per committed event after broadcast, ordered by priority then registration. Use event-tag types and the single registration door. Never submit actions inside a hook. Preserve default-system ordering and turn-start availability/events/AP ordering.
 - `AttackContext.Resolve` is the shared target-feasibility gate. Preview and attack share the hit calculator. Spend ammunition before rolling; damage, armor spill, statuses, and buffs follow the detailed reference.
 - `EventPlaybackDirector` only plays committed events. Selection belongs to the UI; presentation never caches authoritative tactical state or mutates the session directly.
-- Engineering owns parsed manufacturing projects and one active job. `GeoscapeSession` routes starts and applies completed Armory stock effects before broadcasting. Preserve captured stock policy, tick order, and session-rebuild behavior.
+- Engineering registers authored recipe references and owns one active job with a scheduled deadline. `GeoscapeSession` routes starts and applies completed Armory stock effects before broadcasting. Preserve tick order, atomic payment, and session-rebuild behavior.
 
 ## Conventions
 - Prefer collection expressions over explicitly instantiating container types.

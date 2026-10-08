@@ -11,5 +11,5 @@ public partial class ManufacturingRecipe : Resource
 
   [Export(PropertyHint.Range, "1,4294967295,1")] public uint DurationDays { get; set; } = 1;
 
-  [Export] public Godot.Collections.Dictionary<Currency, long> Costs { get; set; } = [];
+  [Export] public Godot.Collections.Dictionary<Currency, ulong> Costs { get; set; } = [];
 }

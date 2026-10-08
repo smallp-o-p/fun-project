@@ -1,7 +1,6 @@
 #nullable disable warnings
 using System;
 using FunProject.GameState;
-using FunProject.Currencies;
 using FunProject.Research;
 using FunProject.Strategic;
 using FunProject.Engineering;
@@ -41,12 +40,11 @@ public class ResearchStateTest
   [TestCase]
   public void CatalogAndCapturedOutputsPreserveIdentityAndImmutableMembership()
   {
-    var currency = MakeCurrency();
     var item = MakeItemData();
     var itemRecipe = MakeManufacturingRecipe(item);
     var replacementItem = MakeItemData();
     var replacementItemRecipe = MakeManufacturingRecipe(replacementItem);
-    var project = MakeResearch(days: 2, manufacturingUnlocks: [itemRecipe], costs: new() { [currency] = 7 });
+    var project = MakeResearch(days: 2, manufacturingUnlocks: [itemRecipe]);
     var sameName = MakeResearch();
     var start = MakeStart(researchProjects: [project, project, sameName]);
     using var campaign = new GeoscapeFixture(start);
@@ -57,13 +55,10 @@ public class ResearchStateTest
     Assert.Equal(sameName, catalog[1]);
     start.ResearchProjects[0] = MakeResearch("Replacement");
     project.DurationDays = 20;
-    project.Costs[currency] = 99;
     project.Condition = new NotResearchCondition { Child = new AlwaysResearchCondition() };
     project.ManufacturingUnlocks[0] = replacementItemRecipe;
     var definition = research.ResolveResearch(project, campaign.State).RequireRight();
     Assert.Equal(2U, definition.DurationDays);
-    Assert.Equal(7L, research.GetCosts(project)[currency]);
-    Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IDictionary<Currency, long>)research.GetCosts(project)).Clear());
     Assert.Equal(itemRecipe, definition.ManufacturingUnlocks[0]);
     Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IList<ResearchProject>)catalog).Clear());
     var available = research.GetAvailableProjects(campaign.State);
@@ -91,14 +86,10 @@ public class ResearchStateTest
     noCondition.Condition = null;
     var noOutputs = MakeResearch();
     noOutputs.ManufacturingUnlocks = null;
-    var noCosts = MakeResearch();
-    noCosts.Costs = null;
     CampaignStartData[] invalid = [nullArray,
       MakeStart(researchProjects: [null]),
       MakeStart(researchProjects: [noCondition]),
       MakeStart(researchProjects: [noOutputs]),
-      MakeStart(researchProjects: [noCosts]),
-      MakeStart(researchProjects: [MakeResearch(manufacturingUnlocks: [null])]),
     ];
     foreach (var start in invalid)
       Assert.Throws<ArgumentNullException>(() => new CampaignGameState(start));

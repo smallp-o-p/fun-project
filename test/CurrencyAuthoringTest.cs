@@ -13,8 +13,11 @@ namespace FunProject.Tests;
 [RequireGodotRuntime]
 public class CurrencyAuthoringTest
 {
-  [TestCase]
-  public void OwningResourceFilesRetainCurrencyCosts()
+  [TestCase(0UL)]
+  [TestCase(9223372036854775807UL)]
+  [TestCase(9223372036854775808UL)]
+  [TestCase(ulong.MaxValue)]
+  public void OwningResourceFilesRetainCurrencyCosts(ulong amount)
   {
     string prefix = $"user://currency-authoring-{Guid.NewGuid():N}";
     string currencyPath = prefix + "-currency.tres";
@@ -31,11 +34,11 @@ public class CurrencyAuthoringTest
       using var authoredItem = MakeItemData();
       Assert.Equal(Error.Ok, ResourceSaver.Save(authoredItem, itemPath));
       using var item = ResourceLoader.Load<EquippableItemData>(itemPath);
-      using var authoredRecipe = MakeManufacturingRecipe(item, days: 2, costs: new() { [currency] = long.MaxValue - 1 });
+      using var authoredRecipe = MakeManufacturingRecipe(item, days: 2, costs: new() { [currency] = amount });
       Assert.Equal(Error.Ok, ResourceSaver.Save(authoredRecipe, recipePath));
       using var recipe = ResourceLoader.Load<ManufacturingRecipe>(recipePath);
-      using var start = MakeStart(manufacturingRecipes: [recipe], startingCurrencies: new() { [currency] = long.MaxValue });
-      using var research = MakeResearch(manufacturingUnlocks: [recipe], costs: new() { [currency] = 11 });
+      using var start = MakeStart(manufacturingRecipes: [recipe], startingCurrencies: new() { [currency] = amount });
+      using var research = MakeResearch(manufacturingUnlocks: [recipe], costs: new() { [currency] = amount });
       Assert.Equal(Error.Ok, ResourceSaver.Save(start, campaignPath));
       Assert.Equal(Error.Ok, ResourceSaver.Save(research, researchPath));
       using var loadedStart = ResourceLoader.Load<CampaignStartData>(campaignPath, cacheMode: ResourceLoader.CacheMode.Ignore);
@@ -49,9 +52,9 @@ public class CurrencyAuthoringTest
       Assert.Equal(currencyPath, loadedCurrency.ResourcePath);
       Assert.True(ReferenceEquals(loadedCurrency, loadedRecipe.Costs.Keys.AsValueEnumerable().Single()));
       Assert.True(ReferenceEquals(loadedCurrency, loadedResearch.Costs.Keys.AsValueEnumerable().Single()));
-      Assert.Equal(long.MaxValue, loadedStart.StartingCurrencies[loadedCurrency]);
-      Assert.Equal(long.MaxValue - 1, loadedRecipe.Costs[loadedCurrency]);
-      Assert.Equal(11L, loadedResearch.Costs[loadedCurrency]);
+      Assert.Equal(amount, loadedStart.StartingCurrencies[loadedCurrency]);
+      Assert.Equal(amount, loadedRecipe.Costs[loadedCurrency]);
+      Assert.Equal(amount, loadedResearch.Costs[loadedCurrency]);
     }
     finally
     {

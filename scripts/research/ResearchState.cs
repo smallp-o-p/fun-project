@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using FunProject.Currencies;
 using FunProject.Engineering;
 using FunProject.Strategic;
 using CampaignGameState = global::FunProject.GameState.GameState;
@@ -16,8 +15,7 @@ namespace FunProject.Research;
 public sealed class ResearchState
 {
   internal sealed record Definition(ResearchProject Project, uint DurationDays,
-    ResearchCondition Condition, IReadOnlyList<ManufacturingRecipe> ManufacturingUnlocks,
-    IReadOnlyDictionary<Currency, long> Costs);
+    ResearchCondition Condition, IReadOnlyList<ManufacturingRecipe> ManufacturingUnlocks);
 
   private readonly List<Definition> _definitions = [];
   private readonly Dictionary<ResearchProject, Definition> _byProject = new(ReferenceEqualityComparer.Instance);
@@ -33,10 +31,8 @@ public sealed class ResearchState
       ArgumentNullException.ThrowIfNull(project.Condition);
       ArgumentNullException.ThrowIfNull(project.ManufacturingUnlocks);
       project.Condition.CheckAuthoring();
-      foreach (var recipe in project.ManufacturingUnlocks)
-        ArgumentNullException.ThrowIfNull(recipe);
       var definition = new Definition(project, project.DurationDays, project.Condition,
-        project.ManufacturingUnlocks.AsValueEnumerable().ToImmutableList(), Currency.CaptureCosts(project.Costs));
+        project.ManufacturingUnlocks.AsValueEnumerable().ToImmutableList());
       _definitions.Add(definition);
       _byProject.Add(project, definition);
     }
@@ -46,8 +42,6 @@ public sealed class ResearchState
     => _definitions.AsValueEnumerable().Select(definition => definition.Project).ToImmutableList();
 
   public Option<ResearchJob> ActiveJob { get; private set; }
-
-  public IReadOnlyDictionary<Currency, long> GetCosts(ResearchProject project) => _byProject[project].Costs;
 
   public bool IsCompleted(ResearchProject project)
   {

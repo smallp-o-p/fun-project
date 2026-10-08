@@ -11,7 +11,7 @@ public class GeoscapeProjectsIntegrationTest
 {
   [TestCase(false)]
   [TestCase(true)]
-  public async Task ProjectCostsUseCapturedPricesAndLiveAffordability(bool research)
+  public async Task ProjectCostsUseAuthoredPricesAndLiveAffordability(bool research)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var currency = MakeCurrency("Budget");
@@ -30,10 +30,8 @@ public class GeoscapeProjectsIntegrationTest
     var rows = view.GetNode<VBoxContainer>(research ? "%ResearchProjects" : "%ManufacturableItems");
     OnlyChild<Button>(rows).EmitSignal(Button.SignalName.Pressed);
     string text = view.GetNode<Label>("%CurrencyCosts").Text;
-    Assert.True(text.Contains("Budget"));
-    Assert.True(text.Contains("10"));
-    Assert.True(text.Contains("5"));
-    Assert.False(text.Contains("99"));
+    Assert.Equal("Cost: Budget: 99", text);
+    Assert.Equal(Colors.Red, view.GetNode<Label>("%CurrencyCosts").GetThemeColor("font_color"));
     var start = view.GetNode<Button>(research ? "%StartResearchButton" : "%ManufactureButton");
     Assert.True(start.Disabled);
     start.EmitSignal(Button.SignalName.Pressed);
@@ -45,6 +43,7 @@ public class GeoscapeProjectsIntegrationTest
     view.Present(free.State, free.Session);
     OnlyChild<Button>(rows).EmitSignal(Button.SignalName.Pressed);
     Assert.Equal("Cost: Free", view.GetNode<Label>("%CurrencyCosts").Text);
+    Assert.False(view.GetNode<Label>("%CurrencyCosts").HasThemeColorOverride("font_color"));
     Assert.False(start.Disabled);
   }
 
@@ -73,8 +72,9 @@ public class GeoscapeProjectsIntegrationTest
     campaign.ClearEvents();
     start.EmitSignal(Button.SignalName.Pressed);
     Assert.True(start.Disabled);
-    Assert.Equal(0L, campaign.State.GetCurrencyBalance(currency));
-    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains("available 0"));
+    Assert.Equal(0UL, campaign.State.GetCurrencyBalance(currency));
+    Assert.Equal("Cost: Budget: 10", view.GetNode<Label>("%CurrencyCosts").Text);
+    Assert.Equal(Colors.Red, view.GetNode<Label>("%CurrencyCosts").GetThemeColor("font_color"));
     string status = view.GetNode<Label>("%Status").Text;
     Assert.True(status.Contains("InsufficientCurrencies"));
     Assert.True(status.Contains(research ? project.Name : item.Name));
@@ -324,7 +324,7 @@ public class GeoscapeProjectsIntegrationTest
     var itemRecipe = MakeManufacturingRecipe(item);
     using var foreignCampaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
     var foreign = foreignCampaign.Session;
-    view.Present(foreign.GetManufacturingOptions(), None, 0);
+    view.Present(foreignCampaign.State, foreign.GetManufacturingOptions(), None, 0);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
     view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
 

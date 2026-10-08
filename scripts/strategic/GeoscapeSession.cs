@@ -1,7 +1,6 @@
 using CampaignGameState = global::FunProject.GameState.GameState;
 using System;
 using System.Collections.Generic;
-using FunProject.Currencies;
 using FunProject.Battle;
 using FunProject.Combatants;
 using FunProject.Engineering;
@@ -73,17 +72,11 @@ public sealed class GeoscapeSession
   public IReadOnlyList<ResearchProject> GetAvailableResearchProjects()
     => _state.Research.GetAvailableProjects(_state);
 
-  public IReadOnlyDictionary<Currency, long> GetResearchCosts(ResearchProject project)
-    => _state.Research.GetCosts(project);
-
-  public IReadOnlyList<(Currency Currency, long Required, long Available)> GetCurrencyShortfalls(IReadOnlyDictionary<Currency, long> costs)
-    => _state.GetCurrencyShortfalls(costs);
-
   public Either<ResearchStartFailure, ResearchJob> StartResearch(ResearchProject project)
     => _state.Research.ResolveResearch(project, _state).Bind<ResearchJob>(definition =>
     {
       var job = new ResearchJob(definition.Project, Tick, CompletionTick(definition.DurationDays));
-      if (!_state.TrySpendCurrencyCosts(definition.Costs))
+      if (!_state.TrySpendCurrencyCosts(definition.Project.Costs))
         return ResearchStartFailure.InsufficientCurrencies;
       var started = _state.Research.Start(job);
       Commit(started);
@@ -240,7 +233,7 @@ public sealed class GeoscapeSession
   private void Handle(ManufacturingCompleted completed)
   {
     var project = completed.Job.Project;
-    _state.Armory.AddItem(project.Item, project.UnlimitedStock);
+    _state.Armory.AddItem(project.Item, project.Item.UnlimitedStock);
     Commit(completed);
   }
 

@@ -19,5 +19,5 @@ public partial class ResearchProject : NamedEntityData
 
   [Export] public ManufacturingRecipe[] ManufacturingUnlocks { get; set; } = [];
 
-  [Export] public Godot.Collections.Dictionary<Currency, long> Costs { get; set; } = [];
+  [Export] public Godot.Collections.Dictionary<Currency, ulong> Costs { get; set; } = [];
 }

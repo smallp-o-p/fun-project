@@ -42,10 +42,10 @@ public class EngineeringViewTest
     await using var cleanup = new DeferredNodeCleanup();
     var currency = MakeCurrency("A currency with a deliberately long descriptive name for campaign production budgets");
     var item = MakeItemData();
-    var itemRecipe = MakeManufacturingRecipe(item, costs: new() { [currency] = long.MaxValue });
+    var itemRecipe = MakeManufacturingRecipe(item, costs: new() { [currency] = ulong.MaxValue });
     for (int i = 0; i < 30; i++)
       item.Description += "Engineering describes workshop production and the supply behavior of a utility kit. ";
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe], startingCurrencies: new() { [currency] = long.MaxValue }));
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe], startingCurrencies: new() { [currency] = ulong.MaxValue }));
     var session = campaign.Session;
     var view = CreateEngineeringView();
     CreateUiViewport(view, new Vector2I(width, height));
@@ -61,7 +61,7 @@ public class EngineeringViewTest
     Assert.True(visible.Encloses(ScreenRect(back)));
     var scroll = view.GetNode<ScrollContainer>("Content/Margin/Layout/Body/Details/DetailsScroll");
     Assert.True(scroll.ClipContents);
-    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(long.MaxValue.ToString()));
+    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(ulong.MaxValue.ToString()));
     Assert.True(view.GetNode<Label>("%CurrencyCosts").Size.X <= scroll.Size.X);
     Assert.True(scroll.GetVScrollBar().MaxValue > scroll.GetVScrollBar().Page);
     var actionRect = ScreenRect(action);
@@ -95,7 +95,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public void SelectingRowsDisplaysParsedDurationAndScarceStockInCatalogOrder()
+  public void SelectingRowsDisplaysRecipeDurationAndScarceStockInCatalogOrder()
   {
     var first = MakeItemData("Field scanner");
     var firstRecipe = MakeManufacturingRecipe(first, days: 1);
@@ -107,8 +107,7 @@ public class EngineeringViewTest
       armory: [first], manufacturingRecipes: [firstRecipe, secondRecipe]));
     campaign.State.Armory.AddStock(first, 1);
     var session = campaign.Session;
-    firstRecipe.DurationDays = 99;
-    first.UnlimitedStock = true;
+    firstRecipe.DurationDays = 3;
     var view = AddToTree(CreateEngineeringView());
     view.Present(campaign.State, session);
 
@@ -118,7 +117,7 @@ public class EngineeringViewTest
     items.GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
     Assert.Equal("Field scanner", view.GetNode<Label>("%ItemName").Text);
     Assert.Equal(first.Description, view.GetNode<Label>("%ItemDescription").Text);
-    Assert.Equal("Duration: 1d", view.GetNode<Label>("%ManufacturingDuration").Text);
+    Assert.Equal("Duration: 3d", view.GetNode<Label>("%ManufacturingDuration").Text);
     Assert.Equal("Stock: 2", view.GetNode<Label>("%Stock").Text);
     Assert.Equal("Produces 1 item.", view.GetNode<Label>("%SupplyEffect").Text);
     items.GetChild<Button>(1).EmitSignal(Button.SignalName.Pressed);
@@ -173,7 +172,7 @@ public class EngineeringViewTest
     var view = AddToTree(CreateEngineeringView());
     view.Present(campaign.State, session);
     Assert.Equal("Manufacturing: Field scanner — 23h 58m remaining", view.GetNode<Label>("%ActiveJob").Text);
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, 1443);
+    view.Present(campaign.State, session.GetManufacturingOptions(), session.ActiveManufacturing, 1443);
     Assert.Equal("Manufacturing: Field scanner — 0m remaining", view.GetNode<Label>("%ActiveJob").Text);
     Assert.Equal(2L, session.Tick);
     Assert.True(session.ActiveManufacturing.IsSome);
@@ -191,7 +190,7 @@ public class EngineeringViewTest
       manufacturingRecipes: [firstRecipe, secondRecipe]));
     var session = campaign.Session;
     var view = AddToTree(CreateEngineeringView());
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    view.Present(campaign.State, session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(1)
       .EmitSignal(Button.SignalName.Pressed);
     secondRecipe.DurationDays = 2;
@@ -199,7 +198,7 @@ public class EngineeringViewTest
       armory: [second], manufacturingRecipes: [secondRecipe, firstRecipe]));
     refreshedCampaign.State.Armory.AddStock(second, 2);
     var refreshed = refreshedCampaign.Session;
-    view.Present(refreshed.GetManufacturingOptions(), refreshed.ActiveManufacturing, refreshed.Tick);
+    view.Present(refreshedCampaign.State, refreshed.GetManufacturingOptions(), refreshed.ActiveManufacturing, refreshed.Tick);
 
     Assert.Equal("Second", view.GetNode<Label>("%ItemName").Text);
     Assert.Equal("Duration: 2d", view.GetNode<Label>("%ManufacturingDuration").Text);
@@ -219,14 +218,14 @@ public class EngineeringViewTest
     using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
     var session = campaign.Session;
     var view = AddToTree(CreateEngineeringView());
-    view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    view.Present(campaign.State, session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0)
       .EmitSignal(Button.SignalName.Pressed);
     var replacementRecipe = MakeManufacturingRecipe(item);
     using var refreshedCampaign = new GeoscapeFixture(MakeStart(
       manufacturingRecipes: [replacementRecipe]));
     var refreshed = refreshedCampaign.Session;
-    view.Present(refreshed.GetManufacturingOptions(), refreshed.ActiveManufacturing, refreshed.Tick);
+    view.Present(refreshedCampaign.State, refreshed.GetManufacturingOptions(), refreshed.ActiveManufacturing, refreshed.Tick);
 
     Assert.True(view.GetNode<Button>("%ManufactureButton").Disabled);
     Assert.Equal("Select an item to manufacture.", view.GetNode<Label>("%ItemName").Text);

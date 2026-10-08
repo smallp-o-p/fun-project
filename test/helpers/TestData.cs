@@ -291,7 +291,7 @@ internal static class TestData
   };
 
   public static ManufacturingRecipe MakeManufacturingRecipe(EquippableItemData item, uint days = 1,
-    Godot.Collections.Dictionary<Currency, long> costs = null)
+    Godot.Collections.Dictionary<Currency, ulong> costs = null)
     => new() { Item = item, DurationDays = days, Costs = costs ?? [] };
 
   public static MultiStatMod MakeMod(string name, bool unlimited = false) =>
@@ -641,7 +641,7 @@ internal static class TestData
     ResearchProject[] researchProjects = null,
     CaptiveEntryData[] captives = null,
     CombatantConditionRulesData? conditionRules = null,
-    Godot.Collections.Dictionary<Currency, long> startingCurrencies = null)
+    Godot.Collections.Dictionary<Currency, ulong> startingCurrencies = null)
   {
     return new CampaignStartData
     {
@@ -665,7 +665,7 @@ internal static class TestData
     string name = "Research", uint days = 1,
     ResearchCondition condition = null,
     ManufacturingRecipe[] manufacturingUnlocks = null,
-    Godot.Collections.Dictionary<Currency, long> costs = null)
+    Godot.Collections.Dictionary<Currency, ulong> costs = null)
     => new()
     {
       Name = name,

@@ -44,34 +44,6 @@ public class ManufacturingUnlockTest
   }
 
   [TestCase]
-  public void NullUnlockBatchLeavesRegistryUnchanged()
-  {
-    var currency = MakeCurrency();
-    var initial = MakeItemData("Initial");
-    var initialRecipe = MakeManufacturingRecipe(initial);
-    var item = MakeItemData("Item");
-    var itemRecipe = MakeManufacturingRecipe(item);
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [initialRecipe]));
-    var engineering = campaign.State.Engineering;
-    var initialProject = campaign.Session.GetManufacturingOptions()[0].Project;
-
-    Assert.Throws<ArgumentNullException>(() => engineering.Unlock([itemRecipe, null]));
-    Assert.Throws<ArgumentNullException>(() => engineering.Unlock(null));
-    var malformed = MakeItemData();
-    var malformedRecipe = MakeManufacturingRecipe(malformed, costs: new() { [currency] = -1 });
-    Assert.Throws<ArgumentOutOfRangeException>(() => engineering.Unlock([itemRecipe, malformedRecipe]));
-    Assert.Equal(ManufacturingStartFailure.UnknownRecipe, campaign.Session.StartManufacturing(malformedRecipe).RequireLeft());
-
-    var options = campaign.Session.GetManufacturingOptions();
-    Assert.Equal(1, options.Count);
-    Assert.Equal(initialProject, options[0].Project);
-    Assert.Equal(ManufacturingStartFailure.UnknownRecipe,
-      campaign.Session.StartManufacturing(itemRecipe).RequireLeft());
-    Assert.Equal(0, campaign.State.Armory.ItemStock().Count);
-    Assert.Equal(0, campaign.Events.Count);
-  }
-
-  [TestCase]
   public void RegistrationChangesUnknownToBusyThenExistingSupplyFailure()
   {
     var initial = MakeItemData("Initial");
@@ -100,39 +72,4 @@ public class ManufacturingUnlockTest
     Assert.Equal(1, campaign.Session.GetManufacturingOptions().Count);
   }
 
-  [TestCase(false)]
-  [TestCase(true)]
-  public void FirstRegistrationCapturesCurrentDurationAndStockPolicy(bool unlimited)
-  {
-    var currency = MakeCurrency();
-    var item = MakeItemData("Product", unlimited: !unlimited);
-    var itemRecipe = MakeManufacturingRecipe(item, days: 2, costs: new() { [currency] = 7 });
-    var research = MakeResearch(days: 0, manufacturingUnlocks: [itemRecipe]);
-    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [research], startingCurrencies: new() { [currency] = 7 }));
-    itemRecipe.DurationDays = 3;
-    item.UnlimitedStock = unlimited;
-
-    campaign.Session.StartResearch(research).RequireRight();
-    campaign.AdvanceTicks(1);
-    var project = campaign.Session.GetManufacturingOptions()[0].Project;
-    itemRecipe.DurationDays = 90;
-    item.UnlimitedStock = !unlimited;
-    itemRecipe.Costs[currency] = 99;
-    campaign.State.Engineering.Unlock([itemRecipe]);
-
-    var option = campaign.Session.GetManufacturingOptions()[0];
-    Assert.Equal(project, option.Project);
-    Assert.Equal(3U, option.Project.DurationDays);
-    Assert.Equal(unlimited, option.Project.UnlimitedStock);
-    Assert.Equal(7L, option.Project.Costs[currency]);
-    Assert.Equal(7L, campaign.State.GetCurrencyBalance(currency));
-    var job = campaign.Session.StartManufacturing(itemRecipe).RequireRight();
-    Assert.Equal(4321L, job.CompletesAtTick);
-    Assert.Equal(0L, campaign.State.GetCurrencyBalance(currency));
-    Assert.Equal(0, campaign.State.Armory.ItemStock().Count);
-
-    campaign.AdvanceTicks(4320);
-    Assert.True(campaign.State.Armory.TryWithdrawItem(item).IsSome);
-    Assert.Equal(unlimited, campaign.State.Armory.TryWithdrawItem(item).IsSome);
-  }
 }

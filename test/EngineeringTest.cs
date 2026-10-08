@@ -125,9 +125,9 @@ public class EngineeringTest
     Assert.True(state.Armory.TryGetItemStock(item).IsNone);
     campaign.AdvanceTicks(1440);
     Assert.Equal(1, state.Armory.ItemStock()[0].Remaining);
-    Assert.Equal(7L, state.GetCurrencyBalance(currency));
+    Assert.Equal(7UL, state.GetCurrencyBalance(currency));
     Assert.True(session.StartManufacturing(itemRecipe).IsRight);
-    Assert.Equal(0L, state.GetCurrencyBalance(currency));
+    Assert.Equal(0UL, state.GetCurrencyBalance(currency));
     Assert.Equal(1, state.Armory.ItemStock()[0].Remaining);
     campaign.AdvanceTicks(1440);
     Assert.Equal(2, state.Armory.ItemStock()[0].Remaining);
@@ -213,11 +213,11 @@ public class EngineeringTest
     Assert.False(state.Armory.HasAvailableItem(item));
     Assert.False(state.Armory.HasAvailableItem(other));
     Assert.True(state.Armory.HasAvailableItem(supplied));
-    Assert.Equal(0L, state.GetCurrencyBalance(currency));
+    Assert.Equal(0UL, state.GetCurrencyBalance(currency));
     campaign.AdvanceTicks(1440);
     campaign.ClearEvents();
     Assert.Equal(ManufacturingStartFailure.AlreadyAvailable, session.StartManufacturing(suppliedRecipe).RequireLeft());
-    Assert.Equal(0L, state.GetCurrencyBalance(currency));
+    Assert.Equal(0UL, state.GetCurrencyBalance(currency));
     Assert.Equal(0, campaign.Events.Count);
   }
 
@@ -243,7 +243,7 @@ public class EngineeringTest
     Assert.Equal(last, options[2].Project.Item);
     Assert.True(state.Armory.TryGetItemStock(first).IsNone);
     Assert.Equal(0, options[0].Remaining);
-    Assert.True(options[1].Project.UnlimitedStock);
+    Assert.True(options[1].Project.Item.UnlimitedStock);
     Assert.Equal(0, options[1].Remaining);
     Assert.Equal(1, options[2].Remaining);
     Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IList<ManufacturingOption>)options).Clear());
@@ -431,54 +431,6 @@ public class EngineeringTest
   }
 
   [TestCase]
-  public void ResourceEditsCannotChangeBakedDurationCatalogOrEitherStockPolicy()
-  {
-    var currency = MakeCurrency();
-    var scarce = MakeItemData("Scarce");
-    var scarceRecipe = MakeManufacturingRecipe(scarce, days: 1, costs: new() { [currency] = 7 });
-    var unlimited = MakeItemData("Unlimited", unlimited: true);
-    var unlimitedRecipe = MakeManufacturingRecipe(unlimited, days: 1);
-    var replacement = MakeItemData("Replacement");
-    var replacementRecipe = MakeManufacturingRecipe(replacement);
-    var start = MakeStart(manufacturingRecipes: [scarceRecipe, unlimitedRecipe], startingCurrencies: new() { [currency] = 7 });
-    using var campaign = new GeoscapeFixture(start);
-    var state = campaign.State;
-    var session = campaign.Session;
-    scarce.UnlimitedStock = true;
-    unlimited.UnlimitedStock = false;
-    scarceRecipe.DurationDays = 100;
-    scarceRecipe.Costs[currency] = 99;
-    unlimitedRecipe.DurationDays = 100;
-    start.ManufacturingRecipes[0] = replacementRecipe;
-
-    var options = session.GetManufacturingOptions();
-    Assert.Equal(2, options.Count);
-    Assert.Equal(scarce, options[0].Project.Item);
-    Assert.False(options[0].Project.UnlimitedStock);
-    Assert.Equal(7L, options[0].Project.Costs[currency]);
-    Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IDictionary<Currency, long>)options[0].Project.Costs).Clear());
-    Assert.True(options[1].Project.UnlimitedStock);
-    Assert.True(session.StartManufacturing(scarceRecipe).IsRight);
-    Assert.Equal(1440L, session.ActiveManufacturing.Match(job => job.CompletesAtTick, () => -1));
-    campaign.AdvanceTicks(1);
-    Assert.False(state.Armory.HasAvailableItem(scarce));
-    campaign.AdvanceTicks(1439);
-    Assert.Equal(1, state.Armory.TryGetItemStock(scarce).RequireSome().Remaining);
-    Assert.True(state.Armory.TryWithdrawItem(scarce).IsSome);
-    Assert.True(state.Armory.TryWithdrawItem(scarce).IsNone);
-    Assert.True(session.StartManufacturing(unlimitedRecipe).IsRight);
-    Assert.Equal(2880L, session.ActiveManufacturing.Match(job => job.CompletesAtTick, () => -1));
-    campaign.AdvanceTicks(1);
-    Assert.False(state.Armory.HasAvailableItem(unlimited));
-    campaign.AdvanceTicks(1439);
-    Assert.True(state.Armory.TryWithdrawItem(unlimited).IsSome);
-    Assert.True(state.Armory.TryWithdrawItem(unlimited).IsSome);
-    Assert.Equal(1, session.GetManufacturingOptions().Count);
-    Assert.Equal(scarce, session.GetManufacturingOptions()[0].Project.Item);
-    Assert.Equal(ManufacturingStartFailure.AlreadyAvailable, session.StartManufacturing(unlimitedRecipe).RequireLeft());
-  }
-
-  [TestCase]
   public void CompletionTickOverflowThrowsBeforeAssigningJobOrChangingStock()
   {
     var currency = MakeCurrency();
@@ -494,11 +446,11 @@ public class EngineeringTest
     Assert.False(state.Armory.HasAvailableItem(item));
     Assert.Equal(0, campaign.Events.Count);
 
-    Assert.Equal(7L, state.GetCurrencyBalance(currency));
+    Assert.Equal(7UL, state.GetCurrencyBalance(currency));
 
     state.Tick = long.MaxValue - 1440;
     var job = session.StartManufacturing(itemRecipe).RequireRight();
-    Assert.Equal(0L, state.GetCurrencyBalance(currency));
+    Assert.Equal(0UL, state.GetCurrencyBalance(currency));
     Assert.Equal(long.MaxValue - 1440, job.StartedAtTick);
     Assert.Equal(long.MaxValue, job.CompletesAtTick);
     Assert.True(state.Engineering.CompleteIfDue(long.MaxValue - 1).IsNone);
@@ -529,6 +481,6 @@ public class EngineeringTest
     Assert.True(session.ActiveManufacturing.IsNone);
     Assert.Equal(int.MaxValue - 1, state.Armory.ItemStock()[0].Remaining);
     Assert.Equal(0, campaign.Events.EventsOf<ManufacturingCompleted>().Length);
-    Assert.Equal(3L, state.GetCurrencyBalance(currency));
+    Assert.Equal(3UL, state.GetCurrencyBalance(currency));
   }
 }

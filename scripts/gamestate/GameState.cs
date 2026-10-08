@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using FunProject.Currencies;
 using FunProject.Engineering;
 using FunProject.Combatants;
@@ -48,19 +47,15 @@ public sealed class GameState
   private readonly List<RegionData> _regions = [];
   private readonly Dictionary<string, int> _indexByName = [];
   private readonly List<Combatant> _roster = [];
-  private readonly Dictionary<Currency, long> _currencies = new(ReferenceEqualityComparer.Instance);
+  private readonly Dictionary<Currency, ulong> _currencies = new(ReferenceEqualityComparer.Instance);
   private readonly DateTime _startTime = DateTime.UnixEpoch;
 
   public GameState(CampaignStartData start)
   {
     ArgumentNullException.ThrowIfNull(start);
 
-    ArgumentNullException.ThrowIfNull(start.StartingCurrencies);
     foreach (var (currency, amount) in start.StartingCurrencies)
-    {
-      Currency.ValidateAmount(currency, amount);
       _currencies.Add(currency, amount);
-    }
 
     GeoscapeMapData map = start.Map ?? throw new InvalidOperationException(
       "CampaignStartData requires a Map; assign one in the inspector.");
@@ -156,43 +151,15 @@ public sealed class GameState
 
   public ResearchState Research { get; }
 
-  public IReadOnlyDictionary<Currency, long> Currencies
-    => new ReadOnlyDictionary<Currency, long>(new Dictionary<Currency, long>(_currencies, ReferenceEqualityComparer.Instance));
+  public ulong GetCurrencyBalance(Currency currency) => _currencies.GetValueOrDefault(currency);
 
-  public long GetCurrencyBalance(Currency currency)
+  public bool CanAffordCurrencyCosts(Godot.Collections.Dictionary<Currency, ulong> costs)
+    => costs.AsValueEnumerable().All(pair => GetCurrencyBalance(pair.Key) >= pair.Value);
+
+  internal bool TrySpendCurrencyCosts(Godot.Collections.Dictionary<Currency, ulong> costs)
   {
-    ArgumentNullException.ThrowIfNull(currency);
-    return _currencies.GetValueOrDefault(currency);
-  }
-
-  public IReadOnlyList<(Currency Currency, long Required, long Available)> GetCurrencyShortfalls(IReadOnlyDictionary<Currency, long> costs)
-  {
-    ArgumentNullException.ThrowIfNull(costs);
-    var shortfalls = new List<(Currency Currency, long Required, long Available)>();
-    foreach (var (currency, required) in costs)
-    {
-      Currency.ValidateAmount(currency, required);
-      long available = _currencies.GetValueOrDefault(currency);
-      if (required > available)
-        shortfalls.Add((currency, required, available));
-    }
-    return shortfalls.AsReadOnly();
-  }
-
-  internal bool TrySpendCurrencyCosts(IReadOnlyDictionary<Currency, long> costs)
-  {
-    ArgumentNullException.ThrowIfNull(costs);
-    bool affordable = true;
-    foreach (var (currency, required) in costs)
-    {
-      Currency.ValidateAmount(currency, required);
-      if (required > _currencies.GetValueOrDefault(currency))
-        affordable = false;
-    }
-    if (!affordable) return false;
-
-    // Nonnegative costs bounded by each balance cannot underflow. No callbacks occur
-    // between preflight and deduction; zero requirements create no keys.
+    if (!CanAffordCurrencyCosts(costs)) return false;
+    // No callbacks occur between checking every balance and deducting payment.
     foreach (var (currency, required) in costs)
       if (required > 0)
         _currencies[currency] = checked(_currencies[currency] - required);

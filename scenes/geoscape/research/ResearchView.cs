@@ -14,6 +14,7 @@ public sealed partial class ResearchView : GeoscapeView
   [Export] public PackedScene EmptyCatalogScene { get; set; } = null!;
 
   private GeoscapeSession _session = null!;
+  private CampaignGameState _state = null!;
   private SysColGeneric.IReadOnlyList<ResearchProject> _projects = [];
   private Option<ResearchProject> _selection = None;
 
@@ -26,6 +27,7 @@ public sealed partial class ResearchView : GeoscapeView
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
     _session = session;
+    _state = state;
     Refresh();
   }
 
@@ -91,10 +93,13 @@ public sealed partial class ResearchView : GeoscapeView
       GetNode<Label>("%ProjectName").Text = project.Name;
       GetNode<Label>("%ProjectDescription").Text = project.Description;
       GetNode<Label>("%ResearchDuration").Text = $"Duration: {project.DurationDays}d";
-      var costs = _session.GetResearchCosts(project);
-      var shortfalls = _session.GetCurrencyShortfalls(costs);
-      GetNode<Label>("%CurrencyCosts").Text = Currency.FormatCosts(costs, shortfalls);
-      start.Disabled = shortfalls.Count > 0;
+      var costLabel = GetNode<Label>("%CurrencyCosts");
+      costLabel.Text = Currency.FormatCosts(project.Costs);
+      start.Disabled = !_state.CanAffordCurrencyCosts(project.Costs);
+      if (start.Disabled)
+        costLabel.AddThemeColorOverride("font_color", Colors.Red);
+      else
+        costLabel.RemoveThemeColorOverride("font_color");
       GetNode<Label>("%ManufacturingUnlocks").Text = "Manufacturing unlocks: " + (project.ManufacturingUnlocks.Length == 0
         ? "None"
         : string.Join(", ", project.ManufacturingUnlocks.AsValueEnumerable().Select(recipe => recipe.Item.Name).ToArray()));
