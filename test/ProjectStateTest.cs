@@ -1,5 +1,6 @@
 using FunProject.GameState;
 using FunProject.Strategic;
+using FunProject.Engineering;
 using GdUnit4;
 
 [TestSuite]
@@ -10,9 +11,10 @@ public class ProjectStateTest
   public void ManufacturingCompletionClearsTheJobWithoutChangingStockItself()
   {
     var item = MakeItemData();
-    var state = new GameState(MakeStart(manufacturableItems: [item]));
+    var itemRecipe = MakeManufacturingRecipe(item);
+    var state = new GameState(MakeStart(manufacturingRecipes: [itemRecipe]));
     var session = new GeoscapeSession(state);
-    var job = session.StartManufacturing(item).RequireRight();
+    var job = session.StartManufacturing(itemRecipe).RequireRight();
 
     Assert.True(state.Engineering.CompleteIfDue(1439).IsNone);
     Assert.Equal(Some(job), state.Engineering.ActiveJob);

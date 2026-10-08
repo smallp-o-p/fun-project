@@ -11,33 +11,34 @@ namespace FunProject.Engineering;
 public sealed class EngineeringState
 {
   private readonly List<ManufacturingProject> _projects = [];
-  private readonly Dictionary<EquippableItemData, ManufacturingProject> _projectsByItem = new(ReferenceEqualityComparer.Instance);
+  private readonly Dictionary<ManufacturingRecipe, ManufacturingProject> _projectsByRecipe = new(ReferenceEqualityComparer.Instance);
 
-  internal EngineeringState(IReadOnlyList<EquippableItemData> initialItems)
+  internal EngineeringState(IReadOnlyList<ManufacturingRecipe> initialRecipes)
   {
-    Unlock(initialItems);
+    Unlock(initialRecipes);
   }
 
-  // Registers unseen item references, baking duration and stock policy at first registration.
+  // Registers unseen recipe references, baking duration and stock policy at first registration.
   // Parse the whole batch before changing the registry, including costs of unseen recipes.
-  internal void Unlock(IReadOnlyList<EquippableItemData> items)
+  internal void Unlock(IReadOnlyList<ManufacturingRecipe> recipes)
   {
-    ArgumentNullException.ThrowIfNull(items);
-    foreach (var item in items)
-      ArgumentNullException.ThrowIfNull(item);
+    ArgumentNullException.ThrowIfNull(recipes);
+    foreach (var recipe in recipes)
+      ArgumentNullException.ThrowIfNull(recipe);
 
     var pending = new List<ManufacturingProject>();
-    var seen = new SysColGeneric.HashSet<EquippableItemData>(ReferenceEqualityComparer.Instance);
-    foreach (var item in items)
+    var seen = new SysColGeneric.HashSet<ManufacturingRecipe>(ReferenceEqualityComparer.Instance);
+    foreach (var recipe in recipes)
     {
-      if (_projectsByItem.ContainsKey(item) || !seen.Add(item)) continue;
-      var project = new ManufacturingProject(item, item.ManufacturingDurationDays, item.UnlimitedStock,
-        CurrencyCosts.Capture(item.ManufacturingCosts));
+      if (_projectsByRecipe.ContainsKey(recipe) || !seen.Add(recipe)) continue;
+      ArgumentNullException.ThrowIfNull(recipe.Item);
+      var project = new ManufacturingProject(recipe, recipe.Item, recipe.DurationDays, recipe.Item.UnlimitedStock,
+        Currency.CaptureCosts(recipe.Costs));
       pending.Add(project);
     }
     foreach (var project in pending)
     {
-      _projectsByItem.Add(project.Item, project);
+      _projectsByRecipe.Add(project.Recipe, project);
       _projects.Add(project);
     }
   }
@@ -53,19 +54,19 @@ public sealed class EngineeringState
       .Where(project => !project.UnlimitedStock || armory.TryGetItemStock(project.Item).IsNone)
       .Select(project => new ManufacturingOption(project,
         armory.TryGetItemStock(project.Item).Match(stock => stock.Remaining, () => 0),
-        CurrencyCosts.Shortfalls(project.Costs, balances)))
+        Currency.GetShortfalls(project.Costs, balances)))
       .ToImmutableList();
   }
 
-  public Either<ManufacturingStartFailure, ManufacturingProject> ResolveManufacturing(EquippableItemData item, Armory armory)
+  public Either<ManufacturingStartFailure, ManufacturingProject> ResolveManufacturing(ManufacturingRecipe recipe, Armory armory)
   {
-    ArgumentNullException.ThrowIfNull(item);
+    ArgumentNullException.ThrowIfNull(recipe);
     ArgumentNullException.ThrowIfNull(armory);
-    if (!_projectsByItem.TryGetValue(item, out var project))
-      return ManufacturingStartFailure.UnknownItem;
+    if (!_projectsByRecipe.TryGetValue(recipe, out var project))
+      return ManufacturingStartFailure.UnknownRecipe;
     if (ActiveJob.IsSome)
       return ManufacturingStartFailure.Busy;
-    if (project.UnlimitedStock && armory.TryGetItemStock(item).IsSome)
+    if (project.UnlimitedStock && armory.TryGetItemStock(project.Item).IsSome)
       return ManufacturingStartFailure.AlreadyAvailable;
     return project;
   }

@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Godot;
+using FunProject.Engineering;
 using GdUnit4;
 using static FunProject.Tests.GeoscapeTestScenes;
 
@@ -13,14 +14,15 @@ public class UnitArmoryAvailabilityTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var item = MakeItemData(unlimited: unlimited);
-    using var campaign = new GeoscapeFixture(MakeStart(roster: [MakeEntry()], manufacturableItems: [item]));
+    var itemRecipe = MakeManufacturingRecipe(item);
+    using var campaign = new GeoscapeFixture(MakeStart(roster: [MakeEntry()], manufacturingRecipes: [itemRecipe]));
     var state = campaign.State;
     var view = AddToTree(CreateUnitView());
     view.Present(state, state.Roster[0]);
     view.SelectSlot(UnitViewSlot.Utility(0));
     Assert.Equal(0, view.GetNode<VBoxContainer>("%ArmoryList").GetChildCount());
 
-    campaign.Session.StartManufacturing(item).RequireRight();
+    campaign.Session.StartManufacturing(itemRecipe).RequireRight();
     campaign.AdvanceTicks(1440);
 
     view.Present(state, state.Roster[0]);

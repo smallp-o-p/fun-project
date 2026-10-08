@@ -2,7 +2,7 @@ namespace FunProject.Engineering;
 
 public enum ManufacturingStartFailure
 {
-  UnknownItem,
+  UnknownRecipe,
   Busy,
   AlreadyAvailable,
   InsufficientCurrencies,

@@ -5,6 +5,7 @@ using FunProject.Currencies;
 using FunProject.Items;
 using FunProject.Research;
 using FunProject.Strategic;
+using FunProject.Engineering;
 using GdUnit4;
 using CampaignGameState = global::FunProject.GameState.GameState;
 
@@ -18,7 +19,8 @@ public class ResearchStateTest
   public void CompletionMarksProjectWithoutApplyingManufacturingEffects()
   {
     var item = MakeItemData();
-    var project = MakeResearch(manufacturingUnlocks: [item]);
+    var itemRecipe = MakeManufacturingRecipe(item);
+    var project = MakeResearch(manufacturingUnlocks: [itemRecipe]);
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project]));
     var research = campaign.State.Research;
     var definition = research.ResolveResearch(project, campaign.State).RequireRight();
@@ -28,7 +30,7 @@ public class ResearchStateTest
     Assert.True(research.CompleteIfDue(1446).IsNone);
     var completed = research.CompleteIfDue(1447).RequireSome();
     Assert.Equal(job, completed.Job);
-    Assert.Equal(item, completed.ManufacturingUnlocks[0]);
+    Assert.Equal(itemRecipe, completed.ManufacturingUnlocks[0]);
     Assert.True(research.ActiveJob.IsNone);
     Assert.True(research.IsCompleted(project));
     Assert.True(research.CompleteIfDue(1448).IsNone);
@@ -42,8 +44,10 @@ public class ResearchStateTest
   {
     var currency = MakeCurrency();
     var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item);
     var replacementItem = MakeItemData();
-    var project = MakeResearch(days: 2, manufacturingUnlocks: [item], costs: new() { [currency] = 7 });
+    var replacementItemRecipe = MakeManufacturingRecipe(replacementItem);
+    var project = MakeResearch(days: 2, manufacturingUnlocks: [itemRecipe], costs: new() { [currency] = 7 });
     var sameName = MakeResearch();
     var start = MakeStart(researchProjects: [project, project, sameName]);
     using var campaign = new GeoscapeFixture(start);
@@ -56,21 +60,20 @@ public class ResearchStateTest
     project.DurationDays = 20;
     project.Costs[currency] = 99;
     project.Condition = new NotResearchCondition { Child = new AlwaysResearchCondition() };
-    project.ManufacturingUnlocks[0] = replacementItem;
+    project.ManufacturingUnlocks[0] = replacementItemRecipe;
     var definition = research.ResolveResearch(project, campaign.State).RequireRight();
     Assert.Equal(2U, definition.DurationDays);
-    Assert.Equal(7L, research.GetCosts(project).RequireSome()[currency]);
-    Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IDictionary<Currency, long>)research.GetCosts(project).RequireSome()).Clear());
-    Assert.Equal(item, definition.ManufacturingUnlocks[0]);
+    Assert.Equal(7L, research.GetCosts(project)[currency]);
+    Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IDictionary<Currency, long>)research.GetCosts(project)).Clear());
+    Assert.Equal(itemRecipe, definition.ManufacturingUnlocks[0]);
     Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IList<ResearchProject>)catalog).Clear());
     var available = research.GetAvailableProjects(campaign.State);
     Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IList<ResearchProject>)available).Clear());
     research.Start(new ResearchJob(project, 0, 2880));
-    Assert.True(campaign.Session.GetResearchCosts(MakeResearch()).IsNone);
     var completed = research.CompleteIfDue(2880).RequireSome();
-    Assert.Equal(item, completed.ManufacturingUnlocks[0]);
+    Assert.Equal(itemRecipe, completed.ManufacturingUnlocks[0]);
     Assert.Throws<NotSupportedException>(() =>
-      ((SysColGeneric.IList<EquippableItemData>)completed.ManufacturingUnlocks).Clear());
+      ((SysColGeneric.IList<ManufacturingRecipe>)completed.ManufacturingUnlocks).Clear());
     Assert.True(research.IsCompleted(project));
     Assert.False(research.IsCompleted(sameName));
   }

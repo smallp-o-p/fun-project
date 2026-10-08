@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using FunProject.Research;
 using FunProject.Strategic;
+using FunProject.Engineering;
 using GdUnit4;
 using Godot;
 using static FunProject.Tests.GeoscapeTestScenes;
@@ -35,7 +36,7 @@ public class ResearchViewTest
     await using var cleanup = new DeferredNodeCleanup();
     bool unlocked = true;
     var first = MakeResearch("Kit", condition: new ResearchTestCondition { Predicate = _ => unlocked },
-      manufacturingUnlocks: [MakeItemData("Kit reward")]);
+      manufacturingUnlocks: [MakeManufacturingRecipe(MakeItemData("Kit reward"))]);
     first.Description = "Prototype details.";
     var second = MakeResearch("Kit");
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [first, second]));
@@ -91,8 +92,9 @@ public class ResearchViewTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var reward = MakeItemData("A research reward with a long descriptive manufacturing name");
+    var rewardRecipe = MakeManufacturingRecipe(reward);
     var currency = MakeCurrency("A currency with a deliberately long descriptive name for campaign research budgets");
-    var project = MakeResearch(manufacturingUnlocks: [reward], costs: new() { [currency] = long.MaxValue });
+    var project = MakeResearch(manufacturingUnlocks: [rewardRecipe], costs: new() { [currency] = long.MaxValue });
     for (int i = 0; i < 80; i++)
       project.Description += "Research develops new equipment for Engineering and advances through campaign time on the map. ";
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project], startingCurrencies: new() { [currency] = long.MaxValue }));

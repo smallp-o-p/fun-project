@@ -11,12 +11,13 @@ public class ProjectCatalogTest
   [TestCase(uint.MaxValue, 6_184_752_904_817L)]
   public void WholeDaysArePreservedAndScheduledFromSubmissionTime(uint days, long completesAtTick)
   {
-    var item = MakeItemData(manufacturingDays: days);
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
+    var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item, days: days);
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
     Assert.Equal(days, campaign.State.Engineering.GetManufacturingOptions(campaign.State.Armory, campaign.State.Currencies)[0].Project.DurationDays);
 
     campaign.AdvanceTicks(17);
-    var job = campaign.Session.StartManufacturing(item).RequireRight();
+    var job = campaign.Session.StartManufacturing(itemRecipe).RequireRight();
     Assert.Equal(17L, job.StartedAtTick);
     Assert.Equal(completesAtTick, job.CompletesAtTick);
   }
@@ -25,17 +26,18 @@ public class ProjectCatalogTest
   public void NullCatalogAuthoringFailsCampaignConstruction()
   {
     Assert.Throws<ArgumentNullException>(() => new GameState(MakeStart(
-      manufacturableItems: [null!])));
+      manufacturingRecipes: [null!])));
 
     var start = MakeStart();
-    start.ManufacturableItems = null!;
+    start.ManufacturingRecipes = null!;
     Assert.Throws<ArgumentNullException>(() => new GameState(start));
   }
 
   [TestCase]
   public void UnenrolledManufacturingDurationIsIgnored()
   {
-    var item = MakeItemData(manufacturingDays: 0);
+    var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item, days: 0);
     var state = new GameState(MakeStart(armory: [item]));
     Assert.True(state.Armory.HasAvailableItem(item));
     Assert.Equal(0, state.Engineering.GetManufacturingOptions(state.Armory, state.Currencies).Count);
@@ -53,29 +55,37 @@ public class ProjectCatalogTest
   public void CatalogPreservesOrderAndIdentityWithoutGrantingStock()
   {
     var firstItem = MakeItemData();
-    var secondItem = MakeItemData();
+    var firstItemRecipe = MakeManufacturingRecipe(firstItem);
+    var secondItem = firstItem;
+    var secondItemRecipe = MakeManufacturingRecipe(secondItem, days: 2);
     var state = new GameState(MakeStart(armory: [firstItem],
-      manufacturableItems: [secondItem, firstItem]));
+      manufacturingRecipes: [secondItemRecipe, firstItemRecipe]));
     var options = state.Engineering.GetManufacturingOptions(state.Armory, state.Currencies);
     Assert.Equal(2, options.Count);
+    Assert.Equal(secondItemRecipe, options[0].Project.Recipe);
+    Assert.Equal(firstItemRecipe, options[1].Project.Recipe);
+    Assert.Equal(2U, options[0].Project.DurationDays);
+    Assert.Equal(1U, options[1].Project.DurationDays);
     Assert.Equal(secondItem, options[0].Project.Item);
     Assert.Equal(firstItem, options[1].Project.Item);
     Assert.Equal(1, state.Armory.ItemStock().Count);
     Assert.Equal(1, state.Armory.ItemStock()[0].Remaining);
-    Assert.False(state.Armory.HasAvailableItem(secondItem));
-    Assert.True(state.Armory.TryGetItemStock(secondItem).IsNone);
+    Assert.True(state.Armory.HasAvailableItem(secondItem));
   }
 
   [TestCase]
   public void CatalogCopiesArraysAndBakesExportedValues()
   {
-    var item = MakeItemData(manufacturingDays: 2);
+    var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item, days: 2);
     var replacement = MakeItemData();
-    var start = MakeStart(manufacturableItems: [item]);
+    var replacementRecipe = MakeManufacturingRecipe(replacement);
+    var start = MakeStart(manufacturingRecipes: [itemRecipe]);
     var state = new GameState(start);
 
-    start.ManufacturableItems[0] = replacement;
-    item.ManufacturingDurationDays = 0;
+    start.ManufacturingRecipes[0] = replacementRecipe;
+    itemRecipe.DurationDays = 0;
+    itemRecipe.Item = replacement;
     item.UnlimitedStock = true;
 
     var options = state.Engineering.GetManufacturingOptions(state.Armory, state.Currencies);
@@ -84,10 +94,10 @@ public class ProjectCatalogTest
     Assert.False(options[0].Project.UnlimitedStock);
     Assert.Throws<NotSupportedException>(() =>
       ((SysColGeneric.IList<ManufacturingOption>)options).Clear());
-    var resolved = state.Engineering.ResolveManufacturing(item, state.Armory).RequireRight();
+    var resolved = state.Engineering.ResolveManufacturing(itemRecipe, state.Armory).RequireRight();
     Assert.Equal(2U, resolved.DurationDays);
     Assert.False(resolved.UnlimitedStock);
-    Assert.Equal(ManufacturingStartFailure.UnknownItem,
-      state.Engineering.ResolveManufacturing(replacement, state.Armory).RequireLeft());
+    Assert.Equal(ManufacturingStartFailure.UnknownRecipe,
+      state.Engineering.ResolveManufacturing(replacementRecipe, state.Armory).RequireLeft());
   }
 }

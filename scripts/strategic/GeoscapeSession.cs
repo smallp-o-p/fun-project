@@ -73,10 +73,10 @@ public sealed class GeoscapeSession
   public IReadOnlyList<ResearchProject> GetAvailableResearchProjects()
     => _state.Research.GetAvailableProjects(_state);
 
-  public Option<IReadOnlyDictionary<Currency, long>> GetResearchCosts(ResearchProject project)
+  public IReadOnlyDictionary<Currency, long> GetResearchCosts(ResearchProject project)
     => _state.Research.GetCosts(project);
 
-  public IReadOnlyList<CurrencyShortfall> GetCurrencyShortfalls(IReadOnlyDictionary<Currency, long> costs)
+  public IReadOnlyList<(Currency Currency, long Required, long Available)> GetCurrencyShortfalls(IReadOnlyDictionary<Currency, long> costs)
     => _state.GetCurrencyShortfalls(costs);
 
   public Either<ResearchStartFailure, ResearchJob> StartResearch(ResearchProject project)
@@ -93,8 +93,8 @@ public sealed class GeoscapeSession
   public IReadOnlyList<ManufacturingOption> GetManufacturingOptions()
     => _state.Engineering.GetManufacturingOptions(_state.Armory, _state.Currencies);
 
-  public Either<ManufacturingStartFailure, ManufacturingJob> StartManufacturing(EquippableItemData data)
-    => _state.Engineering.ResolveManufacturing(data, _state.Armory).Bind<ManufacturingJob>(project =>
+  public Either<ManufacturingStartFailure, ManufacturingJob> StartManufacturing(ManufacturingRecipe recipe)
+    => _state.Engineering.ResolveManufacturing(recipe, _state.Armory).Bind<ManufacturingJob>(project =>
     {
       var job = new ManufacturingJob(project, Tick, CompletionTick(project.DurationDays));
       if (!_state.TrySpendCurrencyCosts(project.Costs))

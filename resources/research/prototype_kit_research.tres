@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/research/ResearchProject.cs" id="1_project"]
 [ext_resource type="Script" path="res://scripts/research/AlwaysResearchCondition.cs" id="2_condition"]
-[ext_resource type="Resource" path="res://resources/items/prototype_kit.tres" id="3_item"]
+[ext_resource type="Resource" path="res://resources/manufacturing/prototype_kit.tres" id="3_item"]
 
 [sub_resource type="Resource" id="Condition_always"]
 script = ExtResource("2_condition")

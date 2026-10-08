@@ -6,6 +6,7 @@ using FunProject.Combatants.Conditions;
 using FunProject.Core;
 using FunProject.Dialogue;
 using FunProject.GameState;
+using FunProject.Engineering;
 using FunProject.Items;
 using FunProject.Items.Capabilities;
 using FunProject.Items.Effects;
@@ -283,14 +284,15 @@ internal static class TestData
   }
 
   // Bare armory stock entries: no capabilities, so withdrawal materializes plain items.
-  public static EquippableItemData MakeItemData(string name = "Item", bool unlimited = false,
-    uint manufacturingDays = 1, Godot.Collections.Dictionary<Currency, long> manufacturingCosts = null) => new()
-    {
-      Name = name,
-      UnlimitedStock = unlimited,
-      ManufacturingDurationDays = manufacturingDays,
-      ManufacturingCosts = manufacturingCosts ?? [],
-    };
+  public static EquippableItemData MakeItemData(string name = "Item", bool unlimited = false) => new()
+  {
+    Name = name,
+    UnlimitedStock = unlimited,
+  };
+
+  public static ManufacturingRecipe MakeManufacturingRecipe(EquippableItemData item, uint days = 1,
+    Godot.Collections.Dictionary<Currency, long> costs = null)
+    => new() { Item = item, DurationDays = days, Costs = costs ?? [] };
 
   public static MultiStatMod MakeMod(string name, bool unlimited = false) =>
     new() { Name = name, UnlimitedStock = unlimited };
@@ -635,7 +637,7 @@ internal static class TestData
     RosterEntryData[] roster = null,
     EquippableItemData[] armory = null,
     EquippableMod[] modStock = null,
-    EquippableItemData[] manufacturableItems = null,
+    ManufacturingRecipe[] manufacturingRecipes = null,
     ResearchProject[] researchProjects = null,
     CaptiveEntryData[] captives = null,
     CombatantConditionRulesData? conditionRules = null,
@@ -649,7 +651,7 @@ internal static class TestData
       StartingRoster = roster ?? [],
       Armory = armory ?? [],
       ModStock = modStock ?? [],
-      ManufacturableItems = manufacturableItems ?? [],
+      ManufacturingRecipes = manufacturingRecipes ?? [],
       ResearchProjects = researchProjects ?? [],
       StartingCaptives = captives ?? [],
       ConditionRules = conditionRules,
@@ -662,7 +664,7 @@ internal static class TestData
   public static ResearchProject MakeResearch(
     string name = "Research", uint days = 1,
     ResearchCondition condition = null,
-    EquippableItemData[] manufacturingUnlocks = null,
+    ManufacturingRecipe[] manufacturingUnlocks = null,
     Godot.Collections.Dictionary<Currency, long> costs = null)
     => new()
     {

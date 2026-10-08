@@ -17,9 +17,10 @@ public class ResearchTest
   {
     var a = MakeCurrency("A");
     var b = MakeCurrency("B");
-    var item = MakeItemData(manufacturingCosts: new() { [a] = 20, [b] = 2 });
+    var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item, costs: new() { [a] = 20, [b] = 2 });
     var project = MakeResearch(costs: new() { [a] = 30, [b] = 3 });
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item], researchProjects: [project],
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe], researchProjects: [project],
       startingCurrencies: new() { [a] = 100, [b] = 10 }));
     campaign.Session.EventCommitted += fact =>
     {
@@ -36,7 +37,7 @@ public class ResearchTest
         Assert.Equal(5L, campaign.State.GetCurrencyBalance(b));
       }
     };
-    campaign.Session.StartManufacturing(item).RequireRight();
+    campaign.Session.StartManufacturing(itemRecipe).RequireRight();
     campaign.Session.StartResearch(project).RequireRight();
     campaign.AdvanceTicks(100);
     var rebuilt = new GeoscapeSession(campaign.State);
@@ -56,10 +57,11 @@ public class ResearchTest
   {
     var a = MakeCurrency("A");
     var b = MakeCurrency("B");
-    var item = MakeItemData(manufacturingCosts: new() { [a] = 7, [b] = 2 });
+    var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item, costs: new() { [a] = 7, [b] = 2 });
     var old = MakeResearch("Old");
     var project = MakeResearch(costs: new() { [a] = 7, [b] = 2 });
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item], researchProjects: [old, project],
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe], researchProjects: [old, project],
       startingCurrencies: new() { [a] = 10, [b] = 1 }));
     var active = campaign.Session.StartResearch(old).RequireRight();
     campaign.AdvanceTicks(100);
@@ -67,7 +69,7 @@ public class ResearchTest
     if (research)
       Assert.Equal(ResearchStartFailure.InsufficientCurrencies, campaign.Session.StartResearch(project).RequireLeft());
     else
-      Assert.Equal(ManufacturingStartFailure.InsufficientCurrencies, campaign.Session.StartManufacturing(item).RequireLeft());
+      Assert.Equal(ManufacturingStartFailure.InsufficientCurrencies, campaign.Session.StartManufacturing(itemRecipe).RequireLeft());
     Assert.Equal(Some(active), campaign.Session.ActiveResearch);
     Assert.True(campaign.Session.ActiveManufacturing.IsNone);
     Assert.Equal(10L, campaign.State.GetCurrencyBalance(a));
@@ -111,8 +113,9 @@ public class ResearchTest
     var currency = MakeCurrency();
     var old = MakeResearch("Old");
     var project = MakeResearch(costs: new() { [currency] = 7 });
-    var item = MakeItemData(manufacturingCosts: new() { [currency] = 7 });
-    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [old, project], manufacturableItems: [item],
+    var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item, costs: new() { [currency] = 7 });
+    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [old, project], manufacturingRecipes: [itemRecipe],
       startingCurrencies: new() { [currency] = 10 }));
     campaign.Session.StartResearch(old).RequireRight();
     campaign.AdvanceTicks(10);
@@ -132,10 +135,10 @@ public class ResearchTest
     }
     else
     {
-      Assert.Throws<InvalidOperationException>(() => campaign.Session.StartManufacturing(item));
+      Assert.Throws<InvalidOperationException>(() => campaign.Session.StartManufacturing(itemRecipe));
       var job = campaign.Session.ActiveManufacturing.RequireSome();
       Assert.Equal(item, job.Project.Item);
-      Assert.Equal(ManufacturingStartFailure.Busy, campaign.Session.StartManufacturing(item).RequireLeft());
+      Assert.Equal(ManufacturingStartFailure.Busy, campaign.Session.StartManufacturing(itemRecipe).RequireLeft());
       Assert.Equal(Some(job), campaign.Session.ActiveManufacturing);
     }
     Assert.Equal(3L, campaign.State.GetCurrencyBalance(currency));
@@ -146,10 +149,12 @@ public class ResearchTest
   {
     var currency = MakeCurrency();
     var first = MakeItemData("Valid");
-    var malformed = MakeItemData("Malformed", manufacturingCosts: new() { [currency] = 7 });
-    var project = MakeResearch(days: 0, manufacturingUnlocks: [first, malformed], costs: new() { [currency] = 7 });
+    var firstRecipe = MakeManufacturingRecipe(first);
+    var malformed = MakeItemData("Malformed");
+    var malformedRecipe = MakeManufacturingRecipe(malformed, costs: new() { [currency] = 7 });
+    var project = MakeResearch(days: 0, manufacturingUnlocks: [firstRecipe, malformedRecipe], costs: new() { [currency] = 7 });
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project], startingCurrencies: new() { [currency] = 10 }));
-    malformed.ManufacturingCosts[currency] = -1;
+    malformedRecipe.Costs[currency] = -1;
     campaign.Session.StartResearch(project).RequireRight();
     Assert.Throws<ArgumentOutOfRangeException>(() => campaign.AdvanceTicks(1));
     Assert.True(campaign.Session.ActiveResearch.IsNone);
@@ -165,13 +170,14 @@ public class ResearchTest
   public void ResearchUnlocksManufacturingBeforeBroadcastWithoutGrantingStock()
   {
     var item = MakeItemData();
-    var project = MakeResearch(manufacturingUnlocks: [item]);
+    var itemRecipe = MakeManufacturingRecipe(item);
+    var project = MakeResearch(manufacturingUnlocks: [itemRecipe]);
     var dependent = MakeResearch("Dependent", condition: new ResearchCompletedCondition { Project = project });
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project, dependent]));
     var session = campaign.Session;
     Assert.Equal(2, session.GetResearchProjects().Count);
     Assert.Equal(1, session.GetAvailableResearchProjects().Count);
-    Assert.Equal(ManufacturingStartFailure.UnknownItem, session.StartManufacturing(item).RequireLeft());
+    Assert.Equal(ManufacturingStartFailure.UnknownRecipe, session.StartManufacturing(itemRecipe).RequireLeft());
     session.EventCommitted += e =>
     {
       if (e is ResearchStarted started)
@@ -198,7 +204,7 @@ public class ResearchTest
     campaign.AdvanceTicks(1);
     Assert.Equal(job, campaign.Events.SingleEvent<ResearchCompleted>().Job);
     Assert.Equal(0, campaign.State.Armory.ItemStock().Count);
-    session.StartManufacturing(item).RequireRight();
+    session.StartManufacturing(itemRecipe).RequireRight();
     campaign.AdvanceTicks(1440);
     Assert.True(campaign.State.Armory.TryWithdrawItem(item).IsSome);
     Assert.Equal(1, campaign.Events.EventsOf<ResearchCompleted>().Length);
@@ -208,9 +214,11 @@ public class ResearchTest
   public void ResearchCompletionRegistersManufacturingOptionsInCompletionOrder()
   {
     var firstItem = MakeItemData("First item");
+    var firstItemRecipe = MakeManufacturingRecipe(firstItem);
     var secondItem = MakeItemData("Second item");
-    var firstProject = MakeResearch("First project", manufacturingUnlocks: [firstItem]);
-    var secondProject = MakeResearch("Second project", manufacturingUnlocks: [secondItem]);
+    var secondItemRecipe = MakeManufacturingRecipe(secondItem);
+    var firstProject = MakeResearch("First project", manufacturingUnlocks: [firstItemRecipe]);
+    var secondProject = MakeResearch("Second project", manufacturingUnlocks: [secondItemRecipe]);
     using var campaign = new GeoscapeFixture(MakeStart(
       researchProjects: [firstProject, secondProject]));
 
@@ -229,6 +237,7 @@ public class ResearchTest
   public void LiveAvailabilityRelocksWhilePausedButDoesNotInterruptStartedResearch()
   {
     var key = MakeItemData("Key");
+    var keyRecipe = MakeManufacturingRecipe(key);
     var condition = new ResearchTestCondition { Predicate = state => state.Armory.HasAvailableItem(key) };
     var first = MakeResearch("First", condition: condition);
     var second = MakeResearch("Second", condition: condition);
@@ -292,9 +301,11 @@ public class ResearchTest
   public void SwitchingDiscardsProgressAndOnlyTheReplacementCanComplete()
   {
     var firstItem = MakeItemData("First reward");
+    var firstItemRecipe = MakeManufacturingRecipe(firstItem);
     var secondItem = MakeItemData("Second reward");
-    var first = MakeResearch("First", manufacturingUnlocks: [firstItem]);
-    var second = MakeResearch("Second", days: 2, manufacturingUnlocks: [secondItem]);
+    var secondItemRecipe = MakeManufacturingRecipe(secondItem);
+    var first = MakeResearch("First", manufacturingUnlocks: [firstItemRecipe]);
+    var second = MakeResearch("Second", days: 2, manufacturingUnlocks: [secondItemRecipe]);
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [first, second]));
     var session = campaign.Session;
     session.StartResearch(first).RequireRight();
@@ -443,11 +454,13 @@ public class ResearchTest
   public void BothJobsCompleteAfterScheduleAndExpiryInDefinedOrder()
   {
     var initial = MakeItemData("Initial");
+    var initialRecipe = MakeManufacturingRecipe(initial);
     var unlocked = MakeItemData("Unlocked");
-    var project = MakeResearch(manufacturingUnlocks: [unlocked]);
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [initial],
+    var unlockedRecipe = MakeManufacturingRecipe(unlocked);
+    var project = MakeResearch(manufacturingUnlocks: [unlockedRecipe]);
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [initialRecipe],
       researchProjects: [project], timeline: [MakeScheduled(1440, MakeEvent("Brief", expiresAfterTicks: 0))]));
-    campaign.Session.StartManufacturing(initial).RequireRight();
+    campaign.Session.StartManufacturing(initialRecipe).RequireRight();
     campaign.Session.StartResearch(project).RequireRight();
     campaign.AdvanceTicks(1439);
     campaign.ClearEvents();
@@ -467,7 +480,8 @@ public class ResearchTest
   public void RebuiltSessionPreservesProgressAndLargeAdvanceCompletesExactlyAtDeadline()
   {
     var item = MakeItemData();
-    var project = MakeResearch(manufacturingUnlocks: [item]);
+    var itemRecipe = MakeManufacturingRecipe(item);
+    var project = MakeResearch(manufacturingUnlocks: [itemRecipe]);
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project]));
     var job = campaign.Session.StartResearch(project).RequireRight();
     campaign.AdvanceTicks(7);
@@ -499,10 +513,12 @@ public class ResearchTest
   public void CompletedResearchAndManufacturingUnlocksSurviveConditionLossAndOverlap()
   {
     var key = MakeItemData("Key");
+    var keyRecipe = MakeManufacturingRecipe(key);
     var item = MakeItemData("Product");
+    var itemRecipe = MakeManufacturingRecipe(item);
     var first = MakeResearch("First", condition: new ResearchTestCondition
-    { Predicate = state => state.Armory.HasAvailableItem(key) }, manufacturingUnlocks: [item]);
-    var second = MakeResearch("Second", manufacturingUnlocks: [item, item]);
+    { Predicate = state => state.Armory.HasAvailableItem(key) }, manufacturingUnlocks: [itemRecipe]);
+    var second = MakeResearch("Second", manufacturingUnlocks: [itemRecipe, itemRecipe]);
     using var campaign = new GeoscapeFixture(MakeStart(armory: [key], researchProjects: [first, second]));
     campaign.Session.StartResearch(first).RequireRight();
     campaign.AdvanceTicks(1440);
@@ -517,6 +533,6 @@ public class ResearchTest
     Assert.False(campaign.State.Armory.HasAvailableItem(item));
     using var other = new GeoscapeFixture(MakeStart(armory: [key], researchProjects: [first, second]));
     Assert.False(other.State.Research.IsCompleted(first));
-    Assert.Equal(ManufacturingStartFailure.UnknownItem, other.Session.StartManufacturing(item).RequireLeft());
+    Assert.Equal(ManufacturingStartFailure.UnknownRecipe, other.Session.StartManufacturing(itemRecipe).RequireLeft());
   }
 }

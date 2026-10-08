@@ -2,6 +2,7 @@ using FunProject.Strategic;
 using FunProject.Geoscape;
 using static FunProject.Tests.GeoscapeTestScenes;
 using Godot;
+using FunProject.Engineering;
 using GdUnit4;
 using System;
 using System.Threading.Tasks;
@@ -23,9 +24,10 @@ public partial class GeoscapeHudTest
   [TestCase(3000L, "0d remaining")]
   public void ManufacturingSummaryShowsOnlyCurrentJobAndRoundedUpDays(long tick, string expected)
   {
-    var item = MakeItemData("Field kit", manufacturingDays: 2);
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
-    Assert.True(campaign.Session.StartManufacturing(item).IsRight);
+    var item = MakeItemData("Field kit");
+    var itemRecipe = MakeManufacturingRecipe(item, days: 2);
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
+    Assert.True(campaign.Session.StartManufacturing(itemRecipe).IsRight);
     var hud = BuildHud();
 
     hud.UpdateManufacturing(campaign.Session.ActiveManufacturing, tick);
@@ -38,9 +40,10 @@ public partial class GeoscapeHudTest
   [TestCase]
   public void IdleManufacturingClearsPreviousJobAndRemainingDays()
   {
-    var item = MakeItemData("Field kit", manufacturingDays: 2);
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
-    Assert.True(campaign.Session.StartManufacturing(item).IsRight);
+    var item = MakeItemData("Field kit");
+    var itemRecipe = MakeManufacturingRecipe(item, days: 2);
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
+    Assert.True(campaign.Session.StartManufacturing(itemRecipe).IsRight);
     var hud = BuildHud();
     hud.UpdateManufacturing(campaign.Session.ActiveManufacturing, 60);
 

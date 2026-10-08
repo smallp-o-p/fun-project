@@ -14,7 +14,7 @@ public class EngineeringViewTest
   public async Task WorkshopCatalogAndInspectorFitWithoutHidingActions(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [MakeItemData()]));
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [MakeManufacturingRecipe(MakeItemData())]));
     var view = CreateEngineeringView();
     CreateUiViewport(view, new Vector2I(width, height));
     view.Present(campaign.State, campaign.Session);
@@ -41,10 +41,11 @@ public class EngineeringViewTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var currency = MakeCurrency("A currency with a deliberately long descriptive name for campaign production budgets");
-    var item = MakeItemData(manufacturingCosts: new() { [currency] = long.MaxValue });
+    var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item, costs: new() { [currency] = long.MaxValue });
     for (int i = 0; i < 30; i++)
       item.Description += "Engineering describes workshop production and the supply behavior of a utility kit. ";
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item], startingCurrencies: new() { [currency] = long.MaxValue }));
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe], startingCurrencies: new() { [currency] = long.MaxValue }));
     var session = campaign.Session;
     var view = CreateEngineeringView();
     CreateUiViewport(view, new Vector2I(width, height));
@@ -96,15 +97,17 @@ public class EngineeringViewTest
   [TestCase]
   public void SelectingRowsDisplaysParsedDurationAndScarceStockInCatalogOrder()
   {
-    var first = MakeItemData("Field scanner", manufacturingDays: 1);
+    var first = MakeItemData("Field scanner");
+    var firstRecipe = MakeManufacturingRecipe(first, days: 1);
     first.Description = "Survey the terrain from a safe distance.";
-    var second = MakeItemData("Medkit", manufacturingDays: 2);
+    var second = MakeItemData("Medkit");
+    var secondRecipe = MakeManufacturingRecipe(second, days: 2);
     second.Description = "Treat injured soldiers.";
     using var campaign = new GeoscapeFixture(MakeStart(
-      armory: [first], manufacturableItems: [first, second]));
+      armory: [first], manufacturingRecipes: [firstRecipe, secondRecipe]));
     campaign.State.Armory.AddStock(first, 1);
     var session = campaign.Session;
-    first.ManufacturingDurationDays = 99;
+    firstRecipe.DurationDays = 99;
     first.UnlimitedStock = true;
     var view = AddToTree(CreateEngineeringView());
     view.Present(campaign.State, session);
@@ -129,16 +132,18 @@ public class EngineeringViewTest
   public async Task ActiveJobDisablesExistingAndNewSelectionAndIgnoresProgrammaticSignal()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var first = MakeItemData("Scanner", manufacturingDays: 1);
+    var first = MakeItemData("Scanner");
+    var firstRecipe = MakeManufacturingRecipe(first, days: 1);
     var second = MakeItemData("Medkit");
+    var secondRecipe = MakeManufacturingRecipe(second);
     using var campaign = new GeoscapeFixture(MakeStart(
-      manufacturableItems: [first, second]));
+      manufacturingRecipes: [firstRecipe, secondRecipe]));
     var session = campaign.Session;
     var view = AddToTree(CreateEngineeringView());
     view.Present(campaign.State, session);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0)
       .EmitSignal(Button.SignalName.Pressed);
-    Assert.True(session.StartManufacturing(first).IsRight);
+    Assert.True(session.StartManufacturing(firstRecipe).IsRight);
     view.Present(campaign.State, session);
     Assert.True(view.GetNode<Button>("%ManufactureButton").Disabled);
     view.GetNode<Button>("%ManufactureButton").EmitSignal(Button.SignalName.Pressed);
@@ -159,10 +164,11 @@ public class EngineeringViewTest
   public async Task ActiveRemainingTimeUsesSuppliedTickAndClampsElapsedCompletion()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var item = MakeItemData("Field scanner", manufacturingDays: 1);
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
+    var item = MakeItemData("Field scanner");
+    var itemRecipe = MakeManufacturingRecipe(item, days: 1);
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
     var session = campaign.Session;
-    Assert.True(session.StartManufacturing(item).IsRight);
+    Assert.True(session.StartManufacturing(itemRecipe).IsRight);
     campaign.AdvanceTicks(2);
     var view = AddToTree(CreateEngineeringView());
     view.Present(campaign.State, session);
@@ -178,17 +184,19 @@ public class EngineeringViewTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var first = MakeItemData("First");
-    var second = MakeItemData("Second", manufacturingDays: 1);
+    var firstRecipe = MakeManufacturingRecipe(first);
+    var second = MakeItemData("Second");
+    var secondRecipe = MakeManufacturingRecipe(second, days: 1);
     using var campaign = new GeoscapeFixture(MakeStart(
-      manufacturableItems: [first, second]));
+      manufacturingRecipes: [firstRecipe, secondRecipe]));
     var session = campaign.Session;
     var view = AddToTree(CreateEngineeringView());
     view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(1)
       .EmitSignal(Button.SignalName.Pressed);
-    second.ManufacturingDurationDays = 2;
+    secondRecipe.DurationDays = 2;
     using var refreshedCampaign = new GeoscapeFixture(MakeStart(
-      armory: [second], manufacturableItems: [second, first]));
+      armory: [second], manufacturingRecipes: [secondRecipe, firstRecipe]));
     refreshedCampaign.State.Armory.AddStock(second, 2);
     var refreshed = refreshedCampaign.Session;
     view.Present(refreshed.GetManufacturingOptions(), refreshed.ActiveManufacturing, refreshed.Tick);
@@ -207,15 +215,17 @@ public class EngineeringViewTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var item = MakeItemData("Scanner");
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
+    var itemRecipe = MakeManufacturingRecipe(item);
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
     var session = campaign.Session;
     var view = AddToTree(CreateEngineeringView());
     view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0)
       .EmitSignal(Button.SignalName.Pressed);
     var replacement = MakeItemData("Scanner");
+    var replacementRecipe = MakeManufacturingRecipe(replacement);
     using var refreshedCampaign = new GeoscapeFixture(MakeStart(
-      manufacturableItems: [replacement]));
+      manufacturingRecipes: [replacementRecipe]));
     var refreshed = refreshedCampaign.Session;
     view.Present(refreshed.GetManufacturingOptions(), refreshed.ActiveManufacturing, refreshed.Tick);
 
@@ -232,10 +242,12 @@ public class EngineeringViewTest
   public async Task ActivatedUnlimitedItemDisappearsAndClearsSelectionWhileOtherItemsRemain()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var supply = MakeItemData("Supply", unlimited: true, manufacturingDays: 1);
+    var supply = MakeItemData("Supply", unlimited: true);
+    var supplyRecipe = MakeManufacturingRecipe(supply, days: 1);
     var scarce = MakeItemData("Medkit");
+    var scarceRecipe = MakeManufacturingRecipe(scarce);
     using var campaign = new GeoscapeFixture(MakeStart(
-      manufacturableItems: [supply, scarce]));
+      manufacturingRecipes: [supplyRecipe, scarceRecipe]));
     var session = campaign.Session;
     var view = AddToTree(CreateEngineeringView());
     view.Present(campaign.State, session);
@@ -245,7 +257,7 @@ public class EngineeringViewTest
     Assert.Equal("Stock: Not established", view.GetNode<Label>("%Stock").Text);
     Assert.Equal("Establishes unlimited supply.", view.GetNode<Label>("%SupplyEffect").Text);
     Assert.False(view.GetNode<Button>("%ManufactureButton").Disabled);
-    session.StartManufacturing(supply).RequireRight();
+    session.StartManufacturing(supplyRecipe).RequireRight();
     campaign.AdvanceTicks(1440);
     view.Present(campaign.State, session);
 
@@ -265,7 +277,8 @@ public class EngineeringViewTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var item = MakeItemData();
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
+    var itemRecipe = MakeManufacturingRecipe(item);
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
     var session = campaign.Session;
     var view = AddToTree(CreateEngineeringView());
     bool backed = false;
@@ -289,7 +302,7 @@ public class EngineeringViewTest
     Assert.True(view.IsInsideTree() && !view.IsQueuedForDeletion()); // Back never frees the view itself
   }
 
-  [TestCase(ManufacturingStartFailure.UnknownItem)]
+  [TestCase(ManufacturingStartFailure.UnknownRecipe)]
   [TestCase(ManufacturingStartFailure.Busy)]
   [TestCase(ManufacturingStartFailure.AlreadyAvailable)]
   [TestCase(ManufacturingStartFailure.InsufficientCurrencies)]
@@ -297,6 +310,7 @@ public class EngineeringViewTest
   {
     var view = AddToTree(CreateEngineeringView());
     var item = MakeItemData("Selected item");
+    var itemRecipe = MakeManufacturingRecipe(item);
     view.ShowFailure(item, failure);
     Assert.True(view.GetNode<Label>("%Status").Text.Contains(item.Name));
     Assert.True(view.GetNode<Label>("%Status").Text.Contains(failure.ToString()));

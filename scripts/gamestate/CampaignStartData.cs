@@ -1,6 +1,7 @@
 using FunProject.Combatants;
 using FunProject.Combatants.Conditions;
 using FunProject.Core;
+using FunProject.Engineering;
 using FunProject.Currencies;
 using FunProject.Items;
 using FunProject.Research;
@@ -37,7 +38,7 @@ public partial class CampaignStartData : NamedEntityData
 
   [Export] public EquippableMod[] ModStock { get; set; } = [];
 
-  [Export] public EquippableItemData[] ManufacturableItems { get; set; } = [];
+  [Export] public ManufacturingRecipe[] ManufacturingRecipes { get; set; } = [];
 
   [Export] public ResearchProject[] ResearchProjects { get; set; } = [];
 

@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using FunProject.Geoscape;
+using FunProject.Engineering;
 using GdUnit4;
 using Godot;
 using static FunProject.Tests.GeoscapeTestScenes;
@@ -14,13 +15,14 @@ public class GeoscapeProjectsIntegrationTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var currency = MakeCurrency("Budget");
-    var item = MakeItemData(manufacturingCosts: new() { [currency] = 10 });
+    var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item, costs: new() { [currency] = 10 });
     var old = MakeResearch("Old");
     var project = MakeResearch(costs: new() { [currency] = 10 });
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item], researchProjects: [old, project],
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe], researchProjects: [old, project],
       startingCurrencies: new() { [currency] = 5 }));
     var active = campaign.Session.StartResearch(old).RequireRight();
-    item.ManufacturingCosts[currency] = 99;
+    itemRecipe.Costs[currency] = 99;
     project.Costs[currency] = 99;
     GeoscapeView view = research ? CreateResearchView() : CreateEngineeringView();
     AddToTree(view);
@@ -38,7 +40,7 @@ public class GeoscapeProjectsIntegrationTest
     Assert.Equal(Some(active), campaign.Session.ActiveResearch);
     Assert.True(campaign.Session.ActiveManufacturing.IsNone);
 
-    using var free = new GeoscapeFixture(MakeStart(manufacturableItems: [MakeItemData(manufacturingCosts: new() { [currency] = 0 })],
+    using var free = new GeoscapeFixture(MakeStart(manufacturingRecipes: [MakeManufacturingRecipe(MakeItemData(), costs: new() { [currency] = 0 })],
       researchProjects: [MakeResearch()]));
     view.Present(free.State, free.Session);
     OnlyChild<Button>(rows).EmitSignal(Button.SignalName.Pressed);
@@ -52,9 +54,10 @@ public class GeoscapeProjectsIntegrationTest
   {
     await using var cleanup = new DeferredNodeCleanup();
     var currency = MakeCurrency("Budget");
-    var item = MakeItemData(manufacturingCosts: new() { [currency] = 10 });
+    var item = MakeItemData();
+    var itemRecipe = MakeManufacturingRecipe(item, costs: new() { [currency] = 10 });
     var project = MakeResearch(costs: new() { [currency] = 10 });
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item], researchProjects: [project],
+    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe], researchProjects: [project],
       startingCurrencies: new() { [currency] = 10 }));
     GeoscapeView view = research ? CreateResearchView() : CreateEngineeringView();
     AddToTree(view);
@@ -64,7 +67,7 @@ public class GeoscapeProjectsIntegrationTest
     var start = view.GetNode<Button>(research ? "%StartResearchButton" : "%ManufactureButton");
     Assert.False(start.Disabled);
     if (research)
-      campaign.Session.StartManufacturing(item).RequireRight();
+      campaign.Session.StartManufacturing(itemRecipe).RequireRight();
     else
       campaign.Session.StartResearch(project).RequireRight();
     campaign.ClearEvents();
@@ -163,10 +166,12 @@ public class GeoscapeProjectsIntegrationTest
   public async Task BrowsingFreezesManufacturingAndReturningToMapRefreshesCompletion()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var scarce = MakeItemData("Scanner", manufacturingDays: 1);
-    var unlimited = MakeItemData("Field kit", unlimited: true, manufacturingDays: 2);
+    var scarce = MakeItemData("Scanner");
+    var scarceRecipe = MakeManufacturingRecipe(scarce, days: 1);
+    var unlimited = MakeItemData("Field kit", unlimited: true);
+    var unlimitedRecipe = MakeManufacturingRecipe(unlimited, days: 2);
     var scene = AddToTree(CreateGeoscapeScene(MakeStart(
-      manufacturableItems: [scarce, unlimited])));
+      manufacturingRecipes: [scarceRecipe, unlimitedRecipe])));
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
     PressEngineeringButton(scene);
@@ -266,8 +271,9 @@ public class GeoscapeProjectsIntegrationTest
   public async Task ReopeningEngineeringStartsOneJobPerRequestAndClearsCompletedSummary()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var item = MakeItemData("Field kit", manufacturingDays: 1);
-    var scene = AddToTree(CreateGeoscapeScene(MakeStart(manufacturableItems: [item])));
+    var item = MakeItemData("Field kit");
+    var itemRecipe = MakeManufacturingRecipe(item, days: 1);
+    var scene = AddToTree(CreateGeoscapeScene(MakeStart(manufacturingRecipes: [itemRecipe])));
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     var hud = scene.GetNode<GeoscapeHud>("%GeoscapeHud");
     PressEngineeringButton(scene);
@@ -315,7 +321,8 @@ public class GeoscapeProjectsIntegrationTest
     PressEngineeringButton(scene);
     var view = (EngineeringView)manager.Current;
     var item = MakeItemData();
-    using var foreignCampaign = new GeoscapeFixture(MakeStart(manufacturableItems: [item]));
+    var itemRecipe = MakeManufacturingRecipe(item);
+    using var foreignCampaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
     var foreign = foreignCampaign.Session;
     view.Present(foreign.GetManufacturingOptions(), None, 0);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0).EmitSignal(Button.SignalName.Pressed);
@@ -324,7 +331,7 @@ public class GeoscapeProjectsIntegrationTest
     Assert.Equal("No items available to manufacture.",
       OnlyChild<Label>(view.GetNode<VBoxContainer>("%ManufacturableItems")).Text);
     Assert.Equal("No active manufacturing.", view.GetNode<Label>("%ActiveJob").Text);
-    Assert.True(view.GetNode<Label>("%Status").Text.Contains("UnknownItem"));
+    Assert.True(view.GetNode<Label>("%Status").Text.Contains("UnknownRecipe"));
     Assert.True(view.GetNode<Label>("%Status").Text.Contains(item.Name));
   }
 }

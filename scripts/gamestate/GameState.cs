@@ -55,8 +55,12 @@ public sealed class GameState
   {
     ArgumentNullException.ThrowIfNull(start);
 
-    foreach (var (currency, amount) in CurrencyCosts.Capture(start.StartingCurrencies))
+    ArgumentNullException.ThrowIfNull(start.StartingCurrencies);
+    foreach (var (currency, amount) in start.StartingCurrencies)
+    {
+      Currency.ValidateAmount(currency, amount);
       _currencies.Add(currency, amount);
+    }
 
     GeoscapeMapData map = start.Map ?? throw new InvalidOperationException(
       "CampaignStartData requires a Map; assign one in the inspector.");
@@ -114,7 +118,7 @@ public sealed class GameState
 
     Conditions = new CombatantConditionSystem(start.ConditionRules);
 
-    Engineering = new EngineeringState(start.ManufacturableItems);
+    Engineering = new EngineeringState(start.ManufacturingRecipes);
     Armory = new Armory(start.Armory, start.ModStock);
   }
 
@@ -161,8 +165,8 @@ public sealed class GameState
     return _currencies.GetValueOrDefault(currency);
   }
 
-  public IReadOnlyList<CurrencyShortfall> GetCurrencyShortfalls(IReadOnlyDictionary<Currency, long> costs)
-    => CurrencyCosts.Shortfalls(costs, _currencies);
+  public IReadOnlyList<(Currency Currency, long Required, long Available)> GetCurrencyShortfalls(IReadOnlyDictionary<Currency, long> costs)
+    => Currency.GetShortfalls(costs, _currencies);
 
   internal bool TrySpendCurrencyCosts(IReadOnlyDictionary<Currency, long> costs)
   {

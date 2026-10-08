@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using FunProject.Engineering;
-using FunProject.Items;
 using FunProject.Research;
 using FunProject.Combatants;
 
@@ -28,7 +27,7 @@ public sealed record ManufacturingCompleted(ManufacturingJob Job) : IGeoscapeEve
 public sealed record ResearchStarted(ResearchJob Job) : IGeoscapeEvent;
 
 public sealed record ResearchCompleted(ResearchJob Job,
-  IReadOnlyList<EquippableItemData> ManufacturingUnlocks) : IGeoscapeEvent;
+  IReadOnlyList<ManufacturingRecipe> ManufacturingUnlocks) : IGeoscapeEvent;
 
 public sealed record TimeAdvanced(long Tick, DateTime CurrentTime) : IGeoscapeEvent;
 

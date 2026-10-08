@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using CampaignGameState = FunProject.GameState.GameState;
 using FunProject.Engineering;
+using FunProject.Currencies;
 using FunProject.Items;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
@@ -35,7 +36,7 @@ public sealed partial class EngineeringView : GeoscapeView
     _selection = _selection.Bind(selected =>
     {
       foreach (var option in _options)
-        if (ReferenceEquals(option.Project.Item, selected.Project.Item))
+        if (ReferenceEquals(option.Project.Recipe, selected.Project.Recipe))
           return Some(option);
       return None;
     });
@@ -57,7 +58,7 @@ public sealed partial class EngineeringView : GeoscapeView
       return;
     _selection.IfSome(option =>
     {
-      var result = _session.StartManufacturing(option.Project.Item);
+      var result = _session.StartManufacturing(option.Project.Recipe);
       Present(_session.GetManufacturingOptions(), _session.ActiveManufacturing, _session.Tick);
       result.IfLeft(reason => ShowFailure(option.Project.Item, reason)); // after the refresh: it clears the status line
     });
@@ -100,7 +101,7 @@ public sealed partial class EngineeringView : GeoscapeView
     {
       int rowIndex = index;
       rows.GetChild<Button>(index).SetPressedNoSignal(_selection.Match(
-        selected => ReferenceEquals(selected.Project.Item, _options[rowIndex].Project.Item),
+        selected => ReferenceEquals(selected.Project.Recipe, _options[rowIndex].Project.Recipe),
         () => false));
     }
     GetNode<Label>("%ItemName").Text = _selection.Match(
@@ -112,7 +113,7 @@ public sealed partial class EngineeringView : GeoscapeView
     GetNode<Label>("%Stock").Text = _selection.Match(
       option => option.Project.UnlimitedStock ? "Stock: Not established" : $"Stock: {option.Remaining}", () => "");
     GetNode<Label>("%CurrencyCosts").Text = _selection.Match(
-      option => CurrencyCostText.Format(option.Project.Costs, option.Shortfalls), () => "");
+      option => Currency.FormatCosts(option.Project.Costs, option.Shortfalls), () => "");
     GetNode<Label>("%CurrencyCosts").Visible = _selection.IsSome;
     GetNode<Label>("%SupplyEffect").Text = _selection.Match(
       option => option.Project.UnlimitedStock ? "Establishes unlimited supply." : "Produces 1 item.", () => "");

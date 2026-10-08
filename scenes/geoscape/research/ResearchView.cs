@@ -1,6 +1,7 @@
 using System;
 using CampaignGameState = FunProject.GameState.GameState;
 using FunProject.Research;
+using FunProject.Currencies;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
 using Godot;
@@ -90,14 +91,13 @@ public sealed partial class ResearchView : GeoscapeView
       GetNode<Label>("%ProjectName").Text = project.Name;
       GetNode<Label>("%ProjectDescription").Text = project.Description;
       GetNode<Label>("%ResearchDuration").Text = $"Duration: {project.DurationDays}d";
-      var costs = _session.GetResearchCosts(project).Match(costs => costs,
-        () => throw new InvalidOperationException("Selected research project is not registered."));
+      var costs = _session.GetResearchCosts(project);
       var shortfalls = _session.GetCurrencyShortfalls(costs);
-      GetNode<Label>("%CurrencyCosts").Text = CurrencyCostText.Format(costs, shortfalls);
+      GetNode<Label>("%CurrencyCosts").Text = Currency.FormatCosts(costs, shortfalls);
       start.Disabled = shortfalls.Count > 0;
       GetNode<Label>("%ManufacturingUnlocks").Text = "Manufacturing unlocks: " + (project.ManufacturingUnlocks.Length == 0
         ? "None"
-        : string.Join(", ", project.ManufacturingUnlocks.AsValueEnumerable().Select(item => item.Name).ToArray()));
+        : string.Join(", ", project.ManufacturingUnlocks.AsValueEnumerable().Select(item => item.Item.Name).ToArray()));
     }
     else
     {
