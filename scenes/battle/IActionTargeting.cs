@@ -19,7 +19,7 @@ public interface IActionTargeting
 {
   ConfirmMode Confirm { get; }
   IReadOnlyCollection<Vector3I> Candidates { get; }              // last-computed candidate cells to highlight
-  IReadOnlyCollection<Vector3I> Begin();                         // (re)computes Candidates and returns it
+  void Begin();                                                // (re)computes Candidates
   Either<BattleQueryFailure, ActionPreview> Preview(Vector3I target);
   bool CanCommit(Vector3I target);
   BattleAction Build(Vector3I target);

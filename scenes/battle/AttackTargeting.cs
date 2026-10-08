@@ -27,14 +27,13 @@ public sealed class AttackTargeting : IActionTargeting
 
   public IReadOnlyCollection<Vector3I> Candidates => _targetsByTile.Keys;
 
-  public IReadOnlyCollection<Vector3I> Begin()
+  public void Begin()
   {
     _targetsByTile.Clear();
 
-    return _runtime.TryGetAlive(_unit).Match(
-      Some: attacker =>
+    _runtime.TryGetAlive(_unit).IfSome(attacker =>
       {
-        void AddCandidate(AliveUnit attacker, BattleEntity entity)
+        void AddCandidate(BattleEntity entity)
         {
           if (_runtime.TryGetAttackTarget(entity).Case is not AttackTarget target) return;
           if (_runtime.Query(new GetHitChanceForAttack(attacker, target)).IsRight)
@@ -42,14 +41,11 @@ public sealed class AttackTargeting : IActionTargeting
         }
 
         foreach (AliveUnit enemy in _runtime.Query(new GetVisibleEnemiesForUnit(attacker)))
-          AddCandidate(attacker, new BattleEntity.Unit(enemy.State));
+          AddCandidate(new BattleEntity.Unit(enemy.State));
 
         foreach (BattleObjectState obj in _runtime.Query(new GetBattleSpecialObjectsQuery()))
-          AddCandidate(attacker, new BattleEntity.Object(obj));
-
-        return (IReadOnlyCollection<Vector3I>)_targetsByTile.Keys;
-      },
-      None: () => System.Array.Empty<Vector3I>());
+          AddCandidate(new BattleEntity.Object(obj));
+      });
   }
 
   public Either<BattleQueryFailure, ActionPreview> Preview(Vector3I target)

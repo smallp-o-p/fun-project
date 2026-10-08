@@ -30,7 +30,8 @@ public class ActionTargetingTest
     var move = new MoveTargeting(battle.Runtime, hero.State);
     Assert.Equal(ConfirmMode.Confirm, move.Confirm); // assigned per verb, before any Begin
 
-    IReadOnlyCollection<Vector3I> reachable = move.Begin();
+    move.Begin();
+    IReadOnlyCollection<Vector3I> reachable = move.Candidates;
     Assert.True(reachable.AsValueEnumerable().Contains(new Vector3I(2, 0, 1)));
 
     ActionPreview preview = move.Preview(new Vector3I(2, 0, 1)).RequireRight();
@@ -53,7 +54,8 @@ public class ActionTargetingTest
     var attack = new AttackTargeting(battle.Runtime, hero.State);
     Assert.Equal(ConfirmMode.Immediate, attack.Confirm); // assigned per verb, before any Begin
 
-    IReadOnlyCollection<Vector3I> candidates = attack.Begin();
+    attack.Begin();
+    IReadOnlyCollection<Vector3I> candidates = attack.Candidates;
     Assert.True(candidates.AsValueEnumerable().Contains(new Vector3I(3, 0, 0)));   // the enemy's tile, in range + visible
 
     ActionPreview preview = attack.Preview(new Vector3I(3, 0, 0)).RequireRight();
@@ -74,7 +76,8 @@ public class ActionTargetingTest
       new Vector3I(4, 0, 0), new Vector3I(4, 0, 2), new Vector3I(3, 0, 1), new Vector3I(5, 0, 1)));
     var move = new MoveTargeting(battle.Runtime, battle.PlayerUnit);
 
-    Assert.Equal(0, move.Begin().Count);
+    move.Begin();
+    Assert.Equal(0, move.Candidates.Count);
     Assert.False(move.CanCommit(new Vector3I(4, 0, 4))); // the enemy's tile
     Assert.False(move.CanCommit(new Vector3I(0, 0, 0))); // an open tile
   }
@@ -91,7 +94,8 @@ public class ActionTargetingTest
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
     Assert.True(Row<AttackActionDefinition>(actions).IsAvailable);
     var targeting = new AttackTargeting(battle.Runtime, battle.PlayerUnit);
-    Assert.Equal(0, targeting.Begin().Count);
+    targeting.Begin();
+    Assert.Equal(0, targeting.Candidates.Count);
     Assert.False(targeting.CanCommit(new Vector3I(7, 0, 7)));
   }
 
@@ -114,7 +118,8 @@ public class ActionTargetingTest
     var obj = objects.AsValueEnumerable().Single(o => o.Position == cell);
     var scenery = objects.AsValueEnumerable().Single(o => o.Position == new Vector3I(2, 0, 2));
     var targeting = new AttackTargeting(battle.Runtime, battle.PlayerUnit);
-    Assert.True(targeting.Begin().AsValueEnumerable().Contains(cell));
+    targeting.Begin();
+    Assert.True(targeting.Candidates.AsValueEnumerable().Contains(cell));
     Assert.False(targeting.Candidates.AsValueEnumerable().Contains(scenery.Position));
     var preview = (AttackPreview)targeting.Preview(cell).RequireRight();
     Assert.Equal(100, preview.HitChance.FinalChance);
@@ -123,7 +128,8 @@ public class ActionTargetingTest
     Assert.Equal(Some(ObjectStatus.Destroyed), obj.Status);
     Assert.True(targeting.Preview(cell).IsLeft);
     Assert.Throws<InvalidOperationException>(() => targeting.Build(cell));
-    Assert.False(targeting.Begin().AsValueEnumerable().Contains(cell));
+    targeting.Begin();
+    Assert.False(targeting.Candidates.AsValueEnumerable().Contains(cell));
   }
 
   [TestCase]
@@ -141,7 +147,11 @@ public class ActionTargetingTest
       new Vector3I(0, 0, 1), shortWeapon);
     var obj = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable().Single();
     Assert.True(battle.Query(new GetFactionVisibleObjectsQuery(battle.PlayerFaction)).AsValueEnumerable().Contains(obj));
-    Assert.False(new AttackTargeting(battle.Runtime, blind).Begin().AsValueEnumerable().Contains(obj.Position));
-    Assert.False(new AttackTargeting(battle.Runtime, shortRange).Begin().AsValueEnumerable().Contains(obj.Position));
+    foreach (BattleUnitState unit in new[] { blind, shortRange })
+    {
+      var targeting = new AttackTargeting(battle.Runtime, unit);
+      targeting.Begin();
+      Assert.False(targeting.Candidates.AsValueEnumerable().Contains(obj.Position));
+    }
   }
 }

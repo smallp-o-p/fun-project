@@ -165,8 +165,11 @@ public sealed class BattleUiController : IDisposable
       case UiState.UnitSelected:
         return TrySelectAt(tile);
       case UiState.Targeting:
+      case UiState.TargetingLocked:
         {
           IActionTargeting handler = RequireHandler();
+          if (_state == UiState.TargetingLocked && _pendingTarget == Some(tile))
+            return Confirm();
           if (!handler.CanCommit(tile))
             return false;
           if (handler.Confirm == ConfirmMode.Immediate)
@@ -174,30 +177,13 @@ public sealed class BattleUiController : IDisposable
             _runtime.ExecuteAction(handler.Build(tile));
             return true; // OnActionResult resets targeting and lands us in UnitSelected
           }
+          bool firstTarget = _state == UiState.Targeting;
           _pendingTarget = Some(tile);
           _lastPreview = handler.Preview(tile).Match(
             Right: preview => Some(preview),
             Left: _ => None);
           SetState(UiState.TargetingLocked);
-          return true;
-        }
-      case UiState.TargetingLocked:
-        {
-          IActionTargeting handler = RequireHandler();
-          if (_pendingTarget == Some(tile))
-          {
-            _runtime.ExecuteAction(handler.Build(tile));
-            return true;
-          }
-          if (handler.CanCommit(tile))
-          {
-            _pendingTarget = Some(tile);
-            _lastPreview = handler.Preview(tile).Match(
-              Right: preview => Some(preview),
-              Left: _ => None);
-            SetState(UiState.TargetingLocked);
-          }
-          return false;
+          return firstTarget;
         }
       default:
         return false;
