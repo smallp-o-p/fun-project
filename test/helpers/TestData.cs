@@ -121,6 +121,7 @@ internal static class TestData
     {
       Name = name,
       Frame = frame ?? MakeFrame(),
+      CompatibleSlots = EquipmentSlot.Weapon,
       DamageStat = new DamageStat { BaseValue = damage },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = critChance },
       RangeStat = new RangeStat { BaseValue = range },
@@ -170,6 +171,7 @@ internal static class TestData
     {
       Name = name,
       Frame = frame ?? MakeFrame(),
+      CompatibleSlots = EquipmentSlot.Weapon,
       DamageStat = new DamageStat { BaseValue = damage },
       CriticalChanceStat = new CriticalChanceStat { BaseValue = critChance },
       RangeStat = new RangeStat { BaseValue = range },
@@ -191,6 +193,7 @@ internal static class TestData
     {
       Name = name,
       Description = description ?? $"{name} weapon",
+      CompatibleSlots = EquipmentSlot.Weapon,
       Frame = MakeFrame(),
       DamageStat = new DamageStat { BaseValue = damage },
       RangeStat = new RangeStat { BaseValue = range },
@@ -214,6 +217,7 @@ internal static class TestData
     {
       Name = name,
       Description = $"{name} armor",
+      CompatibleSlots = EquipmentSlot.Armor,
       Capabilities =
     [
       new ArmorCapabilityData
@@ -251,6 +255,7 @@ internal static class TestData
     {
       Name = name,
       Description = $"{name} grenade",
+      CompatibleSlots = EquipmentSlot.Utility,
       Capabilities =
       [
         new ThrowableCapabilityData { ThrowRange = throwRange, ActionPointCost = actionPointCost, ConsumesOnUse = true },
@@ -267,6 +272,7 @@ internal static class TestData
     {
       Name = name,
       Description = $"{name} throwable",
+      CompatibleSlots = EquipmentSlot.Utility,
       Capabilities = [new ThrowableCapabilityData { ThrowRange = throwRange, ActionPointCost = actionPointCost, ConsumesOnUse = consumesOnUse }],
     });
     return item.With<ThrowableCapability>().RequireSome();
@@ -278,6 +284,7 @@ internal static class TestData
     {
       Name = name,
       Description = $"{name} usable item",
+      CompatibleSlots = EquipmentSlot.Utility,
       Capabilities = [new ChargesCapabilityData { MaxCharges = maxCharges }],
     });
     return item.With<ChargesCapability>().RequireSome();
@@ -288,6 +295,13 @@ internal static class TestData
   {
     Name = name,
     UnlimitedStock = unlimited,
+  };
+
+  public static EquippableItemData MakeUtilityData(string name = "Kit", bool unlimited = false) => new()
+  {
+    Name = name,
+    UnlimitedStock = unlimited,
+    CompatibleSlots = EquipmentSlot.Utility,
   };
 
   public static ManufacturingRecipe MakeManufacturingRecipe(EquippableItemData item, uint days = 1,

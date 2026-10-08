@@ -284,7 +284,7 @@ public class GeoscapeSquadLoadoutTest
     { StatMods = [new AimStatMod { Modifiers = [StatModifier.Add(10)] }] });
     alpha.EquipWeapon(rifle);
     alpha.EquipArmor(MakeArmor("Vest"));
-    alpha.EquipItem(new EquippableItem(MakeItemData("Medkit")), 0);
+    alpha.EquipItem(new EquippableItem(MakeUtilityData("Medkit")).ForUtilitySlot().RequireSome(), 0);
     alpha.GetModSlots()[0].Equip(new MultiStatMod { Name = "Nerves", StatMods = [] });
 
     var view = PresentedSquadView(pending, fixture.State, fixture.Session);
@@ -325,7 +325,7 @@ public class GeoscapeSquadLoadoutTest
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission(
       [MakeEntry("Alpha")],
-      armory: [MakeFirearmWeaponData("Rifle"), MakeArmorData("Vest"), MakeItemData("Medkit")]);
+      armory: [MakeFirearmWeaponData("Rifle"), MakeArmorData("Vest"), MakeUtilityData("Medkit")]);
     using var _ = fixture;
     var manager = CreatePresentedManager(fixture);
 

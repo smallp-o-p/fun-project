@@ -78,7 +78,7 @@ public class CombatantSummaryTest
     using var campaign = EquippedSoldierCampaign();
     var combatant = campaign.State.Roster[0];
     combatant.EquipArmor(MakeArmor("Vest"));
-    combatant.EquipItem(new EquippableItem(MakeItemData("Medkit")), 0);
+    combatant.EquipItem(new EquippableItem(MakeUtilityData("Medkit")).ForUtilitySlot().RequireSome(), 0);
 
     string squad = CombatantSummary.EquipmentText(combatant, includeMods: true);
     Assert.True(squad.Contains("Weapon: Rifle"), squad);

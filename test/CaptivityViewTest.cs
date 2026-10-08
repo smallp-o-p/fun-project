@@ -135,7 +135,7 @@ public class CaptivityViewTest
     { StatMods = [new AimStatMod { Modifiers = [StatModifier.Add(10)] }] });
     equipped.EquipWeapon(rifle);
     equipped.EquipArmor(MakeArmor("Vest"));
-    equipped.EquipItem(new EquippableItem(MakeItemData("Medkit")), 0);
+    equipped.EquipItem(new EquippableItem(MakeUtilityData("Medkit")).ForUtilitySlot().RequireSome(), 0);
     var bare = MakeCombatant("Bare", MakeFaction("Hybrids"));
     using var fixture = CaptiveCampaign([equipped, bare]);
     var view = AddToTree(CreateCaptivityView());

@@ -7,3 +7,4 @@ script = ExtResource("1_item")
 Name = "Prototype Kit"
 Description = "An experimental utility kit produced by Engineering."
 UnlimitedStock = false
+CompatibleSlots = 4

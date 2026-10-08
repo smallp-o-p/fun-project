@@ -41,4 +41,5 @@ RangeStat = SubResource("Resource_njiaa")
 CriticalChanceStat = SubResource("Resource_ofjgw")
 Capabilities = Array[ExtResource("2_base")]([SubResource("Resource_modslots")])
 Name = "Combat Rifle"
+CompatibleSlots = 1
 Description = "Service rifle. Flatter trajectory, heavier rounds, larger magazine than the pistol."

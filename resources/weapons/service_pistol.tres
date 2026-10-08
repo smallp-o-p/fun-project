@@ -38,6 +38,7 @@ DamageStat = SubResource("Resource_32rhf")
 RangeStat = SubResource("Resource_njiaa")
 CriticalChanceStat = SubResource("Resource_ofjgw")
 UnlimitedStock = true
+CompatibleSlots = 1
 Name = "Service Pistol"
 Description = "Standard-issue service pistol"
 metadata/_custom_type_script = "uid://d7wswcxh2fxc"

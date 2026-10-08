@@ -358,9 +358,9 @@ public sealed partial class UnitView : GeoscapeView
 
   private static bool AcceptsItem(UnitViewSlot slot, EquippableItemData data) => slot.Kind switch
   {
-    UnitViewSlotKind.Weapon => data is WeaponData,
-    UnitViewSlotKind.Armor => HasArmorCapability(data),
-    UnitViewSlotKind.Utility => true,
+    UnitViewSlotKind.Weapon => data.CompatibleSlots.Supports(EquipmentSlot.Weapon) && data is WeaponData,
+    UnitViewSlotKind.Armor => data.CompatibleSlots.Supports(EquipmentSlot.Armor) && HasArmorCapability(data),
+    UnitViewSlotKind.Utility => data.CompatibleSlots.Supports(EquipmentSlot.Utility),
     _ => false,
   };
 
@@ -375,6 +375,8 @@ public sealed partial class UnitView : GeoscapeView
   private void EquipItem(ArmoryItemStock line)
   {
     UnitViewSlot slot = _selection!.Value;
+    if (!AcceptsItem(slot, line.Data))
+      return;
     // AcceptsItem's _ => false arm prevents non-item slots from reaching this withdrawal.
     Option<EquippableItem> withdrawn = _state!.Armory.TryWithdrawItem(line.Data);
     withdrawn.IfSome(item =>
@@ -391,8 +393,12 @@ public sealed partial class UnitView : GeoscapeView
             _unit!.EquipArmor(proof).IfSome(old => _state.Armory.DepositItem(old.Item)));
           break;
         case UnitViewSlotKind.Utility:
+          // Parse before displacing the current item.
+          UtilityItem utility = item.ForUtilitySlot().Match(
+            proof => proof,
+            () => throw new InvalidOperationException("The selected item does not support the utility slot."));
           _unit!.UnequipItem(slot.Index).IfSome(old => _state.Armory.DepositItem(old));
-          _unit.EquipItem(item, slot.Index);
+          _unit.EquipItem(utility, slot.Index);
           break;
       }
     });

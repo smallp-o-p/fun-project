@@ -29,7 +29,7 @@ public class UnitViewLayoutTest
   public async Task FifthUtilitySlotEquipsImmediatelyAndRetainsDetailsAfterRefresh()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var item = MakeItemData("Field Kit");
+    var item = MakeUtilityData("Field Kit");
     item.Description = "A useful field kit.";
     using var campaign = new GeoscapeFixture(MakeStart(
       roster: [MakeEntry()], armory: [item]));

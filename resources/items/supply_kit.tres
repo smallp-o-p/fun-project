@@ -7,3 +7,4 @@ script = ExtResource("1_item")
 Name = "Supply Kit"
 Description = "Manufacture once to establish unlimited utility-kit supply."
 UnlimitedStock = true
+CompatibleSlots = 4
