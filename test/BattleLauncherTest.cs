@@ -82,7 +82,7 @@ public partial class BattleLauncherTest
   }
 
   [TestCase(TestName = "Disposing an attached host detaches pending playback before runtime teardown")]
-  public void DisposeDetachesPendingPlayback()
+  public static void DisposeDetachesPendingPlayback()
   {
     var setup = BattleSetupResolver.Resolve(TestData.MakeDuelBattleType()).RequireRight();
     using var runtime = BattleFactory.Start(setup).RequireRight();
@@ -104,7 +104,7 @@ public partial class BattleLauncherTest
   }
 
   [TestCase(TestName = "Pointer picking uses the delivered event position even after the cursor moves")]
-  public async Task PointerPickingUsesDeliveredPosition()
+  public static async Task PointerPickingUsesDeliveredPosition()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var launcher = AddToTree(new BattleLauncher { BattleType = TestData.MakeDuelBattleType() });
