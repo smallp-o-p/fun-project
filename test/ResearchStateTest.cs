@@ -2,7 +2,6 @@
 using System;
 using FunProject.GameState;
 using FunProject.Currencies;
-using FunProject.Items;
 using FunProject.Research;
 using FunProject.Strategic;
 using FunProject.Engineering;

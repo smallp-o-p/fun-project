@@ -237,7 +237,6 @@ public class ResearchTest
   public void LiveAvailabilityRelocksWhilePausedButDoesNotInterruptStartedResearch()
   {
     var key = MakeItemData("Key");
-    var keyRecipe = MakeManufacturingRecipe(key);
     var condition = new ResearchTestCondition { Predicate = state => state.Armory.HasAvailableItem(key) };
     var first = MakeResearch("First", condition: condition);
     var second = MakeResearch("Second", condition: condition);
@@ -513,7 +512,6 @@ public class ResearchTest
   public void CompletedResearchAndManufacturingUnlocksSurviveConditionLossAndOverlap()
   {
     var key = MakeItemData("Key");
-    var keyRecipe = MakeManufacturingRecipe(key);
     var item = MakeItemData("Product");
     var itemRecipe = MakeManufacturingRecipe(item);
     var first = MakeResearch("First", condition: new ResearchTestCondition

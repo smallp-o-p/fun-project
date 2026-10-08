@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using FunProject.Currencies;
 using FunProject.GameState;
 using CampaignGameState = FunProject.GameState.GameState;
-using FunProject.Items;
 using FunProject.Strategic;
 
 namespace FunProject.Engineering;

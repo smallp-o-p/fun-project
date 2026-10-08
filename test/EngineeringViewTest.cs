@@ -180,7 +180,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public async Task PresentPreservesItemIdentityAcrossReorderingAndRefreshesParsedEntry()
+  public async Task PresentPreservesRecipeIdentityAcrossReorderingAndRefreshesParsedEntry()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var first = MakeItemData("First");
@@ -211,7 +211,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public async Task PresentClearsStaleSelectionEvenWhenReplacementHasSameName()
+  public async Task PresentClearsStaleSelectionWhenReplacementProducesSameItem()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var item = MakeItemData("Scanner");
@@ -222,8 +222,7 @@ public class EngineeringViewTest
     view.Present(session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
     view.GetNode<VBoxContainer>("%ManufacturableItems").GetChild<Button>(0)
       .EmitSignal(Button.SignalName.Pressed);
-    var replacement = MakeItemData("Scanner");
-    var replacementRecipe = MakeManufacturingRecipe(replacement);
+    var replacementRecipe = MakeManufacturingRecipe(item);
     using var refreshedCampaign = new GeoscapeFixture(MakeStart(
       manufacturingRecipes: [replacementRecipe]));
     var refreshed = refreshedCampaign.Session;
@@ -310,7 +309,6 @@ public class EngineeringViewTest
   {
     var view = AddToTree(CreateEngineeringView());
     var item = MakeItemData("Selected item");
-    var itemRecipe = MakeManufacturingRecipe(item);
     view.ShowFailure(item, failure);
     Assert.True(view.GetNode<Label>("%Status").Text.Contains(item.Name));
     Assert.True(view.GetNode<Label>("%Status").Text.Contains(failure.ToString()));

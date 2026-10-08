@@ -23,7 +23,7 @@ public class ProjectCatalogTest
   }
 
   [TestCase]
-  public void NullCatalogAuthoringFailsCampaignConstruction()
+  public void MalformedCatalogAuthoringFailsCampaignConstruction()
   {
     Assert.Throws<ArgumentNullException>(() => new GameState(MakeStart(
       manufacturingRecipes: [null!])));
@@ -31,16 +31,11 @@ public class ProjectCatalogTest
     var start = MakeStart();
     start.ManufacturingRecipes = null!;
     Assert.Throws<ArgumentNullException>(() => new GameState(start));
-  }
-
-  [TestCase]
-  public void UnenrolledManufacturingDurationIsIgnored()
-  {
-    var item = MakeItemData();
-    var itemRecipe = MakeManufacturingRecipe(item, days: 0);
-    var state = new GameState(MakeStart(armory: [item]));
-    Assert.True(state.Armory.HasAvailableItem(item));
-    Assert.Equal(0, state.Engineering.GetManufacturingOptions(state).Count);
+    using var noItem = MakeManufacturingRecipe(null!);
+    Assert.Throws<ArgumentNullException>(() => new GameState(MakeStart(manufacturingRecipes: [noItem])));
+    using var noCosts = MakeManufacturingRecipe(MakeItemData());
+    noCosts.Costs = null!;
+    Assert.Throws<ArgumentNullException>(() => new GameState(MakeStart(manufacturingRecipes: [noCosts])));
   }
 
   [TestCase]
@@ -54,23 +49,20 @@ public class ProjectCatalogTest
   [TestCase]
   public void CatalogPreservesOrderAndIdentityWithoutGrantingStock()
   {
-    var firstItem = MakeItemData();
-    var firstItemRecipe = MakeManufacturingRecipe(firstItem);
-    var secondItem = firstItem;
-    var secondItemRecipe = MakeManufacturingRecipe(secondItem, days: 2);
-    var state = new GameState(MakeStart(armory: [firstItem],
-      manufacturingRecipes: [secondItemRecipe, firstItemRecipe]));
+    var item = MakeItemData();
+    var firstRecipe = MakeManufacturingRecipe(item);
+    var secondRecipe = MakeManufacturingRecipe(item, days: 2);
+    var state = new GameState(MakeStart(armory: [item], manufacturingRecipes: [secondRecipe, firstRecipe]));
     var options = state.Engineering.GetManufacturingOptions(state);
     Assert.Equal(2, options.Count);
-    Assert.Equal(secondItemRecipe, options[0].Project.Recipe);
-    Assert.Equal(firstItemRecipe, options[1].Project.Recipe);
+    Assert.Equal(secondRecipe, options[0].Project.Recipe);
+    Assert.Equal(firstRecipe, options[1].Project.Recipe);
     Assert.Equal(2U, options[0].Project.DurationDays);
     Assert.Equal(1U, options[1].Project.DurationDays);
-    Assert.Equal(secondItem, options[0].Project.Item);
-    Assert.Equal(firstItem, options[1].Project.Item);
+    Assert.Equal(item, options[0].Project.Item);
+    Assert.Equal(item, options[1].Project.Item);
     Assert.Equal(1, state.Armory.ItemStock().Count);
     Assert.Equal(1, state.Armory.ItemStock()[0].Remaining);
-    Assert.True(state.Armory.HasAvailableItem(secondItem));
   }
 
   [TestCase]

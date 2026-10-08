@@ -97,7 +97,7 @@ public sealed partial class ResearchView : GeoscapeView
       start.Disabled = shortfalls.Count > 0;
       GetNode<Label>("%ManufacturingUnlocks").Text = "Manufacturing unlocks: " + (project.ManufacturingUnlocks.Length == 0
         ? "None"
-        : string.Join(", ", project.ManufacturingUnlocks.AsValueEnumerable().Select(item => item.Item.Name).ToArray()));
+        : string.Join(", ", project.ManufacturingUnlocks.AsValueEnumerable().Select(recipe => recipe.Item.Name).ToArray()));
     }
     else
     {

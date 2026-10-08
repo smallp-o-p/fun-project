@@ -33,8 +33,8 @@ public sealed class ResearchState
       ArgumentNullException.ThrowIfNull(project.Condition);
       ArgumentNullException.ThrowIfNull(project.ManufacturingUnlocks);
       project.Condition.CheckAuthoring();
-      foreach (var item in project.ManufacturingUnlocks)
-        ArgumentNullException.ThrowIfNull(item);
+      foreach (var recipe in project.ManufacturingUnlocks)
+        ArgumentNullException.ThrowIfNull(recipe);
       var definition = new Definition(project, project.DurationDays, project.Condition,
         project.ManufacturingUnlocks.AsValueEnumerable().ToImmutableList(), Currency.CaptureCosts(project.Costs));
       _definitions.Add(definition);
