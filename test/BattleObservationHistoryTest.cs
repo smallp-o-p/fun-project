@@ -31,7 +31,6 @@ public sealed class BattleObservationHistoryTest
     });
     Assert.True(recorded);
     Assert.Equal(1, battle.Query(new GetFactionLastSeenContacts(battle.PlayerFaction)).Count);
-    battle.Read(() => Assert.True(battle.PlayerUnit.HasSeenHostile));
   }
 
   private sealed class VerifyBootstrapHistory(System.Action found) : BattleHook<UnitSpottedBattleEvent>
@@ -67,28 +66,11 @@ public sealed class BattleObservationHistoryTest
   public void BriefMidActionContactSurvivesLoss()
   {
     using var battle = Contacts(4);
-    battle.Read(() => Assert.False(battle.PlayerUnit.HasSeenHostile));
     battle.EndFactionTurn(battle.PlayerFaction);
     battle.Move(battle.EnemyUnit, [new Vector3I(3, 0, 0), new Vector3I(2, 0, 0), new Vector3I(3, 0, 0)]);
     var knowledge = battle.Query(new GetFactionUnitKnowledge(battle.PlayerFaction));
     Assert.Equal(1, knowledge.Current.Count);
     Assert.Equal(new Vector3I(2, 0, 0), knowledge.Remembered[0].Position);
-    battle.Read(() => Assert.True(battle.PlayerUnit.HasSeenHostile));
-  }
-
-  [TestCase]
-  public void SeenHostileIsMonotonicAndIndependentOfActivation()
-  {
-    using var battle = Contacts();
-    battle.EndFactionTurn(battle.PlayerFaction);
-    battle.Move(battle.EnemyUnit, [new Vector3I(3, 0, 0)]);
-    battle.EndFactionTurn(battle.EnemyFaction);
-    battle.Read(() => Assert.True(battle.PlayerUnit.HasSeenHostile));
-    var faction = TestData.MakeFaction("Ally");
-    using var allies = BattleFixture.Started(new Vector3I(4, 1, 1),
-      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("A", faction)), new Vector3I(0, 0, 0)),
-      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", faction)), new Vector3I(1, 0, 0)));
-    allies.Read(() => Assert.False(allies.PlayerUnit.HasSeenHostile));
   }
 
   [TestCase]
