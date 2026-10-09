@@ -27,12 +27,12 @@ public partial class StatusEffectBattleTest
         Assert.Equal(2, appliedEvent.RemainingTurns, name);
         battle.Events.EventBefore<UnitDamagedBattleEvent, UnitStatusEffectAppliedBattleEvent>();
       }),
-      ("re-applying a status keeps a single instance", 20, 3, 2, (battle, target, burn, name) =>
+      ("re-applying a status keeps a single instance", 20, 3, 2, (battle, target, _, name) =>
       {
         Assert.Equal(1, target.ActiveStatusEffects.Count, name);
         Assert.Equal(2, battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Count(), name);
       }),
-      ("a killing blow does not apply statuses", 4, 5, 1, (battle, target, burn, name) =>
+      ("a killing blow does not apply statuses", 4, 5, 1, (battle, target, _, name) =>
       {
         Assert.True(target.IsDead, name);
         Assert.False(battle.Events.EventsOf<UnitStatusEffectAppliedBattleEvent>().AsValueEnumerable().Any(), name);

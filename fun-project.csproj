@@ -42,4 +42,8 @@
     <PackageReference Include="gdUnit4.api" Version="5.0.0" />
     <PackageReference Include="gdUnit4.test.adapter" Version="3.0.0" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Build-time diagnostics only, including export configurations. -->
+    <PackageReference Include="Roslynator.Analyzers" Version="5.0.1" PrivateAssets="all" IncludeAssets="analyzers;build;buildtransitive" />
+  </ItemGroup>
 </Project>

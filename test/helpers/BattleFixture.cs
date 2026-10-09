@@ -38,9 +38,9 @@ public sealed class BattleFixture : IDisposable
   public IReadOnlyList<Faction> Factions { get; }
   public IReadOnlyList<BattleEvent> Events => _events;
 
-  private Option<BattleUnitState> _playerUnit;
-  private Option<BattleUnitState> _enemyUnit;
-  private Option<BattleUnitState> _supportUnit;
+  private readonly Option<BattleUnitState> _playerUnit;
+  private readonly Option<BattleUnitState> _enemyUnit;
+  private readonly Option<BattleUnitState> _supportUnit;
 
   public Faction PlayerFaction => Factions[0];
   public Faction EnemyFaction => Factions[1];

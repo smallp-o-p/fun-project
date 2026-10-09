@@ -55,7 +55,7 @@ public partial class BattleEntityAnnotator : Node3D
   {
     if (Markers is null || System.Array.IndexOf(Markers.GetItemList(), item) < 0) return None;
     var mesh = Markers.GetItemMesh(item);
-    return mesh is not null && mesh.HasMeta(BattleAnnotationMarker.FootprintMeta) &&
+    return mesh?.HasMeta(BattleAnnotationMarker.FootprintMeta) == true &&
       mesh.GetMeta(BattleAnnotationMarker.FootprintMeta).AsGodotObject() is BattleFootprintData data ? data : None;
   }
 

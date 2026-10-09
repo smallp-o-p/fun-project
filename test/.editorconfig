@@ -1,0 +1,4 @@
+[*.cs]
+# GdUnit requires discoverable non-static suite classes even when every case is static.
+# Keep the production RCS1102 diagnostic enabled.
+dotnet_diagnostic.RCS1102.severity = none

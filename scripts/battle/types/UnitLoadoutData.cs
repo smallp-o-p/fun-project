@@ -20,8 +20,7 @@ public partial class UnitLoadoutData : Resource
   public EquippableItemData? Armor
   {
     get => _armor;
-    set => _armor = value is not null
-      && value.Capabilities.AsValueEnumerable().Any(capability => capability is ArmorCapabilityData)
+    set => _armor = value?.Capabilities.AsValueEnumerable().Any(capability => capability is ArmorCapabilityData) == true
         ? value : null;
   }
 

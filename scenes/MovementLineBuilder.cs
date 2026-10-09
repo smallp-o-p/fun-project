@@ -22,7 +22,7 @@ public static class MovementLineBuilder
       return mesh;
 
     int rings = Mathf.Max(2, (int)Mathf.Ceil(bakedLength / RingSpacing));
-    int ringVertexCount = RadialSegments + 1;
+    const int ringVertexCount = RadialSegments + 1;
     Vector3[] vertices = new Vector3[rings * ringVertexCount];
     Vector3[] normals = new Vector3[vertices.Length];
     Vector2[] uvs = new Vector2[vertices.Length];

@@ -20,7 +20,7 @@ public partial class GameCameraTest
       GlobalPosition = new Vector3(1.0f, 2.0f, 3.0f)
     });
     Vector2 viewportPosition = new(320.0f, 180.0f);
-    float rayLength = 75.0f;
+    const float rayLength = 75.0f;
 
     PhysicsRayQueryParameters3D query =
       GameCamera.CreateViewportRayQuery(camera, viewportPosition, rayLength);
