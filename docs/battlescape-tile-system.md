@@ -41,7 +41,7 @@ One tile is one cell. Cell centers sit at `(x + 0.5, y + 0.5, z + 0.5)` in board
 
 ## Adjacency and pathfinding
 
-Adjacency includes orthogonal and same-level diagonal steps. A diagonal needs at least one open flank. `BattleBoardState.FindPath` uses breadth-first search with a fixed direction order for deterministic tie-breaks.
+Adjacency includes eight horizontal neighbors and two vertical neighbors; there are no vertical diagonals. A diagonal needs at least one open flank. `BattleBoardState.FindPath` uses breadth-first search with a fixed direction order for deterministic tie-breaks.
 
 The session and actions check battle legality, spend AP, and apply turn rules. Controllers preview routes through `FindPathForUnit` and `GetPossibleMoveTilesForUnit`, then submit destination steps to `MoveUnit`.
 
@@ -54,3 +54,12 @@ The session and actions check battle legality, spend AP, and apply turn rules. C
 ## Supported geometry
 
 Map authoring supports multi-tile prop footprints, including upper volumes for movement and sight blocking. Each volume needs ground floor support. Stacked walkable floors and ramps remain deferred.
+
+
+## Exact-world and faction-knowledge queries
+
+`FindPathForUnit` and `GetPossibleMoveTilesForUnit` consult authoritative board occupancy. They are exact-world queries, not a fog-of-war-safe interface.
+
+`GetTileKnowledgeForFaction` combines remembered terrain with occupancy admitted by current vision. Outside vision, own-unit occupancy is known; other occupancy remains `Unknown`. `FindKnownPathForUnit` and `GetKnownMoveTilesForUnit` use that knowledge and return raw coordinates. Unknown cells can appear in their estimates, so a known path is not proof that the authoritative action can execute it. `MoveUnit` still validates actual route legality at submission.
+
+Use the appropriate information boundary for the caller. Runtime vertical adjacency does not imply support for stacked floors in the authoring baker.
