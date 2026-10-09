@@ -178,4 +178,4 @@ Everything the system owns is inspectable read-only in the editor; changing any 
 
 ## Platform verification
 
-The original Blender-import migration was verified on Windows; a later pass re-verified fresh imports on Linux (Blender 5.1.2, Godot 4.7.2 .NET). Both committed source files require Blender 5.1. [The historical review report](model-controls-review.md) records that verification scope; its assertions are historical and the current guide plus git history are authoritative.
+The original Blender-import migration was verified on Windows; a later pass re-verified fresh imports on Linux (Blender 5.1.2, Godot 4.7.2 .NET). Both committed source files require Blender 5.1. [The historical review report](archive/model-controls-review.md) records that verification scope; its assertions are historical and the current guide plus git history are authoritative.

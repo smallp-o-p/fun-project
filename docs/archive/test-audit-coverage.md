@@ -1,6 +1,6 @@
 # Coverage-assisted test audit, 2026-10-08
 
-Base: master `131046880c0653d79baa7280676883adb60af872` (PRs 15, 16 and 17). Local branch: `audit/coverage-test-purge`. PR19 concurrency remains on hold. Production files and behavior are unchanged.
+Base: master `131046880c0653d79baa7280676883adb60af872` (PRs 15, 16 and 17). Historical branch: `audit/coverage-test-purge`. PR19 concurrency remains on hold. Production files and behavior are unchanged.
 
 ## Result
 
@@ -31,20 +31,9 @@ Pilot `CurrencyTest.MultiCurrencySpendIsAtomic`: **1/1 passed**, `GameState.TryS
 
 References: [Microsoft collector CLI](https://learn.microsoft.com/en-us/dotnet/core/additional-tools/dotnet-coverage), [filter configuration](https://github.com/microsoft/codecoverage/blob/main/docs/configuration.md), [ReportGenerator](https://github.com/danielpalme/ReportGenerator).
 
-## Reproduce
+## Historical collection procedure
 
-Use the Godot mono path in `.runsettings`; no concurrent editor/build/tests:
-
-```powershell
-dotnet tool restore --configfile .config/coverage-nuget.config
-dotnet build fun-project.csproj --no-restore
-.\tools\Measure-TestCoverage.ps1 -Name full
-.\tools\Measure-TestCoverage.ps1 -Name payment -Filter 'FullyQualifiedName~CurrencyTest.MultiCurrencySpendIsAtomic'
-.\tools\Measure-TestCoverage.ps1 -Name control -Filter 'FullyQualifiedName~StatFoldTest'
-python tools/Compare-Coverage.py <baseline-cobertura.xml> TestResults/coverage/full/coverage.cobertura.xml --output comparison.json
-```
-
-Run names must be new. The script validates nonzero tests/production hits, exclusions, DLL/PDB restoration, exit/counts and residual Godot processes before HTML generation. Artifacts retain invocation, revision/worktree state, TRX, Cobertura, logs/source HTML. Recover baseline in a separate worktree at the base above, build it and apply identical pinned tools/settings. Never instrument concurrent runs.
+The October 8 audit used custom collection/comparison scripts that have since been removed. Their invocations are not current reproduction instructions. For present tooling and safeguards, see [testing.md](../testing.md#coverage). This report preserves the original measurements, failed attempts, and restoration checks without implying that old ignored artifacts are available in a fresh checkout.
 
 ## Intentional coverage differences
 
@@ -70,4 +59,4 @@ Coverage is aggregate, not per-test attribution. It covers this Debug gameplay a
 
 ## Recovery and reports
 
-Large outputs stay ignored under `TestResults/coverage/`. Source reports: `TestResults/coverage/baseline/html/index.html`, `TestResults/coverage/final/html/index.html`. Rejected pilots/omission attempts remain beside them. Plain/focused TRX files are under `TestResults/final-plain`, `final-handoff`, `final-plain-retry`; console logs are one directory above the worktree. `../audit-artifacts/` retains baseline tests archive, full deletion inventory, omission filter, source metrics, comparison, independent review and recovery patch. Baseline/first-omission JSON test counts were reconstructed from original TRX after a serialization issue; original coverage/timing/exit data remained unchanged. The script now serializes counts explicitly. Local/unpublished; no merge or PR19 work.
+Large outputs stay ignored under `TestResults/coverage/`. Source reports: `TestResults/coverage/baseline/html/index.html`, `TestResults/coverage/final/html/index.html`. Rejected pilots/omission attempts remain beside them. Plain/focused TRX files are under `TestResults/final-plain`, `final-handoff`, `final-plain-retry`; console logs are one directory above the worktree. `../audit-artifacts/` retains baseline tests archive, full deletion inventory, omission filter, source metrics, comparison, independent review and recovery patch. Baseline/first-omission JSON test counts were reconstructed from original TRX after a serialization issue; original coverage/timing/exit data remained unchanged. At the time of the audit, the script was corrected to serialize counts explicitly. This audit subsequently landed in master; these artifact paths describe the original local run, not files distributed with the repository.

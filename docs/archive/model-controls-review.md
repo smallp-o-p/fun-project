@@ -1,6 +1,6 @@
 # Character model controls — historical review report
 
-This report is historical. The current authoring and API guide is [model-controls.md](model-controls.md); git history holds the full text of the reviews summarized here.
+This report is historical. The current authoring and API guide is [model-controls.md](../model-controls.md); git history holds the full text of the reviews summarized here.
 
 Two review passes reshaped the model system in October 2026:
 

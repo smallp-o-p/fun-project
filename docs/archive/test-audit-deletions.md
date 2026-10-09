@@ -1,5 +1,7 @@
 # Test deletion evidence
 
+Historical evidence only. Claims and paths describe the recorded baseline or external checkout; they are not current implementation requirements.
+
 Baseline: `131046880c0653d79baa7280676883adb60af872`. Each location refers to the baseline before removal.
 
 Production remains unchanged. Zero-caller wrappers are retained for a separate production cleanup. Coverage supports the behavior review; it does not establish assertion equivalence.

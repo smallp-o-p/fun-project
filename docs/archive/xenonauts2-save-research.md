@@ -1,5 +1,7 @@
 # Xenonauts 2 — Save System & Game State Research
 
+Historical evidence only. Claims and paths describe the recorded baseline or external checkout; they are not current implementation requirements.
+
 This document records save-system research from the decompiled Xenonauts 2 source (`.xenonauts2-research/`, gitignored). The takeaways are proposals for this game's future persistence layer.
 
 File paths are relative to `.xenonauts2-research/Xenonauts2/Assets/Code/`. Key claims were spot-checked against that source.
