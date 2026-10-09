@@ -163,6 +163,32 @@ public partial class BattleLauncherTest
   }
 
   [TestCase]
+  public static void ObserverExitIgnoresAlreadyCapturedResultDeliveryAndLaterInput()
+  {
+    var setup = BattleSetupResolver.Resolve(TestData.MakeDuelBattleType()).RequireRight();
+    using var runtime = BattleFactory.Start(setup).RequireRight();
+    var scene = CreateBattleScene();
+    scene.Present(runtime, setup);
+    AddToTree(scene);
+    bool exit = false;
+    // Register before presentation delivery: multicast dispatch retains callbacks that
+    // this observer unsubscribes while the completed result is already being delivered.
+    runtime.ActionCompleted += _ => { if (exit) scene.Dispose(); };
+    scene.InitializePresentation();
+    var input = scene.GetNode<BattleInputController>("BattleInputController");
+    var hud = scene.GetNode<BattleHud>("BattleUI/BattleHud");
+    exit = true;
+    var action = BattleAction.EndFactionTurn(setup.PlayerFaction.RequireSome());
+    var result = runtime.ExecuteAction(action);
+    Assert.Equal(action, result.Action);
+    Assert.False(Director(scene).Busy);
+    hud.GetNode<Button>("%ConfirmButton").EmitSignal(Button.SignalName.Pressed);
+    input._UnhandledInput(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Pressed = true });
+    scene.Dispose();
+    Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetActiveSideQuery()));
+  }
+
+  [TestCase]
   public static async Task InitiallyActiveEnemyRunsAfterMeshesAndInitialHudAreInstalled()
   {
     var type = TestData.MakeDuelBattleType();

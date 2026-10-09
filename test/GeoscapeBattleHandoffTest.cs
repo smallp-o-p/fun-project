@@ -274,9 +274,10 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(manager.Visible);
   }
 
-  [TestCase(true, TestName = "A missing %GameCamera in a correctly typed battle export aborts the installation")]
-  [TestCase(false, TestName = "A missing %BattleUI in a correctly typed battle export aborts the installation")]
-  public static async Task CorrectlyTypedInstallFailureAbortsInstallationAndRestoresPreparation(bool dropCamera)
+  [TestCase("GameCamera", TestName = "A missing %GameCamera in a correctly typed battle export aborts the installation")]
+  [TestCase("BattleUI", TestName = "A missing %BattleUI in a correctly typed battle export aborts the installation")]
+  [TestCase("BattleUI/BattleHud", TestName = "A partially ready battle UI without its HUD still disposes the runtime")]
+  public static async Task CorrectlyTypedInstallFailureAbortsInstallationAndRestoresPreparation(string missingNode)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (scene, manager, squad, _, _) = PreparedScene(SurvivalMission(1), out var capture);
@@ -288,9 +289,17 @@ public partial class GeoscapeBattleHandoffTest
     Option<int> seedBefore = pending.Event.BattleSeed;
 
     BattleScene prototype = CreateBattleScene();
-    Node authored = prototype.GetNode<Node>(dropCamera ? "GameCamera" : "BattleUI");
-    prototype.RemoveChild(authored);
+    Node authored = prototype.GetNode<Node>(missingNode);
+    authored.GetParent().RemoveChild(authored);
     authored.Free();
+    if (string.Equals(missingNode, "BattleUI/BattleHud", StringComparison.Ordinal))
+    {
+      // Inline this nested instance: packing an instance otherwise restores deleted
+      // children from its original scene, so the requested missing-HUD case would be lost.
+      var partialUi = prototype.GetNode<BattleUI>("BattleUI");
+      partialUi.SceneFilePath = "";
+      foreach (Node child in partialUi.GetChildren()) child.Owner = prototype;
+    }
     ((MissionView)squad).BattleScene = Pack(prototype); // correctly typed root, missing a fallible node
 
     // Godot's signal dispatch only logs handler exceptions, so the aborted installation is

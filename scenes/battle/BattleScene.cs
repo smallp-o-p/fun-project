@@ -14,6 +14,7 @@ public sealed partial class BattleScene : Node3D
   private BattleUiController _ui = null!;
   private EventPlaybackDirector _director = null!;
   private BattleUI _view = null!;
+  private BattleHud _hud = null!;
   private BattleInputController _input = null!;
   private Faction _playerFaction = null!;
   private bool _allowReturn;
@@ -46,12 +47,12 @@ public sealed partial class BattleScene : Node3D
       _director.PlaybackIdle -= OnPlaybackIdle;
     }
     if (_ui is not null) _ui.Changed -= RefreshView;
-    if (_view is not null)
+    if (_hud is not null)
     {
-      _view.Hud.ConfirmRequested -= OnConfirmIntent;
-      _view.Hud.CancelRequested -= OnCancelIntent;
-      _view.Hud.VerbSelected -= OnVerbIntent;
-      _view.Hud.ReturnRequested -= OnReturnIntent;
+      _hud.ConfirmRequested -= OnConfirmIntent;
+      _hud.CancelRequested -= OnCancelIntent;
+      _hud.VerbSelected -= OnVerbIntent;
+      _hud.ReturnRequested -= OnReturnIntent;
     }
     if (_input is not null)
     {
@@ -96,10 +97,11 @@ public sealed partial class BattleScene : Node3D
     AddChild(_input);
     _input.Initialize(rig);
     _view = GetNode<BattleUI>("%BattleUI");
-    _view.Hud.ConfirmRequested += OnConfirmIntent;
-    _view.Hud.CancelRequested += OnCancelIntent;
-    _view.Hud.VerbSelected += OnVerbIntent;
-    _view.Hud.ReturnRequested += OnReturnIntent;
+    _hud = _view.Hud ?? throw new InvalidOperationException("Battle UI requires a ready BattleHud.");
+    _hud.ConfirmRequested += OnConfirmIntent;
+    _hud.CancelRequested += OnCancelIntent;
+    _hud.VerbSelected += OnVerbIntent;
+    _hud.ReturnRequested += OnReturnIntent;
     _input.TileClicked += OnTileClicked;
     _input.TileHovered += OnTileHovered;
     _input.ConfirmPressed += OnConfirmIntent;
@@ -133,13 +135,13 @@ public sealed partial class BattleScene : Node3D
     if (_disposed) return;
     if (_director.Busy)
     {
-      _view.Hud.DisableInput();
+      _hud.DisableInput();
       return;
     }
     var queriedUnits = _runtime.Query(new GetFactionAliveUnits(_playerFaction))
       .AsValueEnumerable().Select(unit => unit.State).ToArray();
-    _view.Hud.ShowUnits(queriedUnits);
-    _view.Hud.ShowActionOptions(_ui.ActionOptions, _ui.Gate == InputGate.Open);
+    _hud.ShowUnits(queriedUnits);
+    _hud.ShowActionOptions(_ui.ActionOptions, _ui.Gate == InputGate.Open);
 
     bool targeting = _ui.State is UiState.Targeting or UiState.TargetingLocked;
     if (targeting)
@@ -147,7 +149,7 @@ public sealed partial class BattleScene : Node3D
     else
       _view.HideTargeting();
 
-    _view.Hud.ShowReturn(CanReturn);
+    _hud.ShowReturn(CanReturn);
     if (_ui.State == UiState.BattleOver)
       ShowBattleOverBanner();
   }
@@ -185,7 +187,7 @@ public sealed partial class BattleScene : Node3D
     string text = _runtime.Query(new GetFactionEndOfBattleSummary(_playerFaction)).Match(
       Right: summary => summary.Outcome == BattleOutcome.Victory ? "VICTORY" : "DEFEAT",
       Left: _ => "BATTLE OVER");
-    _view.Hud.ShowBattleOver(text);
+    _hud.ShowBattleOver(text);
   }
 
   private void OnConfirmIntent()
