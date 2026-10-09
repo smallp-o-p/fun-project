@@ -16,6 +16,8 @@ public sealed class EnemyPolicyTest
   {
     var features = EnemyScoreFeatures.FromNormalized(.25, 0, .10, 0, 0, 0, 0);
     Assert.Equal(950L, new EnemyPolicy().Score(features));
+    Assert.Equal(14533L, new EnemyPolicy(new(200, 25, 150)).Score(
+      EnemyScoreFeatures.FromNormalized(.25, .50, .10, -.20, .30, .40, 1)));
     Assert.Equal(25, EnemyScoreFeatures.FromNormalized(.245, 0, 0, 0, -.245, 0, 0).Damage);
     Assert.Equal(-25, EnemyScoreFeatures.FromNormalized(0, 0, 0, 0, -.245, 0, 0).Progress);
     Assert.Throws<ArgumentOutOfRangeException>(() => _ = new EnemyPolicySettings(aggressionPercent: 201));
@@ -50,6 +52,25 @@ public sealed class EnemyPolicyTest
     Assert.Equal(8, decision.Candidates.Count);
     var second = actor with { UnitId = 1, CanAct = true, CanAttack = false };
     Assert.Equal(1, new EnemyPolicy().Decide(frame with { OwnUnits = [actor, second] }, new EnemyTurnMemory()).Intent.ActorId);
+
+    using var battle = BattleFixture.Duel(configure: setup => setup with
+    {
+      Sides = [setup.Sides[0] with
+      {
+        Units = [.. setup.Sides[0].Units, new(new(TestData.MakeCombatant("Armed ally", setup.Sides[0].Faction),
+          TestData.MakeWeapon("Pistol", damage: 20)), Vector3I.Zero)],
+      }, setup.Sides[1]],
+    });
+    var observed = battle.Query(new GetEnemyDecisionFrame(battle.PlayerFaction));
+    Assert.Equal(2, observed.OwnUnits.Count);
+    Assert.Equal(0, observed.AttackPreviews.Count); // The lowest actable actor is unarmed.
+    Assert.Equal(battle.PlayerUnit.Id, new EnemyPolicy().Decide(observed, new EnemyTurnMemory()).Intent.ActorId);
+    battle.Pass(battle.PlayerUnit);
+    observed = battle.Query(new GetEnemyDecisionFrame(battle.PlayerFaction));
+    int nextActor = observed.OwnUnits.AsValueEnumerable().Single(unit => unit.CanAct).UnitId;
+    Assert.Equal(1, observed.AttackPreviews.Count);
+    Assert.Equal(nextActor, observed.AttackPreviews[0].ActorId);
+    Assert.Equal(EnemyIntentKind.Attack, new EnemyPolicy().Decide(observed, new EnemyTurnMemory()).Intent.Kind);
   }
 
   [TestCase]

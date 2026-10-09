@@ -20,6 +20,7 @@ public sealed class GetEnemyDecisionFrame(Faction faction) : IBattleSessionQuery
       .ToArray();
     List<EnemyOwnUnit> own = [];
     List<EnemyAttackPreview> previews = [];
+    bool actorChosen = false;
     foreach (var unit in session.GetFactionAliveUnits(faction).AsValueEnumerable().OrderBy(unit => unit.Id))
     {
       var alive = session.MintAlive(unit);
@@ -30,6 +31,8 @@ public sealed class GetEnemyDecisionFrame(Faction faction) : IBattleSessionQuery
         if (damage.Kind == DamageKind.Health) health += damage.Amount;
         else if (damage.Kind == DamageKind.Stun) stun += damage.Amount;
       bool canAct = session.CanUnitActNow(unit);
+      bool chosenActor = canAct && !actorChosen;
+      actorChosen |= canAct;
       bool canAttack = canAct && unit.CurrentActionPoints >= BattleSession.DefaultAttackActionPointCost
         && weapon.Match(value => value.IsLoaded, () => false);
       bool canReload = canAct && unit.CurrentActionPoints >= BattleSession.DefaultReloadActionPointCost
@@ -39,7 +42,8 @@ public sealed class GetEnemyDecisionFrame(Faction faction) : IBattleSessionQuery
         weapon.Match(value => value.EffectiveRange, () => 0),
         (int)Math.Min(health, int.MaxValue), (int)Math.Min(stun, int.MaxValue),
         weapon.Match(value => value is AmmunitionedWeapon magazine ? magazine.CurrentAmmo : -1, () => -1)));
-      if (!canAttack) continue;
+      // The policy always uses the lowest-ID actable actor, including an unarmed one.
+      if (!chosenActor || !canAttack) continue;
       foreach (var hostile in hostiles.AsValueEnumerable()
         .OrderBy(target => BattleSession.GetGridDistance(alive.Position.Raw, target.Position))
         .ThenBy(target => target.UnitId).Take(8))
