@@ -6,7 +6,7 @@ namespace FunProject.Battle;
 public sealed class EnemyTurnMemory
 {
   private readonly Dictionary<int, SysColGeneric.HashSet<Vector3I>> _visited = [];
-  private readonly SysColGeneric.HashSet<int> _dismissedContacts = [];
+  private readonly Dictionary<int, long> _dismissedContacts = [];
   private readonly SysColGeneric.HashSet<EnemyIntent> _suppressed = [];
 
   public void Visit(int actorId, Vector3I position)
@@ -17,7 +17,8 @@ public sealed class EnemyTurnMemory
 
   public bool HasVisited(int actorId, Vector3I position)
     => _visited.TryGetValue(actorId, out var visited) && visited.Contains(position);
-  public bool IsDismissed(int unitId) => _dismissedContacts.Contains(unitId);
+  public bool IsDismissed(LastSeenContact contact)
+    => _dismissedContacts.TryGetValue(contact.UnitId, out long revision) && revision == contact.VisibilityRevision;
   public bool IsSuppressed(EnemyIntent intent) => _suppressed.Contains(intent);
   public void Suppress(EnemyIntent intent) => _suppressed.Add(intent);
 
@@ -27,6 +28,6 @@ public sealed class EnemyTurnMemory
     foreach (var contact in frame.Contacts)
       if (frame.Tiles.AsValueEnumerable().Any(tile => tile.Position == contact.Position && tile.Visible)
         && !frame.Hostiles.AsValueEnumerable().Any(hostile => hostile.UnitId == contact.UnitId))
-        _dismissedContacts.Add(contact.UnitId);
+        _dismissedContacts[contact.UnitId] = contact.VisibilityRevision;
   }
 }

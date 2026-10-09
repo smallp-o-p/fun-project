@@ -58,7 +58,7 @@ public sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
       && !memory.HasVisited(actor.UnitId, tile.Position))
       .OrderBy(tile => tile.Position.X).ThenBy(tile => tile.Position.Y).ThenBy(tile => tile.Position.Z).ToArray();
     Option<Vector3I> goal = targets.Length > 0 ? Some(targets[0].Position)
-      : frame.Contacts.AsValueEnumerable().Where(contact => !memory.IsDismissed(contact.UnitId))
+      : frame.Contacts.AsValueEnumerable().Where(contact => !memory.IsDismissed(contact))
         .OrderByDescending(contact => contact.VisibilityRevision).ThenBy(contact => contact.UnitId)
         .Select(contact => Some(contact.Position)).FirstOrDefault();
     if (goal.IsNone)

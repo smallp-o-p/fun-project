@@ -130,6 +130,15 @@ public sealed class EnemyPolicyTest
     Assert.Equal(EnemyIntentKind.Pass, policy.Decide(frame, memory).Intent.Kind);
     var observedEmpty = frame with { Tiles = [new(new(2, 0, 0), TraversalKnowledge.Clear, true, true, TileCover.None)] };
     memory.Observe(observedEmpty);
-    Assert.True(memory.IsDismissed(9));
+    Assert.True(memory.IsDismissed(frame.Contacts[0]));
+    var newSighting = frame with
+    {
+      Contacts = [new(9, new(0, 0, 2), 6)],
+      Tiles = [new(Vector3I.Zero, TraversalKnowledge.Blocked, true, true, TileCover.None),
+        new(new(0, 0, 1), TraversalKnowledge.Clear, true, true, TileCover.None),
+        new(new(0, 0, 2), TraversalKnowledge.Unknown, true, false, TileCover.None)],
+    };
+    memory.Observe(newSighting);
+    Assert.Equal(new Vector3I(0, 0, 1), policy.Decide(newSighting, memory).Intent.Destination);
   }
 }
