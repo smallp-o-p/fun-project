@@ -11,5 +11,3 @@ Read the guide for the subsystem being changed; follow its links only as needed.
 - [Stats](stat-system.md): typed identity, folding, and contribution order.
 - [Character models](model-controls.md): import-owned structure, animation, clothing, masks, and attachments.
 - [Testing](testing.md): environment setup, verification, and coverage tools. Test design and audit rules live in the [test-audit skill](../.agents/skills/test-audit/SKILL.md).
-
-Historical reports and external-game research are retained in Git history, not the current documentation.

@@ -176,6 +176,6 @@ Everything the system owns is inspectable read-only in the editor; changing any 
 | Surface materials | The `presentation_source` `.res` files open in the Inspector. |
 | Manifests | The Manifest Inspector plugin (`res://addons/manifest_inspector/`) renders their metadata read-only and can dump the full contents to Output. Use the Inspector or printed metadata to compare binary `.res` files. |
 
-## Platform verification
+## Import prerequisites
 
-The original Blender-import migration was verified on Windows; a later pass re-verified fresh imports on Linux (Blender 5.1.2, Godot 4.7.2 .NET). Both committed source files require Blender 5.1. Git history records the original review and verification scope; those historical runs are not evidence of a current passing import.
+Both committed Blender source files require Blender 5.1. Verify a fresh import on the target platform when changing the import pipeline.

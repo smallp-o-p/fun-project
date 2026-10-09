@@ -6,7 +6,7 @@ Godot 4.7.2 mono / C# tactical strategy game targeting .NET 10.
 
 - Implement the requested change and verify it. Resolve routine choices from source and project contracts; ask when an unresolved decision materially affects scope or correctness. Preserve unrelated edits.
 - Start with the affected subsystem and its tests. Use the [architecture map](docs/architecture-reference.md) to find its contract; do not load every guide by default.
-- Historical reports, research checkouts, and ignored planning directories are background, not active instructions. User instructions take precedence over skills. Do not invent additional approval gates or import another agent's tool permissions.
+- User instructions take precedence over skills. Do not invent additional approval gates or import another agent's tool permissions.
 - Report changes, verification actually completed, and remaining limitations concisely. Do not claim a failed or incomplete run passed.
 
 ## Verification
