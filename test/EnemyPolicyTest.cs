@@ -58,13 +58,19 @@ public sealed class EnemyPolicyTest
     var own = TestData.MakeFaction("Observer");
     var hostile = TestData.MakeFaction("Hostile");
     BattleSetup Setup() => new(TestData.MakeOpenBattleMap(new Vector3I(8, 1, 3)),
-      [new(own, [new FakeObjectiveData()], [new(new(TestData.MakeCombatant("Observer", own, vision: 1)), Vector3I.Zero)]),
+      [new(own, [new FakeObjectiveData()], [new(new(TestData.MakeCombatant("Observer", own, vision: 1)), new(5, 0, 0))]),
        new(hostile, [new FakeObjectiveData()], [new(new(TestData.MakeCombatant("Hidden", hostile)), new(6, 0, 0))])], Seed: 7);
     using var open = new BattleFixture(Setup());
     using var hidden = new BattleFixture(Setup());
+    Assert.Equal(1, open.Query(new GetEnemyDecisionFrame(own)).Hostiles.Count);
+    open.Move(open.PlayerUnit, [new(4, 0, 0)]);
+    hidden.Move(hidden.PlayerUnit, [new(4, 0, 0)]);
     var retained = open.Query(new GetEnemyDecisionFrame(own));
-    hidden.Board.SetTileWalkable(hidden.At(5, 0, 0), false);
-    hidden.Spawn(TestData.MakeCombatant("Hidden equipped", hostile), new(5, 0, 2), TestData.MakeWeapon("Secret", damage: 999));
+    Assert.Equal(1, retained.Contacts.Count);
+    Assert.Equal(0, retained.Hostiles.Count);
+    hidden.Board.SetTileWalkable(hidden.At(7, 0, 0), false);
+    hidden.Move(hidden.EnemyUnit, [new(6, 0, 1)]);
+    hidden.Spawn(TestData.MakeCombatant("Hidden equipped", hostile), new(7, 0, 2), TestData.MakeWeapon("Secret", damage: 999));
     hidden.ApplyDamage(hidden.EnemyUnit, 999);
     var other = hidden.Query(new GetEnemyDecisionFrame(own));
     Assert.True(retained.OwnUnits.AsValueEnumerable().SequenceEqual(other.OwnUnits));
@@ -78,8 +84,8 @@ public sealed class EnemyPolicyTest
     Assert.Equal(a.Intent, b.Intent);
     Assert.Equal(a.FallbackReason, b.FallbackReason);
     Assert.True(a.Candidates.AsValueEnumerable().SequenceEqual(b.Candidates));
-    open.Move(open.PlayerUnit, [new(1, 0, 0)]);
-    Assert.Equal(Vector3I.Zero, retained.OwnUnits[0].Position);
+    open.Move(open.PlayerUnit, [new(3, 0, 0)]);
+    Assert.Equal(new Vector3I(4, 0, 0), retained.OwnUnits[0].Position);
   }
 
   [TestCase]

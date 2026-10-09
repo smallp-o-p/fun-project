@@ -7,6 +7,9 @@ public sealed class BattleRuntime : IDisposable
   private readonly BattleSession _session;
   private readonly BattleActionExecutor _actions;
   private bool _disposed;
+  private bool _executing;
+  private bool _executionFaulted;
+  private EnemyTurnController? _enemyTurns;
 
   public event Action<BattleEvent> BattleEventCommitted = delegate { };
   public event Action<BattleAction> ActionStarted = delegate { };
@@ -65,14 +68,75 @@ public sealed class BattleRuntime : IDisposable
     return _session.Board.ValidatePoint(coordinates);
   }
 
-  public BattleActionExecResult ExecuteAction(BattleAction action)
+  public void EnableEnemyTurns(EnemyPolicySettings? settings = null)
   {
     ThrowIfDisposed();
+    if (_enemyTurns is not null) throw new InvalidOperationException("Enemy turns are already enabled.");
+    if (_executionFaulted) throw new InvalidOperationException("Cannot enable enemy turns after an execution fault.");
+    var player = _session.PlayerFaction.Match(value => value,
+      () => throw new InvalidOperationException("Enemy turns require a designated player faction."));
+    EnterExecution();
+    try
+    {
+      _enemyTurns = new(this, player, new EnemyPolicy(settings), _session.GlobalFactionTurnOrder.Count, ExecuteSingle);
+      _enemyTurns.Drain();
+    }
+    catch
+    {
+      StopAfterFault();
+      throw;
+    }
+    finally { _executing = false; }
+  }
+
+  // Diagnostics remain detached and inspectable after disposal.
+  public System.Collections.Generic.IReadOnlyList<EnemyDecisionTrace> LatestEnemyDecisions
+    => _enemyTurns?.LatestDecisions ?? [];
+  public string EnemyTurnFallbackReason => _enemyTurns?.FallbackReason ?? "";
+  internal bool IsDisposed => _disposed;
+
+  public BattleActionExecResult ExecuteAction(BattleAction action)
+  {
+    EnterExecution();
+    try
+    {
+      var result = ExecuteSingle(action);
+      _enemyTurns?.Drain();
+      return result;
+    }
+    catch
+    {
+      StopAfterFault();
+      throw;
+    }
+    finally { _executing = false; }
+  }
+
+  // Both public and automated submissions use this path. The outer execution guard spans
+  // observers and the complete drain, so a callback cannot nest a new submission.
+  private BattleActionExecResult ExecuteSingle(BattleAction action)
+  {
+    ThrowIfDisposed();
+    ArgumentNullException.ThrowIfNull(action);
     _actions.EnsureCanSubmit();
     ActionStarted.Invoke(action);
-    BattleActionExecResult result = _actions.Submit(action);
+    ThrowIfDisposed();
+    var result = _actions.Submit(action);
     ActionCompleted.Invoke(result);
     return result;
+  }
+
+  private void EnterExecution()
+  {
+    ThrowIfDisposed();
+    if (_executing) throw new InvalidOperationException("Cannot submit or enable enemy turns during another execution.");
+    _executing = true;
+  }
+
+  private void StopAfterFault()
+  {
+    _executionFaulted = true;
+    _enemyTurns?.Stop("Execution fault");
   }
 
   public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0)
@@ -94,9 +158,10 @@ public sealed class BattleRuntime : IDisposable
     if (_disposed)
       return;
 
+    _disposed = true;
+    _enemyTurns?.Stop("Disposed");
     _session.BattleEventCommitted -= RaiseBattleEventCommitted;
     _actions.Dispose();
-    _disposed = true;
   }
 
   private void ThrowIfDisposed()
