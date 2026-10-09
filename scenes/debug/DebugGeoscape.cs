@@ -1,6 +1,8 @@
 using FunProject.GameState;
 using CampaignGameState = global::FunProject.GameState.GameState;
 
+namespace FunProject.Scenes;
+
 // Debug bring-up: playtest host for the injury/fatigue flow. Adds two soldiers stamped from
 // the authored template on top of the campaign's roster, then reports each as returning
 // from a mission with 10% and 60% health damage — the default injury tiers 1 (Lightly) and

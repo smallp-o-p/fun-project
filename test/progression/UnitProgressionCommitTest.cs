@@ -2,12 +2,14 @@ using System;
 using FunProject.Progression;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class UnitProgressionCommitTest
 {
   [TestCase(TestName = "Committing is free; a unit may hold at most two committed paths")]
-  public void CommitRules()
+  public static void CommitRules()
   {
     var progression = new UnitProgression();
     var first = TestData.MakePath("Alpha", TestData.MakeStep(1));
@@ -30,14 +32,14 @@ public partial class UnitProgressionCommitTest
   }
 
   [TestCase(TestName = "Committing a path with no steps throws (authoring mistake)")]
-  public void EmptyPathThrows()
+  public static void EmptyPathThrows()
   {
     var progression = new UnitProgression();
     Assert.Throws<InvalidOperationException>(() => progression.TryCommit(TestData.MakePath("Empty")));
   }
 
   [TestCase(TestName = "AwardPoints accumulates; non-positive amounts are caller bugs")]
-  public void AwardPointsRules()
+  public static void AwardPointsRules()
   {
     var progression = new UnitProgression();
     progression.AwardPoints(3);

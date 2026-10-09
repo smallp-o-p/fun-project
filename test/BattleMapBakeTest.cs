@@ -4,12 +4,14 @@ using System;
 using System.Threading.Tasks;
 using static GdUnit4.Assertions;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleMapBakeTest
 {
   [TestCase]
-  public async Task NativePaletteFloorPickingRespectsHolesAndIgnoresProps()
+  public static async Task NativePaletteFloorPickingRespectsHolesAndIgnoresProps()
   {
     var source = TestData.MakeMapAuthoring();
     source.Palette = GD.Load<MeshLibrary>("res://resources/map_entities/MapPalette.tres");
@@ -33,7 +35,7 @@ public partial class BattleMapBakeTest
   }
 
   [TestCase]
-  public void NativePaintDataPaletteAndSpawnsSurviveSaveReload()
+  public static void NativePaintDataPaletteAndSpawnsSurviveSaveReload()
   {
     var source = AutoFree(TestData.MakeMapAuthoring())!;
     var palette = TestData.MakeTilePalette(new() { [42] = TestData.MakeFloorFootprint(2, 1) });
@@ -66,7 +68,7 @@ public partial class BattleMapBakeTest
   }
 
   [TestCase]
-  public void MapRootMustUseTheFixedBoardConvention()
+  public static void MapRootMustUseTheFixedBoardConvention()
   {
     var source = AutoFree(TestData.MakeMapAuthoring())!;
     source.Position = Vector3.Right;
@@ -77,7 +79,7 @@ public partial class BattleMapBakeTest
   [TestCase(0)]
   [TestCase(1)]
   [TestCase(2)]
-  public void SpawnRequiresNonnegativeSlotAndWalkableGroundCell(int scenario)
+  public static void SpawnRequiresNonnegativeSlotAndWalkableGroundCell(int scenario)
   {
     var source = AutoFree(TestData.MakeMapAuthoring())!;
     var footprint = TestData.MakeFloorFootprint(1, 1);
@@ -88,7 +90,7 @@ public partial class BattleMapBakeTest
   }
 
   [TestCase]
-  public void InvalidBakePreservesStoredData()
+  public static void InvalidBakePreservesStoredData()
   {
     var source = AutoFree(TestData.MakeMapAuthoring())!;
     source.Palette = TestData.MakeTilePalette(new() { [0] = TestData.MakeFloorFootprint(1, 1) });

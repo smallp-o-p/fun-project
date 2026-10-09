@@ -3,6 +3,8 @@ using GdUnit4;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ActionTargetingTest
@@ -23,7 +25,7 @@ public class ActionTargetingTest
   }
 
   [TestCase(TestName = "MoveTargeting: Begin reachable, Preview path, Build moves the unit")]
-  public void MoveTargetingFlow()
+  public static void MoveTargetingFlow()
   {
     using var battle = MakeArmedBattle();
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
@@ -47,7 +49,7 @@ public class ActionTargetingTest
   }
 
   [TestCase(TestName = "AttackTargeting: Begin candidate enemy tile, Preview hit chance, Build attacks")]
-  public void AttackTargetingFlow()
+  public static void AttackTargetingFlow()
   {
     using var battle = MakeArmedBattle();
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
@@ -68,7 +70,7 @@ public class ActionTargetingTest
   }
 
   [TestCase(TestName = "Boxed-in unit: MoveTargeting yields empty candidates and no committable tiles")]
-  public void BoxedInMoveTargetingHasNoCommittableTiles()
+  public static void BoxedInMoveTargetingHasNoCommittableTiles()
   {
     // Default duel positions: player at (4,0,1), enemy at (4,0,4). Wall off every horizontal
     // neighbor of the player; the board is one tile tall, so there is no vertical escape.
@@ -83,7 +85,7 @@ public class ActionTargetingTest
   }
 
   [TestCase(TestName = "Out-of-range enemy: Attack row stays available with no committable tiles")]
-  public void OutOfRangeEnemyKeepsAttackAvailableWithNoTargets()
+  public static void OutOfRangeEnemyKeepsAttackAvailableWithNoTargets()
   {
     // Knife (range 1) against an enemy across the board: the Attack verb stays usable, but
     // the candidate set is empty and even the enemy's own tile is not committable.
@@ -100,7 +102,7 @@ public class ActionTargetingTest
   }
 
   [TestCase]
-  public void ObjectTargetingPreviewsBuildsAndRefreshesAfterDestruction()
+  public static void ObjectTargetingPreviewsBuildsAndRefreshesAfterDestruction()
   {
     var weapon = TestData.MakeWeapon("Rifle", damage: 5);
     using var battle = BattleFixture.Duel(
@@ -133,7 +135,7 @@ public class ActionTargetingTest
   }
 
   [TestCase]
-  public void ObjectCandidatesUseCurrentAttackerFeasibility()
+  public static void ObjectCandidatesUseCurrentAttackerFeasibility()
   {
     using var battle = BattleFixture.Duel(configure: setup => setup with
     {

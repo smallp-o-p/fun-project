@@ -15,6 +15,8 @@ using GdUnit4;
 using CampaignGameState = global::FunProject.GameState.GameState;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class GeoscapeSquadLoadoutTest
@@ -52,7 +54,7 @@ public class GeoscapeSquadLoadoutTest
 
   // Mission preparation as the resolution opener now performs it: the entire active event
   // handed to ConfigureMission, which derives title, gate, and capacity from it.
-  private static SquadLoadoutView PresentedMissionView(PendingResolution pending,
+  private static MissionView PresentedMissionView(PendingResolution pending,
     CampaignGameState state, GeoscapeSession session)
   {
     var view = AddToTree(CreateMissionView());
@@ -73,7 +75,7 @@ public class GeoscapeSquadLoadoutTest
       + $"{card.GetNode<RichTextLabel>("%Stats").Text}";
 
   [TestCase(TestName = "Configure resizes slots and resets picks")]
-  public async Task ConfigureResizesSlotsAndResetsPicks()
+  public static async Task ConfigureResizesSlotsAndResetsPicks()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeEntry("Alpha"), MakeEntry("Bravo")]);
@@ -100,7 +102,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Editing-disabled configuration hides Edit on occupied cards")]
-  public async Task EditingDisabledConfigurationHidesEdit()
+  public static async Task EditingDisabledConfigurationHidesEdit()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeEntry("Alpha")]);
@@ -117,7 +119,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "An empty-roster mission presents three empty slots and no choices")]
-  public async Task EmptyRosterPresentsThreeEmptySlots()
+  public static async Task EmptyRosterPresentsThreeEmptySlots()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([]);
@@ -141,7 +143,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "The squad scene inherits the shared geoscape view shell")]
-  public void SceneInheritsTheSharedShell()
+  public static void SceneInheritsTheSharedShell()
   {
     var scene = GD.Load<PackedScene>("res://scenes/geoscape/squad/SquadLoadoutView.tscn");
 
@@ -152,7 +154,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "The authored title passes the mouse through so its tooltip is reachable")]
-  public void AuthoredTitlePassesMouseThroughForTooltip()
+  public static void AuthoredTitlePassesMouseThroughForTooltip()
   {
     var view = GD.Load<PackedScene>("res://scenes/geoscape/squad/SquadLoadoutView.tscn")
       .Instantiate<SquadLoadoutView>();
@@ -168,7 +170,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Mission size controls preparation capacity and Deploy readiness")]
-  public async Task MissionSizeControlsPreparationCapacity()
+  public static async Task MissionSizeControlsPreparationCapacity()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeEntry("Alpha")],
@@ -186,7 +188,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Setup failure preserves selection for a corrected retry")]
-  public async Task SetupFailurePreservesSelectionAndRetry()
+  public static async Task SetupFailurePreservesSelectionAndRetry()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeEntry("Alpha"), MakeEntry("Bravo")],
@@ -214,7 +216,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Choices are inert without a destination and occupied units stay unavailable")]
-  public async Task ChoicesRequireADestinationAndExcludeOccupiedUnits()
+  public static async Task ChoicesRequireADestinationAndExcludeOccupiedUnits()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission(
@@ -245,7 +247,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Replace and remove keep other slots and leave holes")]
-  public async Task ReplaceAndRemoveKeepStableSlots()
+  public static async Task ReplaceAndRemoveKeepStableSlots()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission(
@@ -273,7 +275,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Occupied cards summarize equipment, mods, and effective stats")]
-  public async Task OccupiedCardsSummarizeEquipmentAndStats()
+  public static async Task OccupiedCardsSummarizeEquipmentAndStats()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeEntry("Alpha", MakeCombatantData(
@@ -306,7 +308,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Unequipped slots have explicit empty equipment text")]
-  public async Task UnequippedUnitsShowEmptyEquipmentText()
+  public static async Task UnequippedUnitsShowEmptyEquipmentText()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeEntry("Alpha")]);
@@ -321,7 +323,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Editor round-trip keeps selection and refreshes summaries")]
-  public async Task EditorRoundTripKeepsSelectionAndRefreshes()
+  public static async Task EditorRoundTripKeepsSelectionAndRefreshes()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission(
@@ -366,7 +368,7 @@ public class GeoscapeSquadLoadoutTest
 
   [TestCase(false, TestName = "Missing UnitViewScene export is an authoring error")]
   [TestCase(true, TestName = "A wrong-root UnitViewScene frees its instance and throws")]
-  public async Task InvalidUnitViewScenePreservesSelection(bool wrongRoot)
+  public static async Task InvalidUnitViewScenePreservesSelection(bool wrongRoot)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeEntry("Alpha")]);
@@ -387,7 +389,7 @@ public class GeoscapeSquadLoadoutTest
 
   [TestCase(false, TestName = "Missing SquadSlotCardScene export is an authoring error")]
   [TestCase(true, TestName = "A wrong-root SquadSlotCardScene frees its instance and throws")]
-  public async Task InvalidSlotCardScenePreservesEmptySelection(bool wrongRoot)
+  public static async Task InvalidSlotCardScenePreservesEmptySelection(bool wrongRoot)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, _) = Mission([MakeEntry("Alpha")]);
@@ -408,7 +410,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Injured units are blocked from mission deployment")]
-  public async Task InjuredUnitsAreBlockedFromMissionDeployment()
+  public static async Task InjuredUnitsAreBlockedFromMissionDeployment()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeConditionEntry("Alpha")]);
@@ -430,7 +432,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Exhausted units are blocked while Tired and Weary remain deployable")]
-  public async Task ExhaustedIsBlockedWhileTiredAndWearyStayDeployable()
+  public static async Task ExhaustedIsBlockedWhileTiredAndWearyStayDeployable()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission(
@@ -460,7 +462,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "The unfit-deployment override enables blocked units once each")]
-  public async Task OverrideEnablesUnfitUnitsOnceEach()
+  public static async Task OverrideEnablesUnfitUnitsOnceEach()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeConditionEntry("Alpha"), MakeConditionEntry("Bravo")],
@@ -495,7 +497,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Selected override cards show countdowns and penalized stats")]
-  public async Task OverrideCardsShowCountdownsAndPenalizedStats()
+  public static async Task OverrideCardsShowCountdownsAndPenalizedStats()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeConditionEntry("Alpha")],
@@ -518,7 +520,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "A positive recovery interval never rounds down to zero")]
-  public async Task PositiveRecoveryIntervalsNeverRoundDownToZero()
+  public static async Task PositiveRecoveryIntervalsNeverRoundDownToZero()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var fixture = new GeoscapeFixture(MakeStart(
@@ -538,7 +540,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "The override retains selected exhausted units across editor navigation")]
-  public async Task OverrideRetainsSelectedExhaustedUnitsAcrossNavigation()
+  public static async Task OverrideRetainsSelectedExhaustedUnitsAcrossNavigation()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission([MakeConditionEntry("Alpha")],
@@ -574,7 +576,7 @@ public class GeoscapeSquadLoadoutTest
   }
 
   [TestCase(TestName = "Generic interrogation retains injured selections when a mission becomes pending")]
-  public async Task GenericInterrogationIgnoresMissionContext()
+  public static async Task GenericInterrogationIgnoresMissionContext()
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var fixture = new GeoscapeFixture(MakeStart(

@@ -1,6 +1,8 @@
 using System;
 using FunProject.Strategic;
 
+namespace FunProject.Scenes;
+
 public static class ProjectTimeText
 {
   public static string Remaining(long completesAtTick, long tick)

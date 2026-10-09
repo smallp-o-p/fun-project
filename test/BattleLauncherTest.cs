@@ -16,7 +16,7 @@ namespace FunProject.Tests;
 public partial class BattleLauncherTest
 {
   [TestCase(TestName = "Launcher boots the battle scene with map, unit meshes, and populated HUD")]
-  public void LauncherBootsBattleSceneWithMapUnitMeshesAndHud()
+  public static void LauncherBootsBattleSceneWithMapUnitMeshesAndHud()
   {
     var type = TestData.MakeDuelBattleType();
     var launcher = new BattleLauncher { BattleType = type };
@@ -33,7 +33,7 @@ public partial class BattleLauncherTest
   }
 
   [TestCase(TestName = "A failing standalone startup leaves no host and a disposed runtime")]
-  public async Task FailingStartupLeavesNoHostAndDisposedRuntime()
+  public static async Task FailingStartupLeavesNoHostAndDisposedRuntime()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var capture = new HookCaptureSystemData();
@@ -48,7 +48,7 @@ public partial class BattleLauncherTest
   }
 
   [TestCase(TestName = "A factory result that already has an outcome shows the battle-over banner at startup")]
-  public void LauncherShowsBannerForStartupTerminalBattle()
+  public static void LauncherShowsBannerForStartupTerminalBattle()
   {
     var type = TestData.MakeDuelBattleType();
     type.Factions[0].Objectives.Clear();
@@ -72,7 +72,7 @@ public partial class BattleLauncherTest
   }
 
   [TestCase(TestName = "Present guards against nulls")]
-  public void PresentGuardsAgainstNulls()
+  public static void PresentGuardsAgainstNulls()
   {
     var scene = GD.Load<PackedScene>("res://scenes/battle/BattleScene.tscn")
       .Instantiate<BattleScene>();
@@ -82,7 +82,7 @@ public partial class BattleLauncherTest
   }
 
   [TestCase(TestName = "Disposing an attached host detaches pending playback before runtime teardown")]
-  public void DisposeDetachesPendingPlayback()
+  public static void DisposeDetachesPendingPlayback()
   {
     var setup = BattleSetupResolver.Resolve(TestData.MakeDuelBattleType()).RequireRight();
     using var runtime = BattleFactory.Start(setup).RequireRight();
@@ -104,7 +104,7 @@ public partial class BattleLauncherTest
   }
 
   [TestCase(TestName = "Pointer picking uses the delivered event position even after the cursor moves")]
-  public async Task PointerPickingUsesDeliveredPosition()
+  public static async Task PointerPickingUsesDeliveredPosition()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var launcher = AddToTree(new BattleLauncher { BattleType = TestData.MakeDuelBattleType() });

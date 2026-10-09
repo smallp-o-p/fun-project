@@ -3,6 +3,8 @@ using FunProject.Models;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class CharacterModelAppearanceAttachmentTest
@@ -12,7 +14,7 @@ public class CharacterModelAppearanceAttachmentTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void IsolationLeavesAuthoredMaterialsUntouchedWithoutRuntimeProcessing()
+  public static void IsolationLeavesAuthoredMaterialsUntouchedWithoutRuntimeProcessing()
   {
     using var fixture = ModelFixture.WithAppearance();
     var material = (ShaderMaterial)fixture.Body.GetSurfaceOverrideMaterial(0)!;
@@ -28,7 +30,7 @@ public class CharacterModelAppearanceAttachmentTest
   // width, a disabled pass, and a surface authored without any pass survive
   // as authored.
   [TestCase]
-  public void IsolationCarriesAuthoredOutlineSettings()
+  public static void IsolationCarriesAuthoredOutlineSettings()
   {
     using var widthFixture = ModelFixture.WithAppearance(start: false,
       authorMaterial: material => ((ShaderMaterial)material.NextPass!).SetShaderParameter("width_scale", 2.5));
@@ -53,7 +55,7 @@ public class CharacterModelAppearanceAttachmentTest
   }
 
   [TestCase]
-  public void RepeatedInitializationKeepsIsolatedMaterials()
+  public static void RepeatedInitializationKeepsIsolatedMaterials()
   {
     using var fixture = ModelFixture.WithAppearance(withMask: true);
     ulong surfaceId = fixture.Body.GetSurfaceOverrideMaterial(0)!.GetInstanceId();
@@ -69,7 +71,7 @@ public class CharacterModelAppearanceAttachmentTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void MaskRenderUsesIsolatedOutlineWeights()
+  public static void MaskRenderUsesIsolatedOutlineWeights()
   {
     // The first mask render uses overrides already localized by instantiation,
     // even though the masked body lives inside a nested mesh wrapper.

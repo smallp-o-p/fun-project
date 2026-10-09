@@ -2,12 +2,14 @@ using System;
 using FunProject.Progression;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class UnitRankGainTest
 {
   [TestCase(TestName = "Rank gain: scaling, per-rank factor, floor at one, overflow recut, chaining, max remainder")]
-  public void GainTable()
+  public static void GainTable()
   {
     (string Name, (string Level, int Factor)[] Levels, int Gain, bool MaxBefore, Action<UnitRank, string> Verify)[] rows =
     [
@@ -69,12 +71,12 @@ public class UnitRankGainTest
   }
 
   [TestCase(TestName = "Non-positive awards and malformed tables throw")]
-  public void GuardsThrow()
+  public static void GuardsThrow()
   {
     var rank = new UnitRank(TestData.MakeRankTable(new RankLevelData { Name = "Rookie", GainFactorPercent = 100 }));
     Assert.Throws<ArgumentOutOfRangeException>(() => rank.Gain(0));
-    Assert.Throws<InvalidOperationException>(() => new UnitRank(new RankTableData()));
-    Assert.Throws<InvalidOperationException>(() => new UnitRank(TestData.MakeRankTable(
+    Assert.Throws<InvalidOperationException>(() => _ = new UnitRank(new RankTableData()));
+    Assert.Throws<InvalidOperationException>(() => _ = new UnitRank(TestData.MakeRankTable(
       new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
       new RankLevelData { Name = "Broken", GainFactorPercent = 0 })));
   }

@@ -4,12 +4,14 @@ using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class WeaponSystemTest
 {
   [TestCase(TestName = "FirearmWeapon constructed from FirearmWeaponData")]
-  public void FirearmWeaponConstructedFromFirearmWeaponData()
+  public static void FirearmWeaponConstructedFromFirearmWeaponData()
   {
     var data = new FirearmWeaponData
     {
@@ -27,14 +29,14 @@ public class WeaponSystemTest
   }
 
   [TestCase(TestName = "MeleeWeapon stats dictionary has no ammo entry")]
-  public void MeleeWeaponStatsDictionaryHasNoAmmoEntry()
+  public static void MeleeWeaponStatsDictionaryHasNoAmmoEntry()
   {
     var weapon = new MeleeWeapon(TestData.MakeWeaponData());
     Assert.True(weapon.TryGetStat<AmmunitionStat>().IsNone);
   }
 
   [TestCase(TestName = "Weapon generic stat lookup returns concrete stats")]
-  public void WeaponGenericStatLookupReturnsConcreteStats()
+  public static void WeaponGenericStatLookupReturnsConcreteStats()
   {
     var weapon = new MeleeWeapon(TestData.MakeWeaponData());
 
@@ -46,7 +48,7 @@ public class WeaponSystemTest
   }
 
   [TestCase(TestName = "Firearm generic stat lookup returns the ammunition stat")]
-  public void FirearmGenericStatLookupReturnsAmmunitionStat()
+  public static void FirearmGenericStatLookupReturnsAmmunitionStat()
   {
     var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1));
 
@@ -57,7 +59,7 @@ public class WeaponSystemTest
   }
 
   [TestCase(TestName = "ModSlot can equip and unequip")]
-  public void ModSlotCanEquipAndUnequip()
+  public static void ModSlotCanEquipAndUnequip()
   {
     var slot = new ModSlot();
     Assert.False(slot.HasMod);

@@ -1,7 +1,10 @@
+using CampaignGameState = global::FunProject.GameState.GameState;
 using System;
 using FunProject.Engineering;
 using FunProject.GameState;
 using GdUnit4;
+
+namespace FunProject.Tests;
 
 [TestSuite]
 [RequireGodotRuntime]
@@ -9,7 +12,7 @@ public class ProjectCatalogTest
 {
   [TestCase(1U, 1457L)]
   [TestCase(uint.MaxValue, 6_184_752_904_817L)]
-  public void WholeDaysArePreservedAndScheduledFromSubmissionTime(uint days, long completesAtTick)
+  public static void WholeDaysArePreservedAndScheduledFromSubmissionTime(uint days, long completesAtTick)
   {
     var item = MakeItemData();
     var itemRecipe = MakeManufacturingRecipe(item, days: days);
@@ -23,12 +26,12 @@ public class ProjectCatalogTest
   }
 
   [TestCase]
-  public void CatalogPreservesOrderAndIdentityWithoutGrantingStock()
+  public static void CatalogPreservesOrderAndIdentityWithoutGrantingStock()
   {
     var item = MakeItemData();
     var firstRecipe = MakeManufacturingRecipe(item);
     var secondRecipe = MakeManufacturingRecipe(item, days: 2);
-    var state = new GameState(MakeStart(armory: [item], manufacturingRecipes: [secondRecipe, firstRecipe]));
+    var state = new CampaignGameState(MakeStart(armory: [item], manufacturingRecipes: [secondRecipe, firstRecipe]));
     var options = state.Engineering.GetManufacturingOptions(state);
     Assert.Equal(2, options.Count);
     Assert.Equal(secondRecipe, options[0].Project);
@@ -42,14 +45,14 @@ public class ProjectCatalogTest
   }
 
   [TestCase]
-  public void CatalogCopiesMembershipAndReadsRecipeValues()
+  public static void CatalogCopiesMembershipAndReadsRecipeValues()
   {
     var item = MakeItemData();
     var itemRecipe = MakeManufacturingRecipe(item, days: 2);
     var replacement = MakeItemData();
     var replacementRecipe = MakeManufacturingRecipe(replacement);
     var start = MakeStart(manufacturingRecipes: [itemRecipe]);
-    var state = new GameState(start);
+    var state = new CampaignGameState(start);
 
     start.ManufacturingRecipes[0] = replacementRecipe;
     itemRecipe.DurationDays = 3;

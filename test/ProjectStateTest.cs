@@ -1,18 +1,21 @@
+using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.GameState;
 using FunProject.Strategic;
 using FunProject.Engineering;
 using GdUnit4;
+
+namespace FunProject.Tests;
 
 [TestSuite]
 [RequireGodotRuntime]
 public class ProjectStateTest
 {
   [TestCase]
-  public void ManufacturingCompletionClearsTheJobWithoutChangingStockItself()
+  public static void ManufacturingCompletionClearsTheJobWithoutChangingStockItself()
   {
     var item = MakeItemData();
     var itemRecipe = MakeManufacturingRecipe(item);
-    var state = new GameState(MakeStart(manufacturingRecipes: [itemRecipe]));
+    var state = new CampaignGameState(MakeStart(manufacturingRecipes: [itemRecipe]));
     var session = new GeoscapeSession(state);
     var job = session.StartManufacturing(itemRecipe).RequireRight();
 

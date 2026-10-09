@@ -7,6 +7,8 @@ using GdUnit4;
 using static GdUnit4.Assertions;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class DialogueIntegrationTest
@@ -42,7 +44,7 @@ public class DialogueIntegrationTest
   // The dialogue-carrying event pushes resolution + dialogue: the dialogue covers the
   // retained resolution view, and finishing it pops back to that resolution.
   [TestCase]
-  public async Task OpeningDialogueEventPlaysDialogueOverResolutionThenPopsBack()
+  public static async Task OpeningDialogueEventPlaysDialogueOverResolutionThenPopsBack()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (scene, manager) = SceneWithEvent(MakeEvent("Council Broadcast", dialogue: CouncilDialogue()));
@@ -69,7 +71,7 @@ public class DialogueIntegrationTest
   }
 
   [TestCase]
-  public async Task OpeningPlainEventPushesResolutionDirectly()
+  public static async Task OpeningPlainEventPushesResolutionDirectly()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (scene, manager) = SceneWithEvent(MakeEvent("Quiet plot"));
@@ -80,7 +82,7 @@ public class DialogueIntegrationTest
   }
 
   [TestCase]
-  public void MissingDialogueViewSceneExportThrowsAtReady()
+  public static void MissingDialogueViewSceneExportThrowsAtReady()
   {
     GeoscapeScene scene = CreateGeoscapeScene(MakeStart());
     AutoFree(scene); // _Ready throws before tree entry; the subtree would leak

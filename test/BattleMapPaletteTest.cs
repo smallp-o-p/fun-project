@@ -2,12 +2,14 @@ using GdUnit4;
 using Godot;
 using static GdUnit4.Assertions;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleMapPaletteTest
 {
   [TestCase]
-  public void BrushMeshMetadataSurvivesSaveReloadAndFieldEdits()
+  public static void BrushMeshMetadataSurvivesSaveReloadAndFieldEdits()
   {
     var marker = AutoFree(new BattleAnnotationMarker { Mesh = new BoxMesh() })!;
     marker.Defaults = new BattleFootprintData { HasFloor = true };
@@ -21,7 +23,7 @@ public partial class BattleMapPaletteTest
   }
 
   [TestCase]
-  public void NativePaletteKeepsNonsequentialIdsAndMeshMetadata()
+  public static void NativePaletteKeepsNonsequentialIdsAndMeshMetadata()
   {
     var palette = TestData.MakeTilePalette(new() { [42] = TestData.MakeFloorFootprint(2, 1), [7] = [] });
     palette.SetItemMeshTransform(42, new(Basis.Identity, new(1, 2, 3)));

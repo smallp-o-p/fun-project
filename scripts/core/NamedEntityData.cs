@@ -9,7 +9,7 @@ public partial class NamedEntityData : Resource
   [Export(PropertyHint.MultilineText)] public string Description { get; set; } = "Description";
 }
 
-public interface HasNameAndDescription
+public interface IHasNameAndDescription
 {
   public string GetName();
   public string GetDescription();

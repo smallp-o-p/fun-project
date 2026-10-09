@@ -7,7 +7,7 @@ namespace FunProject.Battle;
 
 /// <summary>
 /// The objective router: the executor registers this plain default system once under
-/// <see cref="BattleEventTag"/> at priority +100, so it receives every committed event.
+/// <see cref="IBattleEventTag"/> at priority +100, so it receives every committed event.
 /// Objectives filter by their declared <see cref="Objective.ObservedEventKeys"/> inside
 /// the router. The router supplies each objective's owning faction to <see cref="Objective.Check"/>.
 /// Dispatch keys are owned by the event itself (per-closed-type statics behind

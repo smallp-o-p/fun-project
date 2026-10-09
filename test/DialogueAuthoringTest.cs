@@ -4,6 +4,8 @@ using FunProject.Strategic;
 using Godot;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class DialogueAuthoringTest
@@ -12,7 +14,7 @@ public class DialogueAuthoringTest
   // test map carries a playable sequence (every line spoken, every speaker portraited).
   // Uses the project's custom Assert (bool/value helpers), not GdUnit4's fluent API.
   [TestCase]
-  public void CouncilBroadcastEventCarriesPlayableDialogue()
+  public static void CouncilBroadcastEventCarriesPlayableDialogue()
   {
     var map = GD.Load<GeoscapeMapData>("res://resources/geoscape/TestMap.tres");
     GeoscapeEventDefinition council = map.Timeline

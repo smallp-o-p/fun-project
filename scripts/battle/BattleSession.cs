@@ -94,7 +94,7 @@ public sealed class BattleSession
     {
       BattleEntity.Unit unit => TryGetAlive(unit.State)
         .Map(alive => new AttackTarget(entity, alive.Position)),
-      BattleEntity.Object obj => TryGetAliveObject(obj.State)
+      BattleEntity.BoardObject obj => TryGetAliveObject(obj.State)
         .Bind(live => obj.State.FindCapability<ObjectHealthCapability>()
           .Map(_ => new AttackTarget(entity, live.Position))),
       _ => throw new InvalidOperationException("Unknown battle entity."),
@@ -116,7 +116,7 @@ public sealed class BattleSession
       Some: position => new LiveObject(obj, position),
       None: () => throw new InvalidOperationException($"Object {obj.Id} is placed but not board-indexed."));
 
-  internal DeadUnit MintDead(BattleUnitState unit)
+  internal static DeadUnit MintDead(BattleUnitState unit)
   {
     return new DeadUnit(unit);
   }

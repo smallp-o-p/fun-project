@@ -35,7 +35,7 @@ The constructor registers the default systems:
 - `CapabilityEffectSystem` — `ItemThrownBattleEvent`.
 - `TurnStartBuffHook` — `TurnStartedBattleEvent`.
 - `UnitSpawnedBuffHook` — `UnitAddedBattleEvent`.
-- `ObjectiveSystem` — catch-all `BattleEventTag` at +100. It receives every event and filters each objective's declared observed keys internally.
+- `ObjectiveSystem` — catch-all `IBattleEventTag` at +100. It receives every event and filters each objective's declared observed keys internally.
 
 Keep one live executor per session through ownership. Duplicate executors register duplicate upkeep handlers, causing statuses, armor regen, and stun recovery to tick twice. Production `BattleRuntime` owns the session's single executor. It subscribes the `BattleEventCommitted` re-raise before it constructs the executor, so subscribers observe cause events before follow-up events from hooks. Tests reuse `BattleFixture.Runtime`. Code disposes the previous owner before creating a lifecycle replacement.
 

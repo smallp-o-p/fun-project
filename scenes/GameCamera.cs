@@ -1,6 +1,8 @@
 using System;
 using Godot;
 
+namespace FunProject.Scenes;
+
 public partial class GameCamera : AnimatableBody3D
 {
   public const float CircleBezierFactor = 0.55228475f;

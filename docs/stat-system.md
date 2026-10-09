@@ -10,7 +10,7 @@ Stats are authored as concrete subresources: `WeaponData` carries `DamageStat`, 
 
 ## Runtime Access
 
-Runtime wrappers such as `Weapon` and `Combatant` implement `HasStats` and store stats in a `StatSheet` keyed by the concrete stat class. The `StatSheet` constructor validates each key against its value's runtime type, so a mismatched entry throws at construction.
+Runtime wrappers such as `Weapon` and `Combatant` implement `IHasStats` and store stats in a `StatSheet` keyed by the concrete stat class. The `StatSheet` constructor validates each key against its value's runtime type, so a mismatched entry throws at construction.
 
 ```csharp
 var damage = weapon.GetStat<DamageStat>().BaseValue;
@@ -29,7 +29,7 @@ Three layers:
 
 ## Folding and Stacking
 
-`HasStats.Fold(float baseValue, IEnumerable<StatModifier> modifiers)` is a static method on the `HasStats` interface. Resolution is deterministic:
+`IHasStats.Fold(float baseValue, IEnumerable<StatModifier> modifiers)` is a static method on the `IHasStats` interface. Resolution is deterministic:
 
 ```
 effective = Override (last entry wins) ?? (base + ΣAdd) * (1 + ΣPercentAdd) * Π Multiply
@@ -39,7 +39,7 @@ effective = Override (last entry wins) ?? (base + ΣAdd) * (1 + ΣPercentAdd) * 
 
 Stacking rule: `PercentAdd` entries are additive with each other (two +10% bonuses give +20%); `Multiply` is reserved for true compounding (two 1.1× multipliers give 1.21×).
 
-`Resolve`/`TryResolve` are extension methods on `HasStats` (`HasStatsExtensions` in `scripts/stats/`):
+`Resolve`/`TryResolve` are extension methods on `IHasStats` (`HasStatsExtensions` in `scripts/stats/`):
 
 - `owner.Resolve<TStat>(IEnumerable<StatMod> sources) : float` — gathers the `StatMod`s targeting `TStat`, collects their modifiers, and folds once over the owner's `BaseValue`. Returns `0f` when the owner lacks the stat.
 - `owner.TryResolve<TStat>(...) : Option<float>` — same fold, `None` when the stat is absent.

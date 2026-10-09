@@ -3,6 +3,8 @@ using FunProject.Combatants;
 using Godot;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 /// <summary>Presents alive units as capsule meshes and registers them with the playback director.</summary>
 public sealed partial class BattleUnitMeshes : Node3D
 {

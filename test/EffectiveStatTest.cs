@@ -5,6 +5,8 @@ using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class EffectiveStatTest
@@ -25,7 +27,7 @@ public class EffectiveStatTest
     new() { Name = name, StatMods = [.. statMods] };
 
   [TestCase(TestName = "Slot and ammunition contributions compute the weapon's effective range")]
-  public void WeaponRangeContributionTable()
+  public static void WeaponRangeContributionTable()
   {
     (string Name, Func<FirearmWeapon> Make, float Expected)[] rows =
     [
@@ -60,7 +62,7 @@ public class EffectiveStatTest
   }
 
   [TestCase(TestName = "Multi-stat mods and separate slots each apply their own stat targets")]
-  public void WeaponMultiStatContributionTable()
+  public static void WeaponMultiStatContributionTable()
   {
     var tacticalData = FirearmData(1, 1);
     var tactical = WithSlotMod(new FirearmWeapon(tacticalData), SlotMod("Tactical Overhaul",
@@ -79,7 +81,7 @@ public class EffectiveStatTest
   }
 
   [TestCase(TestName = "Combatant slot and faction Health contributions raise MaxHealth")]
-  public void CombatantHealthContributionTable()
+  public static void CombatantHealthContributionTable()
   {
     var faction = TestData.MakeFaction("Player");
     var slotted = TestData.MakeCombatant("Alpha", faction, health: 20, modSlotCount: 1);
@@ -99,7 +101,7 @@ public class EffectiveStatTest
   }
 
   [TestCase(TestName = "BattleCombatQueries: a range mod brings a distant target into range")]
-  public void RangeModExtendsAttackRange()
+  public static void RangeModExtendsAttackRange()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -127,7 +129,7 @@ public class EffectiveStatTest
   }
 
   [TestCase(TestName = "An equipped Aim mod raises the hit-chance base")]
-  public void AimModRaisesHitChance()
+  public static void AimModRaisesHitChance()
   {
     var faction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");

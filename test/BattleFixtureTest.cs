@@ -19,7 +19,7 @@ public partial class BattleFixtureTest
       Seed: 7);
 
   [TestCase]
-  public void SetupAndActionsShareOneNativeUnitAndExplicitEventWindow()
+  public static void SetupAndActionsShareOneNativeUnitAndExplicitEventWindow()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(SingleUnitSetup(faction));
@@ -39,7 +39,7 @@ public partial class BattleFixtureTest
   }
 
   [TestCase]
-  public void RepeatedMovesMintFreshProofsOnTheSameFixture()
+  public static void RepeatedMovesMintFreshProofsOnTheSameFixture()
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     battle.ClearEvents();
@@ -51,7 +51,7 @@ public partial class BattleFixtureTest
   }
 
   [TestCase]
-  public void ExplicitInvalidActionsStillPropagateTheirRejection()
+  public static void ExplicitInvalidActionsStillPropagateTheirRejection()
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var action = BattleAction.MoveUnit(battle.Alive(battle.Unit), [battle.At(2, 0, 0)]);
@@ -77,7 +77,7 @@ public partial class BattleFixtureTest
     { Systems = [.. startupSystems] };
 
   [TestCase(TestName = "A startup reinforcement cannot steal an authored fixture role")]
-  public void StartupReinforcementKeepsAuthoredRoles()
+  public static void StartupReinforcementKeepsAuthoredRoles()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -102,7 +102,7 @@ public partial class BattleFixtureTest
   }
 
   [TestCase(TestName = "A startup replacement reusing the authored combatant and cell cannot steal the authored raw unit")]
-  public void StartupReplacementRetainsAuthoredRawUnit()
+  public static void StartupReplacementRetainsAuthoredRawUnit()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -173,7 +173,7 @@ public partial class BattleFixtureTest
   }
 
   [TestCase]
-  public void PresentationObjectsAreReusedAndOwnedNodesAreFreed()
+  public static void PresentationObjectsAreReusedAndOwnedNodesAreFreed()
   {
     using var uiBattle = BattleFixture.UiBattle();
     Assert.True(ReferenceEquals(uiBattle.Ui, uiBattle.Ui));
@@ -202,7 +202,7 @@ public partial class BattleFixtureTest
   }
 
   [TestCase]
-  public void DisposalDetachesRecordingAndClosesTheRuntime()
+  public static void DisposalDetachesRecordingAndClosesTheRuntime()
   {
     var faction = TestData.MakeFaction("Player");
     var battle = new BattleFixture(SingleUnitSetup(faction));

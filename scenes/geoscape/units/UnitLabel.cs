@@ -2,6 +2,8 @@ using FunProject.Combatants;
 using Godot;
 using System;
 
+namespace FunProject.Scenes;
+
 public partial class UnitLabel : PanelContainer
 {
   public RichTextLabel? UnitName { get; private set; }

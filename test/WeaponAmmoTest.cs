@@ -2,12 +2,14 @@ using FunProject.Battle;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class WeaponAmmoTest
 {
   [TestCase(TestName = "Spending a shot decrements only this weapon instance, never the authored template")]
-  public void SpendingNeverMutatesTemplateOrSiblings()
+  public static void SpendingNeverMutatesTemplateOrSiblings()
   {
     var data = TestData.MakeAmmoWeaponData("SMG", magazine: 6);
     var weaponA = new AmmunitionedWeapon(data);
@@ -21,7 +23,7 @@ public class WeaponAmmoTest
   }
 
   [TestCase(TestName = "TrySpendShot returns None once the magazine cannot afford a shot")]
-  public void TrySpendShotReturnsNoneWhenEmpty()
+  public static void TrySpendShotReturnsNoneWhenEmpty()
   {
     var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 1);
 
@@ -33,7 +35,7 @@ public class WeaponAmmoTest
   }
 
   [TestCase(TestName = "Reload refills to magazine size and leaves the authored stat untouched")]
-  public void ReloadRefillsToMagazineSize()
+  public static void ReloadRefillsToMagazineSize()
   {
     var data = TestData.MakeAmmoWeaponData("Rifle", magazine: 4);
     var weapon = new AmmunitionedWeapon(data);
@@ -49,7 +51,7 @@ public class WeaponAmmoTest
   }
 
   [TestCase(TestName = "A melee weapon always spends a shot successfully")]
-  public void MeleeAlwaysSpends()
+  public static void MeleeAlwaysSpends()
   {
     var weapon = TestData.MakeWeapon("Sword");
 

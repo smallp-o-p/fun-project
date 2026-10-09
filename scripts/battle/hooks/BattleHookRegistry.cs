@@ -5,7 +5,7 @@ namespace FunProject.Battle;
 
 /// <summary>
 /// The one hook registry, executor-owned. Entries are (hook, priority, stamp) keyed by
-/// BattleEventTag type; each firing sorts by priority (lower first) then registration
+/// IBattleEventTag type; each firing sorts by priority (lower first) then registration
 /// order. Matches are materialized before iteration, and the registry retires hooks that
 /// signal <see cref="BattleHook.NeedsToUnregister"/> right after their firing (one-shot
 /// mines) — both safe mid-firing, both effective on the next dispatch.
@@ -18,7 +18,7 @@ internal sealed class BattleHookRegistry
   private long _nextStamp;
 
   internal void Register<TEventKey>(BattleHook hook, int priority)
-    where TEventKey : BattleEventTag
+    where TEventKey : IBattleEventTag
   {
     ArgumentNullException.ThrowIfNull(hook);
     RegisteredHook entry = new(hook, priority, _nextStamp++);
@@ -26,7 +26,7 @@ internal sealed class BattleHookRegistry
   }
 
   internal bool Unregister<TEventKey>(BattleHook hook)
-    where TEventKey : BattleEventTag
+    where TEventKey : IBattleEventTag
   {
     ArgumentNullException.ThrowIfNull(hook);
     return _hooks.RemoveFirst<TEventKey>(entry => ReferenceEquals(entry.Hook, hook));
@@ -64,7 +64,7 @@ internal sealed class BattleHookRegistry
 }
 
 /// <summary>
-/// Shared multimap keyed by <see cref="BattleEventTag"/> type. Items register against a tag
+/// Shared multimap keyed by <see cref="IBattleEventTag"/> type. Items register against a tag
 /// type (a concrete event record or a marker interface) and are looked up for a committed
 /// event, so registrations against tag interfaces also fire.
 /// </summary>
@@ -73,7 +73,7 @@ internal sealed class EventKeyedRegistry<T>
   private readonly Dictionary<Type, List<T>> _itemsByEventType = [];
 
   internal void Register<TEventKey>(T item)
-    where TEventKey : BattleEventTag
+    where TEventKey : IBattleEventTag
   {
     ArgumentNullException.ThrowIfNull(item);
 
@@ -86,7 +86,7 @@ internal sealed class EventKeyedRegistry<T>
 
   /// <summary>Removes the first item under the key that satisfies the predicate; false if none does.</summary>
   internal bool RemoveFirst<TEventKey>(Func<T, bool> match)
-    where TEventKey : BattleEventTag
+    where TEventKey : IBattleEventTag
   {
     if (!_itemsByEventType.TryGetValue(typeof(TEventKey), out var items))
       return false;

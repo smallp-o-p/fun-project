@@ -4,6 +4,8 @@ using GdUnit4;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public sealed partial class BattleUiControllerTest
@@ -13,7 +15,7 @@ public sealed partial class BattleUiControllerTest
   // battle.Ui lazily mints the single controller bound to that runtime and battle.Busy.
 
   [TestCase(TestName = "Selecting a friendly unit selects it and loads its verbs")]
-  public void SelectingFriendlyUnitLoadsVerbs()
+  public static void SelectingFriendlyUnitLoadsVerbs()
   {
     using var battle = BattleFixture.UiBattle();
     Assert.Equal(UiState.Unselected, battle.Ui.State);
@@ -27,7 +29,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Action options retain identity and reflect live availability across selection changes")]
-  public void ActionOptionsRetainIdentityAndLiveAvailability()
+  public static void ActionOptionsRetainIdentityAndLiveAvailability()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -46,7 +48,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Disposal clears retained UI state and detaches runtime handling")]
-  public void DisposalClearsStateAndDetachesRuntimeHandling()
+  public static void DisposalClearsStateAndDetachesRuntimeHandling()
   {
     using var battle = BattleFixture.UiBattle();
     BattleUiController ui = battle.Ui;
@@ -78,7 +80,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Clicking enemy or empty tiles does not select")]
-  public void ClickingEnemyOrEmptyTilesDoesNotSelect()
+  public static void ClickingEnemyOrEmptyTilesDoesNotSelect()
   {
     using var battle = BattleFixture.UiBattle();
     Assert.False(battle.Ui.TrySelectAt(new Vector3I(4, 0, 4))); // enemy tile
@@ -87,7 +89,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Selection and cancel each publish one complete update")]
-  public void SelectionAndCancelPublishCompleteUpdates()
+  public static void SelectionAndCancelPublishCompleteUpdates()
   {
     using var battle = BattleFixture.UiBattle();
     int changes = 0;
@@ -121,7 +123,7 @@ public sealed partial class BattleUiControllerTest
   [TestCase(UiState.Targeting, 20, DamageKind.Stun, TestName = "A foreign stun during targeting deselects and clears actions")]
   [TestCase(UiState.TargetingLocked, 20, DamageKind.Stun, TestName = "A foreign stun during locked targeting deselects and clears actions")]
   [TestCase(UiState.UnitSelected, 999, DamageKind.Health, TestName = "A foreign kill of the selected unit deselects")]
-  public void ForeignIncapacitationDeselectsAndClearsActions(UiState initialState, int amount, DamageKind kind)
+  public static void ForeignIncapacitationDeselectsAndClearsActions(UiState initialState, int amount, DamageKind kind)
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -147,7 +149,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "A submission that ends the battle enters terminal BattleOver")]
-  public void BattleEndEntersTerminalBattleOver()
+  public static void BattleEndEntersTerminalBattleOver()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -165,7 +167,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "A factory result that already has an outcome starts BattleOver with closed input")]
-  public void StartupTerminalFactoryResultStartsBattleOver()
+  public static void StartupTerminalFactoryResultStartsBattleOver()
   {
     // The factory finishes bootstrap before returning, so this terminal first-turn objective
     // is decided before the controller is even constructed — no action result can deliver it.
@@ -193,7 +195,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "BeginAction enters targeting with candidates; invalid clicks no-op")]
-  public void BeginActionEntersTargetingWithCandidates()
+  public static void BeginActionEntersTargetingWithCandidates()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -211,7 +213,7 @@ public sealed partial class BattleUiControllerTest
 
   [TestCase(false, TestName = "A disabled retained option starts neither targeting nor a submission")]
   [TestCase(true, TestName = "An option retained from another selection cannot act")]
-  public void RetainedPassOptionCannotAct(bool foreign)
+  public static void RetainedPassOptionCannotAct(bool foreign)
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -237,7 +239,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "A boxed-in available move can enter empty targeting and cancel")]
-  public void BoxedInAvailableMoveCanCancelEmptyTargeting()
+  public static void BoxedInAvailableMoveCanCancelEmptyTargeting()
   {
     using var battle = BattleFixture.Duel(map: TestData.MakeMapWithWalls(new Vector3I(8, 1, 8),
       new Vector3I(4, 0, 0), new Vector3I(4, 0, 2), new Vector3I(3, 0, 1), new Vector3I(5, 0, 1)),
@@ -255,7 +257,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "An available out-of-range attack can enter empty targeting and cancel")]
-  public void OutOfRangeAvailableAttackCanCancelEmptyTargeting()
+  public static void OutOfRangeAvailableAttackCanCancelEmptyTargeting()
   {
     using var battle = BattleFixture.Duel(
       player: new("Hero", Position: new Vector3I(0, 0, 0), Weapon: TestData.MakeWeapon("Knife", range: 1)),
@@ -274,7 +276,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Move locks then confirms; commit exits targeting via the signal")]
-  public void MoveLocksThenConfirmsAndCommits()
+  public static void MoveLocksThenConfirmsAndCommits()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -295,7 +297,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Re-clicking a different tile re-targets; same tile commits")]
-  public void LockedRetargetThenSameTileCommits()
+  public static void LockedRetargetThenSameTileCommits()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -327,7 +329,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Attack is click-to-fire and enters BattleOver when it ends the battle")]
-  public void AttackIsClickToFire()
+  public static void AttackIsClickToFire()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -342,7 +344,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Escape ladder: locked -> targeting -> selected -> unselected")]
-  public void EscapeLadderWalksBack()
+  public static void EscapeLadderWalksBack()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -359,7 +361,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Retained direct options refuse to mint actions after their unit dies")]
-  public void RetainedDirectOptionsRequireFreshAliveProof()
+  public static void RetainedDirectOptionsRequireFreshAliveProof()
   {
     using var battle = BattleFixture.Duel(
       player: new("Hero", Weapon: TestData.MakeAmmoWeapon("Rifle")),
@@ -377,7 +379,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Instant verbs submit directly and stay in UnitSelected")]
-  public void InstantVerbsSubmitDirectly()
+  public static void InstantVerbsSubmitDirectly()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -390,7 +392,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "PreviewAt updates LastPreview only while targeting")]
-  public void PreviewAtUpdatesLastPreviewOnlyWhileTargeting()
+  public static void PreviewAtUpdatesLastPreviewOnlyWhileTargeting()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -402,7 +404,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Busy playback closes the gate and blocks intents")]
-  public void BusyPlaybackBlocksIntents()
+  public static void BusyPlaybackBlocksIntents()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -422,7 +424,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Enemy turn closes the gate; selection persists and reopens")]
-  public void EnemyTurnClosesGateAndSelectionPersists()
+  public static void EnemyTurnClosesGateAndSelectionPersists()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -441,7 +443,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase]
-  public void ExhaustedActionPointsKeepSelectionAndAllowReselection()
+  public static void ExhaustedActionPointsKeepSelectionAndAllowReselection()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
@@ -455,7 +457,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase]
-  public void TemporaryImmobilizationKeepsSelectionAndAllowsReselection()
+  public static void TemporaryImmobilizationKeepsSelectionAndAllowsReselection()
   {
     using var battle = BattleFixture.Duel(
       player: new("Hero"),
@@ -475,7 +477,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Switching selection publishes current unit readouts")]
-  public void SwitchingSelectionPublishesCurrentReadouts()
+  public static void SwitchingSelectionPublishesCurrentReadouts()
   {
     using var battle = BattleFixture.UiBattle();
     int updates = 0;
@@ -498,7 +500,7 @@ public sealed partial class BattleUiControllerTest
   }
 
   [TestCase(TestName = "Invalid hover clears the stale preview; gated previews are refused")]
-  public void InvalidHoverClearsStalePreview()
+  public static void InvalidHoverClearsStalePreview()
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));

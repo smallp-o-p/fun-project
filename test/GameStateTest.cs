@@ -1,18 +1,21 @@
+using CampaignGameState = global::FunProject.GameState.GameState;
 using System;
 using FunProject.GameState;
 using FunProject.Items;
 using FunProject.Stats;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class GameStateTest
 {
   [TestCase]
-  public void CampaignCaptivityIsIsolatedFromOtherCampaigns()
+  public static void CampaignCaptivityIsIsolatedFromOtherCampaigns()
   {
-    var first = new GameState(MakeStart());
-    var second = new GameState(MakeStart());
+    var first = new CampaignGameState(MakeStart());
+    var second = new CampaignGameState(MakeStart());
     var combatant = TestData.MakeCombatant("Hostile", TestData.MakeFaction("Enemy"));
     first.Captivity.Add(combatant);
 
@@ -21,9 +24,9 @@ public class GameStateTest
   }
 
   [TestCase(TestName = "Roster is stamped: one Combatant per entry, override wins, empty falls back, all owned by the player faction")]
-  public void RosterIsStamped()
+  public static void RosterIsStamped()
   {
-    var state = new GameState(TestData.MakeStart(roster:
+    var state = new CampaignGameState(TestData.MakeStart(roster:
     [
       TestData.MakeEntry("Cpl. Ada Voss"),
       TestData.MakeEntry(""),            // fallback to the mold name
@@ -39,9 +42,9 @@ public class GameStateTest
   }
 
   [TestCase(TestName = "Map size and regions bind from the campaign map")]
-  public void MapBinds()
+  public static void MapBinds()
   {
-    var state = new GameState(TestData.MakeStart(regions: [TestData.MakeRegion("Northmark")]));
+    var state = new CampaignGameState(TestData.MakeStart(regions: [TestData.MakeRegion("Northmark")]));
 
     Assert.Equal(1, state.Regions.Count);
     Assert.Equal(0, state.IndexOfRegion("Northmark"));
@@ -49,7 +52,7 @@ public class GameStateTest
   }
 
   [TestCase(TestName = "Malformed campaign authoring fails GameState construction")]
-  public void MalformedCampaignAuthoringFailsConstruction()
+  public static void MalformedCampaignAuthoringFailsConstruction()
   {
     EquippableItemData duplicate = new() { Name = "Duplicate" };
     (string Case, CampaignStartData Start)[] malformed =
@@ -79,13 +82,13 @@ public class GameStateTest
       ("armory with a duplicated item reference", TestData.MakeStart(armory: [duplicate, duplicate])),
     ];
     foreach ((string name, CampaignStartData start) in malformed)
-      Assert.Throws<InvalidOperationException>(() => new GameState(start), name);
+      Assert.Throws<InvalidOperationException>(() => _ = new CampaignGameState(start), name);
   }
 
   [TestCase(TestName = "Captives are stamped with override and fallback names and leave the roster untouched")]
-  public void CaptivesAreStamped()
+  public static void CaptivesAreStamped()
   {
-    var state = new GameState(TestData.MakeStart(roster: [TestData.MakeEntry("Sgt. Bram Okafor")], captives:
+    var state = new CampaignGameState(TestData.MakeStart(roster: [TestData.MakeEntry("Sgt. Bram Okafor")], captives:
     [
       TestData.MakeCaptiveEntry("Captured Grunt 01"),
       TestData.MakeCaptiveEntry(),
@@ -99,10 +102,10 @@ public class GameStateTest
   }
 
   [TestCase(TestName = "Captives keep their authored faction, separate from the player's and shared by seed reference")]
-  public void CaptiveFactionsAreSeparateAndShared()
+  public static void CaptiveFactionsAreSeparateAndShared()
   {
     var raiders = new FunProject.Combatants.FactionData { Name = "Alien Raiders" };
-    var state = new GameState(TestData.MakeStart(captives:
+    var state = new CampaignGameState(TestData.MakeStart(captives:
     [
       TestData.MakeCaptiveEntry("One", faction: raiders),
       TestData.MakeCaptiveEntry("Two", faction: raiders),
@@ -120,11 +123,11 @@ public class GameStateTest
   }
 
   [TestCase(TestName = "Rebuilding the campaign mints fresh captive combatants and factions")]
-  public void CaptivesAreFreshAcrossCampaigns()
+  public static void CaptivesAreFreshAcrossCampaigns()
   {
     var start = TestData.MakeStart(captives: [TestData.MakeCaptiveEntry("One")]);
-    var first = new GameState(start);
-    var second = new GameState(start);
+    var first = new CampaignGameState(start);
+    var second = new CampaignGameState(start);
 
     var firstCaptive = first.Captivity.Combatants[0];
     var secondCaptive = second.Captivity.Combatants[0];
@@ -133,10 +136,10 @@ public class GameStateTest
   }
 
   [TestCase(TestName = "Armory is built from CampaignStartData with flag-driven stock policy")]
-  public void ArmoryBuiltFromStart()
+  public static void ArmoryBuiltFromStart()
   {
     EquippableItemData pistol = new() { Name = "Pistol" };
-    var state = new GameState(TestData.MakeStart(armory: [pistol],
+    var state = new CampaignGameState(TestData.MakeStart(armory: [pistol],
       modStock: [new MultiStatMod { Name = "Chip" }]));
 
     Assert.Equal(1, state.Armory.ItemStock().Count);

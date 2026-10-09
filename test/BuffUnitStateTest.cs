@@ -7,6 +7,8 @@ using FunProject.Stats;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BuffUnitStateTest
@@ -26,7 +28,7 @@ public partial class BuffUnitStateTest
       Seed: 7));
 
   [TestCase(TestName = "Unit aggregates innate and equipped-item buffs; identical buffs stack")]
-  public void AggregatesAndStacks()
+  public static void AggregatesAndStacks()
   {
     var faction = TestData.MakeFaction("Player");
     var shared = AimBuff("Shared");
@@ -45,7 +47,7 @@ public partial class BuffUnitStateTest
   }
 
   [TestCase(TestName = "A buff that would push max health to zero clamps current health to 1, never killing")]
-  public void ClampFloorsAtOneHealth()
+  public static void ClampFloorsAtOneHealth()
   {
     var faction = TestData.MakeFaction("Player");
     var crushing = TestData.MakeBuff(
@@ -61,7 +63,7 @@ public partial class BuffUnitStateTest
   }
 
   [TestCase(TestName = "Sharing a buff resource preserves independent unit activation snapshots")]
-  public void SharedResourceHasIndependentActivation()
+  public static void SharedResourceHasIndependentActivation()
   {
     var shared = AimBuff("Shared");
     using var battle = BattleFixture.Duel(
@@ -91,7 +93,7 @@ public partial class BuffUnitStateTest
   }
 
   [TestCase(TestName = "Duplicate grants keep separate flags and evaluate after each health clamp")]
-  public void DuplicateGrantsEvaluateSequentially()
+  public static void DuplicateGrantsEvaluateSequentially()
   {
     var shared = TestData.MakeBuff(
       "Fragile Focus",
@@ -139,7 +141,7 @@ public partial class BuffUnitStateTest
   }
 
   [TestCase(TestName = "Duplicate active grants both contribute stats and attack damage")]
-  public void DuplicateGrantsContributeStatsAndDamage()
+  public static void DuplicateGrantsContributeStatsAndDamage()
   {
     var shared = TestData.MakeBuff(
       "Stacked Focus",
@@ -172,7 +174,7 @@ public partial class BuffUnitStateTest
   }
 
   [TestCase(TestName = "A missing authored condition fails at unit construction")]
-  public void UnitRequiresBuffCondition()
+  public static void UnitRequiresBuffCondition()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = UnitSolo(faction, TestData.MakeCombatant("Seed", faction));
@@ -184,7 +186,7 @@ public partial class BuffUnitStateTest
   }
 
   [TestCase(TestName = "A null buff grant fails at unit construction")]
-  public void UnitRejectsNullBuffGrant()
+  public static void UnitRejectsNullBuffGrant()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = UnitSolo(faction, TestData.MakeCombatant("Seed", faction));

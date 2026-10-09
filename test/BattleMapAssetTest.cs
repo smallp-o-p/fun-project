@@ -2,12 +2,14 @@ using GdUnit4;
 using Godot;
 using static GdUnit4.Assertions;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleMapAssetTest
 {
   [TestCase]
-  public void ExportAndReexportKeepModelAndResolvedFlagsSeparateFromTheSource()
+  public static void ExportAndReexportKeepModelAndResolvedFlagsSeparateFromTheSource()
   {
     var flags = new BattleFootprintData { CoverAmount = 25 };
     var source = AutoFree(TestData.MakeEntityAnnotator(new() { [Godot.Vector3I.Zero] = flags }))!;

@@ -5,6 +5,8 @@ using FunProject.Core;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public sealed class BattleObservationHistoryTest
@@ -21,7 +23,7 @@ public sealed class BattleObservationHistoryTest
   }
 
   [TestCase]
-  public void BootstrapRecordsHostileContactBeforeBroadcast()
+  public static void BootstrapRecordsHostileContactBeforeBroadcast()
   {
     bool recorded = false;
     using var battle = Contacts(2, new SetupSystemData
@@ -46,7 +48,7 @@ public sealed class BattleObservationHistoryTest
   }
 
   [TestCase]
-  public void RepeatedSightUpdatesRevisionAndPosition()
+  public static void RepeatedSightUpdatesRevisionAndPosition()
   {
     using var battle = Contacts();
     var first = battle.Query(new GetFactionLastSeenContacts(battle.PlayerFaction))[0];
@@ -63,7 +65,7 @@ public sealed class BattleObservationHistoryTest
   }
 
   [TestCase]
-  public void BriefMidActionContactSurvivesLoss()
+  public static void BriefMidActionContactSurvivesLoss()
   {
     using var battle = Contacts(4);
     battle.EndFactionTurn(battle.PlayerFaction);
@@ -74,7 +76,7 @@ public sealed class BattleObservationHistoryTest
   }
 
   [TestCase]
-  public void HiddenDeathAndEquipmentCannotChangeKnowledge()
+  public static void HiddenDeathAndEquipmentCannotChangeKnowledge()
   {
     using var alive = Contacts(); using var hiddenDeath = Contacts();
     var visibleSnapshot = hiddenDeath.Query(new GetFactionUnitKnowledge(hiddenDeath.PlayerFaction));
@@ -102,7 +104,7 @@ public sealed class BattleObservationHistoryTest
   }
 
   [TestCase]
-  public void ExploredObjectDoesNotRevealUnseenStatus()
+  public static void ExploredObjectDoesNotRevealUnseenStatus()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new BattleSetup(TestData.MakeOpenBattleMap(new Vector3I(8, 1, 1)),

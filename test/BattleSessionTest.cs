@@ -7,6 +7,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleSessionTest
@@ -22,7 +24,7 @@ public class BattleSessionTest
         side.Position))]);
 
   [TestCase(TestName = "SpawnUnit occupies its tile")]
-  public void SpawnUnitOccupiesItsTile()
+  public static void SpawnUnitOccupiesItsTile()
   {
     var faction = TestData.MakeFaction("City Guard");
     using var battle = FixtureFromSides(new Vector3I(4, 2, 4), (faction, "Seed", new Vector3I(0, 0, 0), 20));
@@ -37,7 +39,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "SpawnUnit rejects occupied tile")]
-  public void SpawnUnitRejectsOccupiedTile()
+  public static void SpawnUnitRejectsOccupiedTile()
   {
     var faction = TestData.MakeFaction("City Guard");
     using var battle = FixtureFromSides(new Vector3I(4, 1, 4), (faction, "Alpha", new Vector3I(1, 0, 1), 20));
@@ -47,7 +49,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Global faction order keeps each faction only once")]
-  public void GlobalFactionOrderKeepsEachFactionOnlyOnce()
+  public static void GlobalFactionOrderKeepsEachFactionOnlyOnce()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -66,7 +68,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Constructor seeds global faction order from the materialized roster")]
-  public void ConstructorSeedsGlobalFactionOrder()
+  public static void ConstructorSeedsGlobalFactionOrder()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -85,7 +87,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Constructor can use a prebuilt board state")]
-  public void ConstructorCanUseAPrebuiltBoardState()
+  public static void ConstructorCanUseAPrebuiltBoardState()
   {
     var faction = TestData.MakeFaction("A");
     var board = new BattleBoardState(new Vector3I(3, 1, 3));
@@ -102,17 +104,17 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Constructor rejects sessions without factions")]
-  public void ConstructorRejectsSessionsWithoutFactions()
+  public static void ConstructorRejectsSessionsWithoutFactions()
   {
     var board = new BattleBoardState(new Vector3I(3, 1, 3));
 
-    Assert.Throws<ArgumentException>(() => new BattleSession(
+    Assert.Throws<ArgumentException>(() => _ = new BattleSession(
       board,
       [], [], [], []));
   }
 
   [TestCase(TestName = "SpawnUnit accepts equipped weapon option")]
-  public void SpawnUnitAcceptsEquippedWeaponOption()
+  public static void SpawnUnitAcceptsEquippedWeaponOption()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = FixtureFromSides(new Vector3I(4, 1, 4), (faction, "Seed", new Vector3I(3, 0, 3), 20));
@@ -124,7 +126,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "AdvanceTurn rotates only participating factions without incrementing early")]
-  public void AdvanceTurnRotatesOnlyParticipatingFactionsWithoutIncrementingEarly()
+  public static void AdvanceTurnRotatesOnlyParticipatingFactionsWithoutIncrementingEarly()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -151,7 +153,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Passing the last available unit advances the global turn counter")]
-  public void PassingTheLastAvailableUnitAdvancesTheGlobalTurnCounter()
+  public static void PassingTheLastAvailableUnitAdvancesTheGlobalTurnCounter()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -175,7 +177,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Eliminating an unacted faction does not block the global turn counter")]
-  public void EliminatingAnUnactedFactionDoesNotBlockTheGlobalTurnCounter()
+  public static void EliminatingAnUnactedFactionDoesNotBlockTheGlobalTurnCounter()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -200,7 +202,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Adding a faction mid-round delays the global turn counter until it acts")]
-  public void AddingAFactionMidRoundDelaysTheGlobalTurnCounterUntilItActs()
+  public static void AddingAFactionMidRoundDelaysTheGlobalTurnCounterUntilItActs()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -230,7 +232,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Adding units to a faction that already acted waits until the next round")]
-  public void AddingUnitsToAFactionThatAlreadyActedWaitsUntilTheNextRound()
+  public static void AddingUnitsToAFactionThatAlreadyActedWaitsUntilTheNextRound()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -251,7 +253,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Move updates unit position occupancy and action points")]
-  public void MoveUpdatesUnitPositionOccupancyAndActionPoints()
+  public static void MoveUpdatesUnitPositionOccupancyAndActionPoints()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 2, 4), new Vector3I(1, 0, 1), actionPoints: 5);
     var session = battle.Session;
@@ -266,7 +268,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "MoveUnit follows a multi-step route and spends AP per step")]
-  public void MoveUnitFollowsAMultiStepRouteAndSpendsAPPerStep()
+  public static void MoveUnitFollowsAMultiStepRouteAndSpendsAPPerStep()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), actionPoints: 5);
     var session = battle.Session;
@@ -287,7 +289,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Session-owned unit position follows movement")]
-  public void SessionOwnedUnitPositionFollowsMovement()
+  public static void SessionOwnedUnitPositionFollowsMovement()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), health: 10, actionPoints: 5);
     var session = battle.Session;
@@ -312,7 +314,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "MoveUnit rejects routes that cost more AP than the unit has")]
-  public void MoveUnitRejectsRoutesThatCostMoreApThanTheUnitHas()
+  public static void MoveUnitRejectsRoutesThatCostMoreApThanTheUnitHas()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0), actionPoints: 1);
     var session = battle.Session;
@@ -332,7 +334,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Passing a unit ends its activation while keeping the next ally available")]
-  public void PassingAUnitEndsItsActivationWhileKeepingTheNextAllyAvailable()
+  public static void PassingAUnitEndsItsActivationWhileKeepingTheNextAllyAvailable()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = FixtureFromSides(new Vector3I(4, 1, 4),
@@ -351,7 +353,7 @@ public class BattleSessionTest
   }
 
   [TestCase]
-  public void KnockedOutActiveFactionKeepsItsQueueHeadUntilEndTurnThenIsSkipped()
+  public static void KnockedOutActiveFactionKeepsItsQueueHeadUntilEndTurnThenIsSkipped()
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
@@ -368,7 +370,7 @@ public class BattleSessionTest
   }
 
   [TestCase]
-  public void ConsciousAllyRemainsAvailableWhileTheBodyStaysUnavailableNextRound()
+  public static void ConsciousAllyRemainsAvailableWhileTheBodyStaysUnavailableNextRound()
   {
     using var battle = BattleFixture.Duel();
     var ally = battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction), new Vector3I(0, 0, 0));
@@ -383,7 +385,7 @@ public class BattleSessionTest
   }
 
   [TestCase]
-  public void ImmobilizationAndExhaustedApDoNotRemoveConsciousFactionsFromFutureTurns()
+  public static void ImmobilizationAndExhaustedApDoNotRemoveConsciousFactionsFromFutureTurns()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.PlayerUnit.ApplyStatusEffect(MakeStun(duration: 2));
@@ -404,7 +406,7 @@ public class BattleSessionTest
   // rejected empty eligible roster).
 
   [TestCase(TestName = "Killing the only active unit on an eliminated faction does not auto-advance")]
-  public void KillingTheOnlyActiveUnitOnAnEliminatedFactionDoesNotAutoAdvance()
+  public static void KillingTheOnlyActiveUnitOnAnEliminatedFactionDoesNotAutoAdvance()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -432,7 +434,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Killing an active unit leaves another surviving ally actable")]
-  public void KillingAnActiveUnitLeavesAnotherSurvivingAllyActable()
+  public static void KillingAnActiveUnitLeavesAnotherSurvivingAllyActable()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -453,7 +455,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "Unit can throw a grenade in battle session")]
-  public void UnitCanThrowAGrenadeInBattleSession()
+  public static void UnitCanThrowAGrenadeInBattleSession()
   {
     using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1), actionPoints: 4);
     var unit = battle.Unit;
@@ -470,7 +472,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "AddUnit throws when a validated placement can no longer be applied")]
-  public void AddUnitThrowsWhenValidatedPlacementCanNoLongerBeApplied()
+  public static void AddUnitThrowsWhenValidatedPlacementCanNoLongerBeApplied()
   {
     var faction = TestData.MakeFaction("Player");
     var board = new BattleBoardState(new Vector3I(4, 1, 4));
@@ -485,7 +487,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "EndUnitActivation throws when the unit is already unavailable")]
-  public void EndUnitActivationThrowsWhenTheUnitIsAlreadyUnavailable()
+  public static void EndUnitActivationThrowsWhenTheUnitIsAlreadyUnavailable()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = FixtureFromSides(new Vector3I(4, 1, 4),
@@ -501,7 +503,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "EndFactionTurn throws when the expected side is not active")]
-  public void EndFactionTurnThrowsWhenTheExpectedSideIsNotActive()
+  public static void EndFactionTurnThrowsWhenTheExpectedSideIsNotActive()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");
@@ -524,7 +526,7 @@ public class BattleSessionTest
   }
 
   [TestCase(TestName = "RollPercent with the same seed produces the same in-range sequence")]
-  public void RollPercentWithTheSameSeedProducesTheSameInRangeSequence()
+  public static void RollPercentWithTheSameSeedProducesTheSameInRangeSequence()
   {
     var first = FreshSession(randomSeed: 1234);
     var second = FreshSession(randomSeed: 1234);

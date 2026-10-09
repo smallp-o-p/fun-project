@@ -5,12 +5,14 @@ using FunProject.Items.Effects;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class EquippableItemSystemTest
 {
   [TestCase(TestName = "Bare item has identity and no capabilities")]
-  public void BareItemHasIdentityAndNoCapabilities()
+  public static void BareItemHasIdentityAndNoCapabilities()
   {
     var item = new EquippableItem(new EquippableItemData
     {
@@ -26,7 +28,7 @@ public class EquippableItemSystemTest
   }
 
   [TestCase(TestName = "Mod slots capability exposes slots")]
-  public void ModSlotsCapabilityExposesSlots()
+  public static void ModSlotsCapabilityExposesSlots()
   {
     var item = new EquippableItem(new EquippableItemData
     {
@@ -39,7 +41,7 @@ public class EquippableItemSystemTest
   }
 
   [TestCase(TestName = "Frag grenade is pure data")]
-  public void FragGrenadeIsPureData()
+  public static void FragGrenadeIsPureData()
   {
     var damageEffect = new DamageEffectData
     {

@@ -6,6 +6,8 @@ using GdUnit4;
 using Godot;
 using System;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class TurnSchedulerTest
@@ -17,7 +19,7 @@ public class TurnSchedulerTest
     => new(factionOrder, battle.Session.HasConsciousUnits, battle.Session.GetFactionConsciousUnits);
 
   [TestCase(TestName = "Construction activates the first conscious side and establishes its availability")]
-  public void ConstructionActivatesTheFirstConsciousSide()
+  public static void ConstructionActivatesTheFirstConsciousSide()
   {
     using var battle = BattleFixture.Duel();
     var scheduler = SchedulerFor(battle, battle.PlayerFaction, battle.EnemyFaction);
@@ -31,7 +33,7 @@ public class TurnSchedulerTest
   }
 
   [TestCase(TestName = "A first declared faction without any unit is skipped")]
-  public void ConstructionSkipsAnEmptyFirstFaction()
+  public static void ConstructionSkipsAnEmptyFirstFaction()
   {
     using var battle = BattleFixture.Duel();
     var stranger = TestData.MakeFaction("Stranger");
@@ -43,7 +45,7 @@ public class TurnSchedulerTest
   }
 
   [TestCase(TestName = "A first declared faction with only unconscious units is skipped")]
-  public void ConstructionSkipsAKnockedOutFirstFaction()
+  public static void ConstructionSkipsAKnockedOutFirstFaction()
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
@@ -55,7 +57,7 @@ public class TurnSchedulerTest
   }
 
   [TestCase(TestName = "A first declared faction with only dead units is skipped")]
-  public void ConstructionSkipsADeadFirstFaction()
+  public static void ConstructionSkipsADeadFirstFaction()
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 999);
@@ -67,7 +69,7 @@ public class TurnSchedulerTest
   }
 
   [TestCase(TestName = "Construction rejects a faction order without any conscious unit")]
-  public void ConstructionRejectsAFactionOrderWithoutConsciousUnits()
+  public static void ConstructionRejectsAFactionOrderWithoutConsciousUnits()
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
@@ -78,7 +80,7 @@ public class TurnSchedulerTest
   }
 
   [TestCase(TestName = "Duplicate faction identities keep the first occurrence only")]
-  public void DuplicateFactionIdentitiesRetainFirstOccurrenceOnly()
+  public static void DuplicateFactionIdentitiesRetainFirstOccurrenceOnly()
   {
     using var battle = BattleFixture.Duel();
     var scheduler = SchedulerFor(battle, battle.PlayerFaction, battle.EnemyFaction, battle.PlayerFaction);
@@ -90,7 +92,7 @@ public class TurnSchedulerTest
   }
 
   [TestCase(TestName = "Advance returns a complete turn or exhaustion")]
-  public void AdvanceReturnsACompleteTurnOrExhaustion()
+  public static void AdvanceReturnsACompleteTurnOrExhaustion()
   {
     using var battle = BattleFixture.Duel();
     var scheduler = SchedulerFor(battle, battle.PlayerFaction, battle.EnemyFaction);

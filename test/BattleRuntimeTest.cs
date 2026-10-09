@@ -5,6 +5,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public sealed partial class BattleRuntimeTest
@@ -17,7 +19,7 @@ public sealed partial class BattleRuntimeTest
       Seed: 7);
 
   [TestCase(TestName = "Runtime forwards queries, actions and committed events")]
-  public void RuntimeForwardsQueriesActionsAndEvents()
+  public static void RuntimeForwardsQueriesActionsAndEvents()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(SingleUnitSetup(faction));
@@ -39,7 +41,7 @@ public sealed partial class BattleRuntimeTest
 
   [TestCase(false, TestName = "RegisterHook affects runtime action execution")]
   [TestCase(true, TestName = "RegisterHook event shape affects runtime action execution")]
-  public void RuntimeRegistrationShapesExecution(bool eventShape)
+  public static void RuntimeRegistrationShapesExecution(bool eventShape)
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), actionPoints: 5);
     var runtime = battle.Runtime;
@@ -60,7 +62,7 @@ public sealed partial class BattleRuntimeTest
   }
 
   [TestCase(TestName = "Disposed runtime no longer republishes session events")]
-  public void DisposedRuntimeNoLongerRepublishesSessionEvents()
+  public static void DisposedRuntimeNoLongerRepublishesSessionEvents()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(SingleUnitSetup(faction));
@@ -81,7 +83,7 @@ public sealed partial class BattleRuntimeTest
   }
 
   [TestCase(TestName = "Public methods throw after runtime is disposed")]
-  public void PublicMethodsThrowAfterRuntimeIsDisposed()
+  public static void PublicMethodsThrowAfterRuntimeIsDisposed()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(SingleUnitSetup(faction));
@@ -107,7 +109,7 @@ public sealed partial class BattleRuntimeTest
   // on Runtime.BattleEventCommitted see the cause before any hook-born follow-up — the
   // order this test pins.
   [TestCase(TestName = "Scene subscribers observe a cause event before hook-born follow-up events")]
-  public void SceneSubscribersObserveCauseBeforeHookFollowUps()
+  public static void SceneSubscribersObserveCauseBeforeHookFollowUps()
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), health: 10);
     var runtime = battle.Runtime;

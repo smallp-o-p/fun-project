@@ -4,12 +4,14 @@ using Godot;
 using System;
 using static GdUnit4.Assertions;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleMapGridMapTest
 {
   [TestCase]
-  public void GroundPropReplacesEveryFloorFlagAndKeepsStandingSurface()
+  public static void GroundPropReplacesEveryFloorFlagAndKeepsStandingSurface()
   {
     var map = AutoFree(TestData.MakeMapAuthoring())!;
     var floor = TestData.MakeFloorFootprint(1, 1);
@@ -36,7 +38,7 @@ public partial class BattleMapGridMapTest
   [TestCase(1)]
   [TestCase(2)]
   [TestCase(3)]
-  public void RotatedMultiCellPropsKeepAnchorAndExternalCover(int turn)
+  public static void RotatedMultiCellPropsKeepAnchorAndExternalCover(int turn)
   {
     var map = AutoFree(TestData.MakeMapAuthoring())!;
     Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> prop = new()
@@ -58,7 +60,7 @@ public partial class BattleMapGridMapTest
   }
 
   [TestCase]
-  public void OnePropsStackedVolumeIsAllowedAndElevatedOnlyVolumeKeepsFloorFlags()
+  public static void OnePropsStackedVolumeIsAllowedAndElevatedOnlyVolumeKeepsFloorFlags()
   {
     var map = AutoFree(TestData.MakeMapAuthoring())!;
     var floor = TestData.MakeFloorFootprint(2, 1);
@@ -85,7 +87,7 @@ public partial class BattleMapGridMapTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public void EveryVolumeCellNeedsGroundSupportIncludingElevatedCells(bool elevated)
+  public static void EveryVolumeCellNeedsGroundSupportIncludingElevatedCells(bool elevated)
   {
     var map = AutoFree(TestData.MakeMapAuthoring())!;
     Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> prop = new() { [new(1, elevated ? 1 : 0, 0)] = new() };
@@ -96,7 +98,7 @@ public partial class BattleMapGridMapTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public void DifferentPropsCannotClaimTheSameVolumeEvenWithFalseBlockingFlags(bool elevated)
+  public static void DifferentPropsCannotClaimTheSameVolumeEvenWithFalseBlockingFlags(bool elevated)
   {
     var map = AutoFree(TestData.MakeMapAuthoring())!;
     map.Floors.SetCellItem(Godot.Vector3I.Zero, 0);
@@ -112,7 +114,7 @@ public partial class BattleMapGridMapTest
   [TestCase(2)]
   [TestCase(3)]
   [TestCase(4)]
-  public void FloorLayerRequiresNonemptyUniqueGroundFloorClaims(int scenario)
+  public static void FloorLayerRequiresNonemptyUniqueGroundFloorClaims(int scenario)
   {
     var map = AutoFree(TestData.MakeMapAuthoring())!;
     var floor = TestData.MakeFloorFootprint(2, 1);
@@ -133,7 +135,7 @@ public partial class BattleMapGridMapTest
   [TestCase(5)]
   [TestCase(6)]
   [TestCase(7)]
-  public void NativeLayerSettingsAnchorsAndItemIdsAreValidated(int scenario)
+  public static void NativeLayerSettingsAnchorsAndItemIdsAreValidated(int scenario)
   {
     var map = AutoFree(TestData.MakeMapAuthoring())!;
     var anchor = Godot.Vector3I.Zero;
@@ -151,7 +153,7 @@ public partial class BattleMapGridMapTest
   }
 
   [TestCase]
-  public void DecorativeEmptyPropDoesNotAddGameplayCells()
+  public static void DecorativeEmptyPropDoesNotAddGameplayCells()
   {
     var map = AutoFree(TestData.MakeMapAuthoring())!;
     map.Floors.SetCellItem(Godot.Vector3I.Zero, 0);

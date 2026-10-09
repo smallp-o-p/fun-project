@@ -7,12 +7,14 @@ using FunProject.Combatants;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class AttackUnitTest
 {
   [TestCase(TestName = "Guaranteed hit damages the target and raises attack then damage events")]
-  public void GuaranteedHitDamagesTargetAndRaisesAttackThenDamageEvents()
+  public static void GuaranteedHitDamagesTargetAndRaisesAttackThenDamageEvents()
   {
     using var battle = BattleFixture.Duel(
       player: new("Alpha", Aim: 100, Weapon: TestData.MakeWeapon("Rifle", damage: 5)));
@@ -35,7 +37,7 @@ public partial class AttackUnitTest
   }
 
   [TestCase(TestName = "Guaranteed miss spends action points without damage")]
-  public void GuaranteedMissSpendsActionPointsWithoutDamage()
+  public static void GuaranteedMissSpendsActionPointsWithoutDamage()
   {
     using var battle = BattleFixture.Duel(
       player: new("Alpha", Aim: 0, Weapon: TestData.MakeWeapon("Rifle")));
@@ -52,7 +54,7 @@ public partial class AttackUnitTest
   }
 
   [TestCase(TestName = "Applicable cover lowers the resolved hit chance")]
-  public void ApplicableCoverLowersTheResolvedHitChance()
+  public static void ApplicableCoverLowersTheResolvedHitChance()
   {
     List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
     for (int x = 0; x < 8; x++)
@@ -77,7 +79,7 @@ public partial class AttackUnitTest
   }
 
   [TestCase(TestName = "Injected calculator replaces the hit chance algorithm")]
-  public void InjectedCalculatorReplacesTheHitChanceAlgorithm()
+  public static void InjectedCalculatorReplacesTheHitChanceAlgorithm()
   {
     using var battle = BattleFixture.Duel(
       hitChanceCalculator: new AlwaysHitCalculator(),
@@ -89,7 +91,7 @@ public partial class AttackUnitTest
   }
 
   [TestCase(TestName = "Infeasible attacks throw without spending action points")]
-  public void InfeasibleAttacksThrowWithoutSpendingActionPoints()
+  public static void InfeasibleAttacksThrowWithoutSpendingActionPoints()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -152,7 +154,7 @@ public partial class AttackUnitTest
   }
 
   [TestCase(TestName = "A stale attack whose target died to an earlier interrupt interrupts silently")]
-  public void StaleAttackOnKilledTargetInterruptsSilently()
+  public static void StaleAttackOnKilledTargetInterruptsSilently()
   {
     var weapon = TestData.MakeAmmoWeapon("Sentinel Rifle", magazine: 2, damage: 5);
     using var battle = BattleFixture.Duel(
@@ -184,13 +186,13 @@ public partial class AttackUnitTest
   }
 
   [TestCase(TestName = "Same seed produces the same attack outcome sequence")]
-  public void SameSeedProducesTheSameAttackOutcomeSequence()
+  public static void SameSeedProducesTheSameAttackOutcomeSequence()
   {
     Assert.True(RunSeededAttackOutcomes(1234).AsValueEnumerable().SequenceEqual(RunSeededAttackOutcomes(1234)));
   }
 
   [TestCase(TestName = "Damage event carries the weapon's emitted bundle")]
-  public void DamageEventCarriesEmittedBundle()
+  public static void DamageEventCarriesEmittedBundle()
   {
     var weapon = TestData.MakeWeapon(
       "Plasma Pistol", damage: 6, frame: TestData.MakeFrame((Element.Thermal, 0.7f), (Element.Electrical, 0.3f)));
@@ -210,7 +212,7 @@ public partial class AttackUnitTest
   }
 
   [TestCase(TestName = "Int damage path wraps the amount as a single Kinetic packet")]
-  public void IntDamagePathWrapsAsKineticPacket()
+  public static void IntDamagePathWrapsAsKineticPacket()
   {
     using var solo = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0));
 
@@ -223,7 +225,7 @@ public partial class AttackUnitTest
   }
 
   [TestCase(TestName = "An empty magazine interrupts the attack without spending AP or raising events")]
-  public void EmptyMagazineInterruptsAttack()
+  public static void EmptyMagazineInterruptsAttack()
   {
     var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 1, damage: 2);
     using var battle = BattleFixture.Duel(
@@ -245,7 +247,7 @@ public partial class AttackUnitTest
   }
 
   [TestCase(TestName = "A missed shot still spends ammunition")]
-  public void MissedShotSpendsAmmo()
+  public static void MissedShotSpendsAmmo()
   {
     var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 3);
     using var battle = BattleFixture.Duel(

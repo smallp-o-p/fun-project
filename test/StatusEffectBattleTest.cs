@@ -6,12 +6,14 @@ using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class StatusEffectBattleTest
 {
   [TestCase(TestName = "Attack-borne statuses: applied after damage, single instance on reapply, nothing on a kill")]
-  public void StatusAttackRows()
+  public static void StatusAttackRows()
   {
     (string Name, int EnemyHealth, int WeaponDamage, int Shots,
       Action<BattleFixture, BattleUnitState, DamageOverTimeStatusSpecData, string> Verify)[] rows =
@@ -56,7 +58,7 @@ public partial class StatusEffectBattleTest
   }
 
   [TestCase(TestName = "RequiresHealthDamage is blocked by absorbing armor and passes once damage spills")]
-  public void RequiresHealthDamageGatesOnSpill()
+  public static void RequiresHealthDamageGatesOnSpill()
   {
     var stun = TestData.MakeStun(requiresHealthDamage: true);
     // 3 Kinetic vs 10 Thermal armor: fully absorbed at 1x, no spill.
@@ -80,7 +82,7 @@ public partial class StatusEffectBattleTest
   }
 
   [TestCase]
-  public void StunPacketCannotBorrowSiblingHealthDamageForStatusApplication()
+  public static void StunPacketCannotBorrowSiblingHealthDamageForStatusApplication()
   {
     var stun = TestData.MakeStun(requiresHealthDamage: true);
     using var battle = BattleFixture.Duel(
@@ -104,7 +106,7 @@ public partial class StatusEffectBattleTest
   }
 
   [TestCase(TestName = "Apply chance rolls on the session RNG")]
-  public void ApplyChanceRollsOnSessionRng()
+  public static void ApplyChanceRollsOnSessionRng()
   {
     const int seed = 1234;
     const int chance = 35;
@@ -126,7 +128,7 @@ public partial class StatusEffectBattleTest
   }
 
   [TestCase(TestName = "Faction turn auto-ends when remaining units are immobilized")]
-  public void FactionTurnAutoEndsWhenRemainingUnitsImmobilized()
+  public static void FactionTurnAutoEndsWhenRemainingUnitsImmobilized()
   {
     using var battle = BattleFixture.Duel(
       hitChanceCalculator: new AlwaysHitCalculator(),
@@ -142,7 +144,7 @@ public partial class StatusEffectBattleTest
   }
 
   [TestCase(TestName = "DoT ticks at the owner's turn end and expires after its duration")]
-  public void DotTicksAtOwnersTurnEndAndExpires()
+  public static void DotTicksAtOwnersTurnEndAndExpires()
   {
     var burn = TestData.MakeBurn();
     using var battle = BattleFixture.Duel(
@@ -182,7 +184,7 @@ public partial class StatusEffectBattleTest
   }
 
   [TestCase(TestName = "DoT ticks resolve through armor with elemental matching")]
-  public void DotTicksResolveThroughArmor()
+  public static void DotTicksResolveThroughArmor()
   {
     var burn = TestData.MakeBurn(duration: 1);
     using var battle = BattleFixture.Duel(
@@ -206,7 +208,7 @@ public partial class StatusEffectBattleTest
   }
 
   [TestCase(TestName = "An active DoT suppresses armor regen by re-arming its delay")]
-  public void DotSuppressesArmorRegen()
+  public static void DotSuppressesArmorRegen()
   {
     var burn = TestData.MakeBurn();
     using var battle = BattleFixture.Duel(
@@ -241,7 +243,7 @@ public partial class StatusEffectBattleTest
   }
 
   [TestCase(TestName = "A lethal tick kills the unit and the turn advances cleanly")]
-  public void LethalTickKillsAndTurnAdvances()
+  public static void LethalTickKillsAndTurnAdvances()
   {
     var burn = TestData.MakeBurn(duration: 3);
     using var battle = BattleFixture.Duel(
@@ -263,7 +265,7 @@ public partial class StatusEffectBattleTest
   }
 
   [TestCase(TestName = "A stunned unit loses its turn and recovers after its own turn end")]
-  public void StunnedUnitLosesTurnAndRecovers()
+  public static void StunnedUnitLosesTurnAndRecovers()
   {
     var stun = TestData.MakeStun();
     using var battle = BattleFixture.Duel(
@@ -285,7 +287,7 @@ public partial class StatusEffectBattleTest
   }
 
   [TestCase(TestName = "A lethal tick stops the unit's remaining statuses")]
-  public void LethalTickStopsRemainingStatuses()
+  public static void LethalTickStopsRemainingStatuses()
   {
     using var battle = BattleFixture.Duel(
       hitChanceCalculator: new AlwaysHitCalculator(),
@@ -314,7 +316,7 @@ public partial class StatusEffectBattleTest
   }
 
   [TestCase(TestName = "Multiple statuses on one unit each tick at the owner's turn end")]
-  public void MultipleStatusesEachTick()
+  public static void MultipleStatusesEachTick()
   {
     using var battle = BattleFixture.Duel(
       hitChanceCalculator: new AlwaysHitCalculator(),

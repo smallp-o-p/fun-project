@@ -4,6 +4,8 @@ using GdUnit4;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class GetAvailableActionsForUnitTest
@@ -23,7 +25,7 @@ public class GetAvailableActionsForUnitTest
     actions.AsValueEnumerable().Single(action => action.Action is TDefinition);
 
   [TestCase(TestName = "Armed melee unit: Move, Attack, Pass, EndTurn rows, all available, no Reload row")]
-  public void ArmedMeleeUnitAllVerbsAvailable()
+  public static void ArmedMeleeUnitAllVerbsAvailable()
   {
     using var battle = MakeBattle(TestData.MakeWeapon("Rifle"));
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.SingleAliveUnit(battle.PlayerFaction)));
@@ -34,7 +36,7 @@ public class GetAvailableActionsForUnitTest
   }
 
   [TestCase(TestName = "Magazine weapon adds a Reload row in catalog order; full mag makes it unavailable")]
-  public void MagazineWeaponAddsReloadRow()
+  public static void MagazineWeaponAddsReloadRow()
   {
     using var battle = MakeBattle(TestData.MakeAmmoWeapon("SMG"));
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.SingleAliveUnit(battle.PlayerFaction)));
@@ -52,13 +54,11 @@ public class GetAvailableActionsForUnitTest
   }
 
   [TestCase(TestName = "Empty magazine: Attack unavailable, Reload available")]
-  public void EmptyMagazineFlipsAttackAndReload()
+  public static void EmptyMagazineFlipsAttackAndReload()
   {
     using var battle = MakeBattle(TestData.MakeAmmoWeapon("Pistol", magazine: 1));
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
-    var weapon = hero.State.EquippedWeapon.Match(
-      Some: w => (AmmunitionedWeapon)w,
-      None: () => throw new Exception("Hero should be armed."));
+    var weapon = (AmmunitionedWeapon)hero.State.EquippedWeapon.RequireSome("Hero should be armed.");
     Assert.True(weapon.TrySpendShot().IsSome); // drain the single round
 
     var actions = battle.Query(new GetAvailableActionsForUnit(hero));
@@ -69,7 +69,7 @@ public class GetAvailableActionsForUnitTest
   }
 
   [TestCase(TestName = "Unarmed unit: no Attack or Reload rows, Move available")]
-  public void UnarmedUnitOmitsAttackAndReload()
+  public static void UnarmedUnitOmitsAttackAndReload()
   {
     using var battle = MakeBattle(None);
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.SingleAliveUnit(battle.PlayerFaction)));
@@ -80,7 +80,7 @@ public class GetAvailableActionsForUnitTest
   }
 
   [TestCase(TestName = "Not-active-side unit: every row unavailable, including EndTurn")]
-  public void NotActiveSideAllUnavailable()
+  public static void NotActiveSideAllUnavailable()
   {
     using var battle = MakeBattle(TestData.MakeWeapon("Rifle"));
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.SingleAliveUnit(battle.EnemyFaction))); // enemy is not active at turn 1
@@ -89,7 +89,7 @@ public class GetAvailableActionsForUnitTest
   }
 
   [TestCase(TestName = "Boxed-in unit: Move available with no reachable destinations")]
-  public void BoxedInMoveAvailableWithoutDestinations()
+  public static void BoxedInMoveAvailableWithoutDestinations()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -105,7 +105,7 @@ public class GetAvailableActionsForUnitTest
   }
 
   [TestCase(TestName = "Out-of-AP unit: only EndTurn is available")]
-  public void OutOfApOnlyEndTurnAvailable()
+  public static void OutOfApOnlyEndTurnAvailable()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -123,7 +123,7 @@ public class GetAvailableActionsForUnitTest
   }
 
   [TestCase(TestName = "Unconscious unit has no available catalog actions, including EndTurn")]
-  public void UnconsciousUnitHasNoAvailableActions()
+  public static void UnconsciousUnitHasNoAvailableActions()
   {
     using var battle = MakeBattle(TestData.MakeAmmoWeapon("SMG"));
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
@@ -136,7 +136,7 @@ public class GetAvailableActionsForUnitTest
   }
 
   [TestCase(TestName = "An unconscious unit has no possible move tiles while FindPath stays geometric")]
-  public void UnconsciousUnitSpatialQueries()
+  public static void UnconsciousUnitSpatialQueries()
   {
     using var battle = MakeBattle(None);
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
@@ -149,7 +149,7 @@ public class GetAvailableActionsForUnitTest
   }
 
   [TestCase(TestName = "A walkable tile directly above is reachable for Move")]
-  public void VerticalNeighborIsReachable()
+  public static void VerticalNeighborIsReachable()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");

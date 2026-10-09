@@ -4,6 +4,8 @@ using FunProject.Models;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class CharacterModelAssetTest
@@ -54,7 +56,7 @@ public class CharacterModelAssetTest
 
   [TestCase(ZhuYuanScene)]
   [TestCase(TriggerScene)]
-  public void NativeComponentsResolveAndTheTreeStartsActive(string scene)
+  public static void NativeComponentsResolveAndTheTreeStartsActive(string scene)
   {
     using var fixture = ModelFixture.FromScene(scene);
 
@@ -82,7 +84,7 @@ public class CharacterModelAssetTest
   }
 
   [TestCase]
-  public void AnimationTreeGetterRequiresReadyConfiguredModel()
+  public static void AnimationTreeGetterRequiresReadyConfiguredModel()
   {
     using var fixture = ModelFixture.WithAnimations(start: false);
     Assert.Throws<InvalidOperationException>(() => _ = fixture.Model.AnimationTree);
@@ -100,7 +102,7 @@ public class CharacterModelAssetTest
 
   [TestCase(ZhuYuanScene)]
   [TestCase(TriggerScene)]
-  public void AuthoredOutlineSettingsSurviveIsolationWithoutRuntimeWrites(string scene)
+  public static void AuthoredOutlineSettingsSurviveIsolationWithoutRuntimeWrites(string scene)
   {
     using var fixture = ModelFixture.FromScene(scene, start: false);
     var authoredIds = new SysColGeneric.List<(MeshInstance3D Mesh, int Surface, ulong Material, ulong Outline)>();
@@ -157,7 +159,7 @@ public class CharacterModelAssetTest
 
   [TestCase(ZhuYuanScene)]
   [TestCase(TriggerScene)]
-  public void AuthoredBodyShapeValuesAreStored(string scene)
+  public static void AuthoredBodyShapeValuesAreStored(string scene)
   {
     using var fixture = ModelFixture.FromScene(scene);
     (string mesh, (string Shape, double Value)[] shapes)[] meshes = scene == ZhuYuanScene
@@ -175,7 +177,7 @@ public class CharacterModelAssetTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void AuthoredMaskDefaultsRenderTheCapturedVariants()
+  public static void AuthoredMaskDefaultsRenderTheCapturedVariants()
   {
     using var zhu = ModelFixture.FromScene(ZhuYuanScene);
     ArrayMesh? authoredDefault = MaskSetupOf(zhu.Model, SharedBodyMesh).Configuration?.DefaultMesh;
@@ -224,7 +226,7 @@ public class CharacterModelAssetTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void TriggerOutfitSwitchReworksPiecesAndBodyMask()
+  public static void TriggerOutfitSwitchReworksPiecesAndBodyMask()
   {
     using var fixture = ModelFixture.FromScene(TriggerScene);
     CharacterModel wardrobe = fixture.Model;
@@ -272,7 +274,7 @@ public class CharacterModelAssetTest
   // The eight alternates never join an outfit, so every clothing derivation
   // must leave them hidden while the valid -1 garments keep driving visibility.
   [TestCase]
-  public void ZhuYuanAlternateGarmentsStayHiddenThroughClothingToggles()
+  public static void ZhuYuanAlternateGarmentsStayHiddenThroughClothingToggles()
   {
     using var fixture = ModelFixture.FromScene(ZhuYuanScene);
     CharacterModel wardrobe = fixture.Model;
@@ -298,7 +300,7 @@ public class CharacterModelAssetTest
 
   [TestCase(ZhuYuanScene)]
   [TestCase(TriggerScene)]
-  public void ClothingAndPresetWeightChangesStayIndependentAcrossInstances(string scene)
+  public static void ClothingAndPresetWeightChangesStayIndependentAcrossInstances(string scene)
   {
     using var first = ModelFixture.FromScene(scene);
     using var second = ModelFixture.FromScene(scene);
@@ -331,7 +333,7 @@ public class CharacterModelAssetTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void ZhuYuanAttachmentsStartHiddenAndToggleThroughTheRoot()
+  public static void ZhuYuanAttachmentsStartHiddenAndToggleThroughTheRoot()
   {
     using var fixture = ModelFixture.FromScene(ZhuYuanScene);
     CharacterModel model = fixture.Model;
@@ -379,7 +381,7 @@ public class CharacterModelAssetTest
   }
 
   [TestCase]
-  public void AttachmentVisibilityStaysIndependentAcrossInstances()
+  public static void AttachmentVisibilityStaysIndependentAcrossInstances()
   {
     using var first = ModelFixture.FromScene(ZhuYuanScene);
     using var second = ModelFixture.FromScene(ZhuYuanScene);
@@ -394,7 +396,7 @@ public class CharacterModelAssetTest
   }
 
   [TestCase]
-  public void TriggerToleratesUnconfiguredAttachments()
+  public static void TriggerToleratesUnconfiguredAttachments()
   {
     using var fixture = ModelFixture.FromScene(TriggerScene);
     Assert.True(fixture.Model.AttachmentsPath.IsEmpty,
@@ -409,7 +411,7 @@ public class CharacterModelAssetTest
 
   [TestCase(ZhuYuanScene, "res://scenes/models/ZhuYuan/ZhuYuan.blend")]
   [TestCase(TriggerScene, "res://scenes/models/Trigger/Trigger4.2.blend")]
-  public void SceneLocalMaterialsKeepMasksAndOutlinesIndependent(string scene, string importedScene)
+  public static void SceneLocalMaterialsKeepMasksAndOutlinesIndependent(string scene, string importedScene)
   {
     using var first = ModelFixture.FromScene(scene, start: false);
     using var second = ModelFixture.FromScene(scene, start: false);
@@ -426,7 +428,7 @@ public class CharacterModelAssetTest
         if (!name.StartsWith(prefix, StringComparison.Ordinal)
           || source.GetNodePropertyValue(node, property).AsGodotObject() is not ShaderMaterial authored)
           continue;
-        int surface = int.Parse(name[prefix.Length..]);
+        int surface = int.Parse(name[prefix.Length..], System.Globalization.CultureInfo.InvariantCulture);
         NodePath path = "Model/" + source.GetNodePath(node);
         var a = (ShaderMaterial)first.Root.GetNode<MeshInstance3D>(path).GetSurfaceOverrideMaterial(surface);
         var b = (ShaderMaterial)second.Root.GetNode<MeshInstance3D>(path).GetSurfaceOverrideMaterial(surface);

@@ -2,6 +2,8 @@ using FunProject.Battle;
 using FunProject.Combatants;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public sealed class BattleKnowledgeMovementTest
@@ -17,7 +19,7 @@ public sealed class BattleKnowledgeMovementTest
     new FindKnownPathForUnit(battle.PlayerFaction, battle.Alive(battle.PlayerUnit), battle.At(destination)));
 
   [TestCase]
-  public void HiddenOccupancyAndTerrainCannotAlterEstimate()
+  public static void HiddenOccupancyAndTerrainCannotAlterEstimate()
   {
     using var open = Observer(new Vector3I(5, 1, 1), 1);
     using var blocked = Observer(new Vector3I(5, 1, 1), 1);
@@ -34,7 +36,7 @@ public sealed class BattleKnowledgeMovementTest
   }
 
   [TestCase]
-  public void KnownBlockerConstrainsSearch()
+  public static void KnownBlockerConstrainsSearch()
   {
     using var battle = Observer(new Vector3I(4, 1, 3), 4, new Vector3I(0, 0, 1));
     battle.Spawn(TestData.MakeCombatant("Ally", battle.PlayerFaction), new Vector3I(1, 0, 1));
@@ -45,7 +47,7 @@ public sealed class BattleKnowledgeMovementTest
   }
 
   [TestCase]
-  public void UnknownDiagonalFlanksRemainTraversable()
+  public static void UnknownDiagonalFlanksRemainTraversable()
   {
     var side = TestData.MakeFaction("Observer");
     using var battle = BattleFixture.Started(new Vector3I(3, 1, 3),
@@ -63,7 +65,7 @@ public sealed class BattleKnowledgeMovementTest
   }
 
   [TestCase]
-  public void ActualAndKnowledgeSearchShareNeighborhood()
+  public static void ActualAndKnowledgeSearchShareNeighborhood()
   {
     using var battle = Observer(new Vector3I(3, 2, 3), 10);
     battle.Board.SetTileWalkable(battle.At(1, 0, 0), false);
@@ -79,7 +81,7 @@ public sealed class BattleKnowledgeMovementTest
   }
 
   [TestCase]
-  public void ExploredTerrainUsesLastObservation()
+  public static void ExploredTerrainUsesLastObservation()
   {
     using var battle = Observer(new Vector3I(5, 1, 1), 1, new Vector3I(2, 0, 0));
     var seen = battle.Query(new GetTileKnowledgeForFaction(battle.PlayerFaction, battle.At(3, 0, 0)));

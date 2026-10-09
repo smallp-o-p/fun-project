@@ -7,6 +7,8 @@ using GdUnit4;
 using static GdUnit4.Assertions;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class DialogueViewTest
@@ -45,7 +47,7 @@ public class DialogueViewTest
   // No awaits between tree entry and these assertions: the first _Process has not run,
   // so the body starts fully unrevealed and the portrait is the first line's model.
   [TestCase]
-  public void InitialLineShowsSpeakerPortraitAndEmptyBody()
+  public static void InitialLineShowsSpeakerPortraitAndEmptyBody()
   {
     DialogueView view = MakeView(Sequence(Line(Speaker(), "Short line.")));
 
@@ -57,7 +59,7 @@ public class DialogueViewTest
   }
 
   [TestCase]
-  public void RevealTickGrowsVisibleCharactersAndShowsIndicatorAtCompletion()
+  public static void RevealTickGrowsVisibleCharactersAndShowsIndicatorAtCompletion()
   {
     DialogueView view = MakeView(Sequence(Line(Speaker(), "12345678")));
     Label body = view.GetNode<Label>("%Body");
@@ -75,7 +77,7 @@ public class DialogueViewTest
   // rather than a layout wait whose wall-clock duration can finish a short line.
   // The long line leaves room for the initial physics ticks without calling TickReveal.
   [TestCase]
-  public async Task PhysicsProcessDrivesReveal()
+  public static async Task PhysicsProcessDrivesReveal()
   {
     DialogueView view = MakeView(Sequence(Line(Speaker(), new string('a', 400))));
     Label body = view.GetNode<Label>("%Body");
@@ -95,7 +97,7 @@ public class DialogueViewTest
   // without clamping to the total, so a tick sized to the label's own total completes
   // the reveal exactly on it.
   [TestCase]
-  public void SupplementaryCharactersRevealCompletely()
+  public static void SupplementaryCharactersRevealCompletely()
   {
     DialogueView view = MakeView(Sequence(Line(Speaker(), "Commander 🛸")));
     Label body = view.GetNode<Label>("%Body");
@@ -107,7 +109,7 @@ public class DialogueViewTest
   }
 
   [TestCase]
-  public void AdvanceWhileRevealingSnapsToFullText()
+  public static void AdvanceWhileRevealingSnapsToFullText()
   {
     DialogueView view = MakeView(Sequence(Line(Speaker(), "A longer line of dialogue.")));
 
@@ -118,7 +120,7 @@ public class DialogueViewTest
   }
 
   [TestCase]
-  public void AdvanceWhenCompleteMovesToNextLineAndSwapsPortrait()
+  public static void AdvanceWhenCompleteMovesToNextLineAndSwapsPortrait()
   {
     SpeakerData first = Speaker("Alpha");
     SpeakerData second = Speaker("Beta");
@@ -139,7 +141,7 @@ public class DialogueViewTest
   }
 
   [TestCase]
-  public void FinalAdvanceFiresFinishedAndRequestsBack()
+  public static void FinalAdvanceFiresFinishedAndRequestsBack()
   {
     DialogueView view = MakeView(Sequence(Line(Speaker(), "Only line.")));
     int finished = 0;
@@ -155,7 +157,7 @@ public class DialogueViewTest
   }
 
   [TestCase]
-  public void DimClickAdvances()
+  public static void DimClickAdvances()
   {
     DialogueView view = MakeView(Sequence(Line(Speaker("A"), "One."), Line(Speaker("B"), "Two.")));
 
@@ -168,7 +170,7 @@ public class DialogueViewTest
   // The panel's authored MouseFilter.Ignore values must let a real mouse event fall
   // through to the dim catcher, which advances like any other click (snap-to-full).
   [TestCase]
-  public async Task ClickOverPanelAdvances()
+  public static async Task ClickOverPanelAdvances()
   {
     DialogueView view = MakeView(Sequence(Line(Speaker(), "One line over the panel.")));
     await WaitForLayout(view);
@@ -190,7 +192,7 @@ public class DialogueViewTest
   // The panel anchors bottom-wide across the view: unpinned horizontal anchors
   // would expand it around x=0 and render the portrait offscreen.
   [TestCase]
-  public void UiAcceptAdvances()
+  public static void UiAcceptAdvances()
   {
     DialogueView view = MakeView(Sequence(Line(Speaker("A"), "One."), Line(Speaker("B"), "Two.")));
 
@@ -201,29 +203,29 @@ public class DialogueViewTest
   }
 
   [TestCase]
-  public void EmptySequenceThrows()
+  public static void EmptySequenceThrows()
     => AssertReadyThrows(new DialogueSequenceData());
 
   [TestCase]
-  public void MissingSpeakerThrows()
+  public static void MissingSpeakerThrows()
     => AssertReadyThrows(Sequence(new DialogueLineData { Text = "Nobody speaks this." }));
 
   [TestCase]
-  public void MissingTextThrows()
+  public static void MissingTextThrows()
     => AssertReadyThrows(Sequence(new DialogueLineData { Speaker = Speaker() }));
 
   [TestCase]
-  public void SpeakerWithoutDisplayNameThrows()
+  public static void SpeakerWithoutDisplayNameThrows()
     => AssertReadyThrows(Sequence(
       new DialogueLineData { Speaker = new SpeakerData { Portrait = Speaker().Portrait }, Text = "Anonymous." }));
 
   [TestCase]
-  public void SpeakerWithoutPortraitThrows()
+  public static void SpeakerWithoutPortraitThrows()
     => AssertReadyThrows(Sequence(
       new DialogueLineData { Speaker = new SpeakerData { DisplayName = "Faceless" }, Text = "Unseen." }));
 
   [TestCase]
-  public void ReadyWithoutConfigureThrows()
+  public static void ReadyWithoutConfigureThrows()
   {
     DialogueView view = CreateDialogueView();
     AutoFree(view);
@@ -231,7 +233,7 @@ public class DialogueViewTest
   }
 
   [TestCase]
-  public void DoubleConfigureThrows()
+  public static void DoubleConfigureThrows()
   {
     DialogueView view = CreateDialogueView();
     AutoFree(view);

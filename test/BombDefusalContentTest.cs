@@ -4,12 +4,14 @@ using System.Threading.Tasks;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BombDefusalContentTest
 {
   [TestCase(TestName = "Authored bomb defusal content starts and expires at the deadline")]
-  public void AuthoredContentPlays()
+  public static void AuthoredContentPlays()
   {
     string godotBin = System.Environment.GetEnvironmentVariable("GODOT_BIN")
       ?? throw new InvalidOperationException("GODOT_BIN was not provided to the test process.");

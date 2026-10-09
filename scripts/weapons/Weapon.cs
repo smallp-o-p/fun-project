@@ -6,20 +6,20 @@ using FunProject.Stats;
 
 namespace FunProject.Weapons;
 
-public class Weapon : EquippableItem, HasStats
+public class Weapon : EquippableItem, IHasStats
 {
-  protected readonly StatSheet _stats;
-  protected readonly WeaponFrameData _frame;
+  protected StatSheet Stats { get; }
+  protected WeaponFrameData Frame { get; }
 
   public Weapon(WeaponData data) : base(data)
   {
-    _frame = data.Frame ?? throw new InvalidOperationException($"Weapon '{ItemName}' has no frame.");
-    if (_frame.Packets.Count == 0)
-      throw new InvalidOperationException($"Weapon '{ItemName}' frame '{_frame.Name}' has no damage packets.");
-    foreach (DamagePacketData packet in _frame.Packets)
+    Frame = data.Frame ?? throw new InvalidOperationException($"Weapon '{ItemName}' has no frame.");
+    if (Frame.Packets.Count == 0)
+      throw new InvalidOperationException($"Weapon '{ItemName}' frame '{Frame.Name}' has no damage packets.");
+    foreach (DamagePacketData packet in Frame.Packets)
       ArgumentNullException.ThrowIfNull(packet);
 
-    _stats = new StatSheet(new Dictionary<Type, Stat>
+    Stats = new StatSheet(new Dictionary<Type, Stat>
     {
       [typeof(DamageStat)] = data.DamageStat,
       [typeof(RangeStat)] = data.RangeStat,
@@ -27,9 +27,9 @@ public class Weapon : EquippableItem, HasStats
     });
   }
 
-  public Option<TStat> TryGetStat<TStat>() where TStat : Stat => _stats.TryGetStat<TStat>();
+  public Option<TStat> TryGetStat<TStat>() where TStat : Stat => Stats.TryGetStat<TStat>();
 
-  public TStat GetStat<TStat>() where TStat : Stat => _stats.GetStat<TStat>();
+  public TStat GetStat<TStat>() where TStat : Stat => Stats.GetStat<TStat>();
 
   /// <summary>Emit this weapon's damage bundle with no external contributions.</summary>
   public List<Damage> EmitDamage() => EmitDamage([]);
@@ -44,7 +44,7 @@ public class Weapon : EquippableItem, HasStats
     int baseDamage = GetDamageStat().BaseValue;
     var context = new DamageEmissionContext(baseDamage);
 
-    List<Damage> bundle = _frame.Packets.AsValueEnumerable()
+    List<Damage> bundle = Frame.Packets.AsValueEnumerable()
       .Select(packet => packet.Derive(baseDamage))
       .ToList();
 
@@ -110,14 +110,14 @@ public class AmmunitionedWeapon : Weapon
 
   public AmmunitionedWeapon(AmmunitionedWeaponData data) : base(data)
   {
-    _stats.Set(data.AmmunitionStat);
+    Stats.Set(data.AmmunitionStat);
     CurrentAmmo = MagazineSize;
   }
 
   public int MagazineSize => Mathf.RoundToInt(EffectiveStat<AmmunitionStat>());
 
   // One shot spends one round per frame packet.
-  public int ShotCost => _frame.Packets.Count;
+  public int ShotCost => Frame.Packets.Count;
 
   public override bool IsLoaded => !NeedsToReload();
 

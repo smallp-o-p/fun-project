@@ -6,6 +6,8 @@ using CampaignGameState = global::FunProject.GameState.GameState;
 using Godot;
 using System;
 
+namespace FunProject.Scenes;
+
 // Composition root for the geoscape: builds the campaign GameState from the authored
 // CampaignStartData and the session over it, wires the authored map control (region
 // visuals live in the scene), owns the code-built camera, feeds frame deltas to the clock,
@@ -13,7 +15,7 @@ using System;
 // the manager owns the stack, this scene only routes events and presents.
 public partial class GeoscapeScene : Control
 {
-  [Export] public CampaignStartData? Start;
+  [Export] public CampaignStartData? Start { get; set; }
   [Export] public PackedScene? ResolutionViewScene { get; set; }
   [Export] public PackedScene? DialogueViewScene { get; set; }
 

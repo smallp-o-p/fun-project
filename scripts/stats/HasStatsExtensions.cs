@@ -9,14 +9,14 @@ public static class HasStatsExtensions
   /// <see cref="StatMod"/> in <paramref name="sources"/> that targets it folded in.
   /// Returns 0 when the owner has no <typeparamref name="TStat"/>.
   /// </summary>
-  public static float Resolve<TStat>(this HasStats owner, IEnumerable<StatMod> sources) where TStat : Stat
+  public static float Resolve<TStat>(this IHasStats owner, IEnumerable<StatMod> sources) where TStat : Stat
     => owner.TryResolve<TStat>(sources).IfNone(0f);
 
   /// <summary>
   /// Like <see cref="Resolve{TStat}"/> but None when the owner has no <typeparamref name="TStat"/>.
   /// </summary>
-  public static Option<float> TryResolve<TStat>(this HasStats owner, IEnumerable<StatMod> sources) where TStat : Stat
-    => owner.TryGetStat<TStat>().Map(stat => HasStats.Fold(
+  public static Option<float> TryResolve<TStat>(this IHasStats owner, IEnumerable<StatMod> sources) where TStat : Stat
+    => owner.TryGetStat<TStat>().Map(stat => IHasStats.Fold(
          stat.BaseValue,
          sources.AsValueEnumerable().Where(mod => mod.TargetType == typeof(TStat)).SelectMany(mod => mod.Modifiers).ToArray()));
 }

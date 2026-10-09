@@ -2,12 +2,14 @@ using FunProject.Battle;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleBoardStateTest
 {
   [TestCase(TestName = "ValidatePoint returns a validated point for in bounds coordinates")]
-  public void ValidatePointReturnsAValidatedPointForInBoundsCoordinates()
+  public static void ValidatePointReturnsAValidatedPointForInBoundsCoordinates()
   {
     BattleBoardState board = new(new Vector3I(3, 2, 4));
     Vector3I coordinates = new(2, 1, 3);
@@ -19,7 +21,7 @@ public partial class BattleBoardStateTest
   }
 
   [TestCase(TestName = "ValidatePoint returns None for out of bounds coordinates")]
-  public void ValidatePointReturnsNoneForOutOfBoundsCoordinates()
+  public static void ValidatePointReturnsNoneForOutOfBoundsCoordinates()
   {
     BattleBoardState board = new(new Vector3I(3, 2, 4));
 
@@ -30,7 +32,7 @@ public partial class BattleBoardStateTest
   }
 
   [TestCase(TestName = "FindPath routes around blocked cells")]
-  public void FindPathRoutesAroundBlockedCells()
+  public static void FindPathRoutesAroundBlockedCells()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
     board.SetTileWalkable(board.At(1, 0, 1), false);
@@ -46,7 +48,7 @@ public partial class BattleBoardStateTest
   }
 
   [TestCase(TestName = "FindPath returns an empty path when no traversable route exists")]
-  public void FindPathReturnsAnEmptyPathWhenNoTraversableRouteExists()
+  public static void FindPathReturnsAnEmptyPathWhenNoTraversableRouteExists()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
     board.SetTileWalkable(board.At(1, 0, 0), false);
@@ -59,7 +61,7 @@ public partial class BattleBoardStateTest
   }
 
   [TestCase(TestName = "FindPath returns an empty path when the destination is occupied")]
-  public void FindPathReturnsAnEmptyPathWhenTheDestinationIsOccupied()
+  public static void FindPathReturnsAnEmptyPathWhenTheDestinationIsOccupied()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
     Assert.True(board.TryPlaceOccupant(board.At(2, 0, 1), 7));
@@ -70,7 +72,7 @@ public partial class BattleBoardStateTest
   }
 
   [TestCase(TestName = "FindPath breaks equal-length ties by the fixed direction order")]
-  public void FindPathBreaksEqualLengthTiesByTheFixedDirectionOrder()
+  public static void FindPathBreaksEqualLengthTiesByTheFixedDirectionOrder()
   {
     // From (0,0,0) to (2,0,1) two 2-step routes exist — +X then the (1,0,1) diagonal, or the
     // (1,0,1) diagonal then +X. The search visits the +X neighbor before the diagonal, so the
@@ -85,7 +87,7 @@ public partial class BattleBoardStateTest
   }
 
   [TestCase(TestName = "FindPath stays in sync with occupant changes")]
-  public void FindPathStaysInSyncWithOccupantChanges()
+  public static void FindPathStaysInSyncWithOccupantChanges()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
 
@@ -108,7 +110,7 @@ public partial class BattleBoardStateTest
   }
 
   [TestCase(TestName = "Same-level diagonals are reachable in a single step")]
-  public void SameLevelDiagonalsAreReachableInASingleStep()
+  public static void SameLevelDiagonalsAreReachableInASingleStep()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
 
@@ -122,7 +124,7 @@ public partial class BattleBoardStateTest
   }
 
   [TestCase(TestName = "Diagonal steps cannot cut a corner sealed on both flanks")]
-  public void DiagonalStepsCannotCutASealedCorner()
+  public static void DiagonalStepsCannotCutASealedCorner()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
     board.SetTileWalkable(board.At(1, 0, 0), false);
@@ -138,7 +140,7 @@ public partial class BattleBoardStateTest
   }
 
   [TestCase(TestName = "HasOccupiableNeighbor is false only when boxed in")]
-  public void HasOccupiableNeighborIsFalseOnlyWhenBoxedIn()
+  public static void HasOccupiableNeighborIsFalseOnlyWhenBoxedIn()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
     Assert.True(board.HasOccupiableNeighbor(board.At(1, 0, 1)));
@@ -155,7 +157,7 @@ public partial class BattleBoardStateTest
   }
 
   [TestCase(TestName = "TryMoveOccupant moves only the matching unit")]
-  public void TryMoveOccupantMovesOnlyTheMatchingUnit()
+  public static void TryMoveOccupantMovesOnlyTheMatchingUnit()
   {
     BattleBoardState board = new(new Vector3I(3, 1, 3));
 

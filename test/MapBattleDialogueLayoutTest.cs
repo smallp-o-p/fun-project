@@ -14,7 +14,7 @@ public class MapBattleDialogueLayoutTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task GeoscapeUsesOneCompactBottomRowAndTopLeftTime(int width, int height)
+  public static async Task GeoscapeUsesOneCompactBottomRowAndTopLeftTime(int width, int height)
   {
     var hud = CreateHud();
     var viewport = CreateUiViewport(hud, new Vector2I(width, height));
@@ -64,7 +64,7 @@ public class MapBattleDialogueLayoutTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task ManufacturingDividerStaysCloseToShortItemAndIdleText(int width, int height)
+  public static async Task ManufacturingDividerStaysCloseToShortItemAndIdleText(int width, int height)
   {
     var hud = CreateHud();
     var viewport = CreateUiViewport(hud, new Vector2I(width, height));
@@ -102,7 +102,7 @@ public class MapBattleDialogueLayoutTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task TacticalActionsStayAtBottomAndLeaveBattlefieldOpen(int width, int height)
+  public static async Task TacticalActionsStayAtBottomAndLeaveBattlefieldOpen(int width, int height)
   {
     var shell = new Control();
     var hud = GD.Load<PackedScene>("res://scenes/battle/BattleHud.tscn").Instantiate<BattleHud>();
@@ -125,7 +125,7 @@ public class MapBattleDialogueLayoutTest
   }
 
   [TestCase]
-  public void EndTurnHasASeparateCommandAndPreservesTheExistingIntent()
+  public static void EndTurnHasASeparateCommandAndPreservesTheExistingIntent()
   {
     var hud = AddToTree(GD.Load<PackedScene>("res://scenes/battle/BattleHud.tscn").Instantiate<BattleHud>());
     using var battle = BattleFixture.Duel();
@@ -144,7 +144,7 @@ public class MapBattleDialogueLayoutTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task DialogueLowerThirdContainsPortraitAndScrollableLongLines(int width, int height)
+  public static async Task DialogueLowerThirdContainsPortraitAndScrollableLongLines(int width, int height)
   {
     var view = CreateDialogueView();
     var speaker = new SpeakerData
@@ -174,7 +174,7 @@ public class MapBattleDialogueLayoutTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task ResolutionKeepsRequiredActionsVisibleWithLongDescription(int width, int height)
+  public static async Task ResolutionKeepsRequiredActionsVisibleWithLongDescription(int width, int height)
   {
     var view = CreateResolutionView();
     var viewport = CreateUiViewport(view, new Vector2I(width, height));
@@ -194,7 +194,7 @@ public class MapBattleDialogueLayoutTest
   }
 
   [TestCase]
-  public async Task DialogueBodyClickAdvancesAndResetsLongLineScroll()
+  public static async Task DialogueBodyClickAdvancesAndResetsLongLineScroll()
   {
     var view = CreateDialogueView();
     var speaker = new SpeakerData

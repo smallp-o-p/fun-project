@@ -4,6 +4,8 @@ using FunProject.Models;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class CharacterModelAnimationAssetTest
@@ -27,7 +29,7 @@ public class CharacterModelAnimationAssetTest
   // ------------------------------------------------------------------
 
   [TestCase(TriggerScene)]
-  public void ClothingChangeKeepsPresetWeightsAndPlayback(string scene)
+  public static void ClothingChangeKeepsPresetWeightsAndPlayback(string scene)
   {
     using var fixture = ModelFixture.FromScene(scene);
     var library = fixture.Root.GetNode<AnimationPlayer>(PlayerNode).GetAnimationLibrary("body");
@@ -74,7 +76,7 @@ public class CharacterModelAnimationAssetTest
 
   [TestCase(ZhuYuanScene)]
   [TestCase(TriggerScene)]
-  public void GraphDrivesPhysicalBoneAndFaceTargets(string scene)
+  public static void GraphDrivesPhysicalBoneAndFaceTargets(string scene)
   {
     using var fixture = ModelFixture.FromScene(scene);
     var player = fixture.Root.GetNode<AnimationPlayer>(PlayerNode);
@@ -144,7 +146,7 @@ public class CharacterModelAnimationAssetTest
   // passing both channels: one preset weight then applies both neutral-relative
   // deltas at once (Smile −0.1, Blink +0.3).
   [TestCase]
-  public void MultiChannelPresetCarriesNegativeAndPositiveDeltas()
+  public static void MultiChannelPresetCarriesNegativeAndPositiveDeltas()
   {
     using var fixture = ModelFixture.WithAnimations(start: false);
     Animation smile = fixture.Player.GetAnimationLibrary("").GetAnimation("smile");
@@ -184,7 +186,7 @@ public class CharacterModelAnimationAssetTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void InitializationPreservesAuthoredParameters()
+  public static void InitializationPreservesAuthoredParameters()
   {
     using var fixture = ModelFixture.WithAnimations(start: false);
     fixture.AnimationTree.Set("parameters/Smile/add_amount", 1.0);

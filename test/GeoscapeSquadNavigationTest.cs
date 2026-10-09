@@ -9,6 +9,8 @@ using Godot;
 using GdUnit4;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class GeoscapeSquadNavigationTest
@@ -53,7 +55,7 @@ public class GeoscapeSquadNavigationTest
   }
 
   [TestCase(TestName = "Engage produces a squad view configured with the mission title without resolving")]
-  public async Task EngageProducesConfiguredSquadWithoutResolving()
+  public static async Task EngageProducesConfiguredSquadWithoutResolving()
   {
     const string title = "Operation Iron";
     await using var cleanup = new DeferredNodeCleanup();
@@ -83,7 +85,7 @@ public class GeoscapeSquadNavigationTest
 
   [TestCase(false, "Operation Iron", TestName = "Engage forwards the mission's policy: injured units stay blocked")]
   [TestCase(true, "Last Stand", TestName = "Engage forwards an override mission: unfit units deploy with notice")]
-  public async Task EngageForwardsMissionPolicy(bool allowUnfitDeployment, string title)
+  public static async Task EngageForwardsMissionPolicy(bool allowUnfitDeployment, string title)
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var fixture = new GeoscapeFixture(MakeStart(
@@ -117,7 +119,7 @@ public class GeoscapeSquadNavigationTest
     TestName = "Full round trip keeps the mission and Decline still resolves")]
   [TestCase(false, 1, true,
     TestName = "Re-engaging starts empty while equipment edits persist")]
-  public async Task PreparationRoundTrip(bool bravoInRoster, int selectedSlot, bool reEngage)
+  public static async Task PreparationRoundTrip(bool bravoInRoster, int selectedSlot, bool reEngage)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var roster = bravoInRoster
@@ -192,7 +194,7 @@ public class GeoscapeSquadNavigationTest
     TestName = "Plot missions still resolve through Continue")]
   [TestCase(GeoscapeEventKind.Minigame, "Play (placeholder)",
     TestName = "Minigame missions still resolve through Play")]
-  public async Task NonTacticalMissionsStillResolve(GeoscapeEventKind kind, string buttonText)
+  public static async Task NonTacticalMissionsStillResolve(GeoscapeEventKind kind, string buttonText)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = AddToTree(CreateGeoscapeScene(MakeStart(
@@ -211,7 +213,7 @@ public class GeoscapeSquadNavigationTest
   }
 
   [TestCase(TestName = "Broken squad exports inside the scene preserve the pending mission")]
-  public async Task BrokenSceneExportsPreserveThePendingMission()
+  public static async Task BrokenSceneExportsPreserveThePendingMission()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (scene, manager) = TacticalScene([MakeEntry("Alpha")]);

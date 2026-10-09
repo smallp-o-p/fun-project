@@ -5,6 +5,8 @@ using FunProject.Items.Effects;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BlastResolutionTest
@@ -20,7 +22,7 @@ public partial class BlastResolutionTest
         u.Position))]);
 
   [TestCase(TestName = "A unit outside the blast radius is unaffected")]
-  public void UnitOutsideBlastRadiusIsUnaffected()
+  public static void UnitOutsideBlastRadiusIsUnaffected()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -45,7 +47,7 @@ public partial class BlastResolutionTest
   }
 
   [TestCase(TestName = "Friendly-fire: an allied unit within the blast radius is also damaged")]
-  public void FriendlyFireDamagesAlliedUnitWithinRadius()
+  public static void FriendlyFireDamagesAlliedUnitWithinRadius()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -69,7 +71,7 @@ public partial class BlastResolutionTest
   }
 
   [TestCase(TestName = "A status effect in the blast applies to an in-radius unit")]
-  public void StatusEffectInBlastAppliesToInRadiusUnit()
+  public static void StatusEffectInBlastAppliesToInRadiusUnit()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -93,7 +95,7 @@ public partial class BlastResolutionTest
   }
 
   [TestCase]
-  public void BlastDamagesObjectsAndUnitsAndSkipsIneligibleObjects()
+  public static void BlastDamagesObjectsAndUnitsAndSkipsIneligibleObjects()
   {
     var origin = new Vector3I(3, 0, 4);
     using var battle = BattleFixture.Duel(
@@ -134,7 +136,7 @@ public partial class BlastResolutionTest
   }
 
   [TestCase]
-  public void RadiusZeroMultipleEffectsAndStatusesDoNotRepeatDestruction()
+  public static void RadiusZeroMultipleEffectsAndStatusesDoNotRepeatDestruction()
   {
     var origin = new Vector3I(3, 0, 2);
     using var battle = BattleFixture.Duel(configure: setup => setup with

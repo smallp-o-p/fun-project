@@ -6,6 +6,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class DefuseAllBombsObjectiveTest
@@ -46,7 +48,7 @@ public class DefuseAllBombsObjectiveTest
   }
 
   [TestCase(TestName = "Defusing every bomb passes and ends the battle in victory")]
-  public void AllDefusedPasses()
+  public static void AllDefusedPasses()
   {
     var (setup, player) = DefuseGoalSetup();
     using var runtime = BattleFactory.Start(setup).RequireRight();
@@ -63,7 +65,7 @@ public class DefuseAllBombsObjectiveTest
   }
 
   [TestCase(TestName = "A expiry fails the objective and ends the battle in defeat")]
-  public void ExpiryFails()
+  public static void ExpiryFails()
   {
     var (setup, player) = DefuseGoalSetup();
     using var runtime = BattleFactory.Start(setup).RequireRight();
@@ -82,7 +84,7 @@ public class DefuseAllBombsObjectiveTest
   // so one defused of two stays Ongoing, and non-timed objects never enter the tally.
 
   [TestCase(TestName = "Defusing one of two bombs stays ongoing")]
-  public void PartialDefusalStaysOngoing()
+  public static void PartialDefusalStaysOngoing()
   {
     var (setup, _) = DefuseGoalSetup(
     [
@@ -104,7 +106,7 @@ public class DefuseAllBombsObjectiveTest
   }
 
   [TestCase(TestName = "Interacting with a non-timed object does not count as a defusal")]
-  public void NonTimedObjectsDoNotCount()
+  public static void NonTimedObjectsDoNotCount()
   {
     var (setup, _) = DefuseGoalSetup(
     [
@@ -125,7 +127,7 @@ public class DefuseAllBombsObjectiveTest
   }
 
   [TestCase]
-  public void DestroyingTimedObjectsFailsButDestroyingCratesDoesNot()
+  public static void DestroyingTimedObjectsFailsButDestroyingCratesDoesNot()
   {
     using var battle = BattleFixture.Duel(playerControlled: true,
       player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 5)),
@@ -161,7 +163,7 @@ public class DefuseAllBombsObjectiveTest
   }
 
   [TestCase]
-  public void GrenadeDestructionFailsTheObjectiveAndFinishesResolution()
+  public static void GrenadeDestructionFailsTheObjectiveAndFinishesResolution()
   {
     using var battle = BattleFixture.Duel(playerControlled: true,
       configure: setup => setup with

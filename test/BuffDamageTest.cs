@@ -5,6 +5,8 @@ using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BuffDamageTest
@@ -16,7 +18,7 @@ public partial class BuffDamageTest
     };
 
   [TestCase(TestName = "TrySpendShot threads external mods through the ammunitioned path")]
-  public void TrySpendShotThreadsExternalMods()
+  public static void TrySpendShotThreadsExternalMods()
   {
     var weapon = TestData.MakeAmmoWeapon("Rifle", magazine: 6, damage: 5);
 
@@ -26,7 +28,7 @@ public partial class BuffDamageTest
   }
 
   [TestCase(TestName = "An attack applies the attacker's active damage buff; inactive applies none")]
-  public void AttackAppliesActiveDamageBuff()
+  public static void AttackAppliesActiveDamageBuff()
   {
     var damageBuff = TestData.MakeBuff(
       "Rampage",

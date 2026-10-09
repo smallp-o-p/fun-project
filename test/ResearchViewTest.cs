@@ -14,7 +14,7 @@ public class ResearchViewTest
 {
   [TestCase(false)]
   [TestCase(true)]
-  public void EmptyOrLockedCatalogKeepsStartDisabled(bool lockedProject)
+  public static void EmptyOrLockedCatalogKeepsStartDisabled(bool lockedProject)
   {
     ResearchProject[] projects = lockedProject
       ? [MakeResearch(condition: new ResearchTestCondition { Predicate = _ => false })]
@@ -31,7 +31,7 @@ public class ResearchViewTest
   }
 
   [TestCase]
-  public async Task RefreshAndStartOrSwitchUseCampaignTruth()
+  public static async Task RefreshAndStartOrSwitchUseCampaignTruth()
   {
     await using var cleanup = new DeferredNodeCleanup();
     bool unlocked = true;
@@ -88,7 +88,7 @@ public class ResearchViewTest
 
   [TestCase(800, 600)]
   [TestCase(1600, 900)]
-  public async Task LongResearchDetailsKeepActionsReachable(int width, int height)
+  public static async Task LongResearchDetailsKeepActionsReachable(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var reward = MakeItemData("A research reward with a long descriptive manufacturing name");
@@ -116,7 +116,7 @@ public class ResearchViewTest
     Assert.True(visible.Encloses(ScreenRect(start)));
     Assert.True(visible.Encloses(ScreenRect(back)));
     var scroll = view.GetNode<ScrollContainer>("%DetailsScroll");
-    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(ulong.MaxValue.ToString()));
+    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(ulong.MaxValue.ToString(System.Globalization.CultureInfo.CurrentCulture)));
     Assert.True(view.GetNode<Label>("%CurrencyCosts").Size.X <= scroll.Size.X);
     var startRect = ScreenRect(start);
     var backRect = ScreenRect(back);

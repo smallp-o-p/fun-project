@@ -22,13 +22,13 @@ public partial class ModSlot : Resource
   }
 }
 
-public interface HasModSlots
+public interface IHasModSlots
 {
   Godot.Collections.Array<ModSlot> GetModSlots();
 }
 
 public static class HasModSlotsExtensions
 {
-  public static IEnumerable<EquippableMod> EquippedMods(this HasModSlots host)
+  public static IEnumerable<EquippableMod> EquippedMods(this IHasModSlots host)
     => host.GetModSlots().AsValueEnumerable().Select(slot => slot.EquippedMod).ToArray().Somes();
 }

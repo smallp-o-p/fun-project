@@ -13,7 +13,7 @@ namespace FunProject.Tests;
 public class ResearchTest
 {
   [TestCase]
-  public void JobStartsSpendSharedBalancesBeforeNotification()
+  public static void JobStartsSpendSharedBalancesBeforeNotification()
   {
     var a = MakeCurrency("A");
     var b = MakeCurrency("B");
@@ -53,7 +53,7 @@ public class ResearchTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public void InsufficientCurrenciesPreserveJobsBalancesAndEvents(bool research)
+  public static void InsufficientCurrenciesPreserveJobsBalancesAndEvents(bool research)
   {
     var a = MakeCurrency("A");
     var b = MakeCurrency("B");
@@ -81,7 +81,7 @@ public class ResearchTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public void SubmissionReadsCurrentAuthoredCostsAndKeepsItsDeadline(bool research)
+  public static void SubmissionReadsCurrentAuthoredCostsAndKeepsItsDeadline(bool research)
   {
     var currency = MakeCurrency();
     var itemRecipe = MakeManufacturingRecipe(MakeItemData(), costs: new() { [currency] = 20 });
@@ -106,7 +106,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void ResearchReplacementPaysAgainWithoutRefund()
+  public static void ResearchReplacementPaysAgainWithoutRefund()
   {
     var currency = MakeCurrency();
     var first = MakeResearch("A", costs: new() { [currency] = 30 });
@@ -134,7 +134,7 @@ public class ResearchTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public void StartNotificationExceptionDoesNotReplayPayment(bool research)
+  public static void StartNotificationExceptionDoesNotReplayPayment(bool research)
   {
     var currency = MakeCurrency();
     var old = MakeResearch("Old");
@@ -171,7 +171,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void ResearchUnlocksManufacturingBeforeBroadcastWithoutGrantingStock()
+  public static void ResearchUnlocksManufacturingBeforeBroadcastWithoutGrantingStock()
   {
     var item = MakeItemData();
     var itemRecipe = MakeManufacturingRecipe(item);
@@ -215,7 +215,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void ResearchCompletionRegistersManufacturingOptionsInCompletionOrder()
+  public static void ResearchCompletionRegistersManufacturingOptionsInCompletionOrder()
   {
     var firstItem = MakeItemData("First item");
     var firstItemRecipe = MakeManufacturingRecipe(firstItem);
@@ -238,7 +238,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void LiveAvailabilityRelocksWhilePausedButDoesNotInterruptStartedResearch()
+  public static void LiveAvailabilityRelocksWhilePausedButDoesNotInterruptStartedResearch()
   {
     var key = MakeItemData("Key");
     var condition = new ResearchTestCondition { Predicate = state => state.Armory.HasAvailableItem(key) };
@@ -267,7 +267,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void StartFailurePrecedencePreservesTheActiveJobAndEventWindow()
+  public static void StartFailurePrecedencePreservesTheActiveJobAndEventWindow()
   {
     var currency = MakeCurrency();
     var completed = MakeResearch("Completed", costs: new() { [currency] = 10 });
@@ -301,7 +301,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void SwitchingDiscardsProgressAndOnlyTheReplacementCanComplete()
+  public static void SwitchingDiscardsProgressAndOnlyTheReplacementCanComplete()
   {
     var firstItem = MakeItemData("First reward");
     var firstItemRecipe = MakeManufacturingRecipe(firstItem);
@@ -337,7 +337,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void ConditionExceptionsAndNullArgumentsPropagateBeforeMutation()
+  public static void ConditionExceptionsAndNullArgumentsPropagateBeforeMutation()
   {
     var failure = new InvalidOperationException("Condition failed");
     var project = MakeResearch(condition: new ResearchTestCondition { Predicate = _ => throw failure });
@@ -359,7 +359,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void ZeroDayResearchStartedDuringTimeEventCompletesInThatTicksResearchPhase()
+  public static void ZeroDayResearchStartedDuringTimeEventCompletesInThatTicksResearchPhase()
   {
     var project = MakeResearch(days: 0);
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project]));
@@ -386,7 +386,7 @@ public class ResearchTest
   [TestCase(0U, 17L)]
   [TestCase(1U, 1457L)]
   [TestCase(uint.MaxValue, 6_184_752_904_817L)]
-  public void CapturedDurationSchedulesFromSubmissionTick(uint days, long deadline)
+  public static void CapturedDurationSchedulesFromSubmissionTick(uint days, long deadline)
   {
     var project = MakeResearch(days: days);
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project]));
@@ -406,7 +406,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void DeadlineOverflowOccursBeforeStartingAndExactMaximumDeadlineIsSupported()
+  public static void DeadlineOverflowOccursBeforeStartingAndExactMaximumDeadlineIsSupported()
   {
     var currency = MakeCurrency();
     var project = MakeResearch(costs: new() { [currency] = 7 });
@@ -431,7 +431,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void PauseAndPendingResolutionFreezeResearch()
+  public static void PauseAndPendingResolutionFreezeResearch()
   {
     var project = MakeResearch();
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project],
@@ -454,7 +454,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void BothJobsCompleteAfterScheduleAndExpiryInDefinedOrder()
+  public static void BothJobsCompleteAfterScheduleAndExpiryInDefinedOrder()
   {
     var initial = MakeItemData("Initial");
     var initialRecipe = MakeManufacturingRecipe(initial);
@@ -480,7 +480,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void RebuiltSessionPreservesProgressAndLargeAdvanceCompletesExactlyAtDeadline()
+  public static void RebuiltSessionPreservesProgressAndLargeAdvanceCompletesExactlyAtDeadline()
   {
     var item = MakeItemData();
     var itemRecipe = MakeManufacturingRecipe(item);
@@ -513,7 +513,7 @@ public class ResearchTest
   }
 
   [TestCase]
-  public void CompletedResearchAndManufacturingUnlocksSurviveConditionLossAndOverlap()
+  public static void CompletedResearchAndManufacturingUnlocksSurviveConditionLossAndOverlap()
   {
     var key = MakeItemData("Key");
     var item = MakeItemData("Product");

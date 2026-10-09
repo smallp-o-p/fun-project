@@ -14,6 +14,8 @@ using GdUnit4;
 using static GdUnit4.Assertions;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class CaptivityViewTest
@@ -38,7 +40,7 @@ public class CaptivityViewTest
     => Row(view, index).ButtonPressed = pressed;
 
   [TestCase(TestName = "An empty captivity shows the empty state and keeps preparation inert")]
-  public async Task EmptyCaptivityShowsEmptyStateAndKeepsPreparationInert()
+  public static async Task EmptyCaptivityShowsEmptyStateAndKeepsPreparationInert()
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var fixture = new GeoscapeFixture();
@@ -58,7 +60,7 @@ public class CaptivityViewTest
   }
 
   [TestCase(TestName = "Same-name captives stay distinct rows with independent toggles")]
-  public async Task SameNameCaptivesStayDistinctRowsWithIndependentToggles()
+  public static async Task SameNameCaptivesStayDistinctRowsWithIndependentToggles()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var faction = MakeFaction("Cult");
@@ -101,7 +103,7 @@ public class CaptivityViewTest
   }
 
   [TestCase(TestName = "Toggling a row updates the selection in place and keeps keyboard focus")]
-  public async Task TogglingARowUpdatesSelectionInPlaceAndKeepsKeyboardFocus()
+  public static async Task TogglingARowUpdatesSelectionInPlaceAndKeepsKeyboardFocus()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var first = MakeCombatant("Alpha", MakeFaction("Cult"));
@@ -124,7 +126,7 @@ public class CaptivityViewTest
   }
 
   [TestCase(TestName = "Details inspect the first captive, then whichever row is toggled")]
-  public async Task DetailsInspectFirstCaptiveThenToggledRows()
+  public static async Task DetailsInspectFirstCaptiveThenToggledRows()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var cult = MakeFaction("Cult of Sirius");
@@ -165,7 +167,7 @@ public class CaptivityViewTest
   }
 
   [TestCase(TestName = "Refresh retains selections; rebinding to another state drops stale ones")]
-  public async Task RefreshRetainsSelectionsAndRebindingDropsStaleOnes()
+  public static async Task RefreshRetainsSelectionsAndRebindingDropsStaleOnes()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var faction = MakeFaction("Cult");
@@ -193,7 +195,7 @@ public class CaptivityViewTest
   }
 
   [TestCase(TestName = "Prepare interrogation opens a two-slot read-only squad view")]
-  public async Task PrepareInterrogationOpensATwoSlotReadOnlySquadView()
+  public static async Task PrepareInterrogationOpensATwoSlotReadOnlySquadView()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var first = MakeCombatant("Alpha", MakeFaction("Cult of Sirius"));
@@ -218,7 +220,7 @@ public class CaptivityViewTest
   }
 
   [TestCase(TestName = "Interrogation preparation selects distinct roster units without campaign effects")]
-  public async Task InterrogationPreparationSelectsDistinctRosterWithoutCampaignEffects()
+  public static async Task InterrogationPreparationSelectsDistinctRosterWithoutCampaignEffects()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var captive = MakeCombatant("Alpha", MakeFaction("Cult"));
@@ -263,7 +265,7 @@ public class CaptivityViewTest
   }
 
   [TestCase(TestName = "Back from interrogation returns to the retained captivity selection")]
-  public async Task BackFromInterrogationReturnsToRetainedSelection()
+  public static async Task BackFromInterrogationReturnsToRetainedSelection()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var first = MakeCombatant("Alpha", MakeFaction("Cult"));
@@ -295,7 +297,7 @@ public class CaptivityViewTest
   }
 
   [TestCase(TestName = "The HUD captivity button forwards a fresh CaptivityView")]
-  public async Task HudCaptivityButtonForwardsAFreshCaptivityView()
+  public static async Task HudCaptivityButtonForwardsAFreshCaptivityView()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var hud = AddToTree(CreateHud());
@@ -316,7 +318,7 @@ public class CaptivityViewTest
 
   [TestCase(false, TestName = "A missing SquadViewScene is an authoring error")]
   [TestCase(true, TestName = "A wrong-root SquadViewScene is an authoring error")]
-  public async Task MissingAndWrongRootSquadViewSceneAreAuthoringErrors(bool wrongRoot)
+  public static async Task MissingAndWrongRootSquadViewSceneAreAuthoringErrors(bool wrongRoot)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var captive = MakeCombatant("Alpha", MakeFaction("Cult"));

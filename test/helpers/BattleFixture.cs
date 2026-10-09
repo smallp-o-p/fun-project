@@ -108,7 +108,7 @@ public sealed class BattleFixture : IDisposable
     Runtime.TryGetAttackTarget(new BattleEntity.Unit(unit)).RequireSome();
 
   public AttackTarget Target(BattleObjectState obj) =>
-    Runtime.TryGetAttackTarget(new BattleEntity.Object(obj)).RequireSome();
+    Runtime.TryGetAttackTarget(new BattleEntity.BoardObject(obj)).RequireSome();
 
   public BattleBoardState.ValidatedPoint At(Vector3I position) => Runtime.TryGetTile(position).RequireSome();
 
@@ -280,16 +280,16 @@ public sealed class BattleFixture : IDisposable
 
   // ---- Hook forwarding ----------------------------------------------------------------
 
-  public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0) where TEventKey : BattleEventTag =>
+  public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0) where TEventKey : IBattleEventTag =>
     Runtime.RegisterHook<TEventKey>(hook, priority);
 
-  public bool UnregisterHook<TEventKey>(BattleHook hook) where TEventKey : BattleEventTag =>
+  public bool UnregisterHook<TEventKey>(BattleHook hook) where TEventKey : IBattleEventTag =>
     Runtime.UnregisterHook<TEventKey>(hook);
 
   // ---- Presentation ownership ---------------------------------------------------------
 
   // Fake playback-busy flag shared with the fixture's UI controller; tests flip it directly.
-  public bool Busy;
+  public bool Busy { get; set; }
 
   private Option<BattleUiController> _ui;
   private readonly List<Godot.Node> _ownedNodes = [];

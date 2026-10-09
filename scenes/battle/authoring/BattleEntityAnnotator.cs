@@ -2,6 +2,8 @@ using Godot;
 using System;
 using FunProject.Scenes.Ext;
 
+namespace FunProject.Scenes;
+
 // Editable entity source: native annotation painting and model geometry export together.
 [Tool, GlobalClass]
 public partial class BattleEntityAnnotator : Node3D

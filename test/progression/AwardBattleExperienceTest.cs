@@ -4,6 +4,8 @@ using FunProject.Combatants;
 using FunProject.Progression;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class AwardBattleExperienceTest
@@ -33,7 +35,7 @@ public class AwardBattleExperienceTest
         new RankLevelData { Name = "Squaddie", GainFactorPercent = 100 }));
 
   [TestCase(TestName = "Every present combatant earns participation XP")]
-  public void ParticipationAwardedToAllPresent()
+  public static void ParticipationAwardedToAllPresent()
   {
     var faction = TestData.MakeFaction("Player");
     var alpha = Present("Alpha", faction);
@@ -51,7 +53,7 @@ public class AwardBattleExperienceTest
   }
 
   [TestCase(TestName = "Kills add on top of participation per defeated count")]
-  public void KillsAddOnTopOfParticipation()
+  public static void KillsAddOnTopOfParticipation()
   {
     var faction = TestData.MakeFaction("Player");
     var alpha = Present("Alpha", faction);
@@ -69,7 +71,7 @@ public class AwardBattleExperienceTest
   }
 
   [TestCase(TestName = "The fallen earn nothing — no participation, no posthumous kills")]
-  public void DeadCombatantsEarnNothing()
+  public static void DeadCombatantsEarnNothing()
   {
     var faction = TestData.MakeFaction("Player");
     var alpha = Present("Alpha", faction);
@@ -96,7 +98,7 @@ public class AwardBattleExperienceTest
   }
 
   [TestCase(TestName = "One battle is one gain per combatant — a single scaling pass, not per-achievement")]
-  public void OneGainPerCombatantPerBattle()
+  public static void OneGainPerCombatantPerBattle()
   {
     var faction = TestData.MakeFaction("Player");
     // A 3% ladder: two separate gains of 10+25 would floor to 1 each (2 total); one
@@ -118,7 +120,7 @@ public class AwardBattleExperienceTest
   }
 
   [TestCase(TestName = "Malformed awards throw")]
-  public void GuardsThrow()
+  public static void GuardsThrow()
   {
     var faction = TestData.MakeFaction("Player");
     Assert.Throws<System.InvalidOperationException>(() => AwardBattleExperience.Award(

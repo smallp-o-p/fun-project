@@ -136,7 +136,7 @@ public sealed class AttackEntity(AliveUnit attacker, AttackTarget target) : Batt
         case BattleEntity.Unit unit:
           session.ApplyDamageTo(unit.State, bundle, Some(attacker.State));
           break;
-        case BattleEntity.Object obj when session.TryGetAttackTarget(target.Entity).IsSome:
+        case BattleEntity.BoardObject obj when session.TryGetAttackTarget(target.Entity).IsSome:
           session.ApplyDamageTo(obj.State, bundle, Some(attacker.State));
           break;
       }

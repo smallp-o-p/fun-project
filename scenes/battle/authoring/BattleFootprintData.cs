@@ -1,6 +1,8 @@
 using FunProject.Battle;
 using Godot;
 
+namespace FunProject.Scenes;
+
 // Authored contributions for one local grid cell; the baker derives final standability.
 [Tool, GlobalClass]
 public partial class BattleFootprintData : Resource

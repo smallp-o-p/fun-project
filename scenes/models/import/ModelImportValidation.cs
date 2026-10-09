@@ -8,7 +8,7 @@ namespace FunProject.Models;
 public partial class ModelImportValidation : RefCounted
 {
   /// <summary>Import-time proof that the fixed masks describe this source geometry.</summary>
-  public string ValidateMaskGeometry(ModelMaskConfiguration configuration, ArrayMesh? mesh)
+  public static string ValidateMaskGeometry(ModelMaskConfiguration configuration, ArrayMesh? mesh)
   {
     if (mesh is null)
       return "Missing mask source mesh.";
@@ -59,7 +59,7 @@ public partial class ModelImportValidation : RefCounted
     return string.Empty;
   }
 
-  public string ValidateMaskPresentation(MeshInstance3D body)
+  public static string ValidateMaskPresentation(MeshInstance3D body)
   {
     for (int surface = 0; surface < body.Mesh.GetSurfaceCount(); surface++)
     {

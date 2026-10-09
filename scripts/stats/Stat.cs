@@ -9,7 +9,7 @@ public abstract partial class Stat : Resource
   [Export] public int BaseValue { get; set; } = 0;
 }
 
-public interface HasStats
+public interface IHasStats
 {
   Option<TStat> TryGetStat<TStat>() where TStat : Stat;
   TStat GetStat<TStat>() where TStat : Stat;

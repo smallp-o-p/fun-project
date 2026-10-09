@@ -1,6 +1,8 @@
 #if TOOLS
 using Godot;
 
+namespace FunProject.Editor.BattleAuthoring;
+
 [Tool]
 public partial class BattleAnnotationEditor : EditorPlugin
 {
@@ -58,13 +60,13 @@ public partial class BattleAnnotationEditor : EditorPlugin
     SetProcess(true);
   }
 
-  public override bool _Handles(GodotObject obj) => obj is GridMap grid && GodotObject.IsInstanceValid(grid) &&
+  public override bool _Handles(GodotObject @object) => @object is GridMap grid && GodotObject.IsInstanceValid(grid) &&
     grid.Name == "Annotations" && grid.GetParent() is BattleEntityAnnotator;
-  public override void _Edit(GodotObject obj)
+  public override void _Edit(GodotObject @object)
   {
     // Root deletion/Undo does not emit SceneChanged. Native selection dispatch
     // resumes annotation polling only after a restored grid is back in the tree.
-    if (obj is GridMap grid && GodotObject.IsInstanceValid(grid) && grid.IsInsideTree() && _Handles(grid))
+    if (@object is GridMap grid && GodotObject.IsInstanceValid(grid) && grid.IsInsideTree() && _Handles(grid))
       TrackScene(EditorInterface.Singleton.GetEditedSceneRoot());
   }
 

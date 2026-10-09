@@ -4,12 +4,14 @@ using FunProject.Weapons;
 using GdUnit4;
 using System;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class DamageResolverTest
 {
   [TestCase(TestName = "Aggregate resolution: absorption, spill, element matching, stun and ignored packets")]
-  public void AggregateResolutionTable()
+  public static void AggregateResolutionTable()
   {
     (string Name, Damage[] Bundle, Option<ArmorState> Armor, DamageResolution Expected)[] rows =
     [
@@ -49,7 +51,7 @@ public class DamageResolverTest
   }
 
   [TestCase]
-  public void StunBypassesArmorAndLeavesItForTheNextPacket()
+  public static void StunBypassesArmorAndLeavesItForTheNextPacket()
   {
     Damage[] bundle =
     [
@@ -63,7 +65,7 @@ public class DamageResolverTest
   }
 
   [TestCase(TestName = "Element match never increases health spill")]
-  public void ElementMatchNeverIncreasesSpill()
+  public static void ElementMatchNeverIncreasesSpill()
   {
     var matched = DamageResolver.Resolve(
       [new Damage(10, Element.Thermal)], Some(new ArmorState(5, Element.Thermal)));
@@ -75,14 +77,14 @@ public class DamageResolverTest
   }
 
   [TestCase(TestName = "Negative armor state is rejected")]
-  public void NegativeArmorStateIsRejected()
+  public static void NegativeArmorStateIsRejected()
   {
     Assert.Throws<ArgumentOutOfRangeException>(
       () => DamageResolver.Resolve([new Damage(1, Element.Kinetic)], Some(new ArmorState(-1, Element.Kinetic))));
   }
 
   [TestCase(TestName = "ResolvePackets reports each packet's armor and health split")]
-  public void ResolvePacketsReportsPerPacketSplit()
+  public static void ResolvePacketsReportsPerPacketSplit()
   {
     var packets = DamageResolver.ResolvePackets(
       [new Damage(6, Element.Thermal), new Damage(4, Element.Kinetic)],
@@ -94,7 +96,7 @@ public class DamageResolverTest
   }
 
   [TestCase(TestName = "ResolvePackets keeps zero and negative packets aligned")]
-  public void ResolvePacketsKeepsAlignmentForIgnoredPackets()
+  public static void ResolvePacketsKeepsAlignmentForIgnoredPackets()
   {
     var packets = DamageResolver.ResolvePackets(
       [new Damage(0, Element.Kinetic), new Damage(5, Element.Kinetic)],

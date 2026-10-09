@@ -4,6 +4,8 @@ using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleVisibilityTest
@@ -49,7 +51,7 @@ public class BattleVisibilityTest
 
   [TestCase(false, TestName = "Open space visibility succeeds between units and caches register them")]
   [TestCase(true, TestName = "Blocking tiles break line of sight and drop the target from the caches")]
-  public void LineOfSightAndVisibilityCaches(bool blocked)
+  public static void LineOfSightAndVisibilityCaches(bool blocked)
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -71,7 +73,7 @@ public class BattleVisibilityTest
   // Verifies that a blocking tile is visible (it IS the wall you look at) but the tile directly
   // behind it on the line is shadowed, while off-axis open tiles remain visible.
   [TestCase(TestName = "Walls cast line-of-sight shadows")]
-  public void WallsCastLineOfSightShadows()
+  public static void WallsCastLineOfSightShadows()
   {
     var playerFaction = TestData.MakeFaction("Player");
     using var battle = VisibilityFixture(new Vector3I(4, 1, 2),
@@ -90,7 +92,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Zero vision units see only their own tile")]
-  public void ZeroVisionUnitsSeeOnlyTheirOwnTile()
+  public static void ZeroVisionUnitsSeeOnlyTheirOwnTile()
   {
     var playerFaction = TestData.MakeFaction("Player");
     using var battle = VisibilityFixture(new Vector3I(2, 1, 1),
@@ -103,7 +105,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Adjacent diagonal tiles remain visible around corners")]
-  public void AdjacentDiagonalTilesRemainVisibleAroundCorners()
+  public static void AdjacentDiagonalTilesRemainVisibleAroundCorners()
   {
     var playerFaction = TestData.MakeFaction("Player");
     using var battle = VisibilityFixture(new Vector3I(2, 1, 2),
@@ -117,7 +119,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Diagonal corner peeking does not reveal tiles behind blockers")]
-  public void DiagonalCornerPeekingDoesNotRevealTilesBehindBlockers()
+  public static void DiagonalCornerPeekingDoesNotRevealTilesBehindBlockers()
   {
     var playerFaction = TestData.MakeFaction("Player");
     using var battle = VisibilityFixture(new Vector3I(3, 1, 2),
@@ -133,7 +135,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Adjacent diagonal peeking does not see through sealed corners")]
-  public void AdjacentDiagonalPeekingDoesNotSeeThroughSealedCorners()
+  public static void AdjacentDiagonalPeekingDoesNotSeeThroughSealedCorners()
   {
     var playerFaction = TestData.MakeFaction("Player");
     using var battle = VisibilityFixture(new Vector3I(2, 1, 2),
@@ -152,7 +154,7 @@ public class BattleVisibilityTest
   // set on the observer's own cell (the floor) seals downward sight.
   [TestCase(false, TestName = "Sight passes through an open column below the observer")]
   [TestCase(true, TestName = "BlocksVerticalLineOfSight prevents seeing below when set on observer cell")]
-  public void VerticalSightBelow(bool blocked)
+  public static void VerticalSightBelow(bool blocked)
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -173,7 +175,7 @@ public class BattleVisibilityTest
   // on an intermediate floor cell seals upward sight through it.
   [TestCase(false, TestName = "Sight passes through an open column above the observer")]
   [TestCase(true, TestName = "BlocksVerticalLineOfSight on intermediate floor prevents seeing above")]
-  public void VerticalSightAbove(bool blocked)
+  public static void VerticalSightAbove(bool blocked)
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -195,7 +197,7 @@ public class BattleVisibilityTest
   // Keep separate from the axial rows: simultaneous crossing is its own rule.
   [TestCase(true, TestName = "BlocksVerticalLineOfSight seals a diagonal ray on a simultaneous crossing")]
   [TestCase(false, TestName = "A diagonal ray through an open column is clear")]
-  public void DiagonalRaySealedByVerticalBlocker(bool blocked)
+  public static void DiagonalRaySealedByVerticalBlocker(bool blocked)
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -212,7 +214,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Vision stat changes which targets are visible")]
-  public void VisionStatChangesWhichTargetsAreVisible()
+  public static void VisionStatChangesWhichTargetsAreVisible()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -231,7 +233,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Knockout removes only its own vision contribution before broadcast")]
-  public void KnockoutRemovesOnlyItsOwnVisionContributionBeforeBroadcast()
+  public static void KnockoutRemovesOnlyItsOwnVisionContributionBeforeBroadcast()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -262,7 +264,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Knockout preserves explored tiles")]
-  public void KnockoutPreservesExploredTiles()
+  public static void KnockoutPreservesExploredTiles()
   {
     using var battle = BattleFixture.Duel();
     var enemyTile = battle.Alive(battle.EnemyUnit).Position;
@@ -274,7 +276,7 @@ public class BattleVisibilityTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public void UnconsciousObserverCachesStayEmptyDuringVisibilityUpdates(bool forceFullRebuild)
+  public static void UnconsciousObserverCachesStayEmptyDuringVisibilityUpdates(bool forceFullRebuild)
   {
     using var battle = BattleFixture.Duel();
     var observer = battle.PlayerUnit;
@@ -290,7 +292,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Faction visible tiles are the union of conscious allies")]
-  public void FactionVisibleTilesAreTheUnionOfConsciousAllies()
+  public static void FactionVisibleTilesAreTheUnionOfConsciousAllies()
   {
     var playerFaction = TestData.MakeFaction("Player");
     using var battle = VisibilityFixture(new Vector3I(5, 1, 5),
@@ -305,7 +307,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Tile visibility includes tiles at the edge of vision range")]
-  public void TileVisibilityIncludesTilesAtTheEdgeOfVisionRange()
+  public static void TileVisibilityIncludesTilesAtTheEdgeOfVisionRange()
   {
     var playerFaction = TestData.MakeFaction("Player");
     using var battle = VisibilityFixture(new Vector3I(6, 1, 1),
@@ -316,7 +318,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Explored tiles persist after they leave current visibility")]
-  public void ExploredTilesPersistAfterTheyLeaveCurrentVisibility()
+  public static void ExploredTilesPersistAfterTheyLeaveCurrentVisibility()
   {
     var playerFaction = TestData.MakeFaction("Player");
     using var battle = VisibilityFixture(new Vector3I(4, 1, 3),
@@ -333,7 +335,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Visible objects follow explored-tile memory for each faction")]
-  public void VisibleObjectsFollowExploredTileMemory()
+  public static void VisibleObjectsFollowExploredTileMemory()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -378,7 +380,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Enemy units drop from faction visibility when sight is broken")]
-  public void EnemyUnitsDropFromFactionVisibilityWhenSightIsBroken()
+  public static void EnemyUnitsDropFromFactionVisibilityWhenSightIsBroken()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -398,7 +400,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Faction visibility queries partition allies and visible hostiles in roster order")]
-  public void FactionVisibilityPartitionsAlliesAndHostiles()
+  public static void FactionVisibilityPartitionsAlliesAndHostiles()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -427,7 +429,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "SpawnUnit refreshes visibility caches")]
-  public void SpawnUnitRefreshesVisibilityCaches()
+  public static void SpawnUnitRefreshesVisibilityCaches()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -439,7 +441,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "Lethal damage refreshes visibility caches")]
-  public void LethalDamageRefreshesVisibilityCaches()
+  public static void LethalDamageRefreshesVisibilityCaches()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -464,7 +466,7 @@ public class BattleVisibilityTest
   }
 
   [TestCase(TestName = "InvalidateVisibility forces recompute after runtime tile LOS change")]
-  public void InvalidateVisibilityForcesRecomputeAfterRuntimeTileLosChange()
+  public static void InvalidateVisibilityForcesRecomputeAfterRuntimeTileLosChange()
   {
     // Board: 5 wide × 1 tall × 3 deep. Observer and target share z=0; mover sits at z=2 so
     // its step stays on the observer's side and cannot restore the observer→target line.
@@ -496,7 +498,7 @@ public class BattleVisibilityTest
   // is visible, while one that exceeds the 3D distance is not — even when the XZ distance alone
   // would admit it on a same-level check.
   [TestCase(TestName = "3D Euclidean range includes vertical distance")]
-  public void ThreeDEuclideanRangeIncludesVerticalDistance()
+  public static void ThreeDEuclideanRangeIncludesVerticalDistance()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -522,7 +524,7 @@ public class BattleVisibilityTest
   // UnitSpottedBattleEvent fires exactly once for a unit that newly enters the observer's sight,
   // and does not fire for a unit that was already visible before the move.
   [TestCase(TestName = "UnitSpottedBattleEvent fires when a unit moves into sight")]
-  public void UnitSpottedBattleEventFiresWhenUnitMovesIntoSight()
+  public static void UnitSpottedBattleEventFiresWhenUnitMovesIntoSight()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -557,7 +559,7 @@ public class BattleVisibilityTest
   // A unit that leaves and re-enters an observer's line of sight is spotted only ONCE: the observer
   // remembers it, so UnitSpottedBattleEvent fires on the first spotting and never again.
   [TestCase(TestName = "UnitSpottedBattleEvent fires only the first time a unit is spotted")]
-  public void UnitSpottedBattleEventFiresOnlyOnFirstSpotting()
+  public static void UnitSpottedBattleEventFiresOnlyOnFirstSpotting()
   {
     // Board: 6 wide × 1 tall × 1 deep. Observer (player) vision 2 starts at (0,0,0); the target
     // (enemy) is stationary at (3,0,0), distance 3 > 2 → NOT visible at battle start (so there is
@@ -598,7 +600,7 @@ public class BattleVisibilityTest
   // membership is rebuilt (its visible-tile set is invariant) — that rebuild must replace
   // stale members, not merely add new ones.
   [TestCase(TestName = "Target moving out of sight drops from the stationary observer")]
-  public void TargetMovingOutOfSightDropsFromStationaryObserver()
+  public static void TargetMovingOutOfSightDropsFromStationaryObserver()
   {
     // Board: 6 wide × 1 tall × 1 deep. Enemy observer (vision 2) stationary at (4,0,0);
     // player target starts at (3,0,0), distance 1 ≤ 2 → visible at battle start.

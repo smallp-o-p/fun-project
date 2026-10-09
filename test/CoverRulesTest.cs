@@ -2,6 +2,8 @@ using FunProject.Battle;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class CoverRulesTest
@@ -15,11 +17,11 @@ public partial class CoverRulesTest
   [TestCase(4, 0, 4, CoverDirections.None, TestName = "Same tile yields no approach")]
   [TestCase(4, 3, 1, CoverDirections.North, TestName = "Vertical difference ignored, north approach")]
   [TestCase(4, 3, 4, CoverDirections.None, TestName = "Vertical difference ignored, same column")]
-  public void GetApproach(int x, int y, int z, CoverDirections expected) =>
+  public static void GetApproach(int x, int y, int z, CoverDirections expected) =>
     Assert.Equal(expected, CoverRules.GetApproach(new(x, y, z), new(4, 0, 4)));
 
   [TestCase(TestName = "Applies requires an overlapping direction and a positive amount")]
-  public void AppliesRequiresOverlappingDirectionAndPositiveAmount()
+  public static void AppliesRequiresOverlappingDirectionAndPositiveAmount()
   {
     TileCover northCover = new(CoverDirections.North, 40);
 

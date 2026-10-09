@@ -18,7 +18,7 @@ public partial class BattleUITest
     => AddToTree(GD.Load<PackedScene>("res://scenes/battle/BattleUI.tscn").Instantiate<BattleUI>());
 
   [TestCase(TestName = "Unit readouts and verb options render from pushed view models")]
-  public void PushedViewModelsRender()
+  public static void PushedViewModelsRender()
   {
     using var battle = BattleFixture.Duel();
     var units = battle.Query(new GetFactionAliveUnits(battle.PlayerUnit.Side))
@@ -42,7 +42,7 @@ public partial class BattleUITest
   }
 
   [TestCase(TestName = "Targeting shows candidate markers and clears them")]
-  public async Task TargetingOverlaysShowAndClear()
+  public static async Task TargetingOverlaysShowAndClear()
   {
     var view = BuildView();
     var highlighter = view.GetNode<ReachableTileHighlighter>("ReachableTileHighlighter");
@@ -60,7 +60,7 @@ public partial class BattleUITest
   }
 
   [TestCase(TestName = "Previews route by kind: path draws the line, attack shows hit chance")]
-  public void PreviewRendersByKind()
+  public static void PreviewRendersByKind()
   {
     var view = BuildView();
     var hitChance = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%HitChance");
@@ -82,7 +82,7 @@ public partial class BattleUITest
   }
 
   [TestCase(TestName = "Authored HUD intents and widgets are available through the battle view")]
-  public void AuthoredHudIntentsAndWidgets()
+  public static void AuthoredHudIntentsAndWidgets()
   {
     using var battle = BattleFixture.Duel();
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));

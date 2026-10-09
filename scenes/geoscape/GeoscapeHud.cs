@@ -4,6 +4,8 @@ using Godot;
 using System;
 using FunProject.Scenes.Ext;
 
+namespace FunProject.Scenes;
+
 /// <summary>
 /// Geoscape HUD controls. GeoscapeScene wires callbacks into the buttons and pushes state updates to be presented.
 /// </summary>

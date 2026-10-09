@@ -3,6 +3,8 @@ using Godot;
 using GdUnit4;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ModelPresentationTest
@@ -12,7 +14,7 @@ public class ModelPresentationTest
       .Instantiate<SubViewportContainer>();
 
   [TestCase]
-  public async Task EmptyPresentationHasItsOwnTransparentWorldAndNoModel()
+  public static async Task EmptyPresentationHasItsOwnTransparentWorldAndNoModel()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var view = AddToTree(CreatePresentation());
@@ -26,7 +28,7 @@ public class ModelPresentationTest
   }
 
   [TestCase]
-  public async Task RebindingSameSceneKeepsInstanceAndClearingReleasesIt()
+  public static async Task RebindingSameSceneKeepsInstanceAndClearingReleasesIt()
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var model = Pack(new MeshInstance3D { Mesh = new BoxMesh(), Name = "Model" });
@@ -45,7 +47,7 @@ public class ModelPresentationTest
   }
 
   [TestCase]
-  public async Task VerticalCompositionCanCropWideLimbsWithoutZoomingOut()
+  public static async Task VerticalCompositionCanCropWideLimbsWithoutZoomingOut()
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var model = Pack(new MeshInstance3D
@@ -64,7 +66,7 @@ public class ModelPresentationTest
   }
 
   [TestCase]
-  public async Task FramingTracksContainerResizeWithoutCapturingInput()
+  public static async Task FramingTracksContainerResizeWithoutCapturingInput()
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var model = Pack(new MeshInstance3D

@@ -2,9 +2,11 @@ using FunProject.Battle;
 using FunProject.Weapons;
 using System;
 
+namespace FunProject.Scenes;
+
 // Presentation-side verb taxonomy. Each retained adapter delegates availability to its domain
 // UnitAction row and owns the factory for its targeting handler. Candidate sets remain on demand;
-// an available verb can still yield an empty set. Targeted verbs implement NeedsTargeting;
+// an available verb can still yield an empty set. Targeted verbs implement INeedsTargeting;
 // instant verbs implement CanActDirectly and mint a fresh proof when invoked.
 public abstract class UnitActionOption
 {
@@ -25,7 +27,7 @@ public abstract class UnitActionOption
       () => throw new InvalidOperationException("Acting unit is no longer alive."));
 }
 
-public sealed class MoveActionOption(UnitAction action) : UnitActionOption(action), NeedsTargeting
+public sealed class MoveActionOption(UnitAction action) : UnitActionOption(action), INeedsTargeting
 {
   public IActionTargeting Targeting(BattleRuntime runtime)
   {
@@ -33,7 +35,7 @@ public sealed class MoveActionOption(UnitAction action) : UnitActionOption(actio
   }
 }
 
-public sealed class AttackActionOption(UnitAction action) : UnitActionOption(action), NeedsTargeting
+public sealed class AttackActionOption(UnitAction action) : UnitActionOption(action), INeedsTargeting
 {
   public IActionTargeting Targeting(BattleRuntime runtime)
   {

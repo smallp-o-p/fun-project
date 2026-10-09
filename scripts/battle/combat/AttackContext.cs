@@ -38,7 +38,7 @@ public sealed record AttackContext(
         if (unit.State.Side == attacker.Side)
           return $"{attacker.Combatant.Name} cannot attack allied unit {name}.";
         break;
-      case BattleEntity.Object obj:
+      case BattleEntity.BoardObject obj:
         name = obj.State.Name;
         break;
       default:
@@ -50,7 +50,7 @@ public sealed record AttackContext(
     bool visible = target.Entity switch
     {
       BattleEntity.Unit unit => attacker.VisibleUnits.Contains(unit.State),
-      BattleEntity.Object => attacker.VisibleTiles.Contains(freshTarget.Position),
+      BattleEntity.BoardObject => attacker.VisibleTiles.Contains(freshTarget.Position),
       _ => throw new InvalidOperationException("Unknown battle entity."),
     };
     if (!visible) return $"{attacker.Combatant.Name} cannot see {name}.";
@@ -62,5 +62,5 @@ public sealed record AttackContext(
   // Object shots bypass the unit calculator entirely: a destructible object has no aim,
   // cover, or dodge profile, so a feasible shot always connects.
   internal HitChanceBreakdown CalculateHitChance(AttackTarget target, IHitChanceCalculator calculator) =>
-    target.Entity is BattleEntity.Object ? new HitChanceBreakdown(100, []) : calculator.Calculate(this);
+    target.Entity is BattleEntity.BoardObject ? new HitChanceBreakdown(100, []) : calculator.Calculate(this);
 }

@@ -3,12 +3,14 @@ using GdUnit4;
 using Godot;
 using System;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleMapAuthoringTest
 {
   [TestCase]
-  public void GroundFloorAndTallVolumeKeepIndependentSightFlags()
+  public static void GroundFloorAndTallVolumeKeepIndependentSightFlags()
   {
     var footprint = new Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData>
     {
@@ -33,7 +35,7 @@ public partial class BattleMapAuthoringTest
   [TestCase(true, 0)]
   [TestCase(false, 1)]
   [TestCase(false, 2)]
-  public void CoverMergesSameSideButRejectsDifferentStrengthsAcrossWalkableSides(bool sameSide, int receiver)
+  public static void CoverMergesSameSideButRejectsDifferentStrengthsAcrossWalkableSides(bool sameSide, int receiver)
   {
     var floors = TestData.MakeFloorFootprint(3, 3);
     if (receiver == 1) floors[new(1, 0, 1)].BlocksMovement = true;

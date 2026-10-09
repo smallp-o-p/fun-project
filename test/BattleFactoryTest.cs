@@ -7,6 +7,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleFactoryTest
@@ -27,7 +29,7 @@ public class BattleFactoryTest
   }
 
   [TestCase]
-  public void BoardSetupIncludesDefaultStunRecovery()
+  public static void BoardSetupIncludesDefaultStunRecovery()
   {
     var (setup, _, _, _, _) = MinimalSetup();
     using var runtime = BattleFactory.Start(setup).RequireRight();
@@ -44,7 +46,7 @@ public class BattleFactoryTest
   // --- tests ---------------------------------------------------------------
 
   [TestCase(TestName = "Start places units, assigns objectives, and begins turn 1")]
-  public void StartHappyPath()
+  public static void StartHappyPath()
   {
     var (setup, player, enemy, _, _) = MinimalSetup();
 
@@ -74,7 +76,7 @@ public class BattleFactoryTest
   }
 
   [TestCase(TestName = "Start fails when a side has no objective")]
-  public void StartMissingObjective()
+  public static void StartMissingObjective()
   {
     var (setup, _, _, _, _) = MinimalSetup();
     var noEnemyObjective = setup with
@@ -86,7 +88,7 @@ public class BattleFactoryTest
   }
 
   [TestCase(TestName = "Start fails when the designated player faction is not among the sides")]
-  public void StartUnknownPlayerFaction()
+  public static void StartUnknownPlayerFaction()
   {
     var (setup, _, _, _, _) = MinimalSetup();
     var stranger = TestData.MakeFaction("Stranger");
@@ -97,7 +99,7 @@ public class BattleFactoryTest
 
   [TestCase(false, TestName = "Start fails when a unit belongs to another side")]
   [TestCase(true, TestName = "Start fails when a unit's faction is entirely foreign")]
-  public void StartUnitOnWrongSide(bool foreign)
+  public static void StartUnitOnWrongSide(bool foreign)
   {
     var (setup, player, _, alpha, _) = MinimalSetup();
     var added = foreign
@@ -125,7 +127,7 @@ public class BattleFactoryTest
 
   [TestCase(false, TestName = "Start fails when a spawn cell is out of bounds")]
   [TestCase(true, TestName = "Start fails when a spawn cell's tile is a wall")]
-  public void StartUnavailableUnitCell(bool blocked)
+  public static void StartUnavailableUnitCell(bool blocked)
   {
     var (setup, player, _, _, _) = MinimalSetup();
     if (blocked)
@@ -146,7 +148,7 @@ public class BattleFactoryTest
   }
 
   [TestCase(TestName = "Start fails when two units share a spawn cell")]
-  public void StartDuplicateSpawnCell()
+  public static void StartDuplicateSpawnCell()
   {
     var (setup, player, _, _, _) = MinimalSetup();
     var broken = setup with
@@ -171,7 +173,7 @@ public class BattleFactoryTest
   [TestCase(false, false, TestName = "Start fails when an object cell is out of bounds")]
   [TestCase(true, false, TestName = "Start fails when an object's tile is a wall")]
   [TestCase(false, true, TestName = "Start fails when a bomb object cell is out of bounds")]
-  public void StartUnavailableObjectCell(bool blocked, bool bomb)
+  public static void StartUnavailableObjectCell(bool blocked, bool bomb)
   {
     var (setup, _, _, _, _) = MinimalSetup();
     if (blocked)
@@ -192,7 +194,7 @@ public class BattleFactoryTest
 
   [TestCase(false, TestName = "Start fails when two objects share a cell")]
   [TestCase(true, TestName = "Start fails when two bomb objects share a cell")]
-  public void StartDuplicateObjectCell(bool bombs)
+  public static void StartDuplicateObjectCell(bool bombs)
   {
     var (setup, _, _, _, _) = MinimalSetup();
     ObjectPlacement Bomb(Vector3I cell) => new(
@@ -216,7 +218,7 @@ public class BattleFactoryTest
 
   [TestCase(false, TestName = "Start fails when an object sits on a unit's spawn cell")]
   [TestCase(true, TestName = "Start fails when a bomb object sits on a unit's spawn cell")]
-  public void StartObjectOnUnitCell(bool bomb)
+  public static void StartObjectOnUnitCell(bool bomb)
   {
     var (setup, _, _, _, _) = MinimalSetup();
     var data = bomb
@@ -233,7 +235,7 @@ public class BattleFactoryTest
   // --- argument contracts --------------------------------------------------
 
   [TestCase(TestName = "Start throws on a null setup")]
-  public void StartThrowsOnNullSetup()
+  public static void StartThrowsOnNullSetup()
   {
     Assert.Throws<ArgumentNullException>(() => BattleFactory.Start((BattleSetup)null!));
   }
@@ -248,7 +250,7 @@ public class BattleFactoryTest
   [TestCase("objectData", TestName = "Start throws on null object data")]
   [TestCase("objects", TestName = "Start throws on explicit null objects")]
   [TestCase("systems", TestName = "Start throws on explicit null systems")]
-  public void StartRejectsNullSetupMember(string member)
+  public static void StartRejectsNullSetupMember(string member)
   {
     var (setup, _, _, _, _) = MinimalSetup();
     BattleSetup broken = member switch
@@ -275,14 +277,14 @@ public class BattleFactoryTest
   }
 
   [TestCase(TestName = "Start throws on an empty side list")]
-  public void StartThrowsOnEmptySides()
+  public static void StartThrowsOnEmptySides()
   {
     var (setup, _, _, _, _) = MinimalSetup();
     Assert.Throws<ArgumentException>(() => BattleFactory.Start(setup with { Sides = [] }));
   }
 
   [TestCase(TestName = "Start throws when two sides share the same faction reference")]
-  public void StartThrowsOnDuplicateSideFaction()
+  public static void StartThrowsOnDuplicateSideFaction()
   {
     var (setup, player, _, _, _) = MinimalSetup();
     var broken = setup with
@@ -300,7 +302,7 @@ public class BattleFactoryTest
   // --- authored battle type entry -------------------------------------------
 
   [TestCase(TestName = "Type start spawns rosters, places objects, registers declared systems")]
-  public void RequestHappyPath()
+  public static void RequestHappyPath()
   {
     BattleTypeData type = MakeBombDefusalType();
     var bombData = new BattleSpecialObjectData { Name = "Bomb" };
@@ -383,7 +385,7 @@ public class BattleFactoryTest
   }
 
   [TestCase(TestName = "Type start with a single map starts units on the tagged spawn cells")]
-  public void StartTypeHappyPath()
+  public static void StartTypeHappyPath()
   {
     BattleTypeData type = TestData.MakeDuelBattleType();
 
@@ -399,7 +401,7 @@ public class BattleFactoryTest
   }
 
   [TestCase(TestName = "Type start fails when a slot has fewer cells than its roster")]
-  public void StartTypeShortfall()
+  public static void StartTypeShortfall()
   {
     BattleTypeData type = TestData.MakeDuelBattleType();
     type.Factions[0].Roster.Add(new FunProject.Battle.RosterEntryData
@@ -416,7 +418,7 @@ public class BattleFactoryTest
   }
 
   [TestCase(TestName = "Type start fails when a tagged spawn cell is not walkable")]
-  public void StartTypeBlockedSpawnCell()
+  public static void StartTypeBlockedSpawnCell()
   {
     var type = new BattleTypeData { Name = "Blocked" };
     type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(4, 1, 4),
@@ -448,7 +450,7 @@ public class BattleFactoryTest
   }
 
   [TestCase(TestName = "Out-of-range player faction index is a typed failure")]
-  public void BadPlayerFactionIndex()
+  public static void BadPlayerFactionIndex()
   {
     BattleTypeData type = MakeBombDefusalType();
     type.PlayerFactionIndex = 5;
@@ -457,7 +459,7 @@ public class BattleFactoryTest
   }
 
   [TestCase(TestName = "Type start throws on a null battle type")]
-  public void StartTypeThrowsOnNullType()
+  public static void StartTypeThrowsOnNullType()
   {
     Assert.Throws<ArgumentNullException>(() => BattleFactory.Start((BattleTypeData)null!));
   }

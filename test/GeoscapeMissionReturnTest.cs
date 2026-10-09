@@ -7,6 +7,8 @@ using FunProject.Strategic;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 // Campaign mission-return boundary: CompleteMission applies one terminal battle return
 // exactly once — survivor conditions, roster removal of reported deaths, victory-only
 // captures, and consumption of the mission, its pending resolution, and the association —
@@ -70,7 +72,7 @@ public class GeoscapeMissionReturnTest
     roster.AsValueEnumerable().Any(member => ReferenceEquals(member, combatant));
 
   [TestCase(TestName = "A rebuilt session commits mixed campaign effects before notifying the return")]
-  public void RebuiltSessionCommitsAllCampaignEffectsBeforeNotifications()
+  public static void RebuiltSessionCommitsAllCampaignEffectsBeforeNotifications()
   {
     using var campaign = NewMissionCampaign();
     var mission = campaign.ActiveEvent;
@@ -160,7 +162,7 @@ public class GeoscapeMissionReturnTest
   }
 
   [TestCase(TestName = "Defeat return removes dead participants, forgets their records, and keeps their equipment")]
-  public void DefeatReturnRemovesDeadParticipants()
+  public static void DefeatReturnRemovesDeadParticipants()
   {
     using var campaign = NewMissionCampaign();
     var mission = campaign.ActiveEvent;
@@ -207,7 +209,7 @@ public class GeoscapeMissionReturnTest
   }
 
   [TestCase(TestName = "A throwing close subscriber leaves the committed return in place")]
-  public void ThrowingSubscriberPropagatesAfterCommit()
+  public static void ThrowingSubscriberPropagatesAfterCommit()
   {
     using var campaign = NewMissionCampaign();
     var mission = campaign.ActiveEvent;

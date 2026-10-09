@@ -1,6 +1,8 @@
 using Godot;
 using System;
 
+namespace FunProject.Scenes;
+
 // Invisible button shaped by its authored Polygon2D "Fill" child.
 [Tool]
 [GlobalClass]

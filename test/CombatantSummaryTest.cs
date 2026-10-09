@@ -7,6 +7,8 @@ using FunProject.Weapons;
 using Godot;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class CombatantSummaryTest
@@ -36,7 +38,7 @@ public class CombatantSummaryTest
   }
 
   [TestCase(TestName = "Campaign aggregation counts equipment once and stays fresh per gather")]
-  public void CampaignAggregationIsFreshAndCountsEquipmentOnce()
+  public static void CampaignAggregationIsFreshAndCountsEquipmentOnce()
   {
     using var campaign = EquippedSoldierCampaign();
     var combatant = campaign.State.Roster[0];
@@ -53,7 +55,7 @@ public class CombatantSummaryTest
   }
 
   [TestCase(TestName = "StatsText resolves every stat against the supplied contribution set")]
-  public void StatsTextResolvesAllStatsAgainstTheSuppliedSet()
+  public static void StatsTextResolvesAllStatsAgainstTheSuppliedSet()
   {
     using var campaign = EquippedSoldierCampaign();
     var combatant = campaign.State.Roster[0];
@@ -74,7 +76,7 @@ public class CombatantSummaryTest
   }
 
   [TestCase(TestName = "EquipmentText lists weapon, armor, and utility slots; mods optional")]
-  public void EquipmentTextListsSlotsWithOptionalModRows()
+  public static void EquipmentTextListsSlotsWithOptionalModRows()
   {
     using var campaign = EquippedSoldierCampaign();
     var combatant = campaign.State.Roster[0];
@@ -96,7 +98,7 @@ public class CombatantSummaryTest
   }
 
   [TestCase(TestName = "Unequipped slots have explicit empty text on every row")]
-  public void UnequippedSlotsHaveExplicitEmptyText()
+  public static void UnequippedSlotsHaveExplicitEmptyText()
   {
     using var campaign = new GeoscapeFixture(TestData.MakeStart(
       roster: [TestData.MakeEntry("Bare", TestData.MakeCombatantData("Bare"))]));

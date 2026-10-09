@@ -1,5 +1,7 @@
 using Godot;
 
+namespace FunProject.Scenes;
+
 // Pure board <-> world mapping for the presentation layer. Single-level slice: board level Y maps
 // directly to world Y; tile size is 1 and centers sit at (x+0.5, y, z+0.5), matching the board
 // pathgraph's center convention.

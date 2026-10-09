@@ -1,3 +1,4 @@
+using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Combatants;
 using FunProject.GameState;
 using FunProject.Items;
@@ -5,12 +6,14 @@ using FunProject.Stats;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class DebugCampaignTest
 {
   [TestCase]
-  public void AuthoredResearchChainUnlocksPrototypeThenSupply()
+  public static void AuthoredResearchChainUnlocksPrototypeThenSupply()
   {
     var start = GD.Load<CampaignStartData>("res://resources/geoscape/TestCampaign.tres");
     var sample = GD.Load<EquippableItemData>("res://resources/items/workshop_sample.tres");
@@ -38,10 +41,10 @@ public class DebugCampaignTest
   // Content regression guard: pins the authored debug captives — three Alien Raiders
   // grunts beside the untouched four-member roster — against TestCampaign.tres.
   [TestCase]
-  public void DebugCampaignSeedsThreePersistentCaptives()
+  public static void DebugCampaignSeedsThreePersistentCaptives()
   {
     var start = GD.Load<CampaignStartData>("res://resources/geoscape/TestCampaign.tres");
-    var state = new GameState(start);
+    var state = new CampaignGameState(start);
 
     var captives = state.Captivity.Combatants;
     Assert.Equal(3, captives.Count);

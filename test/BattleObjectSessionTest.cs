@@ -5,6 +5,8 @@ using GdUnit4;
 using Godot;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleObjectSessionTest
@@ -17,7 +19,7 @@ public class BattleObjectSessionTest
   }
 
   [TestCase(TestName = "Startup object placement occupies the tile and mints a live proof")]
-  public void PlacementBlocksOccupancy()
+  public static void PlacementBlocksOccupancy()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
@@ -49,7 +51,7 @@ public class BattleObjectSessionTest
   }
 
   [TestCase(TestName = "Start(setup) places objects")]
-  public void StartPlacesObjects()
+  public static void StartPlacesObjects()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");

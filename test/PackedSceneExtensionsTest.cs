@@ -7,6 +7,8 @@ using GdUnit4;
 using static GdUnit4.Assertions;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 // Partial: the suite nests GodotObject-derived test doubles (GD0002).
@@ -15,7 +17,7 @@ public partial class PackedSceneExtensionsTest
   internal sealed partial class ProbeView : Control;
 
   [TestCase(TestName = "A typed root instantiates once, live and unparented")]
-  public async Task TypedRootIsReturnedLiveAndUnparented()
+  public static async Task TypedRootIsReturnedLiveAndUnparented()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var view = Pack(new ProbeView()).InstantiateAs<ProbeView>("Test probe");
@@ -25,7 +27,7 @@ public partial class PackedSceneExtensionsTest
   }
 
   [TestCase(TestName = "A wrong root is freed immediately and throws with role and types")]
-  public async Task WrongRootIsFreedImmediatelyAndThrows()
+  public static async Task WrongRootIsFreedImmediatelyAndThrows()
   {
     await using var cleanup = new DeferredNodeCleanup();
 

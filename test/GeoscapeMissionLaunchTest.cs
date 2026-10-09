@@ -6,6 +6,8 @@ using FunProject.Stats;
 using FunProject.Strategic;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 // Mission selection normalization, startup snapshots, setup failures, and campaign associations.
 // Tests dispose their host-owned runtimes.
 [TestSuite]
@@ -43,7 +45,7 @@ public partial class GeoscapeMissionLaunchTest
   }
 
   [TestCase(TestName = "Unsigned maximum capacity preserves the selected squad")]
-  public void UnsignedCapacityPreservesSelectedSquad()
+  public static void UnsignedCapacityPreservesSelectedSquad()
   {
     using var campaign = NewMissionCampaign(customize: mission =>
       mission.Size.MaxPlayerUnits = uint.MaxValue);
@@ -68,7 +70,7 @@ public partial class GeoscapeMissionLaunchTest
   }
 
   [TestCase(TestName = "Exceptional deployment captures only condition penalties")]
-  public void ExceptionalDeploymentCapturesOnlyConditionPenalties()
+  public static void ExceptionalDeploymentCapturesOnlyConditionPenalties()
   {
     using var campaign = NewMissionCampaign(allowUnfitDeployment: true);
     var active = campaign.ActiveEvent;
@@ -108,7 +110,7 @@ public partial class GeoscapeMissionLaunchTest
   }
 
   [TestCase(TestName = "Launch normalizes and snapshots selection before startup while retaining the pending mission")]
-  public void StartupSelectionMutationKeepsValidatedDeployment()
+  public static void StartupSelectionMutationKeepsValidatedDeployment()
   {
     var mutation = new ScriptedSystemData();
     using var campaign = NewMissionCampaign(customize: mission =>
@@ -167,7 +169,7 @@ public partial class GeoscapeMissionLaunchTest
   }
 
   [TestCase(TestName = "Setup shortfall retains the typed failure and the pending event")]
-  public void SetupShortfallRetainsTypedFailureAndPending()
+  public static void SetupShortfallRetainsTypedFailureAndPending()
   {
     using var campaign = NewMissionCampaign(maxPlayerUnits: 3);
     var active = campaign.ActiveEvent;
@@ -182,7 +184,7 @@ public partial class GeoscapeMissionLaunchTest
   }
 
   [TestCase(TestName = "A throwing initialization propagates without registering a launch")]
-  public void ThrowingInitializationPropagatesWithoutAssociation()
+  public static void ThrowingInitializationPropagatesWithoutAssociation()
   {
     var boom = new InvalidOperationException("Initialization exploded.");
     using var campaign = NewMissionCampaign(customize: mission =>
@@ -208,7 +210,7 @@ public partial class GeoscapeMissionLaunchTest
   }
 
   [TestCase(TestName = "Presentation abort clears only the association and retains the pending mission")]
-  public void AbortMissionPresentationRetainsPendingMission()
+  public static void AbortMissionPresentationRetainsPendingMission()
   {
     using var campaign = NewMissionCampaign();
     var active = campaign.ActiveEvent;

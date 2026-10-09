@@ -21,10 +21,10 @@ public abstract class BattleEntity
   }
 
   /// <summary>Identity of one <see cref="BattleObjectState"/>.</summary>
-  public sealed class Object : BattleEntity
+  public sealed class BoardObject : BattleEntity
   {
     public BattleObjectState State { get; }
-    public Object(BattleObjectState state)
+    public BoardObject(BattleObjectState state)
     {
       ArgumentNullException.ThrowIfNull(state);
       State = state;

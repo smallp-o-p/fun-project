@@ -5,6 +5,8 @@ using FunProject.Stats;
 using FunProject.Strategic;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 // Direct condition-lifecycle tests: CombatantConditionSystem is a scene-independent
 // campaign registry, so these exercise its record mutations directly (fresh system per
 // case, TestData combatants as identities) instead of routing every scenario through a
@@ -29,7 +31,7 @@ public class CombatantConditionsTest
   [TestCase(25L, 99, 2)]
   [TestCase(74L, 99, 3)]
   [TestCase(24L, 96, 2)]
-  public void MissionReturnClassifiesExactDamageRatios(long damage, int maxHealth, int expectedTier)
+  public static void MissionReturnClassifiesExactDamageRatios(long damage, int maxHealth, int expectedTier)
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -45,7 +47,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "An exact 29% threshold classifies 29/100 damage as earned, not drifted")]
-  public void ExactThresholdRatiosClassifyWithoutDivideMultiplyDrift()
+  public static void ExactThresholdRatiosClassifyWithoutDivideMultiplyDrift()
   {
     var rules = RulesWith(InjuryLadder(
       Tier("A", 1, 0f), Tier("B", 1, 29f), Tier("C", 1, 50f), Tier("D", 1, 75f)));
@@ -59,7 +61,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "A one-day tier recovers in exactly 1440 ticks, never 60")]
-  public void OneDayTierConvertsToExactly1440Ticks()
+  public static void OneDayTierConvertsToExactly1440Ticks()
   {
     var rules = RulesWith(InjuryLadder(
       Tier("A", 1, 0f), Tier("B", 1, 25f), Tier("C", 1, 50f), Tier("D", 1, 75f)));
@@ -77,7 +79,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "Each mission return adds its earned tiers, capped at the last authored tier")]
-  public void EachMissionReturnAddsItsEarnedTiersCappedAtTheLastAuthoredTier()
+  public static void EachMissionReturnAddsItsEarnedTiersCappedAtTheLastAuthoredTier()
   {
     // A five-rung ladder whose top rung sits at 90%: the cap comes from the data, so a
     // third heavy return clamps at position 5 instead of the default ladder's 4.
@@ -98,7 +100,7 @@ public class CombatantConditionsTest
   [TestCase(10, 10, 1, 2, 8700L)]
   [TestCase(25, 25, 2, 4, 43260L)]
   [TestCase(10, 0, 1, 1, 5760L)]
-  public void RepeatedReturnsAccumulateOrPreserveInjury(
+  public static void RepeatedReturnsAccumulateOrPreserveInjury(
     int firstDamage, int secondDamage, int firstTier, int expectedTier, long expectedDeadline)
   {
     var unit = Unit();
@@ -115,7 +117,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "Damage after partial recovery adds onto the recovered level")]
-  public void DamageAfterPartialRecoveryAddsOntoCurrentLevel()
+  public static void DamageAfterPartialRecoveryAddsOntoCurrentLevel()
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -129,7 +131,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "An exhausted return resets its own 11520-tick fatigue deadline")]
-  public void ExhaustedReturnResetsItsFatigueDeadline()
+  public static void ExhaustedReturnResetsItsFatigueDeadline()
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -148,7 +150,7 @@ public class CombatantConditionsTest
   // below runs only in the 43200 case.
   [TestCase(43200L)]
   [TestCase(50000L)]
-  public void CriticalInjuryRecoveryPreservesChainedDeadlines(long firstRecoveryTick)
+  public static void CriticalInjuryRecoveryPreservesChainedDeadlines(long firstRecoveryTick)
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -187,7 +189,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "Fatigue recovers through its 1440/5760/11520 chain")]
-  public void FatigueRecoversThroughItsChain()
+  public static void FatigueRecoversThroughItsChain()
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -209,7 +211,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "Recovery on an already-healthy subject is a no-op")]
-  public void RecoveryOnHealthySubjectIsANoOp()
+  public static void RecoveryOnHealthySubjectIsANoOp()
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -219,7 +221,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "Condition names follow the current tiers and clear at position 0")]
-  public void NamesFollowCurrentTiers()
+  public static void NamesFollowCurrentTiers()
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -235,7 +237,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "One late recovery call settles both conditions concurrently")]
-  public void LateRecoverySettlesBothConditionsConcurrently()
+  public static void LateRecoverySettlesBothConditionsConcurrently()
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -252,7 +254,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "Damage taken after a full recovery starts a fresh injury")]
-  public void DamageAfterFullRecoveryStartsFresh()
+  public static void DamageAfterFullRecoveryStartsFresh()
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -264,7 +266,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "Fatigue modifiers follow the fatigue tiers and clear when rested")]
-  public void FatigueModifiersFollowFatigueTiers()
+  public static void FatigueModifiersFollowFatigueTiers()
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -278,7 +280,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "A fresh combatant's stats are unchanged by conditions")]
-  public void FreshStatsAreUnchanged()
+  public static void FreshStatsAreUnchanged()
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -294,7 +296,7 @@ public class CombatantConditionsTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public void ActiveInjuryFloorsOneHealthCombatant(bool authoredWithoutCaps)
+  public static void ActiveInjuryFloorsOneHealthCombatant(bool authoredWithoutCaps)
   {
     CombatantConditionRulesData? rules = null;
     if (authoredWithoutCaps)
@@ -324,7 +326,7 @@ public class CombatantConditionsTest
 
   [TestCase(0)]
   [TestCase(2)]
-  public void CriticalInjuryStatsComposeWithFatigue(int priorReturns)
+  public static void CriticalInjuryStatsComposeWithFatigue(int priorReturns)
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -344,7 +346,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "Authored condition rules customize names, durations, and mods")]
-  public void AuthoredRulesCustomizeNamesDurationsAndMods()
+  public static void AuthoredRulesCustomizeNamesDurationsAndMods()
   {
     var rules = new CombatantConditionRulesData
     {
@@ -374,7 +376,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "Combatants in one system keep independent condition records")]
-  public void CombatantsInOneSystemHaveIndependentRecords()
+  public static void CombatantsInOneSystemHaveIndependentRecords()
   {
     var faction = TestData.MakeFaction("Player");
     var first = TestData.MakeCombatant("Alpha", faction, health: 100);
@@ -388,7 +390,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "Malformed condition rules are rejected by the rules resource")]
-  public void MalformedRulesAreRejectedByTheRulesResource()
+  public static void MalformedRulesAreRejectedByTheRulesResource()
   {
     static CombatantConditionRulesData WithNullMod()
     {
@@ -412,7 +414,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "Deadline overflow throws and leaves the current record unchanged")]
-  public void DeadlineOverflowLeavesRecordUnchanged()
+  public static void DeadlineOverflowLeavesRecordUnchanged()
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
@@ -427,7 +429,7 @@ public class CombatantConditionsTest
   }
 
   [TestCase(TestName = "CanDeploy gates on injury and exhaustion; the flag overrides both")]
-  public void CanDeployGatesOnInjuryAndExhaustion()
+  public static void CanDeployGatesOnInjuryAndExhaustion()
   {
     // Positions 0..4 across the default four-rung injury ladder and 0..3 across the
     // three-rung fatigue ladder, driven by the authored array counts.

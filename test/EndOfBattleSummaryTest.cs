@@ -3,12 +3,14 @@ using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class EndOfBattleSummaryTest
 {
   [TestCase]
-  public void CapturesAreAvailableBeforeSessionEndedIsBroadcast()
+  public static void CapturesAreAvailableBeforeSessionEndedIsBroadcast()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     int endedEvents = 0;
@@ -28,7 +30,7 @@ public class EndOfBattleSummaryTest
   }
 
   [TestCase]
-  public void CapturedMembershipIsFrozenAtTheFirstEndBattle()
+  public static void CapturedMembershipIsFrozenAtTheFirstEndBattle()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
@@ -45,7 +47,7 @@ public class EndOfBattleSummaryTest
   }
 
   [TestCase]
-  public void OnlyTheDesignatedPlayerSummaryReceivesVictoryCaptures()
+  public static void OnlyTheDesignatedPlayerSummaryReceivesVictoryCaptures()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.ApplyDamage(battle.EnemyUnit, 20, DamageKind.Stun);
@@ -59,7 +61,7 @@ public class EndOfBattleSummaryTest
   }
 
   [TestCase]
-  public void UnconsciousParticipantsRemainPresentAndAliveInHealthBasedSummaries()
+  public static void UnconsciousParticipantsRemainPresentAndAliveInHealthBasedSummaries()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     var support = battle.Spawn(TestData.MakeCombatant("Support", battle.PlayerFaction), new Vector3I(0, 0, 0));
@@ -80,7 +82,7 @@ public class EndOfBattleSummaryTest
   }
 
   [TestCase(TestName = "Summaries carry per-combatant health reports")]
-  public void SummaryCarriesHealthReports()
+  public static void SummaryCarriesHealthReports()
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
     battle.ApplyDamage(battle.PlayerUnit, 3);
@@ -97,7 +99,7 @@ public class EndOfBattleSummaryTest
   }
 
   [TestCase(TestName = "The summary query fails while the battle has not ended")]
-  public void SummaryQueryFailsWhileBattleInProgress()
+  public static void SummaryQueryFailsWhileBattleInProgress()
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(5, 1, 5),
@@ -110,7 +112,7 @@ public class EndOfBattleSummaryTest
   }
 
   [TestCase(TestName = "A victory summary tallies kills per combatant and faction-filtered dead and wounded")]
-  public void VictorySummaryTalliesKillsDeadAndWounded()
+  public static void VictorySummaryTalliesKillsDeadAndWounded()
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(8, 1, 8),
@@ -143,7 +145,7 @@ public class EndOfBattleSummaryTest
   }
 
   [TestCase(TestName = "A defeat summary excludes enemy wounded and the enemy summary attributes its kill")]
-  public void DefeatSummaryFiltersByFactionAndAttributesEnemyKill()
+  public static void DefeatSummaryFiltersByFactionAndAttributesEnemyKill()
   {
     using var battle = BattleFixture.Duel(
       dimensions: new Vector3I(8, 1, 8),

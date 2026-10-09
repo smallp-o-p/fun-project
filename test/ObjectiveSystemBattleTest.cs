@@ -4,6 +4,8 @@ using GdUnit4;
 using Godot;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ObjectiveSystemBattleTest
@@ -29,7 +31,7 @@ public class ObjectiveSystemBattleTest
       PlayerFaction: Some(player)));
 
   [TestCase(TestName = "Objectives added after executor construction are read from session state")]
-  public void PostExecutorObjectivesAreReadFromSessionState()
+  public static void PostExecutorObjectivesAreReadFromSessionState()
   {
     var a = TestData.MakeFaction("A");
     var b = TestData.MakeFaction("B");
@@ -45,7 +47,7 @@ public class ObjectiveSystemBattleTest
   }
 
   [TestCase(TestName = "AddObjective raises an ObjectiveAdded event")]
-  public void AddObjectiveRaisesEvent()
+  public static void AddObjectiveRaisesEvent()
   {
     var a = TestData.MakeFaction("A");
     using var battle = SoloFixture(a, new FakeObjectiveData());
@@ -57,7 +59,7 @@ public class ObjectiveSystemBattleTest
   }
 
   [TestCase(TestName = "An objective is only checked against events it observes")]
-  public void ObjectivesAreOnlyCheckedAgainstObservedEvents()
+  public static void ObjectivesAreOnlyCheckedAgainstObservedEvents()
   {
     var a = TestData.MakeFaction("A");
     using var battle = SoloFixture(a, new EliminateAllOpposingForcesObjectiveData());
@@ -74,7 +76,7 @@ public class ObjectiveSystemBattleTest
   }
 
   [TestCase(TestName = "A queued follow-up is visible starting with the next event")]
-  public void QueuedFollowUpRoutesFromNextEvent()
+  public static void QueuedFollowUpRoutesFromNextEvent()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -115,7 +117,7 @@ public class ObjectiveSystemBattleTest
 
   [TestCase(false, TestName = "Flips resolve in add order and the first EndBattle wins")]
   [TestCase(true, TestName = "Add order wins across concrete and interface observed keys")]
-  public void AddOrderWinsAcrossObservedKeyBuckets(bool interfaceKey)
+  public static void AddOrderWinsAcrossObservedKeyBuckets(bool interfaceKey)
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -150,7 +152,7 @@ public class ObjectiveSystemBattleTest
   }
 
   [TestCase(TestName = "GetObjectivesForFaction returns the faction's objectives")]
-  public void QueryReturnsObjectives()
+  public static void QueryReturnsObjectives()
   {
     var a = TestData.MakeFaction("A");
     using var battle = SoloFixture(a, new FakeObjectiveData());

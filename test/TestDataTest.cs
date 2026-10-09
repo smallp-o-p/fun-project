@@ -8,7 +8,7 @@ namespace FunProject.Tests;
 public partial class TestDataTest
 {
   [TestCase]
-  public void DefaultResourceGraphsHaveIndependentRankTables()
+  public static void DefaultResourceGraphsHaveIndependentRankTables()
   {
     var first = TestData.MakeCombatantData();
     var second = TestData.MakeCombatantData();

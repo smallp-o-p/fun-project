@@ -1,6 +1,8 @@
 using Godot;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 [Tool]
 public partial class MovementLine : MeshInstance3D
 {

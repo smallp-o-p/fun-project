@@ -14,7 +14,7 @@ namespace FunProject.Tests;
 public class ResearchStateTest
 {
   [TestCase]
-  public void CompletionMarksProjectWithoutApplyingManufacturingEffects()
+  public static void CompletionMarksProjectWithoutApplyingManufacturingEffects()
   {
     var item = MakeItemData();
     var itemRecipe = MakeManufacturingRecipe(item);
@@ -38,7 +38,7 @@ public class ResearchStateTest
   }
 
   [TestCase]
-  public void CatalogAndCapturedOutputsPreserveIdentityAndImmutableMembership()
+  public static void CatalogAndCapturedOutputsPreserveIdentityAndImmutableMembership()
   {
     var item = MakeItemData();
     var itemRecipe = MakeManufacturingRecipe(item);
@@ -73,7 +73,7 @@ public class ResearchStateTest
   }
 
   [TestCase]
-  public void EmptyCatalogWorksAndMalformedCatalogsFailConstruction()
+  public static void EmptyCatalogWorksAndMalformedCatalogsFailConstruction()
   {
     using var empty = new GeoscapeFixture();
     Assert.Equal(0, empty.State.Research.Projects.Count);
@@ -92,6 +92,6 @@ public class ResearchStateTest
       MakeStart(researchProjects: [noOutputs]),
     ];
     foreach (var start in invalid)
-      Assert.Throws<ArgumentNullException>(() => new CampaignGameState(start));
+      Assert.Throws<ArgumentNullException>(() => _ = new CampaignGameState(start));
   }
 }

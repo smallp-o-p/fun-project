@@ -4,12 +4,14 @@ using GdUnit4;
 using Godot;
 using System;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleResultTest
 {
   [TestCase(TestName = "Result query rejects an in-progress battle")]
-  public void RejectsInProgress()
+  public static void RejectsInProgress()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");
@@ -21,7 +23,7 @@ public class BattleResultTest
   }
 
   [TestCase(TestName = "Ended battle reports outcome, counts, and object tallies")]
-  public void EndedBattleCounts()
+  public static void EndedBattleCounts()
   {
     var player = TestData.MakeFaction("P");
     var enemy = TestData.MakeFaction("E");

@@ -2,6 +2,8 @@ using FunProject.Battle;
 using FunProject.Items.Effects;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleObjectTest
@@ -19,7 +21,7 @@ public class BattleObjectTest
   }
 
   [TestCase(TestName = "State exposes data name and finds capabilities")]
-  public void StateExposesDataAndCapabilities()
+  public static void StateExposesDataAndCapabilities()
   {
     var state = new BattleObjectState(-1, MakeBombData(), new Vector3I(0, 0, 0));
 
@@ -33,18 +35,18 @@ public class BattleObjectTest
   }
 
   [TestCase(TestName = "Duplicate capability kinds are rejected at construction")]
-  public void DuplicateCapabilityThrows()
+  public static void DuplicateCapabilityThrows()
   {
     var data = new BattleSpecialObjectData { Name = "Broken" };
     data.Capabilities.Add(new InteractiveCapabilityData());
     data.Capabilities.Add(new InteractiveCapabilityData());
 
     Assert.Throws<System.InvalidOperationException>(
-      () => new BattleObjectState(-1, data, new Vector3I(0, 0, 0)));
+      () => _ = new BattleObjectState(-1, data, new Vector3I(0, 0, 0)));
   }
 
   [TestCase(TestName = "Timed effect runtime clamps non-positive radius and copies effects")]
-  public void ElapsedTriggerRuntimeShape()
+  public static void ElapsedTriggerRuntimeShape()
   {
     var data = new TimedEffectCapabilityData
     {

@@ -12,7 +12,7 @@ enum FactionStanding
   Hostile
 };
 
-public class Faction : HasNameAndDescription
+public class Faction : IHasNameAndDescription
 {
   public string Name { get; set; } = "Faction";
   public string Description { get; set; } = "Faction Description";

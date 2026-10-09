@@ -5,6 +5,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleHookTest
@@ -57,7 +59,7 @@ public partial class BattleHookTest
   }
 
   [TestCase(TestName = "Hook registered for a concrete event type receives only that event")]
-  public void HookReceivesOnlyItsConcreteEvent()
+  public static void HookReceivesOnlyItsConcreteEvent()
   {
     var faction = TestData.MakeFaction("Player");
     var turnStartedListener = new RecordingHook();
@@ -82,7 +84,7 @@ public partial class BattleHookTest
   }
 
   [TestCase(TestName = "Hook registered for a marker interface receives implementing events")]
-  public void HookReceivesMarkerInterfaceEvents()
+  public static void HookReceivesMarkerInterfaceEvents()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0));
     var unitEventsListener = new RecordingHook();
@@ -94,7 +96,7 @@ public partial class BattleHookTest
   }
 
   [TestCase(TestName = "A hook registered under the root event tag receives every committed event")]
-  public void RootTagRegistrationReceivesEveryCommittedEvent()
+  public static void RootTagRegistrationReceivesEveryCommittedEvent()
   {
     var faction = TestData.MakeFaction("Player");
     var catchAll = new RecordingHook();
@@ -105,7 +107,7 @@ public partial class BattleHookTest
       Seed: 7) with
     {
       Systems = [new SetupSystemData { OnRegister = runtime =>
-        runtime.RegisterHook<BattleEventTag>(catchAll) }]
+        runtime.RegisterHook<IBattleEventTag>(catchAll) }]
     };
     using var battle = new BattleFixture(setup);
 
@@ -119,7 +121,7 @@ public partial class BattleHookTest
   }
 
   [TestCase(TestName = "Hook firing order follows priority then registration across different event keys")]
-  public void PriorityThenRegistrationOrderHoldsAcrossDifferentEventKeys()
+  public static void PriorityThenRegistrationOrderHoldsAcrossDifferentEventKeys()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0));
     var log = new List<string>();
@@ -133,7 +135,7 @@ public partial class BattleHookTest
   }
 
   [TestCase(TestName = "A hook registered under concrete and interface keys fires once for one event")]
-  public void OneHookRegisteredUnderMultipleMatchingKeysFiresOnce()
+  public static void OneHookRegisteredUnderMultipleMatchingKeysFiresOnce()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(1, 0, 1));
     var unit = battle.Unit;
@@ -147,7 +149,7 @@ public partial class BattleHookTest
   }
 
   [TestCase(TestName = "Event raised by a hook dispatches after the current event and reaches other hooks")]
-  public void HookRaisedEventDispatchesAfterCurrentEvent()
+  public static void HookRaisedEventDispatchesAfterCurrentEvent()
   {
     var faction = TestData.MakeFaction("Player");
     var hook = new CountingHook();
@@ -191,7 +193,7 @@ public partial class BattleHookTest
   }
 
   [TestCase(TestName = "A throwing hook propagates out of Submit and clears undispatched events")]
-  public void ThrowingHookPropagatesAndClearsQueue()
+  public static void ThrowingHookPropagatesAndClearsQueue()
   {
     var faction = TestData.MakeFaction("Player");
     var setup = new BattleSetup(
@@ -232,7 +234,7 @@ public partial class BattleHookTest
   }
 
   [TestCase(TestName = "A hook returning interrupts outside an executor action throws")]
-  public void InterruptsOutsideExecutorActionThrow()
+  public static void InterruptsOutsideExecutorActionThrow()
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
     var unit = battle.Unit;
@@ -258,7 +260,7 @@ public partial class BattleHookTest
   }
 
   [TestCase(TestName = "Hooks receive the in-flight action as SourceAction during executor dispatches")]
-  public void HooksReceiveSourceActionInsideExecutorDispatch()
+  public static void HooksReceiveSourceActionInsideExecutorDispatch()
   {
     using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(1, 0, 1));
     var unit = battle.Unit;
@@ -274,7 +276,7 @@ public partial class BattleHookTest
 
   [TestCase(false, TestName = "One-shot hook retires itself by signalling NeedsToUnregister")]
   [TestCase(true, TestName = "A retired one-shot hook is removed from every key it was registered under")]
-  public void OneShotRetiresAcrossRegisteredKeys(bool multipleKeys)
+  public static void OneShotRetiresAcrossRegisteredKeys(bool multipleKeys)
   {
     using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0));
 

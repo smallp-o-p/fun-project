@@ -31,6 +31,8 @@ namespace FunProject.Tests;
 // tables are built per graph instead of sharing a mutable ladder.
 internal static class TestData
 {
+  private static readonly string[] WardrobeVariantNames = ["outfit0", "outfit1"];
+
   // Hermetic default for test-built combatants: test data carries its own ladder instead
   // of sharing the mutable res://resources/ranks.tres table across graphs. Three full-factor
   // rungs so gains accrue without immediately hitting max.
@@ -888,7 +890,7 @@ internal static class TestData
   // One imported component with a garment and body mask rule per outfit.
   public static ModelWardrobeConfiguration MakeWardrobeConfiguration()
     => ImportedResource<ModelWardrobeConfiguration>(
-      ("_variants", new string[] { "outfit0", "outfit1" }),
+      ("_variants", WardrobeVariantNames),
       ("_components", new Godot.Collections.Dictionary<string, ModelWardrobeComponent>
       {
         ["Garment"] = Component(Piece("GarmentA", 0), Piece("GarmentB", 1)),
@@ -902,7 +904,7 @@ internal static class TestData
   // OR their contributions rather than allowing the last rule to win.
   public static ModelWardrobeConfiguration MakeOverlappingWardrobeConfiguration()
     => ImportedResource<ModelWardrobeConfiguration>(
-      ("_variants", new string[] { "outfit0", "outfit1" }),
+      ("_variants", WardrobeVariantNames),
       ("_components", new Godot.Collections.Dictionary<string, ModelWardrobeComponent>
       {
         ["shirt"] = Component(Piece("GarmentA")),

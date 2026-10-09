@@ -5,6 +5,8 @@ using System;
 using FunProject.Geoscape;
 using FunProject.Scenes.Ext;
 
+namespace FunProject.Scenes;
+
 /// <summary>
 /// Modal dialog to resolve a GeoscapeEvent that needs addressing.
 /// </summary>

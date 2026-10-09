@@ -4,12 +4,14 @@ using FunProject.Battle;
 using FunProject.Weapons;
 using GdUnit4;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class StunBattleTest
 {
   [TestCase]
-  public void UnconsciousUnitsRetainTheirBoardOccupancy()
+  public static void UnconsciousUnitsRetainTheirBoardOccupancy()
   {
     using var battle = BattleFixture.Duel();
     var point = battle.Alive(battle.EnemyUnit).Position;
@@ -21,7 +23,7 @@ public partial class StunBattleTest
   }
 
   [TestCase]
-  public void OnlyNewTransitionsEmitUnconsciousOrKilledEvents()
+  public static void OnlyNewTransitionsEmitUnconsciousOrKilledEvents()
   {
     using var battle = BattleFixture.Duel();
     battle.ClearEvents();
@@ -37,7 +39,7 @@ public partial class StunBattleTest
   [TestCase(19, false)]
   [TestCase(20, true)]
   [TestCase(21, true)]
-  public void StunThresholdUsesCurrentHealth(int stun, bool unconscious)
+  public static void StunThresholdUsesCurrentHealth(int stun, bool unconscious)
   {
     using var battle = BattleFixture.Duel();
 
@@ -48,7 +50,7 @@ public partial class StunBattleTest
   }
 
   [TestCase]
-  public void HealthDamageCanCrossTheStunThreshold()
+  public static void HealthDamageCanCrossTheStunThreshold()
   {
     using var battle = BattleFixture.Duel();
     battle.ApplyDamage(battle.EnemyUnit, 10, DamageKind.Stun);
@@ -62,7 +64,7 @@ public partial class StunBattleTest
   }
 
   [TestCase]
-  public void LethalMixedAttackEmitsKilledOnly()
+  public static void LethalMixedAttackEmitsKilledOnly()
   {
     using var battle = BattleFixture.Duel(
       hitChanceCalculator: new AlwaysHitCalculator(),
@@ -79,7 +81,7 @@ public partial class StunBattleTest
   }
 
   [TestCase]
-  public void KnockoutEventCarriesTheUnitPositionAndAttacker()
+  public static void KnockoutEventCarriesTheUnitPositionAndAttacker()
   {
     using var battle = BattleFixture.Duel(
       hitChanceCalculator: new AlwaysHitCalculator(),
@@ -96,15 +98,15 @@ public partial class StunBattleTest
   }
 
   [TestCase]
-  public void KilledAndUnconsciousEventsRejectNullUnit()
+  public static void KilledAndUnconsciousEventsRejectNullUnit()
   {
     using var battle = BattleFixture.Duel();
-    Assert.Throws<ArgumentNullException>(() => new UnitKilledBattleEvent(null, battle.At(0, 0, 0), None));
-    Assert.Throws<ArgumentNullException>(() => new UnitUnconsciousBattleEvent(null, battle.At(0, 0, 0), None));
+    Assert.Throws<ArgumentNullException>(() => _ = new UnitKilledBattleEvent(null, battle.At(0, 0, 0), None));
+    Assert.Throws<ArgumentNullException>(() => _ = new UnitUnconsciousBattleEvent(null, battle.At(0, 0, 0), None));
   }
 
   [TestCase]
-  public void StunAttacksBypassArmorAndHealth()
+  public static void StunAttacksBypassArmorAndHealth()
   {
     var armor = TestData.MakeArmor("Plating", armor: 10);
     using var battle = BattleFixture.Duel(
@@ -120,7 +122,7 @@ public partial class StunBattleTest
   }
 
   [TestCase]
-  public void KnockingOutAnAvailableUnitConsumesItsActivation()
+  public static void KnockingOutAnAvailableUnitConsumesItsActivation()
   {
     using var battle = BattleFixture.Duel();
     Assert.True(battle.Query(new IsUnitStillAvailableThisTurn(battle.PlayerUnit)));
@@ -131,7 +133,7 @@ public partial class StunBattleTest
   }
 
   [TestCase]
-  public void StunRejectsNegativeAmountsAndOverflowWithoutWrapping()
+  public static void StunRejectsNegativeAmountsAndOverflowWithoutWrapping()
   {
     using var battle = BattleFixture.Duel();
     Assert.Throws<ArgumentOutOfRangeException>(() => battle.EnemyUnit.ReceiveStun(-1));

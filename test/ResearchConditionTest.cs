@@ -11,7 +11,7 @@ namespace FunProject.Tests;
 public class ResearchConditionTest
 {
   [TestCase]
-  public void LogicalConditionsHaveExplicitEmptyAndShortCircuitSemantics()
+  public static void LogicalConditionsHaveExplicitEmptyAndShortCircuitSemantics()
   {
     using var campaign = new GeoscapeFixture();
     var yes = new AlwaysResearchCondition();
@@ -30,16 +30,16 @@ public class ResearchConditionTest
   }
 
   [TestCase]
-  public void AuthoringRejectsNullsAndCyclesButAllowsSharedChildren()
+  public static void AuthoringRejectsNullsAndCyclesButAllowsSharedChildren()
   {
     var self = new AllResearchConditions();
     self.Children = [self];
     var left = new NotResearchCondition { Child = new AlwaysResearchCondition() };
     var right = new AnyResearchConditions { Children = [left] };
     left.Child = right;
-    Assert.Throws<InvalidOperationException>(() => new CampaignGameState(MakeStart(
+    Assert.Throws<InvalidOperationException>(() => _ = new CampaignGameState(MakeStart(
       researchProjects: [MakeResearch(condition: self)])));
-    Assert.Throws<InvalidOperationException>(() => new CampaignGameState(MakeStart(
+    Assert.Throws<InvalidOperationException>(() => _ = new CampaignGameState(MakeStart(
       researchProjects: [MakeResearch(condition: left)])));
     ResearchCondition[] invalid = [
       new AllResearchConditions { Children = null },
@@ -48,7 +48,7 @@ public class ResearchConditionTest
       new ResearchCompletedCondition { Project = null },
     ];
     foreach (var condition in invalid)
-      Assert.Throws<ArgumentNullException>(() => new CampaignGameState(MakeStart(
+      Assert.Throws<ArgumentNullException>(() => _ = new CampaignGameState(MakeStart(
         researchProjects: [MakeResearch(condition: condition)])));
     var shared = new AlwaysResearchCondition();
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [MakeResearch(
@@ -57,7 +57,7 @@ public class ResearchConditionTest
   }
 
   [TestCase]
-  public void CompletionPrerequisiteReadsTheSuppliedCampaignAndDoesNotRecurse()
+  public static void CompletionPrerequisiteReadsTheSuppliedCampaignAndDoesNotRecurse()
   {
     var first = MakeResearch("First");
     var second = MakeResearch("Second", condition: new ResearchCompletedCondition { Project = first });

@@ -5,12 +5,14 @@ using FunProject.Weapons;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public partial class BattleCombatQueriesTest
 {
   [TestCase(TestName = "Hit chance preview matches the breakdown the attack resolves with")]
-  public void HitChancePreviewMatchesResolution()
+  public static void HitChancePreviewMatchesResolution()
   {
     List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
     for (int x = 0; x < 8; x++)
@@ -43,7 +45,7 @@ public partial class BattleCombatQueriesTest
   }
 
   [TestCase(TestName = "GetHitChanceForAttack ignores turn order")]
-  public void GetHitChanceForAttackIgnoresTurnOrder()
+  public static void GetHitChanceForAttackIgnoresTurnOrder()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -71,7 +73,7 @@ public partial class BattleCombatQueriesTest
   }
 
   [TestCase(TestName = "GetHitChanceForAttack fails when the odds are undefined")]
-  public void GetHitChanceForAttackFailsWhenTheOddsAreUndefined()
+  public static void GetHitChanceForAttackFailsWhenTheOddsAreUndefined()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -112,7 +114,7 @@ public partial class BattleCombatQueriesTest
   }
 
   [TestCase(TestName = "Unconscious targets still allow hit chance previews")]
-  public void UnconsciousTargetsStillAllowHitChancePreviews()
+  public static void UnconsciousTargetsStillAllowHitChancePreviews()
   {
     using var battle = BattleFixture.Duel(
       player: new("Alpha", Weapon: TestData.MakeAmmoWeapon("Rifle")));
@@ -123,7 +125,7 @@ public partial class BattleCombatQueriesTest
   }
 
   [TestCase(TestName = "Hit chance preview ignores action points and phase availability")]
-  public void HitChancePreviewIgnoresActionPointAndPhaseAvailability()
+  public static void HitChancePreviewIgnoresActionPointAndPhaseAvailability()
   {
     using var battle = BattleFixture.Duel(
       player: new("Alpha", Weapon: TestData.MakeAmmoWeapon("Rifle")));

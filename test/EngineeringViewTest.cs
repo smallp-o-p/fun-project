@@ -4,6 +4,8 @@ using GdUnit4;
 using Godot;
 using static FunProject.Tests.GeoscapeTestScenes;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class EngineeringViewTest
@@ -11,7 +13,7 @@ public class EngineeringViewTest
   [TestCase(800, 600)]
   [TestCase(1280, 720)]
   [TestCase(1920, 1080)]
-  public async Task WorkshopCatalogAndInspectorFitWithoutHidingActions(int width, int height)
+  public static async Task WorkshopCatalogAndInspectorFitWithoutHidingActions(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
     using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [MakeManufacturingRecipe(MakeItemData())]));
@@ -37,7 +39,7 @@ public class EngineeringViewTest
 
   [TestCase(800, 600)]
   [TestCase(1600, 900)]
-  public async Task LongDescriptionScrollsWhileManufactureAndBackStayReachable(int width, int height)
+  public static async Task LongDescriptionScrollsWhileManufactureAndBackStayReachable(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var currency = MakeCurrency("A currency with a deliberately long descriptive name for campaign production budgets");
@@ -61,7 +63,7 @@ public class EngineeringViewTest
     Assert.True(visible.Encloses(ScreenRect(back)));
     var scroll = view.GetNode<ScrollContainer>("Content/Margin/Layout/Body/Details/DetailsScroll");
     Assert.True(scroll.ClipContents);
-    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(ulong.MaxValue.ToString()));
+    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(ulong.MaxValue.ToString(System.Globalization.CultureInfo.CurrentCulture)));
     Assert.True(view.GetNode<Label>("%CurrencyCosts").Size.X <= scroll.Size.X);
     Assert.True(scroll.GetVScrollBar().MaxValue > scroll.GetVScrollBar().Page);
     var actionRect = ScreenRect(action);
@@ -81,7 +83,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public void EmptyCatalogExplainsNoOptionsWithoutSelectableRows()
+  public static void EmptyCatalogExplainsNoOptionsWithoutSelectableRows()
   {
     using var campaign = new GeoscapeFixture(MakeStart());
     var view = AddToTree(CreateEngineeringView());
@@ -95,7 +97,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public void SelectingRowsDisplaysRecipeDurationAndScarceStockInCatalogOrder()
+  public static void SelectingRowsDisplaysRecipeDurationAndScarceStockInCatalogOrder()
   {
     var first = MakeItemData("Field scanner");
     var firstRecipe = MakeManufacturingRecipe(first, days: 1);
@@ -128,7 +130,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public async Task ActiveJobDisablesExistingAndNewSelectionAndIgnoresProgrammaticSignal()
+  public static async Task ActiveJobDisablesExistingAndNewSelectionAndIgnoresProgrammaticSignal()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var first = MakeItemData("Scanner");
@@ -160,7 +162,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public async Task ActiveRemainingTimeUsesSuppliedTickAndClampsElapsedCompletion()
+  public static async Task ActiveRemainingTimeUsesSuppliedTickAndClampsElapsedCompletion()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var item = MakeItemData("Field scanner");
@@ -179,7 +181,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public async Task PresentPreservesRecipeIdentityAcrossReorderingAndRefreshesParsedEntry()
+  public static async Task PresentPreservesRecipeIdentityAcrossReorderingAndRefreshesParsedEntry()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var first = MakeItemData("First");
@@ -210,7 +212,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public async Task PresentClearsStaleSelectionWhenReplacementProducesSameItem()
+  public static async Task PresentClearsStaleSelectionWhenReplacementProducesSameItem()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var item = MakeItemData("Scanner");
@@ -237,7 +239,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public async Task ActivatedUnlimitedItemDisappearsAndClearsSelectionWhileOtherItemsRemain()
+  public static async Task ActivatedUnlimitedItemDisappearsAndClearsSelectionWhileOtherItemsRemain()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var supply = MakeItemData("Supply", unlimited: true);
@@ -271,7 +273,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public async Task RepeatedPresentReplacesRowsAndStartsOneJobPerRequest()
+  public static async Task RepeatedPresentReplacesRowsAndStartsOneJobPerRequest()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var item = MakeItemData();
@@ -301,7 +303,7 @@ public class EngineeringViewTest
   }
 
   [TestCase]
-  public void FailureExplainsRejectionAndNextPresentClearsIt()
+  public static void FailureExplainsRejectionAndNextPresentClearsIt()
   {
     var view = AddToTree(CreateEngineeringView());
     var item = MakeItemData("Selected item");

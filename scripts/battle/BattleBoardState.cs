@@ -9,7 +9,7 @@ public sealed class BattleBoardState
 {
   public readonly struct ValidatedPoint : IEquatable<ValidatedPoint>
   {
-    public readonly Vector3I Raw;
+    public Vector3I Raw { get; }
     public int X => Raw.X;
     public int Y => Raw.Y;
     public int Z => Raw.Z;

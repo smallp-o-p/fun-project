@@ -3,6 +3,8 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Scenes;
+
 [Tool]
 public partial class BattleMapAuthoring : BattleMap
 {
@@ -70,6 +72,9 @@ public partial class BattleMapAuthoring : BattleMap
     finally { exported.Free(); }
   }
 
+#if !TOOLS
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "The editor-only body uses this authoring node; export builds compile that body out. Preserve the same instance helper in both configurations.")]
+#endif
   private void MarkUnsaved()
   {
 #if TOOLS

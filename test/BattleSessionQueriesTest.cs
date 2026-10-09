@@ -4,6 +4,8 @@ using GdUnit4;
 using Godot;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleSessionQueriesTest
@@ -41,7 +43,7 @@ public class BattleSessionQueriesTest
   }
 
   [TestCase(TestName = "FindPathForUnit returns a successful path result")]
-  public void FindPathForUnitReturnsASuccessfulPathResult()
+  public static void FindPathForUnitReturnsASuccessfulPathResult()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(SoloSetup(faction, "Runner", new Vector3I(0, 0, 0)));
@@ -57,7 +59,7 @@ public class BattleSessionQueriesTest
 
   [TestCase(1, TestName = "GetUnitAtTile returns the unit occupying a tile")]
   [TestCase(2, TestName = "GetUnitAtTile returns None for an empty tile")]
-  public void GetUnitAtTileReturnsOccupantOrNone(int x)
+  public static void GetUnitAtTileReturnsOccupantOrNone(int x)
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(SoloSetup(faction, "Runner", new Vector3I(1, 0, 0)));
@@ -71,7 +73,7 @@ public class BattleSessionQueriesTest
   }
 
   [TestCase(TestName = "GetPossibleMoveTilesForUnit respects action points")]
-  public void GetPossibleMoveTilesForUnitRespectsActionPoints()
+  public static void GetPossibleMoveTilesForUnitRespectsActionPoints()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(SoloSetup(faction, "Runner", new Vector3I(0, 0, 0), actionPoints: 2));
@@ -86,7 +88,7 @@ public class BattleSessionQueriesTest
   }
 
   [TestCase(TestName = "GetPossibleMoveTilesForUnit does not include unreachable tiles inside movement range")]
-  public void GetPossibleMoveTilesForUnitDoesNotIncludeUnreachableTilesInsideMovementRange()
+  public static void GetPossibleMoveTilesForUnitDoesNotIncludeUnreachableTilesInsideMovementRange()
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(SoloSetup(faction, "Runner", new Vector3I(0, 0, 0),
@@ -98,7 +100,7 @@ public class BattleSessionQueriesTest
   }
 
   [TestCase(TestName = "GetVisibleEnemiesForUnit returns visible enemies only")]
-  public void GetVisibleEnemiesForUnitReturnsVisibleEnemiesOnly()
+  public static void GetVisibleEnemiesForUnitReturnsVisibleEnemiesOnly()
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -116,7 +118,7 @@ public class BattleSessionQueriesTest
   }
 
   [TestCase(TestName = "GetFactionDeadUnits filters by faction")]
-  public void GetFactionDeadUnitsFiltersByFaction()
+  public static void GetFactionDeadUnitsFiltersByFaction()
   {
     var factionA = TestData.MakeFaction("A");
     var factionB = TestData.MakeFaction("B");

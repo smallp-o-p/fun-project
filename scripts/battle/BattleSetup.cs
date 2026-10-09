@@ -59,7 +59,7 @@ public sealed record BattleSetup(
 
   /// <summary>The pooled scene the map was extracted from, when this setup was resolved from
   /// a battle type. Hand-built setups carry None; the runtime itself stays scene-independent.</summary>
-  public Option<Godot.PackedScene> MapScene { get; init; } = default;
+  public Option<Godot.PackedScene> MapScene { get; init; }
 }
 
 /// <summary>Typed reasons a battle request/setup can fail before the session starts.</summary>

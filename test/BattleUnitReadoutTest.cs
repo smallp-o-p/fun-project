@@ -8,7 +8,7 @@ namespace FunProject.Tests;
 public sealed class BattleUnitReadoutTest
 {
   [TestCase]
-  public void ReadoutShowsCurrentStunAndUnconsciousness()
+  public static void ReadoutShowsCurrentStunAndUnconsciousness()
   {
     using var battle = BattleFixture.Duel();
 

@@ -3,6 +3,8 @@ using FunProject.Models;
 using GdUnit4;
 using Godot;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class ModelClothingTest
@@ -12,7 +14,7 @@ public class ModelClothingTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void WardrobeExposesDiscoveredPiecesAndOutfits()
+  public static void WardrobeExposesDiscoveredPiecesAndOutfits()
   {
     using var fixture = ModelFixture.WithWardrobe();
     CharacterModel model = fixture.Model;
@@ -36,7 +38,7 @@ public class ModelClothingTest
   // Each inventory getter is the first operation on its unstarted fixture:
   // inventories must be available without initializing scene bindings.
   [TestCase]
-  public void InventoryGettersExposeAuthoredEntriesBeforeInitialization()
+  public static void InventoryGettersExposeAuthoredEntriesBeforeInitialization()
   {
     using var piecesFixture = ModelFixture.WithWardrobe(start: false);
     CharacterModel piecesModel = piecesFixture.Model;
@@ -54,7 +56,7 @@ public class ModelClothingTest
   }
 
   [TestCase]
-  public void CatalogAndInventoriesCannotBeEditedByConsumers()
+  public static void CatalogAndInventoriesCannotBeEditedByConsumers()
   {
     using var fixture = ModelFixture.WithWardrobe();
     var catalog = fixture.Model.WardrobeConfiguration;
@@ -78,7 +80,7 @@ public class ModelClothingTest
   }
 
   [TestCase]
-  public void PieceDisableAndOutfitSelectionRemainInstanceLocal()
+  public static void PieceDisableAndOutfitSelectionRemainInstanceLocal()
   {
     using var first = ModelFixture.WithWardrobe();
     using var second = ModelFixture.WithWardrobe();
@@ -91,7 +93,7 @@ public class ModelClothingTest
   }
 
   [TestCase]
-  public void SelectionBeforeImportedChildIsAttachedUsesCatalogAtInitialization()
+  public static void SelectionBeforeImportedChildIsAttachedUsesCatalogAtInitialization()
   {
     using var fixture = ModelFixture.WithWardrobe(start: false);
     var imported = fixture.Model.GetNode("Model");
@@ -109,7 +111,7 @@ public class ModelClothingTest
   }
 
   [TestCase]
-  public void ImportedCatalogHasNoInspectorAuthoringSurface()
+  public static void ImportedCatalogHasNoInspectorAuthoringSurface()
   {
     using var fixture = ModelFixture.WithWardrobe();
     foreach (var property in fixture.Model.GetPropertyList())
@@ -133,7 +135,7 @@ public class ModelClothingTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void SelectOutfitSwapsGarmentsVariantMasksAndRenderCounts()
+  public static void SelectOutfitSwapsGarmentsVariantMasksAndRenderCounts()
   {
     using var fixture = ModelFixture.WithWardrobe();
     CharacterModel model = fixture.Model;
@@ -153,7 +155,7 @@ public class ModelClothingTest
   }
 
   [TestCase]
-  public void ClothingToggleHidesAndRestoresTheEntireOutfit()
+  public static void ClothingToggleHidesAndRestoresTheEntireOutfit()
   {
     using var fixture = ModelFixture.WithWardrobe();
     ModelClothingPiece piece = fixture.Piece("Garment");
@@ -178,7 +180,7 @@ public class ModelClothingTest
   // round trips; playback independence is owned by the real-scene animation suite
   // (ClothingChangeKeepsPresetWeightsAndPlayback).
   [TestCase]
-  public void PieceDisableSurvivesOutfitSwitchAndToggle()
+  public static void PieceDisableSurvivesOutfitSwitchAndToggle()
   {
     using var fixture = ModelFixture.WithWardrobe();
     ModelClothingPiece piece = fixture.Piece("Garment");
@@ -204,7 +206,7 @@ public class ModelClothingTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void OverlappingPiecesOrTheirSharedBodyRegion()
+  public static void OverlappingPiecesOrTheirSharedBodyRegion()
   {
     // Two variant-independent pieces whose enabled rules both cover bit zero:
     // coordinated derivation ORs both contributions instead of applying
@@ -233,7 +235,7 @@ public class ModelClothingTest
   }
 
   [TestCase]
-  public void ComponentlessVariantRuleFollowsOutfitSelection()
+  public static void ComponentlessVariantRuleFollowsOutfitSelection()
   {
     using var fixture = ModelFixture.WithWardrobe(
       configuration: TestData.MakeWardrobeConfigurationWithComponentlessVariantRule(variant: 1),
@@ -258,7 +260,7 @@ public class ModelClothingTest
   // ------------------------------------------------------------------
 
   [TestCase]
-  public void MissingGarmentAfterInitializationRejectsWriteWithoutChanges()
+  public static void MissingGarmentAfterInitializationRejectsWriteWithoutChanges()
   {
     // A garment node disappearing after initialization (a torn-down subtree)
     // is the predictable live failure: the write preflights, stores nothing,
@@ -277,7 +279,7 @@ public class ModelClothingTest
     Assert.True(ModelFixture.SameNative(model.MaskRenderMesh(fixture.MaskPath), authoredRender));
   }
   [TestCase]
-  public void FreedMaskBodyRejectsSelectionBeforeAnyWrites()
+  public static void FreedMaskBodyRejectsSelectionBeforeAnyWrites()
   {
     using var fixture = ModelFixture.WithWardrobe();
     CharacterModel model = fixture.Model;

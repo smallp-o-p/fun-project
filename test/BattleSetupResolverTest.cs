@@ -8,12 +8,14 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+namespace FunProject.Tests;
+
 [TestSuite]
 [RequireGodotRuntime]
 public class BattleSetupResolverTest
 {
   [TestCase(TestName = "Deployment preserves faction/combatant/equipment identity and captures modifiers at spawn")]
-  public void DeploymentPreservesIdentityAndCapturesModifiersAtSpawn()
+  public static void DeploymentPreservesIdentityAndCapturesModifiersAtSpawn()
   {
     var type = TestData.MakeDuelBattleType();
     type.Factions[0].Faction.FactionBonuses.Add(
@@ -48,7 +50,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "Concrete-setup StatMods capture at spawn and stay stable afterwards")]
-  public void ConcreteSetupCapturesModifiersAtSpawn()
+  public static void ConcreteSetupCapturesModifiersAtSpawn()
   {
     var player = TestData.MakeFaction("Player");
     var enemy = TestData.MakeFaction("Enemy");
@@ -73,7 +75,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "Resolve preserves the seed and selects the map with a separate stream")]
-  public void SeedAndMapChoice()
+  public static void SeedAndMapChoice()
   {
     var type = TestData.MakeDuelBattleType();
     type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(2, 1, 1),
@@ -88,7 +90,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "A pooled BattleMap scene contributes its MapData and records the chosen scene")]
-  public void SingleScenePoolResolvesMapDataAndScene()
+  public static void SingleScenePoolResolvesMapDataAndScene()
   {
     var type = TestData.MakeDuelBattleType();
     PackedScene scene = TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(4, 1, 1),
@@ -105,7 +107,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "A pooled scene whose root is not a BattleMap fails with MapSceneInvalid")]
-  public void NonBattleMapSceneRootFails()
+  public static void NonBattleMapSceneRootFails()
   {
     var type = TestData.MakeDuelBattleType();
     type.MapPool.Clear();
@@ -117,7 +119,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "A null pool entry fails with MapSceneInvalid")]
-  public void NullPoolEntryFails()
+  public static void NullPoolEntryFails()
   {
     var type = TestData.MakeDuelBattleType();
     type.MapPool.Clear();
@@ -129,7 +131,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "An empty pool still fails with EmptyMapPool")]
-  public void EmptyPoolFailsWithEmptyMapPool()
+  public static void EmptyPoolFailsWithEmptyMapPool()
   {
     var type = TestData.MakeDuelBattleType();
     type.MapPool.Clear();
@@ -150,7 +152,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "Resolving without a seed returns the integer that reproduces the layout")]
-  public void MissingSeed()
+  public static void MissingSeed()
   {
     var type = TestData.MakeDuelBattleType();
     BattleSetup first = BattleSetupResolver.Resolve(type).RequireRight();
@@ -168,7 +170,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "A mixed deployment roster fails without reassigning any owning faction")]
-  public void MixedRosterFailsWithoutReassigningFactions()
+  public static void MixedRosterFailsWithoutReassigningFactions()
   {
     var type = TestData.MakeDuelBattleType();
     var campaign = TestData.MakeFaction("Campaign");
@@ -187,7 +189,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "Resolve guards the supplied deployment's required inputs")]
-  public void SuppliedDeploymentGuards()
+  public static void SuppliedDeploymentGuards()
   {
     var type = TestData.MakeDuelBattleType();
     var campaign = TestData.MakeFaction("Campaign");
@@ -204,7 +206,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "An empty deployment keeps its faction and does not restore the authored roster")]
-  public void EmptyDeployment()
+  public static void EmptyDeployment()
   {
     var type = TestData.MakeDuelBattleType();
     var campaign = TestData.MakeFaction("Campaign");
@@ -221,7 +223,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "Without a deployment the authored player faction bonuses apply")]
-  public void NoDeploymentUsesAuthoredFactionBonuses()
+  public static void NoDeploymentUsesAuthoredFactionBonuses()
   {
     var type = TestData.MakeDuelBattleType();
     type.Factions[0].Faction.FactionBonuses.Add(
@@ -236,7 +238,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "Other sides stay authored with fresh factions and their own bonuses")]
-  public void OtherSidesRemainAuthored()
+  public static void OtherSidesRemainAuthored()
   {
     var type = TestData.MakeDuelBattleType();
     type.Factions[1].Faction.FactionBonuses.Add(
@@ -264,7 +266,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "Authored loadouts expand into fresh combatant, weapon, and armor instances per unit")]
-  public void AuthoredLoadoutsCreateIndependentInstances()
+  public static void AuthoredLoadoutsCreateIndependentInstances()
   {
     var type = TestData.MakeDuelBattleType();
     type.Factions[0].Roster.Clear();
@@ -312,7 +314,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "Loadout authoring clears equipment without an armor capability")]
-  public void LoadoutAuthoringClearsNonArmor()
+  public static void LoadoutAuthoringClearsNonArmor()
   {
     using var loadout = new UnitLoadoutData
     {
@@ -327,7 +329,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "A loadout without authored gear stays unarmed and unarmored")]
-  public void MissingGearRemainsUnequipped()
+  public static void MissingGearRemainsUnequipped()
   {
     var type = TestData.MakeDuelBattleType();
     type.Factions[0].Roster.Clear();
@@ -346,7 +348,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "Resolved output keeps collection membership independent of the authored lists")]
-  public void CollectionMembershipSurvivesOriginalMutation()
+  public static void CollectionMembershipSurvivesOriginalMutation()
   {
     var type = TestData.MakeDuelBattleType();
     var campaign = TestData.MakeFaction("Campaign");
@@ -384,7 +386,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "A side deployment replaces only its designated non-player slot")]
-  public void SideDeploymentReplacesOnlyItsDesignatedSlot()
+  public static void SideDeploymentReplacesOnlyItsDesignatedSlot()
   {
     var type = TestData.MakeTacticalBattleType(enemyCells: 4);
     var mission = TestData.MakeTacticalMission(type, minEnemyUnits: 2, maxEnemyUnits: 2);
@@ -417,7 +419,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(7, TestName = "Seed 7: a side deployment never changes the seeded map choice")]
-  public void SideDeploymentPreservesSeededMapChoice(int seed)
+  public static void SideDeploymentPreservesSeededMapChoice(int seed)
   {
     var type = TestData.MakeTacticalBattleType(enemyCells: 4);
     type.MapPool.Add(TestData.MakeMapScene(TestData.MakeMapData(new Vector3I(5, 1, 1),
@@ -440,7 +442,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "Side deployments guard index, player slot, membership, and required inputs")]
-  public void SideDeploymentGuards()
+  public static void SideDeploymentGuards()
   {
     var type = TestData.MakeDuelBattleType();
     var campaign = TestData.MakeFaction("Campaign");
@@ -472,7 +474,7 @@ public class BattleSetupResolverTest
   }
 
   [TestCase(TestName = "Campaign equipment slots are never read; only loadout equipment equips")]
-  public void ExplicitEquipmentOnly()
+  public static void ExplicitEquipmentOnly()
   {
     var type = TestData.MakeDuelBattleType();
     var campaign = TestData.MakeFaction("Campaign");
