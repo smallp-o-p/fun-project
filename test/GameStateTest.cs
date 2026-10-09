@@ -96,8 +96,8 @@ public class GameStateTest
 
     var captives = state.Captivity.Combatants;
     Assert.Equal(2, captives.Count);
-    Assert.True(captives.AsValueEnumerable().Any(c => c.Name == "Captured Grunt 01"));
-    Assert.True(captives.AsValueEnumerable().Any(c => c.Name == "Grunt")); // MakeCaptiveEntry's default mold name
+    Assert.True(captives.AsValueEnumerable().Any(c => string.Equals(c.Name, "Captured Grunt 01", StringComparison.Ordinal)));
+    Assert.True(captives.AsValueEnumerable().Any(c => string.Equals(c.Name, "Grunt", StringComparison.Ordinal))); // MakeCaptiveEntry's default mold name
     Assert.Equal(1, state.Roster.Count); // captives never join the roster
   }
 
@@ -113,9 +113,9 @@ public class GameStateTest
     ]));
 
     var captives = state.Captivity.Combatants;
-    var one = captives.AsValueEnumerable().Single(c => c.Name == "One");
-    var two = captives.AsValueEnumerable().Single(c => c.Name == "Two");
-    var three = captives.AsValueEnumerable().Single(c => c.Name == "Three");
+    var one = captives.AsValueEnumerable().Single(c => string.Equals(c.Name, "One", StringComparison.Ordinal));
+    var two = captives.AsValueEnumerable().Single(c => string.Equals(c.Name, "Two", StringComparison.Ordinal));
+    var three = captives.AsValueEnumerable().Single(c => string.Equals(c.Name, "Three", StringComparison.Ordinal));
     Assert.Equal("Alien Raiders", one.OwningFaction.Name);
     Assert.False(ReferenceEquals(one.OwningFaction, state.PlayerFaction));
     Assert.True(ReferenceEquals(one.OwningFaction, two.OwningFaction));

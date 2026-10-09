@@ -32,9 +32,9 @@ public partial class BattleMapData : Resource
     var flags = TileFlags.Length == 0 ? BattleTileFlags.None : (BattleTileFlags)TileFlags[index];
     return new BattleMapTileData
     {
-      Walkable = (flags & BattleTileFlags.Walkable) != 0,
-      BlocksLineOfSight = (flags & BattleTileFlags.BlocksLineOfSight) != 0,
-      BlocksVerticalLineOfSight = (flags & BattleTileFlags.BlocksVerticalLineOfSight) != 0,
+      Walkable = (flags & BattleTileFlags.Walkable) != BattleTileFlags.None,
+      BlocksLineOfSight = (flags & BattleTileFlags.BlocksLineOfSight) != BattleTileFlags.None,
+      BlocksVerticalLineOfSight = (flags & BattleTileFlags.BlocksVerticalLineOfSight) != BattleTileFlags.None,
       CoverDirections = TileFlags.Length == 0 ? CoverDirections.None : (CoverDirections)TileCoverDirections[index],
       CoverAmount = TileFlags.Length == 0 ? 0 : TileCoverAmounts[index],
       SpawnFactionSlot = SpawnSlots.TryGetValue(cell, out int slot) ? slot : -1

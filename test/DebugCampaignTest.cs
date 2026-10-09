@@ -48,9 +48,9 @@ public class DebugCampaignTest
 
     var captives = state.Captivity.Combatants;
     Assert.Equal(3, captives.Count);
-    Assert.True(captives.AsValueEnumerable().Any(c => c.Name == "Captured Grunt 01"));
-    Assert.True(captives.AsValueEnumerable().Any(c => c.Name == "Captured Grunt 02"));
-    Assert.True(captives.AsValueEnumerable().Any(c => c.Name == "Captured Grunt 03"));
+    Assert.True(captives.AsValueEnumerable().Any(c => string.Equals(c.Name, "Captured Grunt 01", System.StringComparison.Ordinal)));
+    Assert.True(captives.AsValueEnumerable().Any(c => string.Equals(c.Name, "Captured Grunt 02", System.StringComparison.Ordinal)));
+    Assert.True(captives.AsValueEnumerable().Any(c => string.Equals(c.Name, "Captured Grunt 03", System.StringComparison.Ordinal)));
 
     // The player roster is untouched by the captive seed.
     Assert.Equal(4, state.Roster.Count);

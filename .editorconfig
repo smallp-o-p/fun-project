@@ -18,3 +18,34 @@ indent_size = 2
 
 # Enforce the existing ZLinq convention without promoting other warnings.
 dotnet_diagnostic.RS0030.severity = error
+
+# This application groups related actions, proofs, events and test cases in one
+# file. Splitting these families to satisfy a file-name rule adds no safety.
+dotnet_diagnostic.MA0048.severity = none
+# Method length is a design review concern, not a fixed line-count contract.
+dotnet_diagnostic.MA0051.severity = none
+# Domain events carry typed payloads; Godot signals impose their own delegates.
+# Changing them to EventHandler would alter the engine and runtime contracts.
+dotnet_diagnostic.MA0046.severity = none
+# TODOs remain visible to design review without warning on every build.
+dotnet_diagnostic.MA0026.severity = suggestion
+# Proof and authored-resource guards intentionally inspect members of inputs.
+MA0015.consider_member_access_as_parameter = true
+
+[**/{Vector3I,BattleObservationHistory,BattleTileState,DamageResolver,TileCover,UnitView}.cs]
+# These managed domain/UI structs have no unmanaged layout contract.
+dotnet_diagnostic.MA0008.severity = none
+
+[**/{Faction,SquadLoadoutView,StatSheet,BattleActionExecutor,DamageBundleMod,Weapon,ModelAnimationGraph}.cs]
+# Preserve concrete mutation, Godot authoring and span-backed event-log APIs.
+dotnet_diagnostic.MA0016.severity = none
+
+[scripts/gamestate/GameState.cs]
+# Preserve the established FunProject.GameState namespace and public type.
+dotnet_diagnostic.MA0049.severity = none
+
+[test/**]
+# GdUnit discovers non-static suite classes, including those with static cases.
+dotnet_diagnostic.MA0036.severity = none
+# Layout waits and deferred cleanup must resume on Godot's main thread.
+dotnet_diagnostic.MA0004.severity = none

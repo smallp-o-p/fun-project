@@ -231,7 +231,7 @@ public partial class GeoscapeBattleHandoffTest
     // Resumed at the prior speed: the active root ticks the campaign clock again.
     string clockResumed = Clock(scene).Text;
     scene._PhysicsProcess(1.0);
-    Assert.That(Clock(scene).Text != clockResumed,
+    Assert.That(!string.Equals(Clock(scene).Text, clockResumed, StringComparison.Ordinal),
       "The campaign clock must advance again after the return.");
 
     OpenResolutionViaMapEvent(scene);

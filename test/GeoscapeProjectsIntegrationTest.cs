@@ -78,8 +78,8 @@ public class GeoscapeProjectsIntegrationTest
     Assert.Equal("Cost: Budget: 10", view.GetNode<Label>("%CurrencyCosts").Text);
     Assert.Equal(Colors.Red, view.GetNode<Label>("%CurrencyCosts").GetThemeColor("font_color"));
     string status = view.GetNode<Label>("%Status").Text;
-    Assert.True(status.Contains("InsufficientCurrencies"));
-    Assert.True(status.Contains(research ? project.Name : item.Name));
+    Assert.True(status.Contains("InsufficientCurrencies", System.StringComparison.Ordinal));
+    Assert.True(status.Contains(research ? project.Name : item.Name, System.StringComparison.Ordinal));
     Assert.True(research ? campaign.Session.ActiveResearch.IsNone : campaign.Session.ActiveManufacturing.IsNone);
     Assert.True(research ? campaign.Session.ActiveManufacturing.IsSome : campaign.Session.ActiveResearch.IsSome);
     Assert.Equal(0, campaign.Events.Count);
@@ -161,7 +161,7 @@ public class GeoscapeProjectsIntegrationTest
     PressEngineeringButton(scene);
     var engineering = (EngineeringView)manager.Current;
     Assert.True(engineering.GetNode<VBoxContainer>("%ManufacturableItems").GetChildren()
-      .AsValueEnumerable().OfType<Button>().Any(button => button.Text == "Prototype Kit"));
+      .AsValueEnumerable().OfType<Button>().Any(button => string.Equals(button.Text, "Prototype Kit", System.StringComparison.Ordinal)));
   }
 
   [TestCase]
@@ -227,7 +227,7 @@ public class GeoscapeProjectsIntegrationTest
     // Clock movement after completion also proves the session retained the selected speed.
     clock = hud.GetNode<Label>("%ClockLabel").Text;
     scene._PhysicsProcess(0.02);
-    Assert.False(clock == hud.GetNode<Label>("%ClockLabel").Text);
+    Assert.False(string.Equals(clock, hud.GetNode<Label>("%ClockLabel").Text, System.StringComparison.Ordinal));
     Assert.Equal("5x", hud.GetNode<Button>("%SpeedButton").Text);
     Assert.False(hud.GetNode<Button>("%PauseButton").ButtonPressed);
   }
@@ -265,7 +265,7 @@ public class GeoscapeProjectsIntegrationTest
 
     roster.GetNode<Button>("%BackButton").EmitSignal(Button.SignalName.Pressed); // roster -> root
     scene._PhysicsProcess(0.02); // one tick at the retained 5x speed
-    Assert.False(clock == hud.GetNode<Label>("%ClockLabel").Text);
+    Assert.False(string.Equals(clock, hud.GetNode<Label>("%ClockLabel").Text, System.StringComparison.Ordinal));
     Assert.Equal("5x", hud.GetNode<Button>("%SpeedButton").Text);
   }
 

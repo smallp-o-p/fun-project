@@ -13,6 +13,7 @@ public partial class ResearchCompletedCondition : ResearchCondition
 
   internal override bool IsMet(in CampaignGameState state) => state.Research.IsCompleted(Project);
 
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "MA0015", Justification = "The guard identifies a missing authored property, not the traversal parameter.")]
   internal override void CheckContents(SysColGeneric.HashSet<ResearchCondition> path)
     => ArgumentNullException.ThrowIfNull(Project);
 }

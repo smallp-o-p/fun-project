@@ -121,7 +121,7 @@ public class BombExpiryTest
 
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
-    Assert.Equal("upkeep,expiry", string.Join(",", order));
+    Assert.Equal("upkeep,expiry", string.Join(',', order));
   }
 
   private sealed class MarkerHook(System.Action onFire) : BattleHook
@@ -148,8 +148,8 @@ public class BombExpiryTest
       ],
     });
     var objects = battle.Query(new GetBattleSpecialObjectsQuery());
-    var bomb = objects.AsValueEnumerable().Single(o => o.Name == "Bomb");
-    var crate = objects.AsValueEnumerable().Single(o => o.Name == "Crate");
+    var bomb = objects.AsValueEnumerable().Single(o => string.Equals(o.Name, "Bomb", StringComparison.Ordinal));
+    var crate = objects.AsValueEnumerable().Single(o => string.Equals(o.Name, "Crate", StringComparison.Ordinal));
     battle.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
     battle.ClearEvents();
     battle.AdvanceTurn();
@@ -171,7 +171,7 @@ public class BombExpiryTest
         Objects = [new ObjectPlacement(TestData.MakeObject("Bomb", 5, timer), new Vector3I(4, 0, 2))],
       });
     var bomb = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable()
-      .Single(o => o.Name == "Bomb");
+      .Single(o => string.Equals(o.Name, "Bomb", StringComparison.Ordinal));
     battle.RegisterHook<TurnEndedBattleEvent>(new SpecialObjectTimerSystem());
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, bomb);

@@ -318,14 +318,11 @@ public partial class CharacterModel
   {
     bool global = key is null or OutfitKey or ClothingEnabledKey;
     string component = global ? "" : key![PiecesPrefix.Length..];
-    int outfit = key == OutfitKey
-      ? selection!.Value.AsInt32()
+    int outfit = string.Equals(key, OutfitKey, StringComparison.Ordinal) ? selection!.Value.AsInt32()
       : Selections.TryGetValue(OutfitKey, out Variant storedOutfit)
         ? storedOutfit.AsInt32() : _boundWardrobe!.DefaultVariant;
-    bool clothing = key == ClothingEnabledKey
-      ? selection!.Value.AsBool() : ReadSelectionBool(ClothingEnabledKey, true);
-    bool Selected(string name) => key == PiecesPrefix + name
-      ? selection!.Value.AsBool()
+    bool clothing = string.Equals(key, ClothingEnabledKey, StringComparison.Ordinal) ? selection!.Value.AsBool() : ReadSelectionBool(ClothingEnabledKey, true);
+    bool Selected(string name) => string.Equals(key, PiecesPrefix + name, StringComparison.Ordinal) ? selection!.Value.AsBool()
       : ReadSelectionBool(PiecesPrefix + name, ComponentDefaultVisible(name));
 
     // A rule contributes its bit when authored enabled, its variant matches the
@@ -367,7 +364,7 @@ public partial class CharacterModel
 
     var masks = new SysColGeneric.List<Action>();
     foreach (MaskRuntime owner in _maskRules.AsValueEnumerable()
-      .Where(binding => global || binding.Rule.Component == component)
+      .Where(binding => global || string.Equals(binding.Rule.Component, component, StringComparison.Ordinal))
       .Select(binding => binding.Region.Owner).Distinct())
     {
       // Re-derive every rule on an affected mask, including other components'

@@ -54,7 +54,7 @@ public sealed class Armory
 
     foreach (EquippableItemData item in items)
     {
-      ArgumentNullException.ThrowIfNull(item);
+      ArgumentNullException.ThrowIfNull(item, nameof(items));
       var shelf = new ItemShelf
       {
         Data = item,
@@ -67,7 +67,7 @@ public sealed class Armory
 
     foreach (EquippableMod mod in mods)
     {
-      ArgumentNullException.ThrowIfNull(mod);
+      ArgumentNullException.ThrowIfNull(mod, nameof(mods));
       var shelf = new ModShelf { Mod = mod, Unlimited = mod.UnlimitedStock, Remaining = 1 };
       if (!_mods.TryAdd(mod, shelf))
         throw new InvalidOperationException($"Mod stock lists '{mod.Name}' more than once.");

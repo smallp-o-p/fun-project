@@ -39,7 +39,7 @@ public sealed partial class BattleHud : CanvasLayer
   }
 
   public void ShowUnits(IReadOnlyList<BattleUnitState> units)
-    => _unitStatusLabel.Text = string.Join("\n", units.AsValueEnumerable().Select(FormatUnitReadout).ToArray());
+    => _unitStatusLabel.Text = string.Join('\n', units.AsValueEnumerable().Select(FormatUnitReadout).ToArray());
 
   public void ShowActionOptions(IReadOnlyList<UnitActionOption> options)
   {

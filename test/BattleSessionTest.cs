@@ -483,7 +483,7 @@ public class BattleSessionTest
       session.AddUnit(TestData.MakeCombatant("Bravo", faction), board.At(1, 0, 1), None, None));
     Assert.Equal(1, session.AliveUnits.AsValueEnumerable().Count());
     Assert.True(session.AliveUnits.AsValueEnumerable().Contains(occupiedUnit));
-    Assert.False(session.AliveUnits.AsValueEnumerable().Any(unit => unit.Combatant.Name == "Bravo"));
+    Assert.False(session.AliveUnits.AsValueEnumerable().Any(unit => string.Equals(unit.Combatant.Name, "Bravo", StringComparison.Ordinal)));
   }
 
   [TestCase(TestName = "EndUnitActivation throws when the unit is already unavailable")]

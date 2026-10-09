@@ -134,11 +134,11 @@ public class GeoscapeSquadLoadoutTest
 
     var choiceText = view.GetNode<VBoxContainer>("%RosterChoices")
       .GetChild(0) is Label note ? note.Text : "";
-    Assert.True(choiceText.Contains("No units"), $"Expected an empty-roster note, got '{choiceText}'.");
+    Assert.True(choiceText.Contains("No units", StringComparison.Ordinal), $"Expected an empty-roster note, got '{choiceText}'.");
     foreach (Node card in view.GetNode<BoxContainer>("%Slots").GetChildren())
     {
       var text = CardText((Control)card);
-      Assert.True(text.Contains("empty"), $"Expected an empty slot card, got '{text}'.");
+      Assert.True(text.Contains("empty", StringComparison.Ordinal), $"Expected an empty slot card, got '{text}'.");
     }
   }
 
@@ -232,8 +232,8 @@ public class GeoscapeSquadLoadoutTest
     var selected = view.GetSelectedCombatants();
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
-    Assert.True(CardText(SquadSlot(view, 1)).Contains("Alpha"));
-    Assert.True(CardText(SquadSlot(view, 0)).Contains("empty"));
+    Assert.True(CardText(SquadSlot(view, 1)).Contains("Alpha", StringComparison.Ordinal));
+    Assert.True(CardText(SquadSlot(view, 0)).Contains("empty", StringComparison.Ordinal));
     Assert.Equal("Squad: 1/3", view.GetNode<Label>("%SquadCount").Text);
 
     Assert.True(SquadChoice(view, "Alpha").Disabled); // destination consumed again
@@ -263,8 +263,8 @@ public class GeoscapeSquadLoadoutTest
     var selected = view.GetSelectedCombatants();
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(fixture.State.Roster[2], selected[0]));
-    Assert.True(CardText(SquadSlot(view, 0)).Contains("Charlie"));
-    Assert.True(CardText(SquadSlot(view, 1)).Contains("empty"));
+    Assert.True(CardText(SquadSlot(view, 0)).Contains("Charlie", StringComparison.Ordinal));
+    Assert.True(CardText(SquadSlot(view, 1)).Contains("empty", StringComparison.Ordinal));
     Assert.Equal("Squad: 1/3", view.GetNode<Label>("%SquadCount").Text);
 
     SquadSlot(view, 2).GetNode<Button>("%ChooseUnit")
@@ -294,13 +294,13 @@ public class GeoscapeSquadLoadoutTest
     ChooseSquadUnit(view, 0, "Alpha");
 
     string card = CardText(SquadSlot(view, 0));
-    Assert.True(card.Contains("Rifle"), $"Weapon missing from '{card}'.");
-    Assert.True(card.Contains("Vest"), $"Armor missing from '{card}'.");
-    Assert.True(card.Contains("Medkit"), $"Utility item missing from '{card}'.");
-    Assert.True(card.Contains("Aim: 70"), $"Weapon-contributed Aim missing from '{card}'.");
-    Assert.True(card.Contains("Health: 20"), $"Health missing from '{card}'.");
-    Assert.True(card.Contains("Movement: 14"), $"Movement missing from '{card}'.");
-    Assert.True(card.Contains("Nerves"), $"Personal mod missing from '{card}'.");
+    Assert.True(card.Contains("Rifle", StringComparison.Ordinal), $"Weapon missing from '{card}'.");
+    Assert.True(card.Contains("Vest", StringComparison.Ordinal), $"Armor missing from '{card}'.");
+    Assert.True(card.Contains("Medkit", StringComparison.Ordinal), $"Utility item missing from '{card}'.");
+    Assert.True(card.Contains("Aim: 70", StringComparison.Ordinal), $"Weapon-contributed Aim missing from '{card}'.");
+    Assert.True(card.Contains("Health: 20", StringComparison.Ordinal), $"Health missing from '{card}'.");
+    Assert.True(card.Contains("Movement: 14", StringComparison.Ordinal), $"Movement missing from '{card}'.");
+    Assert.True(card.Contains("Nerves", StringComparison.Ordinal), $"Personal mod missing from '{card}'.");
 
     var selected = view.GetSelectedCombatants();
     Assert.True(ReferenceEquals(rifle, selected[0].EquippedWeapon.RequireSome()));
@@ -317,9 +317,9 @@ public class GeoscapeSquadLoadoutTest
     ChooseSquadUnit(view, 0, "Alpha");
 
     string card = CardText(SquadSlot(view, 0));
-    Assert.True(card.Contains("Weapon:"), card);
-    Assert.True(card.Contains("empty"), card);
-    Assert.True(card.Contains("Armor:"), card);
+    Assert.True(card.Contains("Weapon:", StringComparison.Ordinal), card);
+    Assert.True(card.Contains("empty", StringComparison.Ordinal), card);
+    Assert.True(card.Contains("Armor:", StringComparison.Ordinal), card);
   }
 
   [TestCase(TestName = "Editor round-trip keeps selection and refreshes summaries")]
@@ -357,13 +357,13 @@ public class GeoscapeSquadLoadoutTest
     Assert.Equal(1, selected.Count);
     Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
     Assert.Equal("Rifle", selected[0].EquippedWeapon.RequireSome().ItemName); // live equipment
-    Assert.True(selected[0].EquippedArmor.RequireSome().Item.ItemName == "Vest");
+    Assert.True(string.Equals(selected[0].EquippedArmor.RequireSome().Item.ItemName, "Vest", StringComparison.Ordinal));
     Assert.Equal("Medkit", selected[0].Inventory[0].Item.ItemName);
 
     string card = CardText(SquadSlot(view, 0)); // summaries refreshed on return
-    Assert.True(card.Contains("Rifle"), card);
-    Assert.True(card.Contains("Vest"), card);
-    Assert.True(card.Contains("Medkit"), card);
+    Assert.True(card.Contains("Rifle", StringComparison.Ordinal), card);
+    Assert.True(card.Contains("Vest", StringComparison.Ordinal), card);
+    Assert.True(card.Contains("Medkit", StringComparison.Ordinal), card);
   }
 
   [TestCase(false, TestName = "Missing UnitViewScene export is an authoring error")]
@@ -421,9 +421,9 @@ public class GeoscapeSquadLoadoutTest
     var view = PresentedMissionView(pending, fixture.State, fixture.Session);
 
     string choice = SquadChoice(view, "Alpha").Text;
-    Assert.True(choice.Contains("Injured (6d)"), $"Expected the injury label with countdown, got '{choice}'.");
-    Assert.True(choice.Contains("Tired (1d)"), $"Expected the fatigue label with countdown, got '{choice}'.");
-    Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"),
+    Assert.True(choice.Contains("Injured (6d)", StringComparison.Ordinal), $"Expected the injury label with countdown, got '{choice}'.");
+    Assert.True(choice.Contains("Tired (1d)", StringComparison.Ordinal), $"Expected the fatigue label with countdown, got '{choice}'.");
+    Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional", StringComparison.Ordinal),
       "A normal mission shows no exceptional-deployment notice.");
 
     SquadSlot(view, 0).GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
@@ -477,7 +477,7 @@ public class GeoscapeSquadLoadoutTest
 
     var view = PresentedMissionView(pending, fixture.State, fixture.Session);
 
-    Assert.True(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional deployment"));
+    Assert.True(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional deployment", StringComparison.Ordinal));
 
     SquadSlot(view, 0).GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
     Assert.False(SquadChoice(view, "Alpha").Disabled);
@@ -510,13 +510,13 @@ public class GeoscapeSquadLoadoutTest
     ChooseSquadUnit(view, 0, "Alpha");
 
     string card = CardText(SquadSlot(view, 0));
-    Assert.True(card.Contains("Injured (6d)"), $"Injury countdown missing from '{card}'.");
-    Assert.True(card.Contains("Tired (1d)"), $"Fatigue countdown missing from '{card}'.");
+    Assert.True(card.Contains("Injured (6d)", StringComparison.Ordinal), $"Injury countdown missing from '{card}'.");
+    Assert.True(card.Contains("Tired (1d)", StringComparison.Ordinal), $"Fatigue countdown missing from '{card}'.");
     // Hand-derived: health 100x0.75, aim 60x0.90x0.90, movement 14x0.90, will 50x0.90.
-    Assert.True(card.Contains("Health: 75"), $"Condition-reduced health missing from '{card}'.");
-    Assert.True(card.Contains("Aim: 49"), $"Condition-reduced aim missing from '{card}'.");
-    Assert.True(card.Contains("Movement: 13"), $"Condition-reduced movement missing from '{card}'.");
-    Assert.True(card.Contains("Will: 45"), $"Condition-reduced will missing from '{card}'.");
+    Assert.True(card.Contains("Health: 75", StringComparison.Ordinal), $"Condition-reduced health missing from '{card}'.");
+    Assert.True(card.Contains("Aim: 49", StringComparison.Ordinal), $"Condition-reduced aim missing from '{card}'.");
+    Assert.True(card.Contains("Movement: 13", StringComparison.Ordinal), $"Condition-reduced movement missing from '{card}'.");
+    Assert.True(card.Contains("Will: 45", StringComparison.Ordinal), $"Condition-reduced will missing from '{card}'.");
   }
 
   [TestCase(TestName = "A positive recovery interval never rounds down to zero")]
@@ -536,7 +536,7 @@ public class GeoscapeSquadLoadoutTest
       fixture.State, fixture.Session);
 
     string choice = SquadChoice(view, "Alpha").Text;
-    Assert.True(choice.Contains("Tired (1d)"), $"Expected a one-day countdown, got '{choice}'.");
+    Assert.True(choice.Contains("Tired (1d)", StringComparison.Ordinal), $"Expected a one-day countdown, got '{choice}'.");
   }
 
   [TestCase(TestName = "The override retains selected exhausted units across editor navigation")]
@@ -571,8 +571,8 @@ public class GeoscapeSquadLoadoutTest
     Assert.True(ReferenceEquals(alpha, selected[0]));
     Assert.Equal("Rifle", selected[0].EquippedWeapon.RequireSome().ItemName);
     string card = CardText(SquadSlot(view, 0));
-    Assert.True(card.Contains("Rifle"), card);
-    Assert.True(card.Contains("Exhausted"), card);
+    Assert.True(card.Contains("Rifle", StringComparison.Ordinal), card);
+    Assert.True(card.Contains("Exhausted", StringComparison.Ordinal), card);
   }
 
   [TestCase(TestName = "Generic interrogation retains injured selections when a mission becomes pending")]
@@ -589,8 +589,8 @@ public class GeoscapeSquadLoadoutTest
     view.Configure("Interrogation", 2, allowEquipmentEditing: false);
     view.Present(fixture.State, fixture.Session);
     Assert.True(fixture.Session.PendingResolution.IsNone);
-    Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"));
-    Assert.True(SquadChoice(view, "Alpha").Text.Contains("Injured (6d)"));
+    Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional", StringComparison.Ordinal));
+    Assert.True(SquadChoice(view, "Alpha").Text.Contains("Injured (6d)", StringComparison.Ordinal));
     ChooseSquadUnit(view, 0, "Alpha");
     Assert.True(ReferenceEquals(alpha, view.GetSelectedCombatants()[0]));
     Assert.False(SquadSlot(view, 0).GetNode<Button>("%EditUnit").Visible);
@@ -603,7 +603,7 @@ public class GeoscapeSquadLoadoutTest
     Assert.Equal("Squad: 1/2", view.GetNode<Label>("%SquadCount").Text);
     Press(SquadSlot(view, 0).GetNode<Button>("%RemoveUnit"));
     ChooseSquadUnit(view, 0, "Alpha");
-    Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional"));
+    Assert.False(view.GetNode<Label>("%SelectionPrompt").Text.Contains("Exceptional", StringComparison.Ordinal));
     Assert.True(view.GetNodeOrNull<Button>("%DeployButton") is null);
     Assert.True(ReferenceEquals(alpha, view.GetSelectedCombatants()[0]));
     Assert.False(SquadSlot(view, 0).GetNode<Button>("%EditUnit").Visible);

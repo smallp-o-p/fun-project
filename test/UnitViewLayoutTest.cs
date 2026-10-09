@@ -23,7 +23,7 @@ public class UnitViewLayoutTest
 
     var choices = view.GetNode<VBoxContainer>("%ArmoryList");
     Assert.Equal(1, choices.GetChildCount());
-    Assert.True(choices.GetChild<Button>(0).Text.Contains("Rifle"));
+    Assert.True(choices.GetChild<Button>(0).Text.Contains("Rifle", System.StringComparison.Ordinal));
     Assert.True(view.GetNode<Button>("%WeaponSlot").ButtonPressed);
   }
 
@@ -47,7 +47,7 @@ public class UnitViewLayoutTest
 
     Assert.Equal("Field Kit", unit.Inventory[4].Item.ItemName);
     Assert.Equal("Field Kit", view.GetNode<Label>("%SelectedItemName").Text);
-    Assert.True(view.GetNode<RichTextLabel>("%SelectedItemDetails").Text.Contains(item.Description));
+    Assert.True(view.GetNode<RichTextLabel>("%SelectedItemDetails").Text.Contains(item.Description, System.StringComparison.Ordinal));
     Assert.True(slots.GetChild<Button>(4).ButtonPressed);
     view.GetNode<Button>("%UnequipButton").EmitSignal(Button.SignalName.Pressed);
     Assert.False(unit.Inventory.ContainsKey(4));
@@ -64,7 +64,7 @@ public class UnitViewLayoutTest
     var view = AddToTree(CreateUnitView());
     view.Present(campaign.State, campaign.State.Roster[0]);
     ArmoryButton(view, "Rifle").EmitSignal(Button.SignalName.Pressed);
-    Assert.True(view.GetNode<Button>("%WeaponSlot").TooltipText.Contains("Rifle"));
+    Assert.True(view.GetNode<Button>("%WeaponSlot").TooltipText.Contains("Rifle", System.StringComparison.Ordinal));
 
     view.GetNode<Button>("%UnequipButton").EmitSignal(Button.SignalName.Pressed);
 

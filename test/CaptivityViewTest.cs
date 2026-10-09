@@ -79,13 +79,13 @@ public class CaptivityViewTest
     Assert.Equal("Selected: 1", view.GetNode<Label>("%SelectionCount").Text);
     Assert.True(Row(view, 0).ButtonPressed);
     Assert.False(Row(view, 1).ButtonPressed); // the sibling identity stayed unselected
-    Assert.True(view.GetNode<RichTextLabel>("%Details").Text.Contains("Aim: 60"), // details inspect row 0's identity
+    Assert.True(view.GetNode<RichTextLabel>("%Details").Text.Contains("Aim: 60", StringComparison.Ordinal), // details inspect row 0's identity
       view.GetNode<RichTextLabel>("%Details").Text);
 
     ToggleRow(view, 1, true);
     Assert.Equal("Selected: 2", view.GetNode<Label>("%SelectionCount").Text);
     Assert.False(view.GetNode<Button>("%PrepareButton").Disabled);
-    Assert.True(view.GetNode<RichTextLabel>("%Details").Text.Contains("Aim: 70"));
+    Assert.True(view.GetNode<RichTextLabel>("%Details").Text.Contains("Aim: 70", StringComparison.Ordinal));
 
     // The outgoing heading carries both identities in displayed (captivity) order.
     GeoscapeView? produced = null;
@@ -122,7 +122,7 @@ public class CaptivityViewTest
     Assert.True(row.HasFocus()); // keyboard focus survived the toggle
     Assert.True(row.ButtonPressed);
     Assert.Equal("Selected: 1", view.GetNode<Label>("%SelectionCount").Text);
-    Assert.True(view.GetNode<RichTextLabel>("%Details").Text.Contains("Alpha"));
+    Assert.True(view.GetNode<RichTextLabel>("%Details").Text.Contains("Alpha", StringComparison.Ordinal));
   }
 
   [TestCase(TestName = "Details inspect the first captive, then whichever row is toggled")]
@@ -145,25 +145,25 @@ public class CaptivityViewTest
     view.Present(fixture.State, fixture.Session);
 
     string details = view.GetNode<RichTextLabel>("%Details").Text; // first captive initially
-    Assert.True(details.Contains("Name: Alpha"), details);
-    Assert.True(details.Contains("Faction: Cult of Sirius"), details);
-    Assert.True(details.Contains("Health (max): 20"), details);
-    Assert.True(details.Contains("Action Points: 8"), details);
-    Assert.True(details.Contains("Will: 55"), details);
-    Assert.True(details.Contains("Movement: 14"), details);
-    Assert.True(details.Contains("Vision: 22"), details);
-    Assert.True(details.Contains("Aim: 70"), details); // weapon mod contribution folded in
-    Assert.True(details.Contains("Weapon: Plasma Rifle"), details);
-    Assert.True(details.Contains("Armor: Vest"), details);
-    Assert.True(details.Contains("Utility 1: Medkit"), details);
-    Assert.True(details.Contains("Buffs: Frenzy"), details);
+    Assert.True(details.Contains("Name: Alpha", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Faction: Cult of Sirius", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Health (max): 20", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Action Points: 8", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Will: 55", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Movement: 14", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Vision: 22", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Aim: 70", StringComparison.Ordinal), details); // weapon mod contribution folded in
+    Assert.True(details.Contains("Weapon: Plasma Rifle", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Armor: Vest", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Utility 1: Medkit", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Buffs: Frenzy", StringComparison.Ordinal), details);
 
     ToggleRow(view, 1, true); // toggling inspects that captive
     details = view.GetNode<RichTextLabel>("%Details").Text;
-    Assert.True(details.Contains("Name: Bare"), details);
-    Assert.True(details.Contains("Weapon: — empty —"), details);
-    Assert.True(details.Contains("Armor: — empty —"), details);
-    Assert.True(details.Contains("Buffs: — none —"), details);
+    Assert.True(details.Contains("Name: Bare", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Weapon: — empty —", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Armor: — empty —", StringComparison.Ordinal), details);
+    Assert.True(details.Contains("Buffs: — none —", StringComparison.Ordinal), details);
   }
 
   [TestCase(TestName = "Refresh retains selections; rebinding to another state drops stale ones")]
@@ -183,15 +183,15 @@ public class CaptivityViewTest
     Assert.True(Row(view, 1).ButtonPressed);
     Assert.False(Row(view, 0).ButtonPressed);
     Assert.Equal("Selected: 1", view.GetNode<Label>("%SelectionCount").Text);
-    Assert.True(view.GetNode<RichTextLabel>("%Details").Text.Contains("Bravo"));
+    Assert.True(view.GetNode<RichTextLabel>("%Details").Text.Contains("Bravo", StringComparison.Ordinal));
 
     using var other = CaptiveCampaign([MakeCombatant("Nova", MakeFaction("Sectoids"))]);
     view.Present(other.State, other.Session); // rebound: stale selection/details removed
     Assert.Equal("Selected: 0", view.GetNode<Label>("%SelectionCount").Text);
     Assert.False(Row(view, 0).ButtonPressed);
     Assert.True(view.GetNode<Button>("%PrepareButton").Disabled);
-    Assert.True(view.GetNode<RichTextLabel>("%Details").Text.Contains("Nova"));
-    Assert.False(view.GetNode<RichTextLabel>("%Details").Text.Contains("Bravo"));
+    Assert.True(view.GetNode<RichTextLabel>("%Details").Text.Contains("Nova", StringComparison.Ordinal));
+    Assert.False(view.GetNode<RichTextLabel>("%Details").Text.Contains("Bravo", StringComparison.Ordinal));
   }
 
   [TestCase(TestName = "Prepare interrogation opens a two-slot read-only squad view")]

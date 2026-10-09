@@ -29,7 +29,7 @@ public partial class BattleLauncherTest
     // The duel type deploys exactly one unit per side.
     Assert.Equal(2, unitMeshes.GetChildren().AsValueEnumerable().OfType<MeshInstance3D>().Count());
     var status = battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Label>("%UnitStatus");
-    Assert.True(status.Text.Contains("HP"));
+    Assert.True(status.Text.Contains("HP", StringComparison.Ordinal));
   }
 
   [TestCase(TestName = "A failing standalone startup leaves no host and a disposed runtime")]

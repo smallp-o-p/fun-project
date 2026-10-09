@@ -27,7 +27,7 @@ public class UnitArmoryAvailabilityTest
 
     var choices = view.GetNode<VBoxContainer>("%ArmoryList");
     Assert.Equal(1, choices.GetChildCount());
-    Assert.True(choices.GetChild<Button>(0).Text.Contains(expected));
+    Assert.True(choices.GetChild<Button>(0).Text.Contains(expected, System.StringComparison.Ordinal));
   }
 
   [TestCase]

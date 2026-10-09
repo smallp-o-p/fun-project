@@ -39,7 +39,7 @@ internal static partial class GeoscapeTestScenes
 
   public static Button EndTurnButton(BattleScene battle)
     => battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Container>("%TurnButtons")
-      .GetChildren().AsValueEnumerable().OfType<Button>().Single(button => button.Text == "End Turn");
+      .GetChildren().AsValueEnumerable().OfType<Button>().Single(button => string.Equals(button.Text, "End Turn", StringComparison.Ordinal));
 
   // Synthetic map scenes carry data only. Supply a ground collider and select the first
   // player's tile through the same viewport/raycast input as the authored battle.
@@ -182,7 +182,7 @@ internal static partial class GeoscapeTestScenes
   public static Button SquadChoice(SquadLoadoutView view, string unitName)
     => view.GetNode<VBoxContainer>("%RosterChoices").GetChildren()
       .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text.Contains(unitName));
+      .Single(button => button.Text.Contains(unitName, StringComparison.Ordinal));
 
   // Sequential by necessity: pressing Choose rebuilds the roster controls, so the choice
   // button must be reacquired AFTER that press, not captured beside it as an argument.
@@ -196,7 +196,7 @@ internal static partial class GeoscapeTestScenes
   public static Button ArmoryButton(UnitView editor, string itemName)
     => editor.GetNode<VBoxContainer>("%ArmoryList").GetChildren()
       .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text.Contains(itemName));
+      .Single(button => button.Text.Contains(itemName, StringComparison.Ordinal));
 
   public static Button SquadDeployButton(SquadLoadoutView view)
     => view.GetNode<Button>("%DeployButton");
@@ -204,7 +204,7 @@ internal static partial class GeoscapeTestScenes
   public static Button DialogButton(GeoscapeEventResolution dialog, string text)
     => dialog.GetNode<HBoxContainer>("%Buttons").GetChildren()
       .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text == text);
+      .Single(button => string.Equals(button.Text, text, StringComparison.Ordinal));
 
   public static Button ReturnButton(BattleScene battle)
     => battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Button>("%ReturnButton");
@@ -238,7 +238,7 @@ internal static partial class GeoscapeTestScenes
   {
     var map = scene.GetNode<GeoscapeMapControl>("%Map");
     return map.GetChildren().AsValueEnumerable().OfType<RegionButton>()
-      .Where(button => button.SceneFilePath == map.EventMarkerScene!.ResourcePath).ToArray();
+      .Where(button => string.Equals(button.SceneFilePath, map.EventMarkerScene!.ResourcePath, StringComparison.Ordinal)).ToArray();
   }
 
   // Press the actual marker so its EventClicked signal reaches the composition root.

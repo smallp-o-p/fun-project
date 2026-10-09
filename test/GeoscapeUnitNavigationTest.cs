@@ -107,7 +107,7 @@ public class GeoscapeUnitNavigationTest
 
     Assert.True(ReferenceEquals(unit, manager.Current));
     Assert.True(unit.IsVisibleInTree());
-    Assert.True(StatsText(unit).Contains("Aim: 65 -> 70"));
+    Assert.True(StatsText(unit).Contains("Aim: 65 -> 70", System.StringComparison.Ordinal));
     Assert.Equal(2, unit.GetNode<VBoxContainer>("%ArmoryList").GetChildCount()); // slot retained
     Assert.True(paths.GetParent() is null && paths.IsQueuedForDeletion());
   }
@@ -115,7 +115,7 @@ public class GeoscapeUnitNavigationTest
   private static Button CommitButton(SkillProgressionView paths, string pathName)
     => paths.GetNode<VBoxContainer>("%AvailableList").GetChildren()
       .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text.Contains(pathName));
+      .Single(button => button.Text.Contains(pathName, System.StringComparison.Ordinal));
 
   private static string StatsText(UnitView unit)
   {

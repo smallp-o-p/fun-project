@@ -548,9 +548,9 @@ public class UnitActionCacheTest
     void ArrangeAtSessionStart(HookContext context)
     {
       BattleUnitState player = context.Session.GetFactionAliveUnits(playerFaction)
-        .AsValueEnumerable().Single(unit => unit.Combatant.Name == "Player");
+        .AsValueEnumerable().Single(unit => string.Equals(unit.Combatant.Name, "Player", StringComparison.Ordinal));
       support = context.Session.GetFactionAliveUnits(playerFaction)
-        .AsValueEnumerable().Single(unit => unit.Combatant.Name == "Support");
+        .AsValueEnumerable().Single(unit => string.Equals(unit.Combatant.Name, "Support", StringComparison.Ordinal));
       player.TrySpendActionPoints(player.CurrentActionPoints);
       support.TrySpendActionPoints(support.CurrentActionPoints);
       existing = new GetAvailableActionsForUnit(

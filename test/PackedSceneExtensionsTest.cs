@@ -46,8 +46,8 @@ public partial class PackedSceneExtensionsTest
       (long)Performance.Singleton.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount));
 
     Assert.True(thrown is not null, "Expected a wrong root to throw.");
-    Assert.True(thrown.Message.Contains("Test probe"), thrown.Message); // the supplied role
-    Assert.True(thrown.Message.Contains("ProbeView"), thrown.Message); // expected type
-    Assert.True(thrown.Message.Contains("Control"), thrown.Message); // actual root type
+    Assert.True(thrown.Message.Contains("Test probe", StringComparison.Ordinal), thrown.Message); // the supplied role
+    Assert.True(thrown.Message.Contains("ProbeView", StringComparison.Ordinal), thrown.Message); // expected type
+    Assert.True(thrown.Message.Contains("Control", StringComparison.Ordinal), thrown.Message); // actual root type
   }
 }

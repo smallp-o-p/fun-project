@@ -318,7 +318,7 @@ public class CharacterModelAnimationAssetTest
   {
     foreach (PresetTarget other in others)
     {
-      if (other.MeshPath == channel.MeshPath && other.Shape == channel.Shape)
+      if (string.Equals(other.MeshPath, channel.MeshPath, StringComparison.Ordinal) && string.Equals(other.Shape, channel.Shape, StringComparison.Ordinal))
         return true;
     }
     return false;
@@ -330,7 +330,7 @@ public class CharacterModelAnimationAssetTest
     for (int track = 0; track < neutral.GetTrackCount(); track++)
     {
       if (neutral.TrackGetType(track) == Animation.TrackType.BlendShape
-          && neutral.TrackGetPath(track).ToString() == fullTrack)
+          && string.Equals(neutral.TrackGetPath(track).ToString(), fullTrack, StringComparison.Ordinal))
         return neutral.BlendShapeTrackInterpolate(track, 0.0);
     }
     throw new InvalidOperationException(
@@ -345,7 +345,7 @@ public class CharacterModelAnimationAssetTest
     for (int track = clip.GetTrackCount() - 1; track >= 0; track--)
     {
       if (clip.TrackGetType(track) == Animation.TrackType.BlendShape
-          && clip.TrackGetPath(track).ToString() == trackPath)
+          && string.Equals(clip.TrackGetPath(track).ToString(), trackPath, StringComparison.Ordinal))
         clip.RemoveTrack(track);
     }
     int added = clip.AddTrack(Animation.TrackType.BlendShape);

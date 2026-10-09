@@ -54,6 +54,7 @@ public sealed class BattleUnitState
   internal IEnumerable<DamageBundleMod> ActiveBuffDamageMods
     => ActiveBuffs.AsValueEnumerable().SelectMany(buff => buff.DamageMods).ToArray();
 
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "MA0015", Justification = "Buff grants combine combatant and equipment state; the guard identifies the invalid grant, not one input parameter.")]
   internal BattleUnitState(
     int unitId,
     Combatant combatant,

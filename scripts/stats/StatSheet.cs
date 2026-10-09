@@ -16,7 +16,7 @@ public sealed class StatSheet
     foreach (var (statType, stat) in stats)
       if (!statType.IsInstanceOfType(stat))
         throw new ArgumentException(
-          $"StatSheet entry for key {statType.Name} holds a {stat?.GetType().Name ?? "null"}.");
+          $"StatSheet entry for key {statType.Name} holds a {stat?.GetType().Name ?? "null"}.", nameof(stats));
     _stats = stats;
   }
 

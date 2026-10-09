@@ -48,7 +48,7 @@ public static class CombatantSummary
       unit.EquippedWeapon.IfSome(weapon => lines.Add(ModsText("Weapon mods", weapon.GetModSlots())));
     }
 
-    return string.Join("\n", lines);
+    return string.Join('\n', lines);
   }
 
   private static string ModsText(string label, Godot.Collections.Array<ModSlot> slots)

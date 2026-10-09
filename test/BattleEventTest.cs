@@ -127,7 +127,7 @@ public class BattleEventTest
         Objects = [new ObjectPlacement(TestData.MakeObject("Crate", 10), new Vector3I(3, 0, 2))],
       });
     var obj = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable()
-      .Single(o => o.Name == "Crate");
+      .Single(o => string.Equals(o.Name, "Crate", StringComparison.Ordinal));
     Assert.Throws<ArgumentNullException>(() => _ = new ObjectDamagedBattleEvent(null!, [], 1, None));
     Assert.Throws<ArgumentNullException>(() => _ = new ObjectDamagedBattleEvent(obj, null!, 1, None));
     foreach (int amount in new[] { 0, -1 })

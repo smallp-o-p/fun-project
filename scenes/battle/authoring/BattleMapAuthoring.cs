@@ -197,7 +197,7 @@ public partial class BattleMapAuthoring : BattleMap
         if (source.TopBlocksVerticalLineOfSight) Tile(cell + Godot.Vector3I.Up).BlocksVerticalLineOfSight = true;
         for (int side = 0; side < 4; side++)
         {
-          if ((source.CoverDirections & Sides[side]) == 0 || source.CoverAmount == 0 || footprint.ContainsKey(local + Directions[side])) continue;
+          if ((source.CoverDirections & Sides[side]) == CoverDirections.None || source.CoverAmount == 0 || footprint.ContainsKey(local + Directions[side])) continue;
           var outward = (Godot.Vector3I)(placement.Basis * (Vector3)Directions[side]).Round();
           var neighbor = cell + outward;
           int facing = System.Array.IndexOf(Directions, -outward);

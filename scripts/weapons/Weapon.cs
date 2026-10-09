@@ -17,7 +17,7 @@ public class Weapon : EquippableItem, IHasStats
     if (Frame.Packets.Count == 0)
       throw new InvalidOperationException($"Weapon '{ItemName}' frame '{Frame.Name}' has no damage packets.");
     foreach (DamagePacketData packet in Frame.Packets)
-      ArgumentNullException.ThrowIfNull(packet);
+      ArgumentNullException.ThrowIfNull(packet, nameof(data));
 
     Stats = new StatSheet(new Dictionary<Type, Stat>
     {
@@ -39,6 +39,7 @@ public class Weapon : EquippableItem, IHasStats
   /// <see cref="DamageContributions"/> followed by <paramref name="externalMods"/> (e.g. the
   /// wielder's active buff mods), and drop non-positive packets at emission.
   /// </summary>
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "MA0015", Justification = "Damage contributions combine equipped resource state with external mods; preserve the offending mod's diagnostic name.")]
   public List<Damage> EmitDamage(IEnumerable<DamageBundleMod> externalMods)
   {
     int baseDamage = GetDamageStat().BaseValue;

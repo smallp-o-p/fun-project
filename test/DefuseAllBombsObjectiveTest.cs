@@ -115,7 +115,7 @@ public class DefuseAllBombsObjectiveTest
     ]);
     using var runtime = BattleFactory.Start(setup).RequireRight();
     var objects = runtime.Query(new GetBattleSpecialObjectsQuery());
-    BattleObjectState crate = objects.AsValueEnumerable().Single(obj => obj.Name == "Crate");
+    BattleObjectState crate = objects.AsValueEnumerable().Single(obj => string.Equals(obj.Name, "Crate", StringComparison.Ordinal));
     BattleUnitState defuser = runtime.Query(new GetUnitAtTile(
       runtime.TryGetTile(new Vector3I(0, 0, 0)).RequireSome())).RequireSome();
 
@@ -149,8 +149,8 @@ public class DefuseAllBombsObjectiveTest
         ],
       });
     var objects = battle.Query(new GetBattleSpecialObjectsQuery());
-    var bomb = objects.AsValueEnumerable().Single(o => o.Name == "Bomb");
-    var crate = objects.AsValueEnumerable().Single(o => o.Name == "Crate");
+    var bomb = objects.AsValueEnumerable().Single(o => string.Equals(o.Name, "Bomb", StringComparison.Ordinal));
+    var crate = objects.AsValueEnumerable().Single(o => string.Equals(o.Name, "Crate", StringComparison.Ordinal));
     battle.Attack(battle.PlayerUnit, crate);
     Assert.True(battle.Query(new GetBattleOutcomeQuery()).IsNone);
     battle.ClearEvents();
@@ -181,7 +181,7 @@ public class DefuseAllBombsObjectiveTest
       });
     var cell = new Vector3I(3, 0, 2);
     var bomb = battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable()
-      .Single(o => o.Name == "Bomb");
+      .Single(o => string.Equals(o.Name, "Bomb", StringComparison.Ordinal));
     var grenade = TestData.MakeGrenade("Frag", throwRange: 10, blastRadius: 0,
       effects: [new DamageEffectData { BaseDamage = 5 }]);
     battle.PlayerUnit.AddInventoryItem(grenade.Item);
