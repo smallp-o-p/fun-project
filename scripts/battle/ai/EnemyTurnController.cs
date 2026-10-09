@@ -7,76 +7,67 @@ namespace FunProject.Battle;
 
 // Owns synchronous automation only. Presentation and committed-event callbacks have no
 // execution role; completion observers finish before every fresh decision frame.
-internal sealed class EnemyTurnController(BattleRuntime runtime, Faction player,
-  EnemyPolicy policy, int initialFactionCount, Func<BattleAction, BattleActionExecResult> submit)
+internal sealed class EnemyTurnController(BattleRuntime runtime)
 {
   private const int FactionSubmissionLimit = 64;
-  private readonly long _drainSubmissionLimit = FactionSubmissionLimit * (long)initialFactionCount;
   private readonly List<EnemyDecisionTrace> _latest = [];
+  private EnemyPolicy? _policy;
+  private Faction? _player;
+  private long _totalSubmissionLimit;
   private bool _stopped;
 
   internal IReadOnlyList<EnemyDecisionTrace> LatestDecisions => System.Array.AsReadOnly(_latest.ToArray());
-  internal string FallbackReason { get; private set; } = "";
 
-  internal void Stop(string reason)
+  internal void Enable(Faction player, EnemyPolicySettings? settings, int factionCount)
   {
-    _stopped = true;
-    FallbackReason = reason;
+    if (_policy is not null) throw new InvalidOperationException("Enemy turns are already enabled.");
+    if (_stopped) throw new InvalidOperationException("Cannot enable enemy turns after an execution fault.");
+    _player = player;
+    _policy = new(settings);
+    _totalSubmissionLimit = FactionSubmissionLimit * (long)factionCount;
   }
 
-  internal void Drain()
+  internal void Stop() => _stopped = true;
+
+  internal void ExecuteEnemyTurns()
   {
-    Faction? activation = null;
-    int activationTurn = -1, submittedThisActivation = 0;
-    long submittedThisDrain = 0;
-    var memory = new EnemyTurnMemory();
-    while (!_stopped && !runtime.IsDisposed && runtime.Query(new GetBattleOutcomeQuery()).IsNone)
+    if (_policy is null || _stopped) return;
+    try { ExecuteEnabledTurns(_policy); }
+    catch { Stop(); throw; }
+  }
+
+  private void ExecuteEnabledTurns(EnemyPolicy policy)
+  {
+    long submitted = 0;
+    while (!_stopped && runtime.Query(new GetBattleOutcomeQuery()).IsNone)
     {
       var side = runtime.Query(new GetActiveSideQuery());
-      if (ReferenceEquals(side, player)) return;
+      if (ReferenceEquals(side, _player)) return;
+      var memory = new EnemyTurnMemory();
       var frame = runtime.Query(new GetEnemyDecisionFrame(side));
-      if (!ReferenceEquals(side, activation) || activationTurn != frame.TurnNumber)
+      for (int factionSubmissions = 0; factionSubmissions < FactionSubmissionLimit; factionSubmissions++)
       {
-        activation = side;
-        activationTurn = frame.TurnNumber;
-        submittedThisActivation = 0;
-        memory = new();
-      }
-      memory.Observe(frame);
-      bool factionLimit = submittedThisActivation >= FactionSubmissionLimit - 1;
-      bool drainLimit = submittedThisDrain >= _drainSubmissionLimit - 1;
-      var decision = factionLimit || drainLimit
-        ? new EnemyDecisionTrace(new(EnemyIntentKind.EndFactionTurn), 0, [], factionLimit ? "Faction submission limit" : "Drain submission limit")
-        : policy.Decide(frame, memory);
-      var action = MintAction(side, decision.Intent);
-      submittedThisActivation++;
-      submittedThisDrain++;
-      Record(decision);
-      submit(action);
-      // Empty interrupted submissions also reach these guards: events are not progress.
-      if (_stopped || runtime.IsDisposed || runtime.Query(new GetBattleOutcomeQuery()).IsSome) return;
-      if (submittedThisDrain >= _drainSubmissionLimit)
-      {
-        Stop("Drain submission limit");
-        return;
-      }
-      if (!ReferenceEquals(runtime.Query(new GetActiveSideQuery()), side)) continue;
-      var after = runtime.Query(new GetEnemyDecisionFrame(side));
-      memory.Observe(after);
-      if (!MadeProgress(frame, after))
-      {
-        memory.Suppress(decision.Intent);
-        _latest[^1] = decision with { FallbackReason = "No progress; intent suppressed" };
-        FallbackReason = "No progress; intent suppressed";
+        memory.RecordObservations(frame);
+        // Reserve the final submission for turn end, even when previous actions were interrupted.
+        var decision = factionSubmissions == FactionSubmissionLimit - 1 || submitted == _totalSubmissionLimit - 1
+          ? new EnemyDecisionTrace(new(EnemyIntentKind.EndFactionTurn), 0, [])
+          : policy.Decide(frame, memory);
+        var action = MintAction(side, decision.Intent);
+        if (_latest.Count == FactionSubmissionLimit) _latest.RemoveAt(0);
+        _latest.Add(decision);
+        runtime.ExecuteSingleAction(action);
+        submitted++;
+        // Disposal/fault can occur inside completion observers; do not query after shutdown.
+        if (_stopped) return;
+        if (submitted == _totalSubmissionLimit) { Stop(); return; }
+        if (!ReferenceEquals(runtime.Query(new GetActiveSideQuery()), side)) break;
+        var after = runtime.Query(new GetEnemyDecisionFrame(side));
+        if (after.IsTerminal) return;
+        if (frame.TurnNumber != after.TurnNumber) break;
+        if (!MadeProgress(frame, after)) memory.MarkFailed(decision.Intent);
+        frame = after;
       }
     }
-  }
-
-  private void Record(EnemyDecisionTrace decision)
-  {
-    if (_latest.Count == FactionSubmissionLimit) _latest.RemoveAt(0);
-    _latest.Add(decision);
-    FallbackReason = decision.FallbackReason;
   }
 
   private BattleAction MintAction(Faction side, EnemyIntent intent)
@@ -105,7 +96,6 @@ internal sealed class EnemyTurnController(BattleRuntime runtime, Faction player,
   }
 
   private static bool MadeProgress(EnemyDecisionFrame before, EnemyDecisionFrame after)
-    => before.TurnNumber != after.TurnNumber || after.IsTerminal
-      || !before.OwnUnits.AsValueEnumerable().SequenceEqual(after.OwnUnits)
+    => !before.OwnUnits.AsValueEnumerable().SequenceEqual(after.OwnUnits)
       || !before.Hostiles.AsValueEnumerable().SequenceEqual(after.Hostiles);
 }

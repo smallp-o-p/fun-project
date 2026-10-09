@@ -20,8 +20,30 @@ public sealed class EnemyPolicyTest
       EnemyScoreFeatures.FromNormalized(.25, .50, .10, -.20, .30, .40, 1)));
     Assert.Equal(25, EnemyScoreFeatures.FromNormalized(.245, 0, 0, 0, -.245, 0, 0).Damage);
     Assert.Equal(-25, EnemyScoreFeatures.FromNormalized(0, 0, 0, 0, -.245, 0, 0).Progress);
-    Assert.Throws<ArgumentOutOfRangeException>(() => _ = new EnemyPolicySettings(aggressionPercent: 201));
-    Assert.Throws<ArgumentOutOfRangeException>(() => _ = new EnemyPolicySettings(preferredRangePercent: -1));
+    var clamped = new EnemyPolicySettings(201, -1, 300, 101);
+    Assert.Equal(200f, clamped.AggressionPercent);
+    Assert.Equal(0f, clamped.CautionPercent);
+    Assert.Equal(200f, clamped.RangeWeightPercent);
+    Assert.Equal(100f, clamped.PreferredRangePercent);
+    var fractional = new EnemyPolicySettings(100.25f, 25.5f, 150.75f, 75.5f);
+    Assert.Equal(100.25f, fractional.AggressionPercent);
+    Assert.Equal(25.5f, fractional.CautionPercent);
+    Assert.Equal(150.75f, fractional.RangeWeightPercent);
+    Assert.Equal(75.5f, fractional.PreferredRangePercent);
+    Assert.Equal(954L, new EnemyPolicy(new(100.25f)).Score(features));
+    Assert.Equal(15801L, new EnemyPolicy(new(100.004f)).Score(
+      EnemyScoreFeatures.FromNormalized(1, 1, 0, 0, 0, 0, 0)));
+    Assert.Equal(-605L, new EnemyPolicy(new(cautionPercent: 115.75f)).Score(
+      EnemyScoreFeatures.FromNormalized(0, 0, .10, 0, 0, 0, 0)));
+    foreach (float invalid in new[] { float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+    {
+      var defaults = new EnemyPolicySettings(invalid, invalid, invalid, invalid);
+      Assert.Equal(100f, defaults.AggressionPercent);
+      Assert.Equal(100f, defaults.CautionPercent);
+      Assert.Equal(100f, defaults.RangeWeightPercent);
+      Assert.Equal(75f, defaults.PreferredRangePercent);
+      Assert.Equal(950L, new EnemyPolicy(defaults).Score(features));
+    }
   }
 
   [TestCase]
@@ -103,7 +125,6 @@ public sealed class EnemyPolicyTest
     var a = new EnemyPolicy().Decide(retained, new EnemyTurnMemory());
     var b = new EnemyPolicy().Decide(other, new EnemyTurnMemory());
     Assert.Equal(a.Intent, b.Intent);
-    Assert.Equal(a.FallbackReason, b.FallbackReason);
     Assert.True(a.Candidates.AsValueEnumerable().SequenceEqual(b.Candidates));
     open.Move(open.PlayerUnit, [new(3, 0, 0)]);
     Assert.Equal(new Vector3I(4, 0, 0), retained.OwnUnits[0].Position);
@@ -156,7 +177,7 @@ public sealed class EnemyPolicyTest
     memory.Visit(1, new(1, 0, 0));
     Assert.Equal(EnemyIntentKind.Pass, policy.Decide(frame, memory).Intent.Kind);
     var observedEmpty = frame with { Tiles = [new(new(2, 0, 0), TraversalKnowledge.Clear, true, true, TileCover.None)] };
-    memory.Observe(observedEmpty);
+    memory.RecordObservations(observedEmpty);
     Assert.True(memory.IsDismissed(frame.Contacts[0]));
     var newSighting = frame with
     {
@@ -165,7 +186,7 @@ public sealed class EnemyPolicyTest
         new(new(0, 0, 1), TraversalKnowledge.Clear, true, true, TileCover.None),
         new(new(0, 0, 2), TraversalKnowledge.Unknown, true, false, TileCover.None)],
     };
-    memory.Observe(newSighting);
+    memory.RecordObservations(newSighting);
     Assert.Equal(new Vector3I(0, 0, 1), policy.Decide(newSighting, memory).Intent.Destination);
   }
 }

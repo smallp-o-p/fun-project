@@ -7,7 +7,7 @@ public sealed class EnemyTurnMemory
 {
   private readonly Dictionary<int, SysColGeneric.HashSet<Vector3I>> _visited = [];
   private readonly Dictionary<int, long> _dismissedContacts = [];
-  private readonly SysColGeneric.HashSet<EnemyIntent> _suppressed = [];
+  private readonly SysColGeneric.HashSet<EnemyIntent> _failedIntents = [];
 
   public void Visit(int actorId, Vector3I position)
   {
@@ -19,10 +19,10 @@ public sealed class EnemyTurnMemory
     => _visited.TryGetValue(actorId, out var visited) && visited.Contains(position);
   public bool IsDismissed(LastSeenContact contact)
     => _dismissedContacts.TryGetValue(contact.UnitId, out long revision) && revision == contact.VisibilityRevision;
-  public bool IsSuppressed(EnemyIntent intent) => _suppressed.Contains(intent);
-  public void Suppress(EnemyIntent intent) => _suppressed.Add(intent);
+  public bool HasFailed(EnemyIntent intent) => _failedIntents.Contains(intent);
+  public void MarkFailed(EnemyIntent intent) => _failedIntents.Add(intent);
 
-  public void Observe(EnemyDecisionFrame frame)
+  public void RecordObservations(EnemyDecisionFrame frame)
   {
     foreach (var own in frame.OwnUnits) Visit(own.UnitId, own.Position);
     foreach (var contact in frame.Contacts)

@@ -31,4 +31,4 @@ public sealed record EnemyScoreFeatures(int Damage, int Kill, int Exposure, int 
 }
 public sealed record EnemyCandidateTrace(EnemyIntent Intent, EnemyScoreFeatures Features, long ScoreCentipoints);
 public sealed record EnemyDecisionTrace(EnemyIntent Intent, long ScoreCentipoints,
-  IReadOnlyList<EnemyCandidateTrace> Candidates, string FallbackReason);
+  IReadOnlyList<EnemyCandidateTrace> Candidates);

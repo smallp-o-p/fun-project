@@ -5,27 +5,21 @@ namespace FunProject.Battle;
 
 public sealed record EnemyPolicySettings
 {
-  public int AggressionPercent { get; }
-  public int CautionPercent { get; }
-  public int RangeWeightPercent { get; }
-  public int PreferredRangePercent { get; }
-  public EnemyPolicySettings(int aggressionPercent = 100, int cautionPercent = 100,
-    int rangeWeightPercent = 100, int preferredRangePercent = 75)
+  public float AggressionPercent { get; }
+  public float CautionPercent { get; }
+  public float RangeWeightPercent { get; }
+  public float PreferredRangePercent { get; }
+  public EnemyPolicySettings(float aggressionPercent = 100, float cautionPercent = 100,
+    float rangeWeightPercent = 100, float preferredRangePercent = 75)
   {
-    Check(aggressionPercent, 200, nameof(aggressionPercent));
-    Check(cautionPercent, 200, nameof(cautionPercent));
-    Check(rangeWeightPercent, 200, nameof(rangeWeightPercent));
-    Check(preferredRangePercent, 100, nameof(preferredRangePercent));
-    AggressionPercent = aggressionPercent;
-    CautionPercent = cautionPercent;
-    RangeWeightPercent = rangeWeightPercent;
-    PreferredRangePercent = preferredRangePercent;
+    AggressionPercent = Clamp(aggressionPercent, 200, 100);
+    CautionPercent = Clamp(cautionPercent, 200, 100);
+    RangeWeightPercent = Clamp(rangeWeightPercent, 200, 100);
+    PreferredRangePercent = Clamp(preferredRangePercent, 100, 75);
   }
 
-  private static void Check(int value, int maximum, string name)
-  {
-    if (value < 0 || value > maximum) throw new ArgumentOutOfRangeException(name, value, $"Expected 0..{maximum}.");
-  }
+  private static float Clamp(float value, float maximum, float defaultValue)
+    => float.IsFinite(value) ? Math.Clamp(value, 0, maximum) : defaultValue;
 }
 
 // Pure: permitted detached values and activation memory in, detached decision/trace out.
@@ -33,15 +27,16 @@ public sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
 {
   private readonly EnemyPolicySettings _settings = settings ?? new();
 
-  // Features are hundredths; return hundredths of a point, retaining long intermediates.
+  // Features are hundredths. Promote float percentages before multiplication and round
+  // only the final centipoints, so valid fractional settings keep their precision.
   public long Score(EnemyScoreFeatures features)
   {
-    long numerator = 60L * _settings.AggressionPercent * features.Damage
-      + 100L * _settings.AggressionPercent * features.Kill
-      - 35L * _settings.CautionPercent * features.Exposure
-      + 20L * _settings.RangeWeightPercent * features.RangeImprovement
+    double numerator = 60d * _settings.AggressionPercent * features.Damage
+      + 100d * _settings.AggressionPercent * features.Kill
+      - 35d * _settings.CautionPercent * features.Exposure
+      + 20d * _settings.RangeWeightPercent * features.RangeImprovement
       + 2000L * features.Progress + 800L * features.Frontier + 1500L * features.Reload - 20000;
-    return numerator >= 0 ? (numerator + 50) / 100 : -((-numerator + 50) / 100);
+    return (long)Math.Round(numerator / 100, MidpointRounding.AwayFromZero);
   }
 
   public EnemyDecisionTrace Decide(EnemyDecisionFrame frame, EnemyTurnMemory memory)
@@ -50,7 +45,7 @@ public sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
     ArgumentNullException.ThrowIfNull(memory);
     var actor = frame.OwnUnits.AsValueEnumerable().Where(unit => unit.CanAct).OrderBy(unit => unit.UnitId).FirstOrDefault();
     if (frame.IsTerminal || actor is null)
-      return new(new(EnemyIntentKind.EndFactionTurn), 0, [], frame.IsTerminal ? "Battle ended" : "No actable own unit");
+      return new(new(EnemyIntentKind.EndFactionTurn), 0, []);
     var targets = frame.Hostiles.AsValueEnumerable().OrderBy(target => Distance(actor.Position, target.Position))
       .ThenBy(target => target.UnitId).Take(8).ToArray();
     var tiles = frame.Tiles.AsValueEnumerable().ToDictionary(tile => tile.Position);
@@ -69,7 +64,7 @@ public sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
     List<EnemyCandidateTrace> candidates = [];
     void Add(EnemyIntent intent, EnemyScoreFeatures features)
     {
-      if (!memory.IsSuppressed(intent)) candidates.Add(new(intent, features, Score(features)));
+      if (!memory.HasFailed(intent)) candidates.Add(new(intent, features, Score(features)));
     }
     if (actor.CanAttack)
       foreach (var target in targets)
@@ -92,8 +87,8 @@ public sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
         double progress = goal.Match(point => (Distance(actor.Position, point) - Distance(destination.Position, point))
           / Math.Max(1, Distance(actor.Position, point)), () => 0);
         double range = targets.Length == 0 || actor.Range <= 0 ? 0 :
-          (Math.Abs(Distance(actor.Position, targets[0].Position) - actor.Range * _settings.PreferredRangePercent / 100d)
-          - Math.Abs(Distance(destination.Position, targets[0].Position) - actor.Range * _settings.PreferredRangePercent / 100d)) / Math.Max(1, actor.Range);
+          (Math.Abs(Distance(actor.Position, targets[0].Position) - actor.Range * (_settings.PreferredRangePercent / 100d))
+          - Math.Abs(Distance(destination.Position, targets[0].Position) - actor.Range * (_settings.PreferredRangePercent / 100d))) / Math.Max(1, actor.Range);
         double frontier = (Frontier(destination.Position, tiles) - Frontier(actor.Position, tiles)) / 10d;
         Add(new(EnemyIntentKind.Move, actor.UnitId, Destination: destination.Position), EnemyScoreFeatures.FromNormalized(
           0, 0, Exposure(destination.Position, targets, tiles), range, progress, frontier, 0));
@@ -102,8 +97,8 @@ public sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
       .OrderByDescending(candidate => candidate.ScoreCentipoints).ThenBy(candidate => candidate.Intent.Kind)
       .ThenBy(candidate => candidate.Intent.TargetId).ThenBy(candidate => candidate.Intent.Destination.X)
       .ThenBy(candidate => candidate.Intent.Destination.Y).ThenBy(candidate => candidate.Intent.Destination.Z).FirstOrDefault();
-    return chosen is null ? new(new(EnemyIntentKind.Pass, actor.UnitId), 0, candidates.AsReadOnly(), "No positive permitted intent")
-      : new(chosen.Intent, chosen.ScoreCentipoints, candidates.AsReadOnly(), "");
+    return chosen is null ? new(new(EnemyIntentKind.Pass, actor.UnitId), 0, candidates.AsReadOnly())
+      : new(chosen.Intent, chosen.ScoreCentipoints, candidates.AsReadOnly());
   }
 
   private static bool LegalNeighbor(EnemyOwnUnit actor, EnemyKnownTile tile, Dictionary<Vector3I, EnemyKnownTile> tiles)

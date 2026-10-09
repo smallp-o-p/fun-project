@@ -94,19 +94,20 @@ public sealed class EnemyTurnControllerTest
     battle.Runtime.Dispose();
   }
 
-  [TestCase]
-  public static void ObserverFaultStopsAutomationWhileLaterManualSubmissionsRemainOrdinary()
+  [TestCase(true)]
+  [TestCase(false)]
+  public static void ObserverFaultStopsAutomationWhileLaterManualSubmissionsRemainOrdinary(bool enableBeforeFault)
   {
     using var battle = BattleFixture.Duel(playerControlled: true);
-    battle.Runtime.EnableEnemyTurns();
+    if (enableBeforeFault) battle.Runtime.EnableEnemyTurns();
     Action<BattleActionExecResult> fail = _ => throw new InvalidOperationException("Observer failed");
     battle.Runtime.ActionCompleted += fail;
     Assert.Throws<InvalidOperationException>(() => battle.EndFactionTurn(battle.PlayerFaction));
     battle.Runtime.ActionCompleted -= fail;
+    if (!enableBeforeFault) Assert.Throws<InvalidOperationException>(() => battle.Runtime.EnableEnemyTurns());
     battle.EndFactionTurn(battle.EnemyFaction);
     battle.EndFactionTurn(battle.PlayerFaction);
     Assert.Equal(battle.EnemyFaction, battle.Query(new GetActiveSideQuery()));
-    Assert.Equal("Execution fault", battle.Runtime.EnemyTurnFallbackReason);
   }
 
   [TestCase]
@@ -172,11 +173,10 @@ public sealed class EnemyTurnControllerTest
     Assert.True(completed[^1] is EndFactionTurn);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
     Assert.Equal(64, battle.Runtime.LatestEnemyDecisions.Count);
-    Assert.Equal("Faction submission limit", battle.Runtime.EnemyTurnFallbackReason);
   }
 
   [TestCase]
-  public static void EmptyNoProgressIntentIsSuppressedAndCannotLoop()
+  public static void EmptyNoProgressIntentIsNotRetriedAndCannotLoop()
   {
     using var battle = BattleFixture.Duel(playerControlled: true, dimensions: new(3, 1, 1),
       player: new("Player", Position: Vector3I.Zero),
@@ -202,8 +202,6 @@ public sealed class EnemyTurnControllerTest
     battle.EndFactionTurn(battle.PlayerFaction);
     Assert.Equal(1, attempts);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
-    Assert.True(battle.Runtime.LatestEnemyDecisions.AsValueEnumerable().Any(trace =>
-      string.Equals(trace.FallbackReason, "No progress; intent suppressed", StringComparison.Ordinal)));
   }
 
   [TestCase]
@@ -227,7 +225,6 @@ public sealed class EnemyTurnControllerTest
     battle.Runtime.ActionCompleted += _ => completed++;
     battle.EndFactionTurn(battle.PlayerFaction);
     Assert.Equal(129, completed);
-    Assert.Equal("Drain submission limit", battle.Runtime.EnemyTurnFallbackReason);
     Assert.Equal(64, battle.Runtime.LatestEnemyDecisions.Count);
   }
 
