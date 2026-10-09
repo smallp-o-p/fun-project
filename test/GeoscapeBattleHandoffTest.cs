@@ -200,11 +200,11 @@ public partial class GeoscapeBattleHandoffTest
     int intents = 0;
     battle.Completed += _ => intents++; // probe subscribed after the mission handler
     var returnButton = ReturnButton(battle);
-    Assert.False(returnButton.Visible); // the enemy turn has not completed
+    Assert.False(returnButton.Visible); // terminal playback has not completed
     returnButton.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(0, intents); // an ongoing battle cannot return
 
-    DrainDirector(battle);
+    await DrainDirector(battle);
     Assert.True(returnButton.Visible); // terminal and idle at drain
 
     returnButton.EmitSignal(Button.SignalName.Pressed);
@@ -244,7 +244,7 @@ public partial class GeoscapeBattleHandoffTest
     var secondBattle = MissionBattleHost(manager.Current);
     await SelectFirstBattleUnit(secondBattle);
     EndTurnButton(secondBattle).EmitSignal(Button.SignalName.Pressed);
-    DrainDirector(secondBattle);
+    await DrainDirector(secondBattle);
     ReturnButton(secondBattle).EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(0, campaign.ActiveEvents.Count);
     Assert.Equal(0, MapEventMarkers(scene).Length);
@@ -373,12 +373,16 @@ public partial class GeoscapeBattleHandoffTest
     runtime.ExecuteAction(BattleAction.ApplyDamage(runtime.TryGetAlive(grunt).RequireSome(), 999));
     Assert.True(battle.Runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.True(Director(scene).Busy);
+    var banner = scene.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Label>("%BattleOverBanner");
+    Assert.False(banner.Visible);
 
     returnButton.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(0, intents); // the guard holds while playback drains
 
-    DrainDirector(scene);
+    await DrainDirector(scene);
     Assert.True(returnButton.Visible);
+    Assert.True(banner.Visible);
+    Assert.Equal("VICTORY", banner.Text);
 
     returnButton.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(1, intents);
@@ -399,7 +403,7 @@ public partial class GeoscapeBattleHandoffTest
     var battle = MissionBattleHost(manager.Current);
     await SelectFirstBattleUnit(battle);
     EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
-    DrainDirector(battle);
+    await DrainDirector(battle);
 
     // Captured before the swap: MapEventMarkers filters by the export's resource path, so
     // after substituting the wrong-root scene its count could not see the original markers.
@@ -454,7 +458,7 @@ public partial class GeoscapeBattleHandoffTest
     var battle = MissionBattleHost(manager.Current);
     await SelectFirstBattleUnit(battle);
     EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
-    DrainDirector(battle);
+    await DrainDirector(battle);
     var map = scene.GetNode<GeoscapeMapControl>("%Map");
     int childrenBeforeReturn = map.GetChildCount(); // authored regions plus both markers
 

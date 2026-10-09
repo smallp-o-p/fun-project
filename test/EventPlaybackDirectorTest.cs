@@ -16,7 +16,7 @@ public sealed partial class EventPlaybackDirectorTest
   {
     var faction = TestData.MakeFaction("Player");
     using var battle = new BattleFixture(new BattleSetup(
-      TestData.MakeOpenBattleMap(new Vector3I(3, 1, 3)),
+      TestData.MakeOpenBattleMap(new Vector3I(22, 1, 3)),
       [new BattleSideSetup(faction, [new FakeObjectiveData()],
         [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Seed", faction)), new Vector3I(0, 0, 0))])],
       Seed: 7));
@@ -28,19 +28,98 @@ public sealed partial class EventPlaybackDirectorTest
 
     BattleActionExecResult result = battle.Submit(BattleAction.SpawnUnit(
       TestData.MakeCombatant("Alpha", battle.PlayerFaction), battle.At(1, 0, 1)));
-    BattleEvent[] committed = result.EventsThatOccurred.ToArray();
+    List<BattleEvent> committed = [.. result.EventsThatOccurred.ToArray()];
+    // Grow the executor log across many completed batches before playback gets a tick.
+    for (int x = 2; x <= 20; x++)
+      committed.AddRange(battle.Submit(BattleAction.SpawnUnit(
+        TestData.MakeCombatant($"Unit{x}", battle.PlayerFaction), battle.At(x, 0, 1)))
+        .EventsThatOccurred.ToArray());
 
     Assert.True(director.Busy); // queued but not yet ticked
     director.Tick();
     Assert.Equal(1, director.Played.Count); // one step per Tick
     while (director.Busy)
       director.Tick();
-    Assert.Equal(committed.Length, director.Played.Count);
-    for (int i = 0; i < committed.Length; i++)
+    Assert.Equal(committed.Count, director.Played.Count);
+    for (int i = 0; i < committed.Count; i++)
       Assert.True(ReferenceEquals(committed[i], director.Played[i])); // commit order
     Assert.Equal(1, idleCount);
     director.Tick(); // idle fires only once
     Assert.Equal(1, idleCount);
+  }
+
+  [TestCase]
+  public static void CapturedMovementFinishesAtConstantSpeedBeforeLaterDeathPlayback()
+  {
+    using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1));
+    var director = battle.AttachDirector(new EventPlaybackDirector());
+    var tree = (SceneTree)Engine.GetMainLoop();
+    tree.Root.AddChild(director);
+    director.SetProcess(false);
+    var mesh = battle.OwnNode(new Node3D
+    {
+      Position = BoardCoordinates.TileToWorldCenter(new Vector3I(1, 0, 1)) + new Vector3(0, .5f, 0),
+    });
+    director.RegisterUnitMesh(battle.Unit, mesh);
+    battle.Move(battle.Unit, [new Vector3I(2, 0, 1), new Vector3I(3, 0, 1)]);
+    battle.ApplyDamage(battle.Unit, 999); // Backend death must not skip its earlier movement.
+
+    director.Tick();
+    Tween tween = tree.GetProcessedTweens().AsValueEnumerable().Last();
+    tween.CustomStep(.51); // two captured one-tile segments at 4 tiles/second
+    Assert.True(mesh.Position.IsEqualApprox(
+      BoardCoordinates.TileToWorldCenter(new Vector3I(3, 0, 1)) + new Vector3(0, .5f, 0)));
+    Assert.True(mesh.Visible);
+    Assert.True(director.Busy); // later damage/death still queued
+    while (director.Busy) director.Tick();
+    Assert.False(mesh.Visible);
+  }
+
+  [TestCase]
+  public static void ExitCancelsActiveTweenAndQueuedEventsIdempotently()
+  {
+    using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1));
+    var director = battle.AttachDirector(new EventPlaybackDirector());
+    var tree = (SceneTree)Engine.GetMainLoop();
+    tree.Root.AddChild(director);
+    director.SetProcess(false);
+    var mesh = battle.OwnNode(new Node3D
+    {
+      Position = BoardCoordinates.TileToWorldCenter(new Vector3I(1, 0, 1)) + new Vector3(0, .5f, 0),
+    });
+    director.RegisterUnitMesh(battle.Unit, mesh);
+    battle.Move(battle.Unit, [new Vector3I(2, 0, 1), new Vector3I(3, 0, 1)]);
+    battle.ApplyDamage(battle.Unit, 999);
+    director.Tick();
+    Tween tween = tree.GetProcessedTweens().AsValueEnumerable().Last();
+    tween.CustomStep(.1);
+    Vector3 stopped = mesh.Position;
+    director._ExitTree();
+    director._ExitTree();
+    Assert.False(tween.IsValid());
+    Assert.False(director.Busy);
+    director.Tick();
+    Assert.Equal(stopped, mesh.Position);
+    Assert.True(mesh.Visible); // cancellation discarded the later death visual
+  }
+
+  [TestCase]
+  public static void ExitIgnoresLateCompletionAndLaterResultDelivery()
+  {
+    using var battle = BattleFixture.Duel();
+    var director = battle.AttachDirector(new HeldDirector());
+    int idle = 0;
+    director.PlaybackIdle += () => idle++;
+    battle.EndFactionTurn(battle.PlayerFaction);
+    director.Tick();
+    Assert.True(director.Busy);
+    director._ExitTree();
+    Assert.False(director.Busy);
+    director.Complete(); // retained asynchronous callback after teardown
+    battle.EndFactionTurn(battle.EnemyFaction);
+    director.Tick();
+    Assert.False(director.Busy);
+    Assert.Equal(0, idle);
   }
 
   [TestCase(TestName = "Consecutive move steps coalesce into one path step; tile bookkeeping folds in")]
@@ -194,6 +273,14 @@ public sealed partial class EventPlaybackDirectorTest
       MoveRuns.Add(run.AsValueEnumerable().Select(step => step.Position.Raw).ToList());
       done();
     }
+  }
+
+  // Holds a visual completion callback to model asynchronous playback.
+  private sealed partial class HeldDirector : EventPlaybackDirector
+  {
+    private Action _complete = delegate { };
+    public void Complete() => _complete();
+    protected override void PlayStep(BattleEvent battleEvent, Action done) => _complete = done;
   }
 
   // No overrides: exposes the production step methods directly.

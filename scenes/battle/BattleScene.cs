@@ -14,6 +14,7 @@ public sealed partial class BattleScene : Node3D
   private BattleUiController _ui = null!;
   private EventPlaybackDirector _director = null!;
   private BattleUI _view = null!;
+  private BattleInputController _input = null!;
   private Faction _playerFaction = null!;
   private bool _allowReturn;
   private bool _disposed;
@@ -44,6 +45,22 @@ public sealed partial class BattleScene : Node3D
       _runtime.ActionCompleted -= _director.EnqueueResult;
       _director.PlaybackIdle -= OnPlaybackIdle;
     }
+    if (_ui is not null) _ui.Changed -= RefreshView;
+    if (_view is not null)
+    {
+      _view.Hud.ConfirmRequested -= OnConfirmIntent;
+      _view.Hud.CancelRequested -= OnCancelIntent;
+      _view.Hud.VerbSelected -= OnVerbIntent;
+      _view.Hud.ReturnRequested -= OnReturnIntent;
+    }
+    if (_input is not null)
+    {
+      _input.TileClicked -= OnTileClicked;
+      _input.TileHovered -= OnTileHovered;
+      _input.ConfirmPressed -= OnConfirmIntent;
+      _input.CancelPressed -= OnCancelIntent;
+    }
+    _director?.Cancel();
     _ui?.Dispose();
     _runtime?.Dispose();
   }
@@ -75,23 +92,24 @@ public sealed partial class BattleScene : Node3D
 
     _ui = new BattleUiController(_runtime, _playerFaction, () => _director.Busy);
 
-    var input = new BattleInputController { Name = "BattleInputController" };
-    AddChild(input);
-    input.Initialize(rig);
+    _input = new BattleInputController { Name = "BattleInputController" };
+    AddChild(_input);
+    _input.Initialize(rig);
     _view = GetNode<BattleUI>("%BattleUI");
-    _view.Hud.ConfirmRequested += () => _ui.Confirm();
-    _view.Hud.CancelRequested += _ui.Cancel;
-    _view.Hud.VerbSelected += _ui.BeginAction;
+    _view.Hud.ConfirmRequested += OnConfirmIntent;
+    _view.Hud.CancelRequested += OnCancelIntent;
+    _view.Hud.VerbSelected += OnVerbIntent;
     _view.Hud.ReturnRequested += OnReturnIntent;
-    input.TileClicked += tile => _ui.ClickTile(tile);
-    input.TileHovered += OnTileHovered;
-    input.ConfirmPressed += () => _ui.Confirm();
-    input.CancelPressed += _ui.Cancel;
+    _input.TileClicked += OnTileClicked;
+    _input.TileHovered += OnTileHovered;
+    _input.ConfirmPressed += OnConfirmIntent;
+    _input.CancelPressed += OnCancelIntent;
 
     _ui.Changed += RefreshView;
     _director.PlaybackIdle += OnPlaybackIdle;
 
     RefreshView();
+    _runtime.EnableEnemyTurns(new(200, 25, 100, 75));
   }
 
   public override void _ExitTree()
@@ -112,10 +130,16 @@ public sealed partial class BattleScene : Node3D
 
   private void RefreshView()
   {
+    if (_disposed) return;
+    if (_director.Busy)
+    {
+      _view.Hud.DisableInput();
+      return;
+    }
     var queriedUnits = _runtime.Query(new GetFactionAliveUnits(_playerFaction))
       .AsValueEnumerable().Select(unit => unit.State).ToArray();
     _view.Hud.ShowUnits(queriedUnits);
-    _view.Hud.ShowActionOptions(_ui.ActionOptions);
+    _view.Hud.ShowActionOptions(_ui.ActionOptions, _ui.Gate == InputGate.Open);
 
     bool targeting = _ui.State is UiState.Targeting or UiState.TargetingLocked;
     if (targeting)
@@ -149,7 +173,7 @@ public sealed partial class BattleScene : Node3D
 
   private void OnTileHovered(Vector3I tile)
   {
-    if (_ui.State != UiState.Targeting)
+    if (_disposed || _ui.Gate != InputGate.Open || _ui.State != UiState.Targeting)
       return;
 
     _ui.PreviewAt(tile);
@@ -164,17 +188,13 @@ public sealed partial class BattleScene : Node3D
     _view.Hud.ShowBattleOver(text);
   }
 
-  private void OnPlaybackIdle()
+  private void OnConfirmIntent()
   {
-    RefreshView();
-    if (_runtime.Query(new GetBattleOutcomeQuery()).IsSome)
-      return;
-
-    Faction activeSide = _runtime.Query(new GetActiveSideQuery());
-    if (ReferenceEquals(activeSide, _playerFaction))
-      return;
-
-    // THROWAWAY: automatically end enemy turns until a real enemy controller exists.
-    _runtime.ExecuteAction(BattleAction.EndFactionTurn(activeSide));
+    if (!_disposed) _ui.Confirm();
   }
+
+  private void OnCancelIntent() { if (!_disposed) _ui.Cancel(); }
+  private void OnVerbIntent(UnitActionOption option) { if (!_disposed) _ui.BeginAction(option); }
+  private void OnTileClicked(Vector3I tile) { if (!_disposed) _ui.ClickTile(tile); }
+  private void OnPlaybackIdle() => RefreshView();
 }

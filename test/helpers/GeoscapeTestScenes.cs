@@ -245,12 +245,19 @@ internal static partial class GeoscapeTestScenes
   public static void OpenResolutionViaMapEvent(GeoscapeScene scene, int eventIndex = 0)
     => MapEventMarkers(scene)[eventIndex].EmitSignal(BaseButton.SignalName.Pressed);
 
-  // Drains the director's playback queue synchronously (instant v1 visuals only).
-  public static void DrainDirector(BattleScene battle)
+  // Give real movement tweens frames to complete; bound failures instead of spinning forever.
+  public static async Task DrainDirector(BattleScene battle)
   {
     EventPlaybackDirector director = Director(battle);
-    while (director.Busy)
+    var tree = (SceneTree)Engine.GetMainLoop();
+    ulong deadline = Godot.Time.GetTicksMsec() + 10000;
+    while (director.Busy && Godot.Time.GetTicksMsec() < deadline)
+    {
       director.Tick();
+      if (director.Busy)
+        await battle.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
+    }
+    Assert.False(director.Busy, "Battle playback did not drain within ten seconds.");
   }
 
   public static Node3D AddBackdrop(GeoscapeView view, Node3D backdrop)
