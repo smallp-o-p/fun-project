@@ -62,6 +62,15 @@ public sealed class BattleKnowledgeMovementTest
     Assert.Equal(2, path.Length);
     Assert.True(battle.Query(new GetKnownMoveTilesForUnit(battle.PlayerFaction, battle.Alive(battle.PlayerUnit)))
       .AsValueEnumerable().Contains(new Vector3I(1, 0, 1)));
+    // Enemy intent admission is stricter than the player's existing unknown-path estimate.
+    var enemyFrame = battle.Query(new GetEnemyDecisionFrame(side));
+    var decision = new EnemyPolicy().Decide(enemyFrame, new EnemyTurnMemory());
+    Assert.False(decision.Candidates.AsValueEnumerable().Any(candidate =>
+      candidate.Intent.Kind == EnemyIntentKind.Move && candidate.Intent.Destination == new Vector3I(1, 0, 1)));
+    battle.Move(battle.SupportUnit, [new(2, 0, 1)]);
+    var nowClear = new EnemyPolicy().Decide(battle.Query(new GetEnemyDecisionFrame(side)), new EnemyTurnMemory());
+    Assert.True(nowClear.Candidates.AsValueEnumerable().Any(candidate =>
+      candidate.Intent.Kind == EnemyIntentKind.Move && candidate.Intent.Destination == new Vector3I(1, 0, 1)));
   }
 
   [TestCase]
