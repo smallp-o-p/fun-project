@@ -206,7 +206,7 @@ public class BattleStartupLifecycleTest
     public bool Observed { get; private set; }
     public int AliveUnitCount { get; private set; }
     public int ObjectCount { get; private set; }
-    public Faction ActiveSide { get; private set; }
+    public Faction? ActiveSide { get; private set; }
     public bool FirstUnitAvailable { get; private set; }
     public bool FirstUnitCanAct { get; private set; }
     public bool MutuallyVisible { get; private set; }
