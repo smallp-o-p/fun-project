@@ -4,7 +4,7 @@ Define item kinds with an `EquippableItemData` resource and its capability resou
 
 ## Design Goals
 
-- The project's Data/Runtime split, applied per capability: authored `Resource` data is immutable; runtime objects own mutable state.
+- The project's Data/Runtime split, applied per capability: authored `Resource` data is treated as immutable during play; runtime objects own mutable state.
 - A new item kind (throwable scanner beacon, multi-use medkit) is data-only: compose capabilities in the inspector.
 - Battle actions take typed proofs of their required capabilities.
 
@@ -49,13 +49,9 @@ Consumption is parsed once, at action construction, into a `Consumable` receipt 
 
 `UseItem` is the generic active-item verb: one charge per use at `BattleSession.DefaultUseItemActionPointCost`, raising `ItemUsedBattleEvent`; effect payloads belong to hooks reacting to that event (the same split as `ItemThrownBattleEvent` → `CapabilityEffectSystem`).
 
-## Health and stun damage packets
+## Combat effects
 
-`DamagePacketData.Kind` and runtime `Damage.Kind` default to `DamageKind.Health`. The kind travels with amount, element, and optional status through packet derivation and damage modifiers; mixed health/stun bundles are supported.
-
-`DamageResolver` processes packets in bundle order. Health packets consume remaining armor (1.5× floored armor loss on an element match); health spill always uses the un-multiplied amount. Stun packets increase only `BattleUnitState.CurrentStun`, preserving health, armor, and its regen delay. Non-positive packets resolve to zero. `DamageResolution` and nonlethal `UnitDamagedBattleEvent` carry separate `ArmorDamage`, `HealthDamage`, and `StunDamage` totals. A status requiring health damage checks its own packet's health spill.
-
-Stun starts at zero. A living unit becomes unconscious when stun is at least its current health; zero health means death. Unconscious bodies keep their inventory, tile occupancy, and targetability. Acting and contributing vision require a living conscious unit. Conscious units recover up to 5 stun at their owner's turn end, after status effects and armor regen; `StunRecoverySystem` owns the fixed unsigned recovery rate.
+Damage packet, health/stun, status, and recovery semantics belong to [the battle runtime](battlescape-architecture.md#damage-disabling-and-recovery). Capability payloads use that pipeline; item composition does not define a second damage model.
 
 ## Adding a capability
 

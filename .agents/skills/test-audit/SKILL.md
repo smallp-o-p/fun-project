@@ -154,25 +154,9 @@ uncertain candidates into cleanup to raise deletion counts.
 
 ## Validation
 
-Never edit sources while `dotnet test` runs. For C# changes: run
-`lsp_diagnostics` on changed files, `dotnet format`, `dotnet build`, then a
-focused run — `dotnet test fun-project.csproj --no-restore --filter
-"FullyQualifiedName~<TestClass>"` (e.g. `WeaponSystemTest`), choosing the
-classes actually affected. Shared runtime, executor, hook-ordering, or
-cross-subsystem changes need the full `dotnet test fun-project.csproj
---no-restore`. Finish with `git diff --check` and a diff self-review.
+Follow [AGENTS.md](../../../AGENTS.md#verification) and [testing.md](../../../docs/testing.md). Choose focused tests from the affected owners; run the full suite for shared-runtime or cross-subsystem changes. Check available compiler/analyzer diagnostics; an optional LSP tool is not a prerequisite.
 
-Tests are GdUnit4 inside a Godot mono runtime, compiled Debug-only by the
-csproj and launched via `.runsettings` `GODOT_BIN` (update it if Godot
-moves). Never test while the editor rebuilds — both write
-`.godot/mono/temp/bin`; a host crash (`-1073741819` / 0xC0000005) means rerun
-afterwards. Documentation-only changes need diff, link, and configuration
-checks only. Scene/editor work goes through `godot-ai` with a confirmed
-session (AGENTS.md); never hand-edit scenes while one is connected.
-
-Report the proof actually run, including failed launches and incomplete runs.
-A completed sweep with zero deletion candidates is a valid outcome; report
-its scope and evidence without implying cleanup occurred.
+Report the proof actually run, including failed launches and incomplete runs. A completed audit with no safe deletion candidates is valid; do not imply cleanup occurred.
 
 ## Landing
 

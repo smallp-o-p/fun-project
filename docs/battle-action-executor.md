@@ -2,21 +2,21 @@
 
 `BattleActionExecutor` is the sequencing and reaction layer for battle mutations. It owns the pending action stack, the hook registry with the default systems, and the interrupt machinery. It runs one primitive step at a time and collects the interrupt actions that hooks return.
 
-Detail: [battlescape-architecture.md](battlescape-architecture.md) (runtime overview), [battle-session-command-pattern.md](battle-session-command-pattern.md) (command and query shapes).
+Detail: [battlescape-architecture.md](battlescape-architecture.md) (runtime overview).
 
 ## Authority Boundaries
 
 - `BattleSession` is the only owner of authoritative tactical state.
 - `BattleAction` is the command object. It owns its legality checks and application against the session. It may be primitive or composite.
 - `BattleActionExecutor` invokes the primitives a submitted action yields, in order, and routes hook-returned interrupts back through the same path.
-- Controllers, HUD code, and AI build actions and submit them. Presentation reacts to committed events.
+- Controllers, HUD code, and AI build actions and submit them through `BattleRuntime.ExecuteAction`. Presentation reacts to committed events.
 - `BattleEvent` reports a state change that already committed.
 
 The executor runs each action through its `Execute` method.
 
 ## Public Surface
 
-- `Submit(BattleAction action)` — `Submit` resolves the action and its reactions. It returns one `BattleActionExecResult`. The result holds the submitted action plus every committed `BattleEvent`. The span is a zero-copy `ReadOnlySpan<BattleEvent>` into the executor's append-only log. One submission is one `Submit` call and all the work it resolves.
+- `Submit(BattleAction action)` — `Submit` resolves the action and its reactions. It returns one `BattleActionExecResult`. The result holds the submitted action plus every committed `BattleEvent`. The result retains a range in the executor's append-only log; `EventsThatOccurred` returns a zero-copy `ReadOnlySpan<BattleEvent>` for that range. Consume the span immediately or copy events for later playback; reacquire it from the result after further submissions rather than retaining it across log growth. One submission is one `Submit` call and all the work it resolves.
 - `RegisterHook<TEventKey>(hook, priority = 0)` / `UnregisterHook<TEventKey>(hook)` — These methods are the registration surface. `BattleRuntime.RegisterHook` delegates here.
 - `Dispose()` — `Dispose` detaches the executor's `BattleEventCommitted` subscription.
 
@@ -78,7 +78,7 @@ The executor registers owner-turn upkeep on `TurnEndedBattleEvent` in this order
 
 Recovery requires a living conscious unit. AP and immobilization are independent of recovery eligibility. Status damage can cause unconsciousness before recovery runs. Ended sessions skip recovery.
 
-When the designated player loses all conscious units, `ObjectiveSystem` suppresses routing on the unit death or unconscious event. The suppression keeps the player-wipe defeat rule authoritative. Other events still update objective history and can queue follow-ups after the battle ends. The first `EndBattle` freezes victory capture membership before `SessionEndedBattleEvent` observers query it. Executor queue clearing then drops remaining work. Applying captures to the campaign is deferred (see [battlescape-architecture.md](battlescape-architecture.md)).
+When the designated player loses all conscious units, `ObjectiveSystem` suppresses routing on the unit death or unconscious event. The suppression keeps the player-wipe defeat rule authoritative. Other events still update objective history and can queue follow-ups after the battle ends. The first `EndBattle` freezes victory capture membership before `SessionEndedBattleEvent` observers query it. Executor queue clearing then drops remaining work. Campaign return applies captures through `GeoscapeSession.CompleteMission` (see [campaign lifetime](strategic-runtime.md#capture-and-campaign-lifetime)).
 
 ## Single-Threaded Execution
 

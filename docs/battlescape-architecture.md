@@ -2,7 +2,7 @@
 
 The tactical runtime is scene-independent C# in `scripts/battle/`. It is the single source of truth for live battle state. Godot scenes read its state and play committed events.
 
-Detail: [battle-action-executor.md](battle-action-executor.md) (execution rules), [battle-session-command-pattern.md](battle-session-command-pattern.md) (typed reads and commands), [battlescape-tile-system.md](battlescape-tile-system.md) (board, LOS, and paths), [battle-map-authoring.md](battle-map-authoring.md) (map authoring).
+Detail: [battle-action-executor.md](battle-action-executor.md) (execution rules), [battlescape-tile-system.md](battlescape-tile-system.md) (board, LOS, and paths), [battle-map-authoring.md](battle-map-authoring.md) (map authoring).
 
 ## Design Goals
 
@@ -85,7 +85,9 @@ flowchart LR
 5. The bootstrap announces the initial placements, `SessionStarted`, and the first turn through the ordinary event dispatch. Every placement announcement precedes the initial spotting announcements. Hooks see the complete roster and availability. Session start precedes the first turn and its AP refresh while the battle is ongoing. Interrupts run only after the startup primitive. The factory owns all setup.
 6. An initialization fault before the runtime exists throws before anything registers. A fault after construction disposes the runtime and rethrows the original exception. A start whose terminal objective ends the battle during startup succeeds and returns the completed runtime.
 
-A supplied `PlayerDeployment` keeps its exact campaign faction and combatant references. `Combatant.OwningFaction` stays unchanged. A mismatch is a typed failure. The campaign-to-battle handoff is deferred. `BattleLauncher` starts the standalone battle and presents `BattleScene` the same way.
+`BattleSetupResolver.Resolve` also accepts a `SideDeployment` for a generated mission enemy force. Deployment stat modifiers enter through `UnitLoadout.StatMods` and contribute exactly once at spawn, in the order defined by [stat folding](stat-system.md#effective-stat-access).
+
+A supplied `PlayerDeployment` keeps its exact campaign faction and combatant references. `Combatant.OwningFaction` stays unchanged. A mismatch is a typed failure. Campaign launch and return are implemented; see [campaign lifetime](strategic-runtime.md#capture-and-campaign-lifetime). `BattleLauncher` starts the standalone battle and presents `BattleScene` the same way.
 
 ### BattleSession
 
@@ -106,19 +108,26 @@ Event dispatch processes a guarded queue. Each broadcast first refreshes visibil
 
 ### Damage, disabling, and recovery
 
-`Damage` packets carry amount, element, and `DamageKind` (default `Health`). `DamageResolver` (`scripts/battle/combat/`) resolves them in bundle order inside `ApplyDamageTo`:
+`DamagePacketData.Kind` and runtime `Damage.Kind` default to `Health`; mixed health/stun bundles preserve kind through modifiers. Stun starts at zero. `Damage` packets carry amount, element, and kind. `DamageResolver` (`scripts/battle/combat/`) resolves them in bundle order inside `ApplyDamageTo`:
 
 - Health packets consume remaining armor. An element match removes 1.5× armor (floored). Health spill uses the original packet amount.
 - Stun packets bypass armor, leave it for later packets, and increase only `CurrentStun`.
 - Non-positive packets resolve to zero.
 
-`UnitDamagedBattleEvent` carries `ArmorDamage`, `HealthDamage`, and `StunDamage` plus the pre-mitigation bundle. Death emits `UnitKilledBattleEvent`. A new unconscious transition emits `UnitUnconsciousBattleEvent`. Other hits emit `UnitDamagedBattleEvent`.
+`DamageResolution` and `UnitDamagedBattleEvent` carry separate `ArmorDamage`, `HealthDamage`, and `StunDamage` totals; the event also carries the pre-mitigation bundle. Death emits `UnitKilledBattleEvent`. A new unconscious transition emits `UnitUnconsciousBattleEvent`. Other hits emit `UnitDamagedBattleEvent`.
 
 A lethal bundle emits only the kill event, including death after earlier unconsciousness. Kill credit is death-only. Elimination objectives observe both event types. Death playback and kill-only hooks keep consuming `UnitKilledBattleEvent`.
 
 Status effects (`StatusEffectSpecData` in `scripts/items/effects/`) apply after survival. Each packet uses its own `ApplyChancePercent` and `RequiresHealthDamage`. A health-damage requirement needs positive health spill from that packet. `StatusEffectSystem` ticks at the owner's turn end: decrement, damage-over-time through the normal pipeline, expiry.
 
 Recovery order at the ending faction's turn end: `StatusEffectSystem` and `ArmorRegenSystem` (priority −100), then `StunRecoverySystem` (priority −90). Only armor or health damage restarts the armor regen delay. In-progress battles recover up to `5u` stun per owner turn for living conscious units. A positive reduction raises `UnitStunRecoveredBattleEvent`. Routing max-health debuff effects through the damage pipeline is deferred.
+
+### Buffs
+
+The buff system uses shared `Buff`/`BuffCondition` resources in `scripts/buffs/`. `BattleUnitState` stores an ordered `(Buff, IsActive)` entry per grant and owns evaluation.
+- Grants at spawn come from `Combatant.InnateBuffs` plus `BuffGrantCapabilityData` on equipped weapon/armor. Identical grants stack. Hooks re-evaluate post-broadcast (`TurnStartBuffHook`, `UnitSpawnedBuffHook`). Turn-start flips apply before the AP refresh.
+- Each flip caps current health at the new maximum, with a minimum cap of 1. It raises the activation event before the next grant.
+- Active snapshots feed `StatMod`s through `GatherStatContributions` and `DamageBundleMod`s through `TrySpendShot` after slot and ammunition mods. The unit owns activation state for the shared resources.
 
 ### Board objects
 
@@ -138,7 +147,7 @@ The first `EndBattle` freezes capture membership before broadcasting `SessionEnd
 
 The list is read-only and deduplicates original `Combatant` references. The Combatants keep their identity and faction. Roster membership stays unchanged. `GetFactionEndOfBattleSummary` exposes `CapturedEnemies` only for that player's victory summary. Unconscious player participants remain survivors.
 
-`GameState.Captivity` retains added Combatants by reference for the campaign's lifetime, deduplicates by reference, and returns detached snapshots. Standalone battle capture summaries work. Captivity transfer and the campaign-to-battle handoff are deferred.
+`GameState.Captivity` retains added Combatants by reference for the campaign's lifetime, deduplicates by reference, and returns detached snapshots. `GeoscapeSession.CompleteMission` transfers captured identities to campaign captivity and removes reported deaths from the roster. See [campaign lifetime](strategic-runtime.md#capture-and-campaign-lifetime).
 
 ### IBattleSessionQuery
 
@@ -159,11 +168,17 @@ Scene code creates proofs at the runtime boundary: `TryGetAlive(unit)`, `TryGetA
 
 Examples: `FindPathForUnit`, `GetPossibleMoveTilesForUnit`, `GetVisibleEnemiesForUnit`, `CanUnitActNow`, `GetHitChanceForAttack`, `GetAvailableActionsForUnit`, `GetPlayerFactionQuery`, `GetFactionEndOfBattleSummary`. Use one question per query. Keep the algorithm in that query's implementation. Keep query classes single-purpose, without enum modes, nullable selector fields, or behavior controlled by unrelated properties. Put a complex or variable algorithm in a strategy behind that specific query. Keep each `BattleRuntime.Query` call mapped to one query implementation.
 
+### Query results and action availability
+
+Guaranteed reads remain valid after completion: the outcome is present, the scheduler retains its last active side, and `CanUnitActNow` returns false.
+
+`GetAvailableActionsForUnit` returns a persistent read-only list for that unit identity. The list and its `UnitAction` objects remain live across submissions; they are not detached snapshots. Committed events invalidate relevant conditions before observers run; failed submissions also invalidate availability. Reads during a submission evaluate current state without replacing the retained cached values.
+
 ### BattleBoardState
 
 The board stores a flat materialized `BattleTileState[]`, unit and object occupancy, and positions. Cells use the index `x + width * (z + depth * y)` (X width, Y height, Z depth).
 
-Adjacency is eight-way: orthogonal plus same-level diagonals. A diagonal step needs at least one open flank. Pathfinding is a pure-C# breadth-first search with a fixed direction order; the board exposes it as `FindPath`. Unit-specific questions stay in queries (`FindPathForUnit`, `GetPossibleMoveTilesForUnit`). See [battlescape-tile-system.md](battlescape-tile-system.md).
+Adjacency has eight horizontal directions and two vertical directions; vertical steps have no diagonals. A diagonal step needs at least one open flank. Pathfinding is a pure-C# breadth-first search with a fixed direction order; the board exposes it as `FindPath`. Unit-specific questions stay in queries (`FindPathForUnit`, `GetPossibleMoveTilesForUnit`). See [battlescape-tile-system.md](battlescape-tile-system.md).
 
 ### Visibility
 
@@ -175,7 +190,9 @@ The session owns visibility because it derives from unit positions, tile state, 
 - A faction always knows its own living units. Conscious observers contribute faction vision and can see unconscious bodies. Exploration persists.
 - After each committed event, only units whose cell or consciousness changed recompute visible tiles. Every conscious observer rebuilds visible-unit membership wholesale.
 
-Vision is omnidirectional. Smoke attenuation, lighting-dependent vision, and last-known enemy memory remain deferred.
+`BattleObservationHistory` retains faction-specific terrain and last-seen contacts. `GetFactionUnitKnowledge` returns detached current observations and remembered contacts not currently visible; `GetFactionLastSeenContacts` exposes the history. Hidden current occupancy or an unseen unit's new state must not be inferred from these records. See [knowledge-aware movement](battlescape-tile-system.md#exact-world-and-faction-knowledge-queries).
+
+Vision is omnidirectional. Smoke attenuation and lighting-dependent vision remain deferred.
 
 ### BattleAction and the executor
 
@@ -188,48 +205,6 @@ var result = runtime.ExecuteAction(BattleAction.MoveUnit(unit, [destination]));
 `Submit` and the `ExecuteAction` facade resolve the chain first. They return one `BattleActionExecResult`. The result holds the submitted action plus every event committed while resolving it. The span is a zero-copy `ReadOnlySpan<BattleEvent>` into the executor's append-only log. An interrupted action or a battle that ends mid-submission leaves the remaining steps unexecuted.
 
 `Submit` converts only a `Result.Rejected` step to `InvalidOperationException` because parameters are trusted. The executor clears queued work first. Arbitrary action or hook exceptions then propagate unchanged. Committed state and events remain. Full rules: [battle-action-executor.md](battle-action-executor.md).
-
-## Representative Flow: Move Command
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Player
-    participant Input as BattleInputController
-    participant Ui as BattleUiController
-    participant Queries as BattleRuntime.Query
-    participant Runtime as BattleRuntime
-    participant Exec as BattleActionExecutor
-    participant Action as MoveUnit
-    participant Session as BattleSession
-    participant Board as BattleBoardState
-    participant Director as EventPlaybackDirector
-    participant Scene as BattleScene
-    participant View as BattleUI
-
-    Player->>Input: Clicks a reachable tile
-    Input->>Ui: TileClicked(tile)
-    Ui->>Queries: Preview path (AliveUnit proof)
-    Queries->>Board: FindPath
-    Queries-->>Ui: Preview path
-    Player->>Ui: Confirms the move
-    Ui->>Runtime: ExecuteAction(MoveUnit with destination steps)
-    Runtime->>Exec: Submit(action)
-    loop Until the action and its reactions settle
-        Exec->>Action: Execute the next primitive step
-        Action->>Session: First Execute only: ValidateRoute once (total AP, adjacency, occupancy)
-        Action->>Session: Every Execute: check liveness, incapacity, next-cell occupancy
-        Action->>Board: Commit the next step
-        Action-->>Session: Raise UnitMoved, TileOccupied
-        Session->>Exec: Broadcast, then fire hooks post-broadcast
-        Exec->>Exec: Collect hook interrupt actions for the committed step
-    end
-    Exec-->>Runtime: BattleActionExecResult (action + committed events)
-    Runtime->>Director: ActionCompleted(result)
-    Runtime-->>Ui: Returns the result
-    Director-->>Scene: PlaybackIdle after the coalesced move run animates
-    Scene-->>View: Refresh view models from queries
-```
 
 ## Turn Flow Notes
 
@@ -247,31 +222,14 @@ sequenceDiagram
 - Unit death updates alive/dead storage, board occupancy, current-turn availability, and faction queue membership through session bookkeeping. Unconsciousness consumes availability and removes the faction from future turns when no conscious ally remains, while preserving the body and its occupancy. A disabled active faction keeps its current queue head until explicit turn end.
 - The designated player's loss of all conscious units ends the battle as defeat. `ObjectiveSystem` suppresses directives on that death or unconscious event, so the player-wipe defeat rule keeps priority over objective results. In a battle with no designated player, the loss of all living conscious units stays in progress until turn end resolves a draw.
 
-## Battle Events
+## Events and hooks
 
-Events are records rooted at `IBattleEventTag`. Hook keys are event types or shared marker interfaces (`IUnitBattleEvent`, `IPositionedBattleEvent`, `ICausedByUnit`). Presentation observes `BattleSession.BattleEventCommitted` (or the runtime re-raise), which fires only after the state change committed.
+`BattleEvent` values report committed changes. Hook keys are event types or marker interfaces such as `IUnitBattleEvent`, `IPositionedBattleEvent`, and `ICausedByUnit`. The runtime re-raises committed events for consumers. Hook registration, priority, interruption, and built-in upkeep are defined in [action execution](battle-action-executor.md).
 
-- Session and turns: `SessionStarted`, `SessionEnded`, `TurnStarted`, `TurnEnded`, `ActiveSideChanged`.
-- Units: `UnitAdded`, `UnitActivationEnded`, `UnitMoved`, `TileOccupied`, `UnitAttacked`, `UnitReloadedWeapon`, `UnitDamaged`, `UnitKilled`, `UnitUnconscious`, `UnitStunRecovered`, `UnitArmorRegenerated`, `UnitSpotted`.
-- Statuses and buffs: `UnitStatusEffectApplied`, `UnitStatusEffectTicked`, `UnitStatusEffectExpired`, `UnitBuffActivated`, `UnitBuffDeactivated`.
-- Items: `ItemThrown`, `ItemUsed`, `CapabilityResolved`.
-- Objects: `ObjectPlaced`, `ObjectInteracted`, `ObjectExpired`, `ObjectDamaged`, `ObjectDestroyed`.
-- Objectives: `ObjectiveAdded`, `ObjectiveCompleted`, `ObjectiveFailed`.
+## Presentation
 
-Hooks register on the executor and fire once per committed event, after the broadcast. Default systems:
+`BattleScene` receives a started runtime and resolved setup through `Present`, instances the map, and owns meshes, input, UI, and playback. It binds HUD intents directly and subscribes the director to `ActionCompleted` before the UI controller. Host disposal detaches subscriptions and playback before disposing the controller and runtime.
 
-- status effects and armor regen (`TurnEndedBattleEvent`, priority −100);
-- stun recovery (−90);
-- capability effects (`ItemThrownBattleEvent`);
-- buff evaluation (`TurnStartedBattleEvent` and `UnitAddedBattleEvent`);
-- `ObjectiveSystem` (catch-all `IBattleEventTag` router at +100, filtering each objective's declared keys).
+`BattleUiController` owns selection and targeting. Memoized `UnitActionOption` adapters delegate live availability and mint fresh proofs when constructing actions. A completed UI update publishes one `Changed`; hover previews render directly without rebuilding widgets. Targeters expose `Candidates`. Input uses delivered viewport-local coordinates.
 
-Registration uses event-tag types.
-
-## Deferred Extensions
-
-`BattleRules`, a battle AI controller, movement- and targeting-query strategies, and reaction fire are still future work. When they arrive, they must read through typed queries, commit through actions, and emit events for presentation.
-
-## Canonical Vocabulary
-
-`BattleSession`, `BattleAction`, `BattleActionExecResult`, `BattleActionExecutor`, `BattleHook` (`BattleHook<TEvent>`, `HookContext`), `IBattleSessionQuery<TResult>`, `BattleQueryFailure`, `BattleRuntime`, `Either<BattleQueryFailure, TResult>`, `IBattleEventTag`, `BattleBoardState`, `BattleTileState`, `BattleUnitState`, `BattleEvent`, `BattleScene`, `BattleUiController`, `EventPlaybackDirector`.
+`EventPlaybackDirector` replays committed events in order. Read tactical state through queries; do not treat a live state reference as a snapshot of an earlier event. Character-model controls are separate presentation-owned state; see [model-controls.md](model-controls.md).
