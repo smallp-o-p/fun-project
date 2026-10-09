@@ -538,10 +538,9 @@ public class UnitActionCacheTest
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
-    BattleUnitState support = null;
-    IReadOnlyList<UnitAction> existing = null;
-    IReadOnlyList<UnitAction> createdDuringCallback = null;
-    UnitAction existingMove = null;
+    BattleUnitState? support = null;
+    IReadOnlyList<UnitAction>? createdDuringCallback = null;
+    UnitAction? existingMove = null;
     bool existingDuringCallback = true;
     bool createdDuringCallbackValue = true;
 
@@ -553,7 +552,7 @@ public class UnitActionCacheTest
         .AsValueEnumerable().Single(unit => string.Equals(unit.Combatant.Name, "Support", StringComparison.Ordinal));
       player.TrySpendActionPoints(player.CurrentActionPoints);
       support.TrySpendActionPoints(support.CurrentActionPoints);
-      existing = new GetAvailableActionsForUnit(
+      IReadOnlyList<UnitAction> existing = new GetAvailableActionsForUnit(
         context.Session.TryGetAlive(player).RequireSome()).Execute(context.Session);
       existingMove = Row<MoveActionDefinition>(existing);
     }
@@ -562,9 +561,13 @@ public class UnitActionCacheTest
     {
       if (context.Session.TurnNumber != 1)
         return;
-      existingDuringCallback = existingMove.IsAvailable;
+      UnitAction move = existingMove ??
+        throw new InvalidOperationException("the SessionStarted callback never queried the player unit");
+      BattleUnitState supportUnit = support ??
+        throw new InvalidOperationException("the SessionStarted callback never found the support unit");
+      existingDuringCallback = move.IsAvailable;
       createdDuringCallback = new GetAvailableActionsForUnit(
-        context.Session.TryGetAlive(support).RequireSome()).Execute(context.Session);
+        context.Session.TryGetAlive(supportUnit).RequireSome()).Execute(context.Session);
       createdDuringCallbackValue = Row<MoveActionDefinition>(createdDuringCallback).IsAvailable;
     }
 
@@ -577,10 +580,14 @@ public class UnitActionCacheTest
       } }],
     });
 
+    UnitAction retainedMove = existingMove ??
+      throw new InvalidOperationException("the SessionStarted callback never queried the player unit");
+    IReadOnlyList<UnitAction> created = createdDuringCallback ??
+      throw new InvalidOperationException("the TurnStarted callback never queried the support unit");
     Assert.False(existingDuringCallback);
     Assert.False(createdDuringCallbackValue);
-    Assert.True(existingMove.IsAvailable);
-    Assert.True(Row<MoveActionDefinition>(createdDuringCallback).IsAvailable);
+    Assert.True(retainedMove.IsAvailable);
+    Assert.True(Row<MoveActionDefinition>(created).IsAvailable);
   }
 
   [TestCase(TestName = "Reads during a continuation TurnStarted observe pre-refresh availability without caching")]

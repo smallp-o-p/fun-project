@@ -11,7 +11,7 @@ namespace FunProject.Tests;
 public class BattleSessionQueriesTest
 {
   private static BattleSetup SoloSetup(Faction faction, string unitName, Vector3I position,
-    int actionPoints = 4, BattleMapData map = null)
+    int actionPoints = 4, BattleMapData? map = null)
     => new(
       map ?? TestData.MakeOpenBattleMap(new Vector3I(4, 1, 1)),
       [new BattleSideSetup(faction, [new FakeObjectiveData()],
@@ -21,7 +21,7 @@ public class BattleSessionQueriesTest
   private static BattleSetup DuelSetup(Faction playerFaction, string playerName, Vector3I playerPosition,
     Faction enemyFaction, string enemyName, Vector3I enemyPosition,
     int playerHealth = 20, int enemyHealth = 20, int playerVision = 20, int enemyVision = 20,
-    BattleMapData map = null)
+    BattleMapData? map = null)
     => new(
       map ?? TestData.MakeOpenBattleMap(new Vector3I(5, 1, 1)),
       [
