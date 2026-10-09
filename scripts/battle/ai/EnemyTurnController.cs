@@ -9,22 +9,20 @@ namespace FunProject.Battle;
 // execution role; completion observers finish before every fresh decision frame.
 internal sealed class EnemyTurnController(BattleRuntime runtime)
 {
-  private const int FactionSubmissionLimit = 64;
+  private const int LatestDecisionCapacity = 64;
   private readonly List<EnemyDecisionTrace> _latest = [];
   private EnemyPolicy? _policy;
   private Faction? _player;
-  private long _totalSubmissionLimit;
   private bool _stopped;
 
   internal IReadOnlyList<EnemyDecisionTrace> LatestDecisions => System.Array.AsReadOnly(_latest.ToArray());
 
-  internal void Enable(Faction player, EnemyPolicySettings? settings, int factionCount)
+  internal void Enable(Faction player, EnemyPolicySettings? settings)
   {
     if (_policy is not null) throw new InvalidOperationException("Enemy turns are already enabled.");
     if (_stopped) throw new InvalidOperationException("Cannot enable enemy turns after an execution fault.");
     _player = player;
     _policy = new(settings);
-    _totalSubmissionLimit = FactionSubmissionLimit * (long)factionCount;
   }
 
   internal void Stop() => _stopped = true;
@@ -38,28 +36,22 @@ internal sealed class EnemyTurnController(BattleRuntime runtime)
 
   private void ExecuteEnabledTurns(EnemyPolicy policy)
   {
-    long submitted = 0;
     while (!_stopped && runtime.Query(new GetBattleOutcomeQuery()).IsNone)
     {
       var side = runtime.Query(new GetActiveSideQuery());
       if (ReferenceEquals(side, _player)) return;
       var memory = new EnemyTurnMemory();
       var frame = runtime.Query(new GetEnemyDecisionFrame(side));
-      for (int factionSubmissions = 0; factionSubmissions < FactionSubmissionLimit; factionSubmissions++)
+      while (true)
       {
         memory.RecordObservations(frame);
-        // Reserve the final submission for turn end, even when previous actions were interrupted.
-        var decision = factionSubmissions == FactionSubmissionLimit - 1 || submitted == _totalSubmissionLimit - 1
-          ? new EnemyDecisionTrace(new(EnemyIntentKind.EndFactionTurn), 0, [])
-          : policy.Decide(frame, memory);
+        var decision = policy.Decide(frame, memory);
         var action = MintAction(side, decision.Intent);
-        if (_latest.Count == FactionSubmissionLimit) _latest.RemoveAt(0);
+        if (_latest.Count == LatestDecisionCapacity) _latest.RemoveAt(0);
         _latest.Add(decision);
         runtime.ExecuteSingleAction(action);
-        submitted++;
         // Disposal/fault can occur inside completion observers; do not query after shutdown.
         if (_stopped) return;
-        if (submitted == _totalSubmissionLimit) { Stop(); return; }
         if (!ReferenceEquals(runtime.Query(new GetActiveSideQuery()), side)) break;
         var after = runtime.Query(new GetEnemyDecisionFrame(side));
         if (after.IsTerminal) return;

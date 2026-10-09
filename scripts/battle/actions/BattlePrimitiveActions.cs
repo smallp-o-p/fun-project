@@ -252,14 +252,11 @@ public sealed class ApplyDamage : BattleAction
 
 public sealed class PassUnit(AliveUnit unit) : BattleAction
 {
-
   public override Result Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
-
-    if (session.TryGetAlive(unit.State).IsNone || unit.State.IsIncapacitated)
-      return Result.Interrupted;
-
+    // Passing finishes an activation regardless of incapacity. Invalid or stale
+    // activation parameters are caller errors owned by the session, not interruptions.
     session.EndUnitActivation(unit.State);
     return Result.Completed;
   }

@@ -158,6 +158,33 @@ public partial class BattleActionExecutorTest
     Assert.True(unit.IsUnconscious);
   }
 
+  [TestCase(false)]
+  [TestCase(true)]
+  public static void PlayerPassEndsActivationDespiteLostCapacity(bool unconscious)
+  {
+    using var battle = BattleFixture.Duel();
+    var pass = BattleAction.PassUnit(battle.Alive(battle.PlayerUnit));
+    int actionPoints = battle.PlayerUnit.CurrentActionPoints;
+    if (unconscious) battle.PlayerUnit.ReceiveStun(battle.PlayerUnit.CurrentHealth);
+    else battle.PlayerUnit.ApplyStatusEffect(TestData.MakeStun(duration: 2));
+    var result = battle.Submit(pass);
+    Assert.Equal(1, result.EventsThatOccurred.ToArray().EventsOf<UnitActivationEndedBattleEvent>().Length);
+    Assert.Equal(actionPoints, battle.PlayerUnit.CurrentActionPoints);
+    Assert.False(battle.Query(new CanUnitActNow(battle.PlayerUnit)));
+    Assert.Equal(battle.EnemyFaction, battle.Query(new GetActiveSideQuery()));
+  }
+
+  [TestCase]
+  public static void PassWithDeadActorRejectsStaleParametersInsteadOfInterrupting()
+  {
+    using var battle = BattleFixture.Duel();
+    var pass = BattleAction.PassUnit(battle.Alive(battle.PlayerUnit));
+    battle.ApplyDamage(battle.PlayerUnit, 999);
+    battle.ClearEvents();
+    Assert.Throws<InvalidOperationException>(() => battle.Submit(pass));
+    Assert.Equal(0, battle.Events.Count);
+  }
+
   [TestCase(TestName = "MoveUnit emits movement and tile occupation events after commit")]
   public static void MoveUnitEmitsMovementAndTileOccupationEventsAfterCommit()
   {

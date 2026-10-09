@@ -157,8 +157,69 @@ public sealed class EnemyTurnControllerTest
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
   }
 
+  [TestCase(false)]
+  [TestCase(true)]
+  public static void EnemyPassCompletesDespiteCapacityChangesInObservers(bool restoreCapacity)
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true, dimensions: new(2, 1, 1),
+      player: new("Player", Position: Vector3I.Zero), enemy: new("Enemy", Position: new(1, 0, 0)));
+    var immobilize = TestData.MakeStun(duration: 2);
+    int passAttempts = 0, completedPasses = 0;
+    battle.Runtime.ActionStarted += action =>
+    {
+      if (action is PassUnit)
+      {
+        passAttempts++;
+        Assert.Equal(1, passAttempts);
+        battle.EnemyUnit.ApplyStatusEffect(immobilize);
+      }
+    };
+    battle.Runtime.ActionCompleted += result =>
+    {
+      if (result.Action is PassUnit)
+      {
+        if (restoreCapacity) battle.EnemyUnit.RemoveStatusEffect(immobilize);
+        Assert.Equal(1, result.EventsThatOccurred.ToArray().EventsOf<UnitActivationEndedBattleEvent>().Length);
+        completedPasses++;
+      }
+    };
+    battle.Runtime.EnableEnemyTurns();
+    battle.EndFactionTurn(battle.PlayerFaction);
+    Assert.Equal(1, passAttempts);
+    Assert.Equal(1, completedPasses);
+    Assert.Equal(!restoreCapacity, battle.EnemyUnit.IsImmobilized);
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
+  }
+
   [TestCase]
-  public static void SixtyFourthSubmissionEndsFactionAndLatestDiagnosticsStayBounded()
+  public static void StaleEnemyEndTurnRejectsAndStopsAutomationWithoutRetrying()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true);
+    battle.EnemyUnit.ApplyStatusEffect(TestData.MakeStun(duration: 2));
+    int attempts = 0, completed = 0;
+    battle.Runtime.ActionStarted += action =>
+    {
+      if (action is EndFactionTurn && ReferenceEquals(battle.Query(new GetActiveSideQuery()), battle.EnemyFaction))
+      {
+        attempts++;
+        Assert.Equal(1, attempts);
+        // Mutate the side during admission so the ordinary AI end-turn action is stale.
+        battle.Session.EndFactionTurn(battle.EnemyFaction);
+      }
+    };
+    battle.Runtime.ActionCompleted += _ => completed++;
+    battle.Runtime.EnableEnemyTurns();
+    Assert.Throws<InvalidOperationException>(() => battle.EndFactionTurn(battle.PlayerFaction));
+    Assert.Equal(1, attempts);
+    Assert.Equal(1, completed);
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
+    battle.EndFactionTurn(battle.PlayerFaction);
+    Assert.Equal(1, attempts);
+    Assert.Equal(battle.EnemyFaction, battle.Query(new GetActiveSideQuery()));
+  }
+
+  [TestCase]
+  public static void LegitimateTurnUsesAllActionPointsBeyondSixtyFourSubmissions()
   {
     using var battle = BattleFixture.Duel(playerControlled: true,
       player: new("Armored player", Armor: TestData.MakeArmor("Armor", armor: 10000)),
@@ -168,8 +229,9 @@ public sealed class EnemyTurnControllerTest
     List<BattleAction> completed = [];
     battle.Runtime.ActionCompleted += result => completed.Add(result.Action);
     battle.EndFactionTurn(battle.PlayerFaction);
-    Assert.Equal(65, completed.Count);
-    Assert.Equal(63, completed.AsValueEnumerable().Count(action => action is AttackEntity));
+    Assert.Equal(102, completed.Count);
+    Assert.Equal(100, completed.AsValueEnumerable().Count(action => action is AttackEntity));
+    Assert.Equal(0, battle.EnemyUnit.CurrentActionPoints);
     Assert.True(completed[^1] is EndFactionTurn);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
     Assert.Equal(64, battle.Runtime.LatestEnemyDecisions.Count);
@@ -195,8 +257,14 @@ public sealed class EnemyTurnControllerTest
       if (action is AttackEntity)
       {
         attempts++;
+        Assert.Equal(1, attempts); // Fail promptly if retry avoidance regresses.
         battle.EnemyUnit.ClearVisibleUnits(); // Lose this actor's sight before its ordinary action commits.
       }
+    };
+    battle.Runtime.ActionCompleted += result =>
+    {
+      if (result.Action is AttackEntity && result.EventsThatOccurred.IsEmpty)
+        battle.EnemyUnit.AddVisibleUnit(battle.PlayerUnit);
     };
     battle.Runtime.EnableEnemyTurns(Demo);
     battle.EndFactionTurn(battle.PlayerFaction);
@@ -205,9 +273,9 @@ public sealed class EnemyTurnControllerTest
   }
 
   [TestCase]
-  public static void WholeDrainIsBoundedByInitialFactionCountWhenHooksKeepAddingFactions()
+  public static void FiniteReinforcementsFinishTheirTurnsWithoutAWholeCallCutoff()
   {
-    using var battle = BattleFixture.Duel(playerControlled: true, dimensions: new(132, 1, 1),
+    using var battle = BattleFixture.Duel(playerControlled: true, dimensions: new(142, 1, 1),
       player: new("Player", Position: Vector3I.Zero), enemy: new("Enemy", Position: new(1, 0, 0)),
       configure: setup => setup with
       {
@@ -219,20 +287,24 @@ public sealed class EnemyTurnControllerTest
           }).ToArray(),
         }).ToArray(),
       });
-    battle.RegisterHook<TurnEndedBattleEvent>(new SpawnNextFaction());
+    battle.RegisterHook<TurnEndedBattleEvent>(new SpawnNextFaction(140));
     battle.Runtime.EnableEnemyTurns();
     int completed = 0;
     battle.Runtime.ActionCompleted += _ => completed++;
     battle.EndFactionTurn(battle.PlayerFaction);
-    Assert.Equal(129, completed);
+    Assert.Equal(142, completed);
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
     Assert.Equal(64, battle.Runtime.LatestEnemyDecisions.Count);
   }
 
-  private sealed class SpawnNextFaction : BattleHook<TurnEndedBattleEvent>
+  private sealed class SpawnNextFaction(int remaining) : BattleHook<TurnEndedBattleEvent>
   {
     private int _next = 2;
+    private int _remaining = remaining;
     protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, TurnEndedBattleEvent evt)
     {
+      if (_remaining == 0) return [];
+      _remaining--;
       var faction = TestData.MakeFaction($"Enemy{_next}");
       var position = context.Session.Board.ValidatePoint(new(_next++, 0, 0)).RequireSome();
       return [BattleAction.SpawnUnit(TestData.MakeCombatant("Enemy", faction, vision: 0), position)];

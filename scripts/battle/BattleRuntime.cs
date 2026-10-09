@@ -74,7 +74,7 @@ public sealed class BattleRuntime : IDisposable
     EnsureNotSubmitting();
     var player = _session.PlayerFaction.Match(value => value,
       () => throw new InvalidOperationException("Enemy turns require a designated player faction."));
-    _enemyController.Enable(player, settings, _session.GlobalFactionTurnOrder.Count);
+    _enemyController.Enable(player, settings);
     _enemyController.ExecuteEnemyTurns();
   }
 
