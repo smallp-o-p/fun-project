@@ -28,7 +28,7 @@ public partial class MovementLineBuilderTest
   [TestCase(TestName = "CreateMesh builds a straight tube spanning its endpoints")]
   public static void CreateMeshBuildsStraightTubeSpanningEndpoints()
   {
-    float width = 0.2f;
+    const float width = 0.2f;
     ArrayMesh mesh = MovementLineBuilder.CreateMesh(
       [new Vector3(0.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f)],
       cornerRadius: 0.25f,

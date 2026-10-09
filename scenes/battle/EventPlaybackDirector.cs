@@ -126,7 +126,7 @@ public partial class EventPlaybackDirector : Node
   // waypoints. A hidden mesh (killed mid-action) completes instantly without tweening.
   protected virtual void PlayMoveStep(IReadOnlyList<UnitMovedBattleEvent> run, Action done)
   {
-    if (!_unitMeshes.TryGetValue(run[0].Unit, out Node3D? mesh) || mesh is null || !mesh.Visible)
+    if (!_unitMeshes.TryGetValue(run[0].Unit, out Node3D? mesh) || mesh?.Visible != true)
     {
       done();
       return;

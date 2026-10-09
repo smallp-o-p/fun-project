@@ -253,7 +253,7 @@ public class CharacterModelAssetTest
     Assert.True(IsVisible(originalPiece) && !IsVisible(switchedPiece),
       "Restoring the outfit did not swap the Trigger UpperBody piece visibility back.");
     Assert.True(TestData.VisibleTriangles(wardrobe.MaskRenderMesh(SharedBodyMesh)) == authoredTriangles,
-      $"Restoring the outfit left the body mask at "
+      "Restoring the outfit left the body mask at "
       + $"{TestData.VisibleTriangles(wardrobe.MaskRenderMesh(SharedBodyMesh))} visible triangles "
       + $"instead of the authored {authoredTriangles}.");
 
@@ -265,7 +265,7 @@ public class CharacterModelAssetTest
     wardrobe.ClothingEnabled = false;
     wardrobe.ClothingEnabled = true;
     Assert.True(TestData.VisibleTriangles(wardrobe.MaskRenderMesh(SharedBodyMesh)) == authoredTriangles,
-      $"The clothing derivation left the body mask at "
+      "The clothing derivation left the body mask at "
       + $"{TestData.VisibleTriangles(wardrobe.MaskRenderMesh(SharedBodyMesh))} visible triangles "
       + $"instead of the authored {authoredTriangles}.");
   }
@@ -500,12 +500,6 @@ public class CharacterModelAssetTest
       Assert.True(ModelFixture.SameNative(texture, first.GetShaderParameter(name).AsGodotObject()));
       Assert.True(ModelFixture.SameNative(texture, second.GetShaderParameter(name).AsGodotObject()));
     }
-  }
-
-  private static string DescribeRoot(Node root)
-  {
-    string script = (root.GetScript().AsGodotObject() as Script)?.ResourcePath ?? "";
-    return script.Length > 0 ? $"{root.GetClass()} with script '{script}'" : root.GetClass();
   }
 
   private static void AssertBodyShape(Node root, string meshPath, (string Shape, double Value)[] expected)

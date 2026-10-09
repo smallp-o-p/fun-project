@@ -2,3 +2,12 @@ is_global = true
 
 # BannedApiAnalyzers analyzes generated code by default, unlike the SDK analyzers.
 dotnet_banned_api_analyzer.exclude_generated_code = true
+
+# Promote focused Roslynator checks that keep mutation and expressions simple.
+# Other analyzer suggestions retain the package's default severity.
+dotnet_diagnostic.RCS1169.severity = warning
+dotnet_diagnostic.RCS1118.severity = warning
+dotnet_diagnostic.RCS1146.severity = warning
+dotnet_diagnostic.RCS1170.severity = warning
+dotnet_diagnostic.RCS1214.severity = warning
+dotnet_diagnostic.RCS1257.severity = warning

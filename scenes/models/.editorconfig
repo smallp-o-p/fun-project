@@ -1,0 +1,4 @@
+[CharacterModel.Masking.cs]
+# Godot hot reload restores mutable mask fields; readonly fields would lose
+# per-instance caches and state. Keep the documented restoration contract.
+dotnet_diagnostic.RCS1169.severity = none

@@ -68,7 +68,7 @@ public sealed partial class GeoscapeHud : Control
   private static string RemainingDays(long completesAtTick, long tick)
   {
     long ticks = completesAtTick <= tick ? 0 : completesAtTick - tick;
-    long ticksPerDay = (TimeSpan.TicksPerDay / TimeSpan.TicksPerSecond) / GeoscapeSession.TickGameSeconds;
+    const long ticksPerDay = (TimeSpan.TicksPerDay / TimeSpan.TicksPerSecond) / GeoscapeSession.TickGameSeconds;
     // A partial day still needs work: keep 1d visible until the job actually completes.
     long days = ticks / ticksPerDay + (ticks % ticksPerDay == 0 ? 0 : 1);
     return $"{days}d remaining";

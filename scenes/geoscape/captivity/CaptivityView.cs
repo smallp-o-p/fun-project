@@ -63,7 +63,7 @@ public sealed partial class CaptivityView : GeoscapeView
       "CaptivityView requires SquadViewScene; assign a PackedScene in the inspector.");
     var view = scene.InstantiateAs<SquadLoadoutView>(
       "CaptivityView SquadViewScene");
-    view.Configure($"Interrogation", InterrogationCapacity,
+    view.Configure("Interrogation", InterrogationCapacity,
       allowEquipmentEditing: false);
     RequestView(view);
   }

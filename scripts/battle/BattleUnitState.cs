@@ -25,7 +25,7 @@ public sealed class BattleUnitState
   public int Id { get; }
   public Combatant Combatant { get; }
   public Faction Side => Combatant.OwningFaction;
-  public Option<Weapon> EquippedWeapon { get; private set; }
+  public Option<Weapon> EquippedWeapon { get; }
   public Option<ItemWith<ArmorCapability>> EquippedArmor { get; }
   public IReadOnlyList<EquippableItem> Inventory => _inventory;
   internal IReadOnlySet<BattleUnitState> VisibleUnits => _visibleUnits;

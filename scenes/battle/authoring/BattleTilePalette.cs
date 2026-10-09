@@ -12,7 +12,7 @@ public static class BattleTilePalette
     foreach (int item in palette.GetItemList())
     {
       var mesh = palette.GetItemMesh(item);
-      if (mesh is null || !mesh.HasMeta(BattleProp.FootprintMeta))
+      if (mesh?.HasMeta(BattleProp.FootprintMeta) != true)
         throw new InvalidOperationException($"Palette item {item} needs an exported BattleProp mesh with footprint metadata.");
       footprints[item] = mesh.GetMeta(BattleProp.FootprintMeta).AsGodotDictionary<Godot.Vector3I, BattleFootprintData>();
     }

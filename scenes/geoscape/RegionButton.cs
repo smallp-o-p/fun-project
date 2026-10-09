@@ -59,7 +59,7 @@ public sealed partial class RegionButton : Button
     get
     {
       var fill = GetNodeOrNull<Polygon2D>("Fill");
-      if (fill is not null && fill.Polygon.Length > 0)
+      if (fill?.Polygon.Length > 0)
         return fill;
       if (Engine.IsEditorHint())
         return null;

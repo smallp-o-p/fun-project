@@ -43,8 +43,8 @@ public partial class BattleMapGridMapTest
     var map = AutoFree(TestData.MakeMapAuthoring())!;
     Godot.Collections.Dictionary<Godot.Vector3I, BattleFootprintData> prop = new()
     {
-      [Godot.Vector3I.Zero] = new() { BlocksMovement = true, CoverDirections = (CoverDirections)15, CoverAmount = 40 },
-      [new(0, 0, 1)] = new() { BlocksMovement = true, CoverDirections = (CoverDirections)15, CoverAmount = 40 }
+      [Godot.Vector3I.Zero] = new() { BlocksMovement = true, CoverDirections = CoverDirections.North | CoverDirections.South | CoverDirections.East | CoverDirections.West, CoverAmount = 40 },
+      [new(0, 0, 1)] = new() { BlocksMovement = true, CoverDirections = CoverDirections.North | CoverDirections.South | CoverDirections.East | CoverDirections.West, CoverAmount = 40 }
     };
     map.Floors.SetCellItem(Godot.Vector3I.Zero, 0);
     var anchor = new Godot.Vector3I(3, 0, 3);

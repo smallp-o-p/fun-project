@@ -56,7 +56,7 @@ public partial class BattleAnnotationEditor : EditorPlugin
     if (GodotObject.IsInstanceValid(_sceneRoot) && _sceneRoot!.IsConnected(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene)))
       _sceneRoot.Disconnect(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene));
     _sceneRoot = root;
-    if (_sceneRoot is not null) _sceneRoot.Connect(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene));
+    _sceneRoot?.Connect(Node.SignalName.TreeExiting, new Callable(this, MethodName.PauseScene));
     SetProcess(true);
   }
 
