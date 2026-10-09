@@ -71,7 +71,7 @@ public class GeoscapeUnitNavigationTest
     await using var cleanup = new DeferredNodeCleanup();
     var scene = BuildScene(
       [MakeEntry(unit: MakeCombatantData("Aimer"))],
-      [MakeItemData("Kit A"), MakeItemData("Kit B")]);
+      [MakeUtilityData("Kit A"), MakeUtilityData("Kit B")]);
     var manager = Manager(scene);
     PressUnitsButton(scene);
     var roster = (UnitRoster)manager.Current;

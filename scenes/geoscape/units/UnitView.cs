@@ -191,8 +191,8 @@ public sealed partial class UnitView : GeoscapeView
     slots.QueueFreeAllChildren();
     for (int i = 0; i < _unit!.MaxInventorySize; i++)
     {
-      string text = _unit.Inventory.TryGetValue(i, out EquippableItem? item)
-        ? $"Utility {i + 1}: {item.ItemName}"
+      string text = _unit.Inventory.TryGetValue(i, out ItemWith<UtilityCapability> item)
+        ? $"Utility {i + 1}: {item.Item.ItemName}"
         : $"Utility {i + 1}: — empty —";
       AddSlotButton(slots, text, UnitViewSlot.Utility(i));
     }
@@ -305,8 +305,8 @@ public sealed partial class UnitView : GeoscapeView
         _unit.EquippedArmor.IfSome(armor => ShowItem(armor.Item));
         break;
       case UnitViewSlotKind.Utility:
-        if (_unit.Inventory.TryGetValue(slot.Index, out EquippableItem? item))
-          ShowItem(item);
+        if (_unit.Inventory.TryGetValue(slot.Index, out ItemWith<UtilityCapability> item))
+          ShowItem(item.Item);
         break;
       case UnitViewSlotKind.PersonalMod:
         ShowMod(_unit.GetModSlots()[slot.Index]);
@@ -344,7 +344,7 @@ public sealed partial class UnitView : GeoscapeView
         _unit!.UnequipArmor().IfSome(old => _state!.Armory.DepositItem(old.Item));
         break;
       case UnitViewSlotKind.Utility:
-        _unit!.UnequipItem(slot.Index).IfSome(old => _state!.Armory.DepositItem(old));
+        _unit!.UnequipItem(slot.Index).IfSome(old => _state!.Armory.DepositItem(old.Item));
         break;
       case UnitViewSlotKind.PersonalMod:
         _unit!.GetModSlots()[slot.Index].Unequip().IfSome(mod => _state!.Armory.DepositMod(mod));
@@ -359,22 +359,19 @@ public sealed partial class UnitView : GeoscapeView
   private static bool AcceptsItem(UnitViewSlot slot, EquippableItemData data) => slot.Kind switch
   {
     UnitViewSlotKind.Weapon => data is WeaponData,
-    UnitViewSlotKind.Armor => HasArmorCapability(data),
-    UnitViewSlotKind.Utility => true,
+    UnitViewSlotKind.Armor => HasCapability<ArmorCapabilityData>(data),
+    UnitViewSlotKind.Utility => HasCapability<UtilityCapabilityData>(data),
     _ => false,
   };
 
-  private static bool HasArmorCapability(EquippableItemData data)
-  {
-    foreach (ItemCapabilityData capability in data.Capabilities)
-      if (capability is ArmorCapabilityData)
-        return true;
-    return false;
-  }
+  private static bool HasCapability<TCapability>(EquippableItemData data) where TCapability : ItemCapabilityData
+    => data.Capabilities.AsValueEnumerable().Any(capability => capability is TCapability);
 
   private void EquipItem(ArmoryItemStock line)
   {
     UnitViewSlot slot = _selection!.Value;
+    if (!AcceptsItem(slot, line.Data))
+      return;
     // AcceptsItem's _ => false arm prevents non-item slots from reaching this withdrawal.
     Option<EquippableItem> withdrawn = _state!.Armory.TryWithdrawItem(line.Data);
     withdrawn.IfSome(item =>
@@ -391,8 +388,11 @@ public sealed partial class UnitView : GeoscapeView
             _unit!.EquipArmor(proof).IfSome(old => _state.Armory.DepositItem(old.Item)));
           break;
         case UnitViewSlotKind.Utility:
-          _unit!.UnequipItem(slot.Index).IfSome(old => _state.Armory.DepositItem(old));
-          _unit.EquipItem(item, slot.Index);
+          // Parse before displacing the current item.
+          var utility = item.With<UtilityCapability>().IfNone(
+            () => throw new InvalidOperationException("The selected item does not support the utility slot."));
+          _unit!.UnequipItem(slot.Index).IfSome(old => _state.Armory.DepositItem(old.Item));
+          _unit.EquipItem(utility, slot.Index);
           break;
       }
     });

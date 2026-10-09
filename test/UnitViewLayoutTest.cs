@@ -29,7 +29,7 @@ public class UnitViewLayoutTest
   public async Task FifthUtilitySlotEquipsImmediatelyAndRetainsDetailsAfterRefresh()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var item = MakeItemData("Field Kit");
+    var item = MakeUtilityData("Field Kit");
     item.Description = "A useful field kit.";
     using var campaign = new GeoscapeFixture(MakeStart(
       roster: [MakeEntry()], armory: [item]));
@@ -43,7 +43,7 @@ public class UnitViewLayoutTest
     ArmoryButton(view, "Field Kit").EmitSignal(Button.SignalName.Pressed);
     view.Present(campaign.State, campaign.Session);
 
-    Assert.Equal("Field Kit", unit.Inventory[4].ItemName);
+    Assert.Equal("Field Kit", unit.Inventory[4].Item.ItemName);
     Assert.Equal("Field Kit", view.GetNode<Label>("%SelectedItemName").Text);
     Assert.True(view.GetNode<RichTextLabel>("%SelectedItemDetails").Text.Contains(item.Description));
     Assert.True(slots.GetChild<Button>(4).ButtonPressed);

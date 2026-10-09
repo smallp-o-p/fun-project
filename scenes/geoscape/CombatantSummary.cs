@@ -1,5 +1,6 @@
 using FunProject.Combatants;
 using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using Godot;
 
@@ -37,8 +38,8 @@ public static class CombatantSummary
     ];
 
     for (int i = 0; i < unit.MaxInventorySize; i++)
-      lines.Add(unit.Inventory.TryGetValue(i, out EquippableItem? item)
-        ? $"Utility {i + 1}: {item.ItemName}"
+      lines.Add(unit.Inventory.TryGetValue(i, out ItemWith<UtilityCapability> item)
+        ? $"Utility {i + 1}: {item.Item.ItemName}"
         : $"Utility {i + 1}: — empty —");
 
     if (includeMods)

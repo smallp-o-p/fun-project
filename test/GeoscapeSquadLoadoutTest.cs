@@ -6,6 +6,7 @@ using FunProject.Combatants;
 using FunProject.Geoscape;
 using FunProject.GameState;
 using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using FunProject.Strategic;
 using FunProject.Weapons;
@@ -284,7 +285,7 @@ public class GeoscapeSquadLoadoutTest
     { StatMods = [new AimStatMod { Modifiers = [StatModifier.Add(10)] }] });
     alpha.EquipWeapon(rifle);
     alpha.EquipArmor(MakeArmor("Vest"));
-    alpha.EquipItem(new EquippableItem(MakeItemData("Medkit")), 0);
+    alpha.EquipItem(new EquippableItem(MakeUtilityData("Medkit")).With<UtilityCapability>().RequireSome(), 0);
     alpha.GetModSlots()[0].Equip(new MultiStatMod { Name = "Nerves", StatMods = [] });
 
     var view = PresentedSquadView(pending, fixture.State, fixture.Session);
@@ -325,7 +326,7 @@ public class GeoscapeSquadLoadoutTest
     await using var cleanup = new DeferredNodeCleanup();
     var (fixture, pending) = Mission(
       [MakeEntry("Alpha")],
-      armory: [MakeFirearmWeaponData("Rifle"), MakeArmorData("Vest"), MakeItemData("Medkit")]);
+      armory: [MakeFirearmWeaponData("Rifle"), MakeArmorData("Vest"), MakeUtilityData("Medkit")]);
     using var _ = fixture;
     var manager = CreatePresentedManager(fixture);
 
@@ -355,7 +356,7 @@ public class GeoscapeSquadLoadoutTest
     Assert.True(ReferenceEquals(fixture.State.Roster[0], selected[0]));
     Assert.Equal("Rifle", selected[0].EquippedWeapon.RequireSome().ItemName); // live equipment
     Assert.True(selected[0].EquippedArmor.RequireSome().Item.ItemName == "Vest");
-    Assert.Equal("Medkit", selected[0].Inventory[0].ItemName);
+    Assert.Equal("Medkit", selected[0].Inventory[0].Item.ItemName);
 
     string card = CardText(SquadSlot(view, 0)); // summaries refreshed on return
     Assert.True(card.Contains("Rifle"), card);

@@ -1,6 +1,7 @@
 using FunProject.Combatants;
 using FunProject.Geoscape;
 using FunProject.Items;
+using FunProject.Items.Capabilities;
 using FunProject.Stats;
 using FunProject.Weapons;
 using Godot;
@@ -78,7 +79,7 @@ public class CombatantSummaryTest
     using var campaign = EquippedSoldierCampaign();
     var combatant = campaign.State.Roster[0];
     combatant.EquipArmor(MakeArmor("Vest"));
-    combatant.EquipItem(new EquippableItem(MakeItemData("Medkit")), 0);
+    combatant.EquipItem(new EquippableItem(MakeUtilityData("Medkit")).With<UtilityCapability>().RequireSome(), 0);
 
     string squad = CombatantSummary.EquipmentText(combatant, includeMods: true);
     Assert.True(squad.Contains("Weapon: Rifle"), squad);

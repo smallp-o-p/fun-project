@@ -18,8 +18,8 @@ public class Combatant : HasStats, HasModSlots
   public Faction OwningFaction { get; internal set; }
   private readonly StatSheet _stats;
   private readonly Godot.Collections.Array<ModSlot> _modSlots = [];
-  private readonly Dictionary<int, EquippableItem> _inventory = [];
-  public IReadOnlyDictionary<int, EquippableItem> Inventory => _inventory;
+  private readonly Dictionary<int, ItemWith<UtilityCapability>> _inventory = [];
+  public IReadOnlyDictionary<int, ItemWith<UtilityCapability>> Inventory => _inventory;
   public int MaxInventorySize { get; }
 
   /// <summary>Battle-facing weapon slot; mirrors BattleUnitState.EquippedWeapon.</summary>
@@ -81,9 +81,9 @@ public class Combatant : HasStats, HasModSlots
          .Concat(Rank.StatMods())
          .ToArray();
 
-  public void EquipItem(EquippableItem item, int slot)
+  public void EquipItem(ItemWith<UtilityCapability> item, int slot)
   {
-    ArgumentNullException.ThrowIfNull(item);
+    ArgumentNullException.ThrowIfNull(item.Item);
     if (slot < 0 || slot >= MaxInventorySize)
       throw new InvalidOperationException(
         $"EquipItem slot {slot} is out of range for an inventory of size {MaxInventorySize}.");
@@ -125,12 +125,12 @@ public class Combatant : HasStats, HasModSlots
   }
 
   /// <summary>Clear one utility inventory slot; returns what was there for the caller to return to the armory.</summary>
-  public Option<EquippableItem> UnequipItem(int slot)
+  public Option<ItemWith<UtilityCapability>> UnequipItem(int slot)
   {
     if (slot < 0 || slot >= MaxInventorySize)
       throw new InvalidOperationException(
         $"UnequipItem slot {slot} is out of range for an inventory of size {MaxInventorySize}.");
 
-    return _inventory.Remove(slot, out EquippableItem? item) ? item : None;
+    return _inventory.Remove(slot, out ItemWith<UtilityCapability> item) ? item : None;
   }
 }

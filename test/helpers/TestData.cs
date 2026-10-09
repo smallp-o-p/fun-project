@@ -290,6 +290,13 @@ internal static class TestData
     UnlimitedStock = unlimited,
   };
 
+  public static EquippableItemData MakeUtilityData(string name = "Kit", bool unlimited = false) => new()
+  {
+    Name = name,
+    UnlimitedStock = unlimited,
+    Capabilities = [new UtilityCapabilityData()],
+  };
+
   public static ManufacturingRecipe MakeManufacturingRecipe(EquippableItemData item, uint days = 1,
     Godot.Collections.Dictionary<Currency, ulong> costs = null)
     => new() { Item = item, DurationDays = days, Costs = costs ?? [] };

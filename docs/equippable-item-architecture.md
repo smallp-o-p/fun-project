@@ -15,6 +15,7 @@ Define item kinds with an `EquippableItemData` resource and its capability resou
 - `EquippableItemData : NamedEntityData` — name/description plus `Capabilities : Array<ItemCapabilityData>`.
 - `ItemCapabilityData : Resource` (abstract) — `CreateRuntime()` factory.
 - Concrete capabilities (in `scripts/items/capabilities/`):
+  - `UtilityCapabilityData` - marker for campaign utility-slot eligibility
   - `ThrowableCapabilityData` — throw range, action-point cost, consumes-on-use
   - `BlastCapabilityData` — blast radius, `Array<BattleEffectData>` payload
   - `ChargesCapabilityData` — max charges
@@ -30,6 +31,10 @@ Define item kinds with an `EquippableItemData` resource and its capability resou
 - `HasModSlots` is implemented by delegation: `GetModSlots()` returns the `ModSlotsCapability` slots, or an empty array when absent.
 
 ## Capability proofs
+
+Campaign utility inventory stores `ItemWith<UtilityCapability>` proofs, minted by `item.With<UtilityCapability>()`. `Combatant.EquipItem` accepts this proof, and `UnequipItem` returns it. Battle deployment unwraps the same runtime item, preserving identity and mutable state. The unit browser checks for authored `UtilityCapabilityData` and rechecks the current selection before withdrawing stock. Weapon slots continue to require weapons, and armor slots require an armor capability proof.
+
+The Frag Grenade, Prototype Kit, and Supply Kit declare the utility marker. Ballistic Vest, Service Pistol, Combat Rifle, and Workshop Sample do not. The marker composes with other capabilities, so intended utility items may deal damage or provide armor.
 
 `item.With<TCap>()` returns `Option<ItemWith<TCap>>`, binding the item to its capability. `ThrowItem` requires `ItemWith<ThrowableCapability>`; `UseItem` requires `ItemWith<ChargesCapability>`. These parameter types enforce capability requirements at compile time. Capability membership stays fixed for the item's lifetime, so the proof remains valid.
 

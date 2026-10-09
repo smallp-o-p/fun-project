@@ -77,8 +77,8 @@ public sealed class BattleUnitState
     // order is an implementation detail — sparse keys must not shuffle it.
     var inventory = new List<EquippableItem>(combatant.MaxInventorySize);
     for (int slot = 0; slot < combatant.MaxInventorySize; slot++)
-      if (combatant.Inventory.TryGetValue(slot, out EquippableItem? item))
-        inventory.Add(item);
+      if (combatant.Inventory.TryGetValue(slot, out ItemWith<UtilityCapability> item))
+        inventory.Add(item.Item);
     _inventory = inventory;
 
     // Preserve every grant in source order, including repeated resources.
