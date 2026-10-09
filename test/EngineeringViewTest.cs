@@ -63,7 +63,7 @@ public class EngineeringViewTest
     Assert.True(visible.Encloses(ScreenRect(back)));
     var scroll = view.GetNode<ScrollContainer>("Content/Margin/Layout/Body/Details/DetailsScroll");
     Assert.True(scroll.ClipContents);
-    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(ulong.MaxValue.ToString(System.Globalization.CultureInfo.CurrentCulture)));
+    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(ulong.MaxValue.ToString(System.Globalization.CultureInfo.CurrentCulture), System.StringComparison.Ordinal));
     Assert.True(view.GetNode<Label>("%CurrencyCosts").Size.X <= scroll.Size.X);
     Assert.True(scroll.GetVScrollBar().MaxValue > scroll.GetVScrollBar().Page);
     var actionRect = ScreenRect(action);
@@ -308,8 +308,8 @@ public class EngineeringViewTest
     var view = AddToTree(CreateEngineeringView());
     var item = MakeItemData("Selected item");
     view.ShowFailure(item, ManufacturingStartFailure.UnknownRecipe);
-    Assert.True(view.GetNode<Label>("%Status").Text.Contains(item.Name));
-    Assert.True(view.GetNode<Label>("%Status").Text.Contains("UnknownRecipe"));
+    Assert.True(view.GetNode<Label>("%Status").Text.Contains(item.Name, System.StringComparison.Ordinal));
+    Assert.True(view.GetNode<Label>("%Status").Text.Contains("UnknownRecipe", System.StringComparison.Ordinal));
     using var campaign = new GeoscapeFixture();
     view.Present(campaign.State, campaign.Session);
     Assert.Equal("", view.GetNode<Label>("%Status").Text);

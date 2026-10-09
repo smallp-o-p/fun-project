@@ -32,7 +32,7 @@ public partial class ModelImportValidation : RefCounted
     string geometryError = ValidateSourceGeometry(mesh);
     if (geometryError.Length != 0)
       return geometryError;
-    if (GeometryHash(mesh) != configuration.GeometryHash)
+    if (!string.Equals(GeometryHash(mesh), configuration.GeometryHash, StringComparison.Ordinal))
       return "Mask geometry hash does not match the source mesh.";
     if (configuration.TriangleMasks.Count != mesh.GetSurfaceCount())
       return "Mask surface count does not match the source mesh.";
@@ -49,7 +49,7 @@ public partial class ModelImportValidation : RefCounted
       if (defaultError.Length != 0)
         return "Default mesh: " + defaultError;
       using ArrayMesh expected = ModelMaskGeometry.BuildMesh(mesh, configuration.TriangleMasks, configuration.DefaultBits);
-      if (GeometryHash(configuration.DefaultMesh) != GeometryHash(expected))
+      if (!string.Equals(GeometryHash(configuration.DefaultMesh), GeometryHash(expected), StringComparison.Ordinal))
         return "Default mask mesh does not match its source geometry and bits.";
       if (!configuration.DefaultMesh.HasMeta("source_vertex_indices")
         || !GD.VarToBytes(configuration.DefaultMesh.GetMeta("source_vertex_indices")).AsSpan()

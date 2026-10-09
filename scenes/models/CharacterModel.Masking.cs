@@ -16,7 +16,7 @@ public partial class CharacterModel
   /// identity; entries hold their
   /// active render mesh strongly, so eviction never pulls it out from under an instance.
   /// </summary>
-  private static readonly SysColGeneric.Dictionary<string, VariantCache> VariantCacheByConfiguration = new();
+  private static readonly SysColGeneric.Dictionary<string, VariantCache> VariantCacheByConfiguration = new(StringComparer.Ordinal);
 
   private sealed class VariantCache
   {

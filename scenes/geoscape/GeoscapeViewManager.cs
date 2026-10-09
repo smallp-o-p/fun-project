@@ -17,6 +17,7 @@ public sealed partial class GeoscapeViewManager : Control
 
   [Signal] public delegate void ViewChangedEventHandler(GeoscapeView view);
 
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "MA0015", Justification = "Godot initializes the exported RootView property before this parameterless callback.")]
   public override void _Ready()
   {
     ArgumentNullException.ThrowIfNull(RootView);

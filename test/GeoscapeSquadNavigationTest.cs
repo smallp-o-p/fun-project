@@ -38,7 +38,7 @@ public class GeoscapeSquadNavigationTest
   private static Button DialogButton(GeoscapeEventResolution dialog, string text)
     => dialog.GetNode<HBoxContainer>("%Buttons").GetChildren()
       .AsValueEnumerable().OfType<Button>()
-      .Single(button => button.Text == text);
+      .Single(button => string.Equals(button.Text, text, System.StringComparison.Ordinal));
 
   // Drives the real dialog's Engage handover and returns the presented squad view it
   // produced, so a test can assert the opener forwarded the pending mission's policy.
@@ -101,8 +101,8 @@ public class GeoscapeSquadNavigationTest
 
     string prompt = squad.GetNode<Label>("%SelectionPrompt").Text;
     Assert.True(allowUnfitDeployment
-      ? prompt.Contains("Exceptional deployment")
-      : !prompt.Contains("Exceptional"));
+      ? prompt.Contains("Exceptional deployment", System.StringComparison.Ordinal)
+      : !prompt.Contains("Exceptional", System.StringComparison.Ordinal));
     squad.GetNode<BoxContainer>("%Slots").GetChild<Control>(0)
       .GetNode<Button>("%ChooseUnit").EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(!allowUnfitDeployment, SquadChoice(squad, "Alpha").Disabled); // the opener's mission context

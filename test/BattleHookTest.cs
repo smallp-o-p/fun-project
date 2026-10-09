@@ -131,7 +131,7 @@ public partial class BattleHookTest
 
     battle.Spawn(TestData.MakeCombatant("Reinforcement", battle.PlayerFaction), new Vector3I(1, 0, 1));
 
-    Assert.Equal("positioned-low-priority|unit-default|concrete-default", string.Join("|", log));
+    Assert.Equal("positioned-low-priority|unit-default|concrete-default", string.Join('|', log));
   }
 
   [TestCase(TestName = "A hook registered under concrete and interface keys fires once for one event")]
@@ -256,7 +256,7 @@ public partial class BattleHookTest
     }
 
     Assert.True(thrown is not null, "Expected the session mutation to throw when a hook returns interrupts outside an executor action.");
-    Assert.True(thrown.Message.Contains("interrupt"));
+    Assert.True(thrown.Message.Contains("interrupt", StringComparison.Ordinal));
   }
 
   [TestCase(TestName = "Hooks receive the in-flight action as SourceAction during executor dispatches")]

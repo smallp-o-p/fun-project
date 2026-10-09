@@ -112,11 +112,11 @@ public partial class BlastResolutionTest
         ],
       });
     var objects = battle.Query(new GetBattleSpecialObjectsQuery());
-    var near = objects.AsValueEnumerable().Single(o => o.Name == "Near");
-    var far = objects.AsValueEnumerable().Single(o => o.Name == "Far");
+    var near = objects.AsValueEnumerable().Single(o => string.Equals(o.Name, "Near", System.StringComparison.Ordinal));
+    var far = objects.AsValueEnumerable().Single(o => string.Equals(o.Name, "Far", System.StringComparison.Ordinal));
     var scenery = objects.AsValueEnumerable().Single(o => o.Position == new Vector3I(2, 0, 4));
-    var resolved = objects.AsValueEnumerable().Single(o => o.Name == "Resolved");
-    var destroyed = objects.AsValueEnumerable().Single(o => o.Name == "Destroyed");
+    var resolved = objects.AsValueEnumerable().Single(o => string.Equals(o.Name, "Resolved", System.StringComparison.Ordinal));
+    var destroyed = objects.AsValueEnumerable().Single(o => string.Equals(o.Name, "Destroyed", System.StringComparison.Ordinal));
     battle.Interact(battle.PlayerUnit, resolved);
     battle.Attack(battle.PlayerUnit, destroyed);
     var grenade = TestData.MakeGrenade("Frag", throwRange: 10, blastRadius: 1,
@@ -149,7 +149,7 @@ public partial class BlastResolutionTest
     });
     var objects = battle.Query(new GetBattleSpecialObjectsQuery());
     var obj = objects.AsValueEnumerable().Single(o => o.Position == origin);
-    var neighbor = objects.AsValueEnumerable().Single(o => o.Name == "Neighbor");
+    var neighbor = objects.AsValueEnumerable().Single(o => string.Equals(o.Name, "Neighbor", System.StringComparison.Ordinal));
     var grenade = TestData.MakeGrenade("Mixed", throwRange: 10, blastRadius: 0,
       effects: [TestData.MakeBurn(), new DamageEffectData { BaseDamage = 5 },
         new DamageEffectData { BaseDamage = 5 }]);

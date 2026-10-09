@@ -62,16 +62,16 @@ public class CombatantSummaryTest
     var contributions = campaign.State.CampaignStatContributions(combatant);
     string text = CombatantSummary.StatsText(combatant, "Health", contributions);
 
-    Assert.True(text.Contains("Health: 20"), text);
-    Assert.True(text.Contains("Action Points: 4"), text);
-    Assert.True(text.Contains("Will: 50"), text);
-    Assert.True(text.Contains("Movement: 12"), text);
-    Assert.True(text.Contains("Vision: 20"), text);
-    Assert.True(text.Contains("Aim: 75"), text); // own +10 and weapon +5 folded once each
+    Assert.True(text.Contains("Health: 20", System.StringComparison.Ordinal), text);
+    Assert.True(text.Contains("Action Points: 4", System.StringComparison.Ordinal), text);
+    Assert.True(text.Contains("Will: 50", System.StringComparison.Ordinal), text);
+    Assert.True(text.Contains("Movement: 12", System.StringComparison.Ordinal), text);
+    Assert.True(text.Contains("Vision: 20", System.StringComparison.Ordinal), text);
+    Assert.True(text.Contains("Aim: 75", System.StringComparison.Ordinal), text); // own +10 and weapon +5 folded once each
 
     // Captivity and squad summaries differ only in the Health label.
     Assert.Equal(
-      text.Replace("Health:", "Health (max):"),
+      text.Replace("Health:", "Health (max):", System.StringComparison.Ordinal),
       CombatantSummary.StatsText(combatant, "Health (max)", contributions));
   }
 
@@ -84,17 +84,17 @@ public class CombatantSummaryTest
     combatant.EquipItem(new EquippableItem(MakeUtilityData("Medkit")).With<UtilityCapability>().RequireSome(), 0);
 
     string squad = CombatantSummary.EquipmentText(combatant, includeMods: true);
-    Assert.True(squad.Contains("Weapon: Rifle"), squad);
-    Assert.True(squad.Contains("Armor: Vest"), squad);
-    Assert.True(squad.Contains("Utility 1: Medkit"), squad);
-    Assert.True(squad.Contains("Personal mods: Scope"), squad); // mod rows only when asked
-    Assert.True(squad.Contains("Weapon mods: Rail"), squad);
+    Assert.True(squad.Contains("Weapon: Rifle", System.StringComparison.Ordinal), squad);
+    Assert.True(squad.Contains("Armor: Vest", System.StringComparison.Ordinal), squad);
+    Assert.True(squad.Contains("Utility 1: Medkit", System.StringComparison.Ordinal), squad);
+    Assert.True(squad.Contains("Personal mods: Scope", System.StringComparison.Ordinal), squad); // mod rows only when asked
+    Assert.True(squad.Contains("Weapon mods: Rail", System.StringComparison.Ordinal), squad);
 
     string captivity = CombatantSummary.EquipmentText(combatant, includeMods: false);
-    Assert.True(captivity.Contains("Weapon: Rifle"), captivity);
-    Assert.True(captivity.Contains("Armor: Vest"), captivity);
-    Assert.False(captivity.Contains("Scope"), captivity);
-    Assert.False(captivity.Contains("Rail"), captivity);
+    Assert.True(captivity.Contains("Weapon: Rifle", System.StringComparison.Ordinal), captivity);
+    Assert.True(captivity.Contains("Armor: Vest", System.StringComparison.Ordinal), captivity);
+    Assert.False(captivity.Contains("Scope", System.StringComparison.Ordinal), captivity);
+    Assert.False(captivity.Contains("Rail", System.StringComparison.Ordinal), captivity);
   }
 
   [TestCase(TestName = "Unequipped slots have explicit empty text on every row")]
@@ -105,10 +105,10 @@ public class CombatantSummaryTest
     var bare = campaign.State.Roster[0];
 
     string text = CombatantSummary.EquipmentText(bare, includeMods: true);
-    Assert.True(text.Contains("Weapon: — empty —"), text);
-    Assert.True(text.Contains("Armor: — empty —"), text);
-    Assert.True(text.Contains("Utility 1: — empty —"), text);
-    Assert.True(text.Contains("Personal mods: — empty —"), text);
-    Assert.False(text.Contains("Weapon mods:"), text); // no weapon: no weapon-mod row
+    Assert.True(text.Contains("Weapon: — empty —", System.StringComparison.Ordinal), text);
+    Assert.True(text.Contains("Armor: — empty —", System.StringComparison.Ordinal), text);
+    Assert.True(text.Contains("Utility 1: — empty —", System.StringComparison.Ordinal), text);
+    Assert.True(text.Contains("Personal mods: — empty —", System.StringComparison.Ordinal), text);
+    Assert.False(text.Contains("Weapon mods:", System.StringComparison.Ordinal), text); // no weapon: no weapon-mod row
   }
 }

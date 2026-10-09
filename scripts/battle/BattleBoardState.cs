@@ -87,9 +87,9 @@ public sealed class BattleBoardState
         var flags = (BattleTileFlags)map.TileFlags[i];
         _tiles[i] = new BattleTileState
         {
-          IsWalkable = (flags & BattleTileFlags.Walkable) != 0,
-          BlocksLineOfSight = (flags & BattleTileFlags.BlocksLineOfSight) != 0,
-          BlocksVerticalLineOfSight = (flags & BattleTileFlags.BlocksVerticalLineOfSight) != 0,
+          IsWalkable = (flags & BattleTileFlags.Walkable) != BattleTileFlags.None,
+          BlocksLineOfSight = (flags & BattleTileFlags.BlocksLineOfSight) != BattleTileFlags.None,
+          BlocksVerticalLineOfSight = (flags & BattleTileFlags.BlocksVerticalLineOfSight) != BattleTileFlags.None,
           Cover = new((CoverDirections)map.TileCoverDirections[i], map.TileCoverAmounts[i])
         };
       }

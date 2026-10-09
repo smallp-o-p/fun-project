@@ -104,8 +104,8 @@ public static class Assert
   public static void MaskRegions(FunProject.Models.CharacterModel model, NodePath meshPath,
     params string[] enabled)
   {
-    var expected = new SysColGeneric.HashSet<string>(enabled);
-    var actual = new SysColGeneric.HashSet<string>();
+    var expected = new SysColGeneric.HashSet<string>(enabled, StringComparer.Ordinal);
+    var actual = new SysColGeneric.HashSet<string>(StringComparer.Ordinal);
     foreach (FunProject.Models.CharacterModel.MaskRuntime.Region region in model.ResolveMask(meshPath).Regions)
     {
       if (region.Enabled)

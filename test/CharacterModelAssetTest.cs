@@ -162,8 +162,7 @@ public class CharacterModelAssetTest
   public static void AuthoredBodyShapeValuesAreStored(string scene)
   {
     using var fixture = ModelFixture.FromScene(scene);
-    (string mesh, (string Shape, double Value)[] shapes)[] meshes = scene == ZhuYuanScene
-      ? [(ZhuYuanBodyMesh, ZhuYuanBodyShape), (SharedBodyMesh, ZhuYuanBodyShape)]
+    (string mesh, (string Shape, double Value)[] shapes)[] meshes = string.Equals(scene, ZhuYuanScene, StringComparison.Ordinal) ? [(ZhuYuanBodyMesh, ZhuYuanBodyShape), (SharedBodyMesh, ZhuYuanBodyShape)]
       : [(TriggerBodyMesh, TriggerBodyShape), (SharedBodyMesh, TriggerBodyShape)];
     foreach ((string mesh, (string Shape, double Value)[] shapes) in meshes)
       AssertBodyShape(fixture.Root, mesh, shapes);
@@ -476,8 +475,12 @@ public class CharacterModelAssetTest
 
   // Resource property reads can create new managed wrappers for the same native texture.
   private static bool SameTextureParameter(Variant first, Variant second)
-    => first.VariantType == second.VariantType && (first.VariantType != Variant.Type.Object
-      ? first.Equals(second) : ModelFixture.SameNative(first.AsGodotObject(), second.AsGodotObject()));
+    => first.VariantType == second.VariantType && first.VariantType switch
+    {
+      Variant.Type.Nil => true,
+      Variant.Type.Object => ModelFixture.SameNative(first.AsGodotObject(), second.AsGodotObject()),
+      _ => false,
+    };
 
   private static void AssertMaterialLocality(ShaderMaterial source, ShaderMaterial first, ShaderMaterial second)
   {

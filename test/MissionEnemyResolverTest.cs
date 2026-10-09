@@ -20,7 +20,7 @@ public class MissionEnemyResolverTest
     { Combatant = TestData.MakeCombatantData("Special One", health: 30) });
     mission.SpecialEnemies.Add(new UnitLoadoutData
     { Combatant = TestData.MakeCombatantData("Special Two", health: 30) });
-    var names = new SysColGeneric.HashSet<string>();
+    var names = new SysColGeneric.HashSet<string>(StringComparer.Ordinal);
     var counts = new SysColGeneric.HashSet<int>();
 
     for (int seed = 1; seed <= 32; seed++)

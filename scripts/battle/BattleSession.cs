@@ -638,7 +638,7 @@ public sealed class BattleSession
   {
     foreach (var battleEvent in events)
     {
-      ArgumentNullException.ThrowIfNull(battleEvent);
+      ArgumentNullException.ThrowIfNull(battleEvent, nameof(events));
       _eventDispatchQueue.Enqueue(battleEvent);
     }
 

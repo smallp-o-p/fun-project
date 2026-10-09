@@ -50,7 +50,7 @@ public class BombDefusalContentTest
     string output = $"STDOUT:\n{stdout}\nSTDERR:\n{stderr}";
     Assert.True(exited, $"Bomb defusal probe timed out.\n{output}");
     Assert.Equal(0, process.ExitCode, output);
-    Assert.True(stdout.Contains("BOMB_DEFUSAL_CONTENT_OK"), output);
-    Assert.True(stdout.Contains("SKIRMISH_CONTENT_OK"), output);
+    Assert.True(stdout.Contains("BOMB_DEFUSAL_CONTENT_OK", StringComparison.Ordinal), output);
+    Assert.True(stdout.Contains("SKIRMISH_CONTENT_OK", StringComparison.Ordinal), output);
   }
 }

@@ -45,6 +45,6 @@ public interface IHasStats
     if (min is not null) value = Mathf.Max(value, min.Value);
     if (max is not null) value = Mathf.Min(value, max.Value);
     // Round to 5 dp to suppress IEEE-754 noise (e.g. 1.2f*1.2f*10 = 14.400001f); game stats need no finer precision.
-    return MathF.Round(value, 5);
+    return MathF.Round(value, 5, MidpointRounding.ToEven);
   }
 }

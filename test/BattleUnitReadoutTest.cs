@@ -14,12 +14,12 @@ public sealed class BattleUnitReadoutTest
 
     battle.ApplyDamage(battle.PlayerUnit, 5, DamageKind.Stun);
     string conscious = BattleHud.FormatUnitReadout(battle.PlayerUnit);
-    Assert.True(conscious.Contains("STUN 5"));
-    Assert.False(conscious.Contains("Unconscious"));
+    Assert.True(conscious.Contains("STUN 5", System.StringComparison.Ordinal));
+    Assert.False(conscious.Contains("Unconscious", System.StringComparison.Ordinal));
 
     battle.ApplyDamage(battle.PlayerUnit, 15, DamageKind.Stun);
     string unconscious = BattleHud.FormatUnitReadout(battle.PlayerUnit);
-    Assert.True(unconscious.Contains("STUN 20"));
-    Assert.True(unconscious.Contains("Unconscious"));
+    Assert.True(unconscious.Contains("STUN 20", System.StringComparison.Ordinal));
+    Assert.True(unconscious.Contains("Unconscious", System.StringComparison.Ordinal));
   }
 }

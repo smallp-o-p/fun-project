@@ -24,6 +24,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
     };
   }
 
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "MA0015", Justification = "The guard identifies the Unit property installed by the owning view, not campaign inputs.")]
   public override void Present(CampaignGameState state, GeoscapeSession session)
   {
     ArgumentNullException.ThrowIfNull(Unit);
@@ -156,7 +157,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
         ModifierOperation.Override => $" = {modifier.Value:0.#}",
         _ => $" {modifier.Operation} {modifier.Value}",
       });
-    return string.Join(" ", texts);
+    return string.Join(' ', texts);
   }
 
   private static void AddLabel(Container parent, string text, int fontSize)

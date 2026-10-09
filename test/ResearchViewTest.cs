@@ -56,8 +56,8 @@ public class ResearchViewTest
     Assert.Equal("Select a project to research.", view.GetNode<Label>("%ProjectName").Text);
     Assert.Equal("", view.GetNode<Label>("%ProjectDescription").Text);
     Assert.False(OnlyChild<Button>(rows).ButtonPressed);
-    Assert.True(view.GetNode<Label>("%Status").Text.Contains("Kit"));
-    Assert.True(view.GetNode<Label>("%Status").Text.Contains("Locked"));
+    Assert.True(view.GetNode<Label>("%Status").Text.Contains("Kit", System.StringComparison.Ordinal));
+    Assert.True(view.GetNode<Label>("%Status").Text.Contains("Locked", System.StringComparison.Ordinal));
     view.Present(campaign.State, campaign.Session);
     Assert.Equal("", view.GetNode<Label>("%Status").Text);
 
@@ -70,10 +70,10 @@ public class ResearchViewTest
     start.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(1, campaign.Events.EventsOf<ResearchStarted>().Length);
     Assert.True(ReferenceEquals(second, campaign.Session.ActiveResearch.RequireSome().Project));
-    Assert.True(view.GetNode<Label>("%ActiveJob").Text.Contains("1d 0h 0m"));
+    Assert.True(view.GetNode<Label>("%ActiveJob").Text.Contains("1d 0h 0m", System.StringComparison.Ordinal));
     campaign.AdvanceTicks(1);
     view.Present(campaign.State, campaign.Session);
-    Assert.True(view.GetNode<Label>("%ActiveJob").Text.Contains("23h 59m"));
+    Assert.True(view.GetNode<Label>("%ActiveJob").Text.Contains("23h 59m", System.StringComparison.Ordinal));
     unlocked = true;
     view.Present(campaign.State, campaign.Session);
     OnlyChild<Button>(rows).EmitSignal(Button.SignalName.Pressed);
@@ -116,7 +116,7 @@ public class ResearchViewTest
     Assert.True(visible.Encloses(ScreenRect(start)));
     Assert.True(visible.Encloses(ScreenRect(back)));
     var scroll = view.GetNode<ScrollContainer>("%DetailsScroll");
-    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(ulong.MaxValue.ToString(System.Globalization.CultureInfo.CurrentCulture)));
+    Assert.True(view.GetNode<Label>("%CurrencyCosts").Text.Contains(ulong.MaxValue.ToString(System.Globalization.CultureInfo.CurrentCulture), System.StringComparison.Ordinal));
     Assert.True(view.GetNode<Label>("%CurrencyCosts").Size.X <= scroll.Size.X);
     var startRect = ScreenRect(start);
     var backRect = ScreenRect(back);

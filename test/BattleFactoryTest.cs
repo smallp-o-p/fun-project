@@ -271,7 +271,7 @@ public class BattleFactoryTest
       "objectData" => setup with { Objects = [new ObjectPlacement(null!, new Vector3I(1, 0, 0))] },
       "objects" => setup with { Objects = null! },
       "systems" => setup with { Systems = null! },
-      _ => throw new ArgumentException($"Unknown member: {member}"),
+      _ => throw new ArgumentException($"Unknown member: {member}", nameof(member)),
     };
     Assert.Throws<ArgumentNullException>(() => BattleFactory.Start(broken));
   }

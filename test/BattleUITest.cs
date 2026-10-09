@@ -34,7 +34,7 @@ public partial class BattleUITest
     view.Hud.ShowActionOptions([moveOption, passOption]);
 
     var status = view.GetNode<BattleHud>("%BattleHud").GetNode<Label>("%UnitStatus");
-    Assert.True(status.Text.Contains("HP"));
+    Assert.True(status.Text.Contains("HP", System.StringComparison.Ordinal));
     Assert.Equal(units.Length, status.Text.Split("\n").Length);
     var verbs = view.GetNode<BattleHud>("%BattleHud").GetNode<Container>("%VerbButtons");
     Assert.Equal(2, verbs.GetChildCount());

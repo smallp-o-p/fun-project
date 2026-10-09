@@ -221,7 +221,7 @@ public class GeoscapeMapControlTest
 
   private static RegionButton[] Markers(GeoscapeMapControl map)
     => map.GetChildren().AsValueEnumerable().OfType<RegionButton>()
-      .Where(button => button.SceneFilePath == map.EventMarkerScene.ResourcePath).ToArray();
+      .Where(button => string.Equals(button.SceneFilePath, map.EventMarkerScene.ResourcePath, StringComparison.Ordinal)).ToArray();
 
   private static void AssertMarkerGeometry(RegionButton[] markers, Vector2I mapSize)
   {

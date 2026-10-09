@@ -26,10 +26,10 @@ public sealed class ResearchState
     ArgumentNullException.ThrowIfNull(projects);
     foreach (var project in projects)
     {
-      ArgumentNullException.ThrowIfNull(project);
+      ArgumentNullException.ThrowIfNull(project, nameof(projects));
       if (_byProject.ContainsKey(project)) continue;
-      ArgumentNullException.ThrowIfNull(project.Condition);
-      ArgumentNullException.ThrowIfNull(project.ManufacturingUnlocks);
+      ArgumentNullException.ThrowIfNull(project.Condition, nameof(projects));
+      ArgumentNullException.ThrowIfNull(project.ManufacturingUnlocks, nameof(projects));
       project.Condition.CheckAuthoring();
       var definition = new Definition(project, project.DurationDays, project.Condition,
         project.ManufacturingUnlocks.AsValueEnumerable().ToImmutableList());

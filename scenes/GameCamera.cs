@@ -194,7 +194,7 @@ public partial class GameCamera : AnimatableBody3D
     {
       CameraRotation.Left => 1.0f,
       CameraRotation.Right => -1.0f,
-      _ => throw new NotImplementedException(),
+      _ => throw new ArgumentOutOfRangeException(nameof(rotate), rotate, "Unknown camera rotation."),
     };
 
     float targetProgress = pathFollow!.Progress + (direction * GetQuarterTurnDistance(curve));

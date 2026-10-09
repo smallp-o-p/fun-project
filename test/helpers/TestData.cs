@@ -359,7 +359,7 @@ internal static class TestData
     var map = new BattleMapAuthoring { Name = "Map" };
     foreach (string name in new[] { "Floors", "Props" })
     {
-      var grid = new GridMap { Name = name, CellSize = Vector3.One, CollisionLayer = name == "Floors" ? 1u : 2u, CollisionMask = 0 };
+      var grid = new GridMap { Name = name, CellSize = Vector3.One, CollisionLayer = string.Equals(name, "Floors", System.StringComparison.Ordinal) ? 1u : 2u, CollisionMask = 0 };
       map.AddChild(grid);
       grid.Owner = map;
     }
@@ -748,7 +748,7 @@ internal static class TestData
   public static ArrayMesh MakeSkinSourceMesh(bool eightBoneWeights = false, bool withBlendShape = true)
   {
     if (eightBoneWeights && withBlendShape)
-      throw new System.ArgumentException("The fixture never combines 8-bone weights with blend shapes.");
+      throw new System.ArgumentException("The fixture never combines 8-bone weights with blend shapes.", nameof(eightBoneWeights));
     int stride = eightBoneWeights ? 8 : 4;
     var mesh = new ArrayMesh();
     if (withBlendShape)
@@ -814,7 +814,7 @@ internal static class TestData
       throw new System.ArgumentOutOfRangeException(nameof(maskCount), maskCount,
         "Mask fixture configurations need between 1 and 64 masks.");
     if (source.GetSurfaceCount() != 1)
-      throw new System.ArgumentException("Mask fixture configurations expect a single-surface source mesh.");
+      throw new System.ArgumentException("Mask fixture configurations expect a single-surface source mesh.", nameof(source));
 
     var masks = new Godot.Collections.Dictionary<string, bool>();
     var triangleFlags = new long[maskCount];

@@ -1,6 +1,8 @@
 using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.GameState;
 
+namespace FunProject.Tests;
+
 // Test-hosted geoscape root: captures the campaign its base builds so handoff tests can
 // prove one campaign/root instance survives battle presentation and return. Used through
 // the serialized test scene that overrides the authored root's script.

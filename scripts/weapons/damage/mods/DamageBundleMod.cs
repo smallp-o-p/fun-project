@@ -10,6 +10,7 @@ public partial class DamageBundleMod : Resource
   [Export] public Godot.Collections.Array<PacketModifier> PacketModifiers { get; set; } = [];
   [Export] public Godot.Collections.Array<DamagePacketData> AddedPackets { get; set; } = [];
 
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "MA0015", Justification = "The guards identify invalid authored PacketModifiers and AddedPackets, not the supplied damage bundle.")]
   public List<Damage> Apply(List<Damage> bundle, DamageEmissionContext context)
   {
     IEnumerable<Damage> result = bundle;

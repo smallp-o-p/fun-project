@@ -29,8 +29,8 @@ public static class BattleSetupResolver
     SideDeployment? sideOverride = null;
     if (sideDeployment.Case is SideDeployment suppliedSide)
     {
-      ArgumentNullException.ThrowIfNull(suppliedSide.Faction);
-      ArgumentNullException.ThrowIfNull(suppliedSide.Loadouts);
+      ArgumentNullException.ThrowIfNull(suppliedSide.Faction, nameof(sideDeployment));
+      ArgumentNullException.ThrowIfNull(suppliedSide.Loadouts, nameof(sideDeployment));
       if (suppliedSide.FactionIndex < 0 || suppliedSide.FactionIndex >= type.Factions.Count)
         return Left<BattleSetupFailure, BattleSetup>(new BattleSetupFailure(
           BattleSetupFailureReason.UnknownFaction,
@@ -41,8 +41,8 @@ public static class BattleSetupResolver
           $"SideDeployment targets faction slot {suppliedSide.FactionIndex}; only non-player slots can be overridden."));
       foreach (UnitLoadout loadout in suppliedSide.Loadouts)
       {
-        ArgumentNullException.ThrowIfNull(loadout);
-        ArgumentNullException.ThrowIfNull(loadout.Combatant);
+        ArgumentNullException.ThrowIfNull(loadout, nameof(sideDeployment));
+        ArgumentNullException.ThrowIfNull(loadout.Combatant, nameof(sideDeployment));
         if (!ReferenceEquals(loadout.Combatant.OwningFaction, suppliedSide.Faction))
           return Left<BattleSetupFailure, BattleSetup>(new(
             BattleSetupFailureReason.FactionMismatch,
@@ -82,19 +82,19 @@ public static class BattleSetupResolver
     for (int slot = 0; slot < type.Factions.Count; slot++)
     {
       FactionDeploymentData authoredSide = type.Factions[slot];
-      ArgumentNullException.ThrowIfNull(authoredSide.Faction);
+      ArgumentNullException.ThrowIfNull(authoredSide.Faction, nameof(type));
       Faction faction;
       IReadOnlyList<UnitLoadout> loadouts;
       if (slot == type.PlayerFactionIndex && playerDeployment.Case is PlayerDeployment supplied)
       {
-        ArgumentNullException.ThrowIfNull(supplied.Faction);
-        ArgumentNullException.ThrowIfNull(supplied.Loadouts);
+        ArgumentNullException.ThrowIfNull(supplied.Faction, nameof(playerDeployment));
+        ArgumentNullException.ThrowIfNull(supplied.Loadouts, nameof(playerDeployment));
         faction = supplied.Faction;
         loadouts = supplied.Loadouts;
         foreach (UnitLoadout loadout in loadouts)
         {
-          ArgumentNullException.ThrowIfNull(loadout);
-          ArgumentNullException.ThrowIfNull(loadout.Combatant);
+          ArgumentNullException.ThrowIfNull(loadout, nameof(playerDeployment));
+          ArgumentNullException.ThrowIfNull(loadout.Combatant, nameof(playerDeployment));
           if (!ReferenceEquals(loadout.Combatant.OwningFaction, faction))
             return Left<BattleSetupFailure, BattleSetup>(new(
               BattleSetupFailureReason.FactionMismatch,

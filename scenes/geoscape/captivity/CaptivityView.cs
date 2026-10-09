@@ -142,7 +142,7 @@ public sealed partial class CaptivityView : GeoscapeView
     $"Name: {captive.Name}",
     $"Faction: {captive.OwningFaction.Name}",
     CombatantSummary.StatsText(captive, "Health (max)", _state!.CampaignStatContributions(captive))
-      .Replace("  ", "\n"),
+      .Replace("  ", "\n", StringComparison.Ordinal),
     CombatantSummary.EquipmentText(captive, includeMods: false),
     BuffsText(captive));
 

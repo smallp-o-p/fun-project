@@ -19,7 +19,7 @@ public class DialogueAuthoringTest
     var map = GD.Load<GeoscapeMapData>("res://resources/geoscape/TestMap.tres");
     GeoscapeEventDefinition council = map.Timeline
       .AsValueEnumerable().Select(schedule => schedule.Event)
-      .Single(definition => definition.Title == "Council Broadcast");
+      .Single(definition => string.Equals(definition.Title, "Council Broadcast", System.StringComparison.Ordinal));
 
     DialogueSequenceData dialogue = council.Dialogue
       ?? throw new System.InvalidOperationException(

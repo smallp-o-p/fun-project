@@ -55,7 +55,7 @@ public partial class PacketModifier : Resource
     float value = amount;
     foreach (StatModifier op in ops)
     {
-      ArgumentNullException.ThrowIfNull(op);
+      ArgumentNullException.ThrowIfNull(op, nameof(ops));
       value = op.Operation switch
       {
         ModifierOperation.Add => value + op.Value,

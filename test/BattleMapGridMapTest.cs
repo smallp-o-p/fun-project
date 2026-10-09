@@ -55,7 +55,7 @@ public partial class BattleMapGridMapTest
     using var neighborTile = data.GetTile(anchor + (Godot.Vector3I)(basis * Vector3.Back).Round());
     Assert.False(anchorTile.Walkable);
     Assert.False(neighborTile.Walkable);
-    Assert.Equal(2, data.TileFlags.AsValueEnumerable().Count(flags => ((BattleTileFlags)flags & BattleTileFlags.Walkable) == 0));
+    Assert.Equal(2, data.TileFlags.AsValueEnumerable().Count(flags => ((BattleTileFlags)flags & BattleTileFlags.Walkable) == BattleTileFlags.None));
     Assert.Equal(6, data.TileCoverAmounts.AsValueEnumerable().Count(amount => amount == 40));
   }
 

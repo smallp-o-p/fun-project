@@ -8,19 +8,19 @@ public struct BattleTileState
   // BattleBoardState.SetTileWalkable.
   public bool IsWalkable
   {
-    get => (_flags & BattleTileFlags.Walkable) != 0;
+    readonly get => (_flags & BattleTileFlags.Walkable) != BattleTileFlags.None;
     internal set => Set(BattleTileFlags.Walkable, value);
   }
 
   public bool BlocksLineOfSight
   {
-    get => (_flags & BattleTileFlags.BlocksLineOfSight) != 0;
+    readonly get => (_flags & BattleTileFlags.BlocksLineOfSight) != BattleTileFlags.None;
     set => Set(BattleTileFlags.BlocksLineOfSight, value);
   }
 
   public bool BlocksVerticalLineOfSight
   {
-    get => (_flags & BattleTileFlags.BlocksVerticalLineOfSight) != 0;
+    readonly get => (_flags & BattleTileFlags.BlocksVerticalLineOfSight) != BattleTileFlags.None;
     set => Set(BattleTileFlags.BlocksVerticalLineOfSight, value);
   }
 

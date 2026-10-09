@@ -338,7 +338,7 @@ public class BattleStartupLifecycleTest
       observed = error;
     }
     Assert.True(observed is InvalidOperationException);
-    Assert.True(observed!.Message.Contains("no activation condition"));
+    Assert.True(observed!.Message.Contains("no activation condition", StringComparison.Ordinal));
     Assert.True(system.RegisteredHooks is null);
   }
 

@@ -115,7 +115,7 @@ public class ModelClothingTest
   {
     using var fixture = ModelFixture.WithWardrobe();
     foreach (var property in fixture.Model.GetPropertyList())
-      Assert.False(property["name"].AsString() == "WardrobeConfiguration",
+      Assert.False(string.Equals(property["name"].AsString(), "WardrobeConfiguration", StringComparison.Ordinal),
         "The model must obtain its catalog from the import, not an editable resource slot.");
     GodotObject[] definitions = [fixture.Model.WardrobeConfiguration,
       fixture.Model.WardrobeConfiguration.Components["Garment"],

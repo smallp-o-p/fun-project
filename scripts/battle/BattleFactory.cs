@@ -32,10 +32,10 @@ public static class BattleFactory
     var sideFactions = new SysColGeneric.HashSet<Faction>();
     foreach (BattleSideSetup side in setup.Sides)
     {
-      ArgumentNullException.ThrowIfNull(side);
-      ArgumentNullException.ThrowIfNull(side.Faction);
-      ArgumentNullException.ThrowIfNull(side.Objectives);
-      ArgumentNullException.ThrowIfNull(side.Units);
+      ArgumentNullException.ThrowIfNull(side, nameof(setup));
+      ArgumentNullException.ThrowIfNull(side.Faction, nameof(setup));
+      ArgumentNullException.ThrowIfNull(side.Objectives, nameof(setup));
+      ArgumentNullException.ThrowIfNull(side.Units, nameof(setup));
       if (!sideFactions.Add(side.Faction))
         throw new ArgumentException(
           $"Two sides share the faction reference {side.Faction.Name}.", nameof(setup));
@@ -71,8 +71,8 @@ public static class BattleFactory
 
       foreach (UnitPlacement placement in side.Units)
       {
-        ArgumentNullException.ThrowIfNull(placement.Loadout);
-        ArgumentNullException.ThrowIfNull(placement.Loadout.Combatant);
+        ArgumentNullException.ThrowIfNull(placement.Loadout, nameof(setup));
+        ArgumentNullException.ThrowIfNull(placement.Loadout.Combatant, nameof(setup));
         if (!ReferenceEquals(placement.Loadout.Combatant.OwningFaction, side.Faction))
           return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
             BattleSetupFailureReason.FactionMismatch,
@@ -93,7 +93,7 @@ public static class BattleFactory
 
     foreach (ObjectPlacement placement in setup.Objects)
     {
-      ArgumentNullException.ThrowIfNull(placement.Data);
+      ArgumentNullException.ThrowIfNull(placement.Data, nameof(setup));
       if (!objectCells.Add(placement.Position))
         return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
           BattleSetupFailureReason.DuplicateObjectCell,
