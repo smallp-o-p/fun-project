@@ -1,4 +1,5 @@
 using System;
+using FunProject.Combatants;
 
 namespace FunProject.Battle;
 
@@ -7,6 +8,8 @@ public sealed class BattleRuntime : IDisposable
   private readonly BattleSession _session;
   private readonly BattleActionExecutor _actions;
   private bool _disposed;
+  private bool _submitting;
+  private readonly EnemyTurnController _enemyController;
 
   public event Action<BattleEvent> BattleEventCommitted = delegate { };
   public event Action<BattleAction> ActionStarted = delegate { };
@@ -21,6 +24,8 @@ public sealed class BattleRuntime : IDisposable
     _session = session;
     _session.BattleEventCommitted += RaiseBattleEventCommitted;
     _actions = new BattleActionExecutor(session);
+    _enemyController = new(this, new(200, 25, 100, 75));
+
   }
 
   public TResult Query<TResult>(IBattleSessionQuery<TResult> query)
@@ -67,12 +72,50 @@ public sealed class BattleRuntime : IDisposable
 
   public BattleActionExecResult ExecuteAction(BattleAction action)
   {
-    ThrowIfDisposed();
-    _actions.EnsureCanSubmit();
-    ActionStarted.Invoke(action);
-    BattleActionExecResult result = _actions.Submit(action);
-    ActionCompleted.Invoke(result);
+    var result = ExecuteSingleAction(action);
+    ExecuteNonPlayerTurn();
     return result;
+  }
+
+  // Guard one synchronous submission, including its callbacks. This prevents observers
+  // from submitting recursively; it does not lock or span the enemy-turn loop.
+  internal BattleActionExecResult ExecuteSingleAction(BattleAction action)
+  {
+    ThrowIfDisposed();
+    EnsureNotSubmitting();
+    ArgumentNullException.ThrowIfNull(action);
+    _actions.EnsureCanSubmit();
+    _submitting = true;
+    try
+    {
+      ActionStarted.Invoke(action);
+      ThrowIfDisposed();
+      var result = _actions.Submit(action);
+      ActionCompleted.Invoke(result);
+      return result;
+    }
+    catch
+    {
+      _enemyController.Stop();
+      throw;
+    }
+    finally { _submitting = false; }
+  }
+
+  private void ExecuteNonPlayerTurn()
+  {
+    if (_session.PlayerFaction.Case is not Faction player) return;
+    while (!_disposed && _session.Outcome.IsNone && !_enemyController.IsStopped)
+    {
+      var active = _session.ActiveSide;
+      if (ReferenceEquals(active, player)) return;
+      _enemyController.ExecuteEnemyActions(active);
+    }
+  }
+
+  private void EnsureNotSubmitting()
+  {
+    if (_submitting) throw new InvalidOperationException("Cannot submit or enable enemy turns from an action callback.");
   }
 
   public void RegisterHook<TEventKey>(BattleHook hook, int priority = 0)
@@ -94,9 +137,10 @@ public sealed class BattleRuntime : IDisposable
     if (_disposed)
       return;
 
+    _disposed = true;
+    _enemyController.Stop();
     _session.BattleEventCommitted -= RaiseBattleEventCommitted;
     _actions.Dispose();
-    _disposed = true;
   }
 
   private void ThrowIfDisposed()
@@ -105,7 +149,5 @@ public sealed class BattleRuntime : IDisposable
   }
 
   private void RaiseBattleEventCommitted(BattleEvent battleEvent)
-  {
-    BattleEventCommitted.Invoke(battleEvent);
-  }
+    => BattleEventCommitted.Invoke(battleEvent);
 }

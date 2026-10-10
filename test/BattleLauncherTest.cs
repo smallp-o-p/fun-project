@@ -82,7 +82,7 @@ public partial class BattleLauncherTest
   }
 
   [TestCase(TestName = "Disposing an attached host detaches pending playback before runtime teardown")]
-  public static void DisposeDetachesPendingPlayback()
+  public static async Task DisposeDetachesPendingPlayback()
   {
     var setup = BattleSetupResolver.Resolve(TestData.MakeDuelBattleType()).RequireRight();
     using var runtime = BattleFactory.Start(setup).RequireRight();
@@ -96,7 +96,7 @@ public partial class BattleLauncherTest
 
     scene.Dispose();
     scene.Dispose(); // teardown remains idempotent
-    DrainDirector(scene); // a retained completion must not query the disposed runtime
+    await DrainDirector(scene); // a retained completion must not query the disposed runtime
 
     Assert.False(director.Busy);
     Assert.Equal(Node.ProcessModeEnum.Disabled, scene.ProcessMode);
@@ -130,5 +130,87 @@ public partial class BattleLauncherTest
 
     Assert.Equal(Vector3I.Zero, hovered.RequireSome());
     Assert.Equal(Vector3I.Zero, clicked.RequireSome());
+  }
+
+  [TestCase]
+  public static async Task PendingPlaybackDefersHudAndDisablesInputUntilDrain()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var setup = BattleSetupResolver.Resolve(TestData.MakeDuelBattleType()).RequireRight();
+    using var runtime = BattleFactory.Start(setup).RequireRight();
+    var scene = CreateBattleScene();
+    scene.Present(runtime, setup);
+    AddToTree(scene);
+    scene.InitializePresentation();
+    Director(scene).SetProcess(false);
+    await SelectFirstBattleUnit(scene);
+    var status = scene.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Label>("%UnitStatus");
+    string before = status.Text;
+    var player = runtime.Query(new GetFactionAliveUnits(setup.PlayerFaction.RequireSome()))
+      .AsValueEnumerable().Single();
+    runtime.ExecuteAction(BattleAction.ApplyDamage(player, 2));
+    Assert.True(Director(scene).Busy);
+    Assert.Equal(before, status.Text);
+    Assert.True(EndTurnButton(scene).Disabled);
+    int submissions = 0;
+    runtime.ActionStarted += _ => submissions++;
+    EndTurnButton(scene).EmitSignal(Button.SignalName.Pressed);
+    Assert.Equal(0, submissions); // programmatic signals must also honor the input gate
+    await DrainDirector(scene);
+    Assert.False(string.Equals(before, status.Text, StringComparison.Ordinal));
+    Assert.True(status.Text.Contains("HP 18/20", StringComparison.Ordinal));
+    Assert.False(EndTurnButton(scene).Disabled);
+  }
+
+  [TestCase]
+  public static void ObserverExitIgnoresAlreadyCapturedResultDeliveryAndLaterInput()
+  {
+    var setup = BattleSetupResolver.Resolve(TestData.MakeDuelBattleType()).RequireRight();
+    using var runtime = BattleFactory.Start(setup).RequireRight();
+    var scene = CreateBattleScene();
+    scene.Present(runtime, setup);
+    AddToTree(scene);
+    bool exit = false;
+    // Register before presentation delivery: multicast dispatch retains callbacks that
+    // this observer unsubscribes while the completed result is already being delivered.
+    runtime.ActionCompleted += _ => { if (exit) scene.Dispose(); };
+    scene.InitializePresentation();
+    var input = scene.GetNode<BattleInputController>("BattleInputController");
+    var hud = scene.GetNode<BattleHud>("BattleUI/BattleHud");
+    exit = true;
+    var action = BattleAction.EndFactionTurn(setup.PlayerFaction.RequireSome());
+    var result = runtime.ExecuteAction(action);
+    Assert.Equal(action, result.Action);
+    Assert.False(Director(scene).Busy);
+    hud.GetNode<Button>("%ConfirmButton").EmitSignal(Button.SignalName.Pressed);
+    input._UnhandledInput(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Pressed = true });
+    scene.Dispose();
+    Assert.Throws<ObjectDisposedException>(() => runtime.Query(new GetActiveSideQuery()));
+  }
+
+  [TestCase]
+  public static void InitiallyActiveEnemyPresentationStartsFromSettledFactoryState()
+  {
+    var type = TestData.MakeDuelBattleType();
+    type.Factions[0].Roster[0].Loadout.Combatant = TestData.MakeCombatantData("Player", health: 100);
+    type.Factions[1].Roster[0].Loadout.Combatant = TestData.MakeCombatantData("Enemy", aim: 100);
+    type.Factions[1].Roster[0].Loadout.Weapon = TestData.MakeWeaponData(damage: 10, critChance: 0, range: 10);
+    var setup = BattleSetupResolver.Resolve(type).RequireRight();
+    setup = setup with { Sides = [setup.Sides[1], setup.Sides[0]] };
+    using var runtime = BattleFactory.Start(setup).RequireRight();
+    var scene = CreateBattleScene();
+    scene.Present(runtime, setup);
+    AddToTree(scene);
+    scene.InitializePresentation();
+    Director(scene).SetProcess(false);
+    var playerFaction = setup.PlayerFaction.RequireSome();
+    Assert.Equal(playerFaction, runtime.Query(new GetActiveSideQuery()));
+    Assert.False(Director(scene).Busy);
+    Assert.Equal(2, scene.GetNode<Node3D>("UnitMeshes").GetChildren()
+      .AsValueEnumerable().OfType<MeshInstance3D>().Count());
+    var status = scene.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Label>("%UnitStatus");
+    var player = runtime.Query(new GetFactionAliveUnits(playerFaction)).AsValueEnumerable().Single();
+    Assert.True(player.State.CurrentHealth < 100);
+    Assert.True(status.Text.Contains($"HP {player.State.CurrentHealth}/100", StringComparison.Ordinal));
   }
 }

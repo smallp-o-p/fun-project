@@ -29,6 +29,7 @@ public sealed class BattleFixture : IDisposable
 {
   private readonly List<BattleEvent> _events = [];
   private bool _disposed;
+  private readonly bool _runEnemyTurns;
 
   // Captured by the fixture recorder from the first startup event; a successfully
   // constructed fixture always recorded at least one, so this is never null afterwards.
@@ -49,9 +50,10 @@ public sealed class BattleFixture : IDisposable
   public BattleUnitState Unit => PlayerUnit;
   public BattleUnitState SupportUnit => _supportUnit.RequireSome("This fixture has no support-unit role; only UiBattle provides one.");
 
-  public BattleFixture(BattleSetup setup, IHitChanceCalculator hitChanceCalculator = null)
+  public BattleFixture(BattleSetup setup, IHitChanceCalculator hitChanceCalculator = null, bool runEnemyTurns = false)
   {
     ArgumentNullException.ThrowIfNull(setup);
+    _runEnemyTurns = runEnemyTurns;
     Factions = setup.Sides.AsValueEnumerable().Select(side => side.Faction).ToArray();
     var recorder = new FixtureRecordingSystem(_events);
     Runtime = BattleFactory
@@ -94,9 +96,11 @@ public sealed class BattleFixture : IDisposable
     }
   }
 
-  // Raw submission door: deliberately invalid or stale actions reach the executor unchanged,
-  // so tests keep exercising rejection, interruption, and stale-proof paths.
-  public BattleActionExecResult Submit(BattleAction action) => Runtime.ExecuteAction(action);
+  // Simulations control both sides through one ordinary submission. AI integration tests
+  // choose the external boundary instead; both paths use the runtime's sole executor.
+  // Invalid or stale actions reach that executor unchanged.
+  public BattleActionExecResult Submit(BattleAction action)
+    => _runEnemyTurns ? Runtime.ExecuteAction(action) : Runtime.ExecuteSingleAction(action);
 
   public T Query<T>(IBattleSessionQuery<T> query) => Runtime.Query(query);
 
@@ -176,7 +180,7 @@ public sealed class BattleFixture : IDisposable
   public static BattleFixture Duel(UnitSpec player = null, UnitSpec enemy = null,
     Vector3I? dimensions = null, BattleMapData map = null,
     IHitChanceCalculator hitChanceCalculator = null, int? randomSeed = null,
-    bool playerControlled = false, Func<BattleSetup, BattleSetup> configure = null)
+    bool playerControlled = false, Func<BattleSetup, BattleSetup> configure = null, bool runEnemyTurns = false)
   {
     var playerFaction = TestData.MakeFaction("Player");
     var enemyFaction = TestData.MakeFaction("Enemy");
@@ -193,7 +197,7 @@ public sealed class BattleFixture : IDisposable
       ],
       Seed: randomSeed ?? 7,
       PlayerFaction: designatedPlayer);
-    return new BattleFixture(configure?.Invoke(setup) ?? setup, hitChanceCalculator);
+    return new BattleFixture(configure?.Invoke(setup) ?? setup, hitChanceCalculator, runEnemyTurns);
   }
 
   // The presentation scenario: the standard duel (8x1x8, Hero at (4,0,1) with a damage-10

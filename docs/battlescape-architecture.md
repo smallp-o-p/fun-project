@@ -24,6 +24,8 @@ flowchart LR
     subgraph Runtime["Battle runtime (scene-independent C#)"]
         Facade["BattleRuntime\nQuery, ExecuteAction,\nproof creation, hook registration"]
         Executor["BattleActionExecutor\nhook registry, action stack,\ninterrupt capture"]
+        EnemyController["EnemyTurnController\nExecuteEnemyActions"]
+        Policy["EnemyPolicy\nruntime queries"]
         Session["BattleSession\nturns, availability, visibility,\nevent dispatch"]
         Board["BattleBoardState\ntiles, occupancy,\nBFS pathfinding"]
         Queries["IBattleSessionQuery&lt;TResult&gt;\ntyped read questions"]
@@ -45,6 +47,11 @@ flowchart LR
     Factory -->|"builds session + runtime"| Facade
     ActorData --> Session
     Facade -->|"ExecuteAction"| Executor
+    Facade -->|"settled external submission, enemy active"| EnemyController
+    EnemyController -->|"single action, no recursive turns"| Facade
+    EnemyController -->|"turn queries"| Queries
+    EnemyController -->|"runtime + faction + turn memory"| Policy
+    Policy -->|"actor, visible targets, local knowledge"| Queries
     Executor -->|"primitives commit"| Session
     Session --- Board
     Facade -->|"Query"| Queries
@@ -66,7 +73,7 @@ flowchart LR
 - `BattleBoardState` owns: tile storage, walkability and occupancy, adjacency, occupant placement, movement, removal, and board-local pathfinding.
 - `BattleAction` owns action-specific legality checks and application. A composite action unfolds into primitives.
 - `BattleActionExecutor` owns: the hook registry (default systems register in its constructor), `RegisterHook`/`UnregisterHook`/`Dispose`, the pending action stack, invocation order, and interrupt capture. A failed submission clears queued work and propagates the exception. Committed state and events remain.
-- `BattleRuntime` owns: the public methods `Query` and `ExecuteAction`, the proof methods `TryGetAlive`/`TryGetAliveObject`/`TryGetAttackTarget`/`TryGetTile`, the `RegisterHook`/`UnregisterHook` facade, and the session's single executor. It re-raises `BattleEventCommitted` and raises `ActionStarted`/`ActionCompleted`.
+- `BattleRuntime` owns: the public methods `Query` and `ExecuteAction`, the proof methods `TryGetAlive`/`TryGetAliveObject`/`TryGetAttackTarget`/`TryGetTile`, the `RegisterHook`/`UnregisterHook` facade, the session's single executor, and one `_enemyController` initialized with the runtime. It re-raises `BattleEventCommitted` and raises `ActionStarted`/`ActionCompleted`.
 - `IBattleSessionQuery<TResult>` implementations each own one question and its result shape.
 - Unit inventory belongs to `BattleUnitState`.
 - `BattleLauncher` resolves a `BattleTypeData`, starts the runtime, loads `BattleScene.tscn`, and calls `Present`. `BattleScene` holds the runtime and setup and instances the pooled `BattleMap`. It builds `EventPlaybackDirector`, `BattleUnitMeshes`, `BattleUiController`, and `BattleInputController`. It pushes view models into the authored `BattleUI` view.
@@ -79,7 +86,7 @@ flowchart LR
 `BattleFactory` is the production entry point. `Start(type, seed?, playerDeployment?)` resolves the setup and starts it. `Start(setup, hitChance?)` is the single startup routine:
 
 1. `BattleSetupResolver.Resolve` picks a map from `BattleTypeData.MapPool` with the seed. It probes the chosen `BattleMap` scene for its `MapData`. It builds ordered sides with positioned units. Resolver failures are typed `BattleSetupFailure`s: `EmptyMapPool`, `MapSceneInvalid`, `UnknownFaction`, deployment faction mismatches, and `SpawnSlotShortfall`.
-2. `Start(setup)` creates a fresh board from the map. It then parses and validates the complete layout before any side effect. The layout check covers objectives, a player faction outside the sides, and duplicate, unavailable, or overlapping unit/object cells.
+2. `Start(setup)` validates the designated player before creating a fresh board: a player faction outside the sides returns `UnknownFaction`, and a player side with zero deployed units returns `EmptyPlayerDeployment`. Playerless setups remain supported. It then parses and validates the complete layout before any side effect. The layout check covers objectives and duplicate, unavailable, or overlapping unit/object cells.
 3. The complete roster and objects materialize on the board, and the objectives instantiate. The factory then constructs the session with its scheduler already valid. The initial round queue, active side, and availability come from the real roster. A roster without an eligible first faction is a construction failure. The factory adds the runtime and its default hooks.
 4. Declared systems register through the narrow `BattleHookRegistration` capability. The capability carries no runtime handle, queries, or submission. The single private factory-owned bootstrap runs after registration.
 5. The bootstrap announces the initial placements, `SessionStarted`, and the first turn through the ordinary event dispatch. Every placement announcement precedes the initial spotting announcements. Hooks see the complete roster and availability. Session start precedes the first turn and its AP refresh while the battle is ongoing. Interrupts run only after the startup primitive. The factory owns all setup.
@@ -222,14 +229,60 @@ var result = runtime.ExecuteAction(BattleAction.MoveUnit(unit, [destination]));
 - Unit death updates alive/dead storage, board occupancy, current-turn availability, and faction queue membership through session bookkeeping. Unconsciousness consumes availability and removes the faction from future turns when no conscious ally remains, while preserving the body and its occupancy. A disabled active faction keeps its current queue head until explicit turn end.
 - The designated player's loss of all conscious units ends the battle as defeat. `ObjectiveSystem` suppresses directives on that death or unconscious event, so the player-wipe defeat rule keeps priority over objective results. In a battle with no designated player, the loss of all living conscious units stays in progress until turn end resolves a draw.
 
+## Enemy turns
+
+`BattleRuntime` owns one `EnemyTurnController` and advances successive enemy factions. Automation is always configured with the demo settings `(200, 25, 100, 75)` when a player faction is designated; playerless simulations stay under manual control. The controller executes units within the faction supplied by the runtime. Controllers for different factions are not separate objects.
+
+The execution flow is synchronous:
+
+1. `ExecuteAction` calls the runtime's internal `ExecuteSingleAction` for the initiating action.
+2. That method raises `ActionStarted`, submits to the executor, resolves all interrupts, and finishes every `ActionCompleted` observer. It releases the submission guard and returns without calling AI.
+3. The public `ExecuteAction` then calls `ExecuteNonPlayerTurn`. Before each faction, it checks disposal, outcome, permanent controller shutdown and the settled active side. It passes an enemy side to `ExecuteEnemyActions` until player control returns. Factory bootstrap uses the same external submission boundary for an initially active enemy.
+4. The policy returns an ordinary action built from the proofs used in that decision. The controller immediately calls `runtime.ExecuteSingleAction` directly. This produces ordinary start/completion notifications and cannot reenter the outer handoff.
+5. The controller owns successive unit actions within that faction. It queries fresh actable actors in ID order and records the selected actor's current position before every decision, and submits ordinary `EndFactionTurn` when none remain. This includes reinforcements made available by an earlier action. After each submission and its observers, it checks shutdown, outcome and faction change. Each controller call starts fresh activation memory. No activation latch or execution flag is needed. Public `ExecuteAction` returns only the initiating action's result.
+
+The runtime's `_submitting` flag rejects synchronous submission from action callbacks. It spans one submission and its start/completion observers, not the enemy loop. This prevents recursive mutation before later observers have consumed the result; it is not a thread lock. The executor's existing admission checks cover disposal and terminal outcomes, not this callback boundary.
+
+### Policy queries and knowledge
+
+`EnemyPolicy.DecideAction(runtime, faction, memory, actor)` uses ordinary runtime queries directly. The controller supplies the actor; the policy reads actor-visible hostiles and faction last-seen history, without projecting the board or building a decision frame. Visibility and remembered terrain are policy choices; the AI has no separate query-access restriction. Live unit, weapon and proof reads stay within the current decision. Activation memory retains unit IDs, visited coordinates, dismissed contact revisions and failed intents. The policy returns the selected detached intent and an ordinary action using its current actor and target proofs; it keeps no candidate list or diagnostic history. The controller submits immediately, before any callback or state mutation. Actions still recheck facts that start observers or interrupts can invalidate; proofs are never retained for another decision.
+
+The controller selects the lowest-ID actable own unit. The policy considers attacks against all hostiles currently visible to that actor, excluding unconscious units, ten adjacent cells (eight horizontal and two vertical), and one empty-magazine reload. Moves require observed-clear occupancy/terrain; a diagonal requires at least one observed-clear flank. Unknown cells are never probed. Preview uses ordinary attack feasibility/hit calculations without spending ammunition or random rolls, and runs only for the chosen actor. Terrain reads are cached for that actor's cell and at most ten neighboring cells, including diagonal flanks. Frontier scoring checks explored membership in adjacent cells, without reading their terrain. Neither step scales with board area.
+
+The goal is the nearest visible hostile, otherwise the most recently seen unresolved contact, otherwise an adjacent unexplored frontier. Passing on a score plateau is allowed; eventual exploration is not guaranteed. The controller records fresh actor positions before each decision to avoid revisits. The policy dismisses contacts whose remembered cells are currently visible while that unit is absent. Currently visible units, including unconscious hostiles, are filtered out of remembered goals. Dismissal includes the visibility revision, so a later sighting can become a goal again. An empty interrupted result marks its intent failed, preventing repeated submissions that spend no AP. A later action that commits events clears failed intents, so an interrupted attack can be reconsidered after reloading. Unrelated silent mutations from completion callbacks do not cause immediate retries. Turn changes replace the memory. This is retry avoidance, not a combat suppression mechanic.
+
+### Settings and scoring
+
+Settings are percentage-valued floats: `100.0` means 100%. Aggression, caution and range weight allow 0..200 (default 100); preferred range allows 0..100 (default 75). Inputs clamp to those ranges with `Math.Clamp`; constructor defaults apply when settings are omitted. The bomb-defusal demo uses aggression 200, caution 25, range weight 100, preferred range 75; each grunt receives its own fresh loaded service pistol.
+
+Score in points is `60*A*D + 100*A*K - 35*C*E + 20*B*R + 20*P + 8*F + 15*L - 2`, where A/C/B are the corresponding weights divided by 100:
+
+| Feature | Meaning |
+| --- | --- |
+| D | Hit probability times useful nominal health/stun damage divided by observed remaining health, capped at one |
+| K | Hit probability of a nominal health kill |
+| E | Geometric exposure from known cover and distance, without enemy equipment or hidden information |
+| R | Improvement toward the preferred weapon range |
+| P | Progress toward the current goal |
+| F | Adjacent unexplored-frontier gain |
+| L | Empty-magazine reload |
+
+Candidate measurements are local values; there is no feature-container DTO. The scoring helper and weights live in `EnemyPolicySettings`. Normalized measurements round to hundredths away from zero. Float weights are promoted to double before multiplication, and only the final score rounds to centipoints away from zero; fractional weights are not rounded beforehand. The integral unweighted terms use long intermediates. Default D=.25 and E=.10 with other features zero gives 9.50 points. Only positive candidates are admitted; ties order attack, reload, move, then target ID or destination X/Y/Z. Otherwise the actor passes.
+
+### Termination and lifecycle
+
+There is no action-count cutoff. Move, attack and reload spend ordinary AP; completed passes consume unit-activation availability. Empty interrupted intents are excluded until a later committed action or turn reset. When no own unit can act, the controller submits ordinary `EndFactionTurn`. `PassUnit` is non-interruptible for all callers: it ends an available activation without checking capacity, and no AI-specific pass workaround is needed. Stale or unavailable activation parameters remain caller errors. `EndFactionTurn` cannot return `Interrupted`; a stale request is rejected. Rejected trusted parameters and action faults propagate and stop automation, without retrying or rolling back committed state. Finite ordinary turns can complete regardless of their submission count; hooks that continually replenish AP or introduce new factions can create unbounded work.
+
+Disposal or execution faults stop the single controller permanently. Later manual submissions retain the executor's existing failure-recovery behavior. Playback is never consulted to decide or submit gameplay.
+
 ## Events and hooks
 
 `BattleEvent` values report committed changes. Hook keys are event types or marker interfaces such as `IUnitBattleEvent`, `IPositionedBattleEvent`, and `ICausedByUnit`. The runtime re-raises committed events for consumers. Hook registration, priority, interruption, and built-in upkeep are defined in [action execution](battle-action-executor.md).
 
 ## Presentation
 
-`BattleScene` receives a started runtime and resolved setup through `Present`, instances the map, and owns meshes, input, UI, and playback. It binds HUD intents directly and subscribes the director to `ActionCompleted` before the UI controller. Host disposal detaches subscriptions and playback before disposing the controller and runtime.
+`BattleScene` receives a started runtime and resolved setup through `Present`, instances the map, and owns meshes, input, UI, and playback. It binds HUD intents directly and subscribes the director to `ActionCompleted` before the UI controller. It initializes meshes/HUD from the settled startup state. An initially active enemy already executes inside factory bootstrap, before the scene subscribes to result delivery; those startup actions have no queued playback. Subsequent external submissions deliver every enemy completion through the installed director. Host disposal detaches subscriptions and cancels playback before disposing the controller and runtime.
 
-`BattleUiController` owns selection and targeting. Memoized `UnitActionOption` adapters delegate live availability and mint fresh proofs when constructing actions. A completed UI update publishes one `Changed`; hover previews render directly without rebuilding widgets. Targeters expose `Candidates`. Input uses delivered viewport-local coordinates.
+`BattleUiController` is a plain C# subscriber, not a Godot node. Its explicit disposal detaches runtime events; `BattleScene` calls it during exit/teardown, including partial setup failures and late captured callbacks. It owns selection and targeting. Memoized `UnitActionOption` adapters delegate live availability and mint fresh proofs when constructing actions. A completed UI update publishes one `Changed`; hover previews render directly without rebuilding widgets. Targeters expose `Candidates`. Input uses delivered viewport-local coordinates.
 
-`EventPlaybackDirector` replays committed events in order. Read tactical state through queries; do not treat a live state reference as a snapshot of an earlier event. Character-model controls are separate presentation-owned state; see [model-controls.md](model-controls.md).
+`EventPlaybackDirector` immediately copies event references from each result span into its FIFO, so backend turns can complete before any playback tick. Captured consecutive coordinates determine movement duration; earlier movement stays queued before a later death. Input remains disabled while playback is busy, and final HP, menus, outcomes and campaign return wait until the queue drains. Empty results and initially terminal battles still refresh. Playback idle only refreshes presentation. Explicit exit kills the active tween, clears queued events, ignores late callbacks and is idempotent. Read tactical state through queries; historical visuals require captured event values rather than live reads. Character-model controls are separate presentation-owned state; see [model-controls.md](model-controls.md).

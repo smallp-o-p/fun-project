@@ -18,6 +18,8 @@ public sealed partial class BattleHud : CanvasLayer
   private Label _unitStatusLabel = null!;
   private Label _hitChanceLabel = null!;
   private Label _bannerLabel = null!;
+  private Button _confirmButton = null!;
+  private Button _cancelButton = null!;
 
   public event Action? ConfirmRequested;
   public event Action? CancelRequested;
@@ -33,16 +35,20 @@ public sealed partial class BattleHud : CanvasLayer
     _hitChanceLabel = GetNode<Label>("%HitChance");
     _bannerLabel = GetNode<Label>("%BattleOverBanner");
 
-    GetNode<Button>("%ConfirmButton").Pressed += () => ConfirmRequested?.Invoke();
-    GetNode<Button>("%CancelButton").Pressed += () => CancelRequested?.Invoke();
+    _confirmButton = GetNode<Button>("%ConfirmButton");
+    _cancelButton = GetNode<Button>("%CancelButton");
+    _confirmButton.Pressed += () => ConfirmRequested?.Invoke();
+    _cancelButton.Pressed += () => CancelRequested?.Invoke();
     _returnButton.Pressed += () => ReturnRequested?.Invoke();
   }
 
   public void ShowUnits(IReadOnlyList<BattleUnitState> units)
     => _unitStatusLabel.Text = string.Join('\n', units.AsValueEnumerable().Select(FormatUnitReadout).ToArray());
 
-  public void ShowActionOptions(IReadOnlyList<UnitActionOption> options)
+  public void ShowActionOptions(IReadOnlyList<UnitActionOption> options, bool inputEnabled = true)
   {
+    _confirmButton.Disabled = !inputEnabled;
+    _cancelButton.Disabled = !inputEnabled;
     _verbButtons.QueueFreeAllChildren();
     _turnButtons.QueueFreeAllChildren();
 
@@ -52,12 +58,22 @@ public sealed partial class BattleHud : CanvasLayer
       {
         Text = LabelFor(option),
         CustomMinimumSize = new Vector2(72, 40),
-        Disabled = !option.IsAvailable,
+        Disabled = !inputEnabled || !option.IsAvailable,
       };
       UnitActionOption captured = option;
       button.Pressed += () => VerbSelected?.Invoke(captured);
       (option is EndTurnActionOption ? (Container)_turnButtons : _verbButtons).AddChild(button);
     }
+  }
+
+  public void DisableInput()
+  {
+    _confirmButton.Disabled = true;
+    _cancelButton.Disabled = true;
+    foreach (Node child in _verbButtons.GetChildren())
+      if (child is Button button) button.Disabled = true;
+    foreach (Node child in _turnButtons.GetChildren())
+      if (child is Button button) button.Disabled = true;
   }
 
   public void ShowHitChance(int finalChance)

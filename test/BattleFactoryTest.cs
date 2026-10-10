@@ -43,6 +43,45 @@ public class BattleFactoryTest
     Assert.Equal(5u, committed.SingleEvent<UnitStunRecoveredBattleEvent>().AmountRecovered);
   }
 
+  [TestCase(false)]
+  [TestCase(true)]
+  public static void PlayerlessStartupLeavesTheFirstConsciousFactionUnderManualControl(bool emptyFirstSide)
+  {
+    var (setup, first, second, _, _) = MinimalSetup();
+    var activations = new StartupActivationLimit();
+    var system = new SetupSystemData
+    {
+      OnRegister = hooks => hooks.RegisterHook<ActiveSideChangedBattleEvent>(activations),
+    };
+    using var runtime = BattleFactory.Start(setup with
+    {
+      PlayerFaction = None,
+      Systems = [system],
+      Sides = setup.Sides.AsValueEnumerable().Select(side => side with
+      {
+        Units = emptyFirstSide && ReferenceEquals(side.Faction, first) ? [] : side.Units.AsValueEnumerable().Select(unit => unit with
+        {
+          Loadout = new(TestData.MakeCombatant(unit.Loadout.Combatant.Name, side.Faction, vision: 0)),
+        }).ToArray(),
+      }).ToArray(),
+    }).RequireRight();
+    Assert.True(runtime.Query(new GetPlayerFactionQuery()).IsNone);
+    Assert.Equal(emptyFirstSide ? second : first, runtime.Query(new GetActiveSideQuery()));
+    Assert.Equal(1, runtime.Query(new GetTurnNumberQuery()));
+    Assert.Equal(0, activations.Count);
+  }
+
+  // Bound a faulty startup loop before the factory returns and observers can be installed.
+  private sealed class StartupActivationLimit : BattleHook<ActiveSideChangedBattleEvent>
+  {
+    public int Count { get; private set; }
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, ActiveSideChangedBattleEvent evt)
+    {
+      if (++Count > 3) throw new InvalidOperationException("Playerless startup repeatedly advanced factions.");
+      return [];
+    }
+  }
+
   // --- tests ---------------------------------------------------------------
 
   [TestCase(TestName = "Start places units, assigns objectives, and begins turn 1")]

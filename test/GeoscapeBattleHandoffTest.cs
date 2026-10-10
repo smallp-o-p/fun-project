@@ -200,11 +200,11 @@ public partial class GeoscapeBattleHandoffTest
     int intents = 0;
     battle.Completed += _ => intents++; // probe subscribed after the mission handler
     var returnButton = ReturnButton(battle);
-    Assert.False(returnButton.Visible); // the enemy turn has not completed
+    Assert.False(returnButton.Visible); // terminal playback has not completed
     returnButton.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(0, intents); // an ongoing battle cannot return
 
-    DrainDirector(battle);
+    await DrainDirector(battle);
     Assert.True(returnButton.Visible); // terminal and idle at drain
 
     returnButton.EmitSignal(Button.SignalName.Pressed);
@@ -244,7 +244,7 @@ public partial class GeoscapeBattleHandoffTest
     var secondBattle = MissionBattleHost(manager.Current);
     await SelectFirstBattleUnit(secondBattle);
     EndTurnButton(secondBattle).EmitSignal(Button.SignalName.Pressed);
-    DrainDirector(secondBattle);
+    await DrainDirector(secondBattle);
     ReturnButton(secondBattle).EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(0, campaign.ActiveEvents.Count);
     Assert.Equal(0, MapEventMarkers(scene).Length);
@@ -274,9 +274,10 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(manager.Visible);
   }
 
-  [TestCase(true, TestName = "A missing %GameCamera in a correctly typed battle export aborts the installation")]
-  [TestCase(false, TestName = "A missing %BattleUI in a correctly typed battle export aborts the installation")]
-  public static async Task CorrectlyTypedInstallFailureAbortsInstallationAndRestoresPreparation(bool dropCamera)
+  [TestCase("GameCamera", TestName = "A missing %GameCamera in a correctly typed battle export aborts the installation")]
+  [TestCase("BattleUI", TestName = "A missing %BattleUI in a correctly typed battle export aborts the installation")]
+  [TestCase("BattleUI/BattleHud", TestName = "A partially ready battle UI without its HUD still disposes the runtime")]
+  public static async Task CorrectlyTypedInstallFailureAbortsInstallationAndRestoresPreparation(string missingNode)
   {
     await using var cleanup = new DeferredNodeCleanup();
     var (scene, manager, squad, _, _) = PreparedScene(SurvivalMission(1), out var capture);
@@ -288,9 +289,17 @@ public partial class GeoscapeBattleHandoffTest
     Option<int> seedBefore = pending.Event.BattleSeed;
 
     BattleScene prototype = CreateBattleScene();
-    Node authored = prototype.GetNode<Node>(dropCamera ? "GameCamera" : "BattleUI");
-    prototype.RemoveChild(authored);
+    Node authored = prototype.GetNode<Node>(missingNode);
+    authored.GetParent().RemoveChild(authored);
     authored.Free();
+    if (string.Equals(missingNode, "BattleUI/BattleHud", StringComparison.Ordinal))
+    {
+      // Inline this nested instance: packing an instance otherwise restores deleted
+      // children from its original scene, so the requested missing-HUD case would be lost.
+      var partialUi = prototype.GetNode<BattleUI>("BattleUI");
+      partialUi.SceneFilePath = "";
+      foreach (Node child in partialUi.GetChildren()) child.Owner = prototype;
+    }
     ((MissionView)squad).BattleScene = Pack(prototype); // correctly typed root, missing a fallible node
 
     // Godot's signal dispatch only logs handler exceptions, so the aborted installation is
@@ -373,12 +382,16 @@ public partial class GeoscapeBattleHandoffTest
     runtime.ExecuteAction(BattleAction.ApplyDamage(runtime.TryGetAlive(grunt).RequireSome(), 999));
     Assert.True(battle.Runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     Assert.True(Director(scene).Busy);
+    var banner = scene.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Label>("%BattleOverBanner");
+    Assert.False(banner.Visible);
 
     returnButton.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(0, intents); // the guard holds while playback drains
 
-    DrainDirector(scene);
+    await DrainDirector(scene);
     Assert.True(returnButton.Visible);
+    Assert.True(banner.Visible);
+    Assert.Equal("VICTORY", banner.Text);
 
     returnButton.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(1, intents);
@@ -399,7 +412,7 @@ public partial class GeoscapeBattleHandoffTest
     var battle = MissionBattleHost(manager.Current);
     await SelectFirstBattleUnit(battle);
     EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
-    DrainDirector(battle);
+    await DrainDirector(battle);
 
     // Captured before the swap: MapEventMarkers filters by the export's resource path, so
     // after substituting the wrong-root scene its count could not see the original markers.
@@ -454,7 +467,7 @@ public partial class GeoscapeBattleHandoffTest
     var battle = MissionBattleHost(manager.Current);
     await SelectFirstBattleUnit(battle);
     EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
-    DrainDirector(battle);
+    await DrainDirector(battle);
     var map = scene.GetNode<GeoscapeMapControl>("%Map");
     int childrenBeforeReturn = map.GetChildCount(); // authored regions plus both markers
 

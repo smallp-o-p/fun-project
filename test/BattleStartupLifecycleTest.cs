@@ -342,12 +342,13 @@ public class BattleStartupLifecycleTest
     Assert.True(system.RegisteredHooks is null);
   }
 
-  [TestCase(TestName = "A battle with objectives but no units fails construction before any registration")]
+  [TestCase(TestName = "A playerless battle with objectives but no units fails construction before any registration")]
   public static void EmptyRostersFailConstructionWithoutRegistration()
   {
     var (setup, _, _) = GroupedSetup();
     var empty = setup with
     {
+      PlayerFaction = None,
       Sides =
       [
         setup.Sides[0] with { Units = [] },

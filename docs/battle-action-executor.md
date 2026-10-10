@@ -24,6 +24,8 @@ Read outcomes from the returned event stream and committed session state. `Battl
 
 Submitting to a battle whose outcome is already decided is a caller error. Both submission paths, `BattleRuntime.ExecuteAction` and a direct executor `Submit`, reject it with an `InvalidOperationException` through one shared internal admission guard. `ExecuteAction` rejects before its `ActionStarted` signal. The rejection happens before any queue mutation, action signal, or committed event.
 
+The runtime also rejects synchronous submissions from its action callbacks; the guard covers one start/execution/completion lifecycle, independently of the executor's disposal/outcome checks. Enemy automation calls the same runtime single-action path after completion observers return. See [enemy turns](battlescape-architecture.md#enemy-turns) for ownership, decisions and termination.
+
 Completion during a submission is a normal case: it finishes the current step's atomic effect and causal event delivery. The executor then drops queued interrupts and remaining composite steps. The original submission returns its committed events. The result is normal when no actual failure occurred.
 
 ## One Executor Per Session
@@ -58,7 +60,7 @@ Code constructs actions with trusted parameters. Proof types such as `AliveUnit`
 
 Availability checks for action points (AP), turn order, and incapacity belong to the read side. They live in action conditions and `CanUnitActNow`, before code builds an action. Mutable facts can still change between construction and commit: liveness, incapacity, item possession, equipped weapon, remaining charges, target feasibility, loaded magazine. Actions re-check these at `Execute` and return `Result.Interrupted` to stop without an exception.
 
-`MoveUnit` validates its whole route once (total AP, adjacency, occupancy) and then re-checks liveness, incapacity, and next-cell occupancy on every step. `AttackEntity`, `ReloadWeapon` (before `CanReload`), `ThrowItem`, `UseItem`, `InteractWithObject`, and `PassUnit` interrupt on lost liveness or incapacity (unconsciousness and immobilization included). The interrupt happens before spending AP, ammunition, charges, items, or mutating objects. `EndFactionTurn` stays independent of any unit's capacity; a stale faction-turn request is a validation rejection. `ApplyDamage` checks target liveness only and can still damage unconscious bodies. A reaction can stop a route after its already-committed step and preserves the AP for later steps.
+`MoveUnit` validates its whole route once (total AP, adjacency, occupancy) and then re-checks liveness, incapacity, and next-cell occupancy on every step. `AttackEntity`, `ReloadWeapon` (before `CanReload`), `ThrowItem`, `UseItem`, and `InteractWithObject` interrupt on lost liveness or incapacity (unconsciousness and immobilization included). The interrupt happens before spending AP, ammunition, charges, items, or mutating objects. `PassUnit` is non-interruptible for every caller: it ends an available activation without checking capacity. Stale/dead/off-board or already-ended activation parameters remain caller errors in the session. `EndFactionTurn` stays independent of any unit's capacity; a stale faction-turn request is a validation rejection. `ApplyDamage` checks target liveness only and can still damage unconscious bodies. A reaction can stop a route after its already-committed step and preserves the AP for later steps.
 
 Actions validate legality before commit. Hooks react to committed changes, such as a watched tile becoming occupied.
 

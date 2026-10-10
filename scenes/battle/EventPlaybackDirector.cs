@@ -11,8 +11,8 @@ namespace FunProject.Scenes;
 // COALESCED into a single path step at dequeue time, so movement animates as one continuous
 // path; anything that interleaves (an interrupting shot, another unit's move) breaks the run
 // and plays between the path segments, preserving commit order. Deliberately dumb otherwise:
-// no parallel tracks, no seeking, no cancellation. v1 visuals: paths tween the unit mesh at
-// constant speed; deaths hide it; everything else is instant.
+// no parallel tracks or seeking. v1 visuals: paths tween the unit mesh at constant speed;
+// deaths hide it; everything else is instant. Exit cancels the queue and active tween.
 public partial class EventPlaybackDirector : Node
 {
   private const float WorldUnitsPerSecond = 4f; // one orthogonal tile per 0.25s
@@ -21,6 +21,8 @@ public partial class EventPlaybackDirector : Node
   private readonly Dictionary<BattleUnitState, Node3D> _unitMeshes = [];
   private bool _stepInProgress;
   private bool _wasBusy;
+  private bool _cancelled;
+  private Option<Tween> _activeTween;
 
   public bool Busy => _stepInProgress || _queue.Count > 0;
 
@@ -30,16 +32,31 @@ public partial class EventPlaybackDirector : Node
   {
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(mesh);
+    if (_cancelled) return;
     _unitMeshes[unit] = mesh;
   }
 
   public override void _Process(double delta) => Tick();
+  public override void _ExitTree() => Cancel();
+
+  public void Cancel()
+  {
+    if (_cancelled) return;
+    _cancelled = true;
+    SetProcess(false);
+    _activeTween.IfSome(tween => tween.Kill());
+    _activeTween = None;
+    _queue.Clear();
+    _unitMeshes.Clear();
+    _stepInProgress = false;
+    _wasBusy = false;
+  }
 
   // Drains at most one step per call: a coalesced move path, or a single event. Fires
   // PlaybackIdle once when the queue empties.
   public void Tick()
   {
-    if (_stepInProgress)
+    if (_cancelled || _stepInProgress)
       return;
 
     if (_queue.Count > 0)
@@ -73,6 +90,7 @@ public partial class EventPlaybackDirector : Node
 
   internal void EnqueueResult(BattleActionExecResult result)
   {
+    if (_cancelled) return;
     foreach (BattleEvent battleEvent in result.EventsThatOccurred)
       _queue.Enqueue(battleEvent);
   }
@@ -110,7 +128,12 @@ public partial class EventPlaybackDirector : Node
     return run;
   }
 
-  private void OnStepDone() => _stepInProgress = false;
+  private void OnStepDone()
+  {
+    if (_cancelled) return;
+    _activeTween = None;
+    _stepInProgress = false;
+  }
 
   // One visual step per non-move event. Subclasses (tests) override to control completion
   // timing. Move events never reach this method - they are coalesced into PlayMoveStep.
@@ -133,10 +156,12 @@ public partial class EventPlaybackDirector : Node
     }
 
     Tween tween = CreateTween();
+    _activeTween = Some(tween);
     foreach (UnitMovedBattleEvent step in run)
     {
       Vector3 destination = BoardCoordinates.TileToWorldCenter(step.Position.Raw) + new Vector3(0f, 0.5f, 0f);
-      float segmentDuration = mesh.Position.DistanceTo(destination) / WorldUnitsPerSecond;
+      Vector3 source = BoardCoordinates.TileToWorldCenter(step.SourcePosition.Raw) + new Vector3(0f, 0.5f, 0f);
+      float segmentDuration = source.DistanceTo(destination) / WorldUnitsPerSecond;
       tween.TweenProperty(mesh, "position", destination, segmentDuration);
     }
 

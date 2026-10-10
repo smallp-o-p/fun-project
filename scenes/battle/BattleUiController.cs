@@ -31,6 +31,7 @@ public sealed class BattleUiController : IDisposable
   private Option<IActionTargeting> _targeter;
   private Option<Vector3I> _pendingTarget;
   private Option<ActionPreview> _lastPreview;
+  private bool _disposed;
 
   // Observers see one complete selection/targeting update. Hover previews are read directly.
   public event Action Changed = delegate { };
@@ -58,6 +59,7 @@ public sealed class BattleUiController : IDisposable
   {
     get
     {
+      if (_disposed) return InputGate.NotPlayerTurn;
       if (_playbackBusy())
         return InputGate.PlaybackBusy;
       if (_runtime.Query(new GetBattleOutcomeQuery()).IsSome)
@@ -78,6 +80,8 @@ public sealed class BattleUiController : IDisposable
 
   public void Dispose()
   {
+    if (_disposed) return;
+    _disposed = true;
     _runtime.ActionCompleted -= OnActionResult;
     _optionsByList.Clear();
     _options = [];
@@ -228,7 +232,7 @@ public sealed class BattleUiController : IDisposable
   // runtime.ExecuteAction, after the submission's state mutations are committed.
   private void OnActionResult(BattleActionExecResult result)
   {
-    if (_state == UiState.BattleOver)
+    if (_disposed || _state == UiState.BattleOver)
       return;
 
     bool battleOver = _runtime.Query(new GetBattleOutcomeQuery()).IsSome;

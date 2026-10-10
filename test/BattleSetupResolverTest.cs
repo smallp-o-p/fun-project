@@ -205,21 +205,29 @@ public class BattleSetupResolverTest
       playerDeployment: Some(new PlayerDeployment(campaign, [new UnitLoadout(null!)]))));
   }
 
-  [TestCase(TestName = "An empty deployment keeps its faction and does not restore the authored roster")]
-  public static void EmptyDeployment()
+  [TestCase(false, TestName = "Concrete setup rejects an empty player deployment before system registration")]
+  [TestCase(true, TestName = "Battle type rejects an empty player deployment before system registration")]
+  public static void EmptyDeployment(bool fromBattleType)
   {
     var type = TestData.MakeDuelBattleType();
     var campaign = TestData.MakeFaction("Campaign");
     var deployment = new PlayerDeployment(campaign, []);
 
-    using var runtime = BattleFactory.Start(type, seed: 7,
-      playerDeployment: Some(deployment)).RequireRight();
-
-    Assert.True(ReferenceEquals(campaign, runtime.Query(new GetPlayerFactionQuery()).RequireSome()));
-    Assert.Equal(0, runtime.Query(new GetFactionAliveUnits(campaign)).Count);
-    Faction enemy = runtime.Query(new GetGlobalFactionTurnOrderQuery())
-      .AsValueEnumerable().Single(f => !ReferenceEquals(f, campaign));
-    Assert.Equal(1, runtime.Query(new GetFactionAliveUnits(enemy)).Count);
+    var system = new SetupSystemData
+    {
+      // Bound the pre-fix startup before it can enter an unreachable player handoff.
+      OnRegister = _ => throw new InvalidOperationException("Empty player deployment reached system registration."),
+    };
+    type.Systems.Add(system);
+    var setup = BattleSetupResolver.Resolve(type, seed: 7, playerDeployment: Some(deployment)).RequireRight();
+    Assert.True(ReferenceEquals(campaign, setup.PlayerFaction.RequireSome()));
+    Assert.Equal(0, setup.Sides.AsValueEnumerable().Single(side => ReferenceEquals(side.Faction, campaign)).Units.Count);
+    var failure = (fromBattleType
+      ? BattleFactory.Start(type, seed: 7, playerDeployment: Some(deployment))
+      : BattleFactory.Start(setup)).RequireLeft();
+    Assert.Equal(BattleSetupFailureReason.EmptyPlayerDeployment, failure.Reason);
+    Assert.True(failure.Message.Contains(campaign.Name, StringComparison.Ordinal));
+    Assert.True(system.RegisteredHooks is null);
   }
 
   [TestCase(TestName = "Without a deployment the authored player faction bonuses apply")]

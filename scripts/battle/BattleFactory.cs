@@ -41,15 +41,18 @@ public static class BattleFactory
           $"Two sides share the faction reference {side.Faction.Name}.", nameof(setup));
     }
 
-    BattleSetupFailure? playerFailure = setup.PlayerFaction.Match(
-      Some: player => sideFactions.Contains(player)
-        ? null
-        : new BattleSetupFailure(
+    if (setup.PlayerFaction.Case is Faction player)
+    {
+      if (!sideFactions.Contains(player))
+        return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
           BattleSetupFailureReason.UnknownFaction,
-          $"PlayerFaction {player.Name} is not among Sides."),
-      None: () => null);
-    if (playerFailure is not null)
-      return Left<BattleSetupFailure, BattleRuntime>(playerFailure);
+          $"PlayerFaction {player.Name} is not among Sides."));
+      var playerSide = setup.Sides.AsValueEnumerable().Single(side => ReferenceEquals(side.Faction, player));
+      if (playerSide.Units.Count == 0)
+        return Left<BattleSetupFailure, BattleRuntime>(new BattleSetupFailure(
+          BattleSetupFailureReason.EmptyPlayerDeployment,
+          $"Player faction {player.Name} has no deployed units."));
+    }
 
     // Every later step builds on a board this call owns: failed startups abandon it with the
     // runtime instead of handing partial placements back to the caller.

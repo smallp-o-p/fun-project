@@ -85,6 +85,8 @@ public enum BattleSetupFailureReason
   ObjectCellUnavailable,
   /// <summary>Two objects were assigned to the same placement cell.</summary>
   DuplicateObjectCell,
+  /// <summary>The designated player side had no deployed units.</summary>
+  EmptyPlayerDeployment,
 }
 
 /// <summary>A typed setup failure with a human-readable explanation.</summary>

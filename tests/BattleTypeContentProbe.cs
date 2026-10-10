@@ -1,6 +1,8 @@
 using FunProject.Combatants;
+using FunProject.Weapons;
 using Godot;
 using System;
+using System.Collections.Generic;
 
 // NOTE: this file deliberately lives in the MAIN project (under tests/) even though it
 // exists only for content testing. BombDefusalContentTest spawns `godot --headless
@@ -41,6 +43,28 @@ public partial class BattleTypeContentProbe : SceneTree
       throw new InvalidOperationException("Bomb defusal battle did not start in progress.");
     if (runtime.Query(new GetBattleSpecialObjectsQuery()).Count != 2)
       throw new InvalidOperationException("Bomb defusal battle did not place two bombs.");
+
+    Faction player = runtime.Query(new GetPlayerFactionQuery()).Match(value => value,
+      () => throw new InvalidOperationException("Bomb defusal requires a player faction."));
+    Faction enemy = runtime.Query(new GetGlobalFactionTurnOrderQuery()).AsValueEnumerable()
+      .Single(faction => !ReferenceEquals(faction, player));
+    List<AmmunitionedWeapon> pistols = [];
+    foreach (AliveUnit unit in runtime.Query(new GetFactionAliveUnits(enemy)))
+    {
+      Weapon weapon = unit.State.EquippedWeapon.Match(value => value,
+        () => throw new InvalidOperationException("Every demo grunt must carry the service pistol."));
+      if (weapon is not AmmunitionedWeapon pistol
+        || !string.Equals(pistol.ItemName, "Service Pistol", StringComparison.Ordinal)
+        || pistol.CurrentAmmo != pistol.MagazineSize || !pistol.IsLoaded || pistols.Contains(pistol))
+        throw new InvalidOperationException("Demo grunts require independent, fully loaded service pistols.");
+      pistols.Add(pistol);
+    }
+    if (pistols.Count != 3)
+      throw new InvalidOperationException("Bomb defusal expected three armed grunts.");
+    if (pistols[0].TrySpendShot().IsNone
+      || pistols[1].CurrentAmmo != pistols[1].MagazineSize
+      || pistols[2].CurrentAmmo != pistols[2].MagazineSize)
+      throw new InvalidOperationException("Spending one demo pistol must not change another's magazine.");
 
     for (int turn = 0; turn < 12 && runtime.Query(new GetBattleOutcomeQuery()).IsNone; turn++)
       runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));

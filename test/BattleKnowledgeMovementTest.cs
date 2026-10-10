@@ -52,7 +52,8 @@ public sealed class BattleKnowledgeMovementTest
     var side = TestData.MakeFaction("Observer");
     using var battle = BattleFixture.Started(new Vector3I(3, 1, 3),
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Actor", side, vision: 0)), Vector3I.Zero),
-      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Scout", side, vision: 2)), new Vector3I(2, 0, 2)));
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Scout", side, vision: 2)), new Vector3I(2, 0, 2)),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Target", TestData.MakeFaction("Hostile"))), new Vector3I(2, 0, 0)));
     var destination = battle.Query(new GetTileKnowledgeForFaction(side, battle.At(1, 0, 1)));
     Assert.True(destination.Terrain.IsSome);
     Assert.Equal(TraversalKnowledge.Clear, destination.Occupancy);
@@ -62,6 +63,19 @@ public sealed class BattleKnowledgeMovementTest
     Assert.Equal(2, path.Length);
     Assert.True(battle.Query(new GetKnownMoveTilesForUnit(battle.PlayerFaction, battle.Alive(battle.PlayerUnit)))
       .AsValueEnumerable().Contains(new Vector3I(1, 0, 1)));
+    // Enemy intent admission is stricter than the player's existing unknown-path estimate.
+    var memory = new EnemyTurnMemory();
+    memory.Visit(battle.PlayerUnit.Id, new(1, 0, 0));
+    memory.Visit(battle.PlayerUnit.Id, new(0, 0, 1));
+    var policy = new EnemyPolicy(new(cautionPercent: 0));
+    // Give this actor a visible goal independently of the faction's terrain knowledge.
+    battle.PlayerUnit.AddVisibleUnit(battle.EnemyUnit);
+    Assert.Equal(EnemyIntentKind.Pass, policy.DecideAction(battle.Runtime, side, memory, battle.Alive(battle.PlayerUnit)).Intent.Kind);
+    battle.Move(battle.SupportUnit, [new(2, 0, 1)]);
+    battle.PlayerUnit.AddVisibleUnit(battle.EnemyUnit);
+    var nowClear = policy.DecideAction(battle.Runtime, side, memory, battle.Alive(battle.PlayerUnit)).Intent;
+    Assert.Equal(EnemyIntentKind.Move, nowClear.Kind);
+    Assert.Equal(new Vector3I(1, 0, 1), nowClear.Destination);
   }
 
   [TestCase]
