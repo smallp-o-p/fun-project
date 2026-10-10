@@ -1,21 +1,16 @@
 using System;
-using System.Collections.Generic;
 using FunProject.Combatants;
 using FunProject.Weapons;
 
 namespace FunProject.Battle;
 
 // Owns synchronous automation only. Presentation and committed-event callbacks have no
-// execution role; completion observers finish before every fresh decision frame.
+// execution role; completion observers finish before every fresh policy decision.
 internal sealed class EnemyTurnController(BattleRuntime runtime)
 {
-  private const int LatestDecisionCapacity = 64;
-  private readonly List<EnemyDecisionTrace> _latest = [];
   private EnemyPolicy? _policy;
   private Faction? _player;
   private bool _stopped;
-
-  internal IReadOnlyList<EnemyDecisionTrace> LatestDecisions => System.Array.AsReadOnly(_latest.ToArray());
 
   internal void Enable(Faction player, EnemyPolicySettings? settings)
   {
@@ -30,42 +25,36 @@ internal sealed class EnemyTurnController(BattleRuntime runtime)
   internal void ExecuteEnemyTurns()
   {
     if (_policy is null || _stopped) return;
-    try { ExecuteEnabledTurns(_policy); }
-    catch { Stop(); throw; }
-  }
-
-  private void ExecuteEnabledTurns(EnemyPolicy policy)
-  {
-    while (!_stopped && runtime.Query(new GetBattleOutcomeQuery()).IsNone)
+    try
     {
-      var side = runtime.Query(new GetActiveSideQuery());
-      if (ReferenceEquals(side, _player)) return;
+      Faction? side = null;
+      int turn = 0;
       var memory = new EnemyTurnMemory();
-      var frame = runtime.Query(new GetEnemyDecisionFrame(side));
-      while (true)
+      while (!_stopped && runtime.Query(new GetBattleOutcomeQuery()).IsNone)
       {
-        memory.RecordObservations(frame);
-        var decision = policy.Decide(frame, memory);
-        var action = MintAction(side, decision.Intent);
-        if (_latest.Count == LatestDecisionCapacity) _latest.RemoveAt(0);
-        _latest.Add(decision);
-        runtime.ExecuteSingleAction(action);
-        // Disposal/fault can occur inside completion observers; do not query after shutdown.
-        if (_stopped) return;
-        if (!ReferenceEquals(runtime.Query(new GetActiveSideQuery()), side)) break;
-        var after = runtime.Query(new GetEnemyDecisionFrame(side));
-        if (after.IsTerminal) return;
-        if (frame.TurnNumber != after.TurnNumber) break;
-        if (!MadeProgress(frame, after)) memory.MarkFailed(decision.Intent);
-        frame = after;
+        var active = runtime.Query(new GetActiveSideQuery());
+        if (ReferenceEquals(active, _player)) return;
+        int currentTurn = runtime.Query(new GetTurnNumberQuery());
+        if (side is not null && (!ReferenceEquals(side, active) || turn != currentTurn)) memory = new();
+        side = active;
+        turn = currentTurn;
+        var intent = _policy.Decide(runtime, side, memory);
+        bool trackProgress = intent.Kind is EnemyIntentKind.Attack or EnemyIntentKind.Reload or EnemyIntentKind.Move;
+        var beforeOwn = trackProgress ? OwnProgress(side) : [];
+        var beforeHostiles = trackProgress ? HostileProgress(side) : [];
+        runtime.ExecuteSingleAction(MintAction(side, intent));
+        // Completion observers can dispose the runtime; do not query after shutdown.
+        if (!_stopped && trackProgress && beforeOwn.AsValueEnumerable().SequenceEqual(OwnProgress(side))
+          && beforeHostiles.AsValueEnumerable().SequenceEqual(HostileProgress(side))) memory.MarkFailed(intent);
       }
     }
+    catch { Stop(); throw; }
   }
 
   private BattleAction MintAction(Faction side, EnemyIntent intent)
   {
     if (intent.Kind == EnemyIntentKind.EndFactionTurn) return BattleAction.EndFactionTurn(side);
-    // Proofs/live references stay on the submission side, never in policy or retained traces.
+    // Mint submission proofs after the decision; policy previews retain no live handles.
     var actor = runtime.Query(new GetFactionAliveUnits(side)).AsValueEnumerable()
       .Single(unit => unit.Id == intent.ActorId);
     switch (intent.Kind)
@@ -87,7 +76,29 @@ internal sealed class EnemyTurnController(BattleRuntime runtime)
     }
   }
 
-  private static bool MadeProgress(EnemyDecisionFrame before, EnemyDecisionFrame after)
-    => !before.OwnUnits.AsValueEnumerable().SequenceEqual(after.OwnUnits)
-      || !before.Hostiles.AsValueEnumerable().SequenceEqual(after.Hostiles);
+  // Only unit values cross a submission. A callback can change another known unit,
+  // allowing an interrupted intent to be reconsidered. Terrain is never copied here.
+  private (int Id, Vector3I Position, int Health, int Stun, int Ap, bool CanAct, bool CanAttack,
+    bool CanReload, int Range, int HealthDamage, int StunDamage, int Ammo)[] OwnProgress(Faction side)
+    => runtime.Query(new GetFactionAliveUnits(side)).AsValueEnumerable().OrderBy(unit => unit.Id).Select(unit =>
+    {
+      var weapon = unit.State.EquippedWeapon;
+      long health = 0, stun = 0;
+      foreach (var damage in weapon.Match(value => value.EmitDamage(unit.State.ActiveBuffDamageMods), () => []))
+        if (damage.Kind == DamageKind.Health) health += damage.Amount;
+        else if (damage.Kind == DamageKind.Stun) stun += damage.Amount;
+      bool canAct = runtime.Query(new CanUnitActNow(unit.State));
+      bool canAttack = canAct && unit.State.CurrentActionPoints >= BattleSession.DefaultAttackActionPointCost
+        && weapon.Match(value => value.IsLoaded, () => false);
+      bool canReload = canAct && unit.State.CurrentActionPoints >= BattleSession.DefaultReloadActionPointCost
+        && weapon.Match(value => value is AmmunitionedWeapon magazine && magazine.CurrentAmmo == 0 && magazine.CanReload(), () => false);
+      return (unit.Id, unit.Position.Raw, unit.State.CurrentHealth, unit.State.CurrentStun, unit.State.CurrentActionPoints,
+        canAct, canAttack, canReload, weapon.Match(value => value.EffectiveRange, () => 0),
+        (int)Math.Min(health, int.MaxValue), (int)Math.Min(stun, int.MaxValue),
+        weapon.Match(value => value is AmmunitionedWeapon magazine ? magazine.CurrentAmmo : -1, () => -1));
+    }).ToArray();
+
+  private (int Id, Vector3I Position, int Health, int Stun)[] HostileProgress(Faction side)
+    => runtime.Query(new GetVisibleHostileUnitsForFaction(side)).AsValueEnumerable().Where(unit => !unit.State.IsUnconscious)
+      .OrderBy(unit => unit.Id).Select(unit => (unit.Id, unit.Position.Raw, unit.State.CurrentHealth, unit.State.CurrentStun)).ToArray();
 }

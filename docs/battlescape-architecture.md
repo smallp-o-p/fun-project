@@ -25,7 +25,7 @@ flowchart LR
         Facade["BattleRuntime\nQuery, ExecuteAction,\nproof creation, hook registration"]
         Executor["BattleActionExecutor\nhook registry, action stack,\ninterrupt capture"]
         EnemyController["EnemyTurnController\nExecuteEnemyTurns"]
-        Policy["EnemyPolicy\ndetached observations"]
+        Policy["EnemyPolicy\nruntime queries"]
         Session["BattleSession\nturns, availability, visibility,\nevent dispatch"]
         Board["BattleBoardState\ntiles, occupancy,\nBFS pathfinding"]
         Queries["IBattleSessionQuery&lt;TResult&gt;\ntyped read questions"]
@@ -49,8 +49,9 @@ flowchart LR
     Facade -->|"ExecuteAction"| Executor
     Facade -->|"after initiating action + observers"| EnemyController
     EnemyController -->|"single action, no recursive turns"| Facade
-    EnemyController -->|"fresh faction query"| Queries
-    EnemyController -->|"detached frame"| Policy
+    EnemyController -->|"turn and progress queries"| Queries
+    EnemyController -->|"runtime + faction + turn memory"| Policy
+    Policy -->|"actor, visible targets, local knowledge"| Queries
     Executor -->|"primitives commit"| Session
     Session --- Board
     Facade -->|"Query"| Queries
@@ -236,19 +237,19 @@ The execution flow is synchronous:
 
 1. `ExecuteAction` calls the runtime's internal `ExecuteSingleAction` for the initiating action.
 2. That method raises `ActionStarted`, submits to the executor, resolves all interrupts, and finishes every `ActionCompleted` observer.
-3. The runtime then calls `_enemyController.ExecuteEnemyTurns`. The controller queries the active faction's fresh permitted observations and asks the pure policy for a choice.
+3. The runtime then calls `_enemyController.ExecuteEnemyTurns`. The controller asks the policy to choose through runtime queries for the active faction.
 4. It mints fresh proofs and calls `runtime.ExecuteSingleAction` directly. This produces ordinary start/completion notifications without recursively starting enemy turns.
-5. After observers return, it checks shutdown, outcome and faction/turn changes, then uses the refreshed frame for the next decision. Player control, completion, disposal or fault stops automation. Public `ExecuteAction` returns only the initiating action's result.
+5. After observers return, it checks shutdown, outcome and faction/turn changes, then queries current state for the next decision. Player control, completion, disposal or fault stops automation. Public `ExecuteAction` returns only the initiating action's result.
 
 The runtime's `_submitting` flag rejects synchronous submission or enablement from action callbacks. It spans one submission and its start/completion observers, not the enemy loop. This prevents recursive mutation before later observers have consumed the result; it is not a thread lock. The executor's existing admission checks cover disposal and terminal outcomes, not this callback boundary.
 
-### Policy and permitted knowledge
+### Policy queries and knowledge
 
-`GetEnemyDecisionFrame` is the live-to-detached boundary. Frames contain own unit values, currently visible conscious hostiles, observed terrain/occupancy/cover, and last-seen contacts. `EnemyPolicy`, activation memory and decision traces hold no runtime, session, board, entity, weapon, event or proof references. Unit IDs express identity; current aliveness and attackability are established separately by the runtime's proofs when submitting.
+`EnemyPolicy.Decide(runtime, faction, memory)` uses ordinary runtime queries directly. It reads the own roster, faction-visible hostiles and last-seen history, without projecting the board or building a decision frame. Visibility and remembered terrain are policy choices; the AI has no separate query-access restriction. Live unit, weapon and proof reads stay within the current decision. Activation memory retains unit IDs, visited coordinates, dismissed contact revisions and failed intents. The policy returns one intent; it keeps no candidate list or diagnostic history. The controller mints fresh submission proofs after each decision.
 
-The policy selects the lowest-ID actable own unit. It considers attacks against at most eight nearest visible conscious hostiles, ten adjacent cells (eight horizontal and two vertical), and one empty-magazine reload. Moves require observed-clear occupancy/terrain; a diagonal requires at least one observed-clear flank. Unknown cells are never probed. Preview uses ordinary attack feasibility/hit calculations without spending ammunition or random rolls, and runs only for the chosen actor.
+The policy selects the lowest-ID actable own unit. It considers attacks against at most eight nearest visible conscious hostiles, ten adjacent cells (eight horizontal and two vertical), and one empty-magazine reload. Moves require observed-clear occupancy/terrain; a diagonal requires at least one observed-clear flank. Unknown cells are never probed. Preview uses ordinary attack feasibility/hit calculations without spending ammunition or random rolls, and runs only for the chosen actor. Terrain reads are cached for that actor's cell and at most ten neighboring cells, including diagonal flanks. Frontier scoring checks explored membership in adjacent cells, without reading their terrain. Neither step scales with board area.
 
-The goal is the nearest visible hostile, otherwise the most recently seen unresolved contact, otherwise an adjacent unexplored frontier. Passing on a score plateau is allowed; eventual exploration is not guaranteed. `RecordObservations` runs once per fresh decision frame: it records own positions to avoid revisits and dismisses contacts whose remembered cells are currently visible while that unit is absent. Dismissal includes the visibility revision, so a later sighting can become a goal again. An intent that changes neither own-unit nor observed-hostile values is marked failed and not selected again that activation. This is retry avoidance, not a combat suppression mechanic.
+The goal is the nearest visible hostile, otherwise the most recently seen unresolved contact, otherwise an adjacent unexplored frontier. Passing on a score plateau is allowed; eventual exploration is not guaranteed. Each decision records own positions to avoid revisits and dismisses contacts whose remembered cells are currently visible while that unit is absent. Currently visible units, including unconscious hostiles, are filtered out of remembered goals. Dismissal includes the visibility revision, so a later sighting can become a goal again. Across attack, reload and movement submissions, the controller compares only scalar own-unit action state and currently visible conscious hostile state. An intent that changes neither is marked failed and not selected again that activation; observed changes from completion callbacks still allow reconsideration. These small unit comparisons preserve progress behavior without copying terrain or attack previews. This is retry avoidance, not a combat suppression mechanic.
 
 ### Settings and scoring
 
@@ -266,7 +267,7 @@ Score in points is `60*A*D + 100*A*K - 35*C*E + 20*B*R + 20*P + 8*F + 15*L - 2`,
 | F | Adjacent unexplored-frontier gain |
 | L | Empty-magazine reload |
 
-Normalized features round to hundredths away from zero. Float weights are promoted to double before multiplication, and only the final score rounds to centipoints away from zero; fractional weights are not rounded beforehand. The integral unweighted terms use long intermediates. Default D=.25 and E=.10 with other features zero gives 9.50 points. Only positive candidates are admitted; ties order attack, reload, move, then target ID or destination X/Y/Z. Otherwise the actor passes. `LatestEnemyDecisions` retains at most 64 detached choices and candidate scores; there is no fallback-reason state.
+Candidate measurements are local values; there is no feature-container DTO. The scoring helper and weights live in `EnemyPolicySettings`. Normalized measurements round to hundredths away from zero. Float weights are promoted to double before multiplication, and only the final score rounds to centipoints away from zero; fractional weights are not rounded beforehand. The integral unweighted terms use long intermediates. Default D=.25 and E=.10 with other features zero gives 9.50 points. Only positive candidates are admitted; ties order attack, reload, move, then target ID or destination X/Y/Z. Otherwise the actor passes.
 
 ### Termination and lifecycle
 

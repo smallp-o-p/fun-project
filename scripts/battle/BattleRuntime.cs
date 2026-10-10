@@ -78,10 +78,6 @@ public sealed class BattleRuntime : IDisposable
     _enemyController.ExecuteEnemyTurns();
   }
 
-  // Diagnostics remain detached and inspectable after disposal.
-  public System.Collections.Generic.IReadOnlyList<EnemyDecisionTrace> LatestEnemyDecisions
-    => _enemyController.LatestDecisions;
-
   public BattleActionExecResult ExecuteAction(BattleAction action)
   {
     var result = ExecuteSingleAction(action);

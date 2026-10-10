@@ -75,7 +75,6 @@ public sealed class EnemyTurnControllerTest
     battle.Runtime.EnableEnemyTurns(Demo);
     Assert.Equal(player, battle.Query(new GetActiveSideQuery()));
     Assert.True(completed > 0);
-    Assert.True(battle.Runtime.LatestEnemyDecisions.Count > 0);
   }
 
   [TestCase]
@@ -234,15 +233,15 @@ public sealed class EnemyTurnControllerTest
     Assert.Equal(0, battle.EnemyUnit.CurrentActionPoints);
     Assert.True(completed[^1] is EndFactionTurn);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
-    Assert.Equal(64, battle.Runtime.LatestEnemyDecisions.Count);
   }
 
-  [TestCase]
-  public static void EmptyNoProgressIntentIsNotRetriedAndCannotLoop()
+  [TestCase(false)]
+  [TestCase(true)]
+  public static void EmptyIntentRetriesOnlyAfterObservedProgress(bool changeKnownAlly)
   {
     using var battle = BattleFixture.Duel(playerControlled: true, dimensions: new(3, 1, 1),
       player: new("Player", Position: Vector3I.Zero),
-      enemy: new("Enemy", Position: new(1, 0, 0), Weapon: TestData.MakeAmmoWeapon("Pistol")),
+      enemy: new("Enemy", Position: new(1, 0, 0), ActionPoints: 1, Weapon: TestData.MakeAmmoWeapon("Pistol")),
       configure: setup => setup with
       {
         Sides = [setup.Sides[0], setup.Sides[1] with
@@ -257,18 +256,21 @@ public sealed class EnemyTurnControllerTest
       if (action is AttackEntity)
       {
         attempts++;
-        Assert.Equal(1, attempts); // Fail promptly if retry avoidance regresses.
-        battle.EnemyUnit.ClearVisibleUnits(); // Lose this actor's sight before its ordinary action commits.
+        Assert.True(attempts <= (changeKnownAlly ? 2 : 1)); // Fail promptly if retry avoidance regresses.
+        if (attempts == 1) battle.EnemyUnit.ClearVisibleUnits(); // Lose this actor's sight before its ordinary action commits.
       }
     };
     battle.Runtime.ActionCompleted += result =>
     {
       if (result.Action is AttackEntity && result.EventsThatOccurred.IsEmpty)
+      {
         battle.EnemyUnit.AddVisibleUnit(battle.PlayerUnit);
+        if (changeKnownAlly) Assert.True(battle.UnitAt(new(2, 0, 0)).TrySpendActionPoints(1));
+      }
     };
     battle.Runtime.EnableEnemyTurns(Demo);
     battle.EndFactionTurn(battle.PlayerFaction);
-    Assert.Equal(1, attempts);
+    Assert.Equal(changeKnownAlly ? 2 : 1, attempts);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
   }
 
@@ -294,7 +296,6 @@ public sealed class EnemyTurnControllerTest
     battle.EndFactionTurn(battle.PlayerFaction);
     Assert.Equal(142, completed);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
-    Assert.Equal(64, battle.Runtime.LatestEnemyDecisions.Count);
   }
 
   private sealed class SpawnNextFaction(int remaining) : BattleHook<TurnEndedBattleEvent>

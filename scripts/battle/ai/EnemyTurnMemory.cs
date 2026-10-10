@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace FunProject.Battle;
 
 // Activation-local, detached memory. The controller replaces this when faction/turn changes.
-public sealed class EnemyTurnMemory
+internal sealed class EnemyTurnMemory
 {
   private readonly Dictionary<int, SysColGeneric.HashSet<Vector3I>> _visited = [];
   private readonly Dictionary<int, long> _dismissedContacts = [];
@@ -22,12 +22,5 @@ public sealed class EnemyTurnMemory
   public bool HasFailed(EnemyIntent intent) => _failedIntents.Contains(intent);
   public void MarkFailed(EnemyIntent intent) => _failedIntents.Add(intent);
 
-  public void RecordObservations(EnemyDecisionFrame frame)
-  {
-    foreach (var own in frame.OwnUnits) Visit(own.UnitId, own.Position);
-    foreach (var contact in frame.Contacts)
-      if (frame.Tiles.AsValueEnumerable().Any(tile => tile.Position == contact.Position && tile.Visible)
-        && !frame.Hostiles.AsValueEnumerable().Any(hostile => hostile.UnitId == contact.UnitId))
-        _dismissedContacts[contact.UnitId] = contact.VisibilityRevision;
-  }
+  public void Dismiss(LastSeenContact contact) => _dismissedContacts[contact.UnitId] = contact.VisibilityRevision;
 }

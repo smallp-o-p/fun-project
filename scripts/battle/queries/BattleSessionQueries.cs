@@ -52,3 +52,9 @@ public sealed class GetBattleOutcomeQuery : IBattleSessionQuery<Option<BattleOut
 {
   public Option<BattleOutcome> Execute(BattleSession session) => session.Outcome;
 }
+
+// The scheduler's current round; automation resets activation memory when it changes.
+public sealed class GetTurnNumberQuery : IBattleSessionQuery<int>
+{
+  public int Execute(BattleSession session) => session.TurnNumber;
+}
