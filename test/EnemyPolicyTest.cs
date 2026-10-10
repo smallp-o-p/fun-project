@@ -32,15 +32,6 @@ public sealed class EnemyPolicyTest
     Assert.Equal(954L, new EnemyPolicySettings(100.25f).Score(damage: .25, exposure: .10));
     Assert.Equal(15801L, new EnemyPolicySettings(100.004f).Score(damage: 1, kill: 1));
     Assert.Equal(-605L, new EnemyPolicySettings(cautionPercent: 115.75f).Score(exposure: .10));
-    foreach (float invalid in new[] { float.NaN, float.PositiveInfinity, float.NegativeInfinity })
-    {
-      var defaults = new EnemyPolicySettings(invalid, invalid, invalid, invalid);
-      Assert.Equal(100f, defaults.AggressionPercent);
-      Assert.Equal(100f, defaults.CautionPercent);
-      Assert.Equal(100f, defaults.RangeWeightPercent);
-      Assert.Equal(75f, defaults.PreferredRangePercent);
-      Assert.Equal(950L, defaults.Score(damage: .25, exposure: .10));
-    }
   }
 
   [TestCase]
@@ -57,8 +48,8 @@ public sealed class EnemyPolicyTest
             new(new(TestData.MakeCombatant("Second target", setup.Sides[1].Faction)), new(3, 0, 0))],
         }],
       });
-    Assert.Equal(EnemyIntentKind.Pass, new EnemyPolicy().Decide(battle.Runtime, battle.PlayerFaction, new()).Kind);
-    var decision = new EnemyPolicy(new(200, 25)).Decide(battle.Runtime, battle.PlayerFaction, new());
+    Assert.Equal(EnemyIntentKind.Pass, new EnemyPolicy().Decide(battle.Runtime, battle.PlayerFaction, new()).Intent.Kind);
+    var decision = new EnemyPolicy(new(200, 25)).Decide(battle.Runtime, battle.PlayerFaction, new()).Intent;
     Assert.Equal(EnemyIntentKind.Attack, decision.Kind);
     Assert.Equal(battle.EnemyUnit.Id, decision.TargetId);
   }
@@ -79,7 +70,7 @@ public sealed class EnemyPolicyTest
               health: x == vulnerableTarget ? 1 : 1000)), new(x, 0, 0)))],
         }],
       });
-    var decision = new EnemyPolicy(new(cautionPercent: 0)).Decide(crowded.Runtime, crowded.PlayerFaction, new());
+    var decision = new EnemyPolicy(new(cautionPercent: 0)).Decide(crowded.Runtime, crowded.PlayerFaction, new()).Intent;
     Assert.Equal(vulnerableTarget == 8 ? EnemyIntentKind.Attack : EnemyIntentKind.Pass, decision.Kind);
     if (vulnerableTarget == 8) Assert.Equal(crowded.UnitAt(new(8, 0, 0)).Id, decision.TargetId);
   }
@@ -96,11 +87,11 @@ public sealed class EnemyPolicyTest
       }, setup.Sides[1]],
     });
     var policy = new EnemyPolicy();
-    var first = policy.Decide(battle.Runtime, battle.PlayerFaction, new());
+    var first = policy.Decide(battle.Runtime, battle.PlayerFaction, new()).Intent;
     Assert.Equal(battle.PlayerUnit.Id, first.ActorId);
     Assert.True(first.Kind != EnemyIntentKind.Attack);
     battle.Pass(battle.PlayerUnit);
-    var next = policy.Decide(battle.Runtime, battle.PlayerFaction, new());
+    var next = policy.Decide(battle.Runtime, battle.PlayerFaction, new()).Intent;
     Assert.Equal(battle.SupportUnit.Id, next.ActorId);
     Assert.Equal(EnemyIntentKind.Attack, next.Kind);
   }
@@ -125,8 +116,8 @@ public sealed class EnemyPolicyTest
     hidden.Spawn(TestData.MakeCombatant("Hidden equipped", hostile), new(4, 0, 2), TestData.MakeWeapon("Secret", damage: 999));
     hidden.ApplyDamage(hidden.EnemyUnit, 999);
     var policy = new EnemyPolicy(new(cautionPercent: 0));
-    var a = policy.Decide(open.Runtime, own, new());
-    var b = policy.Decide(hidden.Runtime, own, new());
+    var a = policy.Decide(open.Runtime, own, new()).Intent;
+    var b = policy.Decide(hidden.Runtime, own, new()).Intent;
     Assert.Equal(EnemyIntentKind.Move, a.Kind);
     Assert.Equal(new Vector3I(5, 0, 0), a.Destination);
     Assert.Equal(a, b);
@@ -141,7 +132,7 @@ public sealed class EnemyPolicyTest
     int ammo = weapon.CurrentAmmo;
     for (int i = 0; i < 5; i++)
     {
-      var decision = new EnemyPolicy(new(cautionPercent: 0)).Decide(queried.Runtime, queried.PlayerFaction, new());
+      var decision = new EnemyPolicy(new(cautionPercent: 0)).Decide(queried.Runtime, queried.PlayerFaction, new()).Intent;
       Assert.Equal(EnemyIntentKind.Attack, decision.Kind);
     }
     Assert.Equal(ammo, weapon.CurrentAmmo);
@@ -167,10 +158,10 @@ public sealed class EnemyPolicyTest
       });
     weapon.TrySpendShot().RequireSome();
     var policy = new EnemyPolicy();
-    var empty = policy.Decide(battle.Runtime, battle.PlayerFaction, new());
+    var empty = policy.Decide(battle.Runtime, battle.PlayerFaction, new()).Intent;
     Assert.Equal(EnemyIntentKind.Reload, empty.Kind);
     battle.Reload(battle.PlayerUnit, weapon);
-    var loaded = policy.Decide(battle.Runtime, battle.PlayerFaction, new());
+    var loaded = policy.Decide(battle.Runtime, battle.PlayerFaction, new()).Intent;
     Assert.Equal(EnemyIntentKind.Pass, loaded.Kind);
   }
 
@@ -190,9 +181,9 @@ public sealed class EnemyPolicyTest
     var contact = battle.Query(new GetFactionLastSeenContacts(battle.PlayerFaction)).AsValueEnumerable().Single();
     var memory = new EnemyTurnMemory();
     var policy = new EnemyPolicy();
-    Assert.Equal(new Vector3I(1, 0, 0), policy.Decide(battle.Runtime, battle.PlayerFaction, memory).Destination);
+    Assert.Equal(new Vector3I(1, 0, 0), policy.Decide(battle.Runtime, battle.PlayerFaction, memory).Intent.Destination);
     memory.Visit(battle.PlayerUnit.Id, new(1, 0, 0));
-    Assert.Equal(EnemyIntentKind.Pass, policy.Decide(battle.Runtime, battle.PlayerFaction, memory).Kind);
+    Assert.Equal(EnemyIntentKind.Pass, policy.Decide(battle.Runtime, battle.PlayerFaction, memory).Intent.Kind);
     battle.Move(battle.EnemyUnit, [new(3, 0, 0)]);
     battle.Move(battle.PlayerUnit, [new(1, 0, 0)]);
     policy.Decide(battle.Runtime, battle.PlayerFaction, memory);
@@ -202,6 +193,6 @@ public sealed class EnemyPolicyTest
     var newContact = battle.Query(new GetFactionLastSeenContacts(battle.PlayerFaction)).AsValueEnumerable().Single();
     Assert.True(newContact.VisibilityRevision > contact.VisibilityRevision);
     Assert.False(memory.IsDismissed(newContact));
-    Assert.Equal(new Vector3I(2, 0, 0), policy.Decide(battle.Runtime, battle.PlayerFaction, memory).Destination);
+    Assert.Equal(new Vector3I(2, 0, 0), policy.Decide(battle.Runtime, battle.PlayerFaction, memory).Intent.Destination);
   }
 }

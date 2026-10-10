@@ -24,13 +24,19 @@ public sealed class EnemyTurnControllerTest
     Assert.Throws<InvalidOperationException>(() => battle.Runtime.EnableEnemyTurns());
   }
 
-  [TestCase]
-  public static void CompletionObserversReturnBeforeSequentialEnemySubmissionsAndInitiatingResultIsRetained()
+  [TestCase(true, true)]
+  [TestCase(false, true)]
+  [TestCase(true, false)]
+  [TestCase(false, false)]
+  public static void CompletionObserversReturnBeforeSequentialEnemySubmissionsAndInitiatingResultIsRetained(
+    bool publicEntry, bool explicitEndTurn)
   {
     using var battle = BattleFixture.Duel(playerControlled: true,
       enemy: new("Enemy", Weapon: TestData.MakeAmmoWeapon("Pistol")));
     battle.Runtime.EnableEnemyTurns(Demo);
-    var initiating = BattleAction.EndFactionTurn(battle.PlayerFaction);
+    battle.RegisterHook<ActiveSideChangedBattleEvent>(new WoundActivatedEnemy(battle.EnemyUnit));
+    BattleAction initiating = explicitEndTurn ? BattleAction.EndFactionTurn(battle.PlayerFaction)
+      : BattleAction.PassUnit(battle.Alive(battle.PlayerUnit));
     List<BattleAction> started = [];
     List<BattleAction> completed = [];
     bool observing = false;
@@ -39,21 +45,27 @@ public sealed class EnemyTurnControllerTest
     {
       if (attemptingNested) return;
       Assert.False(observing);
+      if (started.Count > 0) Assert.Equal(19, battle.EnemyUnit.CurrentHealth);
       started.Add(action);
       attemptingNested = true;
-      try { Assert.Throws<InvalidOperationException>(() => battle.Submit(BattleAction.EndFactionTurn(battle.Query(new GetActiveSideQuery())))); }
+      try
+      {
+        Assert.Throws<InvalidOperationException>(() => battle.Submit(BattleAction.EndFactionTurn(battle.Query(new GetActiveSideQuery()))));
+        Assert.Throws<InvalidOperationException>(() => battle.Runtime.EnableEnemyTurns());
+      }
       finally { attemptingNested = false; }
     };
     battle.Runtime.ActionCompleted += result =>
     {
       if (attemptingNested) return;
       observing = true;
+      if (ReferenceEquals(result.Action, initiating)) Assert.Equal(19, battle.EnemyUnit.CurrentHealth);
       completed.Add(result.Action);
       attemptingNested = true;
       try { Assert.Throws<InvalidOperationException>(() => battle.Submit(BattleAction.EndFactionTurn(battle.Query(new GetActiveSideQuery())))); }
       finally { observing = false; attemptingNested = false; }
     };
-    var returned = battle.Submit(initiating);
+    var returned = publicEntry ? battle.Submit(initiating) : battle.Runtime.ExecuteSingleAction(initiating);
     Assert.Equal(initiating, returned.Action);
     Assert.False(returned.EventsThatOccurred.ToArray().AsValueEnumerable().Any(evt => evt is UnitAttackedBattleEvent));
     Assert.True(started.Count > 1);
@@ -237,7 +249,7 @@ public sealed class EnemyTurnControllerTest
 
   [TestCase(false)]
   [TestCase(true)]
-  public static void EmptyIntentRetriesOnlyAfterObservedProgress(bool changeKnownAlly)
+  public static void EmptyInterruptedIntentDoesNotRetryForUnrelatedObserverChanges(bool changeKnownAlly)
   {
     using var battle = BattleFixture.Duel(playerControlled: true, dimensions: new(3, 1, 1),
       player: new("Player", Position: Vector3I.Zero),
@@ -256,7 +268,7 @@ public sealed class EnemyTurnControllerTest
       if (action is AttackEntity)
       {
         attempts++;
-        Assert.True(attempts <= (changeKnownAlly ? 2 : 1)); // Fail promptly if retry avoidance regresses.
+        Assert.True(attempts <= 1); // Fail promptly if retry avoidance regresses.
         if (attempts == 1) battle.EnemyUnit.ClearVisibleUnits(); // Lose this actor's sight before its ordinary action commits.
       }
     };
@@ -270,7 +282,7 @@ public sealed class EnemyTurnControllerTest
     };
     battle.Runtime.EnableEnemyTurns(Demo);
     battle.EndFactionTurn(battle.PlayerFaction);
-    Assert.Equal(changeKnownAlly ? 2 : 1, attempts);
+    Assert.Equal(1, attempts);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
   }
 
@@ -316,5 +328,11 @@ public sealed class EnemyTurnControllerTest
   {
     protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitAttackedBattleEvent evt)
       => [BattleAction.ApplyDamage(context.Session.TryGetAlive(evt.Unit).RequireSome(), 999)];
+  }
+
+  private sealed class WoundActivatedEnemy(BattleUnitState enemy) : BattleHook<ActiveSideChangedBattleEvent>
+  {
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, ActiveSideChangedBattleEvent evt)
+      => ReferenceEquals(evt.Faction, enemy.Side) ? [BattleAction.ApplyDamage(context.Session.TryGetAlive(enemy).RequireSome(), 1)] : [];
   }
 }

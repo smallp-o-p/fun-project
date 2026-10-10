@@ -68,9 +68,9 @@ public sealed class BattleKnowledgeMovementTest
     memory.Visit(battle.PlayerUnit.Id, new(1, 0, 0));
     memory.Visit(battle.PlayerUnit.Id, new(0, 0, 1));
     var policy = new EnemyPolicy(new(cautionPercent: 0));
-    Assert.Equal(EnemyIntentKind.Pass, policy.Decide(battle.Runtime, side, memory).Kind);
+    Assert.Equal(EnemyIntentKind.Pass, policy.Decide(battle.Runtime, side, memory).Intent.Kind);
     battle.Move(battle.SupportUnit, [new(2, 0, 1)]);
-    var nowClear = policy.Decide(battle.Runtime, side, memory);
+    var nowClear = policy.Decide(battle.Runtime, side, memory).Intent;
     Assert.Equal(EnemyIntentKind.Move, nowClear.Kind);
     Assert.Equal(new Vector3I(1, 0, 1), nowClear.Destination);
   }

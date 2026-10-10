@@ -23,6 +23,14 @@ public partial class GameCamera : AnimatableBody3D
   private PathFollow3D? pathFollow;
   private Camera3D? camera;
   private Option<Tween> rotationTween;
+  public bool InputEnabled { get; private set; } = true;
+
+  public void SetInputEnabled(bool enabled)
+  {
+    InputEnabled = enabled;
+    if (!enabled && rotationTween.Match(IsInstanceValid, () => false))
+      rotationTween.IfSome(tween => tween.Kill());
+  }
 
   enum CameraRotation
   {
@@ -71,11 +79,11 @@ public partial class GameCamera : AnimatableBody3D
   public override void _Process(double delta)
   {
 
-    if (Input.IsActionJustPressed("rotate_camera_l"))
+    if (InputEnabled && Input.IsActionJustPressed("rotate_camera_l"))
     {
       RotateQuarterTurn(cameraPath!.Curve, CameraRotation.Left);
     }
-    else if (Input.IsActionJustPressed("rotate_camera_r"))
+    else if (InputEnabled && Input.IsActionJustPressed("rotate_camera_r"))
     {
       RotateQuarterTurn(cameraPath!.Curve, CameraRotation.Right);
     }
@@ -84,6 +92,7 @@ public partial class GameCamera : AnimatableBody3D
 
   public override void _PhysicsProcess(double delta)
   {
+    if (!InputEnabled) return;
     Vector2 moveDirection = GetRequestedMoveDirection();
     float verticalStep = GetRequestedVerticalStep();
     float cameraZoom = GetZoom();

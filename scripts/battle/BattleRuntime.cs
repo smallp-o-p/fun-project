@@ -75,15 +75,10 @@ public sealed class BattleRuntime : IDisposable
     var player = _session.PlayerFaction.Match(value => value,
       () => throw new InvalidOperationException("Enemy turns require a designated player faction."));
     _enemyController.Enable(player, settings);
-    _enemyController.ExecuteEnemyTurns();
+    _enemyController.ExecutePendingEnemyTurns();
   }
 
-  public BattleActionExecResult ExecuteAction(BattleAction action)
-  {
-    var result = ExecuteSingleAction(action);
-    _enemyController.ExecuteEnemyTurns();
-    return result;
-  }
+  public BattleActionExecResult ExecuteAction(BattleAction action) => ExecuteSingleAction(action);
 
   // Guard one synchronous submission, including its callbacks. This prevents observers
   // from submitting recursively; it does not lock or span the enemy-turn loop.
@@ -94,13 +89,13 @@ public sealed class BattleRuntime : IDisposable
     ArgumentNullException.ThrowIfNull(action);
     _actions.EnsureCanSubmit();
     _submitting = true;
+    BattleActionExecResult result;
     try
     {
       ActionStarted.Invoke(action);
       ThrowIfDisposed();
-      var result = _actions.Submit(action);
+      result = _actions.Submit(action);
       ActionCompleted.Invoke(result);
-      return result;
     }
     catch
     {
@@ -108,6 +103,10 @@ public sealed class BattleRuntime : IDisposable
       throw;
     }
     finally { _submitting = false; }
+    // Activation events only request execution. Settle it after every interrupt and
+    // completion observer, with the submission guard released for ordinary AI actions.
+    _enemyController.ExecutePendingEnemyTurns();
+    return result;
   }
 
   private void EnsureNotSubmitting()
@@ -147,6 +146,8 @@ public sealed class BattleRuntime : IDisposable
 
   private void RaiseBattleEventCommitted(BattleEvent battleEvent)
   {
+    if (battleEvent is ActiveSideChangedBattleEvent activation)
+      _enemyController.OnFactionActivated(activation.Faction);
     BattleEventCommitted.Invoke(battleEvent);
   }
 }

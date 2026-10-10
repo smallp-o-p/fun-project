@@ -21,6 +21,7 @@ internal sealed class EnemyTurnMemory
     => _dismissedContacts.TryGetValue(contact.UnitId, out long revision) && revision == contact.VisibilityRevision;
   public bool HasFailed(EnemyIntent intent) => _failedIntents.Contains(intent);
   public void MarkFailed(EnemyIntent intent) => _failedIntents.Add(intent);
+  public void ClearFailed() => _failedIntents.Clear();
 
   public void Dismiss(LastSeenContact contact) => _dismissedContacts[contact.UnitId] = contact.VisibilityRevision;
 }

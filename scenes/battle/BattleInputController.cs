@@ -23,6 +23,7 @@ public sealed partial class BattleInputController : Node
 
   public override void _UnhandledInput(InputEvent @event)
   {
+    if (!_cameraRig.InputEnabled) return;
     if (@event is InputEventMouseMotion motion)
     {
       PickTile(motion.Position).IfSome(tile => TileHovered?.Invoke(tile));

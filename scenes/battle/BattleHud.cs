@@ -70,6 +70,7 @@ public sealed partial class BattleHud : CanvasLayer
   {
     _confirmButton.Disabled = true;
     _cancelButton.Disabled = true;
+    _returnButton.Disabled = true;
     foreach (Node child in _verbButtons.GetChildren())
       if (child is Button button) button.Disabled = true;
     foreach (Node child in _turnButtons.GetChildren())
@@ -92,7 +93,10 @@ public sealed partial class BattleHud : CanvasLayer
   }
 
   public void ShowReturn(bool available)
-    => _returnButton.Visible = available;
+  {
+    _returnButton.Visible = available;
+    _returnButton.Disabled = !available;
+  }
 
   internal static string FormatUnitReadout(BattleUnitState unit)
     => $"{unit.Combatant.Name}  HP {unit.CurrentHealth}/{unit.MaxHealth}  STUN {unit.CurrentStun}"
