@@ -93,7 +93,7 @@ internal sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
       .ToArray();
 
     // Prefer a visible enemy, then the newest unresolved contact, then an adjacent frontier.
-   
+
     Option<Vector3I> goal = targets.Length > 0 ? Some(targets[0].Position.Raw)
       : contacts
         .Where(contact => !memory.IsDismissed(contact))
@@ -127,6 +127,7 @@ internal sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
     if (weaponOpt.Case is not Weapon weapon)
       goto moveScore;
 
+    range = weapon.EffectiveRange;
     if (!weapon.IsLoaded)
     {
       // Reload only an empty magazine; otherwise score single-step legal movement.
@@ -140,10 +141,9 @@ internal sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
           chosenAction = BattleAction.ReloadWeapon(actor, magazine);
         }
       }
-      range = weapon.EffectiveRange;
     }
 
-    if (actor.State.CurrentActionPoints >= BattleSession.DefaultAttackActionPointCost)
+    if (weapon.IsLoaded && actor.State.CurrentActionPoints >= BattleSession.DefaultAttackActionPointCost)
     {
       long healthDmg = 0, stunDmg = 0;
       foreach (var damage in weapon.EmitDamage(actor.State.ActiveBuffDamageMods))
@@ -172,7 +172,7 @@ internal sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
       }
     }
 
-    moveScore:
+  moveScore:
     if (actor.State.CurrentActionPoints < BattleSession.DefaultMovementStepActionPointCost)
       return (chosen, chosenAction);
 
@@ -213,7 +213,7 @@ internal sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
           return known.Terrain
                    .Match(value => value.IsWalkable, () => false) &&
                  known.Occupancy == TraversalKnowledge.Clear;
-        }, 
+        },
         () => false);
 
     bool LegalNeighbor(Vector3I direction) => Clear(position + direction)

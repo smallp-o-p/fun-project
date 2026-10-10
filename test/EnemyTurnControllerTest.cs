@@ -9,31 +9,13 @@ namespace FunProject.Tests;
 [RequireGodotRuntime]
 public sealed class EnemyTurnControllerTest
 {
-  private static EnemyPolicySettings Demo => new(200, 25);
-
-  [TestCase]
-  public static void EnemyTurnsAreExplicitOptInAndRequireDesignatedPlayer()
-  {
-    using var undesignated = BattleFixture.Duel();
-    Assert.Throws<InvalidOperationException>(() => undesignated.Runtime.EnableEnemyTurns());
-    using var battle = BattleFixture.Duel(playerControlled: true);
-    battle.EndFactionTurn(battle.PlayerFaction);
-    Assert.Equal(battle.EnemyFaction, battle.Query(new GetActiveSideQuery()));
-    battle.Runtime.EnableEnemyTurns();
-    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
-    Assert.Throws<InvalidOperationException>(() => battle.Runtime.EnableEnemyTurns());
-  }
-
-  [TestCase(true, true)]
-  [TestCase(false, true)]
-  [TestCase(true, false)]
-  [TestCase(false, false)]
+  [TestCase(true)]
+  [TestCase(false)]
   public static void CompletionObserversReturnBeforeSequentialEnemySubmissionsAndInitiatingResultIsRetained(
-    bool publicEntry, bool explicitEndTurn)
+    bool explicitEndTurn)
   {
-    using var battle = BattleFixture.Duel(playerControlled: true,
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true,
       enemy: new("Enemy", Weapon: TestData.MakeAmmoWeapon("Pistol")));
-    battle.Runtime.EnableEnemyTurns(Demo);
     battle.RegisterHook<ActiveSideChangedBattleEvent>(new WoundActivatedEnemy(battle.EnemyUnit));
     BattleAction initiating = explicitEndTurn ? BattleAction.EndFactionTurn(battle.PlayerFaction)
       : BattleAction.PassUnit(battle.Alive(battle.PlayerUnit));
@@ -51,7 +33,6 @@ public sealed class EnemyTurnControllerTest
       try
       {
         Assert.Throws<InvalidOperationException>(() => battle.Submit(BattleAction.EndFactionTurn(battle.Query(new GetActiveSideQuery()))));
-        Assert.Throws<InvalidOperationException>(() => battle.Runtime.EnableEnemyTurns());
       }
       finally { attemptingNested = false; }
     };
@@ -65,90 +46,55 @@ public sealed class EnemyTurnControllerTest
       try { Assert.Throws<InvalidOperationException>(() => battle.Submit(BattleAction.EndFactionTurn(battle.Query(new GetActiveSideQuery())))); }
       finally { observing = false; attemptingNested = false; }
     };
-    var returned = publicEntry ? battle.Submit(initiating) : battle.Runtime.ExecuteSingleAction(initiating);
+    var returned = battle.Submit(initiating);
     Assert.Equal(initiating, returned.Action);
     Assert.False(returned.EventsThatOccurred.ToArray().AsValueEnumerable().Any(evt => evt is UnitAttackedBattleEvent));
     Assert.True(started.AsValueEnumerable().SequenceEqual(completed));
-    if (publicEntry)
-    {
-      Assert.True(started.Count > 1);
-      Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
-      Assert.True(battle.Events.EventsOf<UnitAttackedBattleEvent>().Length > 0);
-    }
-    else
-    {
-      Assert.Equal(1, started.Count);
-      Assert.Equal(battle.EnemyFaction, battle.Query(new GetActiveSideQuery()));
-      Assert.Equal(0, battle.Events.EventsOf<UnitAttackedBattleEvent>().Length);
-      battle.ApplyDamage(battle.EnemyUnit, 1); // The next external submission hands the settled enemy side to AI.
-      Assert.True(started.Count > 2);
-      Assert.True(started.AsValueEnumerable().SequenceEqual(completed));
-      Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
-    }
+    Assert.True(started.Count > 1);
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
+    Assert.True(battle.Events.EventsOf<UnitAttackedBattleEvent>().Length > 0);
   }
 
-  [TestCase]
-  public static void EnablingInitiallyActiveEnemyDeliversOrdinaryCompletionsWithoutPresentationTicks()
+  [TestCase(false)]
+  [TestCase(true)]
+  public static void CompletionObserverDisposalStopsDrainAndReturnsInitiatingResult(bool duringEnemyAction)
   {
-    using var battle = BattleFixture.Duel(playerControlled: true,
-      enemy: new("Enemy", Weapon: TestData.MakeAmmoWeapon("Pistol")),
-      configure: setup => setup with { Sides = [setup.Sides[1], setup.Sides[0]] });
-    int completed = 0;
-    battle.Runtime.ActionCompleted += _ => completed++;
-    var player = battle.Session.PlayerFaction.RequireSome();
-    Assert.False(ReferenceEquals(player, battle.Query(new GetActiveSideQuery())));
-    battle.Runtime.EnableEnemyTurns(Demo);
-    Assert.Equal(player, battle.Query(new GetActiveSideQuery()));
-    Assert.True(completed > 0);
-  }
-
-  [TestCase]
-  public static void CompletionObserverDisposalStopsDrainAndReturnsInitiatingResult()
-  {
-    using var battle = BattleFixture.Duel(playerControlled: true);
-    battle.Runtime.EnableEnemyTurns();
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true,
+      enemy: new("Enemy", Weapon: TestData.MakeAmmoWeapon("Pistol")));
     int started = 0;
     battle.Runtime.ActionStarted += _ => started++;
-    battle.Runtime.ActionCompleted += _ => battle.Runtime.Dispose();
+    battle.Runtime.ActionCompleted += result =>
+    {
+      if (!duringEnemyAction || result.Action is AttackEntity) battle.Runtime.Dispose();
+    };
     var action = BattleAction.EndFactionTurn(battle.PlayerFaction);
     var returned = battle.Submit(action);
     Assert.Equal(action, returned.Action);
-    Assert.Equal(1, started);
+    Assert.Equal(duringEnemyAction ? 2 : 1, started);
     Assert.Equal(battle.EnemyFaction, battle.Session.ActiveSide);
     battle.Runtime.Dispose();
   }
 
-  [TestCase(true)]
-  [TestCase(false)]
-  public static void ObserverFaultStopsAutomationWhileLaterManualSubmissionsRemainOrdinary(bool enableBeforeFault)
+  [TestCase]
+  public static void ObserverFaultStopsAutomationWhileLaterManualSubmissionsRemainOrdinary()
   {
-    using var battle = BattleFixture.Duel(playerControlled: true);
-    if (enableBeforeFault) battle.Runtime.EnableEnemyTurns();
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true);
     Action<BattleActionExecResult> fail = _ => throw new InvalidOperationException("Observer failed");
     battle.Runtime.ActionCompleted += fail;
     Assert.Throws<InvalidOperationException>(() => battle.EndFactionTurn(battle.PlayerFaction));
     battle.Runtime.ActionCompleted -= fail;
-    if (!enableBeforeFault) Assert.Throws<InvalidOperationException>(() => battle.Runtime.EnableEnemyTurns());
     battle.EndFactionTurn(battle.EnemyFaction);
     battle.EndFactionTurn(battle.PlayerFaction);
     Assert.Equal(battle.EnemyFaction, battle.Query(new GetActiveSideQuery()));
   }
 
   [TestCase]
-  public static void TerminalBattleEnablementDoesNotSubmitAndMidActionInterruptEndingBattleStopsDrain()
+  public static void MidActionInterruptEndingBattleStopsDrain()
   {
-    using var alreadyEnded = BattleFixture.Duel(playerControlled: true);
-    alreadyEnded.ApplyDamage(alreadyEnded.EnemyUnit, 999);
-    int attempts = 0;
-    alreadyEnded.Runtime.ActionStarted += _ => attempts++;
-    alreadyEnded.Runtime.EnableEnemyTurns();
-    Assert.Equal(0, attempts);
-
-    using var battle = BattleFixture.Duel(playerControlled: true,
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true,
       enemy: new("Enemy", Weapon: TestData.MakeAmmoWeapon("Pistol")),
       hitChanceCalculator: new AlwaysHitCalculator());
     battle.RegisterHook<UnitAttackedBattleEvent>(new KillAttacker());
-    battle.Runtime.EnableEnemyTurns(Demo);
     int completed = 0;
     battle.Runtime.ActionCompleted += _ => completed++;
     battle.EndFactionTurn(battle.PlayerFaction);
@@ -160,7 +106,7 @@ public sealed class EnemyTurnControllerTest
   public static void EmptyInterruptedResultReobservesAndContinuesToReloadThenPlayerControl()
   {
     var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 1);
-    using var battle = BattleFixture.Duel(playerControlled: true,
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true,
       enemy: new("Enemy", ActionPoints: 2, Weapon: weapon), hitChanceCalculator: new AlwaysHitCalculator());
     bool interrupted = false;
     int empty = 0;
@@ -173,7 +119,6 @@ public sealed class EnemyTurnControllerTest
       }
     };
     battle.Runtime.ActionCompleted += result => { if (result.EventsThatOccurred.IsEmpty) empty++; };
-    battle.Runtime.EnableEnemyTurns(Demo);
     battle.EndFactionTurn(battle.PlayerFaction);
     Assert.Equal(1, empty);
     Assert.Equal(1, battle.Events.EventsOf<UnitReloadedWeaponBattleEvent>().Length);
@@ -181,11 +126,10 @@ public sealed class EnemyTurnControllerTest
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
   }
 
-  [TestCase(false)]
-  [TestCase(true)]
-  public static void EnemyPassCompletesDespiteCapacityChangesInObservers(bool restoreCapacity)
+  [TestCase]
+  public static void EnemyPassCompletesDespiteRestoredCapacityInObserver()
   {
-    using var battle = BattleFixture.Duel(playerControlled: true, dimensions: new(2, 1, 1),
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true, dimensions: new(2, 1, 1),
       player: new("Player", Position: Vector3I.Zero), enemy: new("Enemy", Position: new(1, 0, 0)));
     var immobilize = TestData.MakeStun(duration: 2);
     int passAttempts = 0, completedPasses = 0;
@@ -202,23 +146,22 @@ public sealed class EnemyTurnControllerTest
     {
       if (result.Action is PassUnit)
       {
-        if (restoreCapacity) battle.EnemyUnit.RemoveStatusEffect(immobilize);
+        battle.EnemyUnit.RemoveStatusEffect(immobilize);
         Assert.Equal(1, result.EventsThatOccurred.ToArray().EventsOf<UnitActivationEndedBattleEvent>().Length);
         completedPasses++;
       }
     };
-    battle.Runtime.EnableEnemyTurns();
     battle.EndFactionTurn(battle.PlayerFaction);
     Assert.Equal(1, passAttempts);
     Assert.Equal(1, completedPasses);
-    Assert.Equal(!restoreCapacity, battle.EnemyUnit.IsImmobilized);
+    Assert.False(battle.EnemyUnit.IsImmobilized);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
   }
 
   [TestCase]
   public static void StaleEnemyEndTurnRejectsAndStopsAutomationWithoutRetrying()
   {
-    using var battle = BattleFixture.Duel(playerControlled: true);
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true);
     battle.EnemyUnit.ApplyStatusEffect(TestData.MakeStun(duration: 2));
     int attempts = 0, completed = 0;
     battle.Runtime.ActionStarted += action =>
@@ -232,7 +175,6 @@ public sealed class EnemyTurnControllerTest
       }
     };
     battle.Runtime.ActionCompleted += _ => completed++;
-    battle.Runtime.EnableEnemyTurns();
     Assert.Throws<InvalidOperationException>(() => battle.EndFactionTurn(battle.PlayerFaction));
     Assert.Equal(1, attempts);
     Assert.Equal(1, completed);
@@ -245,11 +187,10 @@ public sealed class EnemyTurnControllerTest
   [TestCase]
   public static void LegitimateTurnUsesAllActionPointsBeyondSixtyFourSubmissions()
   {
-    using var battle = BattleFixture.Duel(playerControlled: true,
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true,
       player: new("Armored player", Armor: TestData.MakeArmor("Armor", armor: 10000)),
       enemy: new("Enemy", ActionPoints: 100, Weapon: TestData.MakeAmmoWeapon("Pistol", magazine: 100)),
       hitChanceCalculator: new AlwaysHitCalculator());
-    battle.Runtime.EnableEnemyTurns(new(cautionPercent: 0));
     List<BattleAction> completed = [];
     battle.Runtime.ActionCompleted += result => completed.Add(result.Action);
     battle.EndFactionTurn(battle.PlayerFaction);
@@ -260,11 +201,10 @@ public sealed class EnemyTurnControllerTest
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
   }
 
-  [TestCase(false)]
-  [TestCase(true)]
-  public static void EmptyInterruptedIntentDoesNotRetryForUnrelatedObserverChanges(bool changeKnownAlly)
+  [TestCase]
+  public static void EmptyInterruptedIntentDoesNotRetryForUnrelatedObserverChanges()
   {
-    using var battle = BattleFixture.Duel(playerControlled: true, dimensions: new(3, 1, 1),
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true, dimensions: new(3, 1, 1),
       player: new("Player", Position: Vector3I.Zero),
       enemy: new("Enemy", Position: new(1, 0, 0), ActionPoints: 1, Weapon: TestData.MakeAmmoWeapon("Pistol")),
       configure: setup => setup with
@@ -290,10 +230,9 @@ public sealed class EnemyTurnControllerTest
       if (result.Action is AttackEntity && result.EventsThatOccurred.IsEmpty)
       {
         battle.EnemyUnit.AddVisibleUnit(battle.PlayerUnit);
-        if (changeKnownAlly) Assert.True(battle.UnitAt(new(2, 0, 0)).TrySpendActionPoints(1));
+        Assert.True(battle.UnitAt(new(2, 0, 0)).TrySpendActionPoints(1));
       }
     };
-    battle.Runtime.EnableEnemyTurns(Demo);
     battle.EndFactionTurn(battle.PlayerFaction);
     Assert.Equal(1, attempts);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
@@ -302,7 +241,7 @@ public sealed class EnemyTurnControllerTest
   [TestCase]
   public static void FiniteReinforcementsFinishTheirTurnsWithoutAWholeCallCutoff()
   {
-    using var battle = BattleFixture.Duel(playerControlled: true, dimensions: new(142, 1, 1),
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true, dimensions: new(142, 1, 1),
       player: new("Player", Position: Vector3I.Zero), enemy: new("Enemy", Position: new(1, 0, 0)),
       configure: setup => setup with
       {
@@ -315,12 +254,82 @@ public sealed class EnemyTurnControllerTest
         }).ToArray(),
       });
     battle.RegisterHook<TurnEndedBattleEvent>(new SpawnNextFaction(140));
-    battle.Runtime.EnableEnemyTurns();
     int completed = 0;
     battle.Runtime.ActionCompleted += _ => completed++;
     battle.EndFactionTurn(battle.PlayerFaction);
     Assert.Equal(142, completed);
     Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
+  }
+
+  [TestCase]
+  public static void ConsecutiveMovesUseFreshPositionsUntilActionPointsAreSpent()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true, dimensions: new(6, 1, 1),
+      player: new("Player", Position: new(5, 0, 0)),
+      enemy: new("Enemy", Position: Vector3I.Zero, ActionPoints: 4));
+    battle.EndFactionTurn(battle.PlayerFaction);
+    var moves = battle.Events.EventsOf<UnitMovedBattleEvent>();
+    Assert.Equal(4, moves.Length);
+    for (int i = 0; i < moves.Length; i++)
+    {
+      Assert.Equal(new Vector3I(i, 0, 0), moves[i].SourcePosition.Raw);
+      Assert.Equal(new Vector3I(i + 1, 0, 0), moves[i].Position.Raw);
+    }
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
+  }
+
+  [TestCase]
+  public static void LowestActableActorActsBeforeArmedAlly()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true, dimensions: new(3, 1, 1),
+      player: new("Player", Position: Vector3I.Zero, Health: 100),
+      enemy: new("First actor", Position: new(1, 0, 0)), hitChanceCalculator: new AlwaysHitCalculator(),
+      configure: setup => setup with
+      {
+        Sides = [setup.Sides[0], setup.Sides[1] with
+        {
+          Units = [.. setup.Sides[1].Units, new(new(TestData.MakeCombatant("Armed ally", setup.Sides[1].Faction),
+            TestData.MakeWeapon("Pistol", damage: 20)), new(2, 0, 0))],
+        }],
+      });
+    battle.EndFactionTurn(battle.PlayerFaction);
+    var passed = battle.Events.SingleEvent<UnitActivationEndedBattleEvent>();
+    Assert.Equal(battle.EnemyUnit, passed.Unit);
+    var attacks = battle.Events.EventsOf<UnitAttackedBattleEvent>();
+    Assert.Equal(4, attacks.Length);
+    var events = battle.Events.AsValueEnumerable().ToArray();
+    Assert.True(System.Array.IndexOf(events, passed) < System.Array.IndexOf(events, attacks[0]));
+    Assert.True(attacks.AsValueEnumerable().All(attack => attack.Unit.Id > passed.Unit.Id));
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
+  }
+
+  [TestCase]
+  public static void SameFactionReinforcementActsDuringCurrentActivation()
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true, runEnemyTurns: true, dimensions: new(3, 1, 1),
+      player: new("Player", Position: Vector3I.Zero, Health: 200),
+      enemy: new("Enemy", Position: new(1, 0, 0), ActionPoints: 1, Weapon: TestData.MakeAmmoWeapon("Pistol", damage: 20)),
+      hitChanceCalculator: new AlwaysHitCalculator());
+    battle.RegisterHook<UnitAttackedBattleEvent>(new SpawnSameFactionAlly(battle.EnemyFaction));
+    battle.EndFactionTurn(battle.PlayerFaction);
+    var attacks = battle.Events.EventsOf<UnitAttackedBattleEvent>();
+    Assert.Equal(2, attacks.Length);
+    Assert.Equal(battle.EnemyUnit, attacks[0].Unit);
+    Assert.Equal(battle.UnitAt(new(2, 0, 0)), attacks[1].Unit);
+    Assert.Equal(0, attacks[1].Unit.CurrentActionPoints);
+    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
+  }
+
+  private sealed class SpawnSameFactionAlly(FunProject.Combatants.Faction side) : BattleHook<UnitAttackedBattleEvent>
+  {
+    private bool _spawned;
+    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitAttackedBattleEvent evt)
+    {
+      if (_spawned || !ReferenceEquals(evt.Unit.Side, side)) return [];
+      _spawned = true;
+      return [BattleAction.SpawnUnit(TestData.MakeCombatant("Reinforcement", side, actionPoints: 1),
+        context.Session.Board.ValidatePoint(new(2, 0, 0)).RequireSome(), TestData.MakeAmmoWeapon("Pistol", damage: 20))];
+    }
   }
 
   private sealed class SpawnNextFaction(int remaining) : BattleHook<TurnEndedBattleEvent>

@@ -48,8 +48,9 @@ public sealed partial class EventPlaybackDirectorTest
     Assert.Equal(1, idleCount);
   }
 
-  [TestCase]
-  public static void CapturedMovementFinishesAtConstantSpeedBeforeLaterDeathPlayback()
+  [TestCase(false)]
+  [TestCase(true)]
+  public static void CapturedMovementPrecedesDeathUnlessPlaybackIsCancelled(bool cancel)
   {
     using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1));
     var director = battle.AttachDirector(new EventPlaybackDirector());
@@ -66,41 +67,28 @@ public sealed partial class EventPlaybackDirectorTest
 
     director.Tick();
     Tween tween = tree.GetProcessedTweens().AsValueEnumerable().Last();
-    tween.CustomStep(.51); // two captured one-tile segments at 4 tiles/second
-    Assert.True(mesh.Position.IsEqualApprox(
-      BoardCoordinates.TileToWorldCenter(new Vector3I(3, 0, 1)) + new Vector3(0, .5f, 0)));
-    Assert.True(mesh.Visible);
-    Assert.True(director.Busy); // later damage/death still queued
-    while (director.Busy) director.Tick();
-    Assert.False(mesh.Visible);
-  }
-
-  [TestCase]
-  public static void ExitCancelsActiveTweenAndQueuedEventsIdempotently()
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(5, 1, 5), new Vector3I(1, 0, 1));
-    var director = battle.AttachDirector(new EventPlaybackDirector());
-    var tree = (SceneTree)Engine.GetMainLoop();
-    tree.Root.AddChild(director);
-    director.SetProcess(false);
-    var mesh = battle.OwnNode(new Node3D
+    if (cancel)
     {
-      Position = BoardCoordinates.TileToWorldCenter(new Vector3I(1, 0, 1)) + new Vector3(0, .5f, 0),
-    });
-    director.RegisterUnitMesh(battle.Unit, mesh);
-    battle.Move(battle.Unit, [new Vector3I(2, 0, 1), new Vector3I(3, 0, 1)]);
-    battle.ApplyDamage(battle.Unit, 999);
-    director.Tick();
-    Tween tween = tree.GetProcessedTweens().AsValueEnumerable().Last();
-    tween.CustomStep(.1);
-    Vector3 stopped = mesh.Position;
-    director._ExitTree();
-    director._ExitTree();
-    Assert.False(tween.IsValid());
-    Assert.False(director.Busy);
-    director.Tick();
-    Assert.Equal(stopped, mesh.Position);
-    Assert.True(mesh.Visible); // cancellation discarded the later death visual
+      tween.CustomStep(.1);
+      Vector3 stopped = mesh.Position;
+      director._ExitTree();
+      director._ExitTree();
+      Assert.False(tween.IsValid());
+      Assert.False(director.Busy);
+      director.Tick();
+      Assert.Equal(stopped, mesh.Position);
+      Assert.True(mesh.Visible); // cancellation discarded the later death visual
+    }
+    else
+    {
+      tween.CustomStep(.51); // two captured one-tile segments at 4 tiles/second
+      Assert.True(mesh.Position.IsEqualApprox(
+        BoardCoordinates.TileToWorldCenter(new Vector3I(3, 0, 1)) + new Vector3(0, .5f, 0)));
+      Assert.True(mesh.Visible);
+      Assert.True(director.Busy); // later damage/death still queued
+      while (director.Busy) director.Tick();
+      Assert.False(mesh.Visible);
+    }
   }
 
   [TestCase]

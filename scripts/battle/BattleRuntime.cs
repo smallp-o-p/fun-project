@@ -1,5 +1,5 @@
 using System;
-using LanguageExt.UnsafeValueAccess;
+using FunProject.Combatants;
 
 namespace FunProject.Battle;
 
@@ -25,7 +25,7 @@ public sealed class BattleRuntime : IDisposable
     _session.BattleEventCommitted += RaiseBattleEventCommitted;
     _actions = new BattleActionExecutor(session);
     _enemyController = new(this, new(200, 25, 100, 75));
-    
+
   }
 
   public TResult Query<TResult>(IBattleSessionQuery<TResult> query)
@@ -104,14 +104,12 @@ public sealed class BattleRuntime : IDisposable
 
   private void ExecuteNonPlayerTurn()
   {
-    if (_disposed || _session.Outcome.IsSome) return;
-
-    var active = _session.ActiveSide;
-
-    while (!ReferenceEquals(active, _session.PlayerFaction.ValueUnsafe()))
+    if (_session.PlayerFaction.Case is not Faction player) return;
+    while (!_disposed && _session.Outcome.IsNone && !_enemyController.IsStopped)
     {
+      var active = _session.ActiveSide;
+      if (ReferenceEquals(active, player)) return;
       _enemyController.ExecuteEnemyActions(active);
-      active = _session.ActiveSide;
     }
   }
 

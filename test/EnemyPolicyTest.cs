@@ -48,16 +48,16 @@ public sealed class EnemyPolicyTest
             new(new(TestData.MakeCombatant("Second target", setup.Sides[1].Faction)), new(3, 0, 0))],
         }],
       });
-    Assert.Equal(EnemyIntentKind.Pass, new EnemyPolicy().DecideAction(battle.Runtime, battle.PlayerFaction, new()).Intent.Kind);
-    var decision = new EnemyPolicy(new(200, 25)).DecideAction(battle.Runtime, battle.PlayerFaction, new()).Intent;
+    Assert.Equal(EnemyIntentKind.Pass, new EnemyPolicy().DecideAction(battle.Runtime, battle.PlayerFaction, new(), battle.Alive(battle.PlayerUnit)).Intent.Kind);
+    var decision = new EnemyPolicy(new(200, 25)).DecideAction(battle.Runtime, battle.PlayerFaction, new(), battle.Alive(battle.PlayerUnit)).Intent;
     Assert.Equal(EnemyIntentKind.Attack, decision.Kind);
     Assert.Equal(battle.EnemyUnit.Id, decision.TargetId);
   }
 
-  [TestCase(8)]
-  [TestCase(9)]
-  public static void OnlyEightNearestTargetsCanBeChosen(int vulnerableTarget)
+  [TestCase]
+  public static void AllActorVisibleTargetsCanBeChosen()
   {
+    const int vulnerableTarget = 9;
     using var crowded = BattleFixture.Duel(dimensions: new(10, 1, 1),
       player: new("Actor", Position: Vector3I.Zero, Weapon: TestData.MakeWeapon("Pistol", damage: 1)),
       enemy: new("Nearest", Position: new(1, 0, 0), Health: 1000), hitChanceCalculator: new AlwaysHitCalculator(),
@@ -70,30 +70,9 @@ public sealed class EnemyPolicyTest
               health: x == vulnerableTarget ? 1 : 1000)), new(x, 0, 0)))],
         }],
       });
-    var decision = new EnemyPolicy(new(cautionPercent: 0)).DecideAction(crowded.Runtime, crowded.PlayerFaction, new()).Intent;
-    Assert.Equal(vulnerableTarget == 8 ? EnemyIntentKind.Attack : EnemyIntentKind.Pass, decision.Kind);
-    if (vulnerableTarget == 8) Assert.Equal(crowded.UnitAt(new(8, 0, 0)).Id, decision.TargetId);
-  }
-
-  [TestCase]
-  public static void LowestActableActorActsBeforeArmedAlly()
-  {
-    using var battle = BattleFixture.Duel(configure: setup => setup with
-    {
-      Sides = [setup.Sides[0] with
-      {
-        Units = [.. setup.Sides[0].Units, new(new(TestData.MakeCombatant("Armed ally", setup.Sides[0].Faction),
-          TestData.MakeWeapon("Pistol", damage: 20)), Vector3I.Zero)],
-      }, setup.Sides[1]],
-    });
-    var policy = new EnemyPolicy();
-    var first = policy.DecideAction(battle.Runtime, battle.PlayerFaction, new()).Intent;
-    Assert.Equal(battle.PlayerUnit.Id, first.ActorId);
-    Assert.True(first.Kind != EnemyIntentKind.Attack);
-    battle.Pass(battle.PlayerUnit);
-    var next = policy.DecideAction(battle.Runtime, battle.PlayerFaction, new()).Intent;
-    Assert.Equal(battle.SupportUnit.Id, next.ActorId);
-    Assert.Equal(EnemyIntentKind.Attack, next.Kind);
+    var decision = new EnemyPolicy(new(cautionPercent: 0)).DecideAction(crowded.Runtime, crowded.PlayerFaction, new(), crowded.Alive(crowded.PlayerUnit)).Intent;
+    Assert.Equal(EnemyIntentKind.Attack, decision.Kind);
+    Assert.Equal(crowded.UnitAt(new(vulnerableTarget, 0, 0)).Id, decision.TargetId);
   }
 
   [TestCase]
@@ -116,11 +95,24 @@ public sealed class EnemyPolicyTest
     hidden.Spawn(TestData.MakeCombatant("Hidden equipped", hostile), new(4, 0, 2), TestData.MakeWeapon("Secret", damage: 999));
     hidden.ApplyDamage(hidden.EnemyUnit, 999);
     var policy = new EnemyPolicy(new(cautionPercent: 0));
-    var a = policy.DecideAction(open.Runtime, own, new()).Intent;
-    var b = policy.DecideAction(hidden.Runtime, own, new()).Intent;
+    var a = policy.DecideAction(open.Runtime, own, new(), open.Alive(open.PlayerUnit)).Intent;
+    var b = policy.DecideAction(hidden.Runtime, own, new(), hidden.Alive(hidden.PlayerUnit)).Intent;
     Assert.Equal(EnemyIntentKind.Move, a.Kind);
     Assert.Equal(new Vector3I(5, 0, 0), a.Destination);
     Assert.Equal(a, b);
+  }
+
+  [TestCase(0)]
+  [TestCase(200)]
+  public static void LoadedWeaponMovementRespectsPreferredRange(int rangeWeight)
+  {
+    using var battle = BattleFixture.Duel(playerControlled: true, dimensions: new(3, 1, 1),
+      player: new("Actor", Position: new(2, 0, 0), Weapon: TestData.MakeWeapon("Weak pistol", damage: 1, range: 2)),
+      enemy: new("Target", Position: Vector3I.Zero, Health: 1000), hitChanceCalculator: new AlwaysHitCalculator());
+    var policy = new EnemyPolicy(new(cautionPercent: 0, rangeWeightPercent: rangeWeight, preferredRangePercent: 100));
+    var decision = policy.DecideAction(battle.Runtime, battle.PlayerFaction, new(), battle.Alive(battle.PlayerUnit)).Intent;
+    Assert.Equal(rangeWeight == 0 ? EnemyIntentKind.Move : EnemyIntentKind.Pass, decision.Kind);
+    if (rangeWeight == 0) Assert.Equal(new Vector3I(1, 0, 0), decision.Destination);
   }
 
   [TestCase]
@@ -132,7 +124,7 @@ public sealed class EnemyPolicyTest
     int ammo = weapon.CurrentAmmo;
     for (int i = 0; i < 5; i++)
     {
-      var decision = new EnemyPolicy(new(cautionPercent: 0)).DecideAction(queried.Runtime, queried.PlayerFaction, new()).Intent;
+      var decision = new EnemyPolicy(new(cautionPercent: 0)).DecideAction(queried.Runtime, queried.PlayerFaction, new(), queried.Alive(queried.PlayerUnit)).Intent;
       Assert.Equal(EnemyIntentKind.Attack, decision.Kind);
     }
     Assert.Equal(ammo, weapon.CurrentAmmo);
@@ -143,26 +135,28 @@ public sealed class EnemyPolicyTest
       queried.Events.SingleEvent<UnitAttackedBattleEvent>().Roll);
   }
 
-  [TestCase]
-  public static void ReloadRequiresEmptyMagazineAndObservedClearMovesNeverProbeUnknown()
+  [TestCase(false)]
+  [TestCase(true)]
+  public static void ReloadRequiresEmptyMagazineAndObservedClearMovesNeverProbeUnknown(bool visibleTarget)
   {
     var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 1);
-    using var battle = BattleFixture.Duel(dimensions: new(4, 1, 1),
-      player: new("Actor", Position: Vector3I.Zero, Weapon: weapon), enemy: new("Hidden", Position: new(3, 0, 0)),
+    using var battle = BattleFixture.Duel(playerControlled: true, dimensions: new(4, 1, 1),
+      player: new("Actor", Position: Vector3I.Zero, Weapon: weapon),
+      enemy: new("Target", Position: new(3, 0, 0), Health: 1),
       configure: setup => setup with
       {
         Sides = [setup.Sides[0] with
         {
-          Units = [new(new(TestData.MakeCombatant("Actor", setup.Sides[0].Faction, vision: 0), weapon), Vector3I.Zero)],
+          Units = [new(new(TestData.MakeCombatant("Actor", setup.Sides[0].Faction, vision: visibleTarget ? 4 : 0), weapon), Vector3I.Zero)],
         }, setup.Sides[1]],
       });
     weapon.TrySpendShot().RequireSome();
     var policy = new EnemyPolicy();
-    var empty = policy.DecideAction(battle.Runtime, battle.PlayerFaction, new()).Intent;
+    var empty = policy.DecideAction(battle.Runtime, battle.PlayerFaction, new(), battle.Alive(battle.PlayerUnit)).Intent;
     Assert.Equal(EnemyIntentKind.Reload, empty.Kind);
     battle.Reload(battle.PlayerUnit, weapon);
-    var loaded = policy.DecideAction(battle.Runtime, battle.PlayerFaction, new()).Intent;
-    Assert.Equal(EnemyIntentKind.Pass, loaded.Kind);
+    var loaded = policy.DecideAction(battle.Runtime, battle.PlayerFaction, new(), battle.Alive(battle.PlayerUnit)).Intent;
+    Assert.Equal(visibleTarget ? EnemyIntentKind.Attack : EnemyIntentKind.Pass, loaded.Kind);
   }
 
   [TestCase]
@@ -181,18 +175,18 @@ public sealed class EnemyPolicyTest
     var contact = battle.Query(new GetFactionLastSeenContacts(battle.PlayerFaction)).AsValueEnumerable().Single();
     var memory = new EnemyTurnMemory();
     var policy = new EnemyPolicy();
-    Assert.Equal(new Vector3I(1, 0, 0), policy.DecideAction(battle.Runtime, battle.PlayerFaction, memory).Intent.Destination);
+    Assert.Equal(new Vector3I(1, 0, 0), policy.DecideAction(battle.Runtime, battle.PlayerFaction, memory, battle.Alive(battle.PlayerUnit)).Intent.Destination);
     memory.Visit(battle.PlayerUnit.Id, new(1, 0, 0));
-    Assert.Equal(EnemyIntentKind.Pass, policy.DecideAction(battle.Runtime, battle.PlayerFaction, memory).Intent.Kind);
+    Assert.Equal(EnemyIntentKind.Pass, policy.DecideAction(battle.Runtime, battle.PlayerFaction, memory, battle.Alive(battle.PlayerUnit)).Intent.Kind);
     battle.Move(battle.EnemyUnit, [new(3, 0, 0)]);
     battle.Move(battle.PlayerUnit, [new(1, 0, 0)]);
-    policy.DecideAction(battle.Runtime, battle.PlayerFaction, memory);
+    policy.DecideAction(battle.Runtime, battle.PlayerFaction, memory, battle.Alive(battle.PlayerUnit));
     Assert.True(memory.IsDismissed(contact));
     battle.Move(battle.PlayerUnit, [new(2, 0, 0)]);
     battle.Move(battle.PlayerUnit, [new(1, 0, 0)]);
     var newContact = battle.Query(new GetFactionLastSeenContacts(battle.PlayerFaction)).AsValueEnumerable().Single();
     Assert.True(newContact.VisibilityRevision > contact.VisibilityRevision);
     Assert.False(memory.IsDismissed(newContact));
-    Assert.Equal(new Vector3I(2, 0, 0), policy.DecideAction(battle.Runtime, battle.PlayerFaction, memory).Intent.Destination);
+    Assert.Equal(new Vector3I(2, 0, 0), policy.DecideAction(battle.Runtime, battle.PlayerFaction, memory, battle.Alive(battle.PlayerUnit)).Intent.Destination);
   }
 }

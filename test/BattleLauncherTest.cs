@@ -189,7 +189,7 @@ public partial class BattleLauncherTest
   }
 
   [TestCase]
-  public static async Task InitiallyActiveEnemyRunsAfterMeshesAndInitialHudAreInstalled()
+  public static void InitiallyActiveEnemyPresentationStartsFromSettledFactoryState()
   {
     var type = TestData.MakeDuelBattleType();
     type.Factions[0].Roster[0].Loadout.Combatant = TestData.MakeCombatantData("Player", health: 100);
@@ -205,14 +205,12 @@ public partial class BattleLauncherTest
     Director(scene).SetProcess(false);
     var playerFaction = setup.PlayerFaction.RequireSome();
     Assert.Equal(playerFaction, runtime.Query(new GetActiveSideQuery()));
-    Assert.True(Director(scene).Busy);
+    Assert.False(Director(scene).Busy);
     Assert.Equal(2, scene.GetNode<Node3D>("UnitMeshes").GetChildren()
       .AsValueEnumerable().OfType<MeshInstance3D>().Count());
     var status = scene.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Label>("%UnitStatus");
-    Assert.True(status.Text.Contains("HP 100/100", StringComparison.Ordinal));
     var player = runtime.Query(new GetFactionAliveUnits(playerFaction)).AsValueEnumerable().Single();
     Assert.True(player.State.CurrentHealth < 100);
-    await DrainDirector(scene);
     Assert.True(status.Text.Contains($"HP {player.State.CurrentHealth}/100", StringComparison.Ordinal));
   }
 }

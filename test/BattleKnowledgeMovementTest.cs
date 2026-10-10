@@ -68,9 +68,12 @@ public sealed class BattleKnowledgeMovementTest
     memory.Visit(battle.PlayerUnit.Id, new(1, 0, 0));
     memory.Visit(battle.PlayerUnit.Id, new(0, 0, 1));
     var policy = new EnemyPolicy(new(cautionPercent: 0));
-    Assert.Equal(EnemyIntentKind.Pass, policy.DecideAction(battle.Runtime, side, memory).Intent.Kind);
+    // Give this actor a visible goal independently of the faction's terrain knowledge.
+    battle.PlayerUnit.AddVisibleUnit(battle.EnemyUnit);
+    Assert.Equal(EnemyIntentKind.Pass, policy.DecideAction(battle.Runtime, side, memory, battle.Alive(battle.PlayerUnit)).Intent.Kind);
     battle.Move(battle.SupportUnit, [new(2, 0, 1)]);
-    var nowClear = policy.DecideAction(battle.Runtime, side, memory).Intent;
+    battle.PlayerUnit.AddVisibleUnit(battle.EnemyUnit);
+    var nowClear = policy.DecideAction(battle.Runtime, side, memory, battle.Alive(battle.PlayerUnit)).Intent;
     Assert.Equal(EnemyIntentKind.Move, nowClear.Kind);
     Assert.Equal(new Vector3I(1, 0, 1), nowClear.Destination);
   }

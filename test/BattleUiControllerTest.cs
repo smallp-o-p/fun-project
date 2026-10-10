@@ -388,7 +388,7 @@ public sealed partial class BattleUiControllerTest
     battle.Ui.BeginAction(endTurn);
 
     Assert.Equal(UiState.UnitSelected, battle.Ui.State); // selection persisted
-    Assert.Equal(battle.EnemyFaction, battle.Runtime.Query(new GetActiveSideQuery()));
+    Assert.Equal(battle.PlayerFaction, battle.Runtime.Query(new GetActiveSideQuery()));
   }
 
   [TestCase(TestName = "PreviewAt updates LastPreview only while targeting")]
@@ -429,14 +429,14 @@ public sealed partial class BattleUiControllerTest
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
 
-    battle.Runtime.ExecuteAction(BattleAction.EndFactionTurn(battle.PlayerFaction));
+    battle.Runtime.ExecuteSingleAction(BattleAction.EndFactionTurn(battle.PlayerFaction));
 
     Assert.Equal(InputGate.NotPlayerTurn, battle.Ui.Gate);
     Assert.False(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));
     Assert.Equal(UiState.UnitSelected, battle.Ui.State);
     Assert.Equal(battle.PlayerUnit, battle.Ui.SelectedUnit.RequireSome());
 
-    battle.Runtime.ExecuteAction(BattleAction.EndFactionTurn(battle.EnemyFaction));
+    battle.Runtime.ExecuteSingleAction(BattleAction.EndFactionTurn(battle.EnemyFaction));
 
     Assert.Equal(InputGate.Open, battle.Ui.Gate);
     Assert.Equal(UiState.UnitSelected, battle.Ui.State);
