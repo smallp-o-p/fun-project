@@ -24,7 +24,7 @@ flowchart LR
     subgraph Runtime["Battle runtime (scene-independent C#)"]
         Facade["BattleRuntime\nQuery, ExecuteAction,\nproof creation, hook registration"]
         Executor["BattleActionExecutor\nhook registry, action stack,\ninterrupt capture"]
-        EnemyController["EnemyTurnController\nExecutePendingEnemyTurns"]
+        EnemyController["EnemyTurnController\nExecuteEnemyTurns"]
         Policy["EnemyPolicy\nruntime queries"]
         Session["BattleSession\nturns, availability, visibility,\nevent dispatch"]
         Board["BattleBoardState\ntiles, occupancy,\nBFS pathfinding"]
@@ -47,7 +47,7 @@ flowchart LR
     Factory -->|"builds session + runtime"| Facade
     ActorData --> Session
     Facade -->|"ExecuteAction"| Executor
-    Facade -->|"deferred faction activation, after observers"| EnemyController
+    Facade -->|"settled external submission, enemy active"| EnemyController
     EnemyController -->|"single action, no recursive turns"| Facade
     EnemyController -->|"turn queries"| Queries
     EnemyController -->|"runtime + faction + turn memory"| Policy
@@ -236,10 +236,10 @@ var result = runtime.ExecuteAction(BattleAction.MoveUnit(unit, [destination]));
 The execution flow is synchronous:
 
 1. `ExecuteAction` calls the runtime's internal `ExecuteSingleAction` for the initiating action.
-2. That method raises `ActionStarted`, submits to the executor, resolves all interrupts, and finishes every `ActionCompleted` observer. `ActiveSideChangedBattleEvent` records a pending enemy activation without executing from event dispatch.
-3. After releasing the submission guard, the single-action completion boundary settles that pending activation through `ExecutePendingEnemyTurns`. An ordinary action with no enemy activation does not start the controller. Enablement explicitly requests the already-active enemy as the first-turn bootstrap.
-4. The policy returns an ordinary action built from the proofs used in that decision. The controller immediately calls `runtime.ExecuteSingleAction` directly. This produces ordinary start/completion notifications without recursively starting enemy turns.
-5. The controller owns successive actions and faction chains, suppressing activation requests and recursive entry while it is executing. After observers return, it checks shutdown, outcome and faction/turn changes, then queries current state for the next decision. Player control, completion, disposal or fault stops automation. Public `ExecuteAction` returns only the initiating action's result.
+2. That method raises `ActionStarted`, submits to the executor, resolves all interrupts, and finishes every `ActionCompleted` observer. It releases the submission guard and returns without calling AI.
+3. The public `ExecuteAction` then calls `HandOffEnemyTurn`. If automation is enabled, the battle is live and the settled active side is an enemy, it passes that side to `ExecuteEnemyTurns`. Enablement uses the same handoff for an initially active enemy. Player-side submissions leave player control unchanged.
+4. The policy returns an ordinary action built from the proofs used in that decision. The controller immediately calls `runtime.ExecuteSingleAction` directly. This produces ordinary start/completion notifications and cannot reenter the outer handoff.
+5. The controller owns successive actions and enemy faction chains. After each submission and its observers, it checks shutdown, outcome and player control, then resets turn memory on a faction/round change before the next decision. No activation latch or execution flag is needed. Public `ExecuteAction` returns only the initiating action's result.
 
 The runtime's `_submitting` flag rejects synchronous submission or enablement from action callbacks. It spans one submission and its start/completion observers, not the enemy loop. This prevents recursive mutation before later observers have consumed the result; it is not a thread lock. The executor's existing admission checks cover disposal and terminal outcomes, not this callback boundary.
 

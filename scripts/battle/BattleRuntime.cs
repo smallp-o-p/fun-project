@@ -75,10 +75,15 @@ public sealed class BattleRuntime : IDisposable
     var player = _session.PlayerFaction.Match(value => value,
       () => throw new InvalidOperationException("Enemy turns require a designated player faction."));
     _enemyController.Enable(player, settings);
-    _enemyController.ExecutePendingEnemyTurns();
+    HandOffEnemyTurn();
   }
 
-  public BattleActionExecResult ExecuteAction(BattleAction action) => ExecuteSingleAction(action);
+  public BattleActionExecResult ExecuteAction(BattleAction action)
+  {
+    var result = ExecuteSingleAction(action);
+    HandOffEnemyTurn();
+    return result;
+  }
 
   // Guard one synchronous submission, including its callbacks. This prevents observers
   // from submitting recursively; it does not lock or span the enemy-turn loop.
@@ -89,13 +94,13 @@ public sealed class BattleRuntime : IDisposable
     ArgumentNullException.ThrowIfNull(action);
     _actions.EnsureCanSubmit();
     _submitting = true;
-    BattleActionExecResult result;
     try
     {
       ActionStarted.Invoke(action);
       ThrowIfDisposed();
-      result = _actions.Submit(action);
+      var result = _actions.Submit(action);
       ActionCompleted.Invoke(result);
+      return result;
     }
     catch
     {
@@ -103,10 +108,14 @@ public sealed class BattleRuntime : IDisposable
       throw;
     }
     finally { _submitting = false; }
-    // Activation events only request execution. Settle it after every interrupt and
-    // completion observer, with the submission guard released for ordinary AI actions.
-    _enemyController.ExecutePendingEnemyTurns();
-    return result;
+  }
+
+  private void HandOffEnemyTurn()
+  {
+    if (_disposed || _session.Outcome.IsSome) return;
+    var active = _session.ActiveSide;
+    if (_enemyController.CanExecuteFor(active))
+      _enemyController.ExecuteEnemyTurns(active);
   }
 
   private void EnsureNotSubmitting()
@@ -145,9 +154,5 @@ public sealed class BattleRuntime : IDisposable
   }
 
   private void RaiseBattleEventCommitted(BattleEvent battleEvent)
-  {
-    if (battleEvent is ActiveSideChangedBattleEvent activation)
-      _enemyController.OnFactionActivated(activation.Faction);
-    BattleEventCommitted.Invoke(battleEvent);
-  }
+    => BattleEventCommitted.Invoke(battleEvent);
 }

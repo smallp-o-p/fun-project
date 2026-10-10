@@ -45,7 +45,7 @@ public sealed class EnemyTurnControllerTest
     {
       if (attemptingNested) return;
       Assert.False(observing);
-      if (started.Count > 0) Assert.Equal(19, battle.EnemyUnit.CurrentHealth);
+      if (started.Count == 1) Assert.Equal(19, battle.EnemyUnit.CurrentHealth);
       started.Add(action);
       attemptingNested = true;
       try
@@ -68,10 +68,23 @@ public sealed class EnemyTurnControllerTest
     var returned = publicEntry ? battle.Submit(initiating) : battle.Runtime.ExecuteSingleAction(initiating);
     Assert.Equal(initiating, returned.Action);
     Assert.False(returned.EventsThatOccurred.ToArray().AsValueEnumerable().Any(evt => evt is UnitAttackedBattleEvent));
-    Assert.True(started.Count > 1);
     Assert.True(started.AsValueEnumerable().SequenceEqual(completed));
-    Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
-    Assert.True(battle.Events.EventsOf<UnitAttackedBattleEvent>().Length > 0);
+    if (publicEntry)
+    {
+      Assert.True(started.Count > 1);
+      Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
+      Assert.True(battle.Events.EventsOf<UnitAttackedBattleEvent>().Length > 0);
+    }
+    else
+    {
+      Assert.Equal(1, started.Count);
+      Assert.Equal(battle.EnemyFaction, battle.Query(new GetActiveSideQuery()));
+      Assert.Equal(0, battle.Events.EventsOf<UnitAttackedBattleEvent>().Length);
+      battle.ApplyDamage(battle.EnemyUnit, 1); // The next external submission hands the settled enemy side to AI.
+      Assert.True(started.Count > 2);
+      Assert.True(started.AsValueEnumerable().SequenceEqual(completed));
+      Assert.Equal(battle.PlayerFaction, battle.Query(new GetActiveSideQuery()));
+    }
   }
 
   [TestCase]
