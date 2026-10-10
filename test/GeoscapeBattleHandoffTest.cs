@@ -138,7 +138,7 @@ public partial class GeoscapeBattleHandoffTest
     Option<Vector3I> clicked = None;
     battle.GetNode<BattleInputController>("BattleInputController").TileClicked += tile => clicked = Some(tile);
     await SelectFirstBattleUnit(battle, throughContainer: true);
-    Assert.True(clicked.IsNone); // terminal battles close all manual input; Return remains available
+    Assert.Equal(Vector3I.Zero, clicked.RequireSome());
     int completions = 0;
     battle.Completed += _ => completions++;
     ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
@@ -194,10 +194,7 @@ public partial class GeoscapeBattleHandoffTest
     scene._PhysicsProcess(1.0); // the pending mission still freezes campaign time
     Assert.Equal(clockDuring, Clock(scene).Text);
 
-    Option<Vector3I> clicked = None;
-    battle.GetNode<BattleInputController>("BattleInputController").TileClicked += tile => clicked = Some(tile);
-    await SelectFirstBattleUnit(battle, throughContainer: true);
-    Assert.Equal(Vector3I.Zero, clicked.RequireSome());
+    await SelectFirstBattleUnit(battle);
     EndTurnButton(battle).EmitSignal(Button.SignalName.Pressed);
 
     int intents = 0;

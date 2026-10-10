@@ -16,7 +16,6 @@ public sealed partial class BattleScene : Node3D
   private BattleUI _view = null!;
   private BattleHud _hud = null!;
   private BattleInputController _input = null!;
-  private GameCamera _cameraRig = null!;
   private Faction _playerFaction = null!;
   private bool _allowReturn;
   private bool _disposed;
@@ -41,7 +40,6 @@ public sealed partial class BattleScene : Node3D
     if (_disposed)
       return;
     _disposed = true;
-    _cameraRig?.SetInputEnabled(false);
     ProcessMode = ProcessModeEnum.Disabled;
     if (_director is not null)
     {
@@ -83,7 +81,7 @@ public sealed partial class BattleScene : Node3D
       None: () => throw new System.InvalidOperationException("Started battle is missing a player faction."));
 
     InstantiateMap();
-    _cameraRig = ConfigureGameCamera();
+    GameCamera rig = ConfigureGameCamera();
 
     _director = new EventPlaybackDirector { Name = "EventPlaybackDirector" };
     AddChild(_director);
@@ -97,7 +95,7 @@ public sealed partial class BattleScene : Node3D
 
     _input = new BattleInputController { Name = "BattleInputController" };
     AddChild(_input);
-    _input.Initialize(_cameraRig);
+    _input.Initialize(rig);
     _view = GetNode<BattleUI>("%BattleUI");
     _hud = _view.Hud ?? throw new InvalidOperationException("Battle UI requires a ready BattleHud.");
     _hud.ConfirmRequested += OnConfirmIntent;
@@ -135,7 +133,6 @@ public sealed partial class BattleScene : Node3D
   private void RefreshView()
   {
     if (_disposed) return;
-    _cameraRig.SetInputEnabled(_ui.Gate == InputGate.Open);
     if (_director.Busy)
     {
       _hud.DisableInput();
