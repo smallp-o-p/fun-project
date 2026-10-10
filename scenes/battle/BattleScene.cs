@@ -111,7 +111,6 @@ public sealed partial class BattleScene : Node3D
     _director.PlaybackIdle += OnPlaybackIdle;
 
     RefreshView();
-    _runtime.EnableEnemyTurns(new(200, 25, 100, 75));
   }
 
   public override void _ExitTree()

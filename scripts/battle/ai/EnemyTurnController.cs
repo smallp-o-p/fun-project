@@ -1,53 +1,63 @@
 using System;
+using System.Linq;
 using FunProject.Combatants;
 
 namespace FunProject.Battle;
 
 // Owns synchronous automation only. Presentation and committed-event callbacks have no
 // execution role; completion observers finish before every fresh policy decision.
-internal sealed class EnemyTurnController(BattleRuntime runtime)
+internal sealed class EnemyTurnController(BattleRuntime runtime, EnemyPolicySettings policy)
 {
-  private EnemyPolicy? _policy;
-  private Faction? _player;
+  private readonly EnemyPolicy _policy = new(policy);
   private bool _stopped;
 
-  internal void Enable(Faction player, EnemyPolicySettings? settings)
-  {
-    if (_policy is not null) throw new InvalidOperationException("Enemy turns are already enabled.");
-    if (_stopped) throw new InvalidOperationException("Cannot enable enemy turns after an execution fault.");
-    _player = player;
-    _policy = new(settings);
-  }
-
   internal void Stop() => _stopped = true;
-
-  internal bool CanExecuteFor(Faction side)
-    => _policy is not null && !_stopped && !ReferenceEquals(side, _player);
-
-  // Runtime supplies the settled enemy side after checking readiness and outcome.
-  internal void ExecuteEnemyTurns(Faction side)
+  
+  /// <summary>
+  /// Decide an action for each unit, run it, then decide again once that unit can no longer act.
+  /// </summary>
+  /// <param name="side"></param>
+  internal void ExecuteEnemyActions(Faction side)
   {
     try
     {
-      int turn = runtime.Query(new GetTurnNumberQuery());
+      var sideUnitsToAct = runtime.Query(new GetFactionAliveUnits(side))
+        .AsValueEnumerable()
+        .Where(unit => runtime.Query(new CanUnitActNow(unit.State)))
+        .OrderBy(unit => unit.Id)
+        .ToList();
+
       var memory = new EnemyTurnMemory();
-      while (true)
+
+      foreach (var unit in sideUnitsToAct)
+        memory.Visit(unit.Id, unit.Position.Raw);
+
+      var currUnit = sideUnitsToAct[0];
+
+      do
       {
-        var decision = _policy!.Decide(runtime, side, memory);
+        if (!ReferenceEquals(side, runtime.Query(new GetActiveSideQuery())))
+          break;
+
+        if (!runtime.Query(new CanUnitActNow(currUnit.State)))
+        {
+          if (sideUnitsToAct.Count == 0)
+            break;
+
+          sideUnitsToAct.RemoveAt(0);
+          currUnit = sideUnitsToAct[0];
+        }
+
+        var decision = _policy.DecideAction(runtime, side, memory, currUnit);
+
         var result = runtime.ExecuteSingleAction(decision.Action);
-        // Empty interrupted submissions can repeat forever without spending AP.
-        // Retry only after a later committed action (for example, reloading) changes state.
-        if (result.EventsThatOccurred.IsEmpty) memory.MarkFailed(decision.Intent);
-        else memory.ClearFailed();
-        if (_stopped || runtime.Query(new GetBattleOutcomeQuery()).IsSome) return;
-        var active = runtime.Query(new GetActiveSideQuery());
-        // Pass auto-advances an exhausted side; explicit EndTurn does the same.
-        if (ReferenceEquals(active, _player)) return;
-        int currentTurn = runtime.Query(new GetTurnNumberQuery());
-        if (!ReferenceEquals(side, active) || turn != currentTurn) memory = new();
-        side = active;
-        turn = currentTurn;
+
+        if (result.EventsThatOccurred.IsEmpty)
+          memory.MarkFailed(decision.Intent);
+        else
+          memory.ClearFailed();
       }
+      while (!_stopped && !runtime.Query(new GetBattleOutcomeQuery()).IsSome);
     }
     catch { Stop(); throw; }
   }

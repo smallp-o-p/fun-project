@@ -1,4 +1,5 @@
 using System;
+using LanguageExt.UnsafeValueAccess;
 
 namespace FunProject.Battle;
 
@@ -23,7 +24,8 @@ public sealed class BattleRuntime : IDisposable
     _session = session;
     _session.BattleEventCommitted += RaiseBattleEventCommitted;
     _actions = new BattleActionExecutor(session);
-    _enemyController = new(this);
+    _enemyController = new(this, new(200, 25, 100, 75));
+    
   }
 
   public TResult Query<TResult>(IBattleSessionQuery<TResult> query)
@@ -68,20 +70,10 @@ public sealed class BattleRuntime : IDisposable
     return _session.Board.ValidatePoint(coordinates);
   }
 
-  public void EnableEnemyTurns(EnemyPolicySettings? settings = null)
-  {
-    ThrowIfDisposed();
-    EnsureNotSubmitting();
-    var player = _session.PlayerFaction.Match(value => value,
-      () => throw new InvalidOperationException("Enemy turns require a designated player faction."));
-    _enemyController.Enable(player, settings);
-    HandOffEnemyTurn();
-  }
-
   public BattleActionExecResult ExecuteAction(BattleAction action)
   {
     var result = ExecuteSingleAction(action);
-    HandOffEnemyTurn();
+    ExecuteNonPlayerTurn();
     return result;
   }
 
@@ -110,12 +102,17 @@ public sealed class BattleRuntime : IDisposable
     finally { _submitting = false; }
   }
 
-  private void HandOffEnemyTurn()
+  private void ExecuteNonPlayerTurn()
   {
     if (_disposed || _session.Outcome.IsSome) return;
+
     var active = _session.ActiveSide;
-    if (_enemyController.CanExecuteFor(active))
-      _enemyController.ExecuteEnemyTurns(active);
+
+    while (!ReferenceEquals(active, _session.PlayerFaction.ValueUnsafe()))
+    {
+      _enemyController.ExecuteEnemyActions(active);
+      active = _session.ActiveSide;
+    }
   }
 
   private void EnsureNotSubmitting()
