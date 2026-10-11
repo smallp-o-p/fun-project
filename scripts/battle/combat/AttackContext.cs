@@ -21,13 +21,12 @@ public sealed record AttackContext(
   // guard the query). Conditions are checked in one fixed order so a shot rejected for
   // multiple reasons surfaces a single, stable failure message.
   internal static Either<string, AttackContext> Resolve(
-    BattleSession session, BattleUnitState attacker, AttackTarget target)
+    BattleSession session, AliveUnit attackerProof, AttackTarget target)
   {
+    var attacker = attackerProof.State;
     if (attacker.EquippedWeapon.IsNone)
       return $"{attacker.Combatant.Name} has no equipped weapon.";
     Weapon weapon = attacker.RequireEquippedWeapon();
-    if (session.TryGetAlive(attacker).Case is not AliveUnit freshAttacker)
-      return $"{attacker.Combatant.Name} is not alive in this session.";
 
     string name;
     switch (target.Entity)
@@ -44,19 +43,17 @@ public sealed record AttackContext(
       default:
         throw new InvalidOperationException("An attack requires a typed target.");
     }
-    if (session.TryGetAttackTarget(target.Entity).Case is not AttackTarget freshTarget)
-      return $"{name} is not alive or attackable in this session.";
 
     bool visible = target.Entity switch
     {
       BattleEntity.Unit unit => attacker.VisibleUnits.Contains(unit.State),
-      BattleEntity.BoardObject => attacker.VisibleTiles.Contains(freshTarget.Position),
+      BattleEntity.BoardObject => attacker.VisibleTiles.Contains(target.Position),
       _ => throw new InvalidOperationException("Unknown battle entity."),
     };
     if (!visible) return $"{attacker.Combatant.Name} cannot see {name}.";
-    if (BattleSession.GetGridDistance(freshAttacker.Position.Raw, freshTarget.Position.Raw) > weapon.EffectiveRange)
+    if (BattleSession.GetGridDistance(attackerProof.Position.Raw, target.Position.Raw) > weapon.EffectiveRange)
       return $"{name} is out of range for {weapon.ItemName}.";
-    return new AttackContext(attacker, weapon, freshAttacker.Position, freshTarget.Position, session.Board);
+    return new AttackContext(attacker, weapon, attackerProof.Position, target.Position, session.Board);
   }
 
   // Object shots bypass the unit calculator entirely: a destructible object has no aim,

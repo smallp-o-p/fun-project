@@ -8,11 +8,17 @@ public sealed class GetHitChanceForAttack(AliveUnit attacker, AttackTarget targe
 {
   public Either<BattleQueryFailure, HitChanceBreakdown> Execute(BattleSession session)
   {
-    // Attacker/target liveness is guaranteed by the proof arguments, so this query only
-    // resolves target feasibility (weapon/self/ally/visibility/range). AttackContext.Resolve
-    // stays the single source of truth for the ACTION path, which re-validates at commit time.
-    return AttackContext.Resolve(session, attacker.State, target)
+    // Freshness does not establish membership in this query's session. Validate at
+    // this public boundary, then share the mutation-free feasibility logic with actions.
+    if (session.TryGetAlive(attacker.State).Case is not AliveUnit sessionAttacker)
+      return new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState,
+        $"{attacker.State.Combatant.Name} is not alive in this session.");
+    if (session.TryGetAttackTarget(target.Entity).Case is not AttackTarget sessionTarget)
+      return new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState,
+        "Target is not alive or attackable in this session.");
+
+    return AttackContext.Resolve(session, sessionAttacker, sessionTarget)
       .MapLeft(message => new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState, message))
-      .Map(context => context.CalculateHitChance(target, session.HitChanceCalculator));
+      .Map(context => context.CalculateHitChance(sessionTarget, session.HitChanceCalculator));
   }
 }

@@ -40,6 +40,9 @@ the deferred capture rule; pass proofs as parameters or acquire inside the helpe
 This is a domain analyzer, not an ownership or whole-program concurrency system.
 The mint doors are the inspected BattleSession/BattleRuntime methods; callers
 remain responsible for the validity of raw data and trusted-core construction.
+Freshness does not prove session ownership. Hit-chance query entry still validates
+attacker and target membership; shared feasibility reads reuse those proofs, as
+does movement after its execution-entry acquisition.
 Raw positions or numeric query results extracted while fresh are ordinary values,
 not proofs. Arbitrary heap storage, reflection, dynamic invocation and concurrent
 mutation are outside the supported proof discipline; use raw identities and

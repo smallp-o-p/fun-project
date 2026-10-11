@@ -107,7 +107,7 @@ public sealed class MoveUnit : BattleAction
 
   public override Result Execute(BattleSession session)
   {
-    if (session.TryGetAlive(Unit).IsNone || Unit.IsIncapacitated)
+    if (session.TryGetAlive(Unit).Case is not AliveUnit unit || Unit.IsIncapacitated)
       return Result.Interrupted;
 
     var route = _validatedRoute ?? ValidateRoute(session);
@@ -118,21 +118,14 @@ public sealed class MoveUnit : BattleAction
     if (route.Count == 0)
       return Result.Completed;
 
-    return session.TryGetAlive(Unit)
-      .Match(
-        unit =>
-        {
-          if (!session.Board.CanOccupy(route.Peek()))
-            return Result.Rejected;
+    if (!session.Board.CanOccupy(route.Peek()))
+      return Result.Rejected;
 
-          Unit.SpendActionPoints(StepApCost);
-          session.MoveUnit(unit.State, unit.Position, route.Peek());
+    Unit.SpendActionPoints(StepApCost);
+    session.MoveUnit(unit.State, unit.Position, route.Peek());
 
-          route.Dequeue();
-          return route.Count != 0 ? Result.Incomplete : Result.Completed;
-        },
-        () => Result.Interrupted
-      );
+    route.Dequeue();
+    return route.Count != 0 ? Result.Incomplete : Result.Completed;
   }
 
   private Queue<BattleBoardState.ValidatedPoint>? ValidateRoute(BattleSession session)

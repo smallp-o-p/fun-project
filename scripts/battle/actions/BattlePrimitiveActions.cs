@@ -98,13 +98,13 @@ public sealed class AttackEntity(AliveUnit attacker, AttackTarget target) : Batt
     // A dead or incapacitated attacker has no right to perform a new action; that staleness
     // (killed or disabled by an earlier interrupt) interrupts quietly like every other mutable
     // fact.
-    if (session.TryGetAlive(_attacker).IsNone || _attacker.IsIncapacitated)
+    if (session.TryGetAlive(_attacker).Case is not AliveUnit freshAttacker || _attacker.IsIncapacitated)
       return Result.Interrupted;
 
     if (session.TryGetAttackTarget(_target).Case is not AttackTarget freshTarget)
       return Result.Interrupted;
 
-    var resolved = AttackContext.Resolve(session, _attacker, freshTarget);
+    var resolved = AttackContext.Resolve(session, freshAttacker, freshTarget);
     var context = resolved.Match<AttackContext?>(_ => null, value => value);
     return context is null
       ? Result.Interrupted

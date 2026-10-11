@@ -140,4 +140,18 @@ public partial class BattleCombatQueriesTest
 
     Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight);
   }
+  [TestCase(TestName = "Hit chance queries reject fresh proofs from another session")]
+  public static void HitChanceQueryRejectsForeignSessionProofs()
+  {
+    using var source = BattleFixture.Duel(player: new("Alpha", Weapon: TestData.MakeWeapon("Rifle")));
+    using var destination = BattleFixture.Duel();
+
+    Assert.True(source.Query(new GetHitChanceForAttack(
+      source.Alive(source.PlayerUnit), source.Target(source.EnemyUnit))).IsRight);
+
+    var failure = destination.Query(new GetHitChanceForAttack(
+      source.Alive(source.PlayerUnit), source.Target(source.EnemyUnit))).RequireLeft();
+    Assert.Equal(BattleQueryFailureReason.InvalidBattleState, failure.Reason);
+  }
+
 }
