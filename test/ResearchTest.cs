@@ -63,8 +63,9 @@ public class ResearchTest
     var project = MakeResearch(costs: new() { [a] = 7, [b] = 2 });
     using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe], researchProjects: [old, project],
       startingCurrencies: new() { [a] = 10, [b] = 1 }));
-    var active = campaign.Session.StartResearch(old).RequireRight();
+    campaign.Session.StartResearch(old).RequireRight();
     campaign.AdvanceTicks(100);
+    var active = campaign.Session.ActiveResearch.RequireSome();
     campaign.ClearEvents();
     if (research)
       Assert.Equal(ResearchStartFailure.InsufficientCurrencies, campaign.Session.StartResearch(project).RequireLeft());
@@ -114,8 +115,9 @@ public class ResearchTest
     var unaffordable = MakeResearch("Too expensive", costs: new() { [currency] = 280 });
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [first, second, unaffordable],
       startingCurrencies: new() { [currency] = 300 }));
-    var old = campaign.Session.StartResearch(first).RequireRight();
+    campaign.Session.StartResearch(first).RequireRight();
     campaign.AdvanceTicks(100);
+    var old = campaign.Session.ActiveResearch.RequireSome();
     campaign.ClearEvents();
     Assert.Equal(ResearchStartFailure.InsufficientCurrencies, campaign.Session.StartResearch(unaffordable).RequireLeft());
     Assert.Equal(ResearchStartFailure.Busy, campaign.Session.StartResearch(first).RequireLeft());
@@ -203,10 +205,14 @@ public class ResearchTest
     Assert.Equal(0L, job.StartedAtTick);
     Assert.Equal(1440L, job.CompletesAtTick);
     campaign.AdvanceTicks(1439);
-    Assert.Equal(Some(job), session.ActiveResearch);
+    Assert.Equal(job.Project, session.ActiveResearch.RequireSome().Project);
+    Assert.Equal(job.StartedAtTick, session.ActiveResearch.RequireSome().StartedAtTick);
+    Assert.Equal(10000L, session.ActiveResearch.RequireSome().Work.RemainingWorkUnits);
     Assert.Equal(0, session.GetManufacturingOptions().Count);
     campaign.AdvanceTicks(1);
-    Assert.Equal(job, campaign.Events.SingleEvent<ResearchCompleted>().Job);
+    Assert.Equal(job.Project, campaign.Events.SingleEvent<ResearchCompleted>().Job.Project);
+    Assert.Equal(job.StartedAtTick, campaign.Events.SingleEvent<ResearchCompleted>().Job.StartedAtTick);
+    Assert.Equal(0L, campaign.Events.SingleEvent<ResearchCompleted>().Job.Work.RemainingWorkUnits);
     Assert.Equal(0, campaign.State.Armory.ItemStock().Count);
     session.StartManufacturing(itemRecipe).RequireRight();
     campaign.AdvanceTicks(1440);
@@ -261,7 +267,9 @@ public class ResearchTest
     Assert.Equal(0, session.GetAvailableResearchProjects().Count);
     Assert.Equal(2, snapshot.Count);
     campaign.AdvanceTicks(1440);
-    Assert.Equal(job, campaign.Events.SingleEvent<ResearchCompleted>().Job);
+    Assert.Equal(job.Project, campaign.Events.SingleEvent<ResearchCompleted>().Job.Project);
+    Assert.Equal(job.StartedAtTick, campaign.Events.SingleEvent<ResearchCompleted>().Job.StartedAtTick);
+    Assert.Equal(0L, campaign.Events.SingleEvent<ResearchCompleted>().Job.Work.RemainingWorkUnits);
     Assert.Equal(ResearchStartFailure.Locked, session.StartResearch(second).RequireLeft());
     Assert.Equal(ResearchStartFailure.AlreadyCompleted, session.StartResearch(first).RequireLeft());
   }
@@ -326,9 +334,13 @@ public class ResearchTest
     Assert.Equal(1440L, restarted.StartedAtTick);
     Assert.Equal(2880L, restarted.CompletesAtTick);
     campaign.AdvanceTicks(1439);
-    Assert.Equal(Some(restarted), session.ActiveResearch);
+    Assert.Equal(restarted.Project, session.ActiveResearch.RequireSome().Project);
+    Assert.Equal(restarted.StartedAtTick, session.ActiveResearch.RequireSome().StartedAtTick);
+    Assert.Equal(10000L, session.ActiveResearch.RequireSome().Work.RemainingWorkUnits);
     campaign.AdvanceTicks(101);
-    Assert.Equal(restarted, campaign.Events.SingleEvent<ResearchCompleted>().Job);
+    Assert.Equal(restarted.Project, campaign.Events.SingleEvent<ResearchCompleted>().Job.Project);
+    Assert.Equal(restarted.StartedAtTick, campaign.Events.SingleEvent<ResearchCompleted>().Job.StartedAtTick);
+    Assert.Equal(0L, campaign.Events.SingleEvent<ResearchCompleted>().Job.Work.RemainingWorkUnits);
     Assert.True(campaign.State.Research.IsCompleted(first));
     Assert.False(campaign.State.Research.IsCompleted(second));
     Assert.Equal(firstItem, session.GetManufacturingOptions().AsValueEnumerable().Single().Project.Item);
@@ -401,7 +413,9 @@ public class ResearchTest
       Assert.Equal(0, campaign.Events.EventsOf<ResearchCompleted>().Length);
       campaign.AdvanceTicks(1);
       Assert.True(campaign.Session.ActiveResearch.IsNone);
-      Assert.Equal(job, campaign.Events.SingleEvent<ResearchCompleted>().Job);
+      Assert.Equal(job.Project, campaign.Events.SingleEvent<ResearchCompleted>().Job.Project);
+      Assert.Equal(job.StartedAtTick, campaign.Events.SingleEvent<ResearchCompleted>().Job.StartedAtTick);
+      Assert.Equal(0L, campaign.Events.SingleEvent<ResearchCompleted>().Job.Work.RemainingWorkUnits);
     }
   }
 
@@ -427,7 +441,10 @@ public class ResearchTest
     Assert.Equal(0, campaign.Events.Count);
     Assert.Equal(7UL, campaign.State.GetCurrencyBalance(currency));
     Assert.True(campaign.State.Research.CompleteIfDue(long.MaxValue - 1).IsNone);
-    Assert.Equal(job, campaign.State.Research.CompleteIfDue(long.MaxValue).RequireSome().Job);
+    var completed = campaign.State.Research.CompleteIfDue(long.MaxValue).RequireSome().Job;
+    Assert.Equal(job.Project, completed.Project);
+    Assert.Equal(job.StartedAtTick, completed.StartedAtTick);
+    Assert.Equal(0L, completed.Work.RemainingWorkUnits);
   }
 
   [TestCase]
@@ -443,6 +460,7 @@ public class ResearchTest
     Assert.Equal(0, campaign.Events.Count);
     campaign.AdvanceTicks(1);
     campaign.OpenResolution(campaign.ActiveEvent);
+    job = campaign.Session.ActiveResearch.RequireSome();
     campaign.ClearEvents();
     campaign.Advance(100);
     Assert.Equal(1L, campaign.Session.Tick);
@@ -450,7 +468,9 @@ public class ResearchTest
     Assert.Equal(Some(job), campaign.Session.ActiveResearch);
     campaign.CompleteResolution(ResolutionOutcome.Acknowledged);
     campaign.AdvanceTicks(1439);
-    Assert.Equal(job, campaign.Events.SingleEvent<ResearchCompleted>().Job);
+    Assert.Equal(job.Project, campaign.Events.SingleEvent<ResearchCompleted>().Job.Project);
+    Assert.Equal(job.StartedAtTick, campaign.Events.SingleEvent<ResearchCompleted>().Job.StartedAtTick);
+    Assert.Equal(0L, campaign.Events.SingleEvent<ResearchCompleted>().Job.Work.RemainingWorkUnits);
   }
 
   [TestCase]
@@ -489,8 +509,10 @@ public class ResearchTest
     var job = campaign.Session.StartResearch(project).RequireRight();
     campaign.AdvanceTicks(7);
     campaign.ClearEvents();
+    var progress = campaign.Session.ActiveResearch;
+    Assert.Equal(14330000L, progress.RequireSome().Work.RemainingWorkUnits);
     var rebuilt = new GeoscapeSession(campaign.State);
-    Assert.Equal(Some(job), rebuilt.ActiveResearch);
+    Assert.Equal(progress, rebuilt.ActiveResearch);
     SysColGeneric.List<IGeoscapeEvent> events = [];
     long completedTick = -1;
     rebuilt.EventCommitted += e =>
@@ -502,7 +524,9 @@ public class ResearchTest
     rebuilt.Advance(200);
     Assert.Equal(2007L, rebuilt.Tick);
     Assert.Equal(1440L, completedTick);
-    Assert.Equal(job, events.SingleEvent<ResearchCompleted>().Job);
+    Assert.Equal(job.Project, events.SingleEvent<ResearchCompleted>().Job.Project);
+    Assert.Equal(job.StartedAtTick, events.SingleEvent<ResearchCompleted>().Job.StartedAtTick);
+    Assert.Equal(0L, events.SingleEvent<ResearchCompleted>().Job.Work.RemainingWorkUnits);
     Assert.Equal(0, campaign.Events.Count);
     var completed = new GeoscapeSession(campaign.State);
     Assert.True(completed.ActiveResearch.IsNone);

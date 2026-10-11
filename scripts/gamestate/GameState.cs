@@ -6,6 +6,7 @@ using FunProject.Combatants;
 using FunProject.Research;
 using FunProject.Stats;
 using FunProject.Strategic;
+using FunProject.Staffing;
 
 namespace FunProject.GameState;
 
@@ -110,6 +111,7 @@ public sealed class GameState
     }
 
     Research = new ResearchState(start.ResearchProjects);
+    Staff = new StaffState(start.StaffingRules);
 
     Conditions = new CombatantConditionSystem(start.ConditionRules);
 
@@ -150,6 +152,7 @@ public sealed class GameState
   public EngineeringState Engineering { get; }
 
   public ResearchState Research { get; }
+  public StaffState Staff { get; }
 
   public ulong GetCurrencyBalance(Currency currency) => _currencies.GetValueOrDefault(currency);
 

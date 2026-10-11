@@ -6,6 +6,7 @@ using FunProject.Currencies;
 using FunProject.Items;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
+using FunProject.Geoscape;
 using Godot;
 
 namespace FunProject.Scenes;
@@ -22,6 +23,12 @@ public sealed partial class EngineeringView : GeoscapeView
   {
     base._Ready();
     GetNode<Button>("%ManufactureButton").Pressed += OnManufacturePressed;
+    GetNode<StaffHiringControl>("%StaffHiring").HireRequested += quantity =>
+    {
+      var result = _session.HireEngineers(quantity);
+      Present(_state, _session);
+      result.IfLeft(reason => GetNode<Label>("%Status").Text = $"Hiring rejected: {reason}.");
+    };
     RefreshSelection();
   }
 
@@ -29,6 +36,7 @@ public sealed partial class EngineeringView : GeoscapeView
   {
     _session = session;
     Present(state, session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    GetNode<StaffHiringControl>("%StaffHiring").Present(state, session);
   }
 
   public void Present(CampaignGameState state, IReadOnlyList<ManufacturingOption> options,
@@ -63,7 +71,7 @@ public sealed partial class EngineeringView : GeoscapeView
     _selection.IfSome(option =>
     {
       var result = _session.StartManufacturing(option.Project);
-      Present(_state, _session.GetManufacturingOptions(), _session.ActiveManufacturing, _session.Tick);
+      Present(_state, _session);
       result.IfLeft(reason => ShowFailure(option.Project.Item, reason)); // after the refresh: it clears the status line
     });
   }

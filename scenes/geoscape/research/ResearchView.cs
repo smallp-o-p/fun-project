@@ -22,6 +22,12 @@ public sealed partial class ResearchView : GeoscapeView
   {
     base._Ready();
     GetNode<Button>("%StartResearchButton").Pressed += OnStartResearchPressed;
+    GetNode<StaffHiringControl>("%StaffHiring").HireRequested += quantity =>
+    {
+      var result = _session.HireResearchers(quantity);
+      Refresh();
+      result.IfLeft(reason => GetNode<Label>("%Status").Text = $"Hiring rejected: {reason}.");
+    };
   }
 
   public override void Present(CampaignGameState state, GeoscapeSession session)
@@ -33,6 +39,7 @@ public sealed partial class ResearchView : GeoscapeView
 
   private void Refresh()
   {
+    GetNode<StaffHiringControl>("%StaffHiring").Present(_state, _session);
     _projects = _session.GetAvailableResearchProjects();
     _selection = _selection.Filter(selected =>
       _projects.AsValueEnumerable().Any(project => ReferenceEquals(project, selected)));

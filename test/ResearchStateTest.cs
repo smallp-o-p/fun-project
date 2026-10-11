@@ -23,11 +23,13 @@ public class ResearchStateTest
     var research = campaign.State.Research;
     var definition = research.ResolveResearch(project, campaign.State).RequireRight();
     Assert.Equal(1U, definition.DurationDays);
-    var job = new ResearchJob(definition.Project, 7, 1447);
+    var job = new ResearchJob(definition.Project, 7, WorkProgress.Start(definition.DurationDays, 7));
     Assert.Equal(job, research.Start(job).Job);
     Assert.True(research.CompleteIfDue(1446).IsNone);
     var completed = research.CompleteIfDue(1447).RequireSome();
-    Assert.Equal(job, completed.Job);
+    Assert.Equal(job.Project, completed.Job.Project);
+    Assert.Equal(job.StartedAtTick, completed.Job.StartedAtTick);
+    Assert.Equal(0L, completed.Job.Work.RemainingWorkUnits);
     Assert.Equal(itemRecipe, completed.ManufacturingUnlocks[0]);
     Assert.True(research.ActiveJob.IsNone);
     Assert.True(research.IsCompleted(project));
@@ -63,7 +65,7 @@ public class ResearchStateTest
     Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IList<ResearchProject>)catalog).Clear());
     var available = research.GetAvailableProjects(campaign.State);
     Assert.Throws<NotSupportedException>(() => ((SysColGeneric.IList<ResearchProject>)available).Clear());
-    research.Start(new ResearchJob(project, 0, 2880));
+    research.Start(new ResearchJob(project, 0, WorkProgress.Start(definition.DurationDays, 0)));
     var completed = research.CompleteIfDue(2880).RequireSome();
     Assert.Equal(itemRecipe, completed.ManufacturingUnlocks[0]);
     Assert.Throws<NotSupportedException>(() =>

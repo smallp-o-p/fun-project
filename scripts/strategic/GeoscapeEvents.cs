@@ -40,3 +40,5 @@ public sealed record ResolutionEventOpened(PendingResolution Pending) : IGeoscap
 public sealed record ResolutionEventClosed(PendingResolution Resolved, ResolutionOutcome SelectedOutcome) : IGeoscapeEvent;
 
 public sealed record CombatantConditionsChanged(Combatant Combatant) : IGeoscapeEvent;
+
+public sealed record StaffHired(FunProject.Staffing.StaffRole Role, int Count, long RateUnits) : IGeoscapeEvent;

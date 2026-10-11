@@ -73,7 +73,9 @@ public class EngineeringTest
     Assert.Equal(1440L, job.CompletesAtTick);
     Assert.False(state.Armory.TryWithdrawItem(item).IsSome);
     campaign.AdvanceTicks(1);
-    Assert.Equal(Some(job), session.ActiveManufacturing);
+    Assert.Equal(job.Project, session.ActiveManufacturing.RequireSome().Project);
+    Assert.Equal(job.StartedAtTick, session.ActiveManufacturing.RequireSome().StartedAtTick);
+    Assert.Equal(14390000L, session.ActiveManufacturing.RequireSome().Work.RemainingWorkUnits);
     campaign.AdvanceTicks(1439);
     var first = state.Armory.TryWithdrawItem(item);
     var second = state.Armory.TryWithdrawItem(item);
@@ -87,7 +89,9 @@ public class EngineeringTest
     Assert.Equal(1, campaign.Events.AsValueEnumerable().Count(e => e is ManufacturingCompleted));
     Assert.Equal(new ManufacturingStarted(job), campaign.Events[0]);
     Assert.True(campaign.Events[1] is TimeAdvanced);
-    Assert.Equal(new ManufacturingCompleted(job), campaign.Events.SingleEvent<ManufacturingCompleted>());
+    Assert.Equal(job.Project, campaign.Events.SingleEvent<ManufacturingCompleted>().Job.Project);
+    Assert.Equal(job.StartedAtTick, campaign.Events.SingleEvent<ManufacturingCompleted>().Job.StartedAtTick);
+    Assert.Equal(0L, campaign.Events.SingleEvent<ManufacturingCompleted>().Job.Work.RemainingWorkUnits);
     Assert.True(session.ActiveManufacturing.IsNone);
   }
 
@@ -265,7 +269,9 @@ public class EngineeringTest
       if (e is ManufacturingCompleted manufacturing)
       {
         completedAt = session.Tick;
-        Assert.Equal(job, manufacturing.Job);
+        Assert.Equal(job.Project, manufacturing.Job.Project);
+        Assert.Equal(job.StartedAtTick, manufacturing.Job.StartedAtTick);
+        Assert.Equal(0L, manufacturing.Job.Work.RemainingWorkUnits);
         Assert.Equal(1, state.Armory.TryGetItemStock(product).RequireSome().Remaining);
         Assert.True(session.ActiveManufacturing.IsNone);
       }
@@ -276,11 +282,13 @@ public class EngineeringTest
     Assert.Equal(1443L, completedAt);
     Assert.Equal(2002, campaign.Events.Count);
     Assert.Equal(2000, campaign.Events.EventsOf<TimeAdvanced>().Length);
-    Assert.Equal(job, campaign.Events.SingleEvent<ManufacturingCompleted>().Job);
+    Assert.Equal(job.Project, campaign.Events.SingleEvent<ManufacturingCompleted>().Job.Project);
+    Assert.Equal(job.StartedAtTick, campaign.Events.SingleEvent<ManufacturingCompleted>().Job.StartedAtTick);
+    Assert.Equal(0L, campaign.Events.SingleEvent<ManufacturingCompleted>().Job.Work.RemainingWorkUnits);
     Assert.True(campaign.Events[0] is ManufacturingStarted);
     Assert.True(campaign.Events[1] is TimeAdvanced);
     Assert.True(campaign.Events[1440] is TimeAdvanced);
-    Assert.Equal(new ManufacturingCompleted(job), campaign.Events[1441]);
+    Assert.True(campaign.Events[1441] is ManufacturingCompleted);
     campaign.AdvanceTicks(5);
     Assert.Equal(1, campaign.Events.EventsOf<ManufacturingCompleted>().Length);
     Assert.Equal(1, state.Armory.TryGetItemStock(product).RequireSome().Remaining);
@@ -304,7 +312,10 @@ public class EngineeringTest
     Assert.Equal(0, campaign.Events.Count);
     campaign.AdvanceTicks(1);
     Assert.Equal(1L, session.Tick);
-    Assert.Equal(job, session.ActiveManufacturing);
+    Assert.Equal(job.RequireSome().Project, session.ActiveManufacturing.RequireSome().Project);
+    Assert.Equal(job.RequireSome().StartedAtTick, session.ActiveManufacturing.RequireSome().StartedAtTick);
+    Assert.Equal(14390000L, session.ActiveManufacturing.RequireSome().Work.RemainingWorkUnits);
+    job = session.ActiveManufacturing;
     session.ChangeSpeed(TimeSpeed.Paused);
     session.Advance(100);
     Assert.Equal(1L, session.Tick);
@@ -313,7 +324,8 @@ public class EngineeringTest
     Assert.Equal(1, campaign.Events.Count);
     campaign.AdvanceTicks(1);
     Assert.Equal(2L, session.Tick);
-    Assert.Equal(job, session.ActiveManufacturing);
+    Assert.Equal(job.RequireSome().Project, session.ActiveManufacturing.RequireSome().Project);
+    Assert.Equal(14380000L, session.ActiveManufacturing.RequireSome().Work.RemainingWorkUnits);
     Assert.Equal(2, campaign.Events.Count);
     campaign.AdvanceTicks(1438);
     Assert.True(session.ActiveManufacturing.IsNone);
@@ -342,7 +354,8 @@ public class EngineeringTest
     session.CompleteResolution(ResolutionOutcome.Acknowledged);
     campaign.AdvanceTicks(1);
     Assert.Equal(2L, session.Tick);
-    Assert.Equal(job, session.ActiveManufacturing);
+    Assert.Equal(job.RequireSome().Project, session.ActiveManufacturing.RequireSome().Project);
+    Assert.Equal(14380000L, session.ActiveManufacturing.RequireSome().Work.RemainingWorkUnits);
     campaign.AdvanceTicks(1438);
     Assert.True(session.ActiveManufacturing.IsNone);
     Assert.Equal(1, state.Armory.TryGetItemStock(product).RequireSome().Remaining);
@@ -359,9 +372,11 @@ public class EngineeringTest
     var job = original.ActiveManufacturing;
     original.ChangeSpeed(TimeSpeed.Normal);
     original.Advance(7 * 0.1);
+    var progress = original.ActiveManufacturing;
+    Assert.Equal(14330000L, progress.RequireSome().Work.RemainingWorkUnits);
     var rebuilt = new GeoscapeSession(state);
     Assert.Equal(7L, rebuilt.Tick);
-    Assert.Equal(job, rebuilt.ActiveManufacturing);
+    Assert.Equal(progress, rebuilt.ActiveManufacturing);
     Assert.Equal(state.Engineering.ActiveJob, rebuilt.ActiveManufacturing);
     SysColGeneric.List<IGeoscapeEvent> events = [];
     rebuilt.EventCommitted += events.Add;
@@ -400,7 +415,10 @@ public class EngineeringTest
     Assert.Equal(long.MaxValue - 1440, job.StartedAtTick);
     Assert.Equal(long.MaxValue, job.CompletesAtTick);
     Assert.True(state.Engineering.CompleteIfDue(long.MaxValue - 1).IsNone);
-    Assert.Equal(new ManufacturingCompleted(job), state.Engineering.CompleteIfDue(long.MaxValue).RequireSome());
+    var completed = state.Engineering.CompleteIfDue(long.MaxValue).RequireSome().Job;
+    Assert.Equal(job.Project, completed.Project);
+    Assert.Equal(job.StartedAtTick, completed.StartedAtTick);
+    Assert.Equal(0L, completed.Work.RemainingWorkUnits);
     Assert.True(state.Engineering.CompleteIfDue(long.MaxValue).IsNone);
     Assert.False(state.Armory.HasAvailableItem(item));
   }
