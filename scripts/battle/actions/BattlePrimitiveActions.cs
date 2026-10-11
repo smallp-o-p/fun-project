@@ -55,23 +55,26 @@ public sealed class SpawnUnit : BattleAction
 /// action wrapping this primitive.</summary>
 public sealed class InteractWithObject(AliveUnit unit, LiveObject obj) : BattleAction
 {
+  private readonly BattleUnitState _unit = unit.State;
+  private readonly BattleObjectState _object = obj.State;
   public override Result Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
 
-    if (session.TryGetAlive(unit.State).IsNone || unit.State.IsIncapacitated)
+    if (session.TryGetAlive(_unit).IsNone || _unit.IsIncapacitated)
       return Result.Interrupted;
-    if (session.TryGetAliveObject(obj.State).IsNone)
+    if (session.TryGetAliveObject(_object).Case is not LiveObject liveObject)
       return Result.Interrupted;
 
-    return obj.State.FindCapability<InteractiveCapability>().Match(
+    var position = liveObject.Position;
+    return _object.FindCapability<InteractiveCapability>().Match(
       Some: interactive =>
       {
-        if (!unit.State.TrySpendActionPoints(interactive.ActionPointCost))
+        if (!_unit.TrySpendActionPoints(interactive.ActionPointCost))
           return Result.Rejected;
 
-        session.MarkObjectInteracted(obj.State);
-        session.RaiseEvents(new ObjectInteractedBattleEvent(unit.State, obj.State, obj.Position));
+        session.MarkObjectInteracted(_object);
+        session.RaiseEvents(new ObjectInteractedBattleEvent(_unit, _object, position));
         return Result.Completed;
       },
       None: () => Result.Rejected);
@@ -88,30 +91,38 @@ public sealed class InteractWithObject(AliveUnit unit, LiveObject obj) : BattleA
 // quiet drop is preferred to unwinding the whole submission over a normal reaction chain.
 public sealed class AttackEntity(AliveUnit attacker, AttackTarget target) : BattleAction
 {
+  private readonly BattleUnitState _attacker = attacker.State;
+  private readonly BattleEntity _target = target.Entity;
   public override Result Execute(BattleSession session)
   {
     // A dead or incapacitated attacker has no right to perform a new action; that staleness
     // (killed or disabled by an earlier interrupt) interrupts quietly like every other mutable
     // fact.
-    if (session.TryGetAlive(attacker.State).IsNone || attacker.State.IsIncapacitated)
+    if (session.TryGetAlive(_attacker).IsNone || _attacker.IsIncapacitated)
       return Result.Interrupted;
 
-    return AttackContext.Resolve(session, attacker.State, target).Match(
-      _ => Result.Interrupted,
-      context => Fire(session, attacker, target, context));
+    if (session.TryGetAttackTarget(_target).Case is not AttackTarget freshTarget)
+      return Result.Interrupted;
+
+    var resolved = AttackContext.Resolve(session, _attacker, freshTarget);
+    var context = resolved.Match<AttackContext?>(_ => null, value => value);
+    return context is null
+      ? Result.Interrupted
+      : Fire(session, _attacker, freshTarget, context);
   }
 
-  private static Result Fire(BattleSession session, AliveUnit attacker, AttackTarget target, AttackContext context)
+  private static Result Fire(BattleSession session, BattleUnitState attacker, AttackTarget target, AttackContext context)
   {
+    var targetEntity = target.Entity;
     // Ammo is mutable state between construction and commit: another interrupt in this
     // submission may have fired the same weapon. An empty magazine interrupts quietly
     // before anything is spent.
     if (!context.Weapon.IsLoaded)
       return Result.Interrupted;
 
-    attacker.State.SpendActionPoints(BattleSession.DefaultAttackActionPointCost);
+    attacker.SpendActionPoints(BattleSession.DefaultAttackActionPointCost);
 
-    SysColGeneric.List<Damage> bundle = context.Weapon.TrySpendShot(attacker.State.ActiveBuffDamageMods).Match(
+    SysColGeneric.List<Damage> bundle = context.Weapon.TrySpendShot(attacker.ActiveBuffDamageMods).Match(
       Some: damage => damage,
       None: () => throw new InvalidOperationException(
         $"{context.Weapon.ItemName} could not spend a shot."));
@@ -121,8 +132,8 @@ public sealed class AttackEntity(AliveUnit attacker, AttackTarget target) : Batt
     bool isHit = roll < breakdown.FinalChance;
 
     session.RaiseEvents(new UnitAttackedBattleEvent(
-      attacker.State,
-      target.Entity,
+      attacker,
+      targetEntity,
       context.DefenderPosition,
       context.Weapon,
       breakdown,
@@ -131,13 +142,13 @@ public sealed class AttackEntity(AliveUnit attacker, AttackTarget target) : Batt
 
     if (isHit)
     {
-      switch (target.Entity)
+      switch (targetEntity)
       {
         case BattleEntity.Unit unit:
-          session.ApplyDamageTo(unit.State, bundle, Some(attacker.State));
+          session.ApplyDamageTo(unit.State, bundle, Some(attacker));
           break;
-        case BattleEntity.BoardObject obj when session.TryGetAttackTarget(target.Entity).IsSome:
-          session.ApplyDamageTo(obj.State, bundle, Some(attacker.State));
+        case BattleEntity.BoardObject obj when session.TryGetAttackTarget(targetEntity).IsSome:
+          session.ApplyDamageTo(obj.State, bundle, Some(attacker));
           break;
       }
     }
@@ -155,6 +166,7 @@ public sealed class ThrowItem(
   ItemWith<ThrowableCapability> throwable,
   BattleBoardState.ValidatedPoint targetCell) : BattleAction
 {
+  private readonly BattleUnitState _unit = unit.State;
   private readonly Option<Consumable> _consumption = MakeConsumption(throwable);
 
   private static Option<Consumable> MakeConsumption(ItemWith<ThrowableCapability> proof)
@@ -171,15 +183,15 @@ public sealed class ThrowItem(
     // Liveness, incapacitation, and possession can change between construction and execution
     // when earlier interrupts in the same submission interpose (death, disablement, item
     // spent/removed elsewhere).
-    if (session.TryGetAlive(unit.State).IsNone || unit.State.IsIncapacitated)
+    if (session.TryGetAlive(_unit).IsNone || _unit.IsIncapacitated)
       return Result.Interrupted;
-    if (!unit.State.HasInventoryItem(throwable.Item))
+    if (!_unit.HasInventoryItem(throwable.Item))
       return Result.Interrupted;
 
-    unit.State.SpendActionPoints(throwable.Capability.ActionPointCost);
-    _consumption.IfSome(consumable => consumable.SpendOnce(unit.State));
+    _unit.SpendActionPoints(throwable.Capability.ActionPointCost);
+    _consumption.IfSome(consumable => consumable.SpendOnce(_unit));
 
-    session.RaiseEvents(new ItemThrownBattleEvent(unit.State, targetCell, throwable.Item));
+    session.RaiseEvents(new ItemThrownBattleEvent(_unit, targetCell, throwable.Item));
     return Result.Completed;
   }
 }
@@ -189,6 +201,7 @@ public sealed class ThrowItem(
 // deployables, ...) belong to hooks reacting to that event, not to this action.
 public sealed class UseItem(AliveUnit unit, ItemWith<ChargesCapability> usable) : BattleAction
 {
+  private readonly BattleUnitState _unit = unit.State;
   private readonly Consumable _consumption = MakeConsumable(usable);
 
   private static Consumable MakeConsumable(ItemWith<ChargesCapability> proof)
@@ -205,32 +218,32 @@ public sealed class UseItem(AliveUnit unit, ItemWith<ChargesCapability> usable) 
     // Liveness, incapacitation, possession, and depletion are re-checked before any mutation:
     // earlier interrupts in the same submission can kill/disable the actor or spend/remove the
     // item, and a depleted use must not spend AP (or throw) mid-submission.
-    if (session.TryGetAlive(unit.State).IsNone || unit.State.IsIncapacitated)
+    if (session.TryGetAlive(_unit).IsNone || _unit.IsIncapacitated)
     {
       return Result.Interrupted;
     }
-    if (!unit.State.HasInventoryItem(usable.Item) || usable.Capability.IsDepleted)
+    if (!_unit.HasInventoryItem(usable.Item) || usable.Capability.IsDepleted)
     {
       return Result.Interrupted;
     }
 
-    unit.State.SpendActionPoints(BattleSession.DefaultUseItemActionPointCost);
-    _consumption.SpendOnce(unit.State);
+    _unit.SpendActionPoints(BattleSession.DefaultUseItemActionPointCost);
+    _consumption.SpendOnce(_unit);
 
-    session.RaiseEvents(new ItemUsedBattleEvent(unit.State, usable.Item));
+    session.RaiseEvents(new ItemUsedBattleEvent(_unit, usable.Item));
     return Result.Completed;
   }
 }
 
 public sealed class ApplyDamage : BattleAction
 {
-  private AliveUnit Unit { get; }
+  private BattleUnitState Unit { get; }
   public int Amount { get; }
   public DamageKind Kind { get; }
 
   internal ApplyDamage(AliveUnit unit, int amount, DamageKind kind = DamageKind.Health)
   {
-    Unit = unit;
+    Unit = unit.State;
     Amount = amount;
     Kind = kind;
   }
@@ -241,10 +254,10 @@ public sealed class ApplyDamage : BattleAction
 
     // Interleaved interrupts can kill the target after this action was constructed; a
     // stale proof interrupts quietly instead of throwing.
-    if (session.TryGetAlive(Unit.State).IsNone)
+    if (session.TryGetAlive(Unit).IsNone)
       return Result.Interrupted;
 
-    session.ApplyDamageTo(Unit.State, Amount, Kind);
+    session.ApplyDamageTo(Unit, Amount, Kind);
 
     return Result.Completed;
   }
@@ -252,12 +265,13 @@ public sealed class ApplyDamage : BattleAction
 
 public sealed class PassUnit(AliveUnit unit) : BattleAction
 {
+  private readonly BattleUnitState _unit = unit.State;
   public override Result Execute(BattleSession session)
   {
     ArgumentNullException.ThrowIfNull(session);
     // Passing finishes an activation regardless of incapacity. Invalid or stale
     // activation parameters are caller errors owned by the session, not interruptions.
-    session.EndUnitActivation(unit.State);
+    session.EndUnitActivation(_unit);
     return Result.Completed;
   }
 }
@@ -280,22 +294,23 @@ public sealed class EndFactionTurn(Faction expectedActiveSide) : BattleAction
 
 public sealed class ReloadWeapon(AliveUnit unit, AmmunitionedWeapon weapon) : BattleAction
 {
+  private readonly BattleUnitState _unit = unit.State;
   public override Result Execute(BattleSession session)
   {
-    if (session.TryGetAlive(unit.State).IsNone || unit.State.IsIncapacitated)
+    if (session.TryGetAlive(_unit).IsNone || _unit.IsIncapacitated)
       return Result.Interrupted;
     if (!weapon.CanReload())
       return Result.Rejected;
 
     // A death or weapon swap earlier in the same submission invalidates the proof/equipment
     // pair; a stale reload interrupts quietly.
-    if (!unit.State.EquippedWeapon.Contains(weapon))
+    if (!_unit.EquippedWeapon.Contains(weapon))
       return Result.Interrupted;
 
-    unit.State.SpendActionPoints(BattleSession.DefaultReloadActionPointCost);
+    _unit.SpendActionPoints(BattleSession.DefaultReloadActionPointCost);
 
     weapon.Reload();
-    session.RaiseEvents(new UnitReloadedWeaponBattleEvent(unit.State, weapon));
+    session.RaiseEvents(new UnitReloadedWeaponBattleEvent(_unit, weapon));
     return Result.Completed;
   }
 }

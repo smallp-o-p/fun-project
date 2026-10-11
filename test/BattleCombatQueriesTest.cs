@@ -135,6 +135,8 @@ public partial class BattleCombatQueriesTest
     Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight);
 
     battle.Session.EndBattle(BattleOutcome.Draw);
+    attacker = battle.Alive(battle.PlayerUnit);
+    target = battle.Target(battle.EnemyUnit);
 
     Assert.True(battle.Query(new GetHitChanceForAttack(attacker, target)).IsRight);
   }

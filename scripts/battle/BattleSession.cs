@@ -101,7 +101,7 @@ public sealed class BattleSession
     };
   }
 
-  // Single mint point: snapshots the unit's board position into the one-shot proof. An alive
+  // Single mint point: snapshots the unit's board position into the snapshot proof. An alive
   // session unit is always board-indexed (visibility Refresh invariant), so a miss here is a
   // session bug, not a caller error. Callers must pass a unit already known alive-in-session.
   internal AliveUnit MintAlive(BattleUnitState unit)
@@ -227,6 +227,7 @@ public sealed class BattleSession
   // first turn-start event and refreshes AP. Turn-start hooks (buffs) fire inside the
   // dispatch, BEFORE the refresh reads buffed MaxActionPoints — mid-dispatch observers see
   // pre-refresh action points.
+  [InvalidatesProofs]
   internal void BeginFirstTurn()
   {
     RaiseEvents(new TurnStartedBattleEvent(ActiveSide, TurnNumber));
@@ -244,6 +245,7 @@ public sealed class BattleSession
 
   // Gameplay reinforcement: folds the new unit into live scheduling — registers a new
   // faction, grants availability to the active side, queues unacted queued sides.
+  [InvalidatesProofs]
   internal SpawnedBattleUnit AddUnit(
     Combatant combatant,
     BattleBoardState.ValidatedPoint position,
@@ -270,12 +272,14 @@ public sealed class BattleSession
     return new SpawnedBattleUnit(unit);
   }
 
+  [InvalidatesProofs]
   internal void ApplyDamageTo(BattleUnitState unit, int amount, DamageKind kind = DamageKind.Health)
     => ApplyDamageTo(unit, [new Damage(amount, Element.Kinetic, Kind: kind)], None);
 
   // Object-side damage: health packets reduce the health capability, stun/status payloads are
   // ignored, and reaching zero is the terminal Destroyed transition (occupancy cleared before
   // the destruction event broadcasts). Damage is a trusted-core mutation like the unit path.
+  [InvalidatesProofs]
   internal void ApplyDamageTo(BattleObjectState obj, IReadOnlyList<Damage> bundle,
     Option<BattleUnitState> cause)
   {
@@ -298,6 +302,7 @@ public sealed class BattleSession
     RaiseEvents(new ObjectDamagedBattleEvent(obj, bundle, amount, cause));
   }
 
+  [InvalidatesProofs]
   internal void ApplyDamageTo(BattleUnitState unit, IReadOnlyList<Damage> bundle, Option<BattleUnitState> cause)
   {
     ArgumentNullException.ThrowIfNull(unit);
@@ -391,6 +396,7 @@ public sealed class BattleSession
     TryApplyStatusEffect(unit, spec);
   }
 
+  [InvalidatesProofs]
   private void HandleUnitDeath(BattleUnitState unit, Option<BattleUnitState> killedBy)
   {
     ArgumentNullException.ThrowIfNull(unit);
@@ -420,6 +426,7 @@ public sealed class BattleSession
     HandleFactionLoss(unitSide);
   }
 
+  [InvalidatesProofs]
   internal void EndUnitActivation(BattleUnitState unit)
   {
     ArgumentNullException.ThrowIfNull(unit);
@@ -493,6 +500,7 @@ public sealed class BattleSession
       unit.RefreshForNewTurn();
   }
 
+  [InvalidatesProofs]
   internal void EndFactionTurn(Faction expectedActiveSide)
   {
     if (Outcome.IsSome)
@@ -540,6 +548,7 @@ public sealed class BattleSession
       id < _units.Count && _units[id].IsAlive ? Some(_units[id]) : None);
   }
 
+  [InvalidatesProofs]
   internal void MarkObjectInteracted(BattleObjectState obj)
   {
     MarkObjectTerminal(obj, ObjectStatus.Interacted);
@@ -568,6 +577,7 @@ public sealed class BattleSession
     return position;
   }
 
+  [InvalidatesProofs]
   internal void MoveUnit(BattleUnitState unit, BattleBoardState.ValidatedPoint source,
     BattleBoardState.ValidatedPoint destination)
   {
@@ -634,6 +644,7 @@ public sealed class BattleSession
   }
 
   // TODO: It may be nicer if this event raising is entirely handled by BattleSession
+  [InvalidatesProofs]
   internal void RaiseEvents(params BattleEvent[] events)
   {
     foreach (var battleEvent in events)

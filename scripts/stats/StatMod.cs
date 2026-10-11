@@ -6,6 +6,7 @@ namespace FunProject.Stats;
 
 public abstract partial class StatMod : Resource
 {
+  [FunProject.Battle.PreservesProofs]
   public abstract Type TargetType { get; }
 
   [Export] public Array<StatModifier> Modifiers { get; set; } = [];

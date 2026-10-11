@@ -3,11 +3,13 @@ using System;
 
 namespace FunProject.Battle;
 
-// One-shot proofs (same minting recipe as ItemWith<TCap>): only BattleSession mints these.
+// Snapshot proofs: only BattleSession mints these. Repeated synchronous reads are valid
+// until a battle mutation; FPF001 checks freshness through copies and query wrappers.
 // A proof is a receipt that the facts held AT MINT — the unit belonged to this session's
 // alive storage, standing at Position. It holds no reference back into the session and
-// guarantees nothing past the mint: held across an executor commit its snapshot may be
+// supports repeated reads until mutation: held across an executor commit its snapshot may be
 // stale. Mint fresh per interaction; use within one synchronous scope that submits nothing.
+[SnapshotProof]
 public readonly struct AliveUnit
 {
   public BattleUnitState State { get; }
@@ -26,6 +28,7 @@ public readonly struct AliveUnit
 }
 
 /// <summary>Receipt that an object was placed in this session at the captured position.</summary>
+[SnapshotProof]
 public readonly struct LiveObject
 {
   /// <summary>The runtime object state proven alive at mint time.</summary>
@@ -48,9 +51,10 @@ public readonly struct LiveObject
 /// Receipt that an entity (unit or board object) was a targetable member of this session at
 /// mint: alive/live and standing at <see cref="Position"/>, a snapshot just like
 /// <see cref="AliveUnit.Position"/>. It holds no reference back into the session and
-/// guarantees nothing past the mint: held across an executor commit its snapshot may be
+/// supports repeated reads until mutation: held across an executor commit its snapshot may be
 /// stale. Mint fresh per interaction; use within one synchronous scope that submits nothing.
 /// </summary>
+[SnapshotProof]
 public readonly struct AttackTarget
 {
   public BattleEntity Entity { get; }

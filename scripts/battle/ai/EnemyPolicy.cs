@@ -136,7 +136,7 @@ internal sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
           magazine.CanReload())
       {
         if (Consider(new EnemyIntent(EnemyIntentKind.Reload, actor.Id),
-              _settings.Score(exposure: Exposure(position), reload: true)))
+              _settings.Score(exposure: Exposure(position, targets), reload: true)))
         {
           chosenAction = BattleAction.ReloadWeapon(actor, magazine);
         }
@@ -166,7 +166,7 @@ internal sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
           double damage = probability * Math.Min(1, useful / Math.Max(1, target.State.CurrentHealth));
           double kill = healthDamage >= target.State.CurrentHealth ? probability : 0;
           if (Consider(new(EnemyIntentKind.Attack, actor.Id, target.Id),
-                _settings.Score(damage: damage, kill: kill, exposure: Exposure(position))))
+                _settings.Score(damage: damage, kill: kill, exposure: Exposure(position, targets))))
             chosenAction = BattleAction.AttackEntity(actor, targetProof);
         });
       }
@@ -187,7 +187,7 @@ internal sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
       double frontier = (Frontier(destination) - Frontier(position)) / 10d;
 
       bool consideration = Consider(new(EnemyIntentKind.Move, actor.Id, Destination: destination),
-        _settings.Score(exposure: Exposure(destination), rangeImprovement: rangeImprovement, progress: progress,
+        _settings.Score(exposure: Exposure(destination, targets), rangeImprovement: rangeImprovement, progress: progress,
           frontier: frontier));
 
       if (consideration)
@@ -252,7 +252,7 @@ internal sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
       return count;
     }
 
-    double Exposure(Vector3I point)
+    double Exposure(Vector3I point, AliveUnit[] visibleTargets)
     {
       var cover = TileCover.None;
 
@@ -263,7 +263,7 @@ internal sealed class EnemyPolicy(EnemyPolicySettings? settings = null)
       }
 
       double exposure = 0;
-      foreach (var target in targets)
+      foreach (var target in visibleTargets)
       {
         double protection = CoverRules.Applies(cover, CoverRules.GetApproach(target.Position.Raw, point))
           ? Math.Clamp(cover.Amount / 100d, 0, 1) : 0;

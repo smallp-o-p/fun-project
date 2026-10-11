@@ -35,18 +35,18 @@ public sealed class AttackTargeting : IActionTargeting
 
     _runtime.TryGetAlive(_unit).IfSome(attacker =>
       {
-        void AddCandidate(BattleEntity entity)
+        void AddCandidate(AliveUnit actor, BattleEntity entity)
         {
           if (_runtime.TryGetAttackTarget(entity).Case is not AttackTarget target) return;
-          if (_runtime.Query(new GetHitChanceForAttack(attacker, target)).IsRight)
+          if (_runtime.Query(new GetHitChanceForAttack(actor, target)).IsRight)
             _targetsByTile[target.Position.Raw] = entity;
         }
 
         foreach (AliveUnit enemy in _runtime.Query(new GetVisibleEnemiesForUnit(attacker)))
-          AddCandidate(new BattleEntity.Unit(enemy.State));
+          AddCandidate(attacker, new BattleEntity.Unit(enemy.State));
 
         foreach (BattleObjectState obj in _runtime.Query(new GetBattleSpecialObjectsQuery()))
-          AddCandidate(new BattleEntity.BoardObject(obj));
+          AddCandidate(attacker, new BattleEntity.BoardObject(obj));
       });
   }
 
