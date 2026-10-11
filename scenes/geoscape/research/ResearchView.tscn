@@ -1,10 +1,12 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
 [ext_resource type="Script" path="res://scenes/geoscape/research/ResearchView.cs" id="2_script"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/research/ResearchProjectButton.tscn" id="3_row"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/research/ResearchEmptyCatalog.tscn" id="4_empty"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/research/ResearchRoom.tscn" id="5_room"]
+
+[ext_resource type="PackedScene" path="res://scenes/geoscape/staffing/StaffHiringControl.tscn" id="91_hiring"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
 bg_color = Color(0.065, 0.09, 0.13, 0.94)
@@ -194,3 +196,26 @@ offset_right = 166.0
 offset_bottom = -16.0
 grow_vertical = 0
 text = "Back to Geoscape"
+
+[node name="StaffHiringPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -330.0
+offset_right = 400.0
+offset_bottom = -72.0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="Margin" type="MarginContainer" parent="StaffHiringPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="StaffHiring" parent="StaffHiringPanel/Margin" instance=ExtResource("91_hiring")]
+unique_name_in_owner = true
+layout_mode = 2
+Role = 0

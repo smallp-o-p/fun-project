@@ -4,6 +4,7 @@ using FunProject.Research;
 using FunProject.Currencies;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
+using FunProject.Staffing;
 using Godot;
 
 namespace FunProject.Geoscape;
@@ -22,6 +23,13 @@ public sealed partial class ResearchView : GeoscapeView
   {
     base._Ready();
     GetNode<Button>("%StartResearchButton").Pressed += OnStartResearchPressed;
+    GetNode<StaffHiringControl>("%StaffHiring").QuantityChanged += PresentHiring;
+    GetNode<StaffHiringControl>("%StaffHiring").HireRequested += quantity =>
+    {
+      var result = _session.HireResearchers(quantity);
+      Refresh();
+      result.IfLeft(reason => GetNode<Label>("%Status").Text = $"Hiring rejected: {reason}.");
+    };
   }
 
   public override void Present(CampaignGameState state, GeoscapeSession session)
@@ -31,8 +39,15 @@ public sealed partial class ResearchView : GeoscapeView
     Refresh();
   }
 
+  private void PresentHiring()
+  {
+    var hiring = GetNode<StaffHiringControl>("%StaffHiring");
+    hiring.Present(_session.GetHiringOption(StaffRole.Researcher, hiring.Quantity));
+  }
+
   private void Refresh()
   {
+    PresentHiring();
     _projects = _session.GetAvailableResearchProjects();
     _selection = _selection.Filter(selected =>
       _projects.AsValueEnumerable().Any(project => ReferenceEquals(project, selected)));

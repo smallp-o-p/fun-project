@@ -61,6 +61,8 @@ public sealed class EngineeringState
     return new ManufacturingStarted(job);
   }
 
+  internal void UpdateJob(ManufacturingJob job) => ActiveJob = Some(job);
+
   internal Option<ManufacturingCompleted> CompleteIfDue(long tick)
     => ActiveJob.Filter(job => job.CompletesAtTick <= tick).Map(job =>
     {

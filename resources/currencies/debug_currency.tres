@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="Currency" format=3]
+
+[ext_resource type="Script" path="res://scripts/currencies/Currency.cs" id="1_currency"]
+
+[resource]
+script = ExtResource("1_currency")
+Name = "Debug Currency"
+Description = "Generic placeholder units for editable debug campaign costs."

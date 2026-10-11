@@ -1,9 +1,11 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
 [ext_resource type="Script" path="res://scenes/geoscape/engineering/EngineeringView.cs" id="2_script"]
 [ext_resource type="PackedScene" path="res://scenes/ui/ModelPresentation.tscn" id="3_model"]
 [ext_resource type="StyleBox" path="res://scenes/ui/ScreenBackground.tres" id="90_background"]
+
+[ext_resource type="PackedScene" path="res://scenes/geoscape/staffing/StaffHiringControl.tscn" id="91_hiring"]
 
 [node name="EngineeringView" instance=ExtResource("1_base") node_paths=PackedStringArray("BackButton")]
 script = ExtResource("2_script")
@@ -58,9 +60,16 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
+[node name="StaffHiring" parent="Content/Margin/Layout/Body/StaffPresentation" instance=ExtResource("91_hiring")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 1
+Role = 1
+
 [node name="StaffCaption" type="Label" parent="Content/Margin/Layout/Body/StaffPresentation"]
 layout_mode = 2
-text = "WORKSHOP STAFF\n3D presentation slot\nNo staff model assigned"
+visible = false
+text = "WORKSHOP STAFF"
 autowrap_mode = 3
 
 [node name="Catalog" type="VBoxContainer" parent="Content/Margin/Layout/Body"]

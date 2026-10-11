@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="StaffingRulesData" format=3]
+
+[ext_resource type="Script" path="res://scripts/staffing/StaffingRulesData.cs" id="1_rules"]
+[ext_resource type="Resource" path="res://resources/currencies/debug_currency.tres" id="2_currency"]
+
+[resource]
+script = ExtResource("1_rules")
+ResearcherSpeedBonus = 0.001
+EngineerSpeedBonus = 0.001
+ResearcherCosts = Dictionary[Resource, int]({
+ExtResource("2_currency"): 100
+})
+EngineerCosts = Dictionary[Resource, int]({
+ExtResource("2_currency"): 100
+})

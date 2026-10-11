@@ -7,6 +7,7 @@ using FunProject.Items;
 using FunProject.Research;
 using FunProject.Stats;
 using FunProject.Strategic;
+using FunProject.Staffing;
 using Godot;
 
 namespace FunProject.GameState;
@@ -43,4 +44,5 @@ public partial class CampaignStartData : NamedEntityData
   [Export] public ResearchProject[] ResearchProjects { get; set; } = [];
 
   [Export] public Godot.Collections.Dictionary<Currency, ulong> StartingCurrencies { get; set; } = [];
+  [Export] public StaffingRulesData StaffingRules { get; set; } = new();
 }

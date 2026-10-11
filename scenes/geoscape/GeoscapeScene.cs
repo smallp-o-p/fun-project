@@ -108,7 +108,7 @@ public partial class GeoscapeScene : Control
   // and HUD never subscribe to the session themselves.
   private void HandleSessionEvent(IGeoscapeEvent geoscapeEvent)
   {
-    if (geoscapeEvent is TimeAdvanced or ManufacturingStarted or ManufacturingCompleted)
+    if (geoscapeEvent is TimeAdvanced or ManufacturingStarted or ManufacturingCompleted or StaffHired)
       _hud.UpdateManufacturing(_session.ActiveManufacturing, _session.Tick);
 
     switch (geoscapeEvent)

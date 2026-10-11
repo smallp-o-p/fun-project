@@ -1,0 +1,62 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/geoscape/staffing/StaffHiringControl.cs" id="1_script"]
+
+[node name="StaffHiring" type="VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+script = ExtResource("1_script")
+
+[node name="StaffCount" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Researchers: 0"
+autowrap_mode = 3
+
+[node name="WorkRate" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Work rate: 1.0x"
+autowrap_mode = 3
+
+[node name="HireCostsScroll" type="ScrollContainer" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="HireCosts" type="Label" parent="HireCostsScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+autowrap_mode = 3
+
+[node name="QuantityRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="QuantityLabel" type="Label" parent="QuantityRow"]
+layout_mode = 2
+text = "Quantity"
+
+[node name="HireQuantity" type="SpinBox" parent="QuantityRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 1.0
+max_value = 4294967295.0
+step = 1.0
+value = 1.0
+rounded = true
+
+[node name="HireButton" type="Button" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+disabled = true
+text = "Hire Researcher"

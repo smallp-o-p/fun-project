@@ -6,6 +6,8 @@ using FunProject.Currencies;
 using FunProject.Items;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
+using FunProject.Staffing;
+using FunProject.Geoscape;
 using Godot;
 
 namespace FunProject.Scenes;
@@ -22,6 +24,13 @@ public sealed partial class EngineeringView : GeoscapeView
   {
     base._Ready();
     GetNode<Button>("%ManufactureButton").Pressed += OnManufacturePressed;
+    GetNode<StaffHiringControl>("%StaffHiring").QuantityChanged += PresentHiring;
+    GetNode<StaffHiringControl>("%StaffHiring").HireRequested += quantity =>
+    {
+      var result = _session.HireEngineers(quantity);
+      Present(_state, _session);
+      result.IfLeft(reason => GetNode<Label>("%Status").Text = $"Hiring rejected: {reason}.");
+    };
     RefreshSelection();
   }
 
@@ -29,6 +38,7 @@ public sealed partial class EngineeringView : GeoscapeView
   {
     _session = session;
     Present(state, session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
+    PresentHiring();
   }
 
   public void Present(CampaignGameState state, IReadOnlyList<ManufacturingOption> options,
@@ -56,6 +66,12 @@ public sealed partial class EngineeringView : GeoscapeView
   public void ShowFailure(EquippableItemData item, ManufacturingStartFailure failure)
     => GetNode<Label>("%Status").Text = $"Manufacturing start rejected for {item.Name}: {failure}.";
 
+  private void PresentHiring()
+  {
+    var hiring = GetNode<StaffHiringControl>("%StaffHiring");
+    hiring.Present(_session.GetHiringOption(StaffRole.Engineer, hiring.Quantity));
+  }
+
   private void OnManufacturePressed()
   {
     if (GetNode<Button>("%ManufactureButton").Disabled)
@@ -63,7 +79,7 @@ public sealed partial class EngineeringView : GeoscapeView
     _selection.IfSome(option =>
     {
       var result = _session.StartManufacturing(option.Project);
-      Present(_state, _session.GetManufacturingOptions(), _session.ActiveManufacturing, _session.Tick);
+      Present(_state, _session);
       result.IfLeft(reason => ShowFailure(option.Project.Item, reason)); // after the refresh: it clears the status line
     });
   }

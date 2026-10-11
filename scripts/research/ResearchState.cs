@@ -82,6 +82,8 @@ public sealed class ResearchState
     return new ResearchStarted(job);
   }
 
+  internal void UpdateJob(ResearchJob job) => ActiveJob = Some(job);
+
   internal Option<ResearchCompleted> CompleteIfDue(long tick)
     => ActiveJob.Filter(job => job.CompletesAtTick <= tick).Map(job =>
     {
