@@ -136,7 +136,8 @@ internal sealed class ProofEffects(Compilation compilation)
     type = Resolve(type, types);
     return type.SpecialType is >= SpecialType.System_Boolean and <= SpecialType.System_Decimal
       || type.SpecialType == SpecialType.System_String || type.TypeKind == TypeKind.Enum
-      || type.ToDisplayString() is "Godot.Vector3I" or "Godot.Vector3";
+      // The domain coordinate is an immutable record of three integers.
+      || type.ToDisplayString() is "FunProject.Core.Vector3I" or "Godot.Vector3I" or "Godot.Vector3";
   }
   private bool DelegateEffect(IOperation? value, HashSet<IMethodSymbol> visiting, Dictionary<IParameterSymbol, bool>? delegates, Dictionary<ITypeParameterSymbol, ITypeSymbol>? types = null)
   {

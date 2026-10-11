@@ -124,6 +124,7 @@ public sealed class SnapshotProofTests
 
   [Theory]
   [InlineData("Equal(1, 2);", 0)]
+  [InlineData("Equal(new FunProject.Core.Vector3I(1, 0, 0), new FunProject.Core.Vector3I(2, 0, 0));", 0)]
   [InlineData("Equal(new Mutating(s), new Mutating(s));", 1)]
   [InlineData("comparer.Equals(1, 2);", 1)]
   [InlineData("_ = $\"{new Mutating(s)}\";", 1)]
@@ -131,6 +132,7 @@ public sealed class SnapshotProofTests
   public async Task DefaultScalarEqualityPreservesProofs(string call, int expected)
   {
     var diagnostics = await Analyze(Contract + """
+      namespace FunProject.Core { public readonly record struct Vector3I(int X, int Y, int Z); }
       class Mutating(BattleSession s) {
         public override bool Equals(object? other) { s.Mutate(); return false; }
         public override int GetHashCode() => 0;
