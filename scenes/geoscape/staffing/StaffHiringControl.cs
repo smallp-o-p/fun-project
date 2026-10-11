@@ -13,21 +13,30 @@ public sealed partial class StaffHiringControl : Control
   [Signal] public delegate void HireRequestedEventHandler(int quantity);
   private CampaignGameState? _state;
   private GeoscapeSession? _session;
+  private int _quantity;
 
   public override void _Ready()
   {
-    GetNode<SpinBox>("%HireQuantity").ValueChanged += _ => Refresh();
+    var quantity = GetNode<SpinBox>("%HireQuantity");
+    _quantity = (int)quantity.Value;
+    quantity.ValueChanged += value => { _quantity = (int)value; Refresh(); };
+    quantity.GetLineEdit().TextChanged += text => { _quantity = ParseQuantity(text); Refresh(); };
+    quantity.GetLineEdit().TextSubmitted += _ => { _quantity = (int)quantity.Value; Refresh(); };
+    quantity.GetLineEdit().FocusExited += () => { _quantity = (int)quantity.Value; Refresh(); };
     GetNode<Button>("%HireButton").Pressed += () =>
     {
-      GetNode<SpinBox>("%HireQuantity").Apply();
-      Refresh();
-      if (!GetNode<Button>("%HireButton").Disabled)
-        EmitSignal(SignalName.HireRequested, Quantity);
+      int requested = ParseQuantity(quantity.GetLineEdit().Text);
+      Refresh(requested);
+      if (GetNode<Button>("%HireButton").Disabled) return;
+      _quantity = requested;
+      quantity.Value = requested;
+      EmitSignal(SignalName.HireRequested, requested);
     };
     Refresh();
   }
 
-  private int Quantity => (int)GetNode<SpinBox>("%HireQuantity").Value;
+  private static int ParseQuantity(string text) => int.TryParse(text,
+    NumberStyles.None, CultureInfo.InvariantCulture, out int quantity) ? quantity : 0;
 
   public void Present(CampaignGameState state, GeoscapeSession session)
   {
@@ -36,7 +45,7 @@ public sealed partial class StaffHiringControl : Control
     Refresh();
   }
 
-  private void Refresh()
+  private void Refresh(int? quantity = null)
   {
     var hire = GetNode<Button>("%HireButton");
     string roleName = Role == StaffRole.Researcher ? "Researchers" : "Engineers";
@@ -47,7 +56,7 @@ public sealed partial class StaffHiringControl : Control
     GetNode<Label>("%StaffCount").Text = $"{roleName}: {count}";
     GetNode<Label>("%WorkRate").Text = $"Work rate: {Multiplier(rate)}x";
     var cost = GetNode<Label>("%HireCosts");
-    var result = _session?.GetHiringOption(Role, Quantity);
+    var result = _session?.GetHiringOption(Role, quantity ?? _quantity);
     var option = result?.Match<StaffHiringOption?>(Right: value => value, Left: _ => null);
     if (option is not null)
     {

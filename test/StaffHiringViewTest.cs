@@ -44,8 +44,22 @@ public class StaffHiringViewTest
     Assert.Equal(15UL, campaign.State.GetCurrencyBalance(currency));
     quantity.Value = 2;
     Assert.True(hiring.GetNode<Label>("%HireCosts").Text.Contains('6'));
-    // Apply pending typed input before submitting, including when it differs from Value.
-    quantity.GetLineEdit().Text = "3";
+    var input = quantity.GetLineEdit();
+    input.Text = "6";
+    input.EmitSignal(LineEdit.SignalName.TextChanged, input.Text);
+    Assert.True(hire.Disabled, "Pending typed quantity must disable hiring before submission.");
+    Assert.True(hiring.GetNode<Label>("%HireCosts").Text.Contains("18", System.StringComparison.Ordinal));
+    foreach (string invalid in new[] { "", "0", "-1", "1.5", "abc", "2147483648" })
+    {
+      input.Text = invalid;
+      input.EmitSignal(LineEdit.SignalName.TextChanged, input.Text);
+      Assert.True(hire.Disabled);
+      hire.EmitSignal(Button.SignalName.Pressed);
+      Assert.Equal(15UL, campaign.State.GetCurrencyBalance(currency));
+    }
+    input.Text = "3";
+    input.EmitSignal(LineEdit.SignalName.TextChanged, input.Text);
+    Assert.False(hire.Disabled);
     hire.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(engineer ? 3 : 0, campaign.State.Staff.Engineers);
     Assert.Equal(engineer ? 0 : 3, campaign.State.Staff.Researchers);
@@ -53,8 +67,7 @@ public class StaffHiringViewTest
     Assert.True(hiring.GetNode<Label>("%StaffCount").Text.EndsWith(": 3", System.StringComparison.Ordinal));
     Assert.True(hiring.GetNode<Label>("%WorkRate").Text.Contains("1.3x", System.StringComparison.Ordinal));
     Assert.True(view.GetNode<Label>("%ActiveJob").Text.Contains("18h 28m", System.StringComparison.Ordinal));
-    quantity.Value = 3;
-    Assert.True(hire.Disabled);
+    Assert.True(hire.Disabled, "The purchase must immediately disable the now-unaffordable quantity.");
     hire.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(6UL, campaign.State.GetCurrencyBalance(currency));
     await WaitForLayout(view);
@@ -67,5 +80,38 @@ public class StaffHiringViewTest
     reopened.Present(campaign.State, campaign.Session);
     Assert.True(reopened.GetNode<StaffHiringControl>("%StaffHiring").GetNode<Label>("%StaffCount")
       .Text.EndsWith(": 3", System.StringComparison.Ordinal));
+  }
+  [TestCase(false)]
+  [TestCase(true)]
+  public static async Task OtherCommittedPurchasesRefreshTheActiveHiringView(bool engineer)
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var currency = MakeCurrency();
+    var recipe = MakeManufacturingRecipe(MakeItemData(), costs: new() { [currency] = 5 });
+    var project = MakeResearch(costs: new() { [currency] = 5 });
+    var scene = CreateGeoscapeScene(MakeStart(manufacturingRecipes: [recipe], researchProjects: [project],
+      startingCurrencies: new() { [currency] = 20 }, staffingRules: new StaffingRulesData
+      {
+        ResearcherCosts = new() { [currency] = 3 },
+        EngineerCosts = new() { [currency] = 3 },
+      }));
+    CreateUiViewport(scene, new Vector2I(800, 600));
+    var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
+    var session = CaptureSceneSession(manager);
+    var open = scene.GetNode<GeoscapeHud>("%GeoscapeHud")
+      .GetNode<Button>(engineer ? "%EngineeringButton" : "%ResearchButton");
+    open.EmitSignal(Button.SignalName.Pressed);
+    var hiring = manager.Current.GetNode<StaffHiringControl>("%StaffHiring");
+    hiring.GetNode<SpinBox>("%HireQuantity").Value = 6;
+    Assert.False(hiring.GetNode<Button>("%HireButton").Disabled);
+    if (engineer) Assert.True(session.StartResearch(project).IsRight);
+    else Assert.True(session.StartManufacturing(recipe).IsRight);
+    Assert.True(hiring.GetNode<Button>("%HireButton").Disabled);
+    manager.Current.RequestBack();
+    open.EmitSignal(Button.SignalName.Pressed);
+    hiring = manager.Current.GetNode<StaffHiringControl>("%StaffHiring");
+    Assert.False(hiring.GetNode<Button>("%HireButton").Disabled);
+    hiring.GetNode<SpinBox>("%HireQuantity").Value = 6;
+    Assert.True(hiring.GetNode<Button>("%HireButton").Disabled);
   }
 }
