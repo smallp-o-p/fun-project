@@ -45,4 +45,5 @@ public partial class CampaignStartData : NamedEntityData
 
   [Export] public Godot.Collections.Dictionary<Currency, ulong> StartingCurrencies { get; set; } = [];
   [Export] public StaffingRulesData StaffingRules { get; set; } = new();
+  [Export] public GlobalBuffData[] InitialGlobalBuffs { get; set; } = [];
 }
