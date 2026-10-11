@@ -1,9 +1,10 @@
 # Battle snapshot freshness
 
-`FPF001` is a build error in Debug and export builds. `AliveUnit`, `LiveObject`
-and `AttackTarget` are annotated `[SnapshotProof]`: repeated synchronous reads
-are valid until a battle mutation. `DeadUnit`, validated tiles and item capability
-proofs are stable and are outside this analysis.
+The game project activates the analyzer alongside proof and effect annotations.
+`FPF001` reports stale use of `[SnapshotProof]` values. The domain
+contract covers `AliveUnit`, `LiveObject` and `AttackTarget`: repeated synchronous
+reads are valid until a battle mutation. `DeadUnit`, validated tiles and item
+capability proofs are stable and are outside this analysis.
 
 The analyzer uses Roslyn control flow. Copies, aliases, generic wrappers such as
 `Option<AliveUnit>`, arrays and source query objects retain freshness provenance.
@@ -26,23 +27,25 @@ facts, and permits unrelated writes such as ammunition expenditure or cache
 materialization. Unknown dispatch, callbacks, asynchronous suspension and
 unrecognized external calls are conservative boundaries.
 
-Actions save raw identities during construction and validate mutable facts during
-execution. These checks remain necessary because interrupts, hooks and callbacks
+Actions validate mutable facts during execution. These checks remain necessary because interrupts, hooks and callbacks
 can change state before execution. Snapshot `State`, `Entity` and `Id` expose
 stable identities for reacquisition; they do not promise current liveness or
-position. Deferred closures and bound delegates cannot retain snapshot proofs.
+position. Private retained proofs used exclusively through these identity properties
+do not make their enclosing object a snapshot carrier; exposing a whole proof or
+reading its position does. Deferred closures and bound delegates cannot retain snapshot proofs.
 Immediate Option/Either callbacks may use fresh proofs repeatedly. Mutating callbacks
-on repeated operators must acquire inside each invocation. Local functions follow
-the deferred capture rule; pass proofs as parameters or acquire inside the helper.
+on repeated operators must acquire inside each invocation. Direct synchronous local
+functions use the caller's current captured state. Converting one to a delegate
+uses the deferred rule. Captured proof assignments conservatively invalidate the
+caller; recursive proof closures require a different boundary or reacquisition.
 
 ## Deliberate limits
 
 This is a domain analyzer, not an ownership or whole-program concurrency system.
 The mint doors are the inspected BattleSession/BattleRuntime methods; callers
 remain responsible for the validity of raw data and trusted-core construction.
-Freshness does not prove session ownership. Hit-chance query entry still validates
-attacker and target membership; shared feasibility reads reuse those proofs, as
-does movement after its execution-entry acquisition.
+Freshness does not prove session ownership; internal callers use proofs with their
+owning session.
 Raw positions or numeric query results extracted while fresh are ordinary values,
 not proofs. Arbitrary heap storage, reflection, dynamic invocation and concurrent
 mutation are outside the supported proof discipline; use raw identities and
@@ -57,6 +60,8 @@ wrappers are not certified by these contracts. Unknown operations, including
 `List.Sort` and explicit `IDisposable.Dispose`, invalidate outstanding proofs.
 Compiler-generated disposal of ordinary foreach iterators uses the same trusted
 collection contract. Keep this small table auditable when adding dependencies.
+Default scalar equality and scalar interpolation are preserving, including through
+generic source helpers. Equality or formatting of arbitrary objects remains unknown.
 
 Exception handlers receive conservative stale inputs; acquisition inside a
 handler or finally block can restore freshness. Finally transfers are analyzed.
@@ -73,7 +78,8 @@ The compiler-contract tests run without Godot:
 dotnet test analyzers/ProofFreshness.Tests/ProofFreshness.Tests.csproj
 ```
 
-The game project references the analyzer with `OutputItemType="Analyzer"` and
-`ReferenceOutputAssembly="false"`; exports compile no analyzer tests and ship no
-Roslyn runtime dependency. Gameplay and interrupt behavior remain owned by the
-existing Godot fixtures and full suite described in [testing.md](testing.md).
+The game project's reference uses
+`OutputItemType="Analyzer"` and `ReferenceOutputAssembly="false"`, alongside proof
+annotations and caller migrations. There are no diagnostic exemptions. Exports
+compile no analyzer tests and ship no Roslyn runtime dependency. Gameplay and interrupt behavior remain owned by the existing Godot
+fixtures and full suite described in [testing.md](testing.md).

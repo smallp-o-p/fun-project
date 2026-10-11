@@ -144,9 +144,8 @@ public class GetAvailableActionsForUnitTest
     battle.ApplyDamage(hero.State, 20, DamageKind.Stun);
     hero = battle.SingleAliveUnit(battle.PlayerFaction);
 
-    var reachable = battle.Query(new GetPossibleMoveTilesForUnit(hero));
+    Assert.Equal(0, battle.Query(new GetPossibleMoveTilesForUnit(hero)).Count);
     var path = battle.Query(new FindPathForUnit(hero, battle.At(new Vector3I(1, 0, 0))));
-    Assert.Equal(0, reachable.Count);
     Vector3I[] expected = [Vector3I.Zero, new Vector3I(1, 0, 0)];
     Assert.True(path.AsValueEnumerable().Select(point => point.Raw).SequenceEqual(expected));
   }

@@ -34,15 +34,36 @@ internal sealed class ProofContract(Compilation compilation)
       if (Carries(argument, seen)) return true;
     foreach (var member in named.GetMembers())
       if (member is IFieldSymbol { IsStatic: false } field && field.Locations.Length > 0 && field.Locations[0].IsInSource
-        && Carries(field.Type, seen)) return true;
+        && Carries(field.Type, new(seen, SymbolEqualityComparer.Default)) && !IdentityOnly(named, field.AssociatedSymbol ?? field)) return true;
     foreach (var constructor in named.InstanceConstructors)
       foreach (var reference in constructor.DeclaringSyntaxReferences)
         if (reference.GetSyntax() is TypeDeclarationSyntax syntax)
           foreach (var parameter in constructor.Parameters)
             if (syntax.DescendantNodes().OfType<IdentifierNameSyntax>().Any(identifier => SymbolEqualityComparer.Default.Equals(compilation.GetSemanticModel(syntax.SyntaxTree).GetSymbolInfo(identifier).Symbol, parameter.OriginalDefinition)
-              && identifier.Ancestors().Any(node => node is MethodDeclarationSyntax or PropertyDeclarationSyntax))
-              && Carries(parameter.Type, seen)) return true;
+              && identifier.Ancestors().Any(node => node is MethodDeclarationSyntax or PropertyDeclarationSyntax or IndexerDeclarationSyntax))
+              && Carries(parameter.Type, new(seen, SymbolEqualityComparer.Default)) && !IdentityOnly(named, parameter)) return true;
     return false;
+  }
+  // Private retention of an identity is not retention of a snapshot fact. Adding a
+  // position read or exposing the whole proof makes the object a carrier again.
+  private bool IdentityOnly(INamedTypeSymbol type, ISymbol symbol)
+  {
+    if (symbol is not IParameterSymbol && symbol.DeclaredAccessibility != Accessibility.Private) return false;
+    foreach (var reference in type.DeclaringSyntaxReferences)
+    {
+      var syntax = reference.GetSyntax();
+      var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+      foreach (var identifier in syntax.DescendantNodes().OfType<IdentifierNameSyntax>())
+      {
+        if (!SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(identifier).Symbol?.OriginalDefinition, symbol.OriginalDefinition)) continue;
+        if (identifier.Parent is AssignmentExpressionSyntax assignment && assignment.Left == identifier) continue;
+        if (symbol is IParameterSymbol && !identifier.Ancestors().Any(node => node is MethodDeclarationSyntax or PropertyDeclarationSyntax or IndexerDeclarationSyntax)) continue;
+        if (identifier.Parent is MemberAccessExpressionSyntax access && access.Expression == identifier
+          && model.GetSymbolInfo(access).Symbol is IPropertySymbol property && Identity(property)) continue;
+        return false;
+      }
+    }
+    return true;
   }
   internal static bool Identity(IPropertySymbol property) => IsProof(property.ContainingType)
     && property.ContainingNamespace.ToDisplayString() == "FunProject.Battle"

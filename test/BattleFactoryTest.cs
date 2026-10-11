@@ -94,10 +94,8 @@ public class BattleFactoryTest
     var playerUnit = runtime.Query(new GetFactionAliveUnits(player)).AsValueEnumerable().Single();
     var enemyUnit = runtime.Query(new GetFactionAliveUnits(enemy)).AsValueEnumerable().Single();
 
-    var playerPosition = playerUnit.Position.Raw;
-    var enemyPosition = enemyUnit.Position.Raw;
-    Assert.Equal(new Vector3I(0, 0, 0), playerPosition);
-    Assert.Equal(new Vector3I(3, 0, 3), enemyPosition);
+    Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw);
+    Assert.Equal(new Vector3I(3, 0, 3), enemyUnit.Position.Raw);
     Assert.Equal(player, runtime.Query(new GetPlayerFactionQuery()).RequireSome());
 
     // InProgress + player (Sides[0]) is the active side: it can act, enemy cannot yet.
@@ -437,10 +435,8 @@ public class BattleFactoryTest
     Faction enemy = runtime.Query(new GetGlobalFactionTurnOrderQuery())
       .AsValueEnumerable().Single(f => !ReferenceEquals(f, player));
     var enemyUnit = runtime.Query(new GetFactionAliveUnits(enemy)).AsValueEnumerable().Single();
-    var playerPosition = playerUnit.Position.Raw;
-    var enemyPosition = enemyUnit.Position.Raw;
-    Assert.Equal(new Vector3I(0, 0, 0), playerPosition);
-    Assert.Equal(new Vector3I(1, 0, 0), enemyPosition);
+    Assert.Equal(new Vector3I(0, 0, 0), playerUnit.Position.Raw);
+    Assert.Equal(new Vector3I(1, 0, 0), enemyUnit.Position.Raw);
   }
 
   [TestCase(TestName = "Type start fails when a slot has fewer cells than its roster")]

@@ -57,6 +57,15 @@ public sealed class SnapshotProofTests
     """;
 
   [Theory]
+  [InlineData("var p = s.MintAlive(new object()); void Read() { s.Read(p); } Read(); Read();", 0)]
+  [InlineData("var p = s.MintAlive(new object()); void Read() { s.Read(p); } Read(); s.Mutate(); Read();", 1)]
+  [InlineData("var p = s.MintAlive(new object()); void Read() { s.Read(p); } Action later = Read;", 1)]
+  [InlineData("var p = s.MintAlive(new object()); void Change() { s.Mutate(); } Change(); s.Read(p);", 1)]
+  [InlineData("var p = s.MintAlive(new object()); void Read<T>() { s.Read(p); } s.Mutate(); Read<int>();", 1)]
+  [InlineData("var p = s.MintAlive(new object()); void Read<T>() { s.Read(p); } Action later = Read<int>;", 1)]
+  [InlineData("var old = s.MintAlive(new object()); s.Mutate(); var p = s.MintAlive(new object()); void Replace() { p = old; } Replace(); s.Read(p);", 1)]
+  [InlineData("var p = s.MintAlive(new object()); void Outer() { void Inner() { s.Read(p); } Inner(); } s.Mutate(); Outer();", 1)]
+  [InlineData("var p = s.MintAlive(new object()); void Read(int n) { s.Read(p); if (n > 0) LanguageExt.Prelude.Some(1).IfSome(_ => Read(n - 1)); } Read(1);", 1)]
   [InlineData("var p = s.MintAlive(new object()); s.Read(p); s.Read(p);", 0)]
   [InlineData("var p = s.MintAlive(new object()); s.Mutate(); s.Read(p);", 1)]
   [InlineData("var p = s.MintAlive(new object()); var q = p; s.Mutate(); s.Read(q);", 1)]
@@ -100,6 +109,43 @@ public sealed class SnapshotProofTests
     var diagnostics = await Analyze(Contract + "class Use { void Run(FunProject.Battle.BattleSession s, bool flag) { " + body + " } }");
     Assert.Equal(expected, diagnostics.Count(d => d.Id == "FPF001"));
     Assert.DoesNotContain(diagnostics, d => d.Id != "FPF001");
+  }
+
+  [Theory]
+  [InlineData("class Retained(AliveUnit p) { public object Read() => p.State; }", 0)]
+  [InlineData("class Retained { private AliveUnit Proof { get; } public Retained(AliveUnit p) { Proof = p; } public object Read() => Proof.State; }", 0)]
+  [InlineData("class Retained(AliveUnit p) { public int Read() => p.Position; }", 1)]
+  [InlineData("class Retained { private AliveUnit p; public Retained(AliveUnit proof) { p = proof; } public AliveUnit Read() => p; }", 1)]
+  public async Task RetentionDistinguishesIdentityFromSnapshot(string declaration, int expected)
+  {
+    var diagnostics = await Analyze(Contract + declaration + "class Use { void Run(BattleSession s) { var retained = new Retained(s.MintAlive(new object())); s.Mutate(); _ = retained.Read(); } }");
+    Assert.Equal(expected, diagnostics.Count(d => d.Id == "FPF001"));
+  }
+
+  [Theory]
+  [InlineData("Equal(1, 2);", 0)]
+  [InlineData("Equal(new FunProject.Core.Vector3I(1, 0, 0), new FunProject.Core.Vector3I(2, 0, 0));", 0)]
+  [InlineData("Equal(new Mutating(s), new Mutating(s));", 1)]
+  [InlineData("comparer.Equals(1, 2);", 1)]
+  [InlineData("_ = $\"{new Mutating(s)}\";", 1)]
+  [InlineData("_ = $\"{1}\";", 0)]
+  public async Task DefaultScalarEqualityPreservesProofs(string call, int expected)
+  {
+    var diagnostics = await Analyze(Contract + """
+      namespace FunProject.Core { public readonly record struct Vector3I(int X, int Y, int Z); }
+      class Mutating(BattleSession s) {
+        public override bool Equals(object? other) { s.Mutate(); return false; }
+        public override int GetHashCode() => 0;
+      }
+      class Use {
+        static void Equal<T>(T a, T b) {
+          if (!System.Collections.Generic.EqualityComparer<T>.Default.Equals(a, b))
+            throw new InvalidOperationException($"{a} differs from {b}");
+        }
+        void Run(BattleSession s, System.Collections.Generic.EqualityComparer<int> comparer) {
+          var p = s.MintAlive(new object());
+      """ + call + "s.Read(p); } }");
+    Assert.Equal(expected, diagnostics.Count(d => d.Id == "FPF001"));
   }
 
   [Fact]
@@ -187,6 +233,7 @@ public sealed class SnapshotProofTests
   [Theory]
   [InlineData("void Run(BattleSession s) { var p = s.MintAlive(new object()); void Read() { s.Read(p); } s.Mutate(); Read(); }")]
   [InlineData("void Run(BattleSession s, AliveUnit p) { void Read() { s.Read(p); } s.Mutate(); Read(); }")]
+  [InlineData("void Run(BattleSession s, AliveUnit p) { void Outer() { void Inner() { s.Read(p); } Inner(); } s.Mutate(); Outer(); }")]
   public async Task CapturedLocalFunctionCannotRetainProof(string method)
   {
     var diagnostics = await Analyze(Contract + "class Use { " + method + " }");
