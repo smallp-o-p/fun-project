@@ -24,6 +24,7 @@ public partial class ModSlot : Resource
 
 public interface IHasModSlots
 {
+  [FunProject.Battle.PreservesProofs]
   Godot.Collections.Array<ModSlot> GetModSlots();
 }
 

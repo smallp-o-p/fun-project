@@ -1,7 +1,6 @@
 using FunProject.Battle;
 using FunProject.Combatants;
 using Godot;
-using System.Collections.Generic;
 
 namespace FunProject.Scenes;
 
@@ -14,16 +13,17 @@ public sealed partial class BattleUnitMeshes : Node3D
 
     foreach (Faction faction in runtime.Query(new GetGlobalFactionTurnOrderQuery()))
     {
-      IReadOnlyCollection<AliveUnit> units = runtime.Query(new GetFactionAliveUnits(faction));
 
       var material = new StandardMaterial3D
       {
         AlbedoColor = faction == playerFaction ? Colors.SteelBlue : Colors.IndianRed,
       };
 
-      foreach (AliveUnit unit in units)
+      var units = runtime.Query(new GetFactionAliveUnits(faction))
+        .AsValueEnumerable().Select(unit => (unit.State, Tile: unit.Position.Raw)).ToArray();
+      foreach (var unit in units)
       {
-        Vector3I tile = unit.Position.Raw;
+        Vector3I tile = unit.Tile;
 
         var mesh = new MeshInstance3D
         {

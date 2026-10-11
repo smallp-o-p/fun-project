@@ -45,6 +45,7 @@ public abstract class ActiveStatusEffect
   internal virtual void OnFactionTurnEnd(BattleSession session, BattleUnitState unit) { }
 
   /// <summary>Whether this effect prevents the owning unit from acting while active.</summary>
+  [PreservesProofs]
   internal virtual bool BlocksAction => false;
 
   internal void Refresh()

@@ -11,6 +11,7 @@ public abstract partial class Stat : Resource
 
 public interface IHasStats
 {
+  [FunProject.Battle.PreservesProofs]
   Option<TStat> TryGetStat<TStat>() where TStat : Stat;
   TStat GetStat<TStat>() where TStat : Stat;
 

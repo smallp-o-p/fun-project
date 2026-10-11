@@ -32,6 +32,7 @@
     <Compile Remove="test\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="analyzers/ProofFreshness/ProofFreshness.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <AdditionalFiles Include="BannedSymbols.txt" />
     <!-- Compile-time enforcement in every configuration; no export/runtime assets. -->
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" PrivateAssets="all" IncludeAssets="analyzers" />

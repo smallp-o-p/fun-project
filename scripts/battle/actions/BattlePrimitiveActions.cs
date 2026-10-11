@@ -61,9 +61,10 @@ public sealed class InteractWithObject(AliveUnit unit, LiveObject obj) : BattleA
 
     if (session.TryGetAlive(unit.State).IsNone || unit.State.IsIncapacitated)
       return Result.Interrupted;
-    if (session.TryGetAliveObject(obj.State).IsNone)
+    if (session.TryGetAliveObject(obj.State).Case is not LiveObject liveObject)
       return Result.Interrupted;
 
+    var position = liveObject.Position;
     return obj.State.FindCapability<InteractiveCapability>().Match(
       Some: interactive =>
       {
@@ -71,7 +72,7 @@ public sealed class InteractWithObject(AliveUnit unit, LiveObject obj) : BattleA
           return Result.Rejected;
 
         session.MarkObjectInteracted(obj.State);
-        session.RaiseEvents(new ObjectInteractedBattleEvent(unit.State, obj.State, obj.Position));
+        session.RaiseEvents(new ObjectInteractedBattleEvent(unit.State, obj.State, position));
         return Result.Completed;
       },
       None: () => Result.Rejected);
@@ -93,12 +94,15 @@ public sealed class AttackEntity(AliveUnit attacker, AttackTarget target) : Batt
     // A dead or incapacitated attacker has no right to perform a new action; that staleness
     // (killed or disabled by an earlier interrupt) interrupts quietly like every other mutable
     // fact.
-    if (session.TryGetAlive(attacker.State).IsNone || attacker.State.IsIncapacitated)
+    if (session.TryGetAlive(attacker.State).Case is not AliveUnit freshAttacker || attacker.State.IsIncapacitated)
       return Result.Interrupted;
 
-    return AttackContext.Resolve(session, attacker.State, target).Match(
+    if (session.TryGetAttackTarget(target.Entity).Case is not AttackTarget freshTarget)
+      return Result.Interrupted;
+
+    return AttackContext.Resolve(session, freshAttacker, freshTarget).Match(
       _ => Result.Interrupted,
-      context => Fire(session, attacker, target, context));
+      context => Fire(session, freshAttacker, freshTarget, context));
   }
 
   private static Result Fire(BattleSession session, AliveUnit attacker, AttackTarget target, AttackContext context)

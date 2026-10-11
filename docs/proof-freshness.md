@@ -1,11 +1,7 @@
 # Battle snapshot freshness
 
-The analyzer implementation and attribute definitions are available here; gameplay
-adoption and build activation belong to the stacked follow-up. The game project
-excludes the tooling sources but does not yet reference the analyzer or annotate
-its proofs. Compiler-contract tests exercise enforcement independently.
-
-When adopted, `FPF001` reports stale use of `[SnapshotProof]` values. The domain
+The game project activates the analyzer alongside proof and effect annotations.
+`FPF001` reports stale use of `[SnapshotProof]` values. The domain
 contract covers `AliveUnit`, `LiveObject` and `AttackTarget`: repeated synchronous
 reads are valid until a battle mutation. `DeadUnit`, validated tiles and item
 capability proofs are stable and are outside this analysis.
@@ -82,9 +78,8 @@ The compiler-contract tests run without Godot:
 dotnet test analyzers/ProofFreshness.Tests/ProofFreshness.Tests.csproj
 ```
 
-Activation in the follow-up adds the game project's reference with
+The game project's reference uses
 `OutputItemType="Analyzer"` and `ReferenceOutputAssembly="false"`, alongside proof
-annotations and caller migrations. There are no diagnostic exemptions in this
-staged adoption. Exports compile no analyzer tests and ship no Roslyn runtime
-dependency. Gameplay and interrupt behavior remain owned by the existing Godot
+annotations and caller migrations. There are no diagnostic exemptions. Exports
+compile no analyzer tests and ship no Roslyn runtime dependency. Gameplay and interrupt behavior remain owned by the existing Godot
 fixtures and full suite described in [testing.md](testing.md).

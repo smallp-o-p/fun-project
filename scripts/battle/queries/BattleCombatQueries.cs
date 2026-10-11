@@ -11,7 +11,7 @@ public sealed class GetHitChanceForAttack(AliveUnit attacker, AttackTarget targe
     // Attacker/target liveness is guaranteed by the proof arguments, so this query only
     // resolves target feasibility (weapon/self/ally/visibility/range). AttackContext.Resolve
     // stays the single source of truth for the ACTION path, which re-validates at commit time.
-    return AttackContext.Resolve(session, attacker.State, target)
+    return AttackContext.Resolve(session, attacker, target)
       .MapLeft(message => new BattleQueryFailure(BattleQueryFailureReason.InvalidBattleState, message))
       .Map(context => context.CalculateHitChance(target, session.HitChanceCalculator));
   }
