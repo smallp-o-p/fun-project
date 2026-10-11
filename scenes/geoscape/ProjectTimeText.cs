@@ -8,7 +8,8 @@ public static class ProjectTimeText
   public static string Duration(uint days, double speed)
   {
     long ticks = new JobProgress(0, GameState.GameState.TicksFromDays(days), speed).CompletesAtTick;
-    return ticks % 1440 == 0 ? $"Duration: {ticks / 1440}d" : $"Duration: {Remaining(ticks, 0)}";
+    long ticksPerDay = GameState.GameState.TicksFromDays(1);
+    return ticks % ticksPerDay == 0 ? $"Duration: {ticks / ticksPerDay}d" : $"Duration: {Remaining(ticks, 0)}";
   }
 
   public static string Remaining(long completesAtTick, long tick)
