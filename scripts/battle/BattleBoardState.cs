@@ -126,7 +126,6 @@ public sealed class BattleBoardState
     return _occupants.TryGetValue(point, out int unitId) ? Some(unitId) : None;
   }
 
-  [InvalidatesProofs]
   public bool TryPlaceOccupant(ValidatedPoint point, int unitId)
   {
     if (!GetTile(point).IsWalkable || _occupants.ContainsKey(point) || _objectOccupants.ContainsKey(point))
@@ -137,7 +136,6 @@ public sealed class BattleBoardState
     return true;
   }
 
-  [InvalidatesProofs]
   public bool TryMoveOccupant(ValidatedPoint source, ValidatedPoint destination, int unitId)
   {
     if (!_occupants.TryGetValue(source, out int sourceOccupant) || sourceOccupant != unitId)
@@ -153,7 +151,6 @@ public sealed class BattleBoardState
     return true;
   }
 
-  [InvalidatesProofs]
   public bool TryClearOccupant(ValidatedPoint point, int unitId)
   {
     if (!_occupants.TryGetValue(point, out int occupant) || occupant != unitId)
@@ -258,7 +255,6 @@ public sealed class BattleBoardState
   public bool IsBlockedByObject(ValidatedPoint point)
     => _objectOccupants.ContainsKey(point);
 
-  [InvalidatesProofs]
   public bool TryPlaceObjectOccupant(ValidatedPoint point, int objectId)
   {
     if (!GetTile(point).IsWalkable || _occupants.ContainsKey(point) || _objectOccupants.ContainsKey(point))
@@ -269,7 +265,6 @@ public sealed class BattleBoardState
     return true;
   }
 
-  [InvalidatesProofs]
   public bool TryClearObjectOccupant(ValidatedPoint point, int objectId)
   {
     if (!_objectOccupants.TryGetValue(point, out int occupant) || occupant != objectId)

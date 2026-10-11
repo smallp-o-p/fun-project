@@ -65,20 +65,16 @@ public class Weapon : EquippableItem, IHasStats
   /// weapon cannot fire. Weapons without a magazine never deplete; <see cref="AmmunitionedWeapon"/>
   /// overrides this with ammunition gating.
   /// </summary>
-  [FunProject.Battle.PreservesProofs]
   public virtual Option<List<Damage>> TrySpendShot(IEnumerable<DamageBundleMod> externalMods)
     => EmitDamage(externalMods);
 
   /// <summary>Whether this weapon can fire right now. Weapons without a magazine are always loaded.</summary>
-  [FunProject.Battle.PreservesProofs]
   public virtual bool IsLoaded => true;
 
   /// <summary>Whether this weapon carries a reloadable magazine.</summary>
-  [FunProject.Battle.PreservesProofs]
   public virtual bool HasMagazine => false;
 
   /// <summary>Whether reloading would change anything. Weapons without a magazine never reload.</summary>
-  [FunProject.Battle.PreservesProofs]
   public virtual bool CanReload() => false;
 
   public float EffectiveStat<TStat>() where TStat : Stat
@@ -87,7 +83,6 @@ public class Weapon : EquippableItem, IHasStats
   public int EffectiveRange => Mathf.RoundToInt(EffectiveStat<RangeStat>());
 
   /// <summary>StatMods this weapon contributes to resolution; override to add more (e.g. ammunition).</summary>
-  [FunProject.Battle.PreservesProofs]
   public virtual IEnumerable<StatMod> StatContributions
     => this.EquippedMods().AsValueEnumerable().SelectMany(m => m.StatContributions).ToArray();
 
@@ -96,7 +91,6 @@ public class Weapon : EquippableItem, IHasStats
   /// mods. Base: slot-mounted mods; override to append more (e.g. ammunition), mirroring
   /// <see cref="StatContributions"/>.
   /// </summary>
-  [FunProject.Battle.PreservesProofs]
   protected virtual IEnumerable<DamageBundleMod> DamageContributions
     => this.EquippedMods().AsValueEnumerable().OfType<DamageBundleEquippableMod>().SelectMany(m => m.BundleMods).ToArray();
 

@@ -16,7 +16,7 @@ internal sealed class ProofEffects(Compilation compilation)
   private readonly Dictionary<IMethodSymbol, bool> _cache = new(SymbolEqualityComparer.Default);
   internal bool Invalidates(IMethodSymbol method)
   {
-    method = (method.ReducedFrom ?? method).OriginalDefinition;
+    method = method.ReducedFrom ?? method;
     if (!_cache.TryGetValue(method, out var effect))
     {
       effect = Invalidates(method, new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default));
@@ -24,9 +24,17 @@ internal sealed class ProofEffects(Compilation compilation)
     }
     return effect;
   }
-  private bool Invalidates(IMethodSymbol method, HashSet<IMethodSymbol> visiting, Dictionary<IParameterSymbol, bool>? delegates = null)
+  private bool Invalidates(IMethodSymbol method, HashSet<IMethodSymbol> visiting, Dictionary<IParameterSymbol, bool>? delegates = null, Dictionary<ITypeParameterSymbol, ITypeSymbol>? types = null)
   {
-    method = (method.ReducedFrom ?? method).OriginalDefinition;
+    method = method.ReducedFrom ?? method;
+    types = types != null ? new(types, SymbolEqualityComparer.Default) : new(SymbolEqualityComparer.Default);
+    for (var i = 0; i < method.TypeParameters.Length; i++)
+      if (!SymbolEqualityComparer.Default.Equals(method.TypeParameters[i], method.TypeArguments[i])) types[method.TypeParameters[i]] = Resolve(method.TypeArguments[i], types);
+    for (var i = 0; i < method.ContainingType.TypeParameters.Length; i++)
+      if (!SymbolEqualityComparer.Default.Equals(method.ContainingType.TypeParameters[i], method.ContainingType.TypeArguments[i])) types[method.ContainingType.TypeParameters[i]] = Resolve(method.ContainingType.TypeArguments[i], types);
+    if (method.ContainingType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.EqualityComparer<T>" && method.Name == "get_Default"
+      && Scalar(method.ContainingType.TypeArguments[0], types)) return false;
+    method = method.OriginalDefinition;
     if (ProofContract.Has(method, "InvalidatesProofs")) return true;
     if (!visiting.Add(method)) return false;
     try
@@ -47,16 +55,16 @@ internal sealed class ProofEffects(Compilation compilation)
             if (type.BaseList != null)
               foreach (var baseSyntax in type.BaseList.Types.OfType<PrimaryConstructorBaseTypeSyntax>())
               {
-                if (model.GetSymbolInfo(baseSyntax).Symbol is IMethodSymbol baseConstructor && Invalidates(baseConstructor, visiting, delegates)) return true;
+                if (model.GetSymbolInfo(baseSyntax).Symbol is IMethodSymbol baseConstructor && Invalidates(baseConstructor, visiting, delegates, types)) return true;
                 foreach (var argument in baseSyntax.ArgumentList.Arguments)
-                  if (model.GetOperation(argument.Expression) is { } baseArgument && Walk(baseArgument, visiting, delegates)) return true;
+                  if (model.GetOperation(argument.Expression) is { } baseArgument && Walk(baseArgument, visiting, delegates, types)) return true;
               }
             foreach (var member in type.Members)
             {
               if (member is FieldDeclarationSyntax field && !field.Modifiers.Any(SyntaxKind.StaticKeyword))
                 foreach (var variable in field.Declaration.Variables)
-                  if (variable.Initializer is { } initializer && model.GetOperation(initializer.Value) is { } init && Walk(init, visiting, delegates)) return true;
-              if (member is PropertyDeclarationSyntax { Initializer: { } propertyInitializer } && model.GetOperation(propertyInitializer.Value) is { } propertyInit && Walk(propertyInit, visiting, delegates)) return true;
+                  if (variable.Initializer is { } initializer && model.GetOperation(initializer.Value) is { } init && Walk(init, visiting, delegates, types)) return true;
+              if (member is PropertyDeclarationSyntax { Initializer: { } propertyInitializer } && model.GetOperation(propertyInitializer.Value) is { } propertyInit && Walk(propertyInit, visiting, delegates, types)) return true;
             }
           }
       // Source constructors run instance initializers even without an explicit body.
@@ -65,7 +73,7 @@ internal sealed class ProofEffects(Compilation compilation)
         && method.ContainingType.Locations.Any(location => location.IsInSource) && method.ContainingType.BaseType is { } baseType
         && !method.DeclaringSyntaxReferences.Any(reference => reference.GetSyntax() is ConstructorDeclarationSyntax { Initializer: not null }))
         foreach (var constructor in baseType.InstanceConstructors)
-          if (constructor.Parameters.Length == 0 && Invalidates(constructor, visiting, delegates)) return true;
+          if (constructor.Parameters.Length == 0 && Invalidates(constructor, visiting, delegates, types)) return true;
       if (method.DeclaringSyntaxReferences.Length == 0)
         return !(method.IsImplicitlyDeclared && method.ContainingType.Locations.Length > 0 && method.ContainingType.Locations[0].IsInSource) && !ExternalRead(method);
       foreach (var reference in method.DeclaringSyntaxReferences)
@@ -75,35 +83,67 @@ internal sealed class ProofEffects(Compilation compilation)
         var operation = model.GetOperation(syntax);
         if (operation == null && syntax is AccessorDeclarationSyntax accessor)
           operation = accessor.Body != null ? model.GetOperation(accessor.Body) : accessor.ExpressionBody != null ? model.GetOperation(accessor.ExpressionBody.Expression) : null;
-        if (operation != null && Walk(operation, visiting, delegates)) return true;
+        if (operation != null && (Walk(operation, visiting, delegates, types) || method.MethodKind == MethodKind.LocalFunction && CapturedProofWrite(operation, method))) return true;
       }
       return false;
     }
     finally { visiting.Remove(method); }
   }
   internal bool Invalidates(IInvocationOperation call) => CallInvalidates(call, new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default), null);
-  private bool CallInvalidates(IInvocationOperation call, HashSet<IMethodSymbol> visiting, Dictionary<IParameterSymbol, bool>? delegates)
+  private bool CallInvalidates(IInvocationOperation call, HashSet<IMethodSymbol> visiting, Dictionary<IParameterSymbol, bool>? delegates, Dictionary<ITypeParameterSymbol, ITypeSymbol>? types = null)
   {
+    if (call.TargetMethod.ContainingType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.EqualityComparer<T>"
+      && call.TargetMethod.Name == "Equals" && Scalar(call.TargetMethod.ContainingType.TypeArguments[0], types)
+      && call.Instance is IPropertyReferenceOperation { Property.Name: "Default", Property.IsStatic: true } comparer
+      && comparer.Property.ContainingType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.EqualityComparer<T>") return false;
     if (call.TargetMethod.Name == "Dispose" && call.IsImplicit && call.Syntax.AncestorsAndSelf().Any(syntax => syntax is ForEachStatementSyntax or ForEachVariableStatementSyntax)) return false;
     if (call.TargetMethod.MethodKind == MethodKind.DelegateInvoke)
-      return DelegateEffect(call.Instance, visiting, delegates);
+      return DelegateEffect(call.Instance, visiting, delegates, types);
     var bindings = delegates != null ? new Dictionary<IParameterSymbol, bool>(delegates, SymbolEqualityComparer.Default) : new Dictionary<IParameterSymbol, bool>(SymbolEqualityComparer.Default);
     var callbackEffect = false;
     foreach (var argument in call.Arguments)
       if (argument.Parameter != null && argument.Parameter.Type.TypeKind == TypeKind.Delegate)
       {
-        var effect = DelegateEffect(argument.Value, visiting, delegates);
+        var effect = DelegateEffect(argument.Value, visiting, delegates, types);
         callbackEffect |= effect;
         bindings[argument.Parameter.OriginalDefinition] = effect;
       }
-    return callbackEffect || Invalidates(call.TargetMethod, visiting, bindings);
+    return callbackEffect || Invalidates(call.TargetMethod, visiting, bindings, types);
   }
-  private bool DelegateEffect(IOperation? value, HashSet<IMethodSymbol> visiting, Dictionary<IParameterSymbol, bool>? delegates)
+  private static ITypeSymbol Resolve(ITypeSymbol type, Dictionary<ITypeParameterSymbol, ITypeSymbol>? types)
   {
-    if (value is IConversionOperation conversion) return DelegateEffect(conversion.Operand, visiting, delegates);
-    if (value is IDelegateCreationOperation creation) return DelegateEffect(creation.Target, visiting, delegates);
-    if (value is IMethodReferenceOperation reference) return Invalidates(reference.Method, visiting, delegates);
-    if (value is IAnonymousFunctionOperation lambda) return Walk(lambda.Body, visiting, delegates);
+    var seen = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+    while (type is ITypeParameterSymbol parameter && types != null && types.TryGetValue(parameter, out var bound) && seen.Add(type)) type = bound;
+    return type;
+  }
+  private bool CapturedProofWrite(IOperation operation, IMethodSymbol method)
+  {
+    if (operation is IAssignmentOperation assignment && Carries(assignment.Target.Type))
+    {
+      var owner = assignment.Target switch
+      {
+        ILocalReferenceOperation local => local.Local.ContainingSymbol,
+        IParameterReferenceOperation parameter => parameter.Parameter.ContainingSymbol,
+        _ => null,
+      };
+      if (owner != null && !SymbolEqualityComparer.Default.Equals(owner, method)) return true;
+    }
+    return operation.ChildOperations.Any(child => CapturedProofWrite(child, method));
+  }
+  internal static bool Scalar(ITypeSymbol? type, Dictionary<ITypeParameterSymbol, ITypeSymbol>? types = null)
+  {
+    if (type == null) return false;
+    type = Resolve(type, types);
+    return type.SpecialType is >= SpecialType.System_Boolean and <= SpecialType.System_Decimal
+      || type.SpecialType == SpecialType.System_String || type.TypeKind == TypeKind.Enum
+      || type.ToDisplayString() is "Godot.Vector3I" or "Godot.Vector3";
+  }
+  private bool DelegateEffect(IOperation? value, HashSet<IMethodSymbol> visiting, Dictionary<IParameterSymbol, bool>? delegates, Dictionary<ITypeParameterSymbol, ITypeSymbol>? types = null)
+  {
+    if (value is IConversionOperation conversion) return DelegateEffect(conversion.Operand, visiting, delegates, types);
+    if (value is IDelegateCreationOperation creation) return DelegateEffect(creation.Target, visiting, delegates, types);
+    if (value is IMethodReferenceOperation reference) return Invalidates(reference.Method, visiting, delegates, types);
+    if (value is IAnonymousFunctionOperation lambda) return Walk(lambda.Body, visiting, delegates, types);
     if (value is IFlowAnonymousFunctionOperation flowLambda) return BodyInvalidates(flowLambda);
     if (value is IParameterReferenceOperation parameter && delegates != null && delegates.TryGetValue(parameter.Parameter.OriginalDefinition, out var effect)) return effect;
     return true;
@@ -156,22 +196,23 @@ internal sealed class ProofEffects(Compilation compilation)
     return method.ContainingType.ToDisplayString() is "Godot.Mathf" or "Godot.Vector3I" or "Godot.Vector3"
       || ns == "Godot.Collections" && (method.MethodKind == MethodKind.PropertyGet || name == ".ctor");
   }
-  private bool Walk(IOperation operation, HashSet<IMethodSymbol> visiting, Dictionary<IParameterSymbol, bool>? delegates = null)
+  private bool Walk(IOperation operation, HashSet<IMethodSymbol> visiting, Dictionary<IParameterSymbol, bool>? delegates = null, Dictionary<ITypeParameterSymbol, ITypeSymbol>? types = null)
   {
     if (operation is IAwaitOperation) return true;
+    if (operation is IInterpolationOperation interpolation && !Scalar(interpolation.Expression.Type, types)) return true;
     if (operation is IInvocationOperation call)
     {
-      if (CallInvalidates(call, visiting, delegates)) return true;
+      if (CallInvalidates(call, visiting, delegates, types)) return true;
     }
-    if (operation is IObjectCreationOperation creation && creation.Constructor != null && Invalidates(creation.Constructor, visiting, delegates)) return true;
+    if (operation is IObjectCreationOperation creation && creation.Constructor != null && Invalidates(creation.Constructor, visiting, delegates, types)) return true;
     if (operation is IPropertyReferenceOperation property && property.Property.GetMethod is { } getter
-      && Invalidates(getter, visiting, delegates)) return true;
+      && Invalidates(getter, visiting, delegates, types)) return true;
     if (operation is IAssignmentOperation assignment && (DomainWrite(assignment.Target)
-      || assignment.Target is IPropertyReferenceOperation { Property.SetMethod: { } setter } && Invalidates(setter, visiting, delegates))) return true;
+      || assignment.Target is IPropertyReferenceOperation { Property.SetMethod: { } setter } && Invalidates(setter, visiting, delegates, types))) return true;
     if (operation is IIncrementOrDecrementOperation increment && (DomainWrite(increment.Target)
-      || increment.Target is IPropertyReferenceOperation { Property.SetMethod: { } incrementSetter } && Invalidates(incrementSetter, visiting, delegates))) return true;
+      || increment.Target is IPropertyReferenceOperation { Property.SetMethod: { } incrementSetter } && Invalidates(incrementSetter, visiting, delegates, types))) return true;
     foreach (var child in operation.ChildOperations)
-      if (Walk(child, visiting, delegates)) return true;
+      if (Walk(child, visiting, delegates, types)) return true;
     return false;
   }
   internal bool ReturnsFresh(IInvocationOperation call) => FreshOrigin(call, new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default));

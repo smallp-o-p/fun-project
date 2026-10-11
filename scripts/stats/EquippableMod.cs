@@ -12,6 +12,5 @@ public abstract partial class EquippableMod : Resource
   // runtime Armory state, never authored.
   [Export] public bool UnlimitedStock { get; set; }
 
-  [FunProject.Battle.PreservesProofs]
   public virtual IEnumerable<StatMod> StatContributions => [];
 }

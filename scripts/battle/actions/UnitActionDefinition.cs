@@ -10,9 +10,7 @@ namespace FunProject.Battle;
 // stateless singletons held by the catalog.
 public abstract class UnitActionDefinition
 {
-  [PreservesProofs]
   internal abstract bool ExistsFor(BattleUnitState unit);
-  [PreservesProofs]
   internal abstract IReadOnlyList<UnitActionCondition> Conditions { get; }
 }
 

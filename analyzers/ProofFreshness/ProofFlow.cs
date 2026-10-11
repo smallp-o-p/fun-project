@@ -9,8 +9,10 @@ namespace FunProject.Analyzers;
 
 // Fresh/Stale is a may-analysis: joins retain any stale path, and loops converge
 // before diagnostics are emitted. Copies preserve provenance; mutations kill every copy.
-internal sealed class ProofFlow(ProofEffects effects, Action<Diagnostic> report, CancellationToken cancellation)
+internal sealed class ProofFlow(ProofEffects effects, Action<Diagnostic> report, CancellationToken cancellation,
+  HashSet<IMethodSymbol>? activeLocals = null)
 {
+  private readonly HashSet<IMethodSymbol> _activeLocals = activeLocals ?? new(SymbolEqualityComparer.Default);
   private const int Fresh = 1;
   private const int Stale = 2;
   private readonly HashSet<(SyntaxTree, int)> _reported = [];
@@ -28,6 +30,8 @@ internal sealed class ProofFlow(ProofEffects effects, Action<Diagnostic> report,
       foreach (var operation in block.Operations) Seed(operation, inputs[0]!);
       if (block.BranchValue != null) Seed(block.BranchValue, inputs[0]!);
     }
+    foreach (var local in graph.LocalFunctions)
+      inputs[0] = NestedState(graph.GetLocalFunctionControlFlowGraph(local, cancellation), inputs[0]!);
     var continuations = new Dictionary<int, List<BasicBlock>>();
     foreach (var block in graph.Blocks)
     {
@@ -63,17 +67,6 @@ internal sealed class ProofFlow(ProofEffects effects, Action<Diagnostic> report,
     _emit = true;
     foreach (var block in graph.Blocks)
       if (inputs[block.Ordinal] is { } input) VisitBlock(block, new(input));
-
-    // Local functions can escape via delegates. Keep their capture rule as conservative
-    // as deferred lambdas; pass fresh proofs as parameters or reacquire inside the helper.
-    foreach (var localFunction in graph.LocalFunctions)
-    {
-      var localGraph = graph.GetLocalFunctionControlFlowGraph(localFunction, cancellation);
-      var capturedState = NestedState(localGraph, inputs[0]!);
-      Invalidate(capturedState);
-      foreach (var parameter in localFunction.Parameters) capturedState.Remove(parameter);
-      new ProofFlow(effects, report, cancellation).Analyze(localGraph, capturedState);
-    }
 
     void AddContinuations(ControlFlowBranch? branch)
     {
@@ -121,6 +114,8 @@ internal sealed class ProofFlow(ProofEffects effects, Action<Diagnostic> report,
       foreach (var operation in block.Operations) Seed(operation, nested);
       if (block.BranchValue != null) Seed(block.BranchValue, nested);
     }
+    foreach (var local in graph.LocalFunctions)
+      nested = NestedState(graph.GetLocalFunctionControlFlowGraph(local, cancellation), nested);
     return nested;
   }
 
@@ -224,6 +219,7 @@ internal sealed class ProofFlow(ProofEffects effects, Action<Diagnostic> report,
         var boundReceiver = Eval(bound.Instance, state);
         // A delegate can execute arbitrarily later; a receiver carrying a proof cannot escape.
         if (boundReceiver != 0) Use(bound.Instance, Stale);
+        AnalyzeLocal(bound.Method, state, deferred: true);
         return 0;
       case IDelegateCreationOperation { Target: IFlowAnonymousFunctionOperation deferred }:
         if (_emit && !(operation.Parent is IArgumentOperation { Parent: IInvocationOperation immediate } && ProofEffects.InlineCallbacks(immediate.TargetMethod)))
@@ -232,7 +228,7 @@ internal sealed class ProofFlow(ProofEffects effects, Action<Diagnostic> report,
           var deferredState = NestedState(deferredGraph, state);
           Invalidate(deferredState);
           foreach (var parameter in deferred.Symbol.Parameters) deferredState.Remove(parameter);
-          new ProofFlow(effects, report, cancellation).Analyze(deferredGraph, deferredState);
+          new ProofFlow(effects, report, cancellation, _activeLocals).Analyze(deferredGraph, deferredState);
         }
         // Immediate LanguageExt callbacks are analyzed by Call. Other closures must not
         // retain a proof; their execution time is unknown.
@@ -241,6 +237,10 @@ internal sealed class ProofFlow(ProofEffects effects, Action<Diagnostic> report,
         Eval(awaited.Operation, state);
         Invalidate(state);
         return effects.Carries(awaited.Type) ? Stale : 0;
+      case IInterpolationOperation interpolation:
+        foreach (var child in interpolation.ChildOperations) Eval(child, state);
+        if (!ProofEffects.Scalar(interpolation.Expression.Type)) Invalidate(state);
+        return 0;
       default:
         var result = 0;
         foreach (var child in operation.ChildOperations) result |= Eval(child, state);
@@ -251,6 +251,7 @@ internal sealed class ProofFlow(ProofEffects effects, Action<Diagnostic> report,
   private int Call(IInvocationOperation call, Dictionary<object, int> state)
   {
     var provenance = EvaluateInputs(call.Instance, call.Arguments, state);
+    AnalyzeLocal(call.TargetMethod, state, deferred: false, call);
     var callbacks = new List<IFlowAnonymousFunctionOperation>();
     foreach (var argument in call.Arguments)
     {
@@ -270,7 +271,7 @@ internal sealed class ProofFlow(ProofEffects effects, Action<Diagnostic> report,
       if (!ProofEffects.InlineCallbacks(call.TargetMethod) || repeatsMutation) Invalidate(callbackState);
       foreach (var parameter in callback.Symbol.Parameters)
         if (effects.Carries(parameter.Type)) callbackState[parameter] = repeatsMutation ? Stale : provenance != 0 ? provenance : Fresh;
-      new ProofFlow(effects, report, cancellation).Analyze(callbackGraph, callbackState);
+      new ProofFlow(effects, report, cancellation, _activeLocals).Analyze(callbackGraph, callbackState);
     }
     var invalidates = effects.Invalidates(call);
     foreach (var callback in callbacks)
@@ -279,6 +280,33 @@ internal sealed class ProofFlow(ProofEffects effects, Action<Diagnostic> report,
     if (!effects.Carries(call.Type)) return 0;
     if (provenance != 0) return invalidates ? Stale : provenance;
     return effects.ReturnsFresh(call) && !invalidates ? Fresh : Stale;
+  }
+
+  private void AnalyzeLocal(IMethodSymbol method, Dictionary<object, int> state, bool deferred, IInvocationOperation? call = null)
+  {
+    if (!_emit || method.MethodKind != MethodKind.LocalFunction) return;
+    method = method.OriginalDefinition;
+    for (var graph = _graph; graph != null; graph = graph.Parent)
+    {
+      if (!System.Linq.Enumerable.Contains(graph.LocalFunctions, method, SymbolEqualityComparer.Default)) continue;
+      var localGraph = graph.GetLocalFunctionControlFlowGraph(method, cancellation);
+      var captured = NestedState(localGraph, state);
+      if (deferred) Invalidate(captured);
+      foreach (var parameter in method.Parameters) captured.Remove(parameter);
+      if (call != null)
+        foreach (var argument in call.Arguments)
+          if (argument.Parameter != null && effects.Carries(argument.Parameter.Type)) captured[argument.Parameter.OriginalDefinition] = state[argument.Value];
+      // Recursive closure freshness is outside this small analysis. Reject a recursive
+      // proof use rather than silently assuming its captures remain fresh.
+      if (!_activeLocals.Add(method))
+      {
+        if (System.Linq.Enumerable.Any(captured.Values, value => value != 0)) Use(call, Stale);
+        return;
+      }
+      try { new ProofFlow(effects, report, cancellation, _activeLocals).Analyze(localGraph, captured); }
+      finally { _activeLocals.Remove(method); }
+      return;
+    }
   }
 
   private int EvaluateInputs(IOperation? instance, System.Collections.Immutable.ImmutableArray<IArgumentOperation> arguments, Dictionary<object, int> state)

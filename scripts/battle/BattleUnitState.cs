@@ -120,7 +120,6 @@ public sealed class BattleUnitState
         $"Unit {Id} cannot spend {cost} action points (has {CurrentActionPoints}).");
   }
 
-  [InvalidatesProofs]
   public void ReceiveDamage(int amount)
   {
     if (amount <= 0)
@@ -241,7 +240,6 @@ public sealed class BattleUnitState
     CurrentHealth = Math.Min(CurrentHealth, Math.Max(MaxHealth, 1));
   }
 
-  [InvalidatesProofs]
   internal void EvaluateBuffs(BattleSession session)
   {
     for (int i = 0; i < _buffs.Count; i++)

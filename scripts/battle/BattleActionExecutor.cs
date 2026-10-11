@@ -86,7 +86,6 @@ public sealed class BattleActionExecutor : IDisposable
     return _hooks.Unregister<TEventKey>(hook);
   }
 
-  [InvalidatesProofs]
   public BattleActionExecResult Submit(BattleAction action)
   {
     EnsureCanSubmit();

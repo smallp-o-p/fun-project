@@ -70,7 +70,6 @@ public sealed class BattleRuntime : IDisposable
     return _session.Board.ValidatePoint(coordinates);
   }
 
-  [InvalidatesProofs]
   public BattleActionExecResult ExecuteAction(BattleAction action)
   {
     var result = ExecuteSingleAction(action);
@@ -80,7 +79,6 @@ public sealed class BattleRuntime : IDisposable
 
   // Guard one synchronous submission, including its callbacks. This prevents observers
   // from submitting recursively; it does not lock or span the enemy-turn loop.
-  [InvalidatesProofs]
   internal BattleActionExecResult ExecuteSingleAction(BattleAction action)
   {
     ThrowIfDisposed();
@@ -134,7 +132,6 @@ public sealed class BattleRuntime : IDisposable
     return _actions.UnregisterHook<TEventKey>(hook);
   }
 
-  [InvalidatesProofs]
   public void Dispose()
   {
     if (_disposed)

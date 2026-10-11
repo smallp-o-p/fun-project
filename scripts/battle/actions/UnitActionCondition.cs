@@ -7,7 +7,6 @@ namespace FunProject.Battle;
 /// </summary>
 public abstract class UnitActionCondition
 {
-  [PreservesProofs]
   internal abstract bool IsMet(BattleSession session, AliveUnit unit);
   internal abstract bool MayChange(BattleEvent battleEvent, BattleUnitState unit);
 

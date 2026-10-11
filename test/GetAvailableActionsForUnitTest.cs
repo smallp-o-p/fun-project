@@ -128,7 +128,6 @@ public class GetAvailableActionsForUnitTest
     using var battle = MakeBattle(TestData.MakeAmmoWeapon("SMG"));
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
     battle.ApplyDamage(hero.State, 20, DamageKind.Stun);
-    hero = battle.SingleAliveUnit(battle.PlayerFaction);
 
     var actions = battle.Query(new GetAvailableActionsForUnit(hero));
 
@@ -142,11 +141,9 @@ public class GetAvailableActionsForUnitTest
     using var battle = MakeBattle(None);
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
     battle.ApplyDamage(hero.State, 20, DamageKind.Stun);
-    hero = battle.SingleAliveUnit(battle.PlayerFaction);
 
-    var reachable = battle.Query(new GetPossibleMoveTilesForUnit(hero));
+    Assert.Equal(0, battle.Query(new GetPossibleMoveTilesForUnit(hero)).Count);
     var path = battle.Query(new FindPathForUnit(hero, battle.At(new Vector3I(1, 0, 0))));
-    Assert.Equal(0, reachable.Count);
     Vector3I[] expected = [Vector3I.Zero, new Vector3I(1, 0, 0)];
     Assert.True(path.AsValueEnumerable().Select(point => point.Raw).SequenceEqual(expected));
   }

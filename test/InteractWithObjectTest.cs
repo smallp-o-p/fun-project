@@ -164,11 +164,10 @@ public class InteractWithObjectTest
     AliveUnit unitProof = battle.Alive(unit);
     LiveObject objectProof = battle.Live(bomb);
 
-    var staleAction = BattleAction.InteractWithObject(unitProof, objectProof);
     battle.Submit(BattleAction.InteractWithObject(unitProof, objectProof));
 
     Assert.True(battle.Session.TryGetAliveObject(bomb).IsNone);
     Assert.Equal(BattleAction.Result.Interrupted,
-      staleAction.Execute(battle.Session));
+      BattleAction.InteractWithObject(unitProof, objectProof).Execute(battle.Session));
   }
 }

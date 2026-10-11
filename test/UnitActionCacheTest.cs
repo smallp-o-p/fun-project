@@ -139,7 +139,7 @@ public class UnitActionCacheTest
 
     battle.Move(battle.PlayerUnit, [new Vector3I(4, 0, 2)], actionPointCost: 4);
 
-    IReadOnlyList<UnitAction> afterSpend = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
+    IReadOnlyList<UnitAction> afterSpend = battle.Query(query);
     Assert.True(ReferenceEquals(actions, afterSpend));
     Assert.True(ReferenceEquals(move, Row<MoveActionDefinition>(afterSpend)));
     Assert.False(move.IsAvailable);
@@ -147,7 +147,7 @@ public class UnitActionCacheTest
     battle.AdvanceTurn();
     battle.AdvanceTurn();
 
-    IReadOnlyList<UnitAction> afterRefresh = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
+    IReadOnlyList<UnitAction> afterRefresh = battle.Query(query);
     Assert.True(ReferenceEquals(actions, afterRefresh));
     Assert.True(ReferenceEquals(move, Row<MoveActionDefinition>(afterRefresh)));
     Assert.Equal(4, battle.PlayerUnit.CurrentActionPoints);
@@ -168,7 +168,7 @@ public class UnitActionCacheTest
     foreach (UnitAction action in actions)
       Assert.False(action.IsAvailable);
 
-    IReadOnlyList<UnitAction> afterWin = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
+    IReadOnlyList<UnitAction> afterWin = battle.Query(query);
     Assert.True(ReferenceEquals(actions, afterWin));
     Assert.True(ReferenceEquals(Row<MoveActionDefinition>(actions), Row<MoveActionDefinition>(afterWin)));
   }
