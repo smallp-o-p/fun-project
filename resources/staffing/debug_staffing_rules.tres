@@ -5,8 +5,8 @@
 
 [resource]
 script = ExtResource("1_rules")
-ResearcherBonusUnits = 1000
-EngineerBonusUnits = 1000
+ResearcherSpeedBonus = 0.001
+EngineerSpeedBonus = 0.001
 ResearcherCosts = Dictionary[Resource, int]({
 ExtResource("2_currency"): 100
 })

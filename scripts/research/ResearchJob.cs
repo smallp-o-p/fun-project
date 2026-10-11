@@ -2,13 +2,12 @@ using FunProject.Strategic;
 
 namespace FunProject.Research;
 
-/// <summary>
-/// Campaign work and its current rate; the deadline is a forecast, not stored progress.
-/// Carries no session reference or event subscription.
-/// </summary>
-public readonly record struct ResearchJob(
-  ResearchProject Project, long StartedAtTick, WorkProgress Work)
+public readonly record struct ResearchJob(ResearchProject Project, JobProgress Progress)
 {
-  public long RateUnits { get; init; } = WorkProgress.RateScale;
-  public long CompletesAtTick => Work.CompletionTick(Work.LastCreditedTick, RateUnits);
+  public ResearchJob(ResearchProject project, long startedAtTick, long completesAtTick)
+    : this(project, new JobProgress(startedAtTick, completesAtTick - startedAtTick)) { }
+
+  public long StartedAtTick => Progress.StartedAtTick;
+  public long CompletesAtTick => Progress.CompletesAtTick;
+  internal ResearchJob WithSpeed(long tick, float speed) => this with { Progress = Progress.WithSpeed(tick, speed) };
 }

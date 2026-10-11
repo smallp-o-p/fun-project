@@ -82,16 +82,14 @@ public sealed class ResearchState
     return new ResearchStarted(job);
   }
 
-  internal void ApplySettledJob(ResearchJob job) => ActiveJob = Some(job);
+  internal void UpdateJob(ResearchJob job) => ActiveJob = Some(job);
 
   internal Option<ResearchCompleted> CompleteIfDue(long tick)
-  {
-    if (ActiveJob.Case is not ResearchJob job) return None;
-    var settled = job with { Work = job.Work.SettleTo(tick, job.RateUnits) };
-    ApplySettledJob(settled);
-    if (settled.Work.RemainingWorkUnits > 0) return None;
-    ActiveJob = None;
-    _completedProjects.Add(job.Project);
-    return new ResearchCompleted(settled, _byProject[job.Project].ManufacturingUnlocks);
-  }
+    => ActiveJob.Filter(job => job.CompletesAtTick <= tick).Map(job =>
+    {
+      var outputs = _byProject[job.Project].ManufacturingUnlocks;
+      ActiveJob = None;
+      _completedProjects.Add(job.Project);
+      return new ResearchCompleted(job, outputs);
+    });
 }

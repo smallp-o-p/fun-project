@@ -667,7 +667,7 @@ internal static class TestData
       StartingCaptives = captives ?? [],
       ConditionRules = conditionRules,
       StartingCurrencies = startingCurrencies ?? [],
-      StaffingRules = staffingRules,
+      StaffingRules = staffingRules ?? new(),
     };
   }
 

@@ -1,80 +1,56 @@
 using System.Globalization;
 using FunProject.Currencies;
 using FunProject.Staffing;
-using FunProject.Strategic;
 using Godot;
-using CampaignGameState = FunProject.GameState.GameState;
 
 namespace FunProject.Geoscape;
 
 public sealed partial class StaffHiringControl : Control
 {
   [Export] public StaffRole Role { get; set; }
-  [Signal] public delegate void HireRequestedEventHandler(int quantity);
-  private CampaignGameState? _state;
-  private GeoscapeSession? _session;
-  private int _quantity;
+  [Signal] public delegate void QuantityChangedEventHandler();
+  [Signal] public delegate void HireRequestedEventHandler(uint quantity);
+  public uint Quantity { get; private set; }
 
   public override void _Ready()
   {
     var quantity = GetNode<SpinBox>("%HireQuantity");
-    _quantity = (int)quantity.Value;
-    quantity.ValueChanged += value => { _quantity = (int)value; Refresh(); };
-    quantity.GetLineEdit().TextChanged += text => { _quantity = ParseQuantity(text); Refresh(); };
-    quantity.GetLineEdit().TextSubmitted += _ => { _quantity = (int)quantity.Value; Refresh(); };
-    quantity.GetLineEdit().FocusExited += () => { _quantity = (int)quantity.Value; Refresh(); };
+    Quantity = (uint)quantity.Value;
+    quantity.ValueChanged += value => ChangeQuantity((uint)value);
+    quantity.GetLineEdit().TextChanged += text => ChangeQuantity(ParseQuantity(text));
+    quantity.GetLineEdit().TextSubmitted += _ => ChangeQuantity((uint)quantity.Value);
+    quantity.GetLineEdit().FocusExited += () => ChangeQuantity((uint)quantity.Value);
     GetNode<Button>("%HireButton").Pressed += () =>
     {
-      int requested = ParseQuantity(quantity.GetLineEdit().Text);
-      Refresh(requested);
+      ChangeQuantity(ParseQuantity(quantity.GetLineEdit().Text));
       if (GetNode<Button>("%HireButton").Disabled) return;
-      _quantity = requested;
-      quantity.Value = requested;
-      EmitSignal(SignalName.HireRequested, requested);
+      quantity.Value = Quantity;
+      EmitSignal(SignalName.HireRequested, Quantity);
     };
-    Refresh();
   }
 
-  private static int ParseQuantity(string text) => int.TryParse(text,
-    NumberStyles.None, CultureInfo.InvariantCulture, out int quantity) ? quantity : 0;
-
-  public void Present(CampaignGameState state, GeoscapeSession session)
+  private void ChangeQuantity(uint quantity)
   {
-    _state = state;
-    _session = session;
-    Refresh();
+    Quantity = quantity;
+    EmitSignal(SignalName.QuantityChanged);
   }
 
-  private void Refresh(int? quantity = null)
+  private static uint ParseQuantity(string text) => uint.TryParse(text,
+    NumberStyles.None, CultureInfo.InvariantCulture, out uint quantity) ? quantity : 0;
+
+  public void Present(StaffHiringOption option)
   {
-    var hire = GetNode<Button>("%HireButton");
     string roleName = Role == StaffRole.Researcher ? "Researchers" : "Engineers";
+    var hire = GetNode<Button>("%HireButton");
     hire.Text = $"Hire {roleName}";
-    int count = Role == StaffRole.Researcher ? _state?.Staff.Researchers ?? 0 : _state?.Staff.Engineers ?? 0;
-    long rate = Role == StaffRole.Researcher ? _state?.Staff.ResearchRateUnits ?? WorkProgress.RateScale
-      : _state?.Staff.ManufacturingRateUnits ?? WorkProgress.RateScale;
-    GetNode<Label>("%StaffCount").Text = $"{roleName}: {count}";
-    GetNode<Label>("%WorkRate").Text = $"Work rate: {Multiplier(rate)}x";
+    hire.Disabled = !option.Affordable;
+    GetNode<Label>("%StaffCount").Text = $"{roleName}: {option.Count}";
+    GetNode<Label>("%WorkRate").Text = $"Work rate: {option.Speed.ToString("0.0###", CultureInfo.InvariantCulture)}x" +
+      $" (+{(option.SpeedBonus * 100).ToString("0.###", CultureInfo.InvariantCulture)}% per hire)";
     var cost = GetNode<Label>("%HireCosts");
-    var result = _session?.GetHiringOption(Role, quantity ?? _quantity);
-    var option = result?.Match<StaffHiringOption?>(Right: value => value, Left: _ => null);
-    if (option is not null)
-    {
-      cost.Text = Currency.FormatCosts(option.Costs) + (option.Affordable ? "" : "\nInsufficient funds.");
-      GetNode<Label>("%WorkRate").Text += $" (+{Multiplier(option.BonusUnits)}x per hire)";
-      hire.Disabled = !option.Affordable;
-    }
-    else
-    {
-      cost.Text = result?.Match(
-        Right: _ => "", Left: reason => reason == StaffHireFailure.NotConfigured
-          ? "Hiring unavailable: no staffing rules." : $"Hiring unavailable: {reason}.") ?? "Hiring unavailable.";
-      hire.Disabled = true;
-    }
+    cost.Text = Quantity == 0 ? "Enter a positive whole quantity." : Currency.FormatCosts(option.Costs) +
+      (option.Affordable ? "" : "\nInsufficient funds.");
     if (hire.Disabled) cost.AddThemeColorOverride("font_color", Colors.Red);
     else cost.RemoveThemeColorOverride("font_color");
   }
-
-  private static string Multiplier(long units)
-    => ((decimal)units / WorkProgress.RateScale).ToString("0.0###", CultureInfo.InvariantCulture);
 }

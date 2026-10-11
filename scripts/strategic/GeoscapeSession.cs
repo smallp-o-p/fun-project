@@ -76,9 +76,8 @@ public sealed class GeoscapeSession
   public Either<ResearchStartFailure, ResearchJob> StartResearch(ResearchProject project)
     => _state.Research.ResolveResearch(project, _state).Bind<ResearchJob>(definition =>
     {
-      var work = WorkProgress.Start(definition.DurationDays, Tick);
-      _ = work.CompletionTick(Tick, _state.Staff.ResearchRateUnits);
-      var job = new ResearchJob(definition.Project, Tick, work) { RateUnits = _state.Staff.ResearchRateUnits };
+      var job = new ResearchJob(definition.Project, new JobProgress(Tick,
+        CampaignGameState.TicksFromDays(definition.DurationDays), _state.Staff.ResearchSpeed));
       if (!_state.TrySpendCurrencyCosts(definition.Project.Costs))
         return ResearchStartFailure.InsufficientCurrencies;
       var started = _state.Research.Start(job);
@@ -92,9 +91,8 @@ public sealed class GeoscapeSession
   public Either<ManufacturingStartFailure, ManufacturingJob> StartManufacturing(ManufacturingRecipe recipe)
     => _state.Engineering.ResolveManufacturing(recipe, _state.Armory).Bind<ManufacturingJob>(project =>
     {
-      var work = WorkProgress.Start(project.DurationDays, Tick);
-      _ = work.CompletionTick(Tick, _state.Staff.ManufacturingRateUnits);
-      var job = new ManufacturingJob(project, Tick, work) { RateUnits = _state.Staff.ManufacturingRateUnits };
+      var job = new ManufacturingJob(project, new JobProgress(Tick,
+        CampaignGameState.TicksFromDays(project.DurationDays), _state.Staff.ManufacturingSpeed));
       if (!_state.TrySpendCurrencyCosts(project.Costs))
         return ManufacturingStartFailure.InsufficientCurrencies;
       ManufacturingStarted started = _state.Engineering.Start(job);
@@ -102,43 +100,37 @@ public sealed class GeoscapeSession
       return started.Job;
     });
 
-  public Either<StaffHireFailure, StaffHiringOption> GetHiringOption(StaffRole role, int quantity)
-    => _state.Staff.PrepareHire(role, quantity).Map(prepared => new StaffHiringOption(
+  public StaffHiringOption GetHiringOption(StaffRole role, uint quantity)
+  {
+    var prepared = _state.Staff.PrepareHire(role, quantity);
+    return new StaffHiringOption(
       role == StaffRole.Researcher ? _state.Staff.Researchers : _state.Staff.Engineers,
-      prepared.OldRateUnits,
-      role == StaffRole.Researcher ? _state.Staff.ResearcherBonusUnits : _state.Staff.EngineerBonusUnits,
-      prepared.Costs, _state.CanAffordCurrencyCosts(prepared.Costs)));
+      role == StaffRole.Researcher ? _state.Staff.ResearchSpeed : _state.Staff.ManufacturingSpeed,
+      role == StaffRole.Researcher ? _state.Staff.ResearcherSpeedBonus : _state.Staff.EngineerSpeedBonus,
+      prepared.Costs, quantity > 0 && _state.CanAffordCurrencyCosts(prepared.Costs));
+  }
 
-  public Either<StaffHireFailure, StaffHired> HireResearchers(int quantity) => Hire(StaffRole.Researcher, quantity);
-  public Either<StaffHireFailure, StaffHired> HireEngineers(int quantity) => Hire(StaffRole.Engineer, quantity);
+  public Either<StaffHireFailure, StaffHired> HireResearchers(uint quantity) => Hire(StaffRole.Researcher, quantity);
+  public Either<StaffHireFailure, StaffHired> HireEngineers(uint quantity) => Hire(StaffRole.Engineer, quantity);
 
-  private Either<StaffHireFailure, StaffHired> Hire(StaffRole role, int quantity)
-    => _state.Staff.PrepareHire(role, quantity).Bind<StaffHired>(prepared =>
-    {
-      var research = role == StaffRole.Researcher
-        ? ActiveResearch.Map(job => job with
-        {
-          Work = job.Work.SettleTo(Tick, prepared.OldRateUnits),
-          RateUnits = prepared.NewRateUnits,
-        }) : None;
-      var manufacturing = role == StaffRole.Engineer
-        ? ActiveManufacturing.Map(job => job with
-        {
-          Work = job.Work.SettleTo(Tick, prepared.OldRateUnits),
-          RateUnits = prepared.NewRateUnits,
-        }) : None;
-      research.IfSome(job => _ = job.CompletesAtTick);
-      manufacturing.IfSome(job => _ = job.CompletesAtTick);
-      var hired = new StaffHired(role, prepared.Count, prepared.NewRateUnits);
-      if (!_state.TrySpendCurrencyCosts(prepared.Costs)) return StaffHireFailure.InsufficientCurrencies;
+  private Either<StaffHireFailure, StaffHired> Hire(StaffRole role, uint quantity)
+  {
+    if (quantity == 0) return StaffHireFailure.InvalidQuantity;
+    var prepared = _state.Staff.PrepareHire(role, quantity);
+    var research = role == StaffRole.Researcher
+      ? ActiveResearch.Map(job => job.WithSpeed(Tick, prepared.Speed)) : None;
+    var manufacturing = role == StaffRole.Engineer
+      ? ActiveManufacturing.Map(job => job.WithSpeed(Tick, prepared.Speed)) : None;
+    var hired = new StaffHired(role, prepared.Count, prepared.Speed);
+    if (!_state.TrySpendCurrencyCosts(prepared.Costs)) return StaffHireFailure.InsufficientCurrencies;
 
-      // All remaining mutations are assignments of prepared values until notification.
-      if (research.Case is ResearchJob researchJob) _state.Research.ApplySettledJob(researchJob);
-      if (manufacturing.Case is ManufacturingJob manufacturingJob) _state.Engineering.ApplySettledJob(manufacturingJob);
-      _state.Staff.Commit(prepared);
-      Commit(hired);
-      return hired;
-    });
+    // Commit all prepared values before notifying subscribers.
+    if (research.Case is ResearchJob researchJob) _state.Research.UpdateJob(researchJob);
+    if (manufacturing.Case is ManufacturingJob manufacturingJob) _state.Engineering.UpdateJob(manufacturingJob);
+    _state.Staff.Commit(prepared);
+    Commit(hired);
+    return hired;
+  }
 
   public void OpenResolution(GeoscapeEvent @event)
   {

@@ -44,5 +44,5 @@ public partial class CampaignStartData : NamedEntityData
   [Export] public ResearchProject[] ResearchProjects { get; set; } = [];
 
   [Export] public Godot.Collections.Dictionary<Currency, ulong> StartingCurrencies { get; set; } = [];
-  [Export] public StaffingRulesData? StaffingRules { get; set; }
+  [Export] public StaffingRulesData StaffingRules { get; set; } = new();
 }

@@ -61,15 +61,12 @@ public sealed class EngineeringState
     return new ManufacturingStarted(job);
   }
 
-  internal void ApplySettledJob(ManufacturingJob job) => ActiveJob = Some(job);
+  internal void UpdateJob(ManufacturingJob job) => ActiveJob = Some(job);
 
   internal Option<ManufacturingCompleted> CompleteIfDue(long tick)
-  {
-    if (ActiveJob.Case is not ManufacturingJob job) return None;
-    var settled = job with { Work = job.Work.SettleTo(tick, job.RateUnits) };
-    ApplySettledJob(settled);
-    if (settled.Work.RemainingWorkUnits > 0) return None;
-    ActiveJob = None;
-    return new ManufacturingCompleted(settled);
-  }
+    => ActiveJob.Filter(job => job.CompletesAtTick <= tick).Map(job =>
+    {
+      ActiveJob = None;
+      return new ManufacturingCompleted(job);
+    });
 }

@@ -1,7 +1,6 @@
 #nullable disable warnings
 using System;
 using FunProject.Research;
-using FunProject.Strategic;
 using GdUnit4;
 using CampaignGameState = global::FunProject.GameState.GameState;
 
@@ -67,7 +66,7 @@ public class ResearchConditionTest
     using var other = new GeoscapeFixture(MakeStart(researchProjects: [first, second]));
     Assert.Equal(0, campaign.State.Research.GetAvailableProjects(campaign.State).Count);
     // Direct lifecycle test: install a trusted historical job to exercise completion lookup.
-    campaign.State.Research.Start(new ResearchJob(first, 0, WorkProgress.Start(0, 0)));
+    campaign.State.Research.Start(new ResearchJob(first, 0, 1));
     campaign.State.Research.CompleteIfDue(1).RequireSome();
     Assert.True(second.Condition.IsMet(campaign.State));
     Assert.False(second.Condition.IsMet(other.State));

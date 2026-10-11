@@ -2,8 +2,12 @@ using FunProject.Strategic;
 
 namespace FunProject.Engineering;
 
-public readonly record struct ManufacturingJob(ManufacturingRecipe Project, long StartedAtTick, WorkProgress Work)
+public readonly record struct ManufacturingJob(ManufacturingRecipe Project, JobProgress Progress)
 {
-  public long RateUnits { get; init; } = WorkProgress.RateScale;
-  public long CompletesAtTick => Work.CompletionTick(Work.LastCreditedTick, RateUnits);
+  public ManufacturingJob(ManufacturingRecipe project, long startedAtTick, long completesAtTick)
+    : this(project, new JobProgress(startedAtTick, completesAtTick - startedAtTick)) { }
+
+  public long StartedAtTick => Progress.StartedAtTick;
+  public long CompletesAtTick => Progress.CompletesAtTick;
+  internal ManufacturingJob WithSpeed(long tick, float speed) => this with { Progress = Progress.WithSpeed(tick, speed) };
 }

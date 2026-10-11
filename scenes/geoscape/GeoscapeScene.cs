@@ -111,9 +111,6 @@ public partial class GeoscapeScene : Control
     if (geoscapeEvent is TimeAdvanced or ManufacturingStarted or ManufacturingCompleted or StaffHired)
       _hud.UpdateManufacturing(_session.ActiveManufacturing, _session.Tick);
 
-    if (geoscapeEvent is StaffHired or ResearchStarted or ManufacturingStarted)
-      _viewManager.Current.Present(_state, _session);
-
     switch (geoscapeEvent)
     {
       case TimeAdvanced timeAdvanced:

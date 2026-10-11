@@ -6,6 +6,7 @@ using FunProject.Currencies;
 using FunProject.Items;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
+using FunProject.Staffing;
 using FunProject.Geoscape;
 using Godot;
 
@@ -23,6 +24,7 @@ public sealed partial class EngineeringView : GeoscapeView
   {
     base._Ready();
     GetNode<Button>("%ManufactureButton").Pressed += OnManufacturePressed;
+    GetNode<StaffHiringControl>("%StaffHiring").QuantityChanged += PresentHiring;
     GetNode<StaffHiringControl>("%StaffHiring").HireRequested += quantity =>
     {
       var result = _session.HireEngineers(quantity);
@@ -36,7 +38,7 @@ public sealed partial class EngineeringView : GeoscapeView
   {
     _session = session;
     Present(state, session.GetManufacturingOptions(), session.ActiveManufacturing, session.Tick);
-    GetNode<StaffHiringControl>("%StaffHiring").Present(state, session);
+    PresentHiring();
   }
 
   public void Present(CampaignGameState state, IReadOnlyList<ManufacturingOption> options,
@@ -63,6 +65,12 @@ public sealed partial class EngineeringView : GeoscapeView
 
   public void ShowFailure(EquippableItemData item, ManufacturingStartFailure failure)
     => GetNode<Label>("%Status").Text = $"Manufacturing start rejected for {item.Name}: {failure}.";
+
+  private void PresentHiring()
+  {
+    var hiring = GetNode<StaffHiringControl>("%StaffHiring");
+    hiring.Present(_session.GetHiringOption(StaffRole.Engineer, hiring.Quantity));
+  }
 
   private void OnManufacturePressed()
   {

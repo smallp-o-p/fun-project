@@ -18,8 +18,8 @@ public class StaffHiringTest
     var other = MakeCurrency();
     var rules = new StaffingRulesData
     {
-      ResearcherBonusUnits = 2000,
-      EngineerBonusUnits = 3000,
+      ResearcherSpeedBonus = 0.2f,
+      EngineerSpeedBonus = 0.3f,
       ResearcherCosts = new() { [currency] = 7, [other] = 2 },
       EngineerCosts = new() { [currency] = 11, [other] = 3 },
     };
@@ -27,8 +27,8 @@ public class StaffHiringTest
       startingCurrencies: new() { [currency] = 100, [other] = 100 }));
     rules.ResearcherCosts[currency] = 99;
     rules.EngineerCosts.Clear();
-    rules.ResearcherBonusUnits = rules.EngineerBonusUnits = 0;
-    var preview = campaign.Session.GetHiringOption(role, 3).RequireRight();
+    rules.ResearcherSpeedBonus = rules.EngineerSpeedBonus = 0;
+    var preview = campaign.Session.GetHiringOption(role, 3);
     ulong price = role == StaffRole.Researcher ? 21UL : 33UL;
     ulong otherPrice = role == StaffRole.Researcher ? 6UL : 9UL;
     Assert.Equal(price, preview.Costs[currency]);
@@ -38,17 +38,17 @@ public class StaffHiringTest
     campaign.Session.EventCommitted += e =>
     {
       if (e is not StaffHired hired) return;
-      Assert.Equal(3, hired.Count);
+      Assert.Equal(3UL, hired.Count);
       Assert.Equal(100UL - price, campaign.State.GetCurrencyBalance(currency));
       Assert.Equal(100UL - otherPrice, campaign.State.GetCurrencyBalance(other));
-      Assert.Equal(3, Count(campaign, role));
-      Assert.Equal(role == StaffRole.Researcher ? 16000L : 19000L, hired.RateUnits);
+      Assert.Equal(3UL, Count(campaign, role));
+      Assert.True(Math.Abs((role == StaffRole.Researcher ? 1.6f : 1.9f) - hired.Speed) < 0.00001f);
     };
     Hire(campaign, role, 3).RequireRight();
-    Assert.Equal(0, Count(campaign, role == StaffRole.Researcher ? StaffRole.Engineer : StaffRole.Researcher));
+    Assert.Equal(0UL, Count(campaign, role == StaffRole.Researcher ? StaffRole.Engineer : StaffRole.Researcher));
     Assert.Equal(1, campaign.Events.EventsOf<StaffHired>().Length);
     var rebuilt = new GeoscapeSession(campaign.State);
-    Assert.Equal(3, rebuilt.GetHiringOption(role, 1).RequireRight().Count);
+    Assert.Equal(3UL, rebuilt.GetHiringOption(role, 1).Count);
   }
 
   [TestCase(StaffRole.Researcher)]
@@ -68,7 +68,7 @@ public class StaffHiringTest
       startingCurrencies: new() { [funded] = 10 }, manufacturingRecipes: [recipe], researchProjects: [project]));
     var manufacturing = campaign.Session.StartManufacturing(recipe).RequireRight();
     var research = campaign.Session.StartResearch(project).RequireRight();
-    Assert.False(campaign.Session.GetHiringOption(role, 2).RequireRight().Affordable);
+    Assert.False(campaign.Session.GetHiringOption(role, 2).Affordable);
     campaign.Session.EventCommitted += e =>
     {
       if (e is not TimeAdvanced) return;
@@ -77,16 +77,14 @@ public class StaffHiringTest
       Assert.Equal(research, campaign.Session.ActiveResearch.RequireSome());
       Assert.Equal(10UL, campaign.State.GetCurrencyBalance(funded));
       Assert.Equal(0UL, campaign.State.GetCurrencyBalance(missing));
-      Assert.Equal(0, Count(campaign, role));
+      Assert.Equal(0UL, Count(campaign, role));
     };
     campaign.AdvanceTicks(1);
     Assert.Equal(0, campaign.Events.EventsOf<StaffHired>().Length);
   }
 
-  [TestCase(0, StaffHireFailure.InvalidQuantity)]
-  [TestCase(-1, StaffHireFailure.InvalidQuantity)]
-  [TestCase(2, StaffHireFailure.Overflow)]
-  public static void InvalidAndOverflowingPricesNeverSpend(int quantity, StaffHireFailure failure)
+  [TestCase]
+  public static void ZeroQuantityIsRejectedAndOverflowingPricesAreClamped()
   {
     var currency = MakeCurrency();
     using var campaign = new GeoscapeFixture(MakeStart(staffingRules: new StaffingRulesData
@@ -94,32 +92,33 @@ public class StaffHiringTest
       ResearcherCosts = new() { [currency] = ulong.MaxValue },
       EngineerCosts = new() { [currency] = ulong.MaxValue },
     }, startingCurrencies: new() { [currency] = ulong.MaxValue }));
-    foreach (StaffRole role in new[] { StaffRole.Researcher, StaffRole.Engineer })
-    {
-      Assert.Equal(failure, campaign.Session.GetHiringOption(role, quantity).RequireLeft());
-      Assert.Equal(failure, Hire(campaign, role, quantity).RequireLeft());
-      Assert.Equal(0, Count(campaign, role));
-    }
+    Assert.Equal(StaffHireFailure.InvalidQuantity, campaign.Session.HireResearchers(0).RequireLeft());
+    Assert.False(campaign.Session.GetHiringOption(StaffRole.Researcher, 0).Affordable);
     Assert.Equal(ulong.MaxValue, campaign.State.GetCurrencyBalance(currency));
     Assert.Equal(0, campaign.Events.Count);
-    // The full unsigned range remains a valid one-person payment.
-    campaign.Session.HireResearchers(1).RequireRight();
+    Assert.Equal(ulong.MaxValue, campaign.Session.GetHiringOption(StaffRole.Researcher, 2).Costs[currency]);
+    campaign.Session.HireResearchers(2).RequireRight();
+    Assert.Equal(2UL, campaign.State.Staff.Researchers);
     Assert.Equal(0UL, campaign.State.GetCurrencyBalance(currency));
+    Assert.Equal(StaffHireFailure.InsufficientCurrencies, campaign.Session.HireEngineers(2).RequireLeft());
+    Assert.Equal(0UL, campaign.State.Staff.Engineers);
   }
 
   [TestCase]
-  public static void MissingRulesAndCountOverflowLeaveStateUnchanged()
+  public static void DefaultBonusIsAdditiveAndFractionalProgressSurvivesRepeatedHiring()
   {
-    using var unconfigured = new GeoscapeFixture();
-    Assert.Equal(StaffHireFailure.NotConfigured, unconfigured.Session.HireResearchers(1).RequireLeft());
-    Assert.Equal(StaffHireFailure.NotConfigured, unconfigured.Session.HireEngineers(1).RequireLeft());
-    using var campaign = new GeoscapeFixture(MakeStart(staffingRules: new StaffingRulesData
-    { ResearcherBonusUnits = uint.MaxValue }));
-    campaign.Session.HireResearchers(int.MaxValue).RequireRight();
-    Assert.Equal(9223372030412334865L, campaign.State.Staff.ResearchRateUnits);
-    Assert.Equal(StaffHireFailure.Overflow, campaign.Session.HireResearchers(1).RequireLeft());
-    Assert.Equal(int.MaxValue, campaign.State.Staff.Researchers);
-    Assert.Equal(1, campaign.Events.Count);
+    var project = MakeResearch();
+    using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project]));
+    campaign.Session.HireResearchers(1).RequireRight();
+    Assert.Equal(1.001f, campaign.State.Staff.ResearchSpeed);
+    campaign.Session.HireResearchers(99).RequireRight();
+    campaign.Session.StartResearch(project).RequireRight();
+    campaign.AdvanceTicks(1);
+    campaign.Session.HireResearchers(100).RequireRight();
+    campaign.AdvanceTicks(1);
+    campaign.Session.HireResearchers(100).RequireRight();
+    Assert.Equal(1.3f, campaign.State.Staff.ResearchSpeed);
+    Assert.Equal(1108L, campaign.Session.ActiveResearch.RequireSome().CompletesAtTick);
   }
 
   [TestCase(StaffRole.Researcher, false)]
@@ -130,7 +129,7 @@ public class StaffHiringTest
   {
     var recipe = MakeManufacturingRecipe(MakeItemData());
     var project = MakeResearch();
-    using var campaign = new GeoscapeFixture(MakeStart(staffingRules: new StaffingRulesData(),
+    using var campaign = new GeoscapeFixture(MakeStart(staffingRules: new StaffingRulesData { ResearcherSpeedBonus = 0.1f, EngineerSpeedBonus = 0.1f },
       manufacturingRecipes: [recipe], researchProjects: [project]));
     campaign.Session.StartManufacturing(recipe).RequireRight();
     campaign.Session.StartResearch(project).RequireRight();
@@ -159,7 +158,7 @@ public class StaffHiringTest
   {
     var project = MakeResearch();
     using var campaign = new GeoscapeFixture(MakeStart(staffingRules: new StaffingRulesData
-    { ResearcherBonusUnits = uint.MaxValue }, researchProjects: [project]));
+    { ResearcherSpeedBonus = 10000f }, researchProjects: [project]));
     campaign.Session.HireResearchers(1).RequireRight();
     campaign.Session.EventCommitted += e =>
     {
@@ -179,13 +178,13 @@ public class StaffHiringTest
     { EngineerCosts = new() { [currency] = 7 } }, startingCurrencies: new() { [currency] = 21 }));
     campaign.Session.EventCommitted += e => { if (e is StaffHired) throw new InvalidOperationException("Subscriber"); };
     Assert.Throws<InvalidOperationException>(() => campaign.Session.HireEngineers(2));
-    Assert.Equal(2, campaign.State.Staff.Engineers);
+    Assert.Equal(2UL, campaign.State.Staff.Engineers);
     Assert.Equal(7UL, campaign.State.GetCurrencyBalance(currency));
   }
 
-  private static int Count(GeoscapeFixture campaign, StaffRole role)
+  private static ulong Count(GeoscapeFixture campaign, StaffRole role)
     => role == StaffRole.Researcher ? campaign.State.Staff.Researchers : campaign.State.Staff.Engineers;
 
-  private static Either<StaffHireFailure, StaffHired> Hire(GeoscapeFixture campaign, StaffRole role, int quantity)
+  private static Either<StaffHireFailure, StaffHired> Hire(GeoscapeFixture campaign, StaffRole role, uint quantity)
     => role == StaffRole.Researcher ? campaign.Session.HireResearchers(quantity) : campaign.Session.HireEngineers(quantity);
 }
