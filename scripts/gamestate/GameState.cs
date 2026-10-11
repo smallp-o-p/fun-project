@@ -49,6 +49,7 @@ public sealed class GameState
   private readonly Dictionary<string, int> _indexByName = [];
   private readonly List<Combatant> _roster = [];
   private readonly Dictionary<Currency, ulong> _currencies = new(ReferenceEqualityComparer.Instance);
+  private readonly Dictionary<GlobalProcess, SysColGeneric.HashSet<GlobalBuffData>> _globalBuffs = [];
   private readonly DateTime _startTime = DateTime.UnixEpoch;
 
   public GameState(CampaignStartData start)
@@ -112,6 +113,7 @@ public sealed class GameState
 
     Research = new ResearchState(start.ResearchProjects);
     Staff = new StaffState(start.StaffingRules);
+    foreach (var buff in start.InitialGlobalBuffs) AddGlobalBuff(buff);
 
     Conditions = new CombatantConditionSystem(start.ConditionRules);
 
@@ -153,6 +155,28 @@ public sealed class GameState
 
   public ResearchState Research { get; }
   public StaffState Staff { get; }
+
+  public bool AddGlobalBuff(GlobalBuffData buff)
+  {
+    ArgumentNullException.ThrowIfNull(buff);
+    if (!Enum.IsDefined(buff.Process) || !double.IsFinite(buff.Modifier))
+      throw new InvalidOperationException("Global buffs require a known process and a finite modifier.");
+    if (!_globalBuffs.TryGetValue(buff.Process, out var buffs))
+      _globalBuffs.Add(buff.Process, buffs = new(ReferenceEqualityComparer.Instance));
+    return buffs.Add(buff);
+  }
+
+  public bool RemoveGlobalBuff(GlobalBuffData buff)
+    => _globalBuffs.TryGetValue(buff.Process, out var buffs) && buffs.Remove(buff);
+
+  internal double GetGlobalModifier(GlobalProcess process)
+    => _globalBuffs.TryGetValue(process, out var buffs)
+      // Bound extreme definitions while retaining double precision for normal percentages.
+      // Even int.MaxValue memberships cannot overflow the aggregate.
+      ? buffs.AsValueEnumerable().Sum(buff => Math.Clamp(buff.Modifier, -(double)float.MaxValue, float.MaxValue)) : 0;
+
+  public double ResearchSpeed => JobProgress.EffectiveSpeed(Staff.ResearchSpeed, GetGlobalModifier(GlobalProcess.ResearchSpeed));
+  public double ManufacturingSpeed => JobProgress.EffectiveSpeed(Staff.ManufacturingSpeed, GetGlobalModifier(GlobalProcess.ManufacturingSpeed));
 
   public ulong GetCurrencyBalance(Currency currency) => _currencies.GetValueOrDefault(currency);
 

@@ -28,7 +28,7 @@ public sealed class StaffState
   internal sealed record PreparedHire(StaffRole Role, ulong Count, float Speed,
     Godot.Collections.Dictionary<Currency, ulong> Costs);
 
-  internal PreparedHire PrepareHire(StaffRole role, uint quantity)
+  internal PreparedHire PrepareHire(StaffRole role, uint quantity, double costModifier = 0)
   {
     var (count, bonus, costs) = role switch
     {
@@ -37,8 +37,13 @@ public sealed class StaffState
       _ => throw new ArgumentOutOfRangeException(nameof(role)),
     };
     var total = new Godot.Collections.Dictionary<Currency, ulong>();
+    decimal factor = (decimal)Math.Clamp(1 + costModifier, 0, (double)ulong.MaxValue);
     foreach (var (currency, cost) in costs)
-      total.Add(currency, quantity != 0 && cost > ulong.MaxValue / quantity ? ulong.MaxValue : cost * quantity);
+    {
+      decimal raw = (decimal)cost * quantity;
+      total.Add(currency, factor >= 1 && raw >= ulong.MaxValue / factor
+        ? ulong.MaxValue : (ulong)Math.Min(ulong.MaxValue, decimal.Ceiling(raw * factor)));
+    }
     ulong nextCount = count > ulong.MaxValue - quantity ? ulong.MaxValue : count + quantity;
     return new PreparedHire(role, nextCount, 1 + nextCount * bonus, total);
   }

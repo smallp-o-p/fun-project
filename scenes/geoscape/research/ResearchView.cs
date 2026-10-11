@@ -107,7 +107,7 @@ public sealed partial class ResearchView : GeoscapeView
     {
       GetNode<Label>("%ProjectName").Text = project.Name;
       GetNode<Label>("%ProjectDescription").Text = project.Description;
-      GetNode<Label>("%ResearchDuration").Text = $"Duration: {project.DurationDays}d";
+      GetNode<Label>("%ResearchDuration").Text = ProjectTimeText.Duration(project.DurationDays, _state.ResearchSpeed);
       var costLabel = GetNode<Label>("%CurrencyCosts");
       costLabel.Text = Currency.FormatCosts(project.Costs);
       start.Disabled = !_state.CanAffordCurrencyCosts(project.Costs);

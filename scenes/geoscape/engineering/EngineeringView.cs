@@ -129,7 +129,7 @@ public sealed partial class EngineeringView : GeoscapeView
     GetNode<Label>("%ItemDescription").Text = _selection.Match(
       option => option.Project.Item.Description, () => "");
     GetNode<Label>("%ManufacturingDuration").Text = _selection.Match(
-      option => $"Duration: {option.Project.DurationDays}d", () => "");
+      option => ProjectTimeText.Duration(option.Project.DurationDays, _state.ManufacturingSpeed), () => "");
     GetNode<Label>("%Stock").Text = _selection.Match(
       option => option.Project.Item.UnlimitedStock ? "Stock: Not established" : $"Stock: {option.Remaining}", () => "");
     var costLabel = GetNode<Label>("%CurrencyCosts");
