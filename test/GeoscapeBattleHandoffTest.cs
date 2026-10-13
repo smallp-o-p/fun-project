@@ -16,7 +16,7 @@ namespace FunProject.Tests;
 
 // Real host handoff at the authored scene boundary: mission preparation's Deploy presents the
 // battle inside the pushed mission view while the stack keeps the campaign and session,
-// and the terminal Return applies the campaign return exactly once before restoring the root.
+// and terminal Return applies the campaign return once, shows results, then Continue restores the root.
 // Battles advance through real HUD actions; startup registration exposes only the hook
 // capability used to verify owner disposal. Campaign effect details live in return tests.
 
@@ -100,6 +100,35 @@ public partial class GeoscapeBattleHandoffTest
     return (scene, manager, squad, dialog, session);
   }
 
+  private static void ContinueResults(GeoscapeView mission)
+    => mission.GetNode<Control>("MissionResultsView").GetNode<Button>("%ContinueButton")
+      .EmitSignal(Button.SignalName.Pressed);
+
+  [TestCase(TestName = "Terminal return retains results and frozen time until Continue")]
+  public static async Task TerminalReturnRetainsResults()
+  {
+    await using var cleanup = new DeferredNodeCleanup();
+    var (scene, manager, squad, _, session) = PreparedScene(SurvivalMission(1), out var capture);
+    SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
+    var battle = MissionBattleHost(squad);
+    ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
+
+    var results = squad.GetNode<Control>("MissionResultsView");
+    Assert.True(results.IsVisibleInTree());
+    Assert.True(ReferenceEquals(squad, manager.Current));
+    Assert.Equal("1", results.GetNode<Label>("%TurnsTaken").Text);
+    Assert.True(session.ActiveMission.IsNone);
+    Assert.True(session.PendingResolution.IsNone);
+    AssertBattleDisposed(capture);
+    long tick = session.Tick;
+    scene._PhysicsProcess(1.0);
+    Assert.Equal(tick, session.Tick);
+    ContinueResults(squad);
+    Assert.True(ReferenceEquals(manager.RootView, manager.Current));
+    scene._PhysicsProcess(0.1);
+    Assert.True(session.Tick > tick);
+  }
+
   [TestCase(800, 600, TestName = "Opaque battle viewport covers retained geoscape at minimum size")]
   [TestCase(1600, 900, TestName = "Opaque battle viewport covers retained geoscape in a scaled window")]
   public static async Task BattleOwnsOpaqueViewport(int width, int height)
@@ -146,6 +175,7 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(session.ActiveMission.IsNone);
     Assert.True(session.PendingResolution.IsNone);
     AssertBattleDisposed(capture);
+    ContinueResults(squad);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
     await WaitForLayout(window);
     using var restored = window.GetTexture().GetImage();
@@ -210,6 +240,15 @@ public partial class GeoscapeBattleHandoffTest
     returnButton.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(1, intents); // the mission handler completed without subscriber failure
 
+    var results = squad.GetNode<Control>("MissionResultsView");
+    Assert.True(results.IsVisibleInTree());
+    Assert.Equal("2", results.GetNode<Label>("%TurnsTaken").Text);
+    Assert.True(ReferenceEquals(squad, manager.Current));
+    AssertBattleDisposed(capture);
+    scene._PhysicsProcess(1.0);
+    Assert.Equal(clockDuring, Clock(scene).Text, "Results must freeze time after mission consumption.");
+    ContinueResults(squad);
+
     Assert.True(session.ActiveMission.IsNone);
     Assert.True(session.PendingResolution.IsNone);
     Assert.Equal(1, campaign.ActiveEvents.Count); // only the deployed mission was consumed
@@ -218,7 +257,6 @@ public partial class GeoscapeBattleHandoffTest
     Assert.True(ReferenceEquals(campaign, scene.Campaign),
       "The scene keeps one campaign instance across presentation and return.");
 
-    AssertBattleDisposed(capture);
     Assert.True(manager.Visible);
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
@@ -246,6 +284,7 @@ public partial class GeoscapeBattleHandoffTest
     EndTurnButton(secondBattle).EmitSignal(Button.SignalName.Pressed);
     await DrainDirector(secondBattle);
     ReturnButton(secondBattle).EmitSignal(Button.SignalName.Pressed);
+    ContinueResults(secondSquad);
     Assert.Equal(0, campaign.ActiveEvents.Count);
     Assert.Equal(0, MapEventMarkers(scene).Length);
     Assert.True(session.ActiveMission.IsNone);
@@ -326,6 +365,7 @@ public partial class GeoscapeBattleHandoffTest
     var retry = MissionBattleHost(manager.Current);
     Assert.True(session.ActiveMission.IsSome);
     ReturnButton(retry).EmitSignal(Button.SignalName.Pressed);
+    ContinueResults(squad);
     Assert.True(session.ActiveMission.IsNone);
     Assert.True(session.PendingResolution.IsNone);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
@@ -438,6 +478,8 @@ public partial class GeoscapeBattleHandoffTest
     AssertBattleDisposed(capture);
     Assert.True(manager.Visible);
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
+    Assert.True(squad.GetNode<Control>("MissionResultsView").IsVisibleInTree());
+    ContinueResults(squad);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
 
     // The throwing close-path refresh detached every original marker before its failed
@@ -493,6 +535,8 @@ public partial class GeoscapeBattleHandoffTest
     AssertBattleDisposed(capture);
     Assert.True(manager.Visible);
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
+    Assert.True(squad.GetNode<Control>("MissionResultsView").IsVisibleInTree());
+    ContinueResults(squad);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
 
     // The guaranteed cleanup retracts the consumed mission's marker without re-stamping

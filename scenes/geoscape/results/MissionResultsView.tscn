@@ -1,0 +1,126 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/geoscape/GeoscapeView.tscn" id="1_base"]
+[ext_resource type="Script" path="res://scenes/geoscape/results/MissionResultsView.cs" id="2_script"]
+[ext_resource type="StyleBox" path="res://scenes/ui/ScreenBackground.tres" id="3_background"]
+
+[node name="MissionResultsView" node_paths=PackedStringArray("BackButton") instance=ExtResource("1_base")]
+script = ExtResource("2_script")
+BackButton = NodePath("Panel/Margin/Center/Layout/Footer/ContinueButton")
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("3_background")
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 32
+
+[node name="Center" type="CenterContainer" parent="Panel/Margin"]
+layout_mode = 2
+
+[node name="Layout" type="VBoxContainer" parent="Panel/Margin/Center"]
+custom_minimum_size = Vector2(640, 0)
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="Title" type="Label" parent="Panel/Margin/Center/Layout"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Mission Results"
+
+[node name="Divider" type="HSeparator" parent="Panel/Margin/Center/Layout"]
+layout_mode = 2
+
+[node name="Tally" type="GridContainer" parent="Panel/Margin/Center/Layout"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 32
+theme_override_constants/v_separation = 20
+
+[node name="MissionTypeHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Mission Type"
+
+[node name="MissionType" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Mission type"
+horizontal_alignment = 2
+autowrap_mode = 3
+
+[node name="TurnsTakenHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Turns Taken"
+
+[node name="TurnsTaken" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "0"
+horizontal_alignment = 2
+
+[node name="SoldiersWoundedHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Soldiers Wounded"
+
+[node name="SoldiersWounded" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "0"
+horizontal_alignment = 2
+
+[node name="SoldiersKilledHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Soldiers Killed"
+
+[node name="SoldiersKilled" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "0"
+horizontal_alignment = 2
+
+[node name="EnemiesKilledHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Enemies Killed"
+
+[node name="EnemiesKilled" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "0"
+horizontal_alignment = 2
+
+[node name="FooterDivider" type="HSeparator" parent="Panel/Margin/Center/Layout"]
+layout_mode = 2
+
+[node name="Footer" type="HBoxContainer" parent="Panel/Margin/Center/Layout"]
+layout_mode = 2
+alignment = 2
+
+[node name="ContinueButton" type="Button" parent="Panel/Margin/Center/Layout/Footer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 44)
+layout_mode = 2
+text = "Continue"
