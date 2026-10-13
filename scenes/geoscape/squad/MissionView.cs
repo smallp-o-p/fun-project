@@ -4,6 +4,7 @@ using FunProject.Combatants;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
 using Godot;
+using System;
 
 namespace FunProject.Geoscape;
 
@@ -28,6 +29,7 @@ public sealed partial class MissionView : SquadLoadoutView
   {
     base._Ready();
     GetNode<Button>("%DeployButton").Pressed += DeployMission;
+    GetNode<MissionResultsView>("%MissionResultsView").BackRequested += RequestBack;
   }
 
   public override void Present(CampaignGameState state, GeoscapeSession session)
@@ -60,7 +62,10 @@ public sealed partial class MissionView : SquadLoadoutView
       {
         launched = handle;
         host.Present(handle.Runtime, handle.Setup, allowReturn: true);
-        host.Completed += CompleteMission;
+        host.Completed += summary => CompleteMission(summary,
+          handle.Runtime.Query(new GetBattleResultQuery()).Match(
+            Right: result => result,
+            Left: failure => throw new InvalidOperationException(failure.Message)));
         GetNode<SubViewport>("Background/Viewport").AddChild(host);
         host.InitializePresentation();
         GetNode<Control>("Content").Hide();
@@ -79,17 +84,23 @@ public sealed partial class MissionView : SquadLoadoutView
     }
   }
 
-  private void CompleteMission(FactionBattleSummary summary)
+  private void CompleteMission(FactionBattleSummary summary, BattleResult result)
   {
+    var results = GetNode<MissionResultsView>("%MissionResultsView");
+    results.Bind(_mission.Definition.TacticalMission!.BattleType.Name, summary, result);
     try
     {
       _session.CompleteMission(summary);
     }
     finally
     {
-      // Consumption completes before notifications; committed returns pop even when a subscriber throws.
+      // Capture display values before disposal; committed returns show results even if a subscriber throws.
       if (_session.ActiveMission.IsNone)
-        RequestBack();
+      {
+        _battle?.Dispose();
+        GetNode<Control>("Background").Hide();
+        results.Show();
+      }
     }
   }
 
