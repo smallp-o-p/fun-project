@@ -87,6 +87,7 @@ public enum BattleSetupFailureReason
   DuplicateObjectCell,
   /// <summary>The designated player side had no deployed units.</summary>
   EmptyPlayerDeployment,
+  InvalidMissionState,
 }
 
 /// <summary>A typed setup failure with a human-readable explanation.</summary>

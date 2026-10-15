@@ -6,6 +6,8 @@
 [ext_resource type="PackedScene" uid="uid://la0pq1jhi1xu" path="res://scenes/geoscape/captivity/CaptivityView.tscn" id="4_30twl"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/research/ResearchView.tscn" id="5_research"]
 
+[ext_resource type="PackedScene" path="res://scenes/geoscape/results/MissionResultsView.tscn" id="6_results"]
+
 [node name="GeoscapeHud" type="Control"]
 layout_mode = 3
 anchors_preset = 15
@@ -117,6 +119,18 @@ mouse_filter = 2
 [node name="Separator" type="VSeparator" parent="BottomBar/Margin/Row"]
 layout_mode = 2
 
+[node name="ResultsButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -136.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 60.0
+text = "Last mission"
+
 [node name="EngineeringProgress" type="Label" parent="BottomBar/Margin/Row"]
 unique_name_in_owner = true
 custom_maximum_size = Vector2(200, -1)
@@ -137,3 +151,5 @@ horizontal_alignment = 2
 [connection signal="pressed" from="BottomBar/Margin/Row/ViewButtons/EngineeringButton" to="." method="RequestView" binds= [ExtResource("3_engineering")]]
 [connection signal="pressed" from="BottomBar/Margin/Row/ViewButtons/CaptivityButton" to="." method="RequestView" binds= [ExtResource("4_30twl")]]
 [connection signal="pressed" from="BottomBar/Margin/Row/ViewButtons/ResearchButton" to="." method="RequestView" binds= [ExtResource("5_research")]]
+
+[connection signal="pressed" from="ResultsButton" to="." method="RequestView" binds= [ExtResource("6_results")]]

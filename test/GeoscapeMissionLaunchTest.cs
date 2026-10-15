@@ -126,6 +126,8 @@ public partial class GeoscapeMissionLaunchTest
     var selected = new List<Combatant> { beta, beta, alpha, campaign.State.Roster[2] };
     mutation.OnRegister = () =>
     {
+      Assert.Equal(BattleSetupFailureReason.InvalidMissionState,
+        new GeoscapeSession(campaign.State).LaunchMission(active, selected).RequireLeft().Reason);
       selected.Clear();
       selected.Add(campaign.State.Roster[2]);
     };

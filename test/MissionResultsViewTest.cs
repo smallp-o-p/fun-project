@@ -1,9 +1,12 @@
 using FunProject.Battle;
 using FunProject.Geoscape;
+using FunProject.Currencies;
+using FunProject.Strategic;
 using FunProject.Weapons;
 using Godot;
 using GdUnit4;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using static FunProject.Tests.GeoscapeTestScenes;
 
 namespace FunProject.Tests;
@@ -38,7 +41,10 @@ public class MissionResultsViewTest
     var view = GD.Load<PackedScene>("res://scenes/geoscape/results/MissionResultsView.tscn")
       .Instantiate<MissionResultsView>();
     CreateScaledWindow(view, new Vector2I(width, height));
-    view.Bind("Bomb Defusal", summary, result);
+    view.Bind(new MissionReceipt("Bomb Defusal", Some(summary.Outcome), new Dictionary<Currency, ulong>())
+    {
+      Tally = Some(MissionTally.From(summary, result)),
+    });
     await WaitForLayout(view);
 
     Assert.Equal("Bomb Defusal", view.GetNode<Label>("%MissionType").Text);

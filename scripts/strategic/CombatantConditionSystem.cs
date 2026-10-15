@@ -83,6 +83,13 @@ public sealed class CombatantConditionSystem
   /// </summary>
   internal void ApplyMissionReturn(Combatant combatant, long healthDamageTaken, int maxHealth, long tick)
   {
+    var next = PrepareMissionReturn(combatant, healthDamageTaken, maxHealth, tick);
+    CommitMissionReturn(combatant, next.Injury, next.Fatigue);
+  }
+
+  internal (Option<InjuryState> Injury, Option<FatigueState> Fatigue) PrepareMissionReturn(
+    Combatant combatant, long healthDamageTaken, int maxHealth, long tick)
+  {
     Option<InjuryState> currentInjury = GetInjury(combatant);
     Option<FatigueState> currentFatigue = GetFatigue(combatant);
 
@@ -112,6 +119,11 @@ public sealed class CombatantConditionSystem
         : new FatigueState(tier, checked(tick + CampaignGameState.TicksFromDays(FatigueTierAt(tier).RecoveryDays)));
     }
 
+    return (nextInjury, nextFatigue);
+  }
+
+  internal void CommitMissionReturn(Combatant combatant, Option<InjuryState> nextInjury, Option<FatigueState> nextFatigue)
+  {
     if (nextInjury.Case is InjuryState activeInjury)
       _injuries[combatant] = activeInjury;
     else

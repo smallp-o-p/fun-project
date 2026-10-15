@@ -193,6 +193,18 @@ public sealed class GameState
     return true;
   }
 
+  internal void CreditCurrencies(IReadOnlyDictionary<Currency, ulong> rewards)
+  {
+    // Check the entire credit before changing any balance. Overflow rejects the return.
+    foreach (var (currency, amount) in rewards)
+      _ = checked(GetCurrencyBalance(currency) + amount);
+    foreach (var (currency, amount) in rewards)
+      if (amount > 0) _currencies[currency] = checked(GetCurrencyBalance(currency) + amount);
+  }
+
+  internal Option<MissionReceipt> LastMissionReceipt { get; set; }
+  internal bool MissionStarting { get; set; }
+
   public DateTime CurrentTime => _startTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
 
   // Days of game time elapsed since the start, 1-based: Day 1 spans the first 24 game-hours,

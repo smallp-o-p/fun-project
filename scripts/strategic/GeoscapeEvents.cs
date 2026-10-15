@@ -14,6 +14,8 @@ public sealed record GeoscapeEvent(
   long OccurredTick,
   Option<long> ExpiresAtTick)
 {
+  internal MissionTerms? Terms { get; set; }
+
   /// <summary>Seed minted once when a tactical event fires and retained on the active record,
   /// so battle resolution reproduces the same force across session rebuilds. Non-tactical
   /// events carry None.</summary>

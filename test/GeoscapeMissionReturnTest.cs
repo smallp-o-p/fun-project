@@ -88,6 +88,7 @@ public class GeoscapeMissionReturnTest
     var battle = campaign.Session.LaunchMission(mission, [alpha, beta, gamma]).RequireRight();
     try
     {
+      campaign.Session.ConfirmMissionDeployment(battle.Deployment);
       var grunt = UnitAt(battle, 3).Combatant;
       Strike(battle, UnitAt(battle, 0), 25);
       Strike(battle, UnitAt(battle, 1), 999, DamageKind.Stun);
@@ -150,7 +151,7 @@ public class GeoscapeMissionReturnTest
         }
       };
 
-      rebuilt.CompleteMission(summary);
+      rebuilt.CompleteMission(battle.Deployment, summary, battle.Runtime.Query(new GetBattleResultQuery()).RequireRight());
       Assert.True(closed);
       Assert.True(rebuilt.ActiveMission.IsNone);
       Assert.True(rebuilt.PendingResolution.IsNone);
@@ -178,11 +179,12 @@ public class GeoscapeMissionReturnTest
     var battle = campaign.Session.LaunchMission(mission, [alpha]).RequireRight();
     try
     {
+      campaign.Session.ConfirmMissionDeployment(battle.Deployment);
       Strike(battle, UnitAt(battle, 0), 999);
       Assert.Equal(BattleOutcome.Defeat, PlayerSummary(battle, campaign.State).Outcome);
 
       campaign.ClearEvents();
-      campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
+      campaign.Session.CompleteMission(battle.Deployment, PlayerSummary(battle, campaign.State), battle.Runtime.Query(new GetBattleResultQuery()).RequireRight());
 
       Assert.False(Holds(campaign.State.Roster, alpha), "The reported death leaves the roster.");
       Assert.Equal(3, campaign.State.Roster.Count);
@@ -218,6 +220,7 @@ public class GeoscapeMissionReturnTest
     var battle = campaign.Session.LaunchMission(mission, [alpha]).RequireRight();
     try
     {
+      campaign.Session.ConfirmMissionDeployment(battle.Deployment);
       var grunt = UnitAt(battle, 3).Combatant;
       Strike(battle, UnitAt(battle, 3), 20, DamageKind.Stun);
       Assert.Equal(BattleOutcome.Victory, PlayerSummary(battle, campaign.State).Outcome);
@@ -233,7 +236,7 @@ public class GeoscapeMissionReturnTest
       Exception? caught = null;
       try
       {
-        campaign.Session.CompleteMission(PlayerSummary(battle, campaign.State));
+        campaign.Session.CompleteMission(battle.Deployment, PlayerSummary(battle, campaign.State), battle.Runtime.Query(new GetBattleResultQuery()).RequireRight());
       }
       catch (Exception exception)
       {

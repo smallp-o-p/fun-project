@@ -21,6 +21,27 @@ custom_minimum_size = Vector2(120, 40)
 layout_mode = 2
 text = "Deploy"
 
+[node name="RewardPreview" type="Label" parent="Content/Margin/Layout" index="1"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="MissionFailure" type="Label" parent="Content/Margin/Layout" index="2"]
+unique_name_in_owner = true
+layout_mode = 2
+modulate = Color(1, 0.45, 0.45, 1)
+autowrap_mode = 3
+
 [node name="MissionResultsView" parent="." instance=ExtResource("4_results")]
 unique_name_in_owner = true
 visible = false
+
+[node name="AbandonButton" type="Button" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_left = 150.0
+offset_top = 16.0
+offset_right = 380.0
+offset_bottom = 56.0
+text = "Abandon mission"
