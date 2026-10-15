@@ -20,6 +20,7 @@
     <!-- Root bin/obj strays never compile in; DefaultItemExcludes here covers only
          the .godot/mono/temp outputs. -->
     <Compile Remove="bin\**\*.cs" />
+    <Compile Remove="analyzers\**\*.cs" />
     <Compile Remove="obj\**\*.cs" />
     <Compile Remove="scenes\DemoBattle*.cs" />
     <Compile Remove="fun-project-test\**\*.cs" />

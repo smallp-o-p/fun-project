@@ -29,3 +29,7 @@ Godot-MCP/
 *.DotSettings.user
 .superpowers/
 .codex/
+
+# Build-only Roslyn tooling and its standalone compiler tests.
+/analyzers/**/bin/
+/analyzers/**/obj/
