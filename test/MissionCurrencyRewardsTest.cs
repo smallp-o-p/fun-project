@@ -17,7 +17,7 @@ namespace FunProject.Tests;
 [RequireGodotRuntime]
 public class MissionCurrencyRewardsTest
 {
-  private static MissionCurrencyRewardData Entry(Currency currency, ulong minimum = 50, ulong maximum = 50)
+  private static MissionCurrencyRewardData Entry(Currency currency, uint minimum = 50, uint maximum = 50)
     => new() { Currency = currency, Minimum = minimum, Maximum = maximum };
 
   private static GeoscapeFixture Campaign(Currency currency, BattleOutcome outcome = BattleOutcome.Victory)
@@ -77,11 +77,21 @@ public class MissionCurrencyRewardsTest
     Assert.True(sets.Count > 1, "Different event seeds must vary the reward subset.");
     using var emptyCampaign = new GeoscapeFixture(MakeStart());
     Assert.Equal(0, emptyCampaign.State.GenerateMissionRewards(1).Count);
-    var maximumStart = MakeStart();
-    maximumStart.MissionRewardPool.Add(Entry(a, ulong.MaxValue, ulong.MaxValue));
-    using var maximumCampaign = new GeoscapeFixture(maximumStart);
-    var maximum = maximumCampaign.State.GenerateMissionRewards(1);
-    Assert.Equal(ulong.MaxValue, maximum[a]);
+  }
+
+  [TestCase(0U, 1U)]
+  [TestCase(uint.MaxValue - 1, uint.MaxValue)]
+  [TestCase(uint.MaxValue, uint.MaxValue)]
+  public static void RewardAmountBoundsAreInclusive(uint minimum, uint maximum)
+  {
+    var currency = MakeCurrency();
+    var start = MakeStart();
+    start.MissionRewardPool.Add(Entry(currency, minimum, maximum));
+    using var campaign = new GeoscapeFixture(start);
+    var amounts = new SysColGeneric.HashSet<ulong>();
+    for (int seed = 0; seed < 24; seed++)
+      amounts.Add(campaign.State.GenerateMissionRewards(seed)[currency]);
+    Assert.True(amounts.SetEquals(new ulong[] { minimum, maximum }));
   }
 
   [TestCase(800, 600)]

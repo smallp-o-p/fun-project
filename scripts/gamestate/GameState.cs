@@ -190,26 +190,12 @@ public sealed class GameState
     {
       var random = new Random(unchecked(seed ^ (int)0xBB67AE85));
       int count = random.Next(1, pool.Length + 1);
-      Span<byte> bytes = stackalloc byte[sizeof(ulong)];
       for (int i = 0; i < count; i++)
       {
         int chosen = random.Next(i, pool.Length);
         (pool[i], pool[chosen]) = (pool[chosen], pool[i]);
         var reward = pool[i];
-        ulong sampled = reward.Minimum;
-        ulong range = reward.Maximum - reward.Minimum;
-        if (range != 0)
-        {
-          ulong width = unchecked(range + 1);
-          ulong threshold = width == 0 ? 0 : unchecked(0UL - width) % width;
-          ulong value;
-          do
-          {
-            random.NextBytes(bytes);
-            value = BitConverter.ToUInt64(bytes);
-          } while (value < threshold);
-          sampled = width == 0 ? value : reward.Minimum + value % width;
-        }
+        ulong sampled = (ulong)random.NextInt64(reward.Minimum, (long)reward.Maximum + 1);
         ulong amount = rewards.GetValueOrDefault(reward.Currency);
         rewards[reward.Currency] = amount + Math.Min(sampled, ulong.MaxValue - amount);
       }

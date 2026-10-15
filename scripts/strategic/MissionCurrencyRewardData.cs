@@ -7,6 +7,6 @@ namespace FunProject.Strategic;
 public partial class MissionCurrencyRewardData : Resource
 {
   [Export] public required Currency Currency { get; set; }
-  [Export] public ulong Minimum { get; set; }
-  [Export] public ulong Maximum { get; set; }
+  [Export] public uint Minimum { get; set; }
+  [Export] public uint Maximum { get; set; }
 }
