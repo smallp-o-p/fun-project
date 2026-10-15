@@ -304,7 +304,7 @@ public sealed class GeoscapeSession
         fire.ExpiresAtTick)
       {
         BattleSeed = seed,
-        Rewards = seed.Match(value => MissionCurrencyRewardData.Generate(_state.MissionRewardPool, value),
+        Rewards = seed.Match(_state.GenerateMissionRewards,
           () => new Dictionary<Currency, ulong>()),
       };
       _state.ActiveEvents.Add(active);

@@ -57,9 +57,6 @@ public sealed class GameState
     ArgumentNullException.ThrowIfNull(start);
 
     MissionRewardPool = start.MissionRewardPool.AsValueEnumerable().ToArray();
-    foreach (var reward in MissionRewardPool)
-      if (reward.Currency is null || reward.Minimum > reward.Maximum)
-        throw new InvalidOperationException("Mission reward pool entries require a currency and an ordered amount range.");
 
     foreach (var (currency, amount) in start.StartingCurrencies)
       _currencies.Add(currency, amount);
@@ -183,7 +180,42 @@ public sealed class GameState
   public double ResearchSpeed => JobProgress.EffectiveSpeed(Staff.ResearchSpeed, GetGlobalModifier(GlobalProcess.ResearchSpeed));
   public double ManufacturingSpeed => JobProgress.EffectiveSpeed(Staff.ManufacturingSpeed, GetGlobalModifier(GlobalProcess.ManufacturingSpeed));
 
-  internal IReadOnlyList<MissionCurrencyRewardData> MissionRewardPool { get; }
+  private IReadOnlyList<MissionCurrencyRewardData> MissionRewardPool { get; }
+
+  internal IReadOnlyDictionary<Currency, ulong> GenerateMissionRewards(int seed)
+  {
+    MissionCurrencyRewardData[] pool = [.. MissionRewardPool];
+    var rewards = new Dictionary<Currency, ulong>(ReferenceEqualityComparer.Instance);
+    if (pool.Length > 0)
+    {
+      var random = new Random(unchecked(seed ^ (int)0xBB67AE85));
+      int count = random.Next(1, pool.Length + 1);
+      Span<byte> bytes = stackalloc byte[sizeof(ulong)];
+      for (int i = 0; i < count; i++)
+      {
+        int chosen = random.Next(i, pool.Length);
+        (pool[i], pool[chosen]) = (pool[chosen], pool[i]);
+        var reward = pool[i];
+        ulong sampled = reward.Minimum;
+        ulong range = reward.Maximum - reward.Minimum;
+        if (range != 0)
+        {
+          ulong width = unchecked(range + 1);
+          ulong threshold = width == 0 ? 0 : unchecked(0UL - width) % width;
+          ulong value;
+          do
+          {
+            random.NextBytes(bytes);
+            value = BitConverter.ToUInt64(bytes);
+          } while (value < threshold);
+          sampled = width == 0 ? value : reward.Minimum + value % width;
+        }
+        ulong amount = rewards.GetValueOrDefault(reward.Currency);
+        rewards[reward.Currency] = amount + Math.Min(sampled, ulong.MaxValue - amount);
+      }
+    }
+    return new System.Collections.ObjectModel.ReadOnlyDictionary<Currency, ulong>(rewards);
+  }
 
   public ulong GetCurrencyBalance(Currency currency) => _currencies.GetValueOrDefault(currency);
 

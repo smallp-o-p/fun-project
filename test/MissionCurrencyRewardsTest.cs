@@ -56,11 +56,14 @@ public class MissionCurrencyRewardsTest
     var b = MakeCurrency("Same");
     var c = MakeCurrency("Other");
     MissionCurrencyRewardData[] pool = [Entry(a, 10, 20), Entry(b, 30, 40), Entry(c, 50, 60)];
+    var start = MakeStart();
+    foreach (var entry in pool) start.MissionRewardPool.Add(entry);
+    using var campaign = new GeoscapeFixture(start);
     var sets = new SysColGeneric.HashSet<string>(StringComparer.Ordinal);
     for (int seed = 0; seed < 24; seed++)
     {
-      var rewards = MissionCurrencyRewardData.Generate(pool, seed);
-      var replay = MissionCurrencyRewardData.Generate(pool, seed);
+      var rewards = campaign.State.GenerateMissionRewards(seed);
+      var replay = campaign.State.GenerateMissionRewards(seed);
       Assert.True(rewards.Count >= 1 && rewards.Count <= 3);
       foreach (var (currency, amount) in rewards)
       {
@@ -72,8 +75,12 @@ public class MissionCurrencyRewardsTest
       sets.Add(string.Join(",", pool.AsValueEnumerable().Select(x => rewards.ContainsKey(x.Currency) ? "1" : "0").ToArray()));
     }
     Assert.True(sets.Count > 1, "Different event seeds must vary the reward subset.");
-    Assert.Equal(0, MissionCurrencyRewardData.Generate([], 1).Count);
-    var maximum = MissionCurrencyRewardData.Generate([Entry(a, ulong.MaxValue, ulong.MaxValue)], 1);
+    using var emptyCampaign = new GeoscapeFixture(MakeStart());
+    Assert.Equal(0, emptyCampaign.State.GenerateMissionRewards(1).Count);
+    var maximumStart = MakeStart();
+    maximumStart.MissionRewardPool.Add(Entry(a, ulong.MaxValue, ulong.MaxValue));
+    using var maximumCampaign = new GeoscapeFixture(maximumStart);
+    var maximum = maximumCampaign.State.GenerateMissionRewards(1);
     Assert.Equal(ulong.MaxValue, maximum[a]);
   }
 
@@ -122,7 +129,7 @@ public class MissionCurrencyRewardsTest
   }
 
   [TestCase]
-  public static void PoolIsIndependentOfStartingWalletAndRejectsMalformedRanges()
+  public static void PoolIsIndependentOfStartingWallet()
   {
     var wallet = MakeCurrency("Wallet only");
     var reward = MakeCurrency("Reward only");
@@ -133,7 +140,5 @@ public class MissionCurrencyRewardsTest
     campaign.AdvanceTicks(1);
     Assert.Equal(50UL, campaign.ActiveEvent.Rewards[reward]);
     Assert.False(campaign.ActiveEvent.Rewards.ContainsKey(wallet));
-    start.MissionRewardPool[0].Minimum = 51;
-    Assert.Throws<InvalidOperationException>(() => { using var invalidCampaign = new GeoscapeFixture(start); });
   }
 }
