@@ -1,4 +1,6 @@
 using FunProject.Battle;
+using FunProject.Currencies;
+using System.Collections.Generic;
 using FunProject.Geoscape;
 using FunProject.Weapons;
 using Godot;
@@ -38,16 +40,17 @@ public class MissionResultsViewTest
     var view = GD.Load<PackedScene>("res://scenes/geoscape/results/MissionResultsView.tscn")
       .Instantiate<MissionResultsView>();
     CreateScaledWindow(view, new Vector2I(width, height));
-    view.Bind("Bomb Defusal", summary, result);
+    view.Bind("Bomb Defusal", summary, result, new Dictionary<Currency, ulong> { [MakeCurrency("Credits")] = 321 });
     await WaitForLayout(view);
 
+    Assert.True(view.GetNode<Label>("%Rewards").Text.Contains("+321 Credits", System.StringComparison.Ordinal));
     Assert.Equal("Bomb Defusal", view.GetNode<Label>("%MissionType").Text);
     Assert.Equal("2", view.GetNode<Label>("%TurnsTaken").Text);
     Assert.Equal("1", view.GetNode<Label>("%SoldiersWounded").Text);
     Assert.Equal("1", view.GetNode<Label>("%SoldiersKilled").Text);
     Assert.Equal("2", view.GetNode<Label>("%EnemiesKilled").Text);
     Rect2 screen = ScreenRect(view);
-    foreach (string name in new[] { "MissionType", "TurnsTaken", "SoldiersWounded", "SoldiersKilled", "EnemiesKilled", "ContinueButton" })
+    foreach (string name in new[] { "MissionType", "TurnsTaken", "SoldiersWounded", "SoldiersKilled", "EnemiesKilled", "Rewards", "ContinueButton" })
       Assert.True(screen.Encloses(ScreenRect(view.GetNode<Control>($"%{name}"))), $"{name} must fit the results screen.");
   }
 }

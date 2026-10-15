@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using FunProject.Battle;
 using FunProject.Combatants;
+using FunProject.Currencies;
 using FunProject.Engineering;
 using FunProject.GameState;
 using FunProject.Items;
@@ -212,6 +213,9 @@ public sealed class GeoscapeSession
     foreach (Combatant captured in summary.CapturedEnemies)
       _state.Captivity.Add(captured);
 
+    if (summary.Outcome == BattleOutcome.Victory)
+      _state.CreditCurrencies(pending.Event.Rewards);
+
     // Commit campaign consumption before notifying observers.
     _state.ActiveMission = Option<MissionDeployment>.None;
     _state.Pending = Option<PendingResolution>.None;
@@ -291,15 +295,17 @@ public sealed class GeoscapeSession
       CampaignGameState.ScheduledFire fire = _state.Timeline[_state.NextScheduleIndex];
       _state.NextScheduleIndex++;
 
+      Option<int> seed = fire.Definition.Kind == GeoscapeEventKind.TacticalBattle
+        ? Some(Random.Shared.Next()) : Option<int>.None;
       var active = new GeoscapeEvent(
         fire.Definition,
         fire.TargetRegionIndex >= 0 ? Some(fire.TargetRegionIndex) : Option<int>.None,
         Tick,
         fire.ExpiresAtTick)
       {
-        BattleSeed = fire.Definition.Kind == GeoscapeEventKind.TacticalBattle
-          ? Some(Random.Shared.Next())
-          : Option<int>.None,
+        BattleSeed = seed,
+        Rewards = seed.Match(_state.GenerateMissionRewards,
+          () => new Dictionary<Currency, ulong>()),
       };
       _state.ActiveEvents.Add(active);
       Commit(new ScheduledEventFired(active));

@@ -1,5 +1,7 @@
 using CampaignGameState = global::FunProject.GameState.GameState;
 using FunProject.Battle;
+using FunProject.Currencies;
+using System.Collections.Generic;
 using FunProject.Combatants;
 using FunProject.Scenes.Ext;
 using FunProject.Strategic;
@@ -87,7 +89,8 @@ public sealed partial class MissionView : SquadLoadoutView
   private void CompleteMission(FactionBattleSummary summary, BattleResult result)
   {
     var results = GetNode<MissionResultsView>("%MissionResultsView");
-    results.Bind(_mission.Definition.TacticalMission!.BattleType.Name, summary, result);
+    results.Bind(_mission.Definition.TacticalMission!.BattleType.Name, summary, result,
+      summary.Outcome == BattleOutcome.Victory ? _mission.Rewards : new Dictionary<Currency, ulong>());
     try
     {
       _session.CompleteMission(summary);

@@ -46,6 +46,10 @@ public sealed partial class GeoscapeEventResolution : GeoscapeView
     _description.Text =
       $"[{pending.Event.Definition.Kind}{RegionSuffix(session, pending)}]\n{pending.Event.Definition.Description}";
 
+    if (pending.Event.Definition.Kind == GeoscapeEventKind.TacticalBattle && pending.Event.Rewards.Count > 0)
+      _description.Text += "\n\nVictory rewards: " + string.Join(", ", pending.Event.Rewards.AsValueEnumerable()
+        .Select(pair => $"{pair.Value} {pair.Key.Name}").ToArray());
+
     foreach (var (txt, outcome) in ButtonsFor(pending.Event.Definition.Kind))
     {
       var button = new Button { Text = txt, CustomMinimumSize = new Vector2(120, 44) };

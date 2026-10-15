@@ -56,6 +56,8 @@ public sealed class GameState
   {
     ArgumentNullException.ThrowIfNull(start);
 
+    MissionRewardPool = start.MissionRewardPool.AsValueEnumerable().ToArray();
+
     foreach (var (currency, amount) in start.StartingCurrencies)
       _currencies.Add(currency, amount);
 
@@ -178,6 +180,29 @@ public sealed class GameState
   public double ResearchSpeed => JobProgress.EffectiveSpeed(Staff.ResearchSpeed, GetGlobalModifier(GlobalProcess.ResearchSpeed));
   public double ManufacturingSpeed => JobProgress.EffectiveSpeed(Staff.ManufacturingSpeed, GetGlobalModifier(GlobalProcess.ManufacturingSpeed));
 
+  private IReadOnlyList<MissionCurrencyRewardData> MissionRewardPool { get; }
+
+  internal IReadOnlyDictionary<Currency, ulong> GenerateMissionRewards(int seed)
+  {
+    MissionCurrencyRewardData[] pool = [.. MissionRewardPool];
+    var rewards = new Dictionary<Currency, ulong>(ReferenceEqualityComparer.Instance);
+    if (pool.Length > 0)
+    {
+      var random = new Random(unchecked(seed ^ (int)0xBB67AE85));
+      int count = random.Next(1, pool.Length + 1);
+      for (int i = 0; i < count; i++)
+      {
+        int chosen = random.Next(i, pool.Length);
+        (pool[i], pool[chosen]) = (pool[chosen], pool[i]);
+        var reward = pool[i];
+        ulong sampled = (ulong)random.NextInt64(reward.Minimum, (long)reward.Maximum + 1);
+        ulong amount = rewards.GetValueOrDefault(reward.Currency);
+        rewards[reward.Currency] = amount + Math.Min(sampled, ulong.MaxValue - amount);
+      }
+    }
+    return new System.Collections.ObjectModel.ReadOnlyDictionary<Currency, ulong>(rewards);
+  }
+
   public ulong GetCurrencyBalance(Currency currency) => _currencies.GetValueOrDefault(currency);
 
   public bool CanAffordCurrencyCosts(Godot.Collections.Dictionary<Currency, ulong> costs)
@@ -191,6 +216,15 @@ public sealed class GameState
       if (required > 0)
         _currencies[currency] = checked(_currencies[currency] - required);
     return true;
+  }
+
+  internal void CreditCurrencies(IReadOnlyDictionary<Currency, ulong> rewards)
+  {
+    foreach (var (currency, amount) in rewards)
+    {
+      ulong balance = GetCurrencyBalance(currency);
+      _currencies[currency] = balance + Math.Min(amount, ulong.MaxValue - balance);
+    }
   }
 
   public DateTime CurrentTime => _startTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
