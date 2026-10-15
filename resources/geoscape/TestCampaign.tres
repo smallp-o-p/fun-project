@@ -26,6 +26,14 @@
 [ext_resource type="Resource" path="res://resources/staffing/debug_staffing_rules.tres" id="20_staff"]
 [ext_resource type="Resource" path="res://resources/currencies/debug_currency.tres" id="21_currency"]
 
+[ext_resource type="Script" path="res://scripts/strategic/MissionCurrencyRewardData.cs" id="22_reward"]
+
+[sub_resource type="Resource" id="MissionCurrencyReward"]
+script = ExtResource("22_reward")
+Currency = ExtResource("21_currency")
+Minimum = 250
+Maximum = 450
+
 [sub_resource type="Resource" id="Resource_7hkgl"]
 script = ExtResource("14_3ckya")
 Name = "Alien Raiders"
@@ -80,6 +88,7 @@ ModStock = [ExtResource("12_reflex"), ExtResource("13_cardio"), ExtResource("14_
 ManufacturingRecipes = [ExtResource("16_workshop")]
 ResearchProjects = [ExtResource("17_prototype"), ExtResource("18_supply")]
 StaffingRules = ExtResource("20_staff")
+MissionRewardPool = Array[ExtResource("22_reward")]([SubResource("MissionCurrencyReward")])
 StartingCurrencies = Dictionary[Resource, int]({
 ExtResource("21_currency"): 1000
 })

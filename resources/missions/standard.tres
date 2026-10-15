@@ -6,15 +6,6 @@
 [ext_resource type="Script" path="res://scripts/battle/types/UnitLoadoutData.cs" id="4_loadout"]
 [ext_resource type="Resource" uid="uid://bcwpute5bjeiv" path="res://resources/combatants/grunt.tres" id="5_grunt"]
 
-[ext_resource type="Script" path="res://scripts/strategic/MissionCurrencyRewardData.cs" id="6_reward"]
-[ext_resource type="Resource" path="res://resources/currencies/debug_currency.tres" id="10_currency"]
-
-[sub_resource type="Resource" id="Reward"]
-script = ExtResource("6_reward")
-Currency = ExtResource("10_currency")
-Minimum = 250
-Maximum = 450
-
 [sub_resource type="Resource" id="Resource_grunt_loadout"]
 script = ExtResource("4_loadout")
 Combatant = ExtResource("5_grunt")
@@ -28,4 +19,3 @@ Size = ExtResource("3_size")
 EnemyFactionIndex = 1
 OrdinaryEnemies = Array[ExtResource("4_loadout")]([SubResource("Resource_grunt_loadout")])
 SpecialEnemies = Array[ExtResource("4_loadout")]([])
-VictoryRewards = Array[ExtResource("6_reward")]([SubResource("Reward")])

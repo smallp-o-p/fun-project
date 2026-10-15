@@ -1,4 +1,5 @@
 using System;
+using FunProject.Currencies;
 using System.Collections.Generic;
 using FunProject.Engineering;
 using FunProject.Research;
@@ -14,7 +15,7 @@ public sealed record GeoscapeEvent(
   long OccurredTick,
   Option<long> ExpiresAtTick)
 {
-  internal MissionTerms? Terms { get; set; }
+  public IReadOnlyDictionary<Currency, ulong> Rewards { get; init; } = new Dictionary<Currency, ulong>();
 
   /// <summary>Seed minted once when a tactical event fires and retained on the active record,
   /// so battle resolution reproduces the same force across session rebuilds. Non-tactical

@@ -56,6 +56,11 @@ public sealed class GameState
   {
     ArgumentNullException.ThrowIfNull(start);
 
+    MissionRewardPool = start.MissionRewardPool.AsValueEnumerable().ToArray();
+    foreach (var reward in MissionRewardPool)
+      if (reward.Currency is null || reward.Minimum > reward.Maximum)
+        throw new InvalidOperationException("Mission reward pool entries require a currency and an ordered amount range.");
+
     foreach (var (currency, amount) in start.StartingCurrencies)
       _currencies.Add(currency, amount);
 
@@ -178,6 +183,8 @@ public sealed class GameState
   public double ResearchSpeed => JobProgress.EffectiveSpeed(Staff.ResearchSpeed, GetGlobalModifier(GlobalProcess.ResearchSpeed));
   public double ManufacturingSpeed => JobProgress.EffectiveSpeed(Staff.ManufacturingSpeed, GetGlobalModifier(GlobalProcess.ManufacturingSpeed));
 
+  internal IReadOnlyList<MissionCurrencyRewardData> MissionRewardPool { get; }
+
   public ulong GetCurrencyBalance(Currency currency) => _currencies.GetValueOrDefault(currency);
 
   public bool CanAffordCurrencyCosts(Godot.Collections.Dictionary<Currency, ulong> costs)
@@ -195,15 +202,12 @@ public sealed class GameState
 
   internal void CreditCurrencies(IReadOnlyDictionary<Currency, ulong> rewards)
   {
-    // Check the entire credit before changing any balance. Overflow rejects the return.
     foreach (var (currency, amount) in rewards)
-      _ = checked(GetCurrencyBalance(currency) + amount);
-    foreach (var (currency, amount) in rewards)
-      if (amount > 0) _currencies[currency] = checked(GetCurrencyBalance(currency) + amount);
+    {
+      ulong balance = GetCurrencyBalance(currency);
+      _currencies[currency] = balance + Math.Min(amount, ulong.MaxValue - balance);
+    }
   }
-
-  internal Option<MissionReceipt> LastMissionReceipt { get; set; }
-  internal bool MissionStarting { get; set; }
 
   public DateTime CurrentTime => _startTime + TimeSpan.FromSeconds(Tick * TickGameSeconds);
 

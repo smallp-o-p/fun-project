@@ -23,5 +23,4 @@ public partial class TacticalMissionData : Resource
   /// one unit, additively to the drawn ordinary count.</summary>
   [Export] public Godot.Collections.Array<UnitLoadoutData> SpecialEnemies { get; set; } = [];
 
-  [Export] public Godot.Collections.Array<MissionCurrencyRewardData> VictoryRewards { get; set; } = [];
 }

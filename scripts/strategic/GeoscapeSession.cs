@@ -170,28 +170,17 @@ public sealed class GeoscapeSession
     Speed = speed;
   }
 
-  public Option<MissionReceipt> LastMissionReceipt => _state.LastMissionReceipt;
-
-  public static MissionTerms GetMissionTerms(GeoscapeEvent mission)
-    => mission.Terms ??= MissionTerms.Resolve(mission.Definition.TacticalMission!,
-      mission.BattleSeed.ValueUnsafe());
-
-  /// <summary>Snapshot mission rewards and participants before startup; the view confirms installation.</summary>
+  /// <summary>Starts the selected mission and stores its deployment after startup succeeds.
+  /// The view owns the returned runtime.</summary>
   public Either<BattleSetupFailure, MissionBattle> LaunchMission(
     GeoscapeEvent mission, IReadOnlyList<Combatant> squad)
   {
-    if (_state.MissionStarting || _state.ActiveMission.IsSome
-      || !_state.Pending.Exists(pending => ReferenceEquals(pending.Event, mission)))
-      return new BattleSetupFailure(BattleSetupFailureReason.InvalidMissionState, "This mission cannot launch now.");
     TacticalMissionData authored = mission.Definition.TacticalMission!;
-    MissionTerms terms = GetMissionTerms(mission);
-    var participants = squad.AsValueEnumerable().Distinct()
-      .Take((int)Math.Min(authored.Size.MaxPlayerUnits, (uint)squad.Count)).ToArray();
-    if (participants.AsValueEnumerable().Any(unit => !_state.Roster.AsValueEnumerable()
-      .Any(member => ReferenceEquals(member, unit)) || !CanDeploy(unit, mission.Definition)))
-      return new BattleSetupFailure(BattleSetupFailureReason.InvalidMissionState, "The selected squad is no longer eligible.");
-    var deployment = new MissionDeployment(mission, System.Array.AsReadOnly(participants), terms);
+    // Capture ordered, unique participants before startup callbacks can change the selection.
+    var deployment = new MissionDeployment([.. squad.AsValueEnumerable().Distinct()
+      .Take((int)Math.Min(authored.Size.MaxPlayerUnits, (uint)squad.Count))]);
     int seed = mission.BattleSeed.ValueUnsafe();
+
     var player = new PlayerDeployment(_state.PlayerFaction,
       [.. deployment.Participants.AsValueEnumerable().Select(combatant => new UnitLoadout(
         combatant, combatant.EquippedWeapon, combatant.EquippedArmor)
@@ -199,92 +188,42 @@ public sealed class GeoscapeSession
         StatMods = _state.Conditions.StatContributions(combatant),
       })]);
     SideDeployment side = MissionEnemyResolver.Resolve(authored, seed);
-    _state.MissionStarting = true;
-    try
-    {
-      return BattleSetupResolver.Resolve(authored.BattleType, seed, Some(player), Some(side))
-        .Bind(setup => BattleFactory.Start(setup).Bind<MissionBattle>(runtime =>
-        {
-          if (!_state.Pending.Exists(pending => ReferenceEquals(pending.Event, mission)))
-          {
-            runtime.Dispose();
-            return new BattleSetupFailure(BattleSetupFailureReason.InvalidMissionState, "The mission closed during startup.");
-          }
-          _state.ActiveMission = Some(deployment);
-          return new MissionBattle(deployment, setup, runtime);
-        }));
-    }
-    finally { _state.MissionStarting = false; }
+
+    return BattleSetupResolver.Resolve(authored.BattleType, seed, Some(player), Some(side))
+      .Bind(setup => BattleFactory.Start(setup).Map(runtime =>
+      {
+        _state.ActiveMission = Some(deployment);
+        return new MissionBattle(deployment, setup, runtime);
+      }));
   }
 
-  public void ConfirmMissionDeployment(MissionDeployment deployment)
-  {
-    RequireActiveMission(deployment);
-    deployment.Installed = true;
-  }
+  /// <summary>Installation failed; retain the pending event and seed for another attempt.
+  /// Runtime disposal belongs to the view.</summary>
+  public void AbortMissionPresentation() => _state.ActiveMission = None;
 
-  /// <summary>Technical installation failure retains the pending mission and never spends.</summary>
-  public void AbortMissionPresentation()
+  /// <summary>Applies the active mission's terminal summary and consumes the mission before
+  /// broadcasting. The completion signal supplies the trusted player summary.</summary>
+  internal void CompleteMission(FactionBattleSummary summary)
   {
-    if (_state.ActiveMission.Exists(deployment => deployment.Installed))
-      throw new InvalidOperationException("An installed mission must be abandoned explicitly.");
-    _state.ActiveMission = None;
-  }
+    PendingResolution pending = _state.Pending.ValueUnsafe()!;
 
-  public MissionReceipt AbandonMission(MissionDeployment deployment)
-  {
-    if (deployment.Receipt.Case is MissionReceipt receipt) return receipt;
-    RequireActiveMission(deployment);
-    if (!deployment.Installed) throw new InvalidOperationException("Only an installed mission can be abandoned.");
-    var abandoned = new MissionReceipt(deployment.Mission.Definition.TacticalMission!.BattleType.Name, None,
-      new Dictionary<Currency, ulong>());
-    ConsumeMission(deployment, abandoned);
-    Commit(new ResolutionEventClosed(new PendingResolution(deployment.Mission), ResolutionOutcome.Declined));
-    return abandoned;
-  }
-
-  private void RequireActiveMission(MissionDeployment deployment)
-  {
-    if (!_state.ActiveMission.Exists(active => ReferenceEquals(active, deployment))
-      || !_state.Pending.Exists(pending => ReferenceEquals(pending.Event, deployment.Mission)))
-      throw new InvalidOperationException("This deployment is not the active mission.");
-  }
-
-  /// <summary>Prepare the entire monetary return before mutation, then consume before callbacks.</summary>
-  internal MissionReceipt CompleteMission(MissionDeployment deployment, FactionBattleSummary summary, BattleResult battleResult)
-  {
-    if (deployment.Receipt.Case is MissionReceipt existing) return existing;
-    RequireActiveMission(deployment);
-    if (!deployment.Installed || !ReferenceEquals(summary.Faction, _state.PlayerFaction))
-      throw new InvalidOperationException("Completion requires an installed mission and its player summary.");
-    var rewards = deployment.Terms.VictoryRewards.AsValueEnumerable().ToDictionary(
-      pair => pair.Key, pair => summary.Outcome == BattleOutcome.Victory ? pair.Value : 0UL);
-    var receipt = new MissionReceipt(deployment.Mission.Definition.TacticalMission!.BattleType.Name, Some(summary.Outcome),
-      new System.Collections.ObjectModel.ReadOnlyDictionary<Currency, ulong>(rewards))
-    { Tally = Some(MissionTally.From(summary, battleResult)) };
-    var returns = summary.HealthByCombatant.AsValueEnumerable().Select(pair =>
-      (Combatant: pair.Key, Conditions: _state.Conditions.PrepareMissionReturn(
-        pair.Key, pair.Value.HealthDamageTaken, pair.Value.MaxHealth, Tick))).ToArray();
-    _state.CreditCurrencies(rewards);
-    foreach (var (combatant, conditions) in returns)
-      _state.Conditions.CommitMissionReturn(combatant, conditions.Injury, conditions.Fatigue);
+    foreach ((Combatant combatant, BattleHealthSummary health) in summary.HealthByCombatant)
+      _state.Conditions.ApplyMissionReturn(combatant, health.HealthDamageTaken, health.MaxHealth, Tick);
     _state.RemoveDeadFromRoster(summary.CombatantsDead);
-    foreach (Combatant captured in summary.CapturedEnemies) _state.Captivity.Add(captured);
-    ConsumeMission(deployment, receipt);
+    foreach (Combatant captured in summary.CapturedEnemies)
+      _state.Captivity.Add(captured);
+
+    if (summary.Outcome == BattleOutcome.Victory)
+      _state.CreditCurrencies(pending.Event.Rewards);
+
+    // Commit campaign consumption before notifying observers.
+    _state.ActiveMission = Option<MissionDeployment>.None;
+    _state.Pending = Option<PendingResolution>.None;
+    _state.ActiveEvents.Remove(pending.Event);
 
     foreach (Combatant combatant in summary.HealthByCombatant.Keys)
       Commit(new CombatantConditionsChanged(combatant));
-    Commit(new ResolutionEventClosed(new PendingResolution(deployment.Mission), ResolutionOutcome.Engaged));
-    return receipt;
-  }
-
-  private void ConsumeMission(MissionDeployment deployment, MissionReceipt receipt)
-  {
-    deployment.Receipt = Some(receipt);
-    _state.LastMissionReceipt = Some(receipt);
-    _state.ActiveMission = None;
-    _state.Pending = None;
-    _state.ActiveEvents.Remove(deployment.Mission);
+    Commit(new ResolutionEventClosed(pending, ResolutionOutcome.Engaged));
   }
 
   public void ApplyMissionReturn(FactionBattleSummary summary)
@@ -356,15 +295,17 @@ public sealed class GeoscapeSession
       CampaignGameState.ScheduledFire fire = _state.Timeline[_state.NextScheduleIndex];
       _state.NextScheduleIndex++;
 
+      Option<int> seed = fire.Definition.Kind == GeoscapeEventKind.TacticalBattle
+        ? Some(Random.Shared.Next()) : Option<int>.None;
       var active = new GeoscapeEvent(
         fire.Definition,
         fire.TargetRegionIndex >= 0 ? Some(fire.TargetRegionIndex) : Option<int>.None,
         Tick,
         fire.ExpiresAtTick)
       {
-        BattleSeed = fire.Definition.Kind == GeoscapeEventKind.TacticalBattle
-          ? Some(Random.Shared.Next())
-          : Option<int>.None,
+        BattleSeed = seed,
+        Rewards = seed.Match(value => MissionCurrencyRewardData.Generate(_state.MissionRewardPool, value),
+          () => new Dictionary<Currency, ulong>()),
       };
       _state.ActiveEvents.Add(active);
       Commit(new ScheduledEventFired(active));

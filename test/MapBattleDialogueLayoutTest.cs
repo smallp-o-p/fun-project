@@ -25,9 +25,6 @@ public class MapBattleDialogueLayoutTest
     hud.UpdateManufacturing(campaign.Session.ActiveManufacturing, 1);
     await WaitForLayout(viewport);
 
-    var results = hud.GetNode<Button>("%ResultsButton");
-    AssertInside(results, width, height);
-    Assert.True(ScreenRect(results).Position.Y < 80);
     var bottom = hud.GetNode<Control>("BottomBar");
     AssertInside(bottom, width, height);
     Assert.True(bottom.Size.Y <= 64, "The bottom HUD must remain one compact row.");

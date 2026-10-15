@@ -53,4 +53,25 @@ public class CurrencyTest
     Assert.Equal(0UL, campaign.State.GetCurrencyBalance(currency));
     Assert.False(campaign.State.TrySpendCurrencyCosts(new() { [currency] = 1 }));
   }
+  [TestCase]
+  public static void CurrencyCreditsSaturateEachBalanceWithoutWrappingOrRejectingOtherCredits()
+  {
+    var full = MakeCurrency("Full");
+    var other = MakeCurrency("Other");
+    var absent = MakeCurrency("New");
+    using var campaign = new GeoscapeFixture(MakeStart(startingCurrencies:
+      new() { [full] = ulong.MaxValue - 2, [other] = 7 }));
+    campaign.State.CreditCurrencies(new SysColGeneric.Dictionary<FunProject.Currencies.Currency, ulong>
+    {
+      [full] = 50,
+      [other] = 3,
+      [absent] = ulong.MaxValue,
+    });
+    Assert.Equal(ulong.MaxValue, campaign.State.GetCurrencyBalance(full));
+    Assert.Equal(10UL, campaign.State.GetCurrencyBalance(other));
+    Assert.Equal(ulong.MaxValue, campaign.State.GetCurrencyBalance(absent));
+    campaign.State.CreditCurrencies(new SysColGeneric.Dictionary<FunProject.Currencies.Currency, ulong> { [full] = 1 });
+    Assert.Equal(ulong.MaxValue, campaign.State.GetCurrencyBalance(full));
+  }
+
 }
