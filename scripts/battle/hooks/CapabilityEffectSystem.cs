@@ -16,7 +16,7 @@ public sealed class CapabilityEffectSystem : BattleHook<ItemThrownBattleEvent>
   {
     thrown.Item.FindCapability<BlastCapability>().IfSome(blast =>
     {
-      CapabilityEffectResolver.Resolve(context.Session, thrown.Position, blast.BlastRadius, blast.Effects);
+      CapabilityEffectResolver.Resolve(context.Session, thrown.Position, blast.BlastRadius, blast.Effects, Some(thrown.Unit));
       context.Session.RaiseEvents(new CapabilityResolvedBattleEvent(thrown.Item, thrown.Position));
     });
 

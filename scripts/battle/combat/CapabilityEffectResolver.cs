@@ -19,7 +19,8 @@ public static class CapabilityEffectResolver
     BattleSession session,
     BattleBoardState.ValidatedPoint origin,
     int radius,
-    IReadOnlyList<BattleEffectData> effects)
+    IReadOnlyList<BattleEffectData> effects,
+    Option<BattleUnitState> cause = default)
   {
     ArgumentNullException.ThrowIfNull(session);
     ArgumentNullException.ThrowIfNull(effects);
@@ -52,10 +53,10 @@ public static class CapabilityEffectResolver
         switch (effect)
         {
           case DamageEffectData damage:
-            session.ApplyDamageTo(unit, [new Damage(damage.BaseDamage, damage.Element)], None);
+            session.ApplyDamageTo(unit, [new Damage(damage.BaseDamage, damage.Element)], cause);
             break;
           case StatusEffectSpecData status:
-            session.ApplyStatusEffectTo(unit, status);
+            session.ApplyStatusEffectTo(unit, status, cause);
             break;
           default:
             // TODO: other BattleEffectData subclasses (e.g. SpawnHazardEffectData,
@@ -77,7 +78,7 @@ public static class CapabilityEffectResolver
           break;
 
         if (effect is DamageEffectData damage)
-          session.ApplyDamageTo(obj, [new Damage(damage.BaseDamage, damage.Element)], None);
+          session.ApplyDamageTo(obj, [new Damage(damage.BaseDamage, damage.Element)], cause);
       }
     }
   }

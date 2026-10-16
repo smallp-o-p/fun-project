@@ -342,13 +342,14 @@ public sealed class BattleSession
     RaiseEvents(new UnitDamagedBattleEvent(unit, cause, bundle,
       resolution.ArmorDamage, resolution.HealthDamage, resolution.StunDamage));
 
-    ApplyStatusEffectsFrom(unit, bundle, packetResolutions);
+    ApplyStatusEffectsFrom(unit, bundle, packetResolutions, cause);
   }
 
   private void ApplyStatusEffectsFrom(
     BattleUnitState unit,
     IReadOnlyList<Damage> bundle,
-    IReadOnlyList<DamageResolution> packetResolutions)
+    IReadOnlyList<DamageResolution> packetResolutions,
+    Option<BattleUnitState> cause)
   {
     foreach ((Damage damage, DamageResolution resolution) in bundle.AsValueEnumerable().Zip(packetResolutions))
     {
@@ -360,7 +361,7 @@ public sealed class BattleSession
         if (spec.RequiresHealthDamage && resolution.HealthDamage <= 0)
           return;
 
-        TryApplyStatusEffect(unit, spec);
+        TryApplyStatusEffect(unit, spec, cause);
       });
     }
   }
@@ -369,26 +370,26 @@ public sealed class BattleSession
   // the applied event. Shared by the damage pipeline (ApplyStatusEffectsFrom) and direct
   // application (ApplyStatusEffectTo). Callers are responsible for liveness and any
   // damage-pipeline gating (e.g. RequiresHealthDamage).
-  private void TryApplyStatusEffect(BattleUnitState unit, StatusEffectSpecData spec)
+  private void TryApplyStatusEffect(BattleUnitState unit, StatusEffectSpecData spec, Option<BattleUnitState> cause)
   {
     if (spec.ApplyChancePercent < 100 && RollPercent() >= spec.ApplyChancePercent)
       return;
 
-    ActiveStatusEffect applied = unit.ApplyStatusEffect(spec);
+    ActiveStatusEffect applied = unit.ApplyStatusEffect(spec, cause);
     RaiseEvents(new UnitStatusEffectAppliedBattleEvent(unit, spec, applied.RemainingTurns));
   }
 
   // Applies a pure status effect (no damage) directly to a unit: the entry point used by
   // capability/effect resolution (e.g. a thrown grenade's status payload). RequiresHealthDamage
   // is a damage-pipeline concern and does not apply here. Does nothing if the unit is dead.
-  internal void ApplyStatusEffectTo(BattleUnitState unit, StatusEffectSpecData spec)
+  internal void ApplyStatusEffectTo(BattleUnitState unit, StatusEffectSpecData spec, Option<BattleUnitState> cause = default)
   {
     ArgumentNullException.ThrowIfNull(unit);
     ArgumentNullException.ThrowIfNull(spec);
     if (unit.IsDead)
       return;
 
-    TryApplyStatusEffect(unit, spec);
+    TryApplyStatusEffect(unit, spec, cause);
   }
 
   private void HandleUnitDeath(BattleUnitState unit, Option<BattleUnitState> killedBy)

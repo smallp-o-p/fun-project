@@ -147,16 +147,18 @@ public sealed class BattleUnitState
     return recovered;
   }
 
-  internal ActiveStatusEffect ApplyStatusEffect(StatusEffectSpecData spec)
+  internal ActiveStatusEffect ApplyStatusEffect(StatusEffectSpecData spec, Option<BattleUnitState> cause = default)
   {
     ArgumentNullException.ThrowIfNull(spec);
     if (_activeStatusEffects.TryGetValue(spec, out var existing))
     {
       existing.Refresh();
+      existing.Cause = cause;
       return existing;
     }
 
     var applied = ActiveStatusEffect.Create(spec);
+    applied.Cause = cause;
     _activeStatusEffects[spec] = applied;
     return applied;
   }
