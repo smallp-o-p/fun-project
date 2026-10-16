@@ -15,6 +15,8 @@ public sealed record GeoscapeEvent(
   long OccurredTick,
   Option<long> ExpiresAtTick)
 {
+  public IReadOnlyList<PredictionMarket> PredictionMarkets { get; init; } = [];
+
   public IReadOnlyDictionary<Currency, ulong> Rewards { get; init; } = new Dictionary<Currency, ulong>();
 
   /// <summary>Seed minted once when a tactical event fires and retained on the active record,

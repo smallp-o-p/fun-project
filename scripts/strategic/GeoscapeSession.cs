@@ -170,6 +170,22 @@ public sealed class GeoscapeSession
     Speed = speed;
   }
 
+  // The view calls this only after battle presentation initializes successfully.
+  internal bool TryAcceptMissionPredictions(IReadOnlyList<MissionPrediction> predictions)
+  {
+    var deployment = _state.ActiveMission.ValueUnsafe()!;
+    if (deployment.Predictions.Count > 0) return true;
+    MissionPrediction[] accepted = [.. predictions];
+    var costs = new Godot.Collections.Dictionary<Currency, ulong>();
+    foreach (var prediction in accepted)
+    {
+      costs.TryGetValue(prediction.Currency, out ulong amount);
+      costs[prediction.Currency] = checked(amount + prediction.Amount);
+    }
+    if (!_state.TrySpendCurrencyCosts(costs)) return false;
+    deployment.Predictions = System.Array.AsReadOnly(accepted);
+    return true;
+  }
   /// <summary>Starts the selected mission and stores its deployment after startup succeeds.
   /// The view owns the returned runtime.</summary>
   public Either<BattleSetupFailure, MissionBattle> LaunchMission(
@@ -205,6 +221,7 @@ public sealed class GeoscapeSession
   /// broadcasting. The completion signal supplies the trusted player summary.</summary>
   internal void CompleteMission(FactionBattleSummary summary)
   {
+    if (_state.ActiveMission.Case is not MissionDeployment deployment) return;
     PendingResolution pending = _state.Pending.ValueUnsafe()!;
 
     foreach ((Combatant combatant, BattleHealthSummary health) in summary.HealthByCombatant)
@@ -215,6 +232,12 @@ public sealed class GeoscapeSession
 
     if (summary.Outcome == BattleOutcome.Victory)
       _state.CreditCurrencies(pending.Event.Rewards);
+
+    foreach (var prediction in deployment.Predictions)
+    {
+      prediction.Correct = prediction.Market.IsCorrect(deployment, summary);
+      _state.CreditCurrencies(new Dictionary<Currency, ulong> { [prediction.Currency] = prediction.Returned });
+    }
 
     // Commit campaign consumption before notifying observers.
     _state.ActiveMission = Option<MissionDeployment>.None;
@@ -306,6 +329,7 @@ public sealed class GeoscapeSession
         BattleSeed = seed,
         Rewards = seed.Match(_state.GenerateMissionRewards,
           () => new Dictionary<Currency, ulong>()),
+        PredictionMarkets = seed.Match(_state.GenerateMissionPredictionMarkets, () => []),
       };
       _state.ActiveEvents.Add(active);
       Commit(new ScheduledEventFired(active));

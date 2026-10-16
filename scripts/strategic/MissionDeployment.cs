@@ -5,4 +5,7 @@ namespace FunProject.Strategic;
 
 /// <summary>Launch-time squad identities; startup callbacks cannot change this snapshot.
 /// Equipment and conditions remain live on the original combatant references.</summary>
-public sealed record MissionDeployment(IReadOnlyList<Combatant> Participants);
+public sealed record MissionDeployment(IReadOnlyList<Combatant> Participants)
+{
+  public IReadOnlyList<MissionPrediction> Predictions { get; internal set; } = [];
+}
