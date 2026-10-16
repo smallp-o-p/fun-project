@@ -58,6 +58,7 @@ public sealed class GameState
 
     MissionRewardPool = start.MissionRewardPool.AsValueEnumerable().ToArray();
 
+    PredictionMarketPool = start.PredictionMarketPool.AsValueEnumerable().ToArray();
     foreach (var (currency, amount) in start.StartingCurrencies)
       _currencies.Add(currency, amount);
 
@@ -149,6 +150,7 @@ public sealed class GameState
 
   public Faction PlayerFaction { get; }
 
+
   public Armory Armory { get; }
 
   public Captivity Captivity { get; } = new();
@@ -181,7 +183,14 @@ public sealed class GameState
   public double ManufacturingSpeed => JobProgress.EffectiveSpeed(Staff.ManufacturingSpeed, GetGlobalModifier(GlobalProcess.ManufacturingSpeed));
 
   private IReadOnlyList<MissionCurrencyRewardData> MissionRewardPool { get; }
+  private IReadOnlyList<PredictionMarketData> PredictionMarketPool { get; }
 
+  internal IReadOnlyList<PredictionMarket> GenerateMissionPredictionMarkets(int seed)
+  {
+    if (_roster.Count == 0) return [];
+    var random = new Random(unchecked(seed ^ (int)0x3C6EF372));
+    return PredictionMarketPool.AsValueEnumerable().Select(data => data.Instantiate(_roster, random)).ToArray();
+  }
   internal IReadOnlyDictionary<Currency, ulong> GenerateMissionRewards(int seed)
   {
     MissionCurrencyRewardData[] pool = [.. MissionRewardPool];
@@ -202,6 +211,8 @@ public sealed class GameState
     }
     return new System.Collections.ObjectModel.ReadOnlyDictionary<Currency, ulong>(rewards);
   }
+
+  public IReadOnlyList<Currency> Currencies => [.. _currencies.Keys];
 
   public ulong GetCurrencyBalance(Currency currency) => _currencies.GetValueOrDefault(currency);
 
