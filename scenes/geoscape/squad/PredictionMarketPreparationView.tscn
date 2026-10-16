@@ -28,7 +28,7 @@ theme_override_constants/separation = 16
 
 [node name="Title" type="Label" parent="Panel/Margin/Layout"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 42
 text = "Prediction Markets"
 
 [node name="MissionTitle" type="Label" parent="Panel/Margin/Layout"]

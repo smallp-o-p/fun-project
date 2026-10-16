@@ -67,7 +67,6 @@ text = "3D model stand-in"
 autowrap_mode = 3
 
 [node name="CaptivesColumn" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
-custom_minimum_size = Vector2(210, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 16
@@ -90,7 +89,7 @@ theme_override_constants/separation = 12
 [node name="Title" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 42
 text = "Captivity"
 
 [node name="Subtitle" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
@@ -146,7 +145,6 @@ size_flags_horizontal = 0
 text = "Back"
 
 [node name="DetailsColumn" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
-custom_minimum_size = Vector2(250, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.25
@@ -169,7 +167,7 @@ theme_override_constants/separation = 12
 
 [node name="DetailsHeading" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsPanel/Margin/InspectionDetails"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "Captive details"
 
 [node name="Divider" type="HSeparator" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsPanel/Margin/InspectionDetails"]

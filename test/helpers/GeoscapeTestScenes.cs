@@ -280,7 +280,7 @@ internal static partial class GeoscapeTestScenes
     var window = new Window
     {
       Size = size,
-      ContentScaleSize = new Vector2I(800, 600),
+      ContentScaleSize = new Vector2I(1920, 1080),
       ContentScaleMode = Window.ContentScaleModeEnum.CanvasItems,
       ContentScaleAspect = Window.ContentScaleAspectEnum.Expand,
     };

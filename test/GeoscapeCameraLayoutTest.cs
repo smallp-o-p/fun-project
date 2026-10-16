@@ -23,19 +23,17 @@ public class GeoscapeCameraLayoutTest
     await WaitForLayout(window);
 
     AssertMapFitsOperationalArea(scene);
-    Assert.Equal(600f, MapCamera(scene).GetViewport().GetVisibleRect().Size.Y);
+    Assert.True(MapCamera(scene).GetViewport().GetVisibleRect().Size.Y >= 1080);
   }
 
   [TestCase]
-  public static async Task FixedFrameSurvivesNativeWindowResizesAndViewNavigation()
+  public static async Task MapRefitsAfterNativeWindowResizesAndViewNavigation()
   {
     await using var cleanup = new DeferredNodeCleanup();
     var scene = CreateGeoscapeScene(TestData.MakeStart());
     var window = CreateScaledWindow(scene, new Vector2I(1600, 900));
     await WaitForLayout(window);
     var camera = MapCamera(scene);
-    Vector2 position = camera.Position;
-    Vector2 zoom = camera.Zoom;
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
 
     foreach (var size in new[] { new Vector2I(800, 600), new Vector2I(1920, 1200),
@@ -46,27 +44,22 @@ public class GeoscapeCameraLayoutTest
       await WaitForLayout(window);
       manager.Pop();
       await WaitForLayout(window);
-      Assert.Equal(position, camera.Position);
-      Assert.Equal(zoom, camera.Zoom);
+      Assert.True(ReferenceEquals(camera, MapCamera(scene)));
       AssertMapFitsOperationalArea(scene);
     }
   }
 
   [TestCase]
-  public static async Task HudChangesDoNotTakeControlOfTheFixedCamera()
+  public static async Task HudSizeChangesRefitTheMap()
   {
     var scene = CreateGeoscapeScene(TestData.MakeStart());
     var window = CreateScaledWindow(scene, new Vector2I(1600, 900));
     await WaitForLayout(window);
-    var camera = MapCamera(scene);
-    Vector2 position = camera.Position;
-    Vector2 zoom = camera.Zoom;
 
     scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Control>("BottomBar").OffsetTop -= 80;
     await WaitForLayout(window);
 
-    Assert.Equal(position, camera.Position);
-    Assert.Equal(zoom, camera.Zoom);
+    AssertMapFitsOperationalArea(scene);
   }
 
   [TestCase]

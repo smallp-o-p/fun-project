@@ -37,7 +37,7 @@ layout_mode = 2
 [node name="Title" type="Label" parent="Content/Margin/Layout/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 36
 text = "ENGINEERING"
 
 [node name="PauseHint" type="Label" parent="Content/Margin/Layout/Header"]
@@ -81,7 +81,7 @@ theme_override_constants/separation = 8
 
 [node name="CatalogTitle" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "BUILD ITEMS"
 
 [node name="CatalogHint" type="Label" parent="Content/Margin/Layout/Body/Catalog"]
@@ -129,7 +129,6 @@ theme_override_constants/separation = 8
 
 [node name="ItemPreview" parent="Content/Margin/Layout/Body/Details" instance=ExtResource("3_model")]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 0.6
@@ -153,7 +152,7 @@ theme_override_constants/separation = 12
 [node name="ItemName" type="Label" parent="Content/Margin/Layout/Body/Details/DetailsScroll/Text"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "Select an item to manufacture."
 autowrap_mode = 3
 

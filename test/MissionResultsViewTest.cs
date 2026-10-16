@@ -14,8 +14,9 @@ namespace FunProject.Tests;
 [RequireGodotRuntime]
 public class MissionResultsViewTest
 {
-  [TestCase(800, 600)]
-  [TestCase(1600, 900)]
+  [TestCase(1280, 720)]
+  [TestCase(1920, 1080)]
+  [TestCase(1280, 960)]
   public static async Task TallyUsesFinalBattleCountsAfterRuntimeDisposal(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
@@ -39,18 +40,54 @@ public class MissionResultsViewTest
 
     var view = GD.Load<PackedScene>("res://scenes/geoscape/results/MissionResultsView.tscn")
       .Instantiate<MissionResultsView>();
-    CreateScaledWindow(view, new Vector2I(width, height));
-    view.Bind("Bomb Defusal", summary, result, new Dictionary<Currency, ulong> { [MakeCurrency("Credits")] = 321 });
-    await WaitForLayout(view);
+    var window = ((SceneTree)Engine.GetMainLoop()).Root;
+    Vector2I originalSize = window.Size;
+    window.Size = new Vector2I(width, height);
+    AddToTree(view);
+    try
+    {
+      view.Bind("Bomb Defusal", summary, result, new Dictionary<Currency, ulong> { [MakeCurrency("Credits")] = 321 });
+      await WaitForLayout(view);
 
-    Assert.True(view.GetNode<Label>("%Rewards").Text.Contains("+321 Credits", System.StringComparison.Ordinal));
-    Assert.Equal("Bomb Defusal", view.GetNode<Label>("%MissionType").Text);
-    Assert.Equal("2", view.GetNode<Label>("%TurnsTaken").Text);
-    Assert.Equal("1", view.GetNode<Label>("%SoldiersWounded").Text);
-    Assert.Equal("1", view.GetNode<Label>("%SoldiersKilled").Text);
-    Assert.Equal("2", view.GetNode<Label>("%EnemiesKilled").Text);
-    Rect2 screen = ScreenRect(view);
-    foreach (string name in new[] { "MissionType", "TurnsTaken", "SoldiersWounded", "SoldiersKilled", "EnemiesKilled", "Rewards", "ContinueButton" })
-      Assert.True(screen.Encloses(ScreenRect(view.GetNode<Control>($"%{name}"))), $"{name} must fit the results screen.");
+      Assert.True(view.GetNode<Label>("%Rewards").Text.Contains("+321 Credits", System.StringComparison.Ordinal));
+      Assert.Equal("Bomb Defusal", view.GetNode<Label>("%MissionType").Text);
+      Assert.Equal("2", view.GetNode<Label>("%TurnsTaken").Text);
+      Assert.Equal("1", view.GetNode<Label>("%SoldiersWounded").Text);
+      Assert.Equal("1", view.GetNode<Label>("%SoldiersKilled").Text);
+      Assert.Equal("2", view.GetNode<Label>("%EnemiesKilled").Text);
+      Rect2 screen = ScreenRect(view);
+      foreach (string name in new[] { "MissionType", "TurnsTaken", "SoldiersWounded", "SoldiersKilled", "EnemiesKilled", "Rewards", "ContinueButton" })
+        Assert.True(screen.Encloses(ScreenRect(view.GetNode<Control>($"%{name}"))), $"{name} must fit the results screen.");
+
+      // Exercise the physical window's actual GUI dispatch after native canvas scaling.
+      int continued = 0;
+      view.BackRequested += () => continued++;
+      await window.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+      string evidence = OS.GetEnvironment("UI_LAYOUT_EVIDENCE");
+      if (!string.IsNullOrEmpty(evidence))
+      {
+        using var pixels = window.GetTexture().GetImage();
+        Assert.Equal(new Vector2I(width, height), pixels.GetSize());
+        pixels.SavePng($"{evidence}/mission-results-{width}x{height}.png");
+      }
+      Vector2 pointer = ScreenRect(view.GetNode<Control>("%ContinueButton")).GetCenter();
+      window.NotifyMouseEntered();
+      window.PushInput(new InputEventMouseMotion { Position = pointer, GlobalPosition = pointer }, true);
+      foreach (bool pressed in new[] { true, false })
+        window.PushInput(new InputEventMouseButton
+        {
+          Position = pointer,
+          GlobalPosition = pointer,
+          ButtonIndex = MouseButton.Left,
+          Pressed = pressed,
+        }, true);
+      Assert.Equal(1, continued);
+    }
+    finally
+    {
+      window.Size = originalSize;
+      await WaitForLayout(window);
+    }
+
   }
 }

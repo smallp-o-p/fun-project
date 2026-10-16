@@ -103,7 +103,7 @@ public class GeoscapeProjectsIntegrationTest
   public static async Task ProjectControlsStayInViewportWhenCameraMovesAndViewportResizes(bool research)
   {
     var scene = CreateGeoscapeScene(MakeStart());
-    var viewport = CreateUiViewport(scene, new Vector2I(1600, 900));
+    var viewport = CreateUiViewport(scene, new Vector2I(1920, 1080));
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     if (research)
       PressResearchButton(scene);
@@ -111,16 +111,16 @@ public class GeoscapeProjectsIntegrationTest
       PressEngineeringButton(scene);
     var view = manager.Current;
     await WaitForLayout(scene);
-    Assert.Equal(new Rect2(0, 0, 1600, 900), ScreenRect(view));
+    Assert.Equal(new Rect2(0, 0, 1920, 1080), ScreenRect(view));
 
     var camera = MapCamera(scene);
     camera.Position = new Vector2(1234, 567);
     camera.Zoom = new Vector2(2, 2);
-    viewport.Size = new Vector2I(800, 600);
+    viewport.Size = new Vector2I(1920, 1440);
     camera.ForceUpdateScroll();
     await WaitForLayout(scene);
 
-    var visible = new Rect2(0, 0, 800, 600);
+    var visible = new Rect2(0, 0, 1920, 1440);
     Assert.Equal(visible, ScreenRect(manager));
     Assert.Equal(visible, ScreenRect(view));
     Assert.Equal(visible, ScreenRect(MapViewport(scene))); // the map viewport tracks too

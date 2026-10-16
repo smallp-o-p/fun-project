@@ -17,7 +17,6 @@ theme_override_constants/separation = 12
 
 [node name="Currency" type="OptionButton" parent="Controls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(160, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 clip_text = true
@@ -25,13 +24,14 @@ fit_to_longest_item = false
 
 [node name="Stake" type="SpinBox" parent="Controls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
+size_flags_horizontal = 3
 step = 1.0
 rounded = true
 prefix = "Stake "
 
 [node name="Return" type="Label" parent="Controls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
+size_flags_horizontal = 3
+autowrap_mode = 3

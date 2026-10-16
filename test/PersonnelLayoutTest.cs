@@ -6,6 +6,7 @@ using static FunProject.Tests.GeoscapeTestScenes;
 
 namespace FunProject.Tests;
 
+// Layout cases use the 1080-native logical canvas; WindowScalingTest checks physical sizes.
 [TestSuite]
 [RequireGodotRuntime]
 public class PersonnelLayoutTest
@@ -31,8 +32,8 @@ public class PersonnelLayoutTest
     }
   }
 
-  [TestCase(800, 600)]
-  [TestCase(1280, 720)]
+  [TestCase(1920, 1440)]
+  [TestCase(2560, 1080)]
   [TestCase(1920, 1080)]
   public static async Task RosterKeepsRowsScrollableAndDirectInspectionReachable(int width, int height)
   {
@@ -63,8 +64,8 @@ public class PersonnelLayoutTest
     requested!.Free();
   }
 
-  [TestCase(800, 600)]
-  [TestCase(1280, 720)]
+  [TestCase(1920, 1440)]
+  [TestCase(2560, 1080)]
   [TestCase(1920, 1080)]
   public static async Task SquadShowsHorizontalCardsAndKeepsRosterAndBackInsideViewport(int width, int height)
   {
@@ -96,8 +97,8 @@ public class PersonnelLayoutTest
     Assert.True(ScreenRect(scroll).Encloses(ScreenRect(lastAction)));
   }
 
-  [TestCase(800, 600)]
-  [TestCase(1280, 720)]
+  [TestCase(1920, 1440)]
+  [TestCase(2560, 1080)]
   [TestCase(1920, 1080)]
   public static async Task CaptivityKeepsListDetailsAndPreparationVisible(int width, int height)
   {
