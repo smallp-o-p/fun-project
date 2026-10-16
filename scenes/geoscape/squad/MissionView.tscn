@@ -5,9 +5,14 @@
 [ext_resource type="PackedScene" path="res://scenes/battle/BattleScene.tscn" id="3_battle"]
 [ext_resource type="PackedScene" path="res://scenes/geoscape/results/MissionResultsView.tscn" id="4_results"]
 
+[ext_resource type="PackedScene" path="res://scenes/geoscape/squad/PredictionMarketPreparationView.tscn" id="5_prediction_markets"]
+
+[ext_resource type="PackedScene" path="res://scenes/geoscape/squad/PredictionMarketRow.tscn" id="6_prediction_row"]
+
 [node name="MissionView" instance=ExtResource("1_squad")]
 script = ExtResource("2_script")
 BattleScene = ExtResource("3_battle")
+PredictionRowScene = ExtResource("6_prediction_row")
 
 [node name="Background" parent="." index="0"]
 mouse_filter = 0
@@ -20,6 +25,22 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 40)
 layout_mode = 2
 text = "Deploy"
+
+[node name="PredictionMarketsButton" type="Button" parent="Content/Margin/Layout/Footer" index="2"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+text = "Prediction Markets"
+
+[node name="MissionFailure" type="Label" parent="Content/Margin/Layout" index="2"]
+unique_name_in_owner = true
+layout_mode = 2
+modulate = Color(1, 0.45, 0.45, 1)
+autowrap_mode = 3
+
+[node name="PredictionMarketPreparationView" parent="." instance=ExtResource("5_prediction_markets")]
+unique_name_in_owner = true
+visible = false
 
 [node name="MissionResultsView" parent="." instance=ExtResource("4_results")]
 unique_name_in_owner = true

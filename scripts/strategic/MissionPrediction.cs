@@ -1,0 +1,32 @@
+using FunProject.Battle;
+using FunProject.Combatants;
+using FunProject.Currencies;
+
+namespace FunProject.Strategic;
+
+public abstract record PredictionMarket(string Description, uint MaxStake, decimal Multiplier)
+{
+  public ulong TotalReturn(ulong stake) => (ulong)(stake * Multiplier);
+  internal abstract bool IsCorrect(MissionDeployment deployment, FactionBattleSummary summary);
+}
+
+public sealed record DeployUnitPredictionMarket(Combatant Unit, string Description, uint MaxStake, decimal Multiplier)
+  : PredictionMarket(Description, MaxStake, Multiplier)
+{
+  internal override bool IsCorrect(MissionDeployment deployment, FactionBattleSummary summary)
+    => deployment.Participants.AsValueEnumerable().Any(member => ReferenceEquals(member, Unit));
+}
+
+public sealed record UnitKillsPredictionMarket(Combatant Unit, uint MinimumKills, string Description, uint MaxStake, decimal Multiplier)
+  : PredictionMarket(Description, MaxStake, Multiplier)
+{
+  internal override bool IsCorrect(MissionDeployment deployment, FactionBattleSummary summary)
+    => deployment.Participants.AsValueEnumerable().Any(member => ReferenceEquals(member, Unit))
+      && (summary.DefeatedPerCombatant.TryGetValue(Unit, out var kills) ? kills.Count : 0) >= MinimumKills;
+}
+
+public sealed record MissionPrediction(PredictionMarket Market, Currency Currency, ulong Amount)
+{
+  public bool Correct { get; internal set; }
+  public ulong Returned => Correct ? Market.TotalReturn(Amount) : 0;
+}
