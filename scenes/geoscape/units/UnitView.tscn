@@ -57,7 +57,6 @@ size_flags_vertical = 3
 theme_override_constants/separation = 20
 
 [node name="PresentationColumn" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
-custom_minimum_size = Vector2(220, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 0.9
@@ -78,7 +77,6 @@ text = "3D model stand-in"
 horizontal_alignment = 1
 
 [node name="DetailsColumn" type="VBoxContainer" parent="Content/Margin/Layout/Body"]
-custom_minimum_size = Vector2(350, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.1
@@ -112,7 +110,7 @@ text = "STATS"
 [node name="StatsKey" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/Identity/StatsHeading"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
-text = "BASE → CURRENT"
+text = "BASE Ã¢â€ â€™ CURRENT"
 
 [node name="StatsList" type="GridContainer" parent="Content/Margin/Layout/Body/DetailsColumn/Identity"]
 unique_name_in_owner = true

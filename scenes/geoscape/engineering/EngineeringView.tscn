@@ -129,14 +129,13 @@ theme_override_constants/separation = 8
 
 [node name="ItemPreview" parent="Content/Margin/Layout/Body/Details" instance=ExtResource("3_model")]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 0.6
 
 [node name="PreviewCaption" type="Label" parent="Content/Margin/Layout/Body/Details"]
 layout_mode = 2
-text = "ITEM PREVIEW · 3D model not assigned"
+text = "ITEM PREVIEW Â· 3D model not assigned"
 autowrap_mode = 3
 
 [node name="DetailsScroll" type="ScrollContainer" parent="Content/Margin/Layout/Body/Details"]

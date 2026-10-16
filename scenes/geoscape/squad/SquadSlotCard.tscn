@@ -22,7 +22,6 @@ layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="PresentationArea" type="Control" parent="Margin/Layout"]
-custom_minimum_size = Vector2(0, 160)
 layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2

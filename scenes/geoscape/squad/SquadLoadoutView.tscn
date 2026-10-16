@@ -86,7 +86,6 @@ theme_override_constants/separation = 12
 
 [node name="RosterPanel" type="PanelContainer" parent="Content/Margin/Layout/Body"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(220, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 
