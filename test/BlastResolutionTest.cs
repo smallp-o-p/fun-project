@@ -21,6 +21,36 @@ public partial class BlastResolutionTest
         new UnitLoadout(TestData.MakeCombatant(u.UnitName, u.Faction, health: u.Health)),
         u.Position))]);
 
+  [TestCase(TestName = "Grenade and grenade-borne DoT kills retain the thrower even after death")]
+  public static void GrenadeKillsRetainThrower()
+  {
+    foreach (bool delayed in new[] { false, true })
+    {
+      var player = TestData.MakeFaction("Player");
+      var enemy = TestData.MakeFaction("Enemy");
+      using var battle = BlastFixture(
+        (player, "Thrower", new Vector3I(1, 0, 1), 20),
+        (player, "Support", new Vector3I(1, 0, 2), 20),
+        (enemy, "Target", new Vector3I(3, 0, 1), 4));
+      var thrower = battle.UnitAt(new Vector3I(1, 0, 1));
+      var target = battle.UnitAt(new Vector3I(3, 0, 1));
+      var grenade = TestData.MakeGrenade("Payload", throwRange: 6, blastRadius: 0,
+        effects: delayed ? [TestData.MakeBurn(tickDamage: 5)] : [new DamageEffectData { BaseDamage = 5 }]);
+      thrower.AddInventoryItem(grenade.Item);
+      battle.Throw(thrower, grenade, new Vector3I(3, 0, 1));
+      battle.ApplyDamage(thrower, 999);
+      if (delayed)
+      {
+        battle.EndFactionTurn(player);
+        battle.EndFactionTurn(enemy);
+      }
+      battle.Session.EndBattle(BattleOutcome.Victory);
+      var summary = battle.Query(new GetFactionEndOfBattleSummary(player)).RequireRight();
+      Assert.True(target.IsDead);
+      Assert.True(summary.DefeatedPerCombatant[thrower.Combatant].Contains(target.Combatant));
+    }
+  }
+
   [TestCase(TestName = "A unit outside the blast radius is unaffected")]
   public static void UnitOutsideBlastRadiusIsUnaffected()
   {
@@ -131,7 +161,8 @@ public partial class BlastResolutionTest
     Assert.Equal(Some(ObjectStatus.Destroyed), destroyed.Status);
     Assert.Equal(0, battle.Events.EventsOf<ObjectDestroyedBattleEvent>().Length);
     Assert.True(scenery.Status.IsNone);
-    Assert.True(battle.Events.SingleEvent<ObjectDamagedBattleEvent>().MaybeCause.IsNone);
+    Assert.True(ReferenceEquals(battle.PlayerUnit,
+      battle.Events.SingleEvent<ObjectDamagedBattleEvent>().MaybeCause.RequireSome()));
     battle.Events.EventBefore<ObjectDamagedBattleEvent, CapabilityResolvedBattleEvent>();
   }
 

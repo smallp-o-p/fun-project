@@ -262,6 +262,28 @@ public partial class StatusEffectBattleTest
     Assert.True(battle.Events.EventsOf<UnitKilledBattleEvent>().AsValueEnumerable().Any());
     Assert.True(battle.Session.Outcome.IsNone);
     Assert.Equal(battle.PlayerFaction, battle.Session.ActiveSide);
+    battle.Session.EndBattle(BattleOutcome.Victory);
+    var summary = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
+    Assert.True(summary.DefeatedPerCombatant[battle.PlayerUnit.Combatant].Contains(target.Combatant));
+  }
+
+  [TestCase]
+  public static void ReapplyingDotTransfersKillCreditToTheLatestSource()
+  {
+    var burn = TestData.MakeBurn(tickDamage: 999);
+    using var battle = BattleFixture.Duel(hitChanceCalculator: new AlwaysHitCalculator(),
+      player: new("First", Weapon: TestData.MakeStatusWeapon(burn, damage: 1)));
+    var second = battle.Spawn(TestData.MakeCombatant("Second", battle.PlayerFaction), new Vector3I(0, 0, 0),
+      weapon: Some(TestData.MakeStatusWeapon(burn, damage: 1)));
+    battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
+    battle.Attack(second, battle.EnemyUnit);
+    battle.ApplyDamage(second, 999);
+    battle.EndFactionTurn(battle.PlayerFaction);
+    battle.EndFactionTurn(battle.EnemyFaction);
+    battle.Session.EndBattle(BattleOutcome.Victory);
+    var summary = battle.Query(new GetFactionEndOfBattleSummary(battle.PlayerFaction)).RequireRight();
+    Assert.False(summary.DefeatedPerCombatant.ContainsKey(battle.PlayerUnit.Combatant));
+    Assert.True(summary.DefeatedPerCombatant[second.Combatant].Contains(battle.EnemyUnit.Combatant));
   }
 
   [TestCase(TestName = "A stunned unit loses its turn and recovers after its own turn end")]

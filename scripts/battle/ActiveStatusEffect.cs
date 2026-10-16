@@ -14,6 +14,9 @@ public abstract class ActiveStatusEffect
 {
   public StatusEffectSpecData Spec { get; }
   public int RemainingTurns { get; private set; }
+  // The latest successful applier owns refreshed damage, even if it subsequently dies.
+  internal Option<BattleUnitState> Cause { get; set; }
+
   public bool IsExpired => RemainingTurns <= 0;
 
   protected ActiveStatusEffect(StatusEffectSpecData spec)
