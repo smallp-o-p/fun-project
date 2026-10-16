@@ -88,28 +88,26 @@ internal static partial class GeoscapeTestScenes
     }, inLocalCoords: true);
   }
 
-  // Momentary capture of the composition root's live session at the production Present
-  // boundary: the manager presents every pushed view with its session, so a capture view
-  // records it without any production seam. Callers pop it back before asserting.
-  public sealed partial class SessionCaptureView : GeoscapeView
+  // Capture at the production Present boundary. Popping re-presents the covered view,
+  // so assert initial view behavior before capturing, and never capture during teardown.
+  public sealed partial class SceneContextCaptureView : GeoscapeView
   {
-    public GeoscapeSession? Captured { get; private set; }
+    public (CampaignGameState State, GeoscapeSession Session)? Captured { get; private set; }
 
     public override void Present(CampaignGameState state, GeoscapeSession session)
-      => Captured = session;
+      => Captured = (state, session);
   }
 
-  // Pushes a capture view over the stack top and pops it back via RequestBack (which
-  // frees the temporary view); valid at any stack depth, so mission flows stay untouched.
-  public static GeoscapeSession CaptureSceneSession(GeoscapeViewManager manager)
+  public static (CampaignGameState State, GeoscapeSession Session) CaptureSceneContext(GeoscapeViewManager manager)
   {
-    var capture = new SessionCaptureView();
+    var capture = new SceneContextCaptureView();
     manager.Current.RequestView(capture);
-    GeoscapeSession session = capture.Captured
+    var context = capture.Captured
       ?? throw new InvalidOperationException("The capture view was never presented.");
     capture.RequestBack();
-    return session;
+    return context;
   }
+
   public static GeoscapeHud CreateHud()
     => GD.Load<PackedScene>("res://scenes/geoscape/GeoscapeHud.tscn").Instantiate<GeoscapeHud>();
 

@@ -25,7 +25,6 @@ public partial class BuffConditionTest
     Assert.False(condition.IsMet(battle.Session, battle.Unit));
     battle.ApplyDamage(battle.Unit, 1);
     Assert.True(condition.IsMet(battle.Session, battle.Unit));
-    Assert.True(condition.IsMet(battle.Session, battle.Unit));
   }
 
   [TestCase(TestName = "Adjacent-enemy predicate reads the supplied battle")]

@@ -33,6 +33,10 @@ public static class Assert
     Left: failure => failure,
     Right: value => throw new InvalidOperationException($"Expected Left, got Right: {value}"));
 
+  public static UnitAction ActionRow<TDefinition>(IReadOnlyList<UnitAction> actions)
+    where TDefinition : UnitActionDefinition =>
+    actions.AsValueEnumerable().Single(action => action.Action is TDefinition);
+
   public static T[] EventsOf<T>(this IEnumerable<object> events) =>
     events.AsValueEnumerable().OfType<T>().ToArray();
 

@@ -32,14 +32,6 @@ public class GeoscapeSquadNavigationTest
     return (scene, manager);
   }
 
-  private static Label Clock(GeoscapeScene scene)
-    => scene.GetNode<GeoscapeHud>("%GeoscapeHud").GetNode<Label>("%ClockLabel");
-
-  private static Button DialogButton(GeoscapeEventResolution dialog, string text)
-    => dialog.GetNode<HBoxContainer>("%Buttons").GetChildren()
-      .AsValueEnumerable().OfType<Button>()
-      .Single(button => string.Equals(button.Text, text, System.StringComparison.Ordinal));
-
   // Drives the real dialog's Engage handover and returns the presented squad view it
   // produced, so a test can assert the opener forwarded the pending mission's policy.
   private static SquadLoadoutView EngagedSquadView(GeoscapeFixture fixture)

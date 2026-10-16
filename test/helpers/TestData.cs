@@ -972,9 +972,8 @@ internal static class TestData
   }
 
   // Deterministic expression clips: one-second looping constants. Neutral carries
-  // the face baseline plus the moving skeleton track (body, five degrees around Y
-  // at the midpoint) and a static identity head track; the expression clips each
-  // hold a single face value so every expression stays neutral-relative.
+  // the face baseline; each expression clip holds a single face value so every
+  // expression stays neutral-relative.
   public static AnimationLibrary MakeExpressionLibrary()
   {
     var library = new AnimationLibrary();
@@ -993,16 +992,6 @@ internal static class TestData
       case "neutral":
         SetConstantBlendShape(clip, "Face:Smile", 0.2f);
         SetConstantBlendShape(clip, "Face:Blink", 0f);
-        Quaternion identity = Quaternion.Identity;
-        Quaternion tilted = Quaternion.FromEuler(new Vector3(0, Mathf.DegToRad(5), 0));
-        int moving = clip.AddTrack(Animation.TrackType.Rotation3D);
-        clip.TrackSetPath(moving, "Skeleton:body");
-        clip.RotationTrackInsertKey(moving, 0, identity);
-        clip.RotationTrackInsertKey(moving, 0.5, tilted);
-        clip.RotationTrackInsertKey(moving, 1, identity);
-        int head = clip.AddTrack(Animation.TrackType.Rotation3D);
-        clip.TrackSetPath(head, "Skeleton:head");
-        clip.RotationTrackInsertKey(head, 0, identity);
         break;
       case "smile":
         SetConstantBlendShape(clip, "Face:Smile", 0.8f);
@@ -1018,8 +1007,14 @@ internal static class TestData
     return clip;
   }
 
-  private static void SetConstantBlendShape(Animation clip, string path, float value)
+  public static void SetConstantBlendShape(Animation clip, string path, float value)
   {
+    for (int trackIndex = clip.GetTrackCount() - 1; trackIndex >= 0; trackIndex--)
+    {
+      if (clip.TrackGetType(trackIndex) == Animation.TrackType.BlendShape
+          && string.Equals(clip.TrackGetPath(trackIndex).ToString(), path, System.StringComparison.Ordinal))
+        clip.RemoveTrack(trackIndex);
+    }
     int track = clip.AddTrack(Animation.TrackType.BlendShape);
     clip.TrackSetPath(track, path);
     clip.BlendShapeTrackInsertKey(track, 0, value);

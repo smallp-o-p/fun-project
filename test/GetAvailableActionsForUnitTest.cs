@@ -20,10 +20,6 @@ public class GetAvailableActionsForUnitTest
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Goon", enemy)), new Vector3I(3, 0, 0)));
   }
 
-  private static UnitAction Row<TDefinition>(IReadOnlyList<UnitAction> actions)
-    where TDefinition : UnitActionDefinition =>
-    actions.AsValueEnumerable().Single(action => action.Action is TDefinition);
-
   [TestCase(TestName = "Armed melee unit: Move, Attack, Pass, EndTurn rows, all available, no Reload row")]
   public static void ArmedMeleeUnitAllVerbsAvailable()
   {
@@ -48,8 +44,8 @@ public class GetAvailableActionsForUnitTest
     Assert.True(actions[3].Action is PassActionDefinition);
     Assert.True(actions[4].Action is EndTurnActionDefinition);
 
-    Assert.True(Row<AttackActionDefinition>(actions).IsAvailable);
-    var reload = Row<ReloadActionDefinition>(actions);
+    Assert.True(Assert.ActionRow<AttackActionDefinition>(actions).IsAvailable);
+    var reload = Assert.ActionRow<ReloadActionDefinition>(actions);
     Assert.False(reload.IsAvailable);
   }
 
@@ -63,9 +59,9 @@ public class GetAvailableActionsForUnitTest
 
     var actions = battle.Query(new GetAvailableActionsForUnit(hero));
 
-    var attack = Row<AttackActionDefinition>(actions);
+    var attack = Assert.ActionRow<AttackActionDefinition>(actions);
     Assert.False(attack.IsAvailable);
-    Assert.True(Row<ReloadActionDefinition>(actions).IsAvailable);
+    Assert.True(Assert.ActionRow<ReloadActionDefinition>(actions).IsAvailable);
   }
 
   [TestCase(TestName = "Unarmed unit: no Attack or Reload rows, Move available")]
@@ -76,7 +72,7 @@ public class GetAvailableActionsForUnitTest
 
     Assert.False(actions.AsValueEnumerable().Any(action => action.Action is AttackActionDefinition));
     Assert.False(actions.AsValueEnumerable().Any(action => action.Action is ReloadActionDefinition));
-    Assert.True(Row<MoveActionDefinition>(actions).IsAvailable);
+    Assert.True(Assert.ActionRow<MoveActionDefinition>(actions).IsAvailable);
   }
 
   [TestCase(TestName = "Not-active-side unit: every row unavailable, including EndTurn")]
@@ -99,7 +95,7 @@ public class GetAvailableActionsForUnitTest
       new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Goon", enemy)), new Vector3I(3, 0, 3)));
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
 
-    var move = Row<MoveActionDefinition>(battle.Query(new GetAvailableActionsForUnit(hero)));
+    var move = Assert.ActionRow<MoveActionDefinition>(battle.Query(new GetAvailableActionsForUnit(hero)));
     Assert.True(move.IsAvailable);
     Assert.Equal(0, battle.Query(new GetPossibleMoveTilesForUnit(hero)).Count);
   }
@@ -116,10 +112,10 @@ public class GetAvailableActionsForUnitTest
     AliveUnit hero = battle.SingleAliveUnit(battle.PlayerFaction);
 
     var actions = battle.Query(new GetAvailableActionsForUnit(hero));
-    Assert.False(Row<MoveActionDefinition>(actions).IsAvailable);
-    Assert.False(Row<AttackActionDefinition>(actions).IsAvailable);
-    Assert.False(Row<PassActionDefinition>(actions).IsAvailable);
-    Assert.True(Row<EndTurnActionDefinition>(actions).IsAvailable);
+    Assert.False(Assert.ActionRow<MoveActionDefinition>(actions).IsAvailable);
+    Assert.False(Assert.ActionRow<AttackActionDefinition>(actions).IsAvailable);
+    Assert.False(Assert.ActionRow<PassActionDefinition>(actions).IsAvailable);
+    Assert.True(Assert.ActionRow<EndTurnActionDefinition>(actions).IsAvailable);
   }
 
   [TestCase(TestName = "Unconscious unit has no available catalog actions, including EndTurn")]
@@ -132,7 +128,7 @@ public class GetAvailableActionsForUnitTest
     var actions = battle.Query(new GetAvailableActionsForUnit(hero));
 
     Assert.True(actions.AsValueEnumerable().All(action => !action.IsAvailable));
-    Assert.False(Row<EndTurnActionDefinition>(actions).IsAvailable);
+    Assert.False(Assert.ActionRow<EndTurnActionDefinition>(actions).IsAvailable);
   }
 
   [TestCase(TestName = "An unconscious unit has no possible move tiles while FindPath stays geometric")]

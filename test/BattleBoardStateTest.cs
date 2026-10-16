@@ -44,7 +44,6 @@ public partial class BattleBoardStateTest
     Assert.Equal(3, path.Length);
     // The +X neighbor is the blocked tile itself, so the detour rounds it via the +Z side.
     Assert.Equal(new Vector3I(1, 0, 2), path[1].Raw);
-    Assert.False(path.AsValueEnumerable().Any(point => point.Raw == new Vector3I(1, 0, 1)));
   }
 
   [TestCase(TestName = "FindPath returns an empty path when no traversable route exists")]

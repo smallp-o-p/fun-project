@@ -124,12 +124,11 @@ public class CharacterModelAssetTest
       Assert.Equal(saved.Material, material.GetInstanceId(), "Ready must use the scene-local material already instantiated by Godot.");
       Assert.Equal(saved.Outline, material.NextPass?.GetInstanceId() ?? 0, "Ready must preserve the scene-local outline.");
     }
-    Assert.True(FindNamedDescendant(fixture.Root, "Appearance") is null,
+    Assert.True(fixture.Root.FindChild("Appearance", recursive: true, owned: false) is null,
       $"The '{scene}' still carries a leftover appearance node; the appearance lives on the model root.");
-    Assert.True(FindNamedDescendant(fixture.Root, "Wardrobe") is null,
+    Assert.True(fixture.Root.FindChild("Wardrobe", recursive: true, owned: false) is null,
       $"The '{scene}' still carries a leftover wardrobe node; the wardrobe lives on the model root.");
-    var meshes = new SysColGeneric.List<MeshInstance3D>();
-    CollectDescendants(fixture.Root, meshes);
+    var meshes = fixture.Root.FindChildren("*", "MeshInstance3D", recursive: true, owned: false);
     int outlinedSurfaces = 0;
     foreach (MeshInstance3D mesh in meshes)
     {
@@ -564,29 +563,6 @@ public class CharacterModelAssetTest
     Assert.True(variant0 is not null && variant2 is not null,
       $"Trigger's authored UpperBody pieces must cover variants 0 and 2, found {pieces.Count} pieces.");
     return (variant0, variant2);
-  }
-
-  private static Node? FindNamedDescendant(Node root, string name)
-  {
-    foreach (Node child in root.GetChildren())
-    {
-      if (child.Name == name)
-        return child;
-      Node? descendant = FindNamedDescendant(child, name);
-      if (descendant is not null)
-        return descendant;
-    }
-    return null;
-  }
-
-  private static void CollectDescendants<T>(Node root, SysColGeneric.List<T> results) where T : Node
-  {
-    foreach (Node child in root.GetChildren())
-    {
-      if (child is T match)
-        results.Add(match);
-      CollectDescendants(child, results);
-    }
   }
 
   private static ModelMeshMaskSetup MaskSetupOf(CharacterModel model, NodePath meshPath)

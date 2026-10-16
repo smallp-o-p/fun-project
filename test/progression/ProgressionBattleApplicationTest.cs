@@ -12,20 +12,12 @@ namespace FunProject.Tests;
 public partial class ProgressionBattleApplicationTest
 {
 
-  // Factory-ready fixture with one seed unit away from the reinforcement cells, so tests can
-  // spawn trained combatants through the ordinary reinforcement door.
-  private static BattleFixture SeededBattle(Faction faction)
-    => new(new BattleSetup(
-      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
-      [new BattleSideSetup(faction, [new FakeObjectiveData()],
-        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Seed", faction)), new Vector3I(0, 0, 0))])],
-      Seed: 7));
-
   [TestCase(TestName = "Unlocked stat-mod step raises the spawned unit's effective aim")]
   public static void UnlockedStatModAppliesAtSpawn()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = SeededBattle(faction);
+    using var battle = BattleFixture.Started(new Vector3I(8, 1, 8),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Seed", faction)), new Vector3I(0, 0, 0)));
     var combatant = TestData.MakeCombatant("Alpha", faction, aim: 65);
     battle.UnlockFirstStep(combatant, TestData.MakePath("Marksman",
       TestData.MakeStep(1, TestData.MakeStatModEffect(new AimStatMod { Modifiers = [StatModifier.Add(10)] }))));
@@ -38,7 +30,8 @@ public partial class ProgressionBattleApplicationTest
   public static void UnlockedHealthModRaisesSpawnHealth()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = SeededBattle(faction);
+    using var battle = BattleFixture.Started(new Vector3I(8, 1, 8),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Seed", faction)), new Vector3I(0, 0, 0)));
     var combatant = TestData.MakeCombatant("Bravo", faction, health: 20);
     battle.UnlockFirstStep(combatant, TestData.MakePath("Vitality",
       TestData.MakeStep(1, TestData.MakeStatModEffect(new HealthStatMod { Modifiers = [StatModifier.Add(5)] }))));
@@ -52,7 +45,8 @@ public partial class ProgressionBattleApplicationTest
   public static void UnlockedBuffGrantSurfacesAndStacks()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = SeededBattle(faction);
+    using var battle = BattleFixture.Started(new Vector3I(8, 1, 8),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Seed", faction)), new Vector3I(0, 0, 0)));
     var condition = new HealthBelowPercentCondition { Percent = 50f };
     var shared = TestData.MakeBuff("Shared", condition);
     var innateOnly = TestData.MakeBuff("Innate", condition);

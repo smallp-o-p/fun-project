@@ -20,14 +20,6 @@ public class DefuseAllBombsObjectiveTest
     return data;
   }
 
-  private static BattleSpecialObjectData MakeCrate()
-  {
-    // Interactable but not timed: interacting with it must not count toward the defuse goal.
-    var data = new BattleSpecialObjectData { Name = "Crate" };
-    data.Capabilities.Add(new InteractiveCapabilityData());
-    return data;
-  }
-
   private static (BattleSetup Setup, Faction Player) DefuseGoalSetup(
     IReadOnlyList<ObjectPlacement>? objects = null)
   {
@@ -111,7 +103,7 @@ public class DefuseAllBombsObjectiveTest
     var (setup, _) = DefuseGoalSetup(
     [
       new ObjectPlacement(MakeBomb(), new Vector3I(1, 0, 0)),
-      new ObjectPlacement(MakeCrate(), new Vector3I(2, 0, 2)),
+      new ObjectPlacement(TestData.MakeObject("Crate", capabilities: new InteractiveCapabilityData()), new Vector3I(2, 0, 2)),
     ]);
     using var runtime = BattleFactory.Start(setup).RequireRight();
     var objects = runtime.Query(new GetBattleSpecialObjectsQuery());

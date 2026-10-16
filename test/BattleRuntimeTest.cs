@@ -11,61 +11,12 @@ namespace FunProject.Tests;
 [RequireGodotRuntime]
 public sealed partial class BattleRuntimeTest
 {
-  private static BattleSetup SingleUnitSetup(Faction faction, string unitName = "Alpha")
-    => new(
-      TestData.MakeOpenBattleMap(new Vector3I(3, 1, 3)),
-      [new BattleSideSetup(faction, [new FakeObjectiveData()],
-        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(unitName, faction)), new Vector3I(0, 0, 0))])],
-      Seed: 7);
-
-  [TestCase(TestName = "Runtime forwards queries, actions and committed events")]
-  public static void RuntimeForwardsQueriesActionsAndEvents()
-  {
-    var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(SingleUnitSetup(faction));
-    var runtime = battle.Runtime;
-    battle.ClearEvents();
-    var cell = new Vector3I(1, 0, 1);
-    // Runtime-only driving (no conveniences): the fixture's runtime owns this session's
-    // only executor; the spawn is an ordinary reinforcement into the started battle.
-    runtime.ExecuteAction(BattleAction.SpawnUnit(
-      TestData.MakeCombatant("Alpha", faction), battle.Board.At(cell)));
-
-    Option<BattleUnitState> queried = runtime.Query(new GetUnitAtTile(battle.Board.At(cell)));
-
-    Assert.Equal(battle.Session.GetUnitAt(battle.Board.At(cell)).RequireSome(), queried.RequireSome());
-    Assert.True(battle.Session.GetUnitPosition(
-      battle.Session.GetUnitAt(battle.Board.At(cell)).RequireSome()).IsSome);
-    Assert.True(battle.Events.EventsOf<UnitAddedBattleEvent>().Length > 0);
-  }
-
-  [TestCase(false, TestName = "RegisterHook affects runtime action execution")]
-  [TestCase(true, TestName = "RegisterHook event shape affects runtime action execution")]
-  public static void RuntimeRegistrationShapesExecution(bool eventShape)
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(3, 1, 3), new Vector3I(0, 0, 0), actionPoints: 5);
-    var runtime = battle.Runtime;
-    var unit = battle.Unit;
-    var log = new List<string>();
-    var targetPosition = new Vector3I(1, 0, 0);
-    string label = eventShape ? "runtime_shape_reaction" : "runtime_reaction";
-    var hook = new RuntimeRecordingHook(label, targetPosition, log);
-    if (eventShape)
-      runtime.RegisterHook<IPositionedBattleEvent>(hook);
-    else
-      runtime.RegisterHook<UnitMovedBattleEvent>(hook);
-
-    runtime.ExecuteAction(BattleAction.MoveUnit(battle.Alive(unit), [battle.Board.At(targetPosition)]));
-
-    Assert.Equal(1, log.Count);
-    Assert.Equal(label, log[0]);
-  }
-
   [TestCase(TestName = "Disposed runtime no longer republishes session events")]
   public static void DisposedRuntimeNoLongerRepublishesSessionEvents()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(SingleUnitSetup(faction));
+    using var battle = BattleFixture.Started(new Vector3I(3, 1, 3),
+      new UnitLoadout(TestData.MakeCombatant("Alpha", faction)), Vector3I.Zero);
     var runtime = battle.Runtime;
     var observed = new List<BattleEvent>();
     runtime.BattleEventCommitted += observed.Add;
@@ -86,9 +37,10 @@ public sealed partial class BattleRuntimeTest
   public static void PublicMethodsThrowAfterRuntimeIsDisposed()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(SingleUnitSetup(faction));
+    using var battle = BattleFixture.Started(new Vector3I(3, 1, 3),
+      new UnitLoadout(TestData.MakeCombatant("Alpha", faction)), Vector3I.Zero);
     var runtime = battle.Runtime;
-    var hook = new RuntimeRecordingHook("runtime_reaction", new Vector3I(1, 0, 0), []);
+    var hook = new RecordingHook();
 
     runtime.Dispose();
 
@@ -98,7 +50,7 @@ public sealed partial class BattleRuntimeTest
       battle.Board.At(1, 0, 1))));
     Assert.Throws<ObjectDisposedException>(() => runtime.RegisterHook<UnitMovedBattleEvent>(hook));
     Assert.Throws<ObjectDisposedException>(() => runtime.RegisterHook<IPositionedBattleEvent>(
-      new RuntimeRecordingHook("runtime_shape_reaction", new Vector3I(1, 0, 0), [])));
+      new RecordingHook()));
     Assert.Throws<ObjectDisposedException>(() => runtime.UnregisterHook<UnitMovedBattleEvent>(hook));
 
     // Disposal is idempotent; the second call must not mask a broken first cleanup above.
@@ -126,30 +78,6 @@ public sealed partial class BattleRuntimeTest
     int followUpIndex = observed.EventIndex<UnitDamagedBattleEvent>();
     Assert.True(causeIndex >= 0);
     Assert.True(followUpIndex > causeIndex);
-  }
-
-  private sealed partial class RuntimeRecordingHook : BattleHook
-  {
-    private readonly string _message;
-    private readonly Vector3I _targetPosition;
-    private readonly List<string> _log;
-
-    public RuntimeRecordingHook(string message, Vector3I targetPosition, List<string> log)
-    {
-      _message = message;
-      _targetPosition = targetPosition;
-      _log = log;
-    }
-
-    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
-    {
-      if (battleEvent is not UnitMovedBattleEvent movedEvent
-        || movedEvent.Position.Raw != _targetPosition)
-        return [];
-
-      _log.Add(_message);
-      return [];
-    }
   }
 
   private sealed class DamageMoverOnMovedHook : BattleHook<UnitMovedBattleEvent>

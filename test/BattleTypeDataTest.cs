@@ -30,7 +30,7 @@ public partial class BattleTypeDataTest
 
     var observed = new List<Option<ObjectStatus>>();
     runtime.RegisterHook<TurnEndedBattleEvent>(
-      new StatusObserverHook(() => observed.Add(bomb.Status)), 0);
+      new CallbackHook(() => observed.Add(bomb.Status)), 0);
     new ObjectExpirySystemData { Priority = -50 }.Register(new BattleHookRegistration(runtime));
 
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
@@ -39,12 +39,4 @@ public partial class BattleTypeDataTest
     Assert.Equal(Some(ObjectStatus.Expired), observed[0]);
   }
 
-  private sealed class StatusObserverHook(System.Action onFire) : BattleHook
-  {
-    public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
-    {
-      onFire();
-      return [];
-    }
-  }
 }

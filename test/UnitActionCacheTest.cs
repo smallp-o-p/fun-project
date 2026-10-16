@@ -112,10 +112,6 @@ public class UnitActionCacheTest
     }
   }
 
-  private static UnitAction Row<TDefinition>(IReadOnlyList<UnitAction> actions)
-    where TDefinition : UnitActionDefinition =>
-    actions.AsValueEnumerable().Single(action => action.Action is TDefinition);
-
   private static void EvaluateAll(IReadOnlyList<UnitAction> actions)
   {
     foreach (UnitAction action in actions)
@@ -129,11 +125,11 @@ public class UnitActionCacheTest
     var query = new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit));
 
     IReadOnlyList<UnitAction> actions = battle.Query(query);
-    UnitAction move = Row<MoveActionDefinition>(actions);
+    UnitAction move = Assert.ActionRow<MoveActionDefinition>(actions);
     IReadOnlyList<UnitAction> repeated = battle.Query(query);
 
     Assert.True(ReferenceEquals(actions, repeated));
-    Assert.True(ReferenceEquals(move, Row<MoveActionDefinition>(repeated)));
+    Assert.True(ReferenceEquals(move, Assert.ActionRow<MoveActionDefinition>(repeated)));
     Assert.True(ReferenceEquals(battle.PlayerUnit, move.Unit));
     Assert.True(move.IsAvailable);
 
@@ -141,7 +137,7 @@ public class UnitActionCacheTest
 
     IReadOnlyList<UnitAction> afterSpend = battle.Query(query);
     Assert.True(ReferenceEquals(actions, afterSpend));
-    Assert.True(ReferenceEquals(move, Row<MoveActionDefinition>(afterSpend)));
+    Assert.True(ReferenceEquals(move, Assert.ActionRow<MoveActionDefinition>(afterSpend)));
     Assert.False(move.IsAvailable);
 
     battle.AdvanceTurn();
@@ -149,7 +145,7 @@ public class UnitActionCacheTest
 
     IReadOnlyList<UnitAction> afterRefresh = battle.Query(query);
     Assert.True(ReferenceEquals(actions, afterRefresh));
-    Assert.True(ReferenceEquals(move, Row<MoveActionDefinition>(afterRefresh)));
+    Assert.True(ReferenceEquals(move, Assert.ActionRow<MoveActionDefinition>(afterRefresh)));
     Assert.Equal(4, battle.PlayerUnit.CurrentActionPoints);
     Assert.True(move.IsAvailable);
   }
@@ -170,7 +166,7 @@ public class UnitActionCacheTest
 
     IReadOnlyList<UnitAction> afterWin = battle.Query(query);
     Assert.True(ReferenceEquals(actions, afterWin));
-    Assert.True(ReferenceEquals(Row<MoveActionDefinition>(actions), Row<MoveActionDefinition>(afterWin)));
+    Assert.True(ReferenceEquals(Assert.ActionRow<MoveActionDefinition>(actions), Assert.ActionRow<MoveActionDefinition>(afterWin)));
   }
 
   [TestCase]
@@ -183,8 +179,8 @@ public class UnitActionCacheTest
       hitChanceCalculator: new AlwaysHitCalculator());
     IReadOnlyList<UnitAction> actions = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    UnitAction attack = Row<AttackActionDefinition>(actions);
-    UnitAction reload = Row<ReloadActionDefinition>(actions);
+    UnitAction attack = Assert.ActionRow<AttackActionDefinition>(actions);
+    UnitAction reload = Assert.ActionRow<ReloadActionDefinition>(actions);
     Assert.True(attack.IsAvailable);
     Assert.False(reload.IsAvailable);
 
@@ -211,9 +207,9 @@ public class UnitActionCacheTest
 
     useBattle.Use(useBattle.PlayerUnit, usable);
 
-    Assert.False(Row<MoveActionDefinition>(useActions).IsAvailable);
-    Assert.False(Row<AttackActionDefinition>(useActions).IsAvailable);
-    Assert.False(Row<PassActionDefinition>(useActions).IsAvailable);
+    Assert.False(Assert.ActionRow<MoveActionDefinition>(useActions).IsAvailable);
+    Assert.False(Assert.ActionRow<AttackActionDefinition>(useActions).IsAvailable);
+    Assert.False(Assert.ActionRow<PassActionDefinition>(useActions).IsAvailable);
 
     using var throwBattle = BattleFixture.Duel(player: new("Alpha", ActionPoints: 1, Weapon: TestData.MakeWeapon("Rifle")));
     ItemWith<ThrowableCapability> throwable = TestData.MakeThrowable("Rock");
@@ -224,9 +220,9 @@ public class UnitActionCacheTest
 
     throwBattle.Throw(throwBattle.PlayerUnit, throwable, new Vector3I(4, 0, 2));
 
-    Assert.False(Row<MoveActionDefinition>(throwActions).IsAvailable);
-    Assert.False(Row<AttackActionDefinition>(throwActions).IsAvailable);
-    Assert.False(Row<PassActionDefinition>(throwActions).IsAvailable);
+    Assert.False(Assert.ActionRow<MoveActionDefinition>(throwActions).IsAvailable);
+    Assert.False(Assert.ActionRow<AttackActionDefinition>(throwActions).IsAvailable);
+    Assert.False(Assert.ActionRow<PassActionDefinition>(throwActions).IsAvailable);
   }
 
   [TestCase]
@@ -239,10 +235,10 @@ public class UnitActionCacheTest
 
     battle.Pass(battle.PlayerUnit);
 
-    Assert.False(Row<MoveActionDefinition>(actions).IsAvailable);
-    Assert.False(Row<AttackActionDefinition>(actions).IsAvailable);
-    Assert.False(Row<PassActionDefinition>(actions).IsAvailable);
-    Assert.True(Row<EndTurnActionDefinition>(actions).IsAvailable);
+    Assert.False(Assert.ActionRow<MoveActionDefinition>(actions).IsAvailable);
+    Assert.False(Assert.ActionRow<AttackActionDefinition>(actions).IsAvailable);
+    Assert.False(Assert.ActionRow<PassActionDefinition>(actions).IsAvailable);
+    Assert.True(Assert.ActionRow<EndTurnActionDefinition>(actions).IsAvailable);
   }
 
   [TestCase]
@@ -257,7 +253,7 @@ public class UnitActionCacheTest
       enemy: new("Durable", Health: 100));
     IReadOnlyList<UnitAction> actions = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    UnitAction attack = Row<AttackActionDefinition>(actions);
+    UnitAction attack = Assert.ActionRow<AttackActionDefinition>(actions);
     Assert.False(attack.IsAvailable);
 
     battle.EndFactionTurn(battle.PlayerFaction);
@@ -306,8 +302,8 @@ public class UnitActionCacheTest
       Seed: 7));
     BattleUnitState support = battle.UnitAt(new Vector3I(2, 0, 1));
     IReadOnlyList<UnitAction> actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(support)));
-    UnitAction move = Row<MoveActionDefinition>(actions);
-    UnitAction endTurn = Row<EndTurnActionDefinition>(actions);
+    UnitAction move = Assert.ActionRow<MoveActionDefinition>(actions);
+    UnitAction endTurn = Assert.ActionRow<EndTurnActionDefinition>(actions);
     Assert.True(move.IsAvailable);
     Assert.True(endTurn.IsAvailable);
 
@@ -373,8 +369,8 @@ public class UnitActionCacheTest
     using var battle = BattleFixture.Duel(enemy: new("Durable", Health: 100));
     IReadOnlyList<UnitAction> actions = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    UnitAction move = Row<MoveActionDefinition>(actions);
-    UnitAction endTurn = Row<EndTurnActionDefinition>(actions);
+    UnitAction move = Assert.ActionRow<MoveActionDefinition>(actions);
+    UnitAction endTurn = Assert.ActionRow<EndTurnActionDefinition>(actions);
     Assert.True(move.IsAvailable);
     Assert.True(endTurn.IsAvailable);
 
@@ -512,8 +508,8 @@ public class UnitActionCacheTest
     BattleUnitState holder = battle.UnitAt(new Vector3I(2, 0, 1));
     BattleUnitState target = battle.UnitAt(new Vector3I(1, 0, 4));
     IReadOnlyList<UnitAction> holderActions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(holder)));
-    UnitAction attack = Row<AttackActionDefinition>(holderActions);
-    UnitAction reload = Row<ReloadActionDefinition>(holderActions);
+    UnitAction attack = Assert.ActionRow<AttackActionDefinition>(holderActions);
+    UnitAction reload = Assert.ActionRow<ReloadActionDefinition>(holderActions);
     _ = attack.IsAvailable;
     _ = reload.IsAvailable;
 
@@ -554,7 +550,7 @@ public class UnitActionCacheTest
       support.TrySpendActionPoints(support.CurrentActionPoints);
       IReadOnlyList<UnitAction> existing = new GetAvailableActionsForUnit(
         context.Session.TryGetAlive(player).RequireSome()).Execute(context.Session);
-      existingMove = Row<MoveActionDefinition>(existing);
+      existingMove = Assert.ActionRow<MoveActionDefinition>(existing);
     }
 
     void ObserveAtFirstTurnStart(HookContext context)
@@ -568,7 +564,7 @@ public class UnitActionCacheTest
       existingDuringCallback = move.IsAvailable;
       createdDuringCallback = new GetAvailableActionsForUnit(
         context.Session.TryGetAlive(supportUnit).RequireSome()).Execute(context.Session);
-      createdDuringCallbackValue = Row<MoveActionDefinition>(createdDuringCallback).IsAvailable;
+      createdDuringCallbackValue = Assert.ActionRow<MoveActionDefinition>(createdDuringCallback).IsAvailable;
     }
 
     using var battle = new BattleFixture(ThreeUnitSetup(playerFaction, enemyFaction) with
@@ -587,7 +583,7 @@ public class UnitActionCacheTest
     Assert.False(existingDuringCallback);
     Assert.False(createdDuringCallbackValue);
     Assert.True(retainedMove.IsAvailable);
-    Assert.True(Row<MoveActionDefinition>(created).IsAvailable);
+    Assert.True(Assert.ActionRow<MoveActionDefinition>(created).IsAvailable);
   }
 
   [TestCase(TestName = "Reads during a continuation TurnStarted observe pre-refresh availability without caching")]
@@ -602,7 +598,7 @@ public class UnitActionCacheTest
     support.TrySpendActionPoints(support.CurrentActionPoints);
     IReadOnlyList<UnitAction> existing = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(player)));
-    UnitAction existingMove = Row<MoveActionDefinition>(existing);
+    UnitAction existingMove = Assert.ActionRow<MoveActionDefinition>(existing);
     Assert.False(existingMove.IsAvailable);
     IReadOnlyList<UnitAction>? createdDuringCallback = null;
     bool existingDuringCallback = true;
@@ -614,7 +610,7 @@ public class UnitActionCacheTest
       existingDuringCallback = existingMove.IsAvailable;
       createdDuringCallback = battle.Query(
         new GetAvailableActionsForUnit(battle.Alive(support)));
-      createdDuringCallbackValue = Row<MoveActionDefinition>(createdDuringCallback).IsAvailable;
+      createdDuringCallbackValue = Assert.ActionRow<MoveActionDefinition>(createdDuringCallback).IsAvailable;
     };
 
     // Round-rollover continuation reaches the player's next TurnStarted.
@@ -626,7 +622,7 @@ public class UnitActionCacheTest
     Assert.False(existingDuringCallback);
     Assert.False(createdDuringCallbackValue);
     Assert.True(existingMove.IsAvailable);
-    Assert.True(Row<MoveActionDefinition>(created).IsAvailable);
+    Assert.True(Assert.ActionRow<MoveActionDefinition>(created).IsAvailable);
   }
 
   private static BattleSetup ThreeUnitSetup(Faction playerFaction, Faction enemyFaction) => new(
@@ -690,9 +686,9 @@ public class UnitActionCacheTest
     Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
     Assert.Equal(1, battle.Events.EventsOf<UnitMovedBattleEvent>().AsValueEnumerable().Count());
     Assert.Equal(1, battle.Events.EventsOf<TileOccupiedBattleEvent>().AsValueEnumerable().Count());
-    Assert.False(Row<MoveActionDefinition>(playerActions).IsAvailable);
-    Assert.False(Row<PassActionDefinition>(playerActions).IsAvailable);
-    Assert.True(Row<EndTurnActionDefinition>(playerActions).IsAvailable);
+    Assert.False(Assert.ActionRow<MoveActionDefinition>(playerActions).IsAvailable);
+    Assert.False(Assert.ActionRow<PassActionDefinition>(playerActions).IsAvailable);
+    Assert.True(Assert.ActionRow<EndTurnActionDefinition>(playerActions).IsAvailable);
     Assert.True(enemyActions.AsValueEnumerable().All(action => !action.IsAvailable));
 
     battle.Pass(battle.PlayerUnit);
@@ -724,7 +720,7 @@ public class UnitActionCacheTest
     Assert.True(ReferenceEquals(failure, caught));
     Assert.Equal(new Vector3I(4, 0, 2), battle.Session.GetUnitPosition(battle.PlayerUnit).RequireSome().Raw);
     Assert.Equal(0, battle.PlayerUnit.CurrentActionPoints);
-    Assert.False(Row<MoveActionDefinition>(actions).IsAvailable);
+    Assert.False(Assert.ActionRow<MoveActionDefinition>(actions).IsAvailable);
 
     battle.Submit(BattleAction.PassUnit(battle.Alive(battle.PlayerUnit)));
     Assert.Equal(new Vector3I(4, 0, 2), battle.Session.GetUnitPosition(battle.PlayerUnit).RequireSome().Raw);
@@ -750,9 +746,9 @@ public class UnitActionCacheTest
     }
 
     Assert.True(ReferenceEquals(failure, caught));
-    Assert.False(Row<MoveActionDefinition>(playerActions).IsAvailable);
-    Assert.False(Row<PassActionDefinition>(playerActions).IsAvailable);
-    Assert.True(Row<EndTurnActionDefinition>(playerActions).IsAvailable);
+    Assert.False(Assert.ActionRow<MoveActionDefinition>(playerActions).IsAvailable);
+    Assert.False(Assert.ActionRow<PassActionDefinition>(playerActions).IsAvailable);
+    Assert.True(Assert.ActionRow<EndTurnActionDefinition>(playerActions).IsAvailable);
   }
 
   [TestCase]

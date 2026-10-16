@@ -23,9 +23,6 @@ public partial class AttackObjectTest
   private static Func<BattleSetup, BattleSetup> ObjectsAt(params ObjectPlacement[] placements) =>
     setup => setup with { Objects = placements };
 
-  private static BattleObjectState ObjectAt(BattleFixture battle, Vector3I cell) =>
-    battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable().Single(o => o.Position == cell);
-
   private static BattleMapData MapWithCoveredCell(Vector3I coverCell)
   {
     List<(Vector3I Cell, BattleMapTileData Tile)> tiles = [];
@@ -49,7 +46,7 @@ public partial class AttackObjectTest
       hitChanceCalculator: new MustNotCalculateObject(),
       player: new("Shooter", Aim: 0, Weapon: weapon),
       configure: ObjectsAt(new ObjectPlacement(TestData.MakeObject("Crate", 20), new Vector3I(4, 0, 2))));
-    var obj = ObjectAt(battle, new Vector3I(4, 0, 2));
+    var obj = battle.ObjectAt(new Vector3I(4, 0, 2));
     var attackOption = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)))
       .AsValueEnumerable().Single(option => option.Action is AttackActionDefinition);
     Assert.True(attackOption.IsAvailable);
@@ -83,7 +80,7 @@ public partial class AttackObjectTest
     using var battle = BattleFixture.Duel(
       player: new("Shooter", Weapon: TestData.MakeWeapon("Rifle", damage: 99)),
       configure: ObjectsAt(new ObjectPlacement(TestData.MakeObject("Crate", 5), new Vector3I(4, 0, 2))));
-    var obj = ObjectAt(battle, new Vector3I(4, 0, 2));
+    var obj = battle.ObjectAt(new Vector3I(4, 0, 2));
     bool observed = false;
     battle.Runtime.BattleEventCommitted += evt =>
     {
@@ -112,7 +109,7 @@ public partial class AttackObjectTest
       player: new("Stunner", Weapon: TestData.MakeStunWeapon()),
       enemy: new("Burner", Weapon: TestData.MakeStatusWeapon(TestData.MakeBurn(applyChancePercent: 50))),
       configure: ObjectsAt(new ObjectPlacement(TestData.MakeObject("Crate", 20), new Vector3I(4, 0, 2))));
-    var obj = ObjectAt(battle, new Vector3I(4, 0, 2));
+    var obj = battle.ObjectAt(new Vector3I(4, 0, 2));
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, obj);
     Assert.Equal(20, obj.FindCapability<ObjectHealthCapability>().RequireSome().CurrentHealth);
@@ -142,7 +139,7 @@ public partial class AttackObjectTest
     using var battle = BattleFixture.Duel(
       enemy: new("Guard", Weapon: weapon),
       configure: ObjectsAt(new ObjectPlacement(TestData.MakeObject("Crate", 5), new Vector3I(3, 0, 3))));
-    var obj = ObjectAt(battle, new Vector3I(3, 0, 3));
+    var obj = battle.ObjectAt(new Vector3I(3, 0, 3));
     battle.RegisterHook<UnitMovedBattleEvent>(new TwoObjectShots(battle.EnemyUnit, obj));
     battle.ClearEvents();
     int beforeAp = battle.EnemyUnit.CurrentActionPoints;
@@ -169,7 +166,7 @@ public partial class AttackObjectTest
     using var battle = BattleFixture.Duel(
       player: new("Shooter", Weapon: weapon),
       configure: ObjectsAt(new ObjectPlacement(TestData.MakeObject("Crate", 20), new Vector3I(4, 0, 2))));
-    var obj = ObjectAt(battle, new Vector3I(4, 0, 2));
+    var obj = battle.ObjectAt(new Vector3I(4, 0, 2));
     battle.RegisterHook<UnitAttackedBattleEvent>(new DestroyDuringShot(obj));
     battle.ClearEvents();
     battle.Attack(battle.PlayerUnit, obj);
@@ -191,7 +188,7 @@ public partial class AttackObjectTest
       new Vector3I(0, 0, 1), shortWeapon);
     var unarmed = battle.Spawn(TestData.MakeCombatant("Unarmed", battle.PlayerFaction),
       new Vector3I(1, 0, 0));
-    var obj = ObjectAt(battle, new Vector3I(3, 0, 1));
+    var obj = battle.ObjectAt(new Vector3I(3, 0, 1));
     Assert.True(battle.Query(new GetFactionVisibleObjectsQuery(battle.PlayerFaction)).AsValueEnumerable().Contains(obj));
     foreach (var actor in new[] { blind, shortRange, unarmed })
     {
@@ -214,8 +211,8 @@ public partial class AttackObjectTest
       configure: ObjectsAt(
         new ObjectPlacement(TestData.MakeObject("Boundary", 20), new Vector3I(2, 0, 1)),
         new ObjectPlacement(TestData.MakeObject("Beyond", 20), new Vector3I(1, 0, 1))));
-    var boundary = ObjectAt(battle, new Vector3I(2, 0, 1));
-    var beyond = ObjectAt(battle, new Vector3I(1, 0, 1));
+    var boundary = battle.ObjectAt(new Vector3I(2, 0, 1));
+    var beyond = battle.ObjectAt(new Vector3I(1, 0, 1));
     Assert.True(battle.Query(new GetHitChanceForAttack(battle.Alive(battle.PlayerUnit), battle.Target(boundary))).IsRight);
     Assert.True(battle.Query(new GetHitChanceForAttack(battle.Alive(battle.PlayerUnit), battle.Target(beyond))).IsLeft);
   }
@@ -228,7 +225,7 @@ public partial class AttackObjectTest
       using var battle = BattleFixture.Duel(randomSeed: 19,
         player: new("Shooter", Weapon: weapon),
         configure: ObjectsAt(new ObjectPlacement(TestData.MakeObject("Crate", 20), new Vector3I(3, 0, 2))));
-      var obj = ObjectAt(battle, new Vector3I(3, 0, 2));
+      var obj = battle.ObjectAt(new Vector3I(3, 0, 2));
       battle.ClearEvents();
       battle.Attack(battle.PlayerUnit, obj);
       battle.Attack(battle.PlayerUnit, battle.EnemyUnit);
@@ -247,8 +244,8 @@ public partial class AttackObjectTest
       new ObjectPlacement(TestData.MakeObject("Crate", 10), new Vector3I(3, 0, 2)),
       new ObjectPlacement(TestData.MakeObject(), new Vector3I(2, 0, 2))));
     using var foreign = BattleFixture.Duel();
-    var obj = ObjectAt(battle, new Vector3I(3, 0, 2));
-    var scenery = ObjectAt(battle, new Vector3I(2, 0, 2));
+    var obj = battle.ObjectAt(new Vector3I(3, 0, 2));
+    var scenery = battle.ObjectAt(new Vector3I(2, 0, 2));
     Assert.Throws<InvalidOperationException>(() => battle.Session.ApplyDamageTo(scenery, [], None));
     Assert.Throws<InvalidOperationException>(() => foreign.Session.ApplyDamageTo(obj, [], None));
     Assert.Throws<ArgumentNullException>(() => battle.Session.ApplyDamageTo(obj, null!, None));

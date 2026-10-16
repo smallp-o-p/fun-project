@@ -11,13 +11,6 @@ namespace FunProject.Tests;
 [RequireGodotRuntime]
 public class InteractWithObjectTest
 {
-  private static BattleSpecialObjectData MakeInteractiveObjectData(int actionPointCost = 2)
-  {
-    var data = new BattleSpecialObjectData { Name = "Bomb" };
-    data.Capabilities.Add(new InteractiveCapabilityData { ActionPointCost = actionPointCost });
-    return data;
-  }
-
   // Factory-ready fixture: unit A at (1,0,1), unit B at (3,0,3), one interactive bomb at (2,0,1).
   private static BattleFixture BombFixture(Faction player, Faction enemy, int playerActionPoints = 4)
     => new(new BattleSetup(
@@ -30,10 +23,7 @@ public class InteractWithObjectTest
           [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
       ],
       Seed: 7) with
-    { Objects = [new ObjectPlacement(MakeInteractiveObjectData(), new Vector3I(2, 0, 1))] });
-
-  private static BattleObjectState BombAt(BattleFixture battle, Vector3I cell) =>
-    battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable().Single(o => o.Position == cell);
+    { Objects = [new ObjectPlacement(TestData.MakeObject("Bomb", capabilities: new InteractiveCapabilityData { ActionPointCost = 2 }), new Vector3I(2, 0, 1))] });
 
   [TestCase(TestName = "Adjacent interact spends AP, defuses, clears occupancy, raises event")]
   public static void HappyPathInteract()
@@ -43,7 +33,7 @@ public class InteractWithObjectTest
     using var battle = BombFixture(player, enemy);
     var unit = battle.UnitAt(new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
-    var bomb = BombAt(battle, point.Raw);
+    var bomb = battle.ObjectAt(point.Raw);
     battle.ClearEvents();
 
     int apBefore = unit.CurrentActionPoints;
@@ -70,10 +60,10 @@ public class InteractWithObjectTest
       enemy: new("Hostile"),
       configure: setup => setup with
       {
-        Objects = [new ObjectPlacement(MakeInteractiveObjectData(actionPointCost: 2), new Vector3I(5, 0, 1))],
+        Objects = [new ObjectPlacement(TestData.MakeObject("Bomb", capabilities: new InteractiveCapabilityData { ActionPointCost = 2 }), new Vector3I(5, 0, 1))],
       });
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(5, 0, 1));
-    BattleObjectState bomb = BombAt(battle, point.Raw);
+    BattleObjectState bomb = battle.ObjectAt(point.Raw);
 
     IReadOnlyList<UnitAction> playerActions = battle.Query(
       new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
@@ -111,7 +101,7 @@ public class InteractWithObjectTest
     using var battle = BombFixture(player, enemy, playerActionPoints: 1);
     var unit = battle.UnitAt(new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
-    var bomb = BombAt(battle, point.Raw);
+    var bomb = battle.ObjectAt(point.Raw);
     battle.ClearEvents();
 
     Assert.Throws<InvalidOperationException>(() => battle.Submit(
@@ -132,11 +122,11 @@ public class InteractWithObjectTest
     using var local = BombFixture(player, enemy);
     var localUnit = local.UnitAt(new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint localPoint = local.At(new Vector3I(2, 0, 1));
-    var localBomb = BombAt(local, localPoint.Raw);
+    var localBomb = local.ObjectAt(localPoint.Raw);
 
     using var foreign = BombFixture(TestData.MakeFaction("P"), TestData.MakeFaction("E"));
     BattleBoardState.ValidatedPoint foreignPoint = foreign.At(new Vector3I(2, 0, 1));
-    var foreignBomb = BombAt(foreign, foreignPoint.Raw);
+    var foreignBomb = foreign.ObjectAt(foreignPoint.Raw);
 
     LiveObject foreignProof = foreign.Live(foreignBomb);
 
@@ -159,7 +149,7 @@ public class InteractWithObjectTest
     using var battle = BombFixture(player, enemy);
     var unit = battle.UnitAt(new Vector3I(1, 0, 1));
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(2, 0, 1));
-    var bomb = BombAt(battle, point.Raw);
+    var bomb = battle.ObjectAt(point.Raw);
 
     AliveUnit unitProof = battle.Alive(unit);
     LiveObject objectProof = battle.Live(bomb);

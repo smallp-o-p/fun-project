@@ -39,8 +39,9 @@ public partial class AttackUnitTest
   [TestCase(TestName = "Guaranteed miss spends action points without damage")]
   public static void GuaranteedMissSpendsActionPointsWithoutDamage()
   {
+    var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 3);
     using var battle = BattleFixture.Duel(
-      player: new("Alpha", Aim: 0, Weapon: TestData.MakeWeapon("Rifle")));
+      player: new("Alpha", Aim: 0, Weapon: weapon));
     var attacker = battle.PlayerUnit;
     var target = battle.EnemyUnit;
 
@@ -48,6 +49,7 @@ public partial class AttackUnitTest
     battle.Attack(attacker, target);
 
     Assert.Equal(target.MaxHealth, target.CurrentHealth);
+    Assert.Equal(2, weapon.CurrentAmmo);
     Assert.Equal(attacker.MaxActionPoints - 1, attacker.CurrentActionPoints);
     Assert.False(battle.Events.SingleEvent<UnitAttackedBattleEvent>().IsHit);
     Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
@@ -166,7 +168,7 @@ public partial class AttackUnitTest
 
     // Both overwatch shots are built during the move event's dispatch, while the mover is
     // still alive; the first kill invalidates the second action's target proof.
-    battle.RegisterHook<UnitMovedBattleEvent>(new BuildInterruptsHook(context =>
+    battle.RegisterHook<UnitMovedBattleEvent>(new MoveInterruptsHook(context =>
     [
       BattleAction.AttackEntity(
         context.Session.TryGetAlive(shooter).RequireSome(),
@@ -246,20 +248,6 @@ public partial class AttackUnitTest
     Assert.False(battle.Events.EventsOf<UnitAttackedBattleEvent>().AsValueEnumerable().Any());
   }
 
-  [TestCase(TestName = "A missed shot still spends ammunition")]
-  public static void MissedShotSpendsAmmo()
-  {
-    var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 3);
-    using var battle = BattleFixture.Duel(
-      player: new("Alpha", Aim: 0, Weapon: weapon));
-    var target = battle.EnemyUnit;
-
-    battle.Attack(battle.PlayerUnit, target);
-
-    Assert.Equal(target.MaxHealth, target.CurrentHealth); // aim 0 -> guaranteed miss
-    Assert.Equal(2, weapon.CurrentAmmo);
-  }
-
   private static List<bool> RunSeededAttackOutcomes(int seed)
   {
     using var battle = BattleFixture.Duel(
@@ -274,9 +262,4 @@ public partial class AttackUnitTest
     return battle.Events.EventsOf<UnitAttackedBattleEvent>().AsValueEnumerable().Select(attackEvent => attackEvent.IsHit).ToList();
   }
 
-  private sealed class BuildInterruptsHook(Func<HookContext, IReadOnlyList<BattleAction>> build) : BattleHook<UnitMovedBattleEvent>
-  {
-    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitMovedBattleEvent evt)
-      => build(context);
-  }
 }
