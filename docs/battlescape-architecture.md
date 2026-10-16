@@ -37,7 +37,7 @@ flowchart LR
         Launcher["BattleLauncher\nstandalone host"]
         Scene["BattleScene\nhost, refresh wiring"]
         Ui["BattleUiController\nselection / targeting FSM"]
-        Input["BattleInputController\ntile picking"]
+        Input["BattleInputController\nunit / tile picking"]
         View["BattleUI\nauthored controls"]
         Director["EventPlaybackDirector\nevent playback"]
     end
@@ -59,7 +59,7 @@ flowchart LR
     Queries -->|"read only"| Board
 
     Launcher -->|"resolve type, Start(setup), Present"| Scene
-    Input -->|"tile events"| Ui
+    Input -->|"unit / tile events"| Ui
     View -->|"intents"| Ui
     Ui -->|"build + submit actions"| Facade
     Scene -->|"refresh view models"| View
@@ -77,7 +77,7 @@ flowchart LR
 - `IBattleSessionQuery<TResult>` implementations each own one question and its result shape.
 - Unit inventory belongs to `BattleUnitState`.
 - `BattleLauncher` resolves a `BattleTypeData`, starts the runtime, loads `BattleScene.tscn`, and calls `Present`. `BattleScene` holds the runtime and setup and instances the pooled `BattleMap`. It builds `EventPlaybackDirector`, `BattleUnitMeshes`, `BattleUiController`, and `BattleInputController`. It pushes view models into the authored `BattleUI` view.
-- `BattleUiController` owns the selection and targeting FSM and turns intents into queries and submitted actions. `BattleInputController` raycasts tiles and emits `TileClicked`/`TileHovered`/`ConfirmPressed`/`CancelPressed`. `EventPlaybackDirector` subscribes to `ActionCompleted`, plays each result's committed events in commit order (coalescing consecutive move events), and raises `PlaybackIdle`. They use runtime queries and submitted actions for tactical reads and writes.
+- `BattleUiController` owns the selection and targeting FSM and turns intents into queries and submitted actions. `BattleInputController` casts one nearest-hit ray across floors (layer 1), props (layer 2), and presentation-only unit areas (layer 3), emitting unit or tile click/hover intents plus confirm/cancel. Nearest prop hits consume clicks without a floor fallback, preventing selection through cover. Matching capsule hitboxes follow the meshes through playback and leave picking when hidden. Unit hits carry the registered `BattleUnitState` identity; the host resolves a fresh alive proof and forwards its current cell to the same selection/targeting FSM as tile hits. The unhandled-input path lets GUI overlays consume events first and consumes world clicks before Godot's later built-in object picking. `EventPlaybackDirector` subscribes to `ActionCompleted`, plays each result's committed events in commit order (coalescing consecutive move events), and raises `PlaybackIdle`. They use runtime queries and submitted actions for tactical reads and writes.
 
 ## Runtime Components
 

@@ -134,7 +134,7 @@ public partial class GeoscapeBattleHandoffTest
   public static async Task BattleOwnsOpaqueViewport(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (_, manager, squad, _, session) = PreparedScene(SurvivalMission(1), out var capture,
+    var (scene, manager, squad, _, session) = PreparedScene(SurvivalMission(1), out var capture,
       windowSize: new Vector2I(width, height));
     var sentinel = new ColorRect { Color = Colors.Magenta, MouseFilter = Control.MouseFilterEnum.Ignore };
     manager.RootView.AddChild(sentinel);
@@ -164,10 +164,10 @@ public partial class GeoscapeBattleHandoffTest
     using var rendered = window.GetTexture().GetImage();
     Assert.False(rendered.GetPixel(1, 1).IsEqualApprox(Colors.Magenta));
     Assert.False(rendered.GetPixel(rendered.GetWidth() - 2, rendered.GetHeight() - 2).IsEqualApprox(Colors.Magenta));
-    Option<Vector3I> clicked = None;
-    battle.GetNode<BattleInputController>("BattleInputController").TileClicked += tile => clicked = Some(tile);
+    Option<BattleUnitState> clicked = None;
+    battle.GetNode<BattleInputController>("BattleInputController").UnitClicked += unit => clicked = Some(unit);
     await SelectFirstBattleUnit(battle, throughContainer: true);
-    Assert.Equal(Vector3I.Zero, clicked.RequireSome());
+    Assert.True(ReferenceEquals(scene.Campaign!.Roster[0], clicked.RequireSome().Combatant));
     int completions = 0;
     battle.Completed += _ => completions++;
     ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);

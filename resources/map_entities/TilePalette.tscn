@@ -4,6 +4,17 @@
 [ext_resource type="PackedScene" path="res://resources/map_entities/Block.tscn" id="4_p4raq"]
 [ext_resource type="PackedScene" path="res://resources/map_entities/Car.tscn" id="5_ipbke"]
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_block"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_car_body"]
+size = Vector3(0.82, 0.5, 1.85)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_car_cabin"]
+size = Vector3(0.68, 0.4, 0.83)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_car_wheel"]
+size = Vector3(0.14, 0.36, 0.34)
 [node name="TilePalette" type="Node3D" unique_id=760079746]
 
 [node name="FloorTile" parent="." unique_id=1826370727 instance=ExtResource("1_g7aw0")]
@@ -14,3 +25,38 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="Car" parent="." unique_id=1072632633 instance=ExtResource("5_ipbke")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+
+[node name="PickingCollision" type="StaticBody3D" parent="Block"]
+collision_layer = 2
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="Block/PickingCollision"]
+shape = SubResource("BoxShape3D_block")
+
+[node name="PickingCollision" type="StaticBody3D" parent="Car"]
+collision_layer = 2
+collision_mask = 0
+
+[node name="Body" type="CollisionShape3D" parent="Car/PickingCollision"]
+position = Vector3(0, 0.43, 0.5)
+shape = SubResource("BoxShape3D_car_body")
+
+[node name="Cabin" type="CollisionShape3D" parent="Car/PickingCollision"]
+position = Vector3(0, 0.81, 0.5)
+shape = SubResource("BoxShape3D_car_cabin")
+
+[node name="FrontLeftWheel" type="CollisionShape3D" parent="Car/PickingCollision"]
+position = Vector3(-0.4, 0.18, -0.07)
+shape = SubResource("BoxShape3D_car_wheel")
+
+[node name="FrontRightWheel" type="CollisionShape3D" parent="Car/PickingCollision"]
+position = Vector3(0.4, 0.18, -0.07)
+shape = SubResource("BoxShape3D_car_wheel")
+
+[node name="RearLeftWheel" type="CollisionShape3D" parent="Car/PickingCollision"]
+position = Vector3(-0.4, 0.18, 1.07)
+shape = SubResource("BoxShape3D_car_wheel")
+
+[node name="RearRightWheel" type="CollisionShape3D" parent="Car/PickingCollision"]
+position = Vector3(0.4, 0.18, 1.07)
+shape = SubResource("BoxShape3D_car_wheel")

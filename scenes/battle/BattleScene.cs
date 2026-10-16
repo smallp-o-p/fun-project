@@ -58,6 +58,8 @@ public sealed partial class BattleScene : Node3D
     {
       _input.TileClicked -= OnTileClicked;
       _input.TileHovered -= OnTileHovered;
+      _input.UnitClicked -= OnUnitClicked;
+      _input.UnitHovered -= OnUnitHovered;
       _input.ConfirmPressed -= OnConfirmIntent;
       _input.CancelPressed -= OnCancelIntent;
     }
@@ -95,7 +97,7 @@ public sealed partial class BattleScene : Node3D
 
     _input = new BattleInputController { Name = "BattleInputController" };
     AddChild(_input);
-    _input.Initialize(rig);
+    _input.Initialize(rig, unitMeshes);
     _view = GetNode<BattleUI>("%BattleUI");
     _hud = _view.Hud ?? throw new InvalidOperationException("Battle UI requires a ready BattleHud.");
     _hud.ConfirmRequested += OnConfirmIntent;
@@ -104,6 +106,8 @@ public sealed partial class BattleScene : Node3D
     _hud.ReturnRequested += OnReturnIntent;
     _input.TileClicked += OnTileClicked;
     _input.TileHovered += OnTileHovered;
+    _input.UnitClicked += OnUnitClicked;
+    _input.UnitHovered += OnUnitHovered;
     _input.ConfirmPressed += OnConfirmIntent;
     _input.CancelPressed += OnCancelIntent;
 
@@ -179,6 +183,18 @@ public sealed partial class BattleScene : Node3D
 
     _ui.PreviewAt(tile);
     _ui.LastPreview.Match(_view.ShowPreview, _view.HidePreview);
+  }
+
+  private void OnUnitClicked(BattleUnitState unit)
+  {
+    if (!_disposed)
+      _runtime.TryGetAlive(unit).IfSome(alive => _ui.ClickTile(alive.Position.Raw));
+  }
+
+  private void OnUnitHovered(BattleUnitState unit)
+  {
+    if (!_disposed)
+      _runtime.TryGetAlive(unit).IfSome(alive => OnTileHovered(alive.Position.Raw));
   }
 
   private void ShowBattleOverBanner()
