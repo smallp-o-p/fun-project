@@ -32,7 +32,7 @@ public class ConditionBattleTest
     using var battle = BattleFixture.Started(new Vector3I(5, 1, 5),
       new UnitLoadout(alpha,
       WeaponWithHealthBonus(30))
-    { StatMods = conditions.StatContributions(alpha) }, Vector3I.Zero);
+      { StatMods = conditions.StatContributions(alpha) }, Vector3I.Zero);
     var unit = battle.Unit;
 
     // MaxHealth carries the loadout weapon and the injury: (100 + 30) x 0.75 = 97.5 -> 98.
@@ -57,7 +57,7 @@ public class ConditionBattleTest
     using var battle = BattleFixture.Started(new Vector3I(5, 1, 5),
       new UnitLoadout(alpha,
       zeroing)
-    { StatMods = conditions.StatContributions(alpha) }, Vector3I.Zero);
+      { StatMods = conditions.StatContributions(alpha) }, Vector3I.Zero);
     var unit = battle.Unit;
 
     Assert.True(unit.IsAlive);
