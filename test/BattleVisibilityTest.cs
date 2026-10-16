@@ -38,13 +38,9 @@ public class BattleVisibilityTest
         }
     BattleMapData map = TestData.MakeMapData(dimensions, [.. tiles]);
 
-    Faction[] factions = units.AsValueEnumerable().Select(u => u.Faction).Distinct().ToArray();
-    BattleSideSetup[] sides = factions.AsValueEnumerable().Select(faction => new BattleSideSetup(
-      faction, [new FakeObjectiveData()],
-      units.AsValueEnumerable().Where(u => ReferenceEquals(u.Faction, faction))
-        .Select(u => new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(u.UnitName, faction,
-          vision: u.Vision)), u.Position)).ToArray())).ToArray();
-    return new BattleFixture(new BattleSetup(map, sides, Seed: 7));
+    return BattleFixture.Started(map,
+      [.. units.AsValueEnumerable().Select(u => new UnitPlacement(
+        new UnitLoadout(TestData.MakeCombatant(u.UnitName, u.Faction, vision: u.Vision)), u.Position))]);
   }
 
   [TestCase(false, TestName = "Open space visibility succeeds between units and caches register them")]

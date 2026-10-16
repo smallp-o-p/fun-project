@@ -120,6 +120,9 @@ public sealed class BattleFixture : IDisposable
 
   public BattleUnitState UnitAt(Vector3I position) => Query(new GetUnitAtTile(At(position))).RequireSome();
 
+  public BattleObjectState ObjectAt(Vector3I position) =>
+    Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable().Single(obj => obj.Position == position);
+
   public AliveUnit SingleAliveUnit(Faction faction)
     => Query(new GetFactionAliveUnits(faction)).AsValueEnumerable().Single();
 
@@ -222,6 +225,9 @@ public sealed class BattleFixture : IDisposable
 
   // A started battle whose factions derive from the placements' own combatants in
   // first-appearance order, one inert FakeObjective per faction, armor-inclusive spawning.
+  public static BattleFixture Started(Vector3I dimensions, UnitLoadout loadout, Vector3I position) =>
+    Started(dimensions, new UnitPlacement(loadout, position));
+
   public static BattleFixture Started(Vector3I dimensions, params UnitPlacement[] placements) =>
     Started(TestData.MakeOpenBattleMap(dimensions), placements);
 

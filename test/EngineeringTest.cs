@@ -12,32 +12,6 @@ namespace FunProject.Tests;
 [RequireGodotRuntime]
 public class EngineeringTest
 {
-  [TestCase(false)]
-  [TestCase(true)]
-  public static void FirstManufactureCreatesShelfOnlyAtCompletion(bool unlimited)
-  {
-    var item = MakeItemData(unlimited: unlimited);
-    var itemRecipe = MakeManufacturingRecipe(item);
-    using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
-    var armory = campaign.State.Armory;
-    var session = campaign.Session;
-
-    Assert.Equal(0, armory.ItemStock().Count);
-    Assert.True(armory.TryGetItemStock(item).IsNone);
-    Assert.True(session.StartManufacturing(itemRecipe).IsRight);
-    campaign.AdvanceTicks(1439);
-    Assert.True(armory.TryGetItemStock(item).IsNone);
-    Assert.True(armory.TryWithdrawItem(item).IsNone);
-
-    campaign.AdvanceTicks(1);
-    Assert.Equal(1, armory.ItemStock().Count);
-    Assert.True(armory.TryGetItemStock(item).RequireSome().Available);
-    Assert.True(armory.TryWithdrawItem(item).IsSome);
-    Assert.True(armory.TryGetItemStock(item).IsSome);
-    Assert.Equal(unlimited, armory.HasAvailableItem(item));
-    Assert.Equal(unlimited ? 0 : 1, session.GetManufacturingOptions().Count);
-  }
-
   [TestCase]
   public static void UnlimitedProductionCreatesSupplyOnce()
   {
@@ -46,6 +20,8 @@ public class EngineeringTest
     using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe]));
     var state = campaign.State;
     var session = campaign.Session;
+    Assert.Equal(0, state.Armory.ItemStock().Count);
+    Assert.True(state.Armory.TryGetItemStock(item).IsNone);
     campaign.ClearEvents();
     session.EventCommitted += e =>
     {
@@ -72,9 +48,13 @@ public class EngineeringTest
     Assert.Equal(Right<ManufacturingStartFailure, ManufacturingJob>(job), result);
     Assert.Equal(1440L, job.CompletesAtTick);
     Assert.False(state.Armory.TryWithdrawItem(item).IsSome);
-    campaign.AdvanceTicks(1);
-    Assert.Equal(Some(job), session.ActiveManufacturing);
     campaign.AdvanceTicks(1439);
+    Assert.Equal(Some(job), session.ActiveManufacturing);
+    Assert.True(state.Armory.TryGetItemStock(item).IsNone);
+    Assert.True(state.Armory.TryWithdrawItem(item).IsNone);
+    campaign.AdvanceTicks(1);
+    Assert.Equal(1, state.Armory.ItemStock().Count);
+    Assert.True(state.Armory.TryGetItemStock(item).RequireSome().Available);
     var first = state.Armory.TryWithdrawItem(item);
     var second = state.Armory.TryWithdrawItem(item);
     Assert.True(first.IsSome);
@@ -100,9 +80,15 @@ public class EngineeringTest
     using var campaign = new GeoscapeFixture(MakeStart(manufacturingRecipes: [itemRecipe], startingCurrencies: new() { [currency] = 14 }));
     var state = campaign.State;
     var session = campaign.Session;
+    Assert.Equal(0, state.Armory.ItemStock().Count);
     Assert.True(session.StartManufacturing(itemRecipe).IsRight);
     Assert.True(state.Armory.TryGetItemStock(item).IsNone);
-    campaign.AdvanceTicks(1440);
+    campaign.AdvanceTicks(1439);
+    Assert.True(state.Armory.TryGetItemStock(item).IsNone);
+    Assert.True(state.Armory.TryWithdrawItem(item).IsNone);
+    campaign.AdvanceTicks(1);
+    Assert.Equal(1, state.Armory.ItemStock().Count);
+    Assert.True(state.Armory.TryGetItemStock(item).RequireSome().Available);
     Assert.Equal(1, state.Armory.ItemStock()[0].Remaining);
     Assert.Equal(7UL, state.GetCurrencyBalance(currency));
     Assert.True(session.StartManufacturing(itemRecipe).IsRight);
@@ -113,6 +99,11 @@ public class EngineeringTest
     Assert.Equal(1, session.GetManufacturingOptions().Count);
     campaign.AdvanceTicks(5);
     Assert.Equal(2, state.Armory.ItemStock()[0].Remaining);
+    Assert.True(state.Armory.TryWithdrawItem(item).IsSome);
+    Assert.True(state.Armory.TryWithdrawItem(item).IsSome);
+    Assert.True(state.Armory.TryGetItemStock(item).IsSome);
+    Assert.False(state.Armory.HasAvailableItem(item));
+    Assert.Equal(1, session.GetManufacturingOptions().Count);
   }
 
   [TestCase]
@@ -400,7 +391,9 @@ public class EngineeringTest
     Assert.Equal(long.MaxValue - 1440, job.StartedAtTick);
     Assert.Equal(long.MaxValue, job.CompletesAtTick);
     Assert.True(state.Engineering.CompleteIfDue(long.MaxValue - 1).IsNone);
+    Assert.Equal(Some(job), state.Engineering.ActiveJob);
     Assert.Equal(new ManufacturingCompleted(job), state.Engineering.CompleteIfDue(long.MaxValue).RequireSome());
+    Assert.True(state.Engineering.ActiveJob.IsNone);
     Assert.True(state.Engineering.CompleteIfDue(long.MaxValue).IsNone);
     Assert.False(state.Armory.HasAvailableItem(item));
   }

@@ -39,8 +39,9 @@ public partial class AttackUnitTest
   [TestCase(TestName = "Guaranteed miss spends action points without damage")]
   public static void GuaranteedMissSpendsActionPointsWithoutDamage()
   {
+    var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 3);
     using var battle = BattleFixture.Duel(
-      player: new("Alpha", Aim: 0, Weapon: TestData.MakeWeapon("Rifle")));
+      player: new("Alpha", Aim: 0, Weapon: weapon));
     var attacker = battle.PlayerUnit;
     var target = battle.EnemyUnit;
 
@@ -48,6 +49,7 @@ public partial class AttackUnitTest
     battle.Attack(attacker, target);
 
     Assert.Equal(target.MaxHealth, target.CurrentHealth);
+    Assert.Equal(2, weapon.CurrentAmmo);
     Assert.Equal(attacker.MaxActionPoints - 1, attacker.CurrentActionPoints);
     Assert.False(battle.Events.SingleEvent<UnitAttackedBattleEvent>().IsHit);
     Assert.False(battle.Events.EventsOf<UnitDamagedBattleEvent>().AsValueEnumerable().Any());
@@ -244,20 +246,6 @@ public partial class AttackUnitTest
 
     Assert.Equal(actionPointsBefore, attacker.CurrentActionPoints);
     Assert.False(battle.Events.EventsOf<UnitAttackedBattleEvent>().AsValueEnumerable().Any());
-  }
-
-  [TestCase(TestName = "A missed shot still spends ammunition")]
-  public static void MissedShotSpendsAmmo()
-  {
-    var weapon = TestData.MakeAmmoWeapon("Pistol", magazine: 3);
-    using var battle = BattleFixture.Duel(
-      player: new("Alpha", Aim: 0, Weapon: weapon));
-    var target = battle.EnemyUnit;
-
-    battle.Attack(battle.PlayerUnit, target);
-
-    Assert.Equal(target.MaxHealth, target.CurrentHealth); // aim 0 -> guaranteed miss
-    Assert.Equal(2, weapon.CurrentAmmo);
   }
 
   private static List<bool> RunSeededAttackOutcomes(int seed)

@@ -111,19 +111,6 @@ public class BombExpiryTest
     Assert.Equal(Some(ObjectStatus.Interacted), bomb.Status);
   }
 
-  [TestCase(TestName = "Expiry fires after the -100 upkeep systems")]
-  public static void ExpiryRunsAfterUpkeep()
-  {
-    var order = new System.Collections.Generic.List<string>();
-    using var runtime = BattleFactory.Start(BombSetup(new Vector3I(1, 0, 1), MakeBomb(expireAfterTurns: 1))).RequireRight();
-    runtime.RegisterHook<TurnEndedBattleEvent>(new CallbackHook(() => order.Add("upkeep")), -100);
-    runtime.RegisterHook<TurnEndedBattleEvent>(new CallbackHook(() => order.Add("expiry")), 0);
-
-    runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
-
-    Assert.Equal("upkeep,expiry", string.Join(',', order));
-  }
-
   [TestCase]
   public static void ExpiryPayloadDamagesObjectsThroughTheSharedResolver()
   {

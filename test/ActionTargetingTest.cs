@@ -10,10 +10,6 @@ namespace FunProject.Tests;
 public class ActionTargetingTest
 {
   // 5x1x5 open board. Player "Hero" (armed) at (0,0,0), enemy "Goon" at (3,0,0).
-  private static UnitAction Row<TDefinition>(IReadOnlyList<UnitAction> actions)
-    where TDefinition : UnitActionDefinition =>
-    actions.AsValueEnumerable().Single(action => action.Action is TDefinition);
-
   private static BattleFixture MakeArmedBattle()
   {
     var player = TestData.MakeFaction("Player");
@@ -94,7 +90,7 @@ public class ActionTargetingTest
       enemy: new("Goon", Position: new Vector3I(7, 0, 7)));
 
     var actions = battle.Query(new GetAvailableActionsForUnit(battle.Alive(battle.PlayerUnit)));
-    Assert.True(Row<AttackActionDefinition>(actions).IsAvailable);
+    Assert.True(Assert.ActionRow<AttackActionDefinition>(actions).IsAvailable);
     var targeting = new AttackTargeting(battle.Runtime, battle.PlayerUnit);
     targeting.Begin();
     Assert.Equal(0, targeting.Candidates.Count);

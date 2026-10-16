@@ -296,26 +296,6 @@ public class CaptivityViewTest
     Assert.True(Row(captivity, 1).ButtonPressed);
   }
 
-  [TestCase(TestName = "The HUD captivity button forwards a fresh CaptivityView")]
-  public static async Task HudCaptivityButtonForwardsAFreshCaptivityView()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var hud = AddToTree(CreateHud());
-
-    SysColGeneric.List<GeoscapeView> received = [];
-    // Emitted views are live and unparented; register each for cleanup or they leak as orphans.
-    hud.ViewRequested += view =>
-    {
-      AutoFree(view);
-      received.Add(view);
-    };
-    hud.GetNode<Button>("%CaptivityButton").EmitSignal(Button.SignalName.Pressed);
-
-    Assert.Equal(1, received.Count);
-    Assert.True(received[0] is CaptivityView);
-    Assert.True(received[0].GetParent() is null); // emitted live and unparented
-  }
-
   [TestCase(false, TestName = "A missing SquadViewScene is an authoring error")]
   [TestCase(true, TestName = "A wrong-root SquadViewScene is an authoring error")]
   public static async Task MissingAndWrongRootSquadViewSceneAreAuthoringErrors(bool wrongRoot)

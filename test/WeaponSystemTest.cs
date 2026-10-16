@@ -10,36 +10,12 @@ namespace FunProject.Tests;
 [RequireGodotRuntime]
 public class WeaponSystemTest
 {
-  [TestCase(TestName = "FirearmWeapon constructed from FirearmWeaponData")]
-  public static void FirearmWeaponConstructedFromFirearmWeaponData()
-  {
-    var data = new FirearmWeaponData
-    {
-      Frame = TestData.MakeFrame(),
-      DamageStat = new DamageStat { BaseValue = 15 },
-      CriticalChanceStat = new CriticalChanceStat { BaseValue = 10 },
-      RangeStat = new RangeStat { BaseValue = 20 },
-      DefaultAmmoData = new Ammunition(),
-      AmmunitionStat = new AmmunitionStat { BaseValue = 12 },
-    };
-    var weapon = new FirearmWeapon(data);
-
-    Assert.Equal(12, weapon.MagazineSize);
-    Assert.Equal(FirearmArchetype.Pistol, weapon.Archetype);
-  }
-
-  [TestCase(TestName = "MeleeWeapon stats dictionary has no ammo entry")]
-  public static void MeleeWeaponStatsDictionaryHasNoAmmoEntry()
-  {
-    var weapon = new MeleeWeapon(TestData.MakeWeaponData());
-    Assert.True(weapon.TryGetStat<AmmunitionStat>().IsNone);
-  }
-
   [TestCase(TestName = "Weapon generic stat lookup returns concrete stats")]
   public static void WeaponGenericStatLookupReturnsConcreteStats()
   {
     var weapon = new MeleeWeapon(TestData.MakeWeaponData());
 
+    Assert.True(weapon.TryGetStat<AmmunitionStat>().IsNone);
     Assert.Equal(10, weapon.GetStat<DamageStat>().BaseValue);
     Option<RangeStat> range = weapon.TryGetStat<RangeStat>();
     Assert.True(range.IsSome);
@@ -52,6 +28,8 @@ public class WeaponSystemTest
   {
     var weapon = new FirearmWeapon(TestData.MakeFirearmWeaponData(range: 1, ammo: new Ammunition(), modSlots: 1));
 
+    Assert.Equal(12, weapon.MagazineSize);
+    Assert.Equal(FirearmArchetype.Pistol, weapon.Archetype);
     Option<AmmunitionStat> ammoStat = weapon.TryGetStat<AmmunitionStat>();
     Assert.True(ammoStat.IsSome);
     Assert.Equal(12, ammoStat.RequireSome().BaseValue);

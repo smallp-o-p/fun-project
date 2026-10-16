@@ -18,15 +18,6 @@ namespace FunProject.Tests;
 [RequireGodotRuntime]
 public class ConditionBattleTest
 {
-  // Factory-ready fixture: one side whose single unit deploys at the origin with an explicit
-  // loadout, so authored weapons/armor/statMods reach the factory as setup data.
-  private static BattleFixture DeployedSolo(Faction faction, UnitLoadout loadout)
-    => new(new BattleSetup(
-      TestData.MakeOpenBattleMap(new Vector3I(5, 1, 5)),
-      [new BattleSideSetup(faction, [new FakeObjectiveData()],
-        [new UnitPlacement(loadout, Vector3I.Zero)])],
-      Seed: 7));
-
   [TestCase(TestName = "Spawn max health uses the loadout weapon and sees persistent conditions")]
   public static void SpawnMaxHealthUsesLoadoutWeaponAndConditions()
   {
@@ -38,9 +29,10 @@ public class ConditionBattleTest
     // The combatant's own weapon slot must NOT feed the unit: only the explicit loadout does.
     alpha.EquipWeapon(WeaponWithHealthBonus(10));
 
-    using var battle = DeployedSolo(faction, new UnitLoadout(alpha,
+    using var battle = BattleFixture.Started(new Vector3I(5, 1, 5),
+      new UnitLoadout(alpha,
       WeaponWithHealthBonus(30))
-    { StatMods = conditions.StatContributions(alpha) });
+    { StatMods = conditions.StatContributions(alpha) }, Vector3I.Zero);
     var unit = battle.Unit;
 
     // MaxHealth carries the loadout weapon and the injury: (100 + 30) x 0.75 = 97.5 -> 98.
@@ -62,9 +54,10 @@ public class ConditionBattleTest
       StatMods = [new HealthStatMod { Modifiers = [StatModifier.Multiply(0f)] }],
     });
 
-    using var battle = DeployedSolo(faction, new UnitLoadout(alpha,
+    using var battle = BattleFixture.Started(new Vector3I(5, 1, 5),
+      new UnitLoadout(alpha,
       zeroing)
-    { StatMods = conditions.StatContributions(alpha) });
+    { StatMods = conditions.StatContributions(alpha) }, Vector3I.Zero);
     var unit = battle.Unit;
 
     Assert.True(unit.IsAlive);
@@ -76,7 +69,8 @@ public class ConditionBattleTest
   {
     var faction = TestData.MakeFaction("Player");
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 20);
-    using var battle = DeployedSolo(faction, new UnitLoadout(alpha));
+    using var battle = BattleFixture.Started(new Vector3I(5, 1, 5),
+      new UnitLoadout(alpha), Vector3I.Zero);
     var unit = battle.Unit;
 
     battle.ApplyDamage(unit, 999);
@@ -94,7 +88,8 @@ public class ConditionBattleTest
   {
     var faction = TestData.MakeFaction("Player");
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 20);
-    using var battle = DeployedSolo(faction, new UnitLoadout(alpha));
+    using var battle = BattleFixture.Started(new Vector3I(5, 1, 5),
+      new UnitLoadout(alpha), Vector3I.Zero);
     var unit = battle.Unit;
 
     battle.ApplyDamage(unit, 15, DamageKind.Stun);
@@ -111,8 +106,8 @@ public class ConditionBattleTest
   {
     var faction = TestData.MakeFaction("Player");
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 100);
-    using var battle = DeployedSolo(faction,
-      new UnitLoadout(alpha, Armor: TestData.MakeArmor("Vest", armor: 10)));
+    using var battle = BattleFixture.Started(new Vector3I(5, 1, 5),
+      new UnitLoadout(alpha, Armor: TestData.MakeArmor("Vest", armor: 10)), Vector3I.Zero);
     var unit = battle.Unit;
 
     battle.ApplyDamage(unit, 5);
@@ -132,7 +127,8 @@ public class ConditionBattleTest
       statMods: [new HealthStatMod { Modifiers = [StatModifier.Multiply(0.4f)] }]);
     var alpha = TestData.MakeCombatant("Alpha", faction, health: 100, buffs: [intimidation]);
 
-    using var battle = DeployedSolo(faction, new UnitLoadout(alpha));
+    using var battle = BattleFixture.Started(new Vector3I(5, 1, 5),
+      new UnitLoadout(alpha), Vector3I.Zero);
     var unit = battle.Unit;
     Assert.Equal(100, unit.CurrentHealth); // no adjacent enemy yet
     battle.Spawn(TestData.MakeCombatant("Enemy", enemy), new Vector3I(1, 0, 0));
@@ -160,8 +156,8 @@ public class ConditionBattleTest
     Assert.Equal(2, campaign.State.Conditions.GetInjury(alpha).RequireSome().Tier); // Injured
     Assert.Equal(1, campaign.State.Conditions.GetFatigue(alpha).RequireSome().Tier); // Tired
 
-    using var battle = DeployedSolo(campaign.State.PlayerFaction,
-      new UnitLoadout(alpha) { StatMods = campaign.State.Conditions.StatContributions(alpha) });
+    using var battle = BattleFixture.Started(new Vector3I(5, 1, 5),
+      new UnitLoadout(alpha) { StatMods = campaign.State.Conditions.StatContributions(alpha) }, Vector3I.Zero);
     var unit = battle.Unit;
 
     Assert.Equal(75, unit.MaxHealth);
@@ -202,7 +198,8 @@ public class ConditionBattleTest
       roster: [TestData.MakeEntry("Alpha", TestData.MakeCombatantData(health: 100))]));
     var alpha = campaign.State.Roster[0];
 
-    using var battle = DeployedSolo(campaign.State.PlayerFaction, new UnitLoadout(alpha));
+    using var battle = BattleFixture.Started(new Vector3I(5, 1, 5),
+      new UnitLoadout(alpha), Vector3I.Zero);
     var unit = battle.Unit;
     // Two separate normal-pipeline hits on the same unit must sum to 30 — a last-hit
     // overwrite would report 10 and under-award the return's injury tiers.

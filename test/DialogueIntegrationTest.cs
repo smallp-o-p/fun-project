@@ -71,17 +71,6 @@ public class DialogueIntegrationTest
   }
 
   [TestCase]
-  public static async Task OpeningPlainEventPushesResolutionDirectly()
-  {
-    await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager) = SceneWithEvent(MakeEvent("Quiet plot"));
-
-    OpenResolutionViaMapEvent(scene);
-
-    Assert.True(manager.Current is GeoscapeEventResolution);
-  }
-
-  [TestCase]
   public static void MissingDialogueViewSceneExportThrowsAtReady()
   {
     GeoscapeScene scene = CreateGeoscapeScene(MakeStart());

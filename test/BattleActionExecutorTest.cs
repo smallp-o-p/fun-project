@@ -16,15 +16,9 @@ public partial class BattleActionExecutorTest
   private static BattleFixture DuelFixture(Faction factionA, string nameA, Vector3I posA,
     Faction factionB, string nameB, Vector3I posB, Vector3I? dimensions = null,
     int aActionPoints = 4)
-    => new(new BattleSetup(
-      TestData.MakeOpenBattleMap(dimensions ?? new Vector3I(4, 1, 4)),
-      [
-        new BattleSideSetup(factionA, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(nameA, factionA, actionPoints: aActionPoints)), posA)]),
-        new BattleSideSetup(factionB, [new FakeObjectiveData()],
-          [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(nameB, factionB)), posB)]),
-      ],
-      Seed: 7));
+    => BattleFixture.Started(dimensions ?? new Vector3I(4, 1, 4),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(nameA, factionA, actionPoints: aActionPoints)), posA),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(nameB, factionB)), posB));
 
   [TestCase(false, true, TestName = "Submit resolves a hook's interrupt within the same submission")]
   [TestCase(true, true, TestName = "Submit reports the submitted action once and resolves interrupts between its steps")]

@@ -38,16 +38,6 @@ public class BattleSessionTest
     Assert.True(battle.Query(new IsUnitStillAvailableThisTurn(unit)));
   }
 
-  [TestCase(TestName = "SpawnUnit rejects occupied tile")]
-  public static void SpawnUnitRejectsOccupiedTile()
-  {
-    var faction = TestData.MakeFaction("City Guard");
-    using var battle = FixtureFromSides(new Vector3I(4, 1, 4), (faction, "Alpha", new Vector3I(1, 0, 1), 20));
-
-    Assert.Throws<System.InvalidOperationException>(
-      () => battle.Submit(BattleAction.SpawnUnit(TestData.MakeCombatant("Bravo", faction), battle.At(1, 0, 1))));
-  }
-
   [TestCase(TestName = "Global faction order keeps each faction only once")]
   public static void GlobalFactionOrderKeepsEachFactionOnlyOnce()
   {

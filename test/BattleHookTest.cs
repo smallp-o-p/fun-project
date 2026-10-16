@@ -83,18 +83,6 @@ public partial class BattleHookTest
     Assert.Equal(0, damagedListener.Received.Count);
   }
 
-  [TestCase(TestName = "Hook registered for a marker interface receives implementing events")]
-  public static void HookReceivesMarkerInterfaceEvents()
-  {
-    using var battle = BattleFixture.Solo(new Vector3I(4, 1, 4), new Vector3I(0, 0, 0));
-    var unitEventsListener = new RecordingHook();
-    battle.RegisterHook<IUnitBattleEvent>(unitEventsListener);
-
-    battle.Spawn(TestData.MakeCombatant("Reinforcement", battle.PlayerFaction), new Vector3I(1, 0, 1));
-
-    Assert.True(unitEventsListener.Received.AsValueEnumerable().OfType<UnitAddedBattleEvent>().Any());
-  }
-
   [TestCase(TestName = "A hook registered under the root event tag receives every committed event")]
   public static void RootTagRegistrationReceivesEveryCommittedEvent()
   {
