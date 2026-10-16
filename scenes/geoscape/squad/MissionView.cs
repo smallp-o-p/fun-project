@@ -152,7 +152,6 @@ public sealed partial class MissionView : SquadLoadoutView
   private void CompleteMission(FactionBattleSummary summary, BattleResult result)
   {
     var results = GetNode<MissionResultsView>("%MissionResultsView");
-    var predictions = _session.ActiveMission.Match(deployment => deployment.Predictions, () => []);
     try
     {
       _session.CompleteMission(summary);
@@ -162,7 +161,7 @@ public sealed partial class MissionView : SquadLoadoutView
       if (_session.ActiveMission.IsNone)
       {
         results.Bind(_mission.Definition.TacticalMission!.BattleType.Name, summary, result,
-          summary.Outcome == BattleOutcome.Victory ? _mission.Rewards : new Dictionary<Currency, ulong>(), predictions);
+          summary.Outcome == BattleOutcome.Victory ? _mission.Rewards : new Dictionary<Currency, ulong>(), _mission.Predictions);
         _battle?.Dispose();
         GetNode<Control>("Background").Hide();
         results.Show();

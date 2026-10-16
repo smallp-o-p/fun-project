@@ -34,11 +34,13 @@
 
 [sub_resource type="Resource" id="DeployPredictionMarket"]
 script = ExtResource("24_deploy_prediction")
+DescriptionFormat = "{0} deploys"
 MaxStake = 100
 Multiplier = 1.5
 
 [sub_resource type="Resource" id="KillsPredictionMarket"]
 script = ExtResource("25_kills_prediction")
+DescriptionFormat = "{0} scores at least {1} kill(s)"
 MaxStake = 200
 Multiplier = 2.5
 MinimumKills = 1

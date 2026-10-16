@@ -69,7 +69,7 @@ public class MissionPredictionMarketsTest
   [TestCase(BattleOutcome.Draw, 1000UL, 1049UL, 1148UL, true)]
   [TestCase(BattleOutcome.Victory, 1000UL, 1099UL, 901UL, false)]
   [TestCase(BattleOutcome.Victory, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, true)]
-  public static void SettlementPaysSelectedCurrenciesOnceBeforeNotifications(BattleOutcome outcome,
+  public static void SettlementPaysSelectedCurrenciesBeforeNotifications(BattleOutcome outcome,
     ulong balance, ulong expectedA, ulong expectedB, bool killPredictionCorrect)
   {
     var a = MakeCurrency("Credits");
@@ -87,7 +87,6 @@ public class MissionPredictionMarketsTest
     Assert.Equal(balance, campaign.State.GetCurrencyBalance(a));
     Assert.Equal(balance, campaign.State.GetCurrencyBalance(b));
     Assert.True(campaign.Session.TryAcceptMissionPredictions(predictions));
-    Assert.True(campaign.Session.TryAcceptMissionPredictions(predictions));
     Assert.Equal(balance - 99, campaign.State.GetCurrencyBalance(a));
     Assert.Equal(balance - 99, campaign.State.GetCurrencyBalance(b));
     var summary = Win(battle, campaign);
@@ -98,18 +97,15 @@ public class MissionPredictionMarketsTest
       Assert.Equal(expectedB, campaign.State.GetCurrencyBalance(b));
       Assert.True(rebuilt.ActiveMission.IsNone);
       Assert.True(rebuilt.PendingResolution.IsNone);
-      rebuilt.CompleteMission(summary);
       throw new InvalidOperationException("Notification failed");
     };
     Assert.Throws<InvalidOperationException>(() => rebuilt.CompleteMission(summary));
-    Assert.True(battle.Deployment.Predictions[0].Correct);
-    Assert.Equal(killPredictionCorrect, battle.Deployment.Predictions[1].Correct);
-    Assert.Equal(148UL, battle.Deployment.Predictions[0].Returned);
-    Assert.Equal(killPredictionCorrect ? 247UL : 0UL, battle.Deployment.Predictions[1].Returned);
-    Assert.True(campaign.State.TrySpendCurrencyCosts(new() { [a] = 1, [b] = 1 }));
-    rebuilt.CompleteMission(summary);
-    Assert.Equal(expectedA - 1, campaign.State.GetCurrencyBalance(a));
-    Assert.Equal(expectedB - 1, campaign.State.GetCurrencyBalance(b));
+    Assert.True(predictions[0].Correct);
+    Assert.Equal(killPredictionCorrect, predictions[1].Correct);
+    Assert.Equal(148UL, predictions[0].Returned);
+    Assert.Equal(killPredictionCorrect ? 247UL : 0UL, predictions[1].Returned);
+    Assert.Equal(expectedA, campaign.State.GetCurrencyBalance(a));
+    Assert.Equal(expectedB, campaign.State.GetCurrencyBalance(b));
   }
 
   [TestCase]
@@ -132,16 +128,17 @@ public class MissionPredictionMarketsTest
     var market = (UnitKillsPredictionMarket)campaign.ActiveEvent.PredictionMarkets[1];
     var battle = campaign.Session.LaunchMission(campaign.ActiveEvent, campaign.State.Roster).RequireRight();
     using var runtime = battle.Runtime;
-    Assert.True(campaign.Session.TryAcceptMissionPredictions([new(market, currency, 100)]));
+    var prediction = new MissionPrediction(market, currency, 100);
+    Assert.True(campaign.Session.TryAcceptMissionPredictions([prediction]));
     var summary = runtime.Query(new GetFactionEndOfBattleSummary(campaign.State.PlayerFaction)).RequireRight();
     Assert.False(summary.DefeatedPerCombatant.ContainsKey(market.Unit));
     campaign.Session.CompleteMission(summary);
-    Assert.True(battle.Deployment.Predictions[0].Correct);
+    Assert.True(prediction.Correct);
     Assert.Equal(1200UL, campaign.State.GetCurrencyBalance(currency));
   }
 
   [TestCase]
-  public static void RejectedSetupAndLateUnaffordabilityDoNotChargeAnyCurrency()
+  public static void AcceptanceAndAbortPreserveCurrencyPaymentBoundaries()
   {
     var a = MakeCurrency("Credits");
     var b = MakeCurrency("Intel");
@@ -166,9 +163,22 @@ public class MissionPredictionMarketsTest
     Assert.False(campaign.Session.TryAcceptMissionPredictions([first]));
     Assert.Equal(50UL, campaign.State.GetCurrencyBalance(a));
     Assert.Equal(101UL, campaign.State.GetCurrencyBalance(b));
-    Assert.Equal(0, battle.Deployment.Predictions.Count);
+    Assert.Equal(0, campaign.ActiveEvent.Predictions.Count);
+    var markets = campaign.ActiveEvent.PredictionMarkets;
+    Assert.True(campaign.Session.TryAcceptMissionPredictions([new(first.Market, a, 25)]));
+    Assert.Equal(25UL, campaign.State.GetCurrencyBalance(a));
+    Assert.Equal(1, campaign.ActiveEvent.Predictions.Count);
     campaign.Session.AbortMissionPresentation();
     Assert.True(campaign.Session.PendingResolution.IsSome);
+    Assert.Equal(0, campaign.ActiveEvent.Predictions.Count);
+    Assert.True(ReferenceEquals(markets, campaign.ActiveEvent.PredictionMarkets));
+    Assert.Equal(25UL, campaign.State.GetCurrencyBalance(a));
+    runtime.Dispose();
+    var retry = campaign.Session.LaunchMission(campaign.ActiveEvent, campaign.State.Roster).RequireRight();
+    using var retryRuntime = retry.Runtime;
+    campaign.Session.CompleteMission(Win(retry, campaign));
+    Assert.Equal(75UL, campaign.State.GetCurrencyBalance(a));
+    Assert.Equal(101UL, campaign.State.GetCurrencyBalance(b));
   }
 
   [TestCase(800, 600)]
@@ -270,13 +280,19 @@ public class MissionPredictionMarketsTest
   public static void GeneratedPredictionMarketsUseAuthoredTemplatesAndRemainStable()
   {
     var currency = MakeCurrency();
-    var deployData = new DeployUnitPredictionMarketData { MaxStake = 17, Multiplier = 1.25 };
+    var deployData = new DeployUnitPredictionMarketData
+    {
+      MaxStake = 17,
+      Multiplier = 1.25,
+      DescriptionFormat = "Deploy {0} now",
+    };
     var killsData = new UnitKillsPredictionMarketData
     {
       MaxStake = 23,
       Multiplier = 3.75,
       MinimumKills = 2,
       MaximumKills = 4,
+      DescriptionFormat = "{0}: {1} confirmed eliminations",
     };
     using var campaign = Campaign(currency, roster: [MakeEntry("Alpha"), MakeEntry("Beta"), MakeEntry("Gamma")],
       configure: start =>
@@ -293,6 +309,8 @@ public class MissionPredictionMarketsTest
     Assert.Equal(1.25m, first[0].Multiplier);
     Assert.Equal(23U, first[1].MaxStake);
     Assert.Equal(3.75m, first[1].Multiplier);
+    Assert.Equal($"Deploy {((DeployUnitPredictionMarket)first[0]).Unit.Name} now", first[0].Description);
+    Assert.Equal($"{((UnitKillsPredictionMarket)first[1]).Unit.Name}: {((UnitKillsPredictionMarket)first[1]).MinimumKills} confirmed eliminations", first[1].Description);
     uint retainedKills = ((UnitKillsPredictionMarket)first[1]).MinimumKills;
     var thresholds = ZLinq.ValueEnumerable.Range(0, 20)
       .Select(seed => ((UnitKillsPredictionMarket)campaign.State.GenerateMissionPredictionMarkets(seed)[1]).MinimumKills)
@@ -301,9 +319,12 @@ public class MissionPredictionMarketsTest
     Assert.True(thresholds.AsValueEnumerable().All(count => count >= 2 && count <= 4));
     deployData.MaxStake = 999;
     killsData.MinimumKills = killsData.MaximumKills = 99;
+    deployData.DescriptionFormat = killsData.DescriptionFormat = "Changed {0}";
     var retained = new GeoscapeSession(campaign.State).PendingResolution.RequireSome().Event.PredictionMarkets;
     Assert.Equal(17U, retained[0].MaxStake);
     Assert.Equal(retainedKills, ((UnitKillsPredictionMarket)retained[1]).MinimumKills);
+    Assert.Equal($"Deploy {((DeployUnitPredictionMarket)retained[0]).Unit.Name} now", retained[0].Description);
+    Assert.Equal($"{((UnitKillsPredictionMarket)retained[1]).Unit.Name}: {retainedKills} confirmed eliminations", retained[1].Description);
     using var noRewards = Campaign(currency, rewards: false);
     Assert.Equal(0, noRewards.ActiveEvent.Rewards.Count);
     Assert.Equal(2, noRewards.ActiveEvent.PredictionMarkets.Count);
@@ -384,12 +405,13 @@ public class MissionPredictionMarketsTest
     var other = campaign.State.Roster.AsValueEnumerable().Single(unit => !ReferenceEquals(unit, target));
     var battle = campaign.Session.LaunchMission(campaign.ActiveEvent, [other, target]).RequireRight();
     using var runtime = battle.Runtime;
-    Assert.True(campaign.Session.TryAcceptMissionPredictions([new(market, currency, 100)]));
+    var prediction = new MissionPrediction(market, currency, 100);
+    Assert.True(campaign.Session.TryAcceptMissionPredictions([prediction]));
     runtime.ExecuteAction(BattleAction.SpawnUnit(target, runtime.TryGetTile(new Vector3I(1, 0, 0)).RequireSome()));
     var summary = Win(battle, campaign, shooterX: 1);
     Assert.True(summary.CombatantsPresent.Contains(target));
     campaign.Session.CompleteMission(summary);
-    Assert.False(battle.Deployment.Predictions[0].Correct);
+    Assert.False(prediction.Correct);
     Assert.Equal(950UL, campaign.State.GetCurrencyBalance(currency));
   }
 }

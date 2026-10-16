@@ -16,6 +16,7 @@ public sealed record GeoscapeEvent(
   Option<long> ExpiresAtTick)
 {
   public IReadOnlyList<PredictionMarket> PredictionMarkets { get; init; } = [];
+  public IReadOnlyList<MissionPrediction> Predictions { get; internal set; } = [];
 
   public IReadOnlyDictionary<Currency, ulong> Rewards { get; init; } = new Dictionary<Currency, ulong>();
 
