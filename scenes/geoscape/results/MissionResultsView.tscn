@@ -24,17 +24,22 @@ theme_override_constants/margin_top = 32
 theme_override_constants/margin_right = 32
 theme_override_constants/margin_bottom = 32
 
-[node name="Center" type="CenterContainer" parent="Panel/Margin"]
+[node name="Center" type="Control" parent="Panel/Margin"]
 layout_mode = 2
 
 [node name="Layout" type="VBoxContainer" parent="Panel/Margin/Center"]
-custom_minimum_size = Vector2(640, 0)
-layout_mode = 2
-theme_override_constants/separation = 24
+layout_mode = 1
+theme_override_constants/separation = 12
+anchor_left = 0.15
+anchor_top = 0.1
+anchor_right = 0.85
+anchor_bottom = 0.9
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="Title" type="Label" parent="Panel/Margin/Center/Layout"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 42
 text = "Mission Results"
 
 [node name="Divider" type="HSeparator" parent="Panel/Margin/Center/Layout"]
@@ -44,81 +49,96 @@ layout_mode = 2
 layout_mode = 2
 columns = 2
 theme_override_constants/h_separation = 32
-theme_override_constants/v_separation = 20
+theme_override_constants/v_separation = 8
 
 [node name="MissionTypeHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "Mission Type"
 
 [node name="MissionType" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "Mission type"
 horizontal_alignment = 2
 autowrap_mode = 3
 
 [node name="TurnsTakenHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "Turns Taken"
 
 [node name="TurnsTaken" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "0"
 horizontal_alignment = 2
 
 [node name="SoldiersWoundedHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "Soldiers Wounded"
 
 [node name="SoldiersWounded" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "0"
 horizontal_alignment = 2
 
 [node name="SoldiersKilledHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "Soldiers Killed"
 
 [node name="SoldiersKilled" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "0"
 horizontal_alignment = 2
 
 [node name="EnemiesKilledHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "Enemies Killed"
 
 [node name="EnemiesKilled" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "0"
 horizontal_alignment = 2
 
-[node name="FooterDivider" type="HSeparator" parent="Panel/Margin/Center/Layout"]
+[node name="Payments" type="ScrollContainer" parent="Panel/Margin/Center/Layout"]
 layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
 
-[node name="Rewards" type="Label" parent="Panel/Margin/Center/Layout"]
+[node name="Details" type="VBoxContainer" parent="Panel/Margin/Center/Layout/Payments"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 16
+
+[node name="Rewards" type="Label" parent="Panel/Margin/Center/Layout/Payments/Details"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
+
+[node name="AcceptedPredictions" type="Label" parent="Panel/Margin/Center/Layout/Payments/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="FooterDivider" type="HSeparator" parent="Panel/Margin/Center/Layout"]
+layout_mode = 2
 
 [node name="Footer" type="HBoxContainer" parent="Panel/Margin/Center/Layout"]
 layout_mode = 2

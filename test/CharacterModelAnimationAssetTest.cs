@@ -150,8 +150,8 @@ public class CharacterModelAnimationAssetTest
   {
     using var fixture = ModelFixture.WithAnimations(start: false);
     Animation smile = fixture.Player.GetAnimationLibrary("").GetAnimation("smile");
-    SetConstantEndpoint(smile, "Face:Smile", 0.0f);
-    SetConstantEndpoint(smile, "Face:Blink", 0.6f);
+    TestData.SetConstantBlendShape(smile, "Face:Smile", 0.0f);
+    TestData.SetConstantBlendShape(smile, "Face:Blink", 0.6f);
     var graph = (AnimationNodeBlendTree)fixture.AnimationTree.TreeRoot;
     var smileAdd = graph.GetNode(new StringName("Smile")) as AnimationNodeAdd2
       ?? throw new InvalidOperationException("The fixture graph has no 'Smile' Add2 preset node.");
@@ -251,10 +251,7 @@ public class CharacterModelAnimationAssetTest
       var clipNode = graph.GetNode(new StringName(nodeName + "Clip")) as AnimationNodeAnimation
         ?? throw new InvalidOperationException(
           $"The graph has no '<{nodeName}>Clip' animation node for the preset layer '{nodeName}'.");
-      // Production graphs name the preset's neutral reference '<Layer>Ref'; the
-      // synthetic fixture spells the same node '<Layer>Neutral'.
-      var refNode = graph.GetNode(new StringName(nodeName + "Ref")) as AnimationNodeAnimation
-        ?? graph.GetNode(new StringName(nodeName + "Neutral")) as AnimationNodeAnimation;
+      var refNode = graph.GetNode(new StringName(nodeName + "Ref")) as AnimationNodeAnimation;
       if (refNode is null)
         throw new InvalidOperationException(
           $"The graph has no '<{nodeName}>Ref' animation node for the preset layer '{nodeName}'.");
@@ -335,22 +332,6 @@ public class CharacterModelAnimationAssetTest
     }
     throw new InvalidOperationException(
       $"The 'neutral' clip has no blend-shape track '{fullTrack}' for '{clipName}'.");
-  }
-
-  // Replaces the clip's constant endpoint on one blend-shape channel: removes
-  // any existing track for the path and authors a fresh constant one, so the
-  // fixture-owned edits stay deterministic.
-  private static void SetConstantEndpoint(Animation clip, string trackPath, float value)
-  {
-    for (int track = clip.GetTrackCount() - 1; track >= 0; track--)
-    {
-      if (clip.TrackGetType(track) == Animation.TrackType.BlendShape
-          && string.Equals(clip.TrackGetPath(track).ToString(), trackPath, StringComparison.Ordinal))
-        clip.RemoveTrack(track);
-    }
-    int added = clip.AddTrack(Animation.TrackType.BlendShape);
-    clip.TrackSetPath(added, trackPath);
-    clip.BlendShapeTrackInsertKey(added, 0.0, value);
   }
 
   private static (string NodePath, string SubName) SplitTrackPath(NodePath path)

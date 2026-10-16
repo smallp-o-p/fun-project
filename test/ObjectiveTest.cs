@@ -17,7 +17,10 @@ public class ObjectiveTest
       player: new("P1", Position: new Vector3I(0, 0, 0)),
       enemy: new("E1", Position: new Vector3I(2, 0, 0)));
 
-    var objective = new EliminateAllOpposingForcesObjective(new EliminateAllOpposingForcesObjectiveData());
+    var data = new EliminateAllOpposingForcesObjectiveData();
+    var objective = data.Instantiate();
+    Assert.True(objective is EliminateAllOpposingForcesObjective);
+    Assert.True(ReferenceEquals(data, objective.Data));
     var anyEvent = new TurnEndedBattleEvent(battle.PlayerFaction, 1);
 
     Assert.Equal(ObjectiveResult.Ongoing, objective.Check(battle.PlayerFaction, anyEvent, battle.Session));
@@ -60,7 +63,10 @@ public class ObjectiveTest
   public static void SurvivalStillCountsAnUnconsciousLivingOwner()
   {
     using var battle = BattleFixture.Duel();
-    var objective = new SurviveUntilTurnObjectiveData { TargetTurn = 1 }.Instantiate();
+    var data = new SurviveUntilTurnObjectiveData { TargetTurn = 1 };
+    var objective = data.Instantiate();
+    Assert.True(objective is SurviveUntilTurnObjective);
+    Assert.True(ReferenceEquals(data, objective.Data));
     battle.ApplyDamage(battle.PlayerUnit, 20, DamageKind.Stun);
 
     Assert.Equal(ObjectiveResult.Passed, objective.Check(battle.PlayerFaction,

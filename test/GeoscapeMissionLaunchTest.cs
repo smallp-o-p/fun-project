@@ -25,23 +25,14 @@ public partial class GeoscapeMissionLaunchTest
       MakeTacticalBattleType(playerCells: 2, enemyCells: 2),
       maxPlayerUnits, minEnemyUnits: 1, maxEnemyUnits: 1);
     customize?.Invoke(mission);
-    var campaign = new GeoscapeFixture(MakeStart(
+    return GeoscapeFixture.WithFiredEvent(MakeStart(
       roster: [MakeEntry("Alpha"), MakeEntry("Beta"), MakeEntry("Gamma")],
       timeline: [MakeScheduled(1, MakeEvent(
         "Ambush",
         GeoscapeEventKind.TacticalBattle,
         allowUnfitDeployment: allowUnfitDeployment,
         tacticalMission: mission))]));
-    try
-    {
-      campaign.AdvanceTicks(1);
-      return campaign;
-    }
-    catch
-    {
-      campaign.Dispose();
-      throw;
-    }
+
   }
 
   [TestCase(TestName = "Unsigned maximum capacity preserves the selected squad")]

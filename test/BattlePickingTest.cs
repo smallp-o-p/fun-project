@@ -17,7 +17,7 @@ public partial class BattlePickingTest
   public static async Task BodyClicksSelectFriendAndAttackEnemyExactlyOnce()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (battle, runtime, _) = CreateBattle();
+    var (battle, runtime) = CreateBattle();
     await WaitForPhysics(battle);
     var input = battle.GetNode<BattleInputController>("BattleInputController");
     int tileClicks = 0;
@@ -45,7 +45,7 @@ public partial class BattlePickingTest
   public static async Task GuiAndTerrainOccludeBodiesAndHiddenBodiesLeaveTilePickingAvailable()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (battle, _, _) = CreateBattle();
+    var (battle, _) = CreateBattle();
     var camera = Camera(battle);
     Vector3 body = new(0.5f, 0.85f, 0.5f);
     Vector2 pointer = camera.UnprojectPosition(body);
@@ -84,7 +84,7 @@ public partial class BattlePickingTest
   public static async Task UnitPickingSupportsOrthographicCameraTransform()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (battle, _, _) = CreateBattle();
+    var (battle, _) = CreateBattle();
     var camera = Camera(battle);
     camera.GlobalPosition = new Vector3(-3, 3, 2);
     camera.LookAt(new Vector3(1, 0.5f, 0.5f));
@@ -99,7 +99,7 @@ public partial class BattlePickingTest
   public static async Task PickingFollowsMovementAndRetiresDeadBodiesAfterPlayback()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (battle, runtime, _) = CreateBattle(TestData.MakeTacticalBattleType(playerCells: 2));
+    var (battle, runtime) = CreateBattle(TestData.MakeTacticalBattleType(playerCells: 2));
     var playerFaction = runtime.Query(new GetPlayerFactionQuery()).RequireSome();
     var player = runtime.Query(new GetFactionAliveUnits(playerFaction)).AsValueEnumerable().Single();
     var input = battle.GetNode<BattleInputController>("BattleInputController");
@@ -129,7 +129,7 @@ public partial class BattlePickingTest
   public static async Task AuthoredPropsBlockBodyClicksWithoutSelectingTheTileBehind(int propItem)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (battle, _, _) = CreateBattle();
+    var (battle, _) = CreateBattle();
     var palette = GD.Load<MeshLibrary>("res://resources/map_entities/MapPalette.tres");
     var floor = new GridMap { MeshLibrary = palette, CellSize = Vector3.One, CollisionLayer = 1, CollisionMask = 0 };
     floor.SetCellItem(Godot.Vector3I.Zero, 0);
@@ -148,8 +148,20 @@ public partial class BattlePickingTest
     Assert.Equal(0, Verbs(battle).GetChildCount(), "The real palette prop must consume the covered body click.");
     ClickBody(battle, new Vector3(0.5f, 0.95f, 0.5f));
     Assert.True(Verbs(battle).GetChildCount() > 0, "The visible upper body above the prop remains clickable.");
+    await WaitForLayout(battle);
+    AttackButton(battle).EmitSignal(Button.SignalName.Pressed);
+    var chance = battle.GetNode<BattleHud>("BattleUI/BattleHud").GetNode<Label>("%HitChance");
+    Vector3 enemy = new(1.5f, 0.85f, 0.5f);
+    ClickBody(battle, enemy, click: false);
+    Assert.True(chance.Visible, "The exposed enemy supplies a real attack preview.");
+    ClickBody(battle, covered, click: false);
+    Assert.False(chance.Visible, "Moving onto an occluding prop must clear the old preview.");
+    ClickBody(battle, enemy, click: false);
+    Assert.True(chance.Visible);
+    ClickBody(battle, new Vector3(3.5f, 0.85f, 0.5f), click: false);
+    Assert.False(chance.Visible, "Moving onto empty space must clear the old preview.");
   }
-  private static (BattleScene Battle, BattleRuntime Runtime, SubViewport Viewport) CreateBattle(BattleTypeData? type = null)
+  private static (BattleScene Battle, BattleRuntime Runtime) CreateBattle(BattleTypeData? type = null)
   {
     var setup = BattleSetupResolver.Resolve(type ?? TestData.MakeDuelBattleType()).RequireRight();
     var runtime = BattleFactory.Start(setup).RequireRight();
@@ -157,7 +169,7 @@ public partial class BattlePickingTest
     battle.Present(runtime, setup);
     var viewport = new SubViewport
     {
-      Size = new Vector2I(800, 600),
+      Size = new Vector2I(1920, 1080),
       OwnWorld3D = true,
       RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
     };
@@ -170,7 +182,7 @@ public partial class BattlePickingTest
     var camera = Camera(battle);
     camera.GlobalPosition = new Vector3(1, 2.5f, 5);
     camera.LookAt(new Vector3(1, 0.5f, 0.5f));
-    return (battle, runtime, viewport);
+    return (battle, runtime);
   }
 
   private static Camera3D Camera(BattleScene battle)

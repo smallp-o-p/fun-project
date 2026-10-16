@@ -71,7 +71,7 @@ public class StaffHiringViewTest
         EngineerCosts = new() { [currency] = 3 },
       }));
     GeoscapeView view = engineer ? CreateEngineeringView() : CreateResearchView();
-    CreateUiViewport(view, new Vector2I(width, height));
+    CreateScaledWindow(view, new Vector2I(width, height));
     view.Present(campaign.State, campaign.Session);
     var hiring = view.GetNode<StaffHiringControl>("%StaffHiring");
     var quantity = hiring.GetNode<SpinBox>("%HireQuantity");
@@ -114,12 +114,12 @@ public class StaffHiringViewTest
     hire.EmitSignal(Button.SignalName.Pressed);
     Assert.Equal(6UL, campaign.State.GetCurrencyBalance(currency));
     await WaitForLayout(view);
-    var visible = new Rect2(0, 0, width, height);
+    var visible = ScreenRect(view);
     Assert.True(visible.Encloses(ScreenRect(hire)));
     Assert.True(visible.Encloses(ScreenRect(quantity)));
     Assert.True(visible.Encloses(ScreenRect(view.GetNode<Button>("%BackButton"))));
     GeoscapeView reopened = engineer ? CreateEngineeringView() : CreateResearchView();
-    CreateUiViewport(reopened, new Vector2I(width, height));
+    CreateScaledWindow(reopened, new Vector2I(width, height));
     reopened.Present(campaign.State, campaign.Session);
     Assert.True(reopened.GetNode<StaffHiringControl>("%StaffHiring").GetNode<Label>("%StaffCount")
       .Text.EndsWith(": 3", System.StringComparison.Ordinal));

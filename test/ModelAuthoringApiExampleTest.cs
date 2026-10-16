@@ -53,9 +53,7 @@ public class ModelAuthoringApiExampleTest
 
     Preview(model, pieceId);
 
-    Assert.False(model.FindPiece(pieceId).Match(
-      piece => piece.Enabled,
-      () => throw new InvalidOperationException("The documented example's piece vanished.")));
+    Assert.False(fixture.Piece(pieceId).Enabled);
     Assert.False(model.ClothingEnabled);
   }
 }

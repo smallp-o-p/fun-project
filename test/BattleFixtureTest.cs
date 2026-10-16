@@ -11,18 +11,12 @@ namespace FunProject.Tests;
 [RequireGodotRuntime]
 public partial class BattleFixtureTest
 {
-  private static BattleSetup SingleUnitSetup(Faction faction, string unitName = "Alpha")
-    => new(
-      TestData.MakeOpenBattleMap(new Vector3I(3, 1, 3)),
-      [new BattleSideSetup(faction, [new FakeObjectiveData()],
-        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant(unitName, faction)), new Vector3I(0, 0, 0))])],
-      Seed: 7);
-
   [TestCase]
   public static void SetupAndActionsShareOneNativeUnitAndExplicitEventWindow()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = new BattleFixture(SingleUnitSetup(faction));
+    using var battle = BattleFixture.Started(new Vector3I(3, 1, 3),
+      new UnitLoadout(TestData.MakeCombatant("Alpha", faction)), Vector3I.Zero);
     var unit = battle.UnitAt(new Vector3I(0, 0, 0));
 
     Assert.True(ReferenceEquals(unit, battle.UnitAt(new Vector3I(0, 0, 0))));
@@ -177,7 +171,8 @@ public partial class BattleFixtureTest
   {
     using var uiBattle = BattleFixture.UiBattle();
     Assert.True(ReferenceEquals(uiBattle.Ui, uiBattle.Ui));
-    using var battle = new BattleFixture(SingleUnitSetup(TestData.MakeFaction("Player")));
+    using var battle = BattleFixture.Started(new Vector3I(3, 1, 3),
+      new UnitLoadout(TestData.MakeCombatant("Alpha", TestData.MakeFaction("Player"))), Vector3I.Zero);
     var mesh = battle.OwnNode(new Godot.Node3D());
     var director = battle.AttachDirector(new EventPlaybackDirector());
     Assert.True(ReferenceEquals(director, battle.AttachDirector(director)));
@@ -205,7 +200,8 @@ public partial class BattleFixtureTest
   public static void DisposalDetachesRecordingAndClosesTheRuntime()
   {
     var faction = TestData.MakeFaction("Player");
-    var battle = new BattleFixture(SingleUnitSetup(faction));
+    var battle = BattleFixture.Started(new Vector3I(3, 1, 3),
+      new UnitLoadout(TestData.MakeCombatant("Alpha", faction)), Vector3I.Zero);
     int recorded = battle.Events.Count;
 
     battle.Dispose();

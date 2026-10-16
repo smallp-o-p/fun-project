@@ -132,7 +132,6 @@ public class BattleSessionQueriesTest
     var factionBDead = battle.Query(new GetFactionDeadUnits(factionB));
 
     Assert.True(factionADead.AsValueEnumerable().Select(d => d.State).Contains(unitA));
-    Assert.False(factionBDead.AsValueEnumerable().Select(d => d.State).Contains(unitA));
     Assert.True(!factionBDead.AsValueEnumerable().Any());
   }
 

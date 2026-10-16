@@ -32,8 +32,7 @@ public class MissionCurrencyRewardsTest
     var start = MakeStart(roster: [MakeEntry("Alpha")], startingCurrencies: new() { [currency] = 1000 },
       timeline: [MakeScheduled(1, MakeEvent("Reward mission", GeoscapeEventKind.TacticalBattle, tacticalMission: mission))]);
     start.MissionRewardPool.Add(Entry(currency));
-    var campaign = new GeoscapeFixture(start);
-    campaign.AdvanceTicks(1);
+    var campaign = GeoscapeFixture.WithFiredEvent(start);
     campaign.OpenResolution(campaign.ActiveEvent);
     return campaign;
   }

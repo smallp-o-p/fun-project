@@ -60,6 +60,7 @@ public sealed partial class BattleScene : Node3D
       _input.TileHovered -= OnTileHovered;
       _input.UnitClicked -= OnUnitClicked;
       _input.UnitHovered -= OnUnitHovered;
+      _input.HoverCleared -= OnHoverCleared;
       _input.ConfirmPressed -= OnConfirmIntent;
       _input.CancelPressed -= OnCancelIntent;
     }
@@ -108,6 +109,7 @@ public sealed partial class BattleScene : Node3D
     _input.TileHovered += OnTileHovered;
     _input.UnitClicked += OnUnitClicked;
     _input.UnitHovered += OnUnitHovered;
+    _input.HoverCleared += OnHoverCleared;
     _input.ConfirmPressed += OnConfirmIntent;
     _input.CancelPressed += OnCancelIntent;
 
@@ -189,6 +191,15 @@ public sealed partial class BattleScene : Node3D
   {
     if (!_disposed)
       _runtime.TryGetAlive(unit).IfSome(alive => _ui.ClickTile(alive.Position.Raw));
+  }
+
+  private void OnHoverCleared()
+  {
+    if (_disposed || _ui.Gate != InputGate.Open || _ui.State != UiState.Targeting)
+      return;
+
+    _ui.ClearHoverPreview();
+    _view.HidePreview();
   }
 
   private void OnUnitHovered(BattleUnitState unit)

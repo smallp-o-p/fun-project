@@ -68,6 +68,7 @@ public partial class GeoscapeHudTest
 
   [TestCase("%UnitsButton", typeof(UnitRoster), "res://scenes/geoscape/units/UnitRoster.tscn")]
   [TestCase("%EngineeringButton", typeof(EngineeringView), "res://scenes/geoscape/engineering/EngineeringView.tscn")]
+  [TestCase("%CaptivityButton", typeof(CaptivityView), "res://scenes/geoscape/captivity/CaptivityView.tscn")]
   [TestCase("%ResearchButton", typeof(ResearchView), "res://scenes/geoscape/research/ResearchView.tscn")]
   public static async Task BoundButtonsForwardFreshViews(string buttonName, Type viewType, string scenePath)
   {
@@ -89,6 +90,7 @@ public partial class GeoscapeHudTest
     foreach (var view in received)
     {
       Assert.True(viewType.IsInstanceOfType(view));
+      Assert.True(view.GetParent() is null);
       Assert.Equal(scenePath, view.SceneFilePath);
     }
     Assert.False(ReferenceEquals(received[0], received[1]));

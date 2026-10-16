@@ -21,6 +21,11 @@ public class CurrencyTest
     Assert.Equal(10UL, second.State.GetCurrencyBalance(currency));
     Assert.Equal(0UL, first.State.GetCurrencyBalance(sameName));
     Assert.Equal(99UL, start.StartingCurrencies[currency]);
+    first.State.CreditCurrencies(new SysColGeneric.Dictionary<Currency, ulong> { [sameName] = 0 });
+    Assert.Equal(2, first.State.Currencies.Count);
+    Assert.True(first.State.Currencies.AsValueEnumerable().Any(value => ReferenceEquals(value, currency)));
+    Assert.True(first.State.Currencies.AsValueEnumerable().Any(value => ReferenceEquals(value, sameName)));
+    Assert.Equal(1, second.State.Currencies.Count);
   }
 
   [TestCase]
@@ -38,6 +43,7 @@ public class CurrencyTest
     Assert.True(campaign.State.TrySpendCurrencyCosts(costs));
     Assert.Equal(3UL, campaign.State.GetCurrencyBalance(a));
     Assert.Equal(0UL, campaign.State.GetCurrencyBalance(b));
+    Assert.True(campaign.State.Currencies.AsValueEnumerable().Any(value => ReferenceEquals(value, b)));
   }
 
   [TestCase]

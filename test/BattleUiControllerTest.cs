@@ -14,20 +14,6 @@ public sealed partial class BattleUiControllerTest
   // (10 health) at (4,0,4), surviving Support at (7,0,7), AlwaysHit, player configured.
   // battle.Ui lazily mints the single controller bound to that runtime and battle.Busy.
 
-  [TestCase(TestName = "Selecting a friendly unit selects it and loads its verbs")]
-  public static void SelectingFriendlyUnitLoadsVerbs()
-  {
-    using var battle = BattleFixture.UiBattle();
-    Assert.Equal(UiState.Unselected, battle.Ui.State);
-    Assert.Equal(InputGate.Open, battle.Ui.Gate);
-
-    Assert.True(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));
-
-    Assert.Equal(UiState.UnitSelected, battle.Ui.State);
-    Assert.Equal(battle.PlayerUnit, battle.Ui.SelectedUnit.RequireSome());
-    Assert.True(battle.Ui.ActionOptions.Count > 0);
-  }
-
   [TestCase(TestName = "Action options retain identity and reflect live availability across selection changes")]
   public static void ActionOptionsRetainIdentityAndLiveAvailability()
   {
@@ -92,6 +78,8 @@ public sealed partial class BattleUiControllerTest
   public static void SelectionAndCancelPublishCompleteUpdates()
   {
     using var battle = BattleFixture.UiBattle();
+    Assert.Equal(UiState.Unselected, battle.Ui.State);
+    Assert.Equal(InputGate.Open, battle.Ui.Gate);
     int changes = 0;
     battle.Ui.Changed += () =>
     {
@@ -109,8 +97,9 @@ public sealed partial class BattleUiControllerTest
       }
     };
 
-    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
+    Assert.True(battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)));
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1)); // reselect refreshes current readouts
+    Assert.Equal(UiState.UnitSelected, battle.Ui.State);
     Assert.Equal(2, changes);
 
     battle.Ui.Cancel();
@@ -391,18 +380,6 @@ public sealed partial class BattleUiControllerTest
     Assert.Equal(battle.PlayerFaction, battle.Runtime.Query(new GetActiveSideQuery()));
   }
 
-  [TestCase(TestName = "PreviewAt updates LastPreview only while targeting")]
-  public static void PreviewAtUpdatesLastPreviewOnlyWhileTargeting()
-  {
-    using var battle = BattleFixture.UiBattle();
-    battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
-    Assert.True(battle.Ui.PreviewAt(new Vector3I(4, 0, 2)).IsLeft); // not targeting: Left
-
-    battle.Ui.BeginAction(battle.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
-    Assert.True(battle.Ui.PreviewAt(new Vector3I(4, 0, 2)).IsRight);
-    Assert.True(battle.Ui.LastPreview.IsSome);
-  }
-
   [TestCase(TestName = "Busy playback closes the gate and blocks intents")]
   public static void BusyPlaybackBlocksIntents()
   {
@@ -504,6 +481,7 @@ public sealed partial class BattleUiControllerTest
   {
     using var battle = BattleFixture.UiBattle();
     battle.Ui.TrySelectAt(new Vector3I(4, 0, 1));
+    Assert.True(battle.Ui.PreviewAt(new Vector3I(4, 0, 2)).IsLeft); // not targeting
     battle.Ui.BeginAction(battle.Ui.ActionOptions.AsValueEnumerable().OfType<MoveActionOption>().Single());
 
     Assert.True(battle.Ui.PreviewAt(new Vector3I(4, 0, 2)).IsRight);

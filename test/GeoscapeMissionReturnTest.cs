@@ -32,7 +32,7 @@ public class GeoscapeMissionReturnTest
       OnComplete = new EndBattleDirectiveData { Outcome = BattleOutcome.Victory },
       OnFail = new EndBattleDirectiveData { Outcome = BattleOutcome.Defeat },
     });
-    var campaign = new GeoscapeFixture(MakeStart(
+    return GeoscapeFixture.WithFiredEvent(MakeStart(
       roster:
       [
         MakeEntry("Alpha", MakeCombatantData("Alpha", health: 100)),
@@ -42,16 +42,7 @@ public class GeoscapeMissionReturnTest
       ],
       timeline: [MakeScheduled(1, MakeEvent(
         "Ambush", GeoscapeEventKind.TacticalBattle, tacticalMission: mission))]));
-    try
-    {
-      campaign.AdvanceTicks(1);
-      return campaign;
-    }
-    catch
-    {
-      campaign.Dispose();
-      throw;
-    }
+
   }
 
   private static BattleUnitState UnitAt(MissionBattle battle, int x) =>

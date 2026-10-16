@@ -28,6 +28,24 @@
 
 [ext_resource type="Script" path="res://scripts/strategic/MissionCurrencyRewardData.cs" id="22_reward"]
 
+[ext_resource type="Script" path="res://scripts/strategic/PredictionMarketData.cs" id="23_prediction_market"]
+[ext_resource type="Script" path="res://scripts/strategic/DeployUnitPredictionMarketData.cs" id="24_deploy_prediction"]
+[ext_resource type="Script" path="res://scripts/strategic/UnitKillsPredictionMarketData.cs" id="25_kills_prediction"]
+
+[sub_resource type="Resource" id="DeployPredictionMarket"]
+script = ExtResource("24_deploy_prediction")
+DescriptionFormat = "{0} deploys"
+MaxStake = 100
+Multiplier = 1.5
+
+[sub_resource type="Resource" id="KillsPredictionMarket"]
+script = ExtResource("25_kills_prediction")
+DescriptionFormat = "{0} scores at least {1} kill(s)"
+MaxStake = 200
+Multiplier = 2.5
+MinimumKills = 1
+MaximumKills = 3
+
 [sub_resource type="Resource" id="MissionCurrencyReward"]
 script = ExtResource("22_reward")
 Currency = ExtResource("21_currency")
@@ -79,6 +97,7 @@ DisplayName = "Cpl. Dmitri Volkov"
 
 [resource]
 script = ExtResource("1_start")
+PredictionMarketPool = Array[ExtResource("23_prediction_market")]([SubResource("DeployPredictionMarket"), SubResource("KillsPredictionMarket")])
 Map = ExtResource("3_map")
 PlayerFaction = ExtResource("4_faction")
 StartingRoster = [SubResource("Resource_entry1"), SubResource("Resource_entry2"), SubResource("Resource_entry3"), SubResource("Resource_entry4")]

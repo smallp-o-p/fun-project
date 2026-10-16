@@ -5,8 +5,7 @@ using Godot;
 namespace FunProject.Tests;
 
 /// <summary>
-/// Owns a synthetic model tree for model tests: a CharacterModel root with a
-/// Skeleton3D carrying a head bone and an AnimationPlayer. Optionally adds the
+/// Owns a synthetic CharacterModel tree for model tests. Optionally adds the
 /// root to the test SceneTree (which runs the model's _Ready initialization);
 /// disposal frees the tree and is idempotent. Invalid-authoring tests construct
 /// the fixture unstarted and call the internal initializers directly, so
@@ -23,12 +22,6 @@ public sealed class ModelFixture : IDisposable
   {
     _model = new CharacterModel { Name = "Model" };
     _root = _model;
-    Skeleton = new Skeleton3D { Name = "Skeleton" };
-    Skeleton.AddBone("head");
-    Player = new AnimationPlayer { Name = "AnimationPlayer" };
-    Player.AddAnimationLibrary("", new AnimationLibrary());
-    Model.AddChild(Skeleton);
-    Model.AddChild(Player);
     if (start)
       Start();
   }
@@ -64,8 +57,7 @@ public sealed class ModelFixture : IDisposable
       Start();
   }
 
-  public Skeleton3D Skeleton { get; } = null!;
-  public AnimationPlayer Player { get; } = null!;
+  public AnimationPlayer Player { get; private set; } = null!;
 
   // Present only on mask/wardrobe fixtures (see WithMask/WithWardrobe): the
   // root-relative mesh path of the masked body and the authored configuration.
@@ -243,7 +235,7 @@ public sealed class ModelFixture : IDisposable
 
   /// <summary>
   /// Animation fixture: the synthetic model plus a Face mesh carrying the Smile
-  /// and Blink blend shapes, a body bone beside the head bone, and an
+  /// and Blink blend shapes, an AnimationPlayer, and an
   /// AnimationTree in manual mode driven by the shared preset library. Preset
   /// weights are the tree's own parameters/Add2 amount parameters.
   /// </summary>
@@ -252,9 +244,9 @@ public sealed class ModelFixture : IDisposable
     var fixture = new ModelFixture(start: false);
     fixture.Face = new MeshInstance3D { Name = "Face", Mesh = TestData.MakeExpressionMesh() };
     fixture.Model.AddChild(fixture.Face);
-    fixture.Skeleton.AddBone("body");
-    fixture.Player.RemoveAnimationLibrary("");
+    fixture.Player = new AnimationPlayer { Name = "AnimationPlayer" };
     fixture.Player.AddAnimationLibrary("", TestData.MakeExpressionLibrary());
+    fixture.Model.AddChild(fixture.Player);
     var tree = new AnimationTree
     {
       Name = "ModelAnimationTree",

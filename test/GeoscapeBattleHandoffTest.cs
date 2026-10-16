@@ -55,22 +55,20 @@ public partial class GeoscapeBattleHandoffTest
     return mission;
   }
 
-  private static GeoscapeBattleHandoffScene NewScene(TacticalMissionData mission,
+  private static GeoscapeScene NewScene(TacticalMissionData mission,
     out HookCaptureSystemData capture, GeoscapeEventDefinition[]? backgroundEvents = null, Vector2I? windowSize = null)
   {
     capture = new HookCaptureSystemData();
     mission.BattleType.Systems.Add(capture);
-    var scene = ((PackedScene)GD.Load<PackedScene>("res://test/GeoscapeBattleHandoffScene.tscn"))
-      .Instantiate<GeoscapeBattleHandoffScene>();
     var timeline = new List<ScheduledEventData>
     {
       MakeScheduled(1, MakeEvent("Ambush", GeoscapeEventKind.TacticalBattle, tacticalMission: mission)),
     };
     foreach (GeoscapeEventDefinition definition in backgroundEvents ?? [])
       timeline.Add(MakeScheduled(1, definition));
-    scene.Start = MakeStart(
+    var scene = CreateGeoscapeScene(MakeStart(
       roster: [MakeEntry("Alpha", MakeCombatantData("Alpha", health: 100))],
-      timeline: [.. timeline]);
+      timeline: [.. timeline]));
     if (windowSize is { } size)
     {
       CreateScaledWindow(scene, size);
@@ -82,8 +80,8 @@ public partial class GeoscapeBattleHandoffTest
   // Fires the mission, captures the scene's live session at the Present boundary, opens
   // its dialog, engages preparation, and selects Alpha. The dialog reference is captured
   // here: after the engage the squad is the stack's current view.
-  private static (GeoscapeBattleHandoffScene Scene, GeoscapeViewManager Manager,
-    SquadLoadoutView Squad, GeoscapeEventResolution Dialog, GeoscapeSession Session) PreparedScene(
+  private static (GeoscapeScene Scene, GeoscapeViewManager Manager,
+    SquadLoadoutView Squad, GeoscapeEventResolution Dialog, GeoscapeSession Session, CampaignGameState Campaign) PreparedScene(
     TacticalMissionData? mission, out HookCaptureSystemData capture,
     GeoscapeEventDefinition[]? backgroundEvents = null, Vector2I? windowSize = null)
   {
@@ -91,13 +89,13 @@ public partial class GeoscapeBattleHandoffTest
     var manager = scene.GetNode<GeoscapeViewManager>("%ViewManager");
     SpeedButton(scene).EmitSignal(Button.SignalName.Pressed); // Normal
     scene._PhysicsProcess(0.1); // the mission fires at tick 1
-    GeoscapeSession session = CaptureSceneSession(manager); // before the mission flow opens
+    var (campaign, session) = CaptureSceneContext(manager); // before the mission flow opens
     OpenResolutionViaMapEvent(scene);
     var dialog = (GeoscapeEventResolution)manager.Current;
     DialogButton(dialog, "Engage").EmitSignal(Button.SignalName.Pressed);
     var squad = (SquadLoadoutView)manager.Current;
     ChooseSquadUnit(squad, 0, "Alpha");
-    return (scene, manager, squad, dialog, session);
+    return (scene, manager, squad, dialog, session, campaign);
   }
 
   private static void ContinueResults(GeoscapeView mission)
@@ -108,7 +106,7 @@ public partial class GeoscapeBattleHandoffTest
   public static async Task TerminalReturnRetainsResults()
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, _, session) = PreparedScene(SurvivalMission(1), out var capture);
+    var (scene, manager, squad, _, session, _) = PreparedScene(SurvivalMission(1), out var capture);
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
     var battle = MissionBattleHost(squad);
     ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
@@ -134,7 +132,7 @@ public partial class GeoscapeBattleHandoffTest
   public static async Task BattleOwnsOpaqueViewport(int width, int height)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, _, session) = PreparedScene(SurvivalMission(1), out var capture,
+    var (_, manager, squad, _, session, campaign) = PreparedScene(SurvivalMission(1), out var capture,
       windowSize: new Vector2I(width, height));
     var sentinel = new ColorRect { Color = Colors.Magenta, MouseFilter = Control.MouseFilterEnum.Ignore };
     manager.RootView.AddChild(sentinel);
@@ -167,7 +165,7 @@ public partial class GeoscapeBattleHandoffTest
     Option<BattleUnitState> clicked = None;
     battle.GetNode<BattleInputController>("BattleInputController").UnitClicked += unit => clicked = Some(unit);
     await SelectFirstBattleUnit(battle, throughContainer: true);
-    Assert.True(ReferenceEquals(scene.Campaign!.Roster[0], clicked.RequireSome().Combatant));
+    Assert.True(ReferenceEquals(campaign.Roster[0], clicked.RequireSome().Combatant));
     int completions = 0;
     battle.Completed += _ => completions++;
     ReturnButton(battle).EmitSignal(Button.SignalName.Pressed);
@@ -188,9 +186,8 @@ public partial class GeoscapeBattleHandoffTest
     await using var cleanup = new DeferredNodeCleanup();
     var secondMission = MakeEvent("Second mission", GeoscapeEventKind.TacticalBattle,
       tacticalMission: SurvivalMission());
-    var (scene, manager, squad, dialog, liveSession) = PreparedScene(null, out var capture,
+    var (scene, manager, squad, dialog, liveSession, campaign) = PreparedScene(null, out var capture,
       backgroundEvents: [secondMission]);
-    CampaignGameState campaign = scene.Campaign!;
     var session = new GeoscapeSession(campaign); // sessions are rebuildable views over state
 
     Assert.True(manager.Visible);
@@ -254,12 +251,14 @@ public partial class GeoscapeBattleHandoffTest
     Assert.Equal(1, campaign.ActiveEvents.Count); // only the deployed mission was consumed
     Assert.Equal(1, MapEventMarkers(scene).Length);
     Assert.Equal(1, campaign.Conditions.GetFatigue(campaign.Roster[0]).RequireSome().Tier);
-    Assert.True(ReferenceEquals(campaign, scene.Campaign),
-      "The scene keeps one campaign instance across presentation and return.");
 
     Assert.True(manager.Visible);
     Assert.Equal(Node.ProcessModeEnum.Inherit, manager.ProcessMode);
     Assert.True(ReferenceEquals(manager.RootView, manager.Current));
+    var (returnedCampaign, returnedSession) = CaptureSceneContext(manager);
+    Assert.True(ReferenceEquals(campaign, returnedCampaign),
+      "The scene keeps one campaign instance across presentation and return.");
+    Assert.True(ReferenceEquals(liveSession, returnedSession));
 
     await WaitForDeferredDeletion((SceneTree)Engine.GetMainLoop());
     Assert.False(GodotObject.IsInstanceValid(squad)); // mission view popped
@@ -277,7 +276,7 @@ public partial class GeoscapeBattleHandoffTest
     DialogButton(secondDialog, "Engage").EmitSignal(Button.SignalName.Pressed);
     var secondSquad = (SquadLoadoutView)manager.Current;
     ChooseSquadUnit(secondSquad, 0, "Alpha");
-    Assert.True(ReferenceEquals(liveSession, CaptureSceneSession(manager)));
+    Assert.True(ReferenceEquals(liveSession, CaptureSceneContext(manager).Session));
     SquadDeployButton(secondSquad).EmitSignal(Button.SignalName.Pressed);
     var secondBattle = MissionBattleHost(manager.Current);
     await SelectFirstBattleUnit(secondBattle);
@@ -299,12 +298,12 @@ public partial class GeoscapeBattleHandoffTest
   {
 
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, _, _) = PreparedScene(null, out _);
+    var (_, manager, squad, _, _, campaign) = PreparedScene(null, out _);
 
     ((MissionView)squad).BattleScene = Pack(new Label { Name = "NotABattleScene" });
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed); // guard throws inside the handler
 
-    var session = new GeoscapeSession(scene.Campaign!);
+    var session = new GeoscapeSession(campaign);
     Assert.True(session.ActiveMission.IsNone); // no launch association exists
     Assert.True(session.PendingResolution.IsSome);
     Assert.True(ReferenceEquals(squad, manager.Current)); // preparation retained
@@ -319,8 +318,7 @@ public partial class GeoscapeBattleHandoffTest
   public static async Task CorrectlyTypedInstallFailureAbortsInstallationAndRestoresPreparation(string missingNode)
   {
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, _, _) = PreparedScene(SurvivalMission(1), out var capture);
-    CampaignGameState campaign = scene.Campaign!;
+    var (_, manager, squad, _, _, campaign) = PreparedScene(SurvivalMission(1), out var capture);
     var session = new GeoscapeSession(campaign);
     PendingResolution pending = session.PendingResolution.Match(
       value => value,
@@ -378,8 +376,8 @@ public partial class GeoscapeBattleHandoffTest
     await using var cleanup = new DeferredNodeCleanup();
     TacticalMissionData mission = EliminationMission();
     mission.BattleType.Systems.Add(new ThrowingSystemData());
-    var (scene, manager, squad, _, _) = PreparedScene(mission, out _);
-    var session = new GeoscapeSession(scene.Campaign!);
+    var (_, manager, squad, _, _, campaign) = PreparedScene(mission, out _);
+    var session = new GeoscapeSession(campaign);
     Option<int> seedBefore = session.PendingResolution.Match(
       value => value.Event.BattleSeed,
       () => throw new InvalidOperationException("The mission must stay pending."));
@@ -443,9 +441,8 @@ public partial class GeoscapeBattleHandoffTest
   {
 
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, dialog, _) = PreparedScene(null, out var capture,
+    var (scene, manager, squad, dialog, _, campaign) = PreparedScene(null, out var capture,
       [MakeEvent("Rumor", GeoscapeEventKind.Plot)]); // stays active so the close refresh renders
-    CampaignGameState campaign = scene.Campaign!;
     var session = new GeoscapeSession(campaign);
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);
@@ -500,9 +497,8 @@ public partial class GeoscapeBattleHandoffTest
   {
 
     await using var cleanup = new DeferredNodeCleanup();
-    var (scene, manager, squad, dialog, liveSession) = PreparedScene(null, out var capture,
+    var (scene, manager, squad, dialog, liveSession, campaign) = PreparedScene(null, out var capture,
       [MakeEvent("Rumor", GeoscapeEventKind.Plot)]); // stays active; its marker must remain
-    CampaignGameState campaign = scene.Campaign!;
     var session = new GeoscapeSession(campaign);
 
     SquadDeployButton(squad).EmitSignal(Button.SignalName.Pressed);

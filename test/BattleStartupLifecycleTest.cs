@@ -113,15 +113,11 @@ public class BattleStartupLifecycleTest
     Assert.Equal(2, added.Length);
     var spotted = hook.Received.EventsOf<UnitSpottedBattleEvent>();
     Assert.Equal(2, spotted.Length);
-    // Exactly one spotting per directed pair; ids follow setup order (0,1) then (1,0).
+    // Exactly one spotting per directed pair, retaining the announced unit identities.
     Assert.True(ReferenceEquals(added[0].Unit, spotted[0].Unit));
     Assert.True(ReferenceEquals(added[1].Unit, spotted[0].Target));
     Assert.True(ReferenceEquals(added[1].Unit, spotted[1].Unit));
     Assert.True(ReferenceEquals(added[0].Unit, spotted[1].Target));
-    Assert.Equal(added[0].Unit.Id, spotted[0].Unit.Id);
-    Assert.Equal(added[1].Unit.Id, spotted[0].Target.Id);
-    Assert.Equal(added[1].Unit.Id, spotted[1].Unit.Id);
-    Assert.Equal(added[0].Unit.Id, spotted[1].Target.Id);
     // Each spotting's observer and target were announced first.
     for (int i = 0; i < spotted.Length; i++)
     {

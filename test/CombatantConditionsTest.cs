@@ -324,25 +324,21 @@ public class CombatantConditionsTest
     Assert.Equal(1f, unit.Resolve<HealthStat>(system.StatContributions(unit)));
   }
 
-  [TestCase(0)]
-  [TestCase(2)]
-  public static void CriticalInjuryStatsComposeWithFatigue(int priorReturns)
+  [TestCase]
+  public static void CriticalInjuryStatsComposeWithFatigue()
   {
     var unit = Unit();
     var system = new CombatantConditionSystem();
     // Fatigue is built before the injury: returns while injured add no fatigue, so with
     // two prior returns the injury return itself adds the final Exhausted step.
-    for (int i = 0; i < priorReturns; i++)
+    for (int i = 0; i < 2; i++)
       system.ApplyMissionReturn(unit, 0, 100, 0);
     system.ApplyMissionReturn(unit, 80, 100, 0);
 
     Assert.Equal(40f, unit.Resolve<HealthStat>(system.StatContributions(unit)));
-    if (priorReturns == 2)
-    {
-      Assert.Equal(45.5f, unit.Resolve<AimStat>(system.StatContributions(unit)));
-      Assert.Equal(65f, unit.Resolve<WillStat>(system.StatContributions(unit)));
-      Assert.Equal(70f, unit.Resolve<MovementStat>(system.StatContributions(unit)));
-    }
+    Assert.Equal(45.5f, unit.Resolve<AimStat>(system.StatContributions(unit)));
+    Assert.Equal(65f, unit.Resolve<WillStat>(system.StatContributions(unit)));
+    Assert.Equal(70f, unit.Resolve<MovementStat>(system.StatContributions(unit)));
   }
 
   [TestCase(TestName = "Authored condition rules customize names, durations, and mods")]

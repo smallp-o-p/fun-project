@@ -99,17 +99,17 @@ public class ResearchViewTest
       project.Description += "Research develops new equipment for Engineering and advances through campaign time on the map. ";
     using var campaign = new GeoscapeFixture(MakeStart(researchProjects: [project], startingCurrencies: new() { [currency] = ulong.MaxValue }));
     var view = CreateResearchView();
-    CreateUiViewport(view, new Vector2I(width, height));
+    CreateScaledWindow(view, new Vector2I(width, height));
     view.Present(campaign.State, campaign.Session);
     OnlyChild<Button>(view.GetNode<VBoxContainer>("%ResearchProjects")).EmitSignal(Button.SignalName.Pressed);
     await WaitForLayout(view);
 
-    var visible = new Rect2(0, 0, width, height);
+    var visible = ScreenRect(view);
     var background = view.GetNode<SubViewportContainer>("Background");
     Assert.True(background.Visible);
     Assert.Equal(visible, ScreenRect(background));
     var panel = view.GetNode<PanelContainer>("%ResearchPanel");
-    Assert.True(ScreenRect(panel).Position.X >= width * 0.5f);
+    Assert.True(ScreenRect(panel).Position.X >= visible.Size.X * 0.5f);
     Assert.True(visible.Encloses(ScreenRect(panel)));
     var start = view.GetNode<Button>("%StartResearchButton");
     var back = view.GetNode<Button>("%BackButton");

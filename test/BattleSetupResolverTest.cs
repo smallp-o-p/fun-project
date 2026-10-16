@@ -111,7 +111,7 @@ public class BattleSetupResolverTest
   {
     var type = TestData.MakeDuelBattleType();
     type.MapPool.Clear();
-    type.MapPool.Add(PackRoot(new Node3D()));
+    type.MapPool.Add(GeoscapeTestScenes.Pack(new Node3D()));
 
     BattleSetupFailure failure = BattleSetupResolver.Resolve(type, seed: 7).RequireLeft();
 
@@ -139,16 +139,6 @@ public class BattleSetupResolverTest
     BattleSetupFailure failure = BattleSetupResolver.Resolve(type, seed: 7).RequireLeft();
 
     Assert.Equal(BattleSetupFailureReason.EmptyMapPool, failure.Reason);
-  }
-
-  private static PackedScene PackRoot(Node prototype)
-  {
-    var scene = new PackedScene();
-    Error error = scene.Pack(prototype);
-    prototype.Free();
-    if (error != Error.Ok)
-      throw new InvalidOperationException($"Test scene packing failed: {error}");
-    return scene;
   }
 
   [TestCase(TestName = "Resolving without a seed returns the integer that reproduces the layout")]

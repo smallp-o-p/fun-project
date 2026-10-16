@@ -18,14 +18,6 @@ public partial class BuffBattleTest
       new HealthBelowPercentCondition { Percent = 50f },
       statMods: [new AimStatMod { Modifiers = [StatModifier.Add(10)] }]);
 
-  // Factory-ready fixture: one buffed unit on the Player side at (4,0,4).
-  private static BattleFixture BuffedSolo(Faction faction, Combatant combatant)
-    => new(new BattleSetup(
-      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
-      [new BattleSideSetup(faction, [new FakeObjectiveData()],
-        [new UnitPlacement(new UnitLoadout(combatant), new Vector3I(4, 0, 4))])],
-      Seed: 7));
-
   [TestCase(TestName = "A buff whose condition already holds activates at spawn, after UnitAdded")]
   public static void SpawnEvaluatesBuffs()
   {
@@ -35,8 +27,8 @@ public partial class BuffBattleTest
       new HealthBelowPercentCondition { Percent = 200f }, // current < 2*max: always true
       statMods: [new AimStatMod { Modifiers = [StatModifier.Add(5)] }]);
 
-    using var battle = BuffedSolo(faction,
-      TestData.MakeCombatant("Alpha", faction, buffs: [alwaysOn]));
+    using var battle = BattleFixture.Started(new Vector3I(8, 1, 8),
+      new UnitLoadout(TestData.MakeCombatant("Alpha", faction, buffs: [alwaysOn])), new Vector3I(4, 0, 4));
     var unit = battle.Unit;
 
     Assert.Equal(1, unit.ActiveBuffs.AsValueEnumerable().Count());

@@ -34,7 +34,7 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/normal_font_size = 28
+theme_override_font_sizes/normal_font_size = 42
 text = "Skill Paths"
 fit_content = true
 scroll_active = false
@@ -53,7 +53,7 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/normal_font_size = 24
+theme_override_font_sizes/normal_font_size = 36
 text = "Points: 0"
 fit_content = true
 scroll_active = false
@@ -78,7 +78,7 @@ theme_override_constants/separation = 12
 
 [node name="CommittedHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/PathsScroll/PathsContent"]
 layout_mode = 2
-theme_override_font_sizes/normal_font_size = 28
+theme_override_font_sizes/normal_font_size = 42
 text = "Committed Paths"
 fit_content = true
 scroll_active = false
@@ -89,7 +89,7 @@ layout_mode = 2
 
 [node name="AvailableHeader" type="RichTextLabel" parent="Content/MarginContainer/VBoxContainer/PathsScroll/PathsContent"]
 layout_mode = 2
-theme_override_font_sizes/normal_font_size = 28
+theme_override_font_sizes/normal_font_size = 42
 text = "Available Paths"
 fit_content = true
 scroll_active = false

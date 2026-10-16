@@ -6,6 +6,7 @@ using static FunProject.Tests.GeoscapeTestScenes;
 
 namespace FunProject.Tests;
 
+// Layout cases use the 1080-native logical canvas; WindowScalingTest checks physical sizes.
 [TestSuite]
 [RequireGodotRuntime]
 public class UnitViewLayoutTest
@@ -124,8 +125,8 @@ public class UnitViewLayoutTest
     Assert.True(ScreenRect(view).Encloses(ScreenRect(view.GetNode<Button>("%PathsButton"))));
   }
 
-  [TestCase(800, 600)]
-  [TestCase(1280, 720)]
+  [TestCase(1920, 1440)]
+  [TestCase(2560, 1080)]
   [TestCase(1920, 1080)]
   public static async Task LongSkillPathsScrollWhileNavigationAndPointsRemainVisible(int width, int height)
   {
@@ -150,8 +151,8 @@ public class UnitViewLayoutTest
     Assert.True(scroll.GetVScrollBar().MaxValue > scroll.Size.Y);
   }
 
-  [TestCase(800, 600)]
-  [TestCase(1280, 720)]
+  [TestCase(1920, 1440)]
+  [TestCase(2560, 1080)]
   [TestCase(1920, 1080)]
   public static async Task UnitLayoutKeepsIdentityAndActionsInsideViewport(int width, int height)
   {
@@ -170,10 +171,9 @@ public class UnitViewLayoutTest
     Assert.Equal(6, view.GetNode<Container>("%StatsList").GetChildCount());
   }
 
-  [TestCase(800, 600)]
-  [TestCase(1066, 600)] // Logical canvas for 16:9, including 4K with native UI scaling.
-  [TestCase(1433, 600)] // Logical canvas for 3440x1440 ultrawide.
-  [TestCase(1280, 720)]
+  [TestCase(1920, 1440)]
+  [TestCase(2580, 1080)] // Native3440x1440 ultrawide logical canvas.
+  [TestCase(2560, 1080)]
   [TestCase(1920, 1080)]
   [TestCase(3440, 1440)]
   [TestCase(3840, 2160)]
@@ -185,7 +185,7 @@ public class UnitViewLayoutTest
     var viewport = CreateUiViewport(view, new Vector2I(width, height));
     view.Present(campaign.State, campaign.State.Roster[0]);
 
-    foreach (var size in new[] { new Vector2I(width, height), new Vector2I(800, 600), new Vector2I(width, height) })
+    foreach (var size in new[] { new Vector2I(width, height), new Vector2I(1920, 1440), new Vector2I(width, height) })
     {
       viewport.Size = size;
       await WaitForLayout(view);

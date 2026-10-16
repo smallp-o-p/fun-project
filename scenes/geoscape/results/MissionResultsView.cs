@@ -1,5 +1,6 @@
 using FunProject.Battle;
 using FunProject.Currencies;
+using FunProject.Strategic;
 using System.Collections.Generic;
 using FunProject.Scenes;
 using Godot;
@@ -11,7 +12,7 @@ namespace FunProject.Geoscape;
 public sealed partial class MissionResultsView : GeoscapeView
 {
   public void Bind(string missionType, FactionBattleSummary summary, BattleResult result,
-    IReadOnlyDictionary<Currency, ulong>? rewards = null)
+    IReadOnlyDictionary<Currency, ulong>? rewards = null, IReadOnlyList<MissionPrediction>? predictions = null)
   {
     GetNode<Label>("%MissionType").Text = missionType;
     GetNode<Label>("%TurnsTaken").Text = summary.TurnCount.ToString(CultureInfo.InvariantCulture);
@@ -22,5 +23,10 @@ public sealed partial class MissionResultsView : GeoscapeView
     GetNode<Label>("%EnemiesKilled").Text = enemiesKilled.ToString(CultureInfo.InvariantCulture);
     GetNode<Label>("%Rewards").Text = "Earned rewards: " + (rewards is null || rewards.Count == 0 ? "None"
       : string.Join(", ", rewards.AsValueEnumerable().Select(pair => $"+{pair.Value} {pair.Key.Name}").ToArray()));
+    var accepted = GetNode<Label>("%AcceptedPredictions");
+    accepted.Visible = predictions is { Count: > 0 };
+    accepted.Text = predictions is null ? "" : "Accepted predictions:\n" + string.Join("\n\n",
+      predictions.AsValueEnumerable().Select(prediction =>
+        $"{(prediction.Correct ? "Correct" : "Incorrect")} - {prediction.Market.Description}\nStake {prediction.Amount} {prediction.Currency.Name}; total return {prediction.Returned} {prediction.Currency.Name}").ToArray());
   }
 }

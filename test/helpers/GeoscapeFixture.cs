@@ -39,9 +39,12 @@ public sealed class GeoscapeFixture : IDisposable
   public GeoscapeFixture(RegionData[] regions = null, ScheduledEventData[] timeline = null)
     : this(TestData.MakeStart(regions, timeline)) { }
 
-  public static GeoscapeFixture WithFiredEvent(GeoscapeEventDefinition definition, RegionData[] regions = null)
+  public static GeoscapeFixture WithFiredEvent(GeoscapeEventDefinition definition, RegionData[] regions = null) =>
+    WithFiredEvent(TestData.MakeStart(regions, [TestData.MakeScheduled(1, definition)]));
+
+  public static GeoscapeFixture WithFiredEvent(CampaignStartData start)
   {
-    var campaign = new GeoscapeFixture(regions, [TestData.MakeScheduled(1, definition)]);
+    var campaign = new GeoscapeFixture(start);
     try
     {
       campaign.AdvanceTicks(1);

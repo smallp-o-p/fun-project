@@ -42,7 +42,6 @@ public partial class MapDeploymentTest
   [TestCase(TestName = "AssignSpawns returns an empty list for an empty roster")]
   public static void AssignSpawnsEmptyRosterReturnsEmptyList()
   {
-    Faction faction = TestData.MakeFaction("Player");
     BattleMapData map = TestData.MakeMapData(new Vector3I(4, 1, 4),
       (new Vector3I(0, 0, 0), TestData.SpawnTile(0)));
 

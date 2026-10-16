@@ -15,6 +15,7 @@ public sealed partial class BattleInputController : Node
   public event Action<BattleUnitState>? UnitHovered;
   public event Action<Vector3I>? TileClicked;
   public event Action<Vector3I>? TileHovered;
+  public event Action? HoverCleared;
   public event Action? ConfirmPressed;
   public event Action? CancelPressed;
 
@@ -56,7 +57,11 @@ public sealed partial class BattleInputController : Node
     // picking runs after _UnhandledInput, so mixing it with tile input would act twice.
     var hit = _cameraRig.RaycastViewportPosition(position,
       collisionMask: 1 | 2 | BattleUnitMeshes.PickingLayer, collideWithAreas: true);
-    if (hit.Count == 0) return;
+    if (hit.Count == 0)
+    {
+      if (!clicked) HoverCleared?.Invoke();
+      return;
+    }
     var collider = hit["collider"].AsGodotObject();
     uint layer = collider switch
     {
@@ -75,6 +80,8 @@ public sealed partial class BattleInputController : Node
       if (clicked) TileClicked?.Invoke(tile);
       else TileHovered?.Invoke(tile);
     }
+    else if (!clicked)
+      HoverCleared?.Invoke();
     if (clicked) GetViewport().SetInputAsHandled();
   }
 }

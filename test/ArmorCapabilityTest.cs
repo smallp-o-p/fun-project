@@ -22,18 +22,6 @@ public class ArmorCapabilityTest
       RegenPerTurn = regenPerTurn,
     };
 
-  [TestCase(TestName = "Armor capability starts at max with the stat's element")]
-  public static void StartsAtMaxWithElement()
-  {
-    var capability = new ArmorCapability(MakeData(armor: 12, element: Element.Thermal));
-
-    Assert.Equal(12, capability.Max);
-    Assert.Equal(12, capability.Current);
-    Assert.Equal(Element.Thermal, capability.Element);
-    Assert.False(capability.CanRegen);
-    Assert.Equal(0, capability.RegenDelayRemaining);
-  }
-
   [TestCase(TestName = "Reduce clamps current armor at zero")]
   public static void ReduceClampsAtZero()
   {
@@ -96,12 +84,15 @@ public class ArmorCapabilityTest
     {
       Name = "Plate Vest",
       Description = "Test armor",
-      Capabilities = [MakeData(armor: 7, element: Element.Chem)],
+      Capabilities = [MakeData(armor: 12, element: Element.Thermal)],
     });
 
     var capability = item.FindCapability<ArmorCapability>().RequireSome();
-    Assert.Equal(7, capability.Max);
-    Assert.Equal(Element.Chem, capability.Element);
+    Assert.Equal(12, capability.Max);
+    Assert.Equal(12, capability.Current);
+    Assert.Equal(Element.Thermal, capability.Element);
+    Assert.False(capability.CanRegen);
+    Assert.Equal(0, capability.RegenDelayRemaining);
     Assert.True(item.With<ArmorCapability>().IsSome);
   }
 }

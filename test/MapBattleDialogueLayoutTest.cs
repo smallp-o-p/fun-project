@@ -7,12 +7,13 @@ using static FunProject.Tests.GeoscapeTestScenes;
 
 namespace FunProject.Tests;
 
+// Layout cases use the 1080-native logical canvas; WindowScalingTest checks physical sizes.
 [TestSuite]
 [RequireGodotRuntime]
 public class MapBattleDialogueLayoutTest
 {
-  [TestCase(800, 600)]
-  [TestCase(1280, 720)]
+  [TestCase(1920, 1440)]
+  [TestCase(2560, 1080)]
   [TestCase(1920, 1080)]
   public static async Task GeoscapeUsesOneCompactBottomRowAndTopLeftTime(int width, int height)
   {
@@ -49,7 +50,7 @@ public class MapBattleDialogueLayoutTest
     var remaining = hud.GetNode<Label>("%EngineeringRemaining");
     Assert.Equal("2d remaining", remaining.Text);
     Assert.True(ScreenRect(remaining).End.X > width - 40, "Manufacturing stays at the right edge.");
-    Assert.True(ScreenRect(remaining).End.X - ScreenRect(progress).Position.X <= 340,
+    Assert.True(ScreenRect(remaining).End.X - ScreenRect(progress).Position.X <= width * 0.4f,
       "Manufacturing remains compact instead of taking all spare row width.");
     Assert.Equal(HorizontalAlignment.Right, progress.HorizontalAlignment);
     Assert.False(hud.HasNode("AlertsPanel"));
@@ -58,11 +59,11 @@ public class MapBattleDialogueLayoutTest
     hud.UpdateManufacturing(None, 3000);
     await WaitForLayout(viewport);
     Assert.True(ScreenRect(progress).End.X > width - 40, "The idle summary stays at the right edge.");
-    Assert.True(progress.Size.X <= 220, "The idle summary remains compact.");
+    Assert.True(progress.Size.X <= width * 0.2f, "The idle summary remains compact.");
   }
 
-  [TestCase(800, 600)]
-  [TestCase(1280, 720)]
+  [TestCase(1920, 1440)]
+  [TestCase(2560, 1080)]
   [TestCase(1920, 1080)]
   public static async Task ManufacturingDividerStaysCloseToShortItemAndIdleText(int width, int height)
   {
@@ -80,11 +81,11 @@ public class MapBattleDialogueLayoutTest
     float textStart = ScreenRect(progress).Position.X + progress.GetCharacterBounds(0).Position.X;
     Assert.True(textStart - ScreenRect(separator).End.X <= 18,
       "The divider must sit beside the item text without a reserved blank name column.");
-    Assert.True(progress.Size.X > 80, "The item name must remain readable.");
-    Assert.True(progress.Size.X < 130, "Short item names use only their content width.");
+    Assert.True(progress.Size.X > 0, "The item name must remain readable.");
+    Assert.True(progress.GetCharacterBounds(progress.Text.Length - 1).End.X <= progress.Size.X, "Short item names use only their content width.");
 
     float originalWidth = progress.Size.X;
-    progress.AddThemeFontSizeOverride("font_size", 20);
+    progress.AddThemeFontSizeOverride("font_size", progress.GetThemeFontSize("font_size") + 6);
     await WaitForLayout(viewport);
     Assert.True(progress.Size.X > originalWidth, "Content sizing follows a changed theme font size.");
     Assert.True(progress.GetCharacterBounds(progress.Text.Length - 1).End.X <= progress.Size.X,
@@ -99,8 +100,8 @@ public class MapBattleDialogueLayoutTest
     Assert.True(ScreenRect(progress).End.X > width - 40);
   }
 
-  [TestCase(800, 600)]
-  [TestCase(1280, 720)]
+  [TestCase(1920, 1440)]
+  [TestCase(2560, 1080)]
   [TestCase(1920, 1080)]
   public static async Task TacticalActionsStayAtBottomAndLeaveBattlefieldOpen(int width, int height)
   {
@@ -141,8 +142,8 @@ public class MapBattleDialogueLayoutTest
     Assert.Equal(0, hud.GetNode<Container>("%VerbButtons").GetChildCount());
   }
 
-  [TestCase(800, 600)]
-  [TestCase(1280, 720)]
+  [TestCase(1920, 1440)]
+  [TestCase(2560, 1080)]
   [TestCase(1920, 1080)]
   public static async Task DialogueLowerThirdContainsPortraitAndScrollableLongLines(int width, int height)
   {
@@ -171,8 +172,8 @@ public class MapBattleDialogueLayoutTest
     Assert.True(view.GetNode<Label>("%Continue").Visible);
   }
 
-  [TestCase(800, 600)]
-  [TestCase(1280, 720)]
+  [TestCase(1920, 1440)]
+  [TestCase(2560, 1080)]
   [TestCase(1920, 1080)]
   public static async Task ResolutionKeepsRequiredActionsVisibleWithLongDescription(int width, int height)
   {

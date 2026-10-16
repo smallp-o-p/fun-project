@@ -173,6 +173,8 @@ public class DialogueViewTest
   public static async Task ClickOverPanelAdvances()
   {
     DialogueView view = MakeView(Sequence(Line(Speaker(), "One line over the panel.")));
+    // Keep the reveal incomplete while layout settles so this tests the GUI click.
+    view.SetPhysicsProcess(false);
     await WaitForLayout(view);
 
     Vector2 click = ScreenRect(view.GetNode<Control>("Panel")).GetCenter();

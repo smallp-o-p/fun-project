@@ -105,7 +105,6 @@ public class BattleOutcomeTest
 
     Assert.True(battle.Session.Outcome.IsNone);
     Assert.Equal(3, battle.Session.TurnNumber);
-    Assert.True(battle.Session.Outcome.IsNone);
     Assert.False(battle.Events.EventsOf<SessionEndedBattleEvent>().AsValueEnumerable().Any());
   }
 

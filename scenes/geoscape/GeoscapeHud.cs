@@ -31,6 +31,7 @@ public sealed partial class GeoscapeHud : Control
     _engineeringProgress = GetNode<Label>("%EngineeringProgress");
     _engineeringRemaining = GetNode<Label>("%EngineeringRemaining");
     _engineeringProgress.ThemeChanged += UpdateManufacturingNameWidth;
+    Resized += UpdateManufacturingNameWidth;
     UpdateManufacturingNameWidth();
 
     _speedButton.Pressed += UpdateSpeed;
@@ -58,11 +59,11 @@ public sealed partial class GeoscapeHud : Control
   private void UpdateManufacturingNameWidth()
   {
     // A clipped Label reports a one-pixel minimum to HBoxContainer in Godot 4.7.
-    // Reserve its natural text width; the scene's maximum bounds long names.
+    // Reserve natural text width, bounded by this HUD's available width.
     Font font = _engineeringProgress.GetThemeFont("font");
     int fontSize = _engineeringProgress.GetThemeFontSize("font_size");
     float width = font.GetStringSize(_engineeringProgress.Text, HorizontalAlignment.Left, -1, fontSize).X;
-    _engineeringProgress.CustomMinimumSize = new Vector2(Mathf.Ceil(width), 0);
+    _engineeringProgress.CustomMinimumSize = new Vector2(Mathf.Min(Mathf.Ceil(width), Size.X * 0.2f), 0);
   }
 
   private static string RemainingDays(long completesAtTick, long tick)
