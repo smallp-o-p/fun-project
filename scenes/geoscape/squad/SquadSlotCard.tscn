@@ -50,13 +50,13 @@ grow_vertical = 2
 text = "+"
 horizontal_alignment = 1
 vertical_alignment = 1
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 60
 
 [node name="CardTitle" type="Label" parent="Margin/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 27
 autowrap_mode = 3
 
 [node name="Divider" type="HSeparator" parent="Margin/Layout"]
@@ -66,7 +66,7 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_font_sizes/normal_font_size = 14
+theme_override_font_sizes/normal_font_size = 21
 fit_content = true
 scroll_active = false
 
@@ -76,7 +76,7 @@ layout_mode = 2
 [node name="Stats" type="RichTextLabel" parent="Margin/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/normal_font_size = 14
+theme_override_font_sizes/normal_font_size = 21
 fit_content = true
 scroll_active = false
 

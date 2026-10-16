@@ -26,6 +26,7 @@ public partial class GeoscapeScene : Control
   private PackedScene _resolutionViewScene = null!;
   private PackedScene _dialogueViewScene = null!;
   private GeoscapeViewManager _viewManager = null!;
+  private GeoscapeCameraRig _mapCamera = null!;
 
   public override void _Ready()
   {
@@ -42,9 +43,14 @@ public partial class GeoscapeScene : Control
     _map.Setup(_session, start.Map.Size);
 
     _hud = GetNode<GeoscapeHud>("%GeoscapeHud");
-    // Fit once after the HUD/container's deferred layout. Native window scaling
-    // handles supported resolutions; the geoscape has no player camera controls.
-    CallDeferred(MethodName.FrameMapCamera, start.Map.Size);
+    _mapCamera = new GeoscapeCameraRig { Name = "Camera" };
+    _map.GetViewport().AddChild(_mapCamera);
+    // Refit after deferred container layout, including aspect changes while covered.
+    // The geoscape still has no player camera controls.
+    Resized += QueueMapFrame;
+    _hud.GetNode<Control>("TimePanel").Resized += QueueMapFrame;
+    _hud.GetNode<Control>("BottomBar").Resized += QueueMapFrame;
+    QueueMapFrame();
 
     _map.RegionClicked += region => GD.Print(region.FlavorText);
 
@@ -62,7 +68,9 @@ public partial class GeoscapeScene : Control
     _viewManager.RootView.Present(_state, _session);
   }
 
-  private void FrameMapCamera(Vector2I mapSize)
+  private void QueueMapFrame() => CallDeferred(MethodName.FrameMapCamera);
+
+  private void FrameMapCamera()
   {
     var viewport = _map.GetViewport();
     var container = (SubViewportContainer)viewport.GetParent();
@@ -77,9 +85,9 @@ public partial class GeoscapeScene : Control
     float ratio = viewportSize.Y / container.Size.Y;
     float top = Mathf.Clamp(topHudBottom.Y * ratio, 0, viewportSize.Y);
     float bottom = Mathf.Clamp(bottomHudTop.Y * ratio, top, viewportSize.Y);
-    var camera = new GeoscapeCameraRig { Name = "Camera" };
-    viewport.AddChild(camera);
-    camera.Setup(mapSize, new Rect2(new Vector2(0, top), new Vector2(viewportSize.X, bottom - top)));
+    if (bottom > top && viewportSize.X > 0)
+      _mapCamera.Setup(Start!.Map.Size,
+        new Rect2(new Vector2(0, top), new Vector2(viewportSize.X, bottom - top)));
   }
 
   private void HandleViewChanged(GeoscapeView view)

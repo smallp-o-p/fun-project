@@ -93,7 +93,7 @@ theme_override_constants/separation = 12
 [node name="Title" type="Label" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 42
 text = "Unit roster"
 
 [node name="Summary" type="HBoxContainer" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table"]
@@ -124,11 +124,13 @@ size_flags_stretch_ratio = 2.2
 text = "Name"
 
 [node name="RankHeader" type="Label" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table/TableHeader"]
+custom_minimum_size = Vector2(65, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Rank"
 
 [node name="StatusHeader" type="Label" parent="Content/Margin/Layout/Body/RosterColumn/RosterPanel/Margin/Table/TableHeader"]
+custom_minimum_size = Vector2(55, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Status"

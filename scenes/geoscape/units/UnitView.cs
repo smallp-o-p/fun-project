@@ -443,7 +443,7 @@ public sealed partial class UnitView : GeoscapeView
       SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
       AutowrapMode = TextServer.AutowrapMode.WordSmart,
     };
-    label.AddThemeFontSizeOverride("normal_font_size", 14);
+    label.AddThemeFontSizeOverride("normal_font_size", 21);
     parent.AddChild(label);
   }
 

@@ -49,7 +49,7 @@ grow_vertical = 2
 [node name="Title" type="Label" parent="Header"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 36
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 2
@@ -86,7 +86,7 @@ theme_override_constants/separation = 8
 
 [node name="CatalogTitle" type="Label" parent="ResearchPanel/Margin/Layout"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 21
 theme_override_colors/font_color = Color(0.64, 0.8, 0.87, 1)
 text = "AVAILABLE PROJECTS"
 
@@ -123,7 +123,7 @@ theme_override_constants/separation = 12
 [node name="ProjectName" type="Label" parent="ResearchPanel/Margin/Layout/DetailsScroll/Text"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "Select a project to research."
 autowrap_mode = 3
 
@@ -152,7 +152,7 @@ layout_mode = 2
 
 [node name="ProjectTitle" type="Label" parent="ResearchPanel/Margin/Layout"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 21
 theme_override_colors/font_color = Color(0.64, 0.8, 0.87, 1)
 text = "CURRENT PROJECT"
 

@@ -52,13 +52,13 @@ public sealed partial class SkillProgressionView : GeoscapeView
       UnitProgression progression = Unit.Progression;
       int unlocked = progression.StepsUnlockedFor(path);
 
-      AddLabel(list, $"{path.Name} — {unlocked}/{path.Steps.Count} unlocked", 22);
+      AddLabel(list, $"{path.Name} — {unlocked}/{path.Steps.Count} unlocked", 33);
 
       for (int i = 0; i < path.Steps.Count; i++)
       {
         SkillUpgradeStepData step = path.Steps[i];
         string marker = i < unlocked ? "[OK]" : (i == unlocked ? "[>] " : "[..]");
-        AddLabel(list, $"    {marker} Step {i + 1}  (cost {step.Cost})  {EffectSummary(step)}", 18);
+        AddLabel(list, $"    {marker} Step {i + 1}  (cost {step.Cost})  {EffectSummary(step)}", 27);
       }
 
       progression.NextStep(path).IfSome(next =>
@@ -73,11 +73,11 @@ public sealed partial class SkillProgressionView : GeoscapeView
         list.AddChild(button);
       });
       if (progression.NextStep(path).IsNone)
-        AddLabel(list, "    (chain complete)", 18);
+        AddLabel(list, "    (chain complete)", 27);
     }
 
     if (list.GetChildCount() == 0)
-      AddLabel(list, "— none —", 18);
+      AddLabel(list, "— none —", 27);
   }
 
   private void RebuildAvailable()
@@ -113,7 +113,7 @@ public sealed partial class SkillProgressionView : GeoscapeView
       }
       else
       {
-        AddLabel(list, $"{path.Name} — no path slots free", 18);
+        AddLabel(list, $"{path.Name} — no path slots free", 27);
       }
     }
   }

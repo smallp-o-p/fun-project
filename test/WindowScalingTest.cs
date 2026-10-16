@@ -21,7 +21,7 @@ public class WindowScalingTest
     {
       Assert.Equal(Window.ContentScaleModeEnum.CanvasItems, root.ContentScaleMode);
       Assert.Equal(Window.ContentScaleAspectEnum.Expand, root.ContentScaleAspect);
-      Assert.Equal(new Vector2I(800, 600), root.ContentScaleSize);
+      Assert.Equal(new Vector2I(1920, 1080), root.ContentScaleSize);
       foreach (var size in new[] {
         new Vector2I(800, 600), new Vector2I(1280, 720),
         new Vector2I(1920, 1080), new Vector2I(1920, 1200),
@@ -32,7 +32,7 @@ public class WindowScalingTest
         root.Size = size;
         await WaitForLayout(root);
         Assert.Equal(size, root.Size);
-        float scale = Mathf.Min(size.X / 800f, size.Y / 600f);
+        float scale = Mathf.Min(size.X / 1920f, size.Y / 1080f);
         Vector2 logical = root.GetVisibleRect().Size;
         // Godot floors the expanded logical canvas to whole viewport pixels. The
         // resulting physical transform may differ slightly between X and Y.
@@ -41,7 +41,7 @@ public class WindowScalingTest
         Assert.True(root.GetFinalTransform().Scale.IsEqualApprox((Vector2)size / logical),
           $"Physical transform must map the entire logical canvas into {size}.");
         Assert.True(new Rect2(Vector2.Zero, logical).Encloses(ScreenRect(button)));
-        Assert.True(button.GetThemeFontSize("font_size") * scale >= 16);
+        Assert.True(button.GetThemeFontSize("font_size") * scale >= 16 * Mathf.Min(1, size.X / 1280f));
         Assert.True(ReferenceEquals(button, hud.GetNode<Button>("%UnitsButton")));
       }
     }

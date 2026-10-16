@@ -40,6 +40,10 @@ project/assembly_name="fun-project"
 
 enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/battle_authoring/plugin.cfg", "res://addons/manifest_inspector/plugin.cfg")
 
+[gui]
+
+theme/default_theme_scale=1.5
+
 [input]
 
 ui_down={

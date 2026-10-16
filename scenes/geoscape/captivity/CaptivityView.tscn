@@ -89,7 +89,7 @@ theme_override_constants/separation = 12
 [node name="Title" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 42
 text = "Captivity"
 
 [node name="Subtitle" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
@@ -101,7 +101,7 @@ layout_mode = 2
 
 [node name="ListHeading" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
 layout_mode = 2
-text = "Captives Ã‚Â· multi-select"
+text = "Captives · multi-select"
 autowrap_mode = 3
 
 [node name="EmptyState" type="Label" parent="Content/Margin/Layout/Body/CaptivesColumn/CaptivesPanel/Margin/Captives"]
@@ -167,7 +167,7 @@ theme_override_constants/separation = 12
 
 [node name="DetailsHeading" type="Label" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsPanel/Margin/InspectionDetails"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "Captive details"
 
 [node name="Divider" type="HSeparator" parent="Content/Margin/Layout/Body/DetailsColumn/DetailsPanel/Margin/InspectionDetails"]

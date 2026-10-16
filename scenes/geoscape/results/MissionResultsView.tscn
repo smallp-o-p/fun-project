@@ -39,7 +39,7 @@ grow_vertical = 2
 
 [node name="Title" type="Label" parent="Panel/Margin/Center/Layout"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 42
 text = "Mission Results"
 
 [node name="Divider" type="HSeparator" parent="Panel/Margin/Center/Layout"]
@@ -53,67 +53,67 @@ theme_override_constants/v_separation = 8
 
 [node name="MissionTypeHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "Mission Type"
 
 [node name="MissionType" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "Mission type"
 horizontal_alignment = 2
 autowrap_mode = 3
 
 [node name="TurnsTakenHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "Turns Taken"
 
 [node name="TurnsTaken" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "0"
 horizontal_alignment = 2
 
 [node name="SoldiersWoundedHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "Soldiers Wounded"
 
 [node name="SoldiersWounded" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "0"
 horizontal_alignment = 2
 
 [node name="SoldiersKilledHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "Soldiers Killed"
 
 [node name="SoldiersKilled" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "0"
 horizontal_alignment = 2
 
 [node name="EnemiesKilledHeading" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "Enemies Killed"
 
 [node name="EnemiesKilled" type="Label" parent="Panel/Margin/Center/Layout/Tally"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "0"
 horizontal_alignment = 2
 
