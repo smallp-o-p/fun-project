@@ -116,22 +116,12 @@ public class BombExpiryTest
   {
     var order = new System.Collections.Generic.List<string>();
     using var runtime = BattleFactory.Start(BombSetup(new Vector3I(1, 0, 1), MakeBomb(expireAfterTurns: 1))).RequireRight();
-    runtime.RegisterHook<TurnEndedBattleEvent>(new MarkerHook(() => order.Add("upkeep")), -100);
-    runtime.RegisterHook<TurnEndedBattleEvent>(new MarkerHook(() => order.Add("expiry")), 0);
+    runtime.RegisterHook<TurnEndedBattleEvent>(new CallbackHook(() => order.Add("upkeep")), -100);
+    runtime.RegisterHook<TurnEndedBattleEvent>(new CallbackHook(() => order.Add("expiry")), 0);
 
     runtime.ExecuteAction(BattleAction.EndFactionTurn(runtime.Query(new GetActiveSideQuery())));
 
     Assert.Equal("upkeep,expiry", string.Join(',', order));
-  }
-
-  private sealed class MarkerHook(System.Action onFire) : BattleHook
-  {
-    public override System.Collections.Generic.IReadOnlyList<BattleAction> OnEvent(
-      HookContext context, BattleEvent battleEvent)
-    {
-      onFire();
-      return [];
-    }
   }
 
   [TestCase]

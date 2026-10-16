@@ -166,7 +166,7 @@ public partial class AttackUnitTest
 
     // Both overwatch shots are built during the move event's dispatch, while the mover is
     // still alive; the first kill invalidates the second action's target proof.
-    battle.RegisterHook<UnitMovedBattleEvent>(new BuildInterruptsHook(context =>
+    battle.RegisterHook<UnitMovedBattleEvent>(new MoveInterruptsHook(context =>
     [
       BattleAction.AttackEntity(
         context.Session.TryGetAlive(shooter).RequireSome(),
@@ -274,9 +274,4 @@ public partial class AttackUnitTest
     return battle.Events.EventsOf<UnitAttackedBattleEvent>().AsValueEnumerable().Select(attackEvent => attackEvent.IsHit).ToList();
   }
 
-  private sealed class BuildInterruptsHook(Func<HookContext, IReadOnlyList<BattleAction>> build) : BattleHook<UnitMovedBattleEvent>
-  {
-    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitMovedBattleEvent evt)
-      => build(context);
-  }
 }

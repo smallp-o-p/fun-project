@@ -7,6 +7,24 @@ using System.Collections.Generic;
 
 namespace FunProject.Tests;
 
+// Observes the committed event without adding interrupts or supplying asserted state.
+internal sealed class CallbackHook(Action onEvent) : BattleHook
+{
+  public override IReadOnlyList<BattleAction> OnEvent(HookContext context, BattleEvent battleEvent)
+  {
+    onEvent();
+    return [];
+  }
+}
+
+// Build proof-carrying interrupts at firing time against the live session.
+internal sealed class MoveInterruptsHook(Func<HookContext, IReadOnlyList<BattleAction>> build)
+  : BattleHook<UnitMovedBattleEvent>
+{
+  protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitMovedBattleEvent evt)
+    => build(context);
+}
+
 // Collects every event it receives; register with executor/runtime RegisterHook<TEventKey>.
 internal sealed class RecordingHook : BattleHook
 {

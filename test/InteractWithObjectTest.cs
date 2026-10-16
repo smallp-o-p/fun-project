@@ -11,13 +11,6 @@ namespace FunProject.Tests;
 [RequireGodotRuntime]
 public class InteractWithObjectTest
 {
-  private static BattleSpecialObjectData MakeInteractiveObjectData(int actionPointCost = 2)
-  {
-    var data = new BattleSpecialObjectData { Name = "Bomb" };
-    data.Capabilities.Add(new InteractiveCapabilityData { ActionPointCost = actionPointCost });
-    return data;
-  }
-
   // Factory-ready fixture: unit A at (1,0,1), unit B at (3,0,3), one interactive bomb at (2,0,1).
   private static BattleFixture BombFixture(Faction player, Faction enemy, int playerActionPoints = 4)
     => new(new BattleSetup(
@@ -30,7 +23,7 @@ public class InteractWithObjectTest
           [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("B", enemy)), new Vector3I(3, 0, 3))]),
       ],
       Seed: 7) with
-    { Objects = [new ObjectPlacement(MakeInteractiveObjectData(), new Vector3I(2, 0, 1))] });
+    { Objects = [new ObjectPlacement(TestData.MakeObject("Bomb", capabilities: new InteractiveCapabilityData { ActionPointCost = 2 }), new Vector3I(2, 0, 1))] });
 
   private static BattleObjectState BombAt(BattleFixture battle, Vector3I cell) =>
     battle.Query(new GetBattleSpecialObjectsQuery()).AsValueEnumerable().Single(o => o.Position == cell);
@@ -70,7 +63,7 @@ public class InteractWithObjectTest
       enemy: new("Hostile"),
       configure: setup => setup with
       {
-        Objects = [new ObjectPlacement(MakeInteractiveObjectData(actionPointCost: 2), new Vector3I(5, 0, 1))],
+        Objects = [new ObjectPlacement(TestData.MakeObject("Bomb", capabilities: new InteractiveCapabilityData { ActionPointCost = 2 }), new Vector3I(5, 0, 1))],
       });
     BattleBoardState.ValidatedPoint point = battle.At(new Vector3I(5, 0, 1));
     BattleObjectState bomb = BombAt(battle, point.Raw);

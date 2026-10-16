@@ -35,8 +35,8 @@ public class ItemCapabilityTest
     Assert.True(capability.IsDepleted);
   }
 
-  [TestCase(TestName = "FindCapability returns Some for attached and None for absent")]
-  public static void FindCapabilityReturnsSomeForAttachedAndNoneForAbsent()
+  [TestCase(TestName = "Capability lookup and proofs preserve payload and identity, and reject absent kinds")]
+  public static void LookupAndProofPreserveCapabilityAndRejectAbsentKinds()
   {
     var item = new EquippableItem(new EquippableItemData
     {
@@ -46,17 +46,6 @@ public class ItemCapabilityTest
 
     Assert.Equal(6, item.FindCapability<ThrowableCapability>().RequireSome().ThrowRange);
     Assert.True(item.FindCapability<ChargesCapability>().IsNone);
-  }
-
-  [TestCase(TestName = "With returns a proof binding item and capability")]
-  public static void WithReturnsProofBindingItemAndCapability()
-  {
-    var item = new EquippableItem(new EquippableItemData
-    {
-      Name = "Beacon",
-      Capabilities = [new ThrowableCapabilityData()],
-    });
-
     ItemWith<ThrowableCapability> proof = item.With<ThrowableCapability>().RequireSome();
     Assert.True(ReferenceEquals(item, proof.Item));
     Assert.True(ReferenceEquals(item.FindCapability<ThrowableCapability>().RequireSome(), proof.Capability));

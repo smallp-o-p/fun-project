@@ -14,15 +14,6 @@ namespace FunProject.Tests;
 public partial class RankEffectsAggregationTest
 {
 
-  // Factory-ready fixture with one seed unit away from the reinforcement cells, so tests can
-  // spawn trained combatants through the ordinary reinforcement door.
-  private static BattleFixture SeededBattle(Faction faction)
-    => new(new BattleSetup(
-      TestData.MakeOpenBattleMap(new Vector3I(8, 1, 8)),
-      [new BattleSideSetup(faction, [new FakeObjectiveData()],
-        [new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Seed", faction)), new Vector3I(0, 0, 0))])],
-      Seed: 7));
-
   [TestCase(TestName = "Combatants without a bespoke rank table use the authored default ladder")]
   public static void UsesAuthoredDefaultRankTable()
   {
@@ -40,7 +31,8 @@ public partial class RankEffectsAggregationTest
   public static void RungStatModsAreCumulative()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = SeededBattle(faction);
+    using var battle = BattleFixture.Started(new Vector3I(8, 1, 8),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Seed", faction)), new Vector3I(0, 0, 0)));
     var table = TestData.MakeRankTable(
       new RankLevelData { Name = "Rookie", GainFactorPercent = 100 },
       new RankLevelData
@@ -75,7 +67,8 @@ public partial class RankEffectsAggregationTest
   public static void RungBuffsFoldIntoInnateBuffs()
   {
     var faction = TestData.MakeFaction("Player");
-    using var battle = SeededBattle(faction);
+    using var battle = BattleFixture.Started(new Vector3I(8, 1, 8),
+      new UnitPlacement(new UnitLoadout(TestData.MakeCombatant("Seed", faction)), new Vector3I(0, 0, 0)));
     var condition = new HealthBelowPercentCondition { Percent = 50f };
     var promoted = TestData.MakeBuff("Veteran", condition);
     var table = TestData.MakeRankTable(

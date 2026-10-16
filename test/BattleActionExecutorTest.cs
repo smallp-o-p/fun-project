@@ -83,7 +83,7 @@ public partial class BattleActionExecutorTest
       Seed: 7));
     var mover = battle.UnitAt(new Vector3I(0, 0, 0));
     var victim = battle.UnitAt(new Vector3I(2, 0, 0));
-    battle.RegisterHook<UnitMovedBattleEvent>(new InterruptActionsHook(
+    battle.RegisterHook<UnitMovedBattleEvent>(new MoveInterruptsHook(
       context =>
       [
         BattleAction.ApplyDamage(context.Session.TryGetAlive(victim).RequireSome(), 10),
@@ -105,7 +105,7 @@ public partial class BattleActionExecutorTest
     var usable = TestData.MakeUsableItem("Medkit", maxCharges: 2);
     unit.AddInventoryItem(usable.Item);
     battle.ClearEvents();
-    battle.RegisterHook<UnitMovedBattleEvent>(new InterruptActionsHook(
+    battle.RegisterHook<UnitMovedBattleEvent>(new MoveInterruptsHook(
       context =>
       [
         BattleAction.ApplyDamage(context.Session.TryGetAlive(unit).RequireSome(), 10),
@@ -541,14 +541,6 @@ public partial class BattleActionExecutorTest
       _spent = true;
       return [BattleAction.SpawnUnit(TestData.MakeCombatant("Blocker", _faction), context.Session.Board.At(_spawnPosition))];
     }
-  }
-
-  // Returns interrupts built at firing time by a delegate, so tests can construct
-  // proof-carrying actions against live session state mid-dispatch.
-  private sealed class InterruptActionsHook(Func<HookContext, IReadOnlyList<BattleAction>> build) : BattleHook<UnitMovedBattleEvent>
-  {
-    protected override IReadOnlyList<BattleAction> OnEvent(HookContext context, UnitMovedBattleEvent evt)
-      => build(context);
   }
 
   // Throws on its first firing only, so a recovery submission can succeed afterwards.
