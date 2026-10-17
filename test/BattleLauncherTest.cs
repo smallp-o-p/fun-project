@@ -110,6 +110,8 @@ public partial class BattleLauncherTest
     var launcher = AddToTree(new BattleLauncher { BattleType = TestData.MakeDuelBattleType() });
     var battle = (BattleScene)launcher.GetChild(0);
     await SelectFirstBattleUnit(battle); // shared collider and physics setup
+    battle.GetNode<Node3D>("UnitMeshes").Visible = false; // isolate the terrain-coordinate contract
+    await battle.ToSignal(battle.GetTree(), SceneTree.SignalName.PhysicsFrame);
     var camera = battle.GetNode<Camera3D>("GameCamera/CameraPath/PathFollow3D/Camera");
     Vector2 delivered = camera.UnprojectPosition(new Vector3(0.5f, 0, 0.5f));
     battle.GetViewport().WarpMouse(Vector2.Zero);

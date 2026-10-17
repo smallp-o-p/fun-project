@@ -91,7 +91,7 @@ Dimensions use the maximum coordinate plus one per axis. Runtime consumes the sa
 
 Author floor-picking collision in the palette source scene. Add a `StaticBody3D` with `CollisionShape3D` children under the finished prop mesh. Place shapes at walkable surfaces and leave holes clear.
 
-`Floors` uses collision layer 1. `Props` uses layer 2. Floor-picking rays target layer 1.
+`Floors` uses collision layer 1. `Props` uses layer 2. Floor-picking rays target layer 1. Battle pointer rays include layers 1–3: layer 2 props occlude layer 3 unit hitboxes. The palette source includes fitted Block and Car collision boxes so re-exporting meshes preserves pointer occlusion.
 
 `HasFloor` defines gameplay support. Collision comes from the authored shapes. Keeping those shapes in the palette source preserves them when entity re-export replaces its finished scene.
 

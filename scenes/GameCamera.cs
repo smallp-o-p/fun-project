@@ -90,28 +90,31 @@ public partial class GameCamera : AnimatableBody3D
     MoveCamera(moveDirection, verticalStep, cameraZoom, delta);
   }
 
-  public Option<Vector3> TryRaycastViewportPosition(Vector2 viewportPosition, float rayLength = DefaultRaycastLength)
+  public Godot.Collections.Dictionary RaycastViewportPosition(Vector2 viewportPosition,
+    float rayLength = DefaultRaycastLength, uint collisionMask = 1, bool collideWithAreas = false)
   {
     if (camera == null)
       throw new InvalidOperationException($"{nameof(GameCamera)} has not been initialized.");
 
     World3D world = GetWorld3D() ?? throw new InvalidOperationException($"{nameof(GameCamera)} must be inside a 3D world before raycasting.");
-    return TryRaycastViewportPosition(camera, world, viewportPosition, rayLength);
+    return RaycastViewportPosition(camera, world, viewportPosition, rayLength, collisionMask, collideWithAreas);
   }
 
-  public static Option<Vector3> TryRaycastViewportPosition(
+  public static Godot.Collections.Dictionary RaycastViewportPosition(
     Camera3D activeCamera,
     World3D world,
     Vector2 viewportPosition,
-    float rayLength = DefaultRaycastLength)
+    float rayLength = DefaultRaycastLength, uint collisionMask = 1, bool collideWithAreas = false)
   {
     ArgumentNullException.ThrowIfNull(world);
 
     PhysicsRayQueryParameters3D query = CreateViewportRayQuery(activeCamera, viewportPosition, rayLength);
+    query.CollisionMask = collisionMask;
+    query.CollideWithAreas = collideWithAreas;
     PhysicsDirectSpaceState3D spaceState =
       world.DirectSpaceState ?? throw new InvalidOperationException($"{nameof(World3D)} has no direct space state.");
 
-    return TryReadRaycastHitPosition(spaceState.IntersectRay(query));
+    return spaceState.IntersectRay(query);
   }
 
   public static PhysicsRayQueryParameters3D CreateViewportRayQuery(
@@ -131,17 +134,6 @@ public partial class GameCamera : AnimatableBody3D
     query.CollideWithBodies = true;
 
     return query;
-  }
-
-  private static Option<Vector3> TryReadRaycastHitPosition(Godot.Collections.Dictionary result)
-  {
-    ArgumentNullException.ThrowIfNull(result);
-    if (result.Count == 0)
-      return None;
-    if (!result.ContainsKey("position"))
-      return None;
-
-    return Some(result["position"].AsVector3());
   }
 
   private static Curve3D BuildCircleCurve(float radius)

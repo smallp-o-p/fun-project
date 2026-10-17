@@ -53,6 +53,6 @@ public partial class GameCameraTest
   {
     var camera = AutoFree(new Camera3D());
 
-    Assert.Throws<ArgumentNullException>(() => GameCamera.TryRaycastViewportPosition(camera, null, Vector2.Zero));
+    Assert.Throws<ArgumentNullException>(() => GameCamera.RaycastViewportPosition(camera, null, Vector2.Zero));
   }
 }

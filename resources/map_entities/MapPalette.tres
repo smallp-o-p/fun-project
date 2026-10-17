@@ -158,6 +158,17 @@ data = {
 [sub_resource type="ImageTexture" id="ImageTexture_6vm1d"]
 image = SubResource("Image_c4eox")
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_block"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_car_body"]
+size = Vector3(0.82, 0.5, 1.85)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_car_cabin"]
+size = Vector3(0.68, 0.4, 0.83)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_car_wheel"]
+size = Vector3(0.14, 0.36, 0.34)
 [resource]
 item/0/name = "FloorTile"
 item/0/mesh = SubResource("BoxMesh_o35b1")
@@ -171,7 +182,7 @@ item/1/name = "Block"
 item/1/mesh = SubResource("BoxMesh_ltvsp")
 item/1/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 item/1/mesh_cast_shadow = 1
-item/1/shapes = []
+item/1/shapes = [SubResource("BoxShape3D_block"), Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)]
 item/1/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 item/1/navigation_layers = 1
 item/1/preview = SubResource("ImageTexture_p5gbk")
@@ -179,7 +190,7 @@ item/2/name = "Car"
 item/2/mesh = SubResource("ArrayMesh_2dprt")
 item/2/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 item/2/mesh_cast_shadow = 1
-item/2/shapes = []
+item/2/shapes = [SubResource("BoxShape3D_car_body"), Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.07, 0.5), SubResource("BoxShape3D_car_cabin"), Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.31, 0.5), SubResource("BoxShape3D_car_wheel"), Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, -0.32, -0.07), SubResource("BoxShape3D_car_wheel"), Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, -0.32, -0.07), SubResource("BoxShape3D_car_wheel"), Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, -0.32, 1.07), SubResource("BoxShape3D_car_wheel"), Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, -0.32, 1.07)]
 item/2/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 item/2/navigation_layers = 1
 item/2/preview = SubResource("ImageTexture_6vm1d")

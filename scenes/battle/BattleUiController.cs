@@ -228,6 +228,12 @@ public sealed class BattleUiController : IDisposable
     return result;
   }
 
+  public void ClearHoverPreview()
+  {
+    if (Gate == InputGate.Open && _state == UiState.Targeting)
+      _lastPreview = None;
+  }
+
   // The single submission-caused transition point. Runs synchronously inside
   // runtime.ExecuteAction, after the submission's state mutations are committed.
   private void OnActionResult(BattleActionExecResult result)

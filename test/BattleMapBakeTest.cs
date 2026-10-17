@@ -28,9 +28,9 @@ public partial class BattleMapBakeTest
       var point = new Vector3(x + 0.5f, 0, 0.5f);
       camera.Position = point + Vector3.Up * 20;
       camera.LookAt(point, Vector3.Forward);
-      var hit = GameCamera.TryRaycastViewportPosition(camera, map.GetWorld3D(), camera.GetViewport().GetVisibleRect().GetCenter());
-      Assert.Equal(x != 1, hit.IsSome);
-      if (x != 1) Assert.True(hit.RequireSome().IsEqualApprox(point));
+      var hit = GameCamera.RaycastViewportPosition(camera, map.GetWorld3D(), camera.GetViewport().GetVisibleRect().GetCenter());
+      Assert.Equal(x != 1, hit.Count > 0);
+      if (x != 1) Assert.True(hit["position"].AsVector3().IsEqualApprox(point));
     }
   }
 
